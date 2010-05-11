@@ -1,0 +1,1560 @@
+% $Id: jss_np.Rnw,v 1.69 2008/07/22 19:01:59 jracine Exp jracine $
+
+%\VignetteIndexEntry{The np Package}
+%\VignetteDepends{np,boot,MASS}
+%\VignetteKeywords{nonparametric, kernel, econometrics, qualitative,
+%categorical}
+%\VignettePackage{np}
+
+\documentclass[nojss]{jss}
+
+%% need no \usepackage{Sweave.sty}
+
+\usepackage{amsmath}
+\usepackage[utf8x]{inputenc} 
+
+\newcommand{\field}[1]{\mathbb{#1}}
+\newcommand{\R}{\field{R}}
+
+\author{Tristen Hayfield\\ETH Z\"urich
+  \And Jeffrey S.~Racine\\McMaster University}
+
+\title{The \pkg{np} Package}
+
+\Plainauthor{Tristen Hayfield, Jeffrey S.~Racine}
+
+\Plaintitle{The np Package}
+
+%\Shorttitle{The np Package}
+
+\Abstract{ 
+  
+  We describe the \proglang{R} \pkg{np} package via a series of
+  applications that may be of interest to applied econometricians.
+  This vignette is based on \citet{v27i01:Hayfield+Racine:2008}.  The
+  \pkg{np} package implements a variety of nonparametric and
+  semiparametric kernel-based estimators that are popular among
+  econometricians. There are also procedures for nonparametric tests
+  of significance and consistent model specification tests for
+  parametric mean regression models and parametric quantile regression
+  models, among others. The \pkg{np} package focuses on kernel methods
+  appropriate for the mix of continuous, discrete, and categorical
+  data often found in applied settings. Data-driven methods of
+  bandwidth selection are emphasized throughout, though we caution the
+  user that data-driven bandwidth selection methods can be
+  computationally demanding.
+
+}
+
+\Keywords{nonparametric, semiparametric, kernel smoothing,
+  categorical data.}
+
+\Plainkeywords{Nonparametric, kernel, econometrics, qualitative,
+  categorical}
+
+%% \Volume{13}
+%% \Issue{9}
+%% \Month{September}
+%% \Year{2004}
+%% \Submitdate{2004-09-29}
+%% \Acceptdate{2004-09-29}
+
+\Address{Tristen Hayfield\\
+  ETH H\"onggerberg Campus\\
+  Physics Department\\
+  CH-8093 Z\"urich, Switzerland\\
+  E-mail: \email{hayfield@phys.ethz.ch}\\
+  URL: \url{http://www.exp-astro.phys.ethz.ch/hayfield/}\\
+  ~\\
+  Jeffrey S.~Racine\\
+  Department of Economics\\
+  McMaster University\\
+  Hamilton, Ontario, Canada, L8S 4L8\\
+  E-mail: \email{racinej@mcmaster.ca}\\
+  URL: \url{http://www.mcmaster.ca/economics/racine/}\\
+}
+
+\begin{document}
+
+%% Note that you should use the \pkg{}, \proglang{} and \code{} commands.
+
+%% Note - fragile using \label{} in \section{} - must be outside
+
+%% For graphics
+
+\setkeys{Gin}{width=\textwidth}
+
+%% Achim's request for R prompt set invisibly at the beginning of the
+%% paper
+
+<<eval=TRUE,echo=FALSE,keep.source=TRUE>>=
+options(prompt = "R> ", np.messages = FALSE, digits = 3)
+@ 
+
+%% Achim asks for making use of <<..., height= ..., width = ...>>= for
+%% better aspect ratios and better pen-to-paper ratios...
+
+%% <<fig=TRUE,eval=TRUE, height=, width=>>=
+
+\section{Introduction}
+
+Devotees of \proglang{R} \citep{R} are likely to be aware of a number
+of nonparametric kernel\footnote{A `kernel' is simply a weighting
+  function.} smoothing methods that exist in \proglang{R} base (e.g.,
+\code{density}) and in certain \proglang{R} packages (e.g.,
+\code{locpoly} in the \pkg{KernSmooth} package
+\citep{R-KernSmooth-package}). These routines deliver nonparametric
+smoothing methods to a wide audience, allowing \proglang{R} users to
+nonparametrically model a density or to conduct nonparametric local
+polynomial regression, by way of example.
+
+The appeal of nonparametric methods, for applied researchers at least,
+lies in their ability to reveal structure in data that might be missed
+by classical parametric methods. Nonparametric kernel smoothing
+methods are often, however, much more computationally demanding than
+their parametric counterparts.
+
+In applied settings we often encounter a combination of categorical
+and continuous datatypes.  Those familiar with traditional
+nonparametric kernel smoothing methods will appreciate that these
+methods presume that the underlying data is continuous in nature,
+which is frequently not the case.  One approach towards handling the
+presence of both continuous and categorical data is called a
+`frequency' approach, whereby data is broken up into subsets (`cells')
+corresponding to the values assumed by the categorical variables, and
+only then do you apply say \code{density} or \code{locpoly} to the
+continuous data remaining in each cell.  Nonparametric frequency
+approaches are widely acknowledged to be unsatisfactory as they often
+lead to substantial efficiency losses arising from the use of sample
+splitting, particularly when the number of cells is large.
+
+Recent theoretical developments offer practitioners a variety of
+kernel-based methods for categorical data only (i.e., unordered and
+ordered factors), or for a mix of continuous and categorical
+data. These methods have the potential to recapture the efficiency
+losses associated with nonparametric frequency approaches as they do
+not rely on sample splitting, rather, they smooth the categorical
+variables in an appropriate manner; see \citet{LI_RACINE:2007} and the
+references therein for an in-depth treatment of these methods, and see
+also the references listed in the bibliography.
+
+The \pkg{np} package implements recently developed kernel methods that
+seamlessly handle the mix of continuous, unordered, and ordered factor
+datatypes often found in applied settings. The package also allows the
+user to create their own routines using high-level function calls
+rather than writing their own \proglang{C} or \proglang{Fortran}
+code.\footnote{The high-level functions found in the package in turn
+  call compiled \proglang{C} code allowing the user to focus on the
+  application rather than the implementation details.}  The design
+philosophy underlying \pkg{np} aims to provide an intuitive, flexible,
+and extensible environment for applied kernel estimation. We
+appreciate that there exists tension among these goals, and have tried
+to balance these competing ends, with varying degrees of success.
+\pkg{np} is available from the Comprehensive \proglang{R} Archive
+Network at \url{http://CRAN.R-project.org/package=np}.
+
+Currently, a range of methods can be found in the \pkg{np} package
+including unconditional (\citeauthor{LI_RACINE:2003a}
+\citeyear{LI_RACINE:2003a}, \citeauthor{OUYANG_LI_RACINE:2006}
+\citeyear{OUYANG_LI_RACINE:2006}) and conditional
+(\citeauthor{HALL_RACINE_LI:2004} \citeyear{HALL_RACINE_LI:2004},
+\citeauthor{RACINE_LI_ZHU:2004} \citeyear{RACINE_LI_ZHU:2004}) density
+estimation and bandwidth selection, conditional mean and gradient
+estimation (local constant \citeauthor{RACINE_LI:2004}
+\citeyear{RACINE_LI:2004}, \citeauthor{HALL_LI_RACINE:2007}
+\citeyear{HALL_LI_RACINE:2007} and local polynomial
+\citeauthor{LI_RACINE:2004} \citeyear{LI_RACINE:2004}), conditional
+quantile and gradient estimation (\citeauthor{LI_RACINE:2008}
+\citeyear{LI_RACINE:2008}), model specification tests (regression
+\citeauthor{HSIAO_LI_RACINE:2007} \citeyear{HSIAO_LI_RACINE:2007},
+quantile), significance tests (\citeauthor{RACINE:1997}
+\citeyear{RACINE:1997}, \citeauthor{RACINE_HART_LI:2006}
+\citeyear{RACINE_HART_LI:2006}), semiparametric regression (partially
+linear \citeauthor{ROBINSON:1988} \citeyear{ROBINSON:1988},
+\citeauthor{RACINE_LIU:2007} \citeyear{RACINE_LIU:2007}, index models
+\citeauthor{KLEIN_SPADY:1993} \citeyear{KLEIN_SPADY:1993},
+\citeauthor{ICHIMURA:1993} \citeyear{ICHIMURA:1993}, average
+derivative estimation, varying/smooth coefficient models
+\citeauthor{LI_RACINE:2007b} \citeyear{LI_RACINE:2007b},
+\citeauthor{RACINE_OUYANG_LI:2007} \citeyear{RACINE_OUYANG_LI:2007}),
+among others. The various functions in the \pkg{np} package are
+described in Table~\ref{np function table}.
+
+
+\begin{table}[!ht]
+  \centering\raggedright
+  {\small
+    \begin{tabular}{p{.75in}|p{3in}|p{2in}}
+			
+			\hline
+			\textbf{Function} & \textbf{Description} & \textbf{Reference} \\ 
+			\hline
+			
+\code{npcdens} & Nonparametric Conditional Density Estimation & \citet{HALL_RACINE_LI:2004} \\
+\code{npcdensbw} &  Nonparametric Conditional Density Bandwidth Selection & \citet{HALL_RACINE_LI:2004}\\
+\code{npcdist} &  Nonparametric Conditional Distribution Estimation & \citet{LI_RACINE:2008}\\
+\code{npcmstest} &   Parametric Model Specification Test & \citet{HSIAO_LI_RACINE:2007}\\
+\code{npconmode} &  Nonparametric Modal Regression & \\
+\code{npdeneqtest} &  Nonparametric Test for Equality of Densities & \citet{LI_MAASOUMI_RACINE:2009} \\
+\code{npdeptest} &  Nonparametric Entropy Test for Pairwise Dependence & \citet{MAASOUMI_RACINE:2002} \\
+\code{npindex} & Semiparametric Single Index Model & \citet{ICHIMURA:1993}, \citet{KLEIN_SPADY:1993}\\
+\code{npindexbw} & Semiparametric Single Index Model Parameter and Bandwidth Selection& \citet{ICHIMURA:1993}, \citet{KLEIN_SPADY:1993}\\
+\code{npksum} &  Nonparametric Kernel Sums & \\
+\code{npplot} & General Purpose Plotting of Nonparametric Objects& \\
+\code{npplreg} & Semiparametric Partially Linear  Regression &
+\citet{ROBINSON:1988}, \citet{RACINE_LIU:2007} \\
+\code{npplregbw} & Semiparametric Partially Linear  Regression Bandwidth Selection & \citet{ROBINSON:1988}, \citet{RACINE_LIU:2007} \\
+\code{npqcmstest} &  Parametric Quantile Regression Model Specification Test
+& \citet{ZHENG:1998}, \citet{RACINE:2006}\\
+\code{npqreg} & Nonparametric Quantile Regression & \citet{LI_RACINE:2008} \\
+\code{npreg} &  Nonparametric Regression & \citet{RACINE_LI:2004}, \citet{LI_RACINE:2004}\\
+\code{npregbw} &  Nonparametric Regression Bandwidth Selection & \citet{HURVICH_SIMONOFF_TSAI:1998}, \citet{RACINE_LI:2004}, \citet{LI_RACINE:2004} \\
+\code{npscoef} & Semiparametric Smooth Coefficient  Regression& \citet{LI_RACINE:2007b}\\
+\code{npscoefbw} & Semiparametric Smooth Coefficient  Regression Bandwidth Selection& \citet{LI_RACINE:2007b}\\
+\code{npsdeptest} & Nonparametric Entropy Test for Serial Nonlinear Dependence& \citet{GRANGER_MAASOUMI_RACINE:2004}\\
+\code{npsigtest} &  Nonparametric Regression Significance Test & \citet{RACINE:1997}, \citet{RACINE_HART_LI:2006}\\
+\code{npsymtest} & Nonparametric Entropy Test for Asymmetry& \citet{MAASOUMI_RACINE:2009}\\
+\code{npudens} &  Nonparametric Density Estimation & \citet{PARZEN:1962}, \citet{ROSENBLATT:1956}, \citet{LI_RACINE:2003a}\\
+\code{npudensbw} &  Nonparametric Density Bandwidth Selection & \citet{PARZEN:1962}, \citet{ROSENBLATT:1956}, \citet{LI_RACINE:2003a}\\
+\code{npudist} &  Nonparametric Distribution Estimation & \citet{PARZEN:1962}, \citet{ROSENBLATT:1956}, \citet{LI_RACINE:2003a}\\
+\code{npunitest} &  Nonparametric Entropy Test for Univariate Density Equality & \citet{MAASOUMI_RACINE:2002} \\
+-- Utilities --&&\\
+\code{gradients} & Extract Gradients& \\
+\code{se} &	Extract Standard Errors&\\
+\code{uocquantile} & Compute Quantiles/Modes for Unordered, Ordered, and Numeric Data& \\
+    \end{tabular}
+    \label{np function table}
+  }
+  \caption{\textbf{\pkg{np} functions.}}
+\end{table}
+	
+In this article, we illustrate the use of the \pkg{np} package via a
+number of empirical applications. Each application is chosen to
+highlight a specific econometric method in an applied setting. We
+begin first with a discussion of some of the features and
+implementation details of the \pkg{np} package in
+Section~\ref{implementation section}. We then proceed to illustrate
+the functionality of the package via a series of applications,
+sometimes beginning with a classical parametric method that will
+likely be familiar to the reader, and then performing the same
+analysis in a semi- or nonparametric framework. It is hoped that such
+comparison helps the reader quickly gauge whether or not there is any
+value added by moving towards a nonparametric framework for the
+application they have at hand. We commence with the workhorse of
+applied data analysis (regression) in Section~\ref{regression
+  section}, beginning with a simple univariate regression example and
+then moving on to a multivariate example. We then proceed to
+nonparametric methods for binary and multinomial outcome models in
+Section~\ref{count section}. Section~\ref{pdf and cdf section}
+considers nonparametric methods for unconditional probability density
+function (PDF) and cumulative distribution function (CDF) estimation,
+while Section~\ref{cpdf and ccdf section} considers conditional PDF
+and CDF estimation, and nonparametric estimators of quantile models
+are considered in Section~\ref{quantile section}. A range of
+semiparametric models are then considered, including partially linear
+models in Section~\ref{partially linear section}, single-index models
+in Section~\ref{single index section}, and finally varying coefficient
+models are considered in Section~\ref{varying coefficient section}.
+
+\section{Important implementation details}\label{implementation section}
+
+In this section we describe some implementation details that may help
+users navigate the methods that reside in the \pkg{np} package. We
+shall presume that the user is familiar with the traditional kernel
+estimation of, say, density functions (e.g.,
+\citet{ROSENBLATT:1956}, \citet{PARZEN:1962}) and regression
+functions (e.g., \citet{NADARAYA:1965}, \citet{WATSON:1964})
+when the underlying data is continuous in nature. However, we do not
+presume familiarity with mixed-data kernel methods hence briefly
+describe modifications to the kernel function that are necessary to
+handle the mix of categorical and continuous data often encountered in
+applied settings. These methods, of course, collapse to the familiar
+estimators when all variables are continuous.
+
+\subsection{The primacy of the bandwidth}
+
+Bandwidth selection is a key aspect of sound nonparametric and
+semiparametric kernel estimation. It is the direct counterpart of
+model selection for parametric approaches, and should therefore not be
+taken lightly. \pkg{np} is designed from the ground up to make
+bandwidth selection the focus of attention. To this end, one typically
+begins by creating a `bandwidth object' which embodies all aspects of
+the method, including specific kernel functions, data names,
+datatypes, and the like. One then passes these bandwidth objects to
+other functions, and those functions can grab the specifics from the
+bandwidth object thereby removing potential inconsistencies and
+unnecessary repetition. For convenience these steps can be combined
+should the user so choose, i.e., if the first step (bandwidth
+selection) is not performed explicitly then the second step will
+automatically call the omitted first step bandwidth selection using
+defaults unless otherwise specified, and the bandwidth object could
+then be retrieved retroactively if so desired. Note that the combined
+approach would not be a wise choice for certain applications such as
+when bootstrapping (as it would involve unnecessary computation since
+the bandwidths would properly be those for the original sample and not
+the bootstrap resamples) or when conducting quantile regression (as it
+would involve unnecessary computation when different quantiles are
+computed from the same conditional cumulative distribution estimate).
+
+Work flow therefore typically proceeds as follows:
+
+\begin{enumerate}
+
+\item compute data-driven bandwidths;
+
+\item using the bandwidth object, proceed to estimate a model and
+  extract fitted or predicted values, standard errors, etc.;
+
+\item optionally, plot the object.
+
+\end{enumerate}
+
+In order to streamline the creation of a set of complicated graphics
+objects, \code{plot} (which calls \code{npplot}) is dynamic; i.e., you
+can specify, say, bootstrapped error bounds and the appropriate
+routines will be called in real time. Be aware, however, that
+bootstrap methods can be computationally demanding hence some plots
+may not appear immediately in the graphics window.
+
+\subsection{Data-driven bandwidth selection methods}
+
+We caution the reader that data-driven bandwidth selection methods can
+be computationally demanding.  We ought to also point out that
+data-driven (i.e., automatic) bandwidth selection procedures are not
+guaranteed always to produce good results due to perhaps the presence
+of outliers or the rounding/discretization of continuous data, among
+others. For this reason, we advise the reader to interrogate their
+bandwidth objects with the \code{summary} command which produces a
+table of bandwidths for the continuous variables along with a constant
+multiple of $\sigma_x n^\alpha$, where $\sigma_x$ is a variable's
+standard deviation, $n$ the number of observations, and $\alpha$ a
+known constant that depends on the method, kernel order, and number of
+continuous variables involved, e.g., $\alpha=-1/5$ for univariate
+density estimation with one continuous variable and a second order
+kernel. Seasoned practitioners can immediately assess whether
+undersmoothing or oversmoothing may be present by examining these
+constants, as the appropriate constant (called the `scaling factor')
+that is multiplied by $\sigma_x n^\alpha$ often ranges from between
+0.5 to 1.5 for some though not all methods, and it is this constant
+that is computed and reported by \code{summary}. Also, the admissible
+range for the bandwidths for the categorical variables is provided
+when \code{summary} is used, which some readers may also find helpful.
+
+We caution users to use multistarting for any serious application
+(multistarting refers to restarting numerical search methods from
+different initial values to avoid the presence of local minima - the
+default is the minimum of the number of variables or 5 and can be
+changed via the argument \code{nmulti =}), and do not recommend
+overriding default search tolerances (unless increasing \code{nmulti =}
+beyond its default value).
+
+We direct the interested reader to the frequently asked questions
+document on the author's website
+(\url{http://socserv.mcmaster.ca/racine/np_faq.pdf}) for a range of
+potentially helpful tips and suggestions surrounding bandwidth
+selection and the \pkg{np} package.
+
+\subsection[Interacting with np functions]{Interacting with \pkg{np} functions}
+
+A few words about the \proglang{R} \code{data.frame} construct are in
+order. Data frames are fundamental objects in \proglang{R}, defined as
+``tightly coupled collections of variables which share many of the
+properties of matrices and of lists, used as the fundamental data
+structure by most of R's modeling software.'' A data frame is ``a
+matrix-like structure whose columns may be of differing types
+(numeric, logical, factor and character and so on).'' Seasoned
+\proglang{R} users would, prior to estimation or inference, transform
+a given data frame into one with appropriately classed elements (the
+\pkg{np} package contains a number of datasets whose variables have
+already been classed appropriately). It will be seen that appropriate
+classing of variables is crucial in order for functions in the
+\pkg{np} package to {\em automatically} use appropriate weighting
+functions which differ according to a variable's class. If your data
+frame contains variables that have not been classed appropriately, you
+can do this `on the fly' by re-classing the variable upon invocation
+of an \pkg{np} function, however, it is preferable to begin with a
+data frame having appropriately classed elements.
+
+There are two ways in which you can interact with functions in
+\pkg{np}, namely using data frames or using a formula interface, where
+appropriate.  Every function in \pkg{np} supports both interfaces,
+where appropriate.
+
+To some, it may be natural to use the data frame interface.  If you
+find this most natural for your project, you first create a data frame
+casting data according to their type (i.e., one of continuous
+(default), \code{factor}, \code{ordered}), as in
+\begin{verbatim} 
+R> data.object <- data.frame(x1 = factor(x1), x2, x3 = ordered(x3)) 
+\end{verbatim} 
+where $x_1$ is, say, a binary \code{factor}, $x_2$ continuous, and
+$x_3$ an \code{ordered} \code{factor}. Then you could pass this data
+frame to the appropriate \pkg{np} function, say
+\begin{verbatim} 
+R> bw <- npudensbw(dat = data.object)
+\end{verbatim}
+
+To others, however, it may be natural to use the formula interface
+that is used for the regression example outlined below. For
+nonparametric regression functions such as \code{npregbw}, you would
+proceed as you might using \code{lm}, e.g.,
+\begin{verbatim}
+R> bw <- npregbw(y ~ x1 + x2)
+\end{verbatim}
+except that you would of course not need to specify, e.g., polynomials
+in variables, interaction terms, or create a number of dummy variables
+for a factor. Of course, if the variables in your data frame have not
+been classed appropriately, then you would need to explicitly cast,
+say, \code{x1} via \code{npregbw(y ~ factor(x1) + x2)} above.
+
+A few words on the formula interface are in order.  We use the
+standard formula interface as it provides capabilities for handling
+missing observations and so forth.  This interface, however, is simply
+a convenient device for telling a routine which variable is, say, the
+outcome and which are, say, the covariates.  That is, just because one
+writes $x_1+x_2$ in no way means or is meant to imply that the model
+will be linear and additive (why use fully nonparametric methods to
+estimate such models in the first place?). It simply means that there
+are, say, two covariates in the model, the first being $x_1$ and the
+second $x_2$, we are passing them to a routine with the formula
+interface, and nothing more is presumed nor implied. This will likely
+be obvious to most \proglang{R} users, but we point it out simply to
+avoid any potential confusion for those unfamiliar with kernel
+smoothing methods.
+
+\subsection{Writing your own functions}
+
+We have tried to make \pkg{np} flexible enough to be of use to a wide
+range of users.  All options can be tweaked by the user (kernel
+function, kernel order, bandwidth type, estimator type and so forth).
+One function, \code{npksum}, allows you to create your own estimators,
+tests, etc.  The function \code{npksum} is simply a call to
+specialized \proglang{C} code, so you get the benefits of compiled
+code along with the power and flexibility of the \proglang{R}
+language. We hope that incorporating the \code{npksum} function
+renders the package suitable for teaching and research alike.
+
+\subsection{Generalized product kernels}\label{generalized kernel
+  section}
+
+As noted above, traditional nonparametric kernel methods presume that
+the underlying data is continuous in nature, which is frequently not
+the case.  The basic idea underlying the treatment of kernel methods
+in the presence of a mix of categorical and continuous data lies in
+the use of what we call `generalized product kernels', which we
+briefly summarize.
+
+Suppose that you are interested in kernel estimation for `unordered'
+categorical data, i.e., you are presented with discrete data $X^d\in
+{\mathcal S}^d$, where ${\mathcal S}^d$ denotes the support of $X^d$.
+We use $x_s^d$ and $X_{is}^d$ to denote the $s$th component of $x^d$
+and $X_i^d$ ($i=1,\dots,n$), respectively.  Following
+\citet{AITCHISON_AITKEN:1976}, for $x_s^d$, $X^d_{is}\in \{0,1,\dots,
+c_s-1\}$, we define a discrete univariate kernel function
+\begin{equation}
+  \label{mixed_smooth:eq:l(.)}
+  l^u(X^d_{is},x^d_s,\lambda_s) = \left\{ \begin{array}{ll}
+      1 - \lambda_s &\text{ if } X^d_{is} = x^d_s \\
+      \lambda_s/(c_s-1) &\text{ if } X^d_{is} \neq x^d_s.
+    \end{array}
+  \right.
+\end{equation}
+
+Note that when $\lambda_s = 0$, $l(X^d_{is},x^d_s,0)={\bf
+  1}(X_{is}^d=x^d_s)$ becomes an indicator function, and if $\lambda_s
+= (c_s - 1)/c_s$, then $l\left(X^d_{is},x^d_s,
+  \frac{c_s-1}{c_s}\right) = 1/c_s$ is a constant for {\it all} values
+of $X_{is}^d$ and $x^d_s$.  The range of $\lambda_s$ is $[0,
+(c_s-1)/c_s]$. Observe that these weights sum to 1.
+
+If, instead, some of the discrete variables are ordered (i.e., are
+`ordinal categorical variables'), then we should use a kernel function
+which is capable of reflecting their ordered status. Assuming that
+$x^d_s$ can take on $c_s$ different ordered values, $\{0,1,\dots
+,c_s-1\}$, \citet[p.~29]{AITCHISON_AITKEN:1976} suggested using the
+kernel function given by
+\begin{equation}
+l^o(x^d_{s},v^d_{s},\lambda_s) =
+\begin{pmatrix}c_s\cr j\end{pmatrix}
+\lambda_s^{j}(1-\lambda_s)^{c_s-j}\text{ when }|x^d_{s}-v^d_s|=j\qquad (0\leq
+s\leq c_s),
+\end{equation}
+ where
+\begin{equation}
+\begin{pmatrix}
+c_s\cr j
+\end{pmatrix}
+=\frac{c_s!}{j!(c_s-j)!}.
+\end{equation}
+Observe that these weights sum to 1.
+
+If instead a variable was continuous, you could use, say, the second
+order Gaussian kernel, namely
+\begin{equation}
+w(x^c,X^c_i,h)=\frac{1}{\sqrt{2\pi}}\exp\left\{-\frac{1}{2}\left(\frac{X^c_i-x^c}{h}\right)^2\right\}.
+\end{equation}
+Observe that these weights integrate to 1.
+
+The `generalized product kernel function' for a vector of, say, one
+unordered, one ordered, and one continuous variable is simply the
+product of $l^u(\cdot)$, $l^o(\cdot)$, and $w(\cdot)$, and
+multivariate versions with differing numbers of each datatype are
+created in the same fashion. We naturally allow the bandwidths to
+differ for each variable. For what follows, for a vector of mixed
+variables, we define $K_{\gamma}(x,X_i)$ to be this product, where
+$\gamma$ is the vector of bandwidths (e.g., the $h$s and $\lambda$s)
+and $x$ the vector of mixed datatypes.  For further details see
+\citet{LI_RACINE:2003a} who proposed the use of these generalized
+product kernels for unconditional density estimation and developed the
+underlying theory for a data-driven method of bandwidth selection for
+this class of estimators.  The use of such kernels offers a seamless
+framework for kernel methods with mixed data. For further details on a
+range of kernel methods that employ this approach, we direct the
+interested reader to \citet[Chapter~4]{LI_RACINE:2007}.
+
+If the user wishes to apply kernel functions other than those provided
+by the default settings, the kernel function can be changed by passing
+the appropriate arguments to \code{ukertype}, \code{okertype}, and
+\code{ckertype} (the first letter of each representing unordered,
+ordered, and continuous, respectively), while the `order' for the
+continuous kernel (i.e., the first non-zero moment) can be changed by
+passing the appropriate (even) integer to \code{ckerorder}. We support
+a variety of unordered, ordered, and continuous kernels along with a
+variety of high-order kernels, the default being \code{ckerorder =
+  2}. Using these arguments, the user could select an eighth order
+Epanechnikov kernel, a fourth order Gaussian kernel, or even a uniform
+kernel for the continuous variables in their application. See
+\code{?np} for further details.
+
+\section{Nonparametric regression}\label{regression section}
+
+We shall start with the workhorse of applied data analysis, namely,
+regression models. In order to introduce nonparametric regression, we
+shall first consider the simplest possible regression model, one that
+involves one continuous dependent variable, $y$, and one continuous
+explanatory variable, $x$.  We shall begin with a popular parametric
+model of a wage equation, and then move on to a fully nonparametric
+regression model. Having compared and contrasted the parametric and
+nonparametric approach towards univariate regression, we then proceed
+to multivariate regression.
+
+\subsection{Univariate regression}
+
+We begin with a classic dataset taken from
+\citet[p.~155]{PAGAN_ULLAH:1999} who consider Canadian cross-section
+wage data consisting of a random sample taken from the 1971 Canadian
+Census Public Use Tapes for male individuals having common education
+(Grade 13). There are $n=205$ observations in total, and 2 variables,
+the logarithm of the individual's wage (\code{logwage}) and their age
+(\code{age}).  The traditional wage equation is typically modelled as
+a quadratic in \code{age}.
+
+First, we begin with a simple parametric model for this relationship.
+
+<<eval=TRUE,keep.source=TRUE>>=
+library("np")
+data("cps71")
+model.par <- lm(logwage ~ age + I(age^2), data = cps71)
+summary(model.par)
+@ 
+
+If we first consider the model's goodness of fit, the model has an
+unadjusted $R^2$ of 23.1\%.  Next, we consider the local linear
+nonparametric method proposed by \citet{LI_RACINE:2004} employing
+cross-validated bandwidth selection using the method of
+\citet{HURVICH_SIMONOFF_TSAI:1998}. Note that in this example we
+conduct bandwidth selection and estimation in one step.
+
+
+<<eval=TRUE,keep.source=TRUE>>=
+model.np <- npreg(logwage ~ age, 
+                  regtype = "ll", 
+                  bwmethod = "cv.aic",
+                  gradients = TRUE,
+                  data = cps71)
+summary(model.np)
+@ 
+
+Using the measure of goodness of fit introduced in the next section,
+we see that this method produces a better in-sample model, at least as
+measured by the $R^2$ criterion, having an $R^2$ of
+32.5\%.\footnote{See Section~\ref{r-squared section} for details on
+  computation of the nonparametric $R^2$ measure.}
+
+So far we have summarized the model's goodness-of-fit. However,
+econometricians also routinely report the results from tests of
+significance. There exist nonparametric counterparts to these tests
+that were proposed by \citet{RACINE:1997}, and extended to admit
+categorical variables by \citet{RACINE_HART_LI:2006}, which we conduct
+below.
+
+<<eval=TRUE,keep.source=TRUE>>=
+npsigtest(model.np)
+@ 
+
+Having conducted this test we observe that, as was the case for the
+linear parametric model, the explanatory variable \code{age} is
+significant at all conventional levels in the local linear
+nonparametric model.
+
+\subsubsection{Assessing goodness of fit for nonparametric
+  models}\label{r-squared section}
+
+The reader may have wondered what the difference is between the $R^2$
+measures reported by the linear and nonparametric models summarized
+above, or perhaps how the $R^2$ was generated for the nonparametric
+model.  It is desirable to use a unit-free measure of goodness-of-fit
+for nonparametric regression models which is comparable to that used
+for parametric regression models, namely $R^2$. Note that this will be
+a {\em within-sample} measure of goodness-of-fit. Given the known
+drawbacks of computing $R^2$ based on the decomposition of the sum of
+squares (such as possible negative values), there is an alternative
+definition and method for computing $R^2$ which can be used that is
+directly applicable to any model, linear or nonlinear.  Letting $y_i$
+denote the outcome and $\hat y_i$ the fitted value for observation
+$i$, we may define $R^2$ as follows:
+\begin{equation*}
+R^2=\frac{\left[\sum_{i=1}^n(y_i-\bar y)(\hat y_i-\bar y)\right]^2}
+{\sum_{i=1}^n(y_i-\bar y)^2\sum_{i=1}^n(\hat y_i-\bar y)^2}
+\end{equation*}
+and this measure will {\em always} lie in the range $[0,1]$ with the
+value 1 denoting a perfect fit to the sample data and 0 denoting no
+predictive power above that given by the unconditional mean of the
+outcome. It can be demonstrated that this method of computing $R^2$ is
+identical to the standard measure computed as $\sum_{i=1}^n(\hat
+y_i-\bar y)^2/\sum_{i=1}^n(y_i-\bar y)^2$ {\em when the model is
+  linear, fitted with least squares, and includes an intercept
+  term}. This useful measure will permit direct comparison of
+within-sample goodness-of-fit subject to the obvious qualification
+that this is by no means a model selection criterion, rather, simply a
+summary measure that some may wish to report. This measure can, of
+course, also be computed using out-of-sample predictions and
+out-of-sample realizations.  Were we to consider models estimated on a
+randomly selected subset of data and evaluated on an independent
+sample of hold-out data, this measure computed for the hold-out
+observations might serve to guide model selection, particularly when
+averaged over a number of independent hold-out datasets.
+
+\subsubsection{Graphical comparison of parametric and nonparametric
+  models}
+
+Often, a suitable graphical comparison of models allows the user to
+immediately appreciate features present in both the data and the
+estimated models.\footnote{By suitable, we mean those that display
+  both point estimates and variability estimates.}  The upper left
+plot in Figure~\ref{age profile} presents the fitted parametric and
+nonparametric regression models along with the data for the
+\code{cps71} example. The following code can be used to construct the
+plots appearing in Figure~\ref{age profile}.
+
+<<eval=FALSE, keep.source=TRUE>>=
+plot(cps71$age, cps71$logwage, xlab = "age", ylab = "log(wage)", cex=.1)
+lines(cps71$age, fitted(model.np), lty = 1, col = "blue")
+lines(cps71$age, fitted(model.par), lty = 2, col = " red")
+plot(model.np, plot.errors.method = "asymptotic")
+
+plot(model.np, gradients = TRUE)
+lines(cps71$age, coef(model.par)[2]+2*cps71$age*coef(model.par)[3],
+      lty = 2,
+      col = "red")
+plot(model.np, gradients = TRUE, plot.errors.method = "asymptotic")
+@ 
+
+\begin{figure}[!ht]
+\begin{center}
+<<fig=TRUE,  multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE>>=
+options(SweaveHooks = list(multifig = function() par(mfrow=c(2,2),mar=c(4,4,3,2))))
+
+# Plot 1
+
+plot(cps71$age,cps71$logwage,xlab="age",ylab="log(wage)",cex=.1)
+lines(cps71$age,fitted(model.np),lty=1,col="blue")
+lines(cps71$age,fitted(model.par),lty=2,col="red")
+
+# Plot 2
+
+plot(cps71$age,gradients(model.np),xlab="age",ylab="gradient",type="l",lty=1,col="blue")
+lines(cps71$age,coef(model.par)[2]+2*cps71$age*coef(model.par)[3],lty=2,col="red")
+
+# Plot 3
+
+plot(cps71$age,fitted(model.np),xlab="age",ylab="log(wage)",ylim=c(min(fitted(model.np)-2*model.np$merr),max(fitted(model.np)+2*model.np$merr)),type="l")
+lines(cps71$age,fitted(model.np)+2*model.np$merr,lty=2,col="red")
+lines(cps71$age,fitted(model.np)-2*model.np$merr,lty=2,col="red")
+
+# Plot 4
+
+plot(cps71$age,gradients(model.np),xlab="age",ylab="gradient",ylim=c(min(gradients(model.np)-2*model.np$gerr),max(gradients(model.np)+2*model.np$gerr)),type="l",lty=1,col="blue")
+lines(cps71$age,gradients(model.np)+2*model.np$gerr,lty=2,col="red")
+lines(cps71$age,gradients(model.np)-2*model.np$gerr,lty=2,col="red")
+
+@ 
+\caption{\label{age profile}The figure on the upper left presents the
+  parametric (quadratic, dashed line) and the nonparametric estimates
+  (solid line) of the regression function for the \code{cps71} data. The
+  figure on the upper right presents the parametric (dashed line) and
+  nonparametric estimates (solid line) of the gradient. The figures on
+  the lower left and lower right present the nonparametric estimates
+  of the regression function and gradient along with their variability
+  bounds, respectively.}
+\end{center}
+\end{figure}
+
+The upper right plot in Figure~\ref{age profile} compares the
+gradients for the parametric and nonparametric models. Note that the
+gradient for the parametric model will be given by $\partial
+\text{logwage}_i/\partial\text{age}_i=\partial\hat\beta_2+2\hat\beta_3\text{age}_i$,
+$i=1,\dots,n$, as the model is quadratic in age.
+
+Of course, it might be preferable to also plot error bars for the
+estimates, either asymptotic or resampled. We have automated this in
+the function \code{npplot} which is automatically called by
+\code{plot}. The lower left and lower right plots in Figure~\ref{age
+  profile} present pointwise error bars using asymptotic standard
+error formulas for the regression function and gradient, respectively.
+
+Often, however, distribution free (bootstrapped) error bounds may be
+desired, and we allow the user to readily do so as we have written
+\pkg{np} to leverage the \pkg{boot} package
+(\citeauthor{R-boot-package} \citeyear{R-boot-package}). By default
+(`\code{iid}'), bootstrap resampling is conducted pairwise on
+$(y,X,Z)$ (i.e., by resampling from rows of the $(y,X)$ data or
+$(y,X,Z)$ data where appropriate). Specifying the type of
+bootstrapping as `\code{inid}' admits general heteroskedasticity of
+unknown form via the wild bootstrap \citep{LIU:1988}, though it does
+not allow for dependence. `\code{fixed}' conducts the block bootstrap
+\citep{KUNSCH:1989} for dependent data, while `\code{geom}' conducts
+the stationary bootstrap \citep{POLITIS_ROMANO:1994}.
+
+\subsubsection{Generating predictions from nonparametric models}
+
+Once you have obtained appropriate bandwidths and estimated a
+nonparametric model, generating predictions is straightforward
+involving nothing more than creating a set of explanatory variables
+for which you wish to generate predictions. These can lie inside the
+support of the original data or outside should the user so choose. We
+have written our routines to support the \code{predict} function in R,
+so by using the \code{newdata =} option one can readily generate
+predictions. It is important to note that typically you do not have
+the outcome for the evaluation data, hence you need only provide the
+explanatory variables.  However, if by chance you do have the outcome
+and you provide it, the routine will compute the out-of-sample summary
+measures of predictive ability. This would be useful when one splits a
+dataset into two independent samples, estimates a model on one sample,
+and wishes to assess its performance on the independent hold-out data.
+
+By way of example we consider the \code{cps71} data, generate a set of
+values for \code{age}, two of which lie outside of the support of the
+data (10 and 70 years of age), and generate the parametric and
+nonparametric predictions using the generic \code{predict} function.
+
+<<eval=TRUE,keep.source=TRUE>>=
+cps.eval <- data.frame(age = seq(10,70, by=10))
+predict(model.par, newdata = cps.eval)
+predict(model.np, newdata = cps.eval)
+@ 
+
+Note that if you provide \code{predict} with the argument
+\code{se.fit = TRUE}, it will also return pointwise asymptotic standard
+errors where appropriate.
+
+\subsection{Multivariate regression with qualitative and quantitative
+  data}\label{wage1 section}
+
+Based on the presumption that some readers will be unfamiliar with the
+kernel smoothing of qualitative data, we next consider a multivariate
+regression example that highlights the potential benefits arising from
+the use of kernel smoothing methods that smooth both the qualitative
+and quantitative variables in a particular manner. For what follows,
+we consider an application taken from \citet[p.~226]{WOOLDRIDGE:2003}
+that involves multiple regression analysis with qualitative
+information.
+
+We consider modeling an hourly wage equation for which the dependent
+variable is $\log$(\code{wage}) (\code{lwage}) while the explanatory
+variables include three continuous variables, namely \code{educ}
+(years of education), \code{exper} (the number of years of potential
+experience), and \code{tenure} (the number of years with their current
+employer) along with two qualitative variables, \code{female}
+(`\code{Female}'/`\code{Male}') and \code{married}
+(`\code{Married}'/`\code{Notmarried}').  For this example there are
+$n=526$ observations.
+
+The classical parametric approach towards estimating such
+relationships requires that one first specify the functional form of
+the underlying relationship.  We start by first modelling this
+relationship using a simple parametric linear model. By way of
+example, \citet[p.~222]{WOOLDRIDGE:2003} presents the following
+model:\footnote{We would like to thank Jeffrey Wooldridge for allowing
+  us to incorporate his data in the \pkg{np} package. Also, we would
+  like to point out that Wooldridge starts out with this na\"ive
+  linear model, but quickly moves on to a more realistic model
+  involving nonlinearities in the continuous variables and so
+  forth. The purpose of this example is simply to demonstrate how
+  nonparametric models can outperform misspecified parametric models
+  in multivariate finite-sample settings.}
+<<eval=TRUE,keep.source=TRUE>>=
+data("wage1")
+model.ols <- lm(lwage ~ female +
+                married +
+                educ +
+                exper +
+                tenure,
+                data = wage1)
+summary(model.ols)
+@
+
+This model is, however, restrictive in a number of ways. First, the
+analyst must specify the functional form (in this case linear) for the
+continuous variables (\code{educ}, \code{exper}, and \code{tenure}).
+Second, the analyst must specify how the qualitative variables
+(\code{female} and \code{married}) enter the model (in this case they
+affect the model's intercepts only). Third, the analyst must specify
+the nature of any interactions among all variables, quantitative and
+qualitative (in this case, there are none).  Should any of these
+presumptions be incorrect, then the estimated model will be biased and
+inconsistent potentially leading to faulty inference.
+
+One might next test the null hypothesis that this parametric linear
+model is correctly specified using the consistent model specification
+test described in \citet{HSIAO_LI_RACINE:2007} that admits both
+categorical and continuous data (we have overridden the default search
+tolerances for this example as the objective function is well-behaved
+via \code{tol = 0.1} and \code{ftol = 0.1}, which should {\em not} be done
+in general - this example will likely take a few minutes on a desktop
+computer as it uses bootstrapping and cross-validated bandwidth
+selection):
+<<eval=TRUE,keep.source=TRUE>>=
+model.ols <- lm(lwage ~ female +
+                married +
+                educ +
+                exper +
+                tenure,
+                x = TRUE,
+                y = TRUE,
+                data = wage1)
+X <- data.frame(wage1$female,
+                wage1$married,
+                wage1$educ,
+                wage1$exper,
+                wage1$tenure)
+output <- npcmstest(model = model.ols, 
+                    xdat = X, 
+                    ydat = wage1$lwage, 
+                    tol = 0.1, 
+                    ftol = 0.1)
+summary(output)
+@
+
+Note that it might appear at first blush that the user needs to do
+some redundant typing as the $X$ data in this example is the same as
+the regressors in the model. However, in general $X$ could differ
+which is why the user must specify this object separately as we cannot
+assume that the explanatory variables in the model will be equal to
+$X$.
+
+This na\"ive linear model is rejected by the data (the $p$-value for
+the null of correct specification is $<0.001$), hence one might
+proceed instead to model this relationship using kernel methods.
+
+As noted, the traditional nonparametric approach towards modeling
+relationships in the presence of qualitative variables requires that
+you first split your data into subsets containing only the continuous
+variables of interest (\code{lwage}, \code{exper}, and \code{tenure}).
+For instance, we would have four such subsets, a) $n=132$ observations
+for married females, b) $n=120$ observations for single females, c)
+$n=86$ observations for single males, and d) $n=188$ observations for
+married males. One would then construct smooth nonparametric
+regression models for each of these subsets and proceed with analysis
+in this fashion. However, this may lead to a loss in efficiency due to
+a reduction in the sample size leading to overly variable estimates of
+the underlying relationship.
+
+Instead, however, we could construct smooth nonparametric regression
+models by i) using a kernel function that is appropriate for the
+qualitative variables as outlined in Section~\ref{generalized kernel
+  section} and ii) modifying the nonparametric regression model as was
+done by \citet{LI_RACINE:2004}. One can then conduct sound
+nonparametric estimation based on the $n=526$ observations rather than
+resorting to sample splitting. The rationale for this lies in the fact
+that doing so may introduce potential bias, however it will always
+reduce variability thus leading to potential finite-sample efficiency
+gains. Our experience has been that the potential benefits arising
+from this approach more than offset the potential costs in
+finite-sample settings.
+
+Next, we consider using the local-linear nonparametric method
+described in \citet{LI_RACINE:2004}. For the reader's convenience we
+supply precomputed cross-validated bandwidths which are automatically
+loaded when one loads the \code{wage1} dataset (recall being cautioned
+about the computational burden associated with multivariate
+data-driven bandwidth methods).
+
+% The commented out code that generates the cross-validated bandwidths
+% is also provided should the reader wish to fully replicate the
+% example
+
+In the example that follows, we use the precomputed bandwidth object
+\code{bw.all} that contains the data-driven bandwidths for the local
+linear regression produced below using all observations in the sample.
+
+<<eval=TRUE,keep.source=TRUE>>=
+#bw.all <- npregbw(formula = lwage ~ female +
+#                  married +
+#                  educ +
+#                  exper +
+#                  tenure,
+#                  regtype = "ll",
+#                  bwmethod = "cv.aic",
+#                  data = wage1)
+model.np <- npreg(bws = bw.all)
+summary(model.np)
+@
+
+Note again that the bandwidth object is the only thing you need to
+pass to \code{npreg} as it encapsulates the kernel types, regression
+method, and so forth. You could also use \code{npreg} and manually
+specify the bandwidths using a bandwidth vector if you so
+choose.\footnote{For example, attach a dataset via \code{data(cps71)}
+  then \code{attach(cps71)} then enter, say, \code{plot(age,logwage)}
+  and \code{lines(age,fitted(npreg(logwage~age,bws=2)))} to plot the
+  local constant estimator with a bandwidth of 2 years).} We have
+tried to make each function as flexible as possible to meet the needs
+of a variety of users.
+
+The goodness of fit of the nonparametric model ($R^2=51.5\%$) is
+better than that for the parametric model ($R^2=40.4\%$).  In order to
+investigate whether this apparent improvement reflects overfitting or
+simply that the nonparametric model is in fact more faithful to the
+underlying data generating process, we shuffled the data and created
+two independent samples, one of size $n_1=400$ and one of size
+$n_2=126$. We fit the models on the $n_1$ training observations then
+evaluate the models on the $n_2$ independent hold-out observations
+using the predicted square error criterion, namely
+$n_2^{-1}\sum_{i=1}^{n_2}(y_i-\hat y_i)^2$, where the $y_i$s are the
+\code{lwage} values for the hold-out observations and the $\hat y_i$s
+are the predicted values. Finally, we compare the parametric model,
+the nonparametric model that smooths both the categorical and
+continuous variables, and the traditional frequency nonparametric
+model that breaks the data into subsets and smooths the continuous
+data only. For this example we use the precomputed bandwidth object
+\code{bw.subset} which contains the data-driven bandwidths for a
+random subset of data.
+
+<<eval=TRUE,keep.source=TRUE>>=
+set.seed(123)
+ii <- sample(seq(1, nrow(wage1)), replace=FALSE)
+wage1.train <- wage1[ii[1:400],]
+wage1.eval <- wage1[ii[401:nrow(wage1)],]
+model.ols <- lm(lwage ~ female +
+                married +
+                educ +
+                exper +
+                tenure,
+                data = wage1.train)
+fit.ols <- predict(model.ols,
+                   data = wage1.train,
+                   newdata = wage1.eval)
+pse.ols <- mean((wage1.eval$lwage - fit.ols)^2)
+#bw.subset <- npregbw(formula = lwage ~ female +
+#                     married +
+#                     educ +
+#                     exper +
+#                     tenure,
+#                     regtype = "ll",
+#                     bwmethod = "cv.aic",
+#                     data = wage1.train)
+model.np <- npreg(bws = bw.subset)
+fit.np <- predict(model.np,
+                  data = wage1.train,
+                  newdata = wage1.eval)
+pse.np <- mean((wage1.eval$lwage - fit.np)^2)
+bw.freq <- bw.subset
+bw.freq$bw[1] <- 0
+bw.freq$bw[2] <- 0
+model.np.freq <- npreg(bws = bw.freq)
+fit.np.freq <- predict(model.np.freq,
+                       data = wage1.train,
+                       newdata = wage1.eval)
+pse.np.freq <- mean((wage1.eval$lwage - fit.np.freq)^2)
+pse.ols
+pse.np
+pse.np.freq
+@
+
+The predicted square error on the hold-out data was $0.147$ for the
+parametric linear model, $0.145$ for the traditional nonparametric
+estimator that splits the data into subsets, and $0.134$ for the
+nonparametric estimator that uses the full sample but smooths both the
+qualitative and quantitative data. The nonparametric model that
+smooths both the quantitative and qualitative data is more than 8\%
+more efficient in terms of out-of-sample predictive ability than the
+parametric or frequency nonparametric model, and therefore appears to
+provide a better description of the underlying data generating process
+than either.
+
+Note that for this example we have only four cells. If one used all
+qualitative and binary variables included in the dataset (sixteen in
+total), one would have $65,536$ cells, many of which would be empty,
+and most having far too few observations to provide meaningful
+nonparametric estimates.  As the number of qualitative variables
+increases, the difference between the estimator that smooths both
+continuous and discrete variables in a particular manner and the
+traditional estimator that relies upon sample splitting will become
+even more pronounced.
+
+Next, we display partial regression plots in Figure~\ref{wage1
+  profile}.\footnote{A `partial regression plot' is simply a 2D plot
+  of the outcome $y$ versus one covariate $x_j$ when all other
+  covariates are held constant at their respective medians/modes (this
+  can be changed by the user).} We also plot bootstrapped variability
+bounds, where the bootstrapping is done via the \pkg{boot} package
+thereby facilitating a variety of bootstrap methods. The following
+code will generate Figure~\ref{wage1 profile}.
+
+<<eval=FALSE, keep.source=TRUE>>=
+plot(model.np,
+     plot.errors.method = "bootstrap",
+     plot.errors.boot.num = 25)
+@
+
+\begin{figure}[!ht]
+\begin{center}
+<<fig=TRUE,eval=TRUE,echo=FALSE,keep.source=TRUE>>=
+plot(model.np,
+     plot.errors.method = "bootstrap",
+     plot.errors.boot.num = 25)
+@
+\caption{\label{wage1 profile}Partial local linear nonparametric
+  regression plots with bootstrapped pointwise error bounds for the
+  \code{wage1} dataset.}
+\end{center}
+\end{figure}
+
+Figure~\ref{wage1 profile} reveals that (holding other regressors
+constant at their median/mode), males have higher expected wages than
+females, there does not appear to be a significant difference between
+the expected wages of married and nonmarried individuals, wages
+increase with education and tenure and first rise then fall as
+experience increases, other things equal.
+
+\section{Nonparametric binary outcome and count data
+  models}\label{count section}
+
+For what follows, we adopt the conditional probability estimator
+proposed in \citet{HALL_RACINE_LI:2004} to estimate a nonparametric
+model of a binary outcome when there exist a number of categorical
+covariates.
+
+For this example, we use the \code{birthwt} data taken from the
+\pkg{MASS} package, and compute a parametric Logit model and a
+nonparametric conditional mode model. We then compare their confusion
+matrices\footnote{A `confusion matrix' is simply a tabulation of the
+  actual outcomes versus those predicted by a model. The diagonal
+  elements contain correctly predicted outcomes while the off-diagonal
+  ones contain incorrectly predicted (confused) outcomes.} and assess
+their classification ability. Note that many of the variables in this
+dataset have not been classed so we must do this upon invocation of a
+function. The outcome is an indicator of low infant birthweight (0/1).
+The method can handle unordered and ordered multinomial outcomes
+without modification (we have overridden the default search tolerances
+for this example as the objective function is well-behaved via
+\code{tol = 0.1} and \code{ftol = 0.1}, which should {\em not} be done in
+general).  In this example we first model this relationship using a
+simple parametric Logit model, then we model this with a nonparametric
+conditional density estimator and compute the conditional mode, and
+finally, we compare confusion matrices from the logit and
+nonparametric models. Note that for the nonparametric estimator we
+conduct bandwidth selection and estimation in one step, and we first
+convert the data frame to one with appropriately classed elements.
+
+<<eval=TRUE,keep.source=TRUE>>=
+data("birthwt", package = "MASS")
+birthwt$low <- factor(birthwt$low)
+birthwt$smoke <- factor(birthwt$smoke)
+birthwt$race <- factor(birthwt$race)
+birthwt$ht <- factor(birthwt$ht)
+birthwt$ui <- factor(birthwt$ui)
+birthwt$ftv <- factor(birthwt$ftv)
+model.logit <- glm(low ~ smoke +
+                   race +
+                   ht +
+                   ui +
+                   ftv +
+                   age +
+                   lwt, 
+                   family = binomial(link = logit),
+                   data = birthwt)
+model.np <- npconmode(low ~
+                      smoke +
+                      race +
+                      ht +
+                      ui +
+                      ftv +
+                      age +
+                      lwt,
+                      tol = 0.1,
+                      ftol = 0.1,
+                      data = birthwt)
+cm <- table(birthwt$low, 
+            ifelse(fitted(model.logit) > 0.5, 1, 0))
+cm
+summary(model.np)
+@
+
+For this example the nonparametric model is better able to predict low
+birthweight infants than its parametric counterpart, correctly
+predicting 161/189 birthweights compared with 144/189 for the
+parametric model.
+
+\section{Nonparametric unconditional PDF and CDF estimation}\label{pdf
+  and cdf section}
+
+The Old Faithful Geyser is a tourist attraction located in Yellowstone
+National Park. This famous dataset containing $n=272$ observations
+consists of two variables, eruption duration in minutes
+(\code{eruptions}) and waiting time until the next eruption in minutes
+(\code{waiting}). This dataset is used by the park service to model,
+among other things, expected duration conditional upon the amount of
+time that has elapsed since the previous eruption. Modeling the joint
+distribution is, however, of interest in its own right, and the
+underlying bimodal nature of the joint PDF and CDF is readily revealed
+by the kernel estimator.  For this example, we load the old faithful
+geyser data and compute the density and distribution functions. To
+plot the conditional distribution we use \code{cdf = TRUE} in
+\code{plot}. Results are presented in Figure~\ref{faithful plot}. Note
+that in this example we conduct bandwidth selection and estimation in
+one step.
+
+<<eval=TRUE,keep.source=TRUE>>=
+data("faithful", package = "datasets")
+f.faithful <- npudens(~ eruptions + waiting, data = faithful)
+summary(f.faithful)
+@
+
+The following code will generate Figure~\ref{faithful plot}.
+
+<<eval=FALSE, keep.source=TRUE>>=
+plot(f.faithful, xtrim = -0.2, view = "fixed", main = "")
+plot(f.faithful, cdf = TRUE, xtrim = -0.2, view = "fixed", main = "")
+@
+
+\begin{figure}[!ht]
+\begin{center}
+<<fig=TRUE, png=TRUE, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=4, width=8>>=
+options(SweaveHooks = list(multifig = function() par(mfrow=c(1,2),mar=rep(1.5,4))))
+plot.output <- plot(f.faithful, xtrim=-0.2, view="fixed", main = "",plot.behavior="data")
+# Retrieve data from plot() to create multiple figures
+f <- matrix(plot.output$d1$dens, 50, 50)
+plot.x1 <- unique(plot.output$d1$eval[,1])
+plot.x2 <- unique(plot.output$d1$eval[,2])
+persp(plot.x1,plot.x2,f,xlab="eruptions",ylab="waiting",zlab="Joint Density",col="lightblue", ticktype="detailed")
+
+plot.output <- plot(f.faithful, cdf = TRUE, xtrim = -0.2, view = "fixed", main="",plot.behavior="data")
+# Retrieve data from plot() to create multiple figures
+f <- matrix(plot.output$d1$dist, 50, 50)
+plot.x1 <- unique(plot.output$d1$eval[,1])
+plot.x2 <- unique(plot.output$d1$eval[,2])
+persp(plot.x1,plot.x2,f,xlab="eruptions",ylab="waiting",zlab="Joint Distribution",col="lightblue", ticktype="detailed")
+
+@
+\caption{\label{faithful plot}Nonparametric multivariate PDF and CDF
+  estimates for the Old Faithful data.}
+\end{center}
+\end{figure}
+
+If one were to instead model this density with a parametric model such
+as the bivariate normal (being symmetric, unimodal, and monotonically
+decreasing away from the mode), one would of course fail to uncover
+the underlying structure readily revealed by the kernel estimate.
+
+\section{Nonparametric conditional PDF and CDF estimation}\label{cpdf
+  and ccdf section}
+
+We consider Giovanni Baiocchi's (\citeauthor{BAIOCCHI:2006}
+\citeyear{BAIOCCHI:2006}) Italian GDP growth panel for 21 regions
+covering the period 1951-1998 (millions of Lire, 1990=base).  There
+are $n=1,008$ observations in total, and two variables, \code{gdp} and
+\code{year}.  First, we compute the bandwidths. Note that this may
+take a minute or two depending on the speed of your computer. We
+override the default tolerances for the search method as the objective
+function is well-behaved (do not of course do this in general), then
+we compute the \code{npcdens} object.  To plot the conditional
+distribution we use \code{cdf = TRUE} in \code{plot}.  Note that in this
+example we conduct bandwidth selection and estimation in one step.
+
+<<eval=TRUE,keep.source=TRUE>>=
+data("Italy")
+fhat <- npcdens(gdp ~ year,
+                tol = 0.1,
+                ftol = 0.1,
+                data = Italy)
+summary(fhat)
+@ 
+
+Figure~\ref{italy conditional plot} plots the resulting conditional
+PDF and CDF for the \code{Italy} GDP panel. The following code will
+generate Figure~\ref{italy conditional plot}.
+
+<<eval=FALSE, keep.source=TRUE>>=
+plot(fhat, view = "fixed", main = "", theta = 300, phi = 50)
+plot(fhat, cdf = TRUE, view = "fixed", main = "", theta = 300, phi = 50)
+@
+
+\begin{figure}[!ht]
+\begin{center}
+<<fig=TRUE, png=TRUE, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=4, width=8>>=
+options(SweaveHooks = list(multifig = function() par(mfrow=c(1,2),mar=rep(1.25,4))))
+plot.output <- plot(fhat, view="fixed", main="",plot.behavior="data")
+# Retrieve data from plot() to create multiple figures
+f <- matrix(plot.output$cd1$condens, 48, 50)
+plot.y1 <- unique(plot.output$cd1$yeval)
+plot.x1 <- unique(plot.output$cd1$xeval)
+persp(as.integer(levels(plot.x1)),plot.y1,f,xlab="year",ylab="gdp",zlab="Conditional Density",col="lightblue", ticktype="detailed",theta=300,phi=50)
+
+plot.output <- plot(fhat, cdf = TRUE, view="fixed", main="",plot.behavior="data")
+# Retrieve data from plot() to create multiple figures
+f <- matrix(plot.output$cd1$condist, 48, 50)
+plot.y1 <- unique(plot.output$cd1$yeval)
+plot.x1 <- unique(plot.output$cd1$xeval)
+persp(as.numeric(plot.x1)+1951,plot.y1,f,xlab="year",ylab="gdp",zlab="Conditional Distribution",col="lightblue", ticktype="detailed",theta=300,phi=50)
+
+@
+\caption{\label{italy conditional plot}Nonparametric conditional PDF
+  and CDF estimates for the Italian GDP panel.}
+\end{center}
+\end{figure}
+
+Figure~\ref{italy conditional plot} reveals that the distribution of
+income has evolved from a unimodal one in the early 1950s to a
+markedly bimodal one in the 1990s. This result is robust to bandwidth
+choice, and is observed whether using simple rules-of-thumb or
+data-driven methods such as likelihood cross-validation.  The kernel
+method readily reveals this evolution which might easily be missed
+were one to use parametric models of the income distribution (e.g.,
+the unimodal lognormal distribution is commonly used to model income
+distributions).
+
+\section{Nonparametric quantile regression}\label{quantile section}
+
+We again consider Giovanni Baiocchi's Italian GDP growth panel.
+First, we compute the likelihood cross-validation bandwidths
+(default). We override the default tolerances for the search method as
+the objective function is well-behaved (do not of course do this in
+general). Then we compute the resulting conditional quantile estimates
+using the method of \citet{LI_RACINE:2008}. By way of example, we
+compute the 25th, 50th, and 75th conditional quantiles. Note that this
+may take a minute or two depending on the speed of your computer.
+Note that for this example we first call \code{npcdensbw} to avoid
+unnecessary re-computation of the bandwidth object.
+
+<<eval=TRUE,keep.source=TRUE>>=
+bw <- npcdensbw(formula = gdp ~ year,
+                tol = 0.1,
+                ftol = 0.1,
+                data = Italy)
+model.q0.25 <- npqreg(bws = bw, tau = 0.25)
+model.q0.50 <- npqreg(bws = bw, tau = 0.50)
+model.q0.75 <- npqreg(bws = bw, tau = 0.75)
+@ 
+
+Figure~\ref{italy quantile plot} plots the resulting quantile
+estimates. The following code will generate Figure~\ref{italy quantile
+  plot}.
+
+<<eval=FALSE,keep.source=TRUE>>=
+plot(Italy$year, Italy$gdp, main = "", 
+     xlab = "Year", ylab = "GDP Quantiles")
+lines(Italy$year, model.q0.25$quantile, col = "red", lty = 1, lwd = 2)
+lines(Italy$year, model.q0.50$quantile, col = "blue", lty = 2, lwd = 2)
+lines(Italy$year, model.q0.75$quantile, col = "red", lty = 3, lwd = 2)
+legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"), 
+       lty = c(1, 2, 3), col = c("red", "blue", "red"))
+@
+
+%% Reset sizing to admit smaller graphs
+
+\setkeys{Gin}{width=0.75\textwidth}
+
+\begin{figure}[!ht]
+\begin{center}
+<<fig=TRUE,eval=TRUE,echo=FALSE,keep.source=TRUE,width=6,height=5>>=
+plot(Italy$year, Italy$gdp, 
+     main = "",
+     xlab = "Year", 
+     ylab = "GDP Quantiles")
+lines(Italy$year, model.q0.25$quantile, col = "red", lty = 1, lwd = 2)
+lines(Italy$year, model.q0.50$quantile, col = "blue", lty = 2, lwd = 2)
+lines(Italy$year, model.q0.75$quantile, col = "red", lty = 3, lwd = 2)
+legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"), 
+       lty = c(1, 2, 3), col = c("red", "blue", "red"))
+@
+\caption{\label{italy quantile plot}Nonparametric quantile regression
+  on the Italian GDP panel.}
+\end{center}
+\end{figure}
+
+One nice feature of this application is that the explanatory variable
+is ordered and there exist multiple observations per year. Using the
+\code{plot} function with ordered data produces a boxplot which
+readily reveals the non-smooth 25th, 50th, and 75th quantiles. These
+non-smooth quantile estimates can then be directly compared to those
+obtained via direct estimation of the smooth CDF which are plotted in
+Figure~\ref{italy quantile plot}.
+
+\section{Semiparametric partially linear models}\label{partially
+  linear section}
+
+Suppose that we consider the \code{wage1} dataset from
+\citet[p.~222]{WOOLDRIDGE:2003}, but now assume that the researcher
+is unwilling to presume the nature of the relationship between
+\code{exper} and \code{lwage}, hence relegates \code{exper} to the
+nonparametric part of a semiparametric partially linear model.  The
+partially linear model was proposed by \citet{ROBINSON:1988} and
+extended to handle the presence of categorical covariates by
+\citet{RACINE_LIU:2007}.
+
+Before proceeding, we ought to clarify a common misunderstanding about
+partially linear models. Many believe that, as the model is apparently
+simple, its computation ought to also be simple. However, the apparent
+simplicity hides the perhaps under-appreciated fact that bandwidth
+selection for partially linear models can be orders of magnitude more
+computationally burdensome than that for fully nonparametric models,
+for one simple reason. Data-driven bandwidth selection methods such as
+cross-validation are being used, and the partially linear model
+involves cross-validation to regress $y$ on $Z$ ($Z$ is multivariate)
+then {\em each column of $X$} on $Z$, whereas fully nonparametric
+regression involves cross-validation of $y$ on $X$ only. The
+computational burden associated with partially linear models is
+therefore much more demanding than for nonparametric models, so be
+forewarned. Note that in this example we conduct bandwidth selection
+and estimation in one step.
+
+<<eval=TRUE,keep.source=TRUE>>=
+model.pl <- npplreg(lwage ~ female +
+                    married +
+                    educ +
+                    tenure | exper,
+                    data = wage1)
+summary(model.pl)
+@ 
+
+A comparison of this model with the parametric and nonparametric
+models presented in Section~\ref{wage1 section} indicates an in-sample
+fit ($44.9\%$) that lies in between the misspecified parametric model
+($40.4\%$) and the fully nonparametric model ($51.5\%$).
+
+\section{Semiparametric single-index models}\label{single index section}
+
+\subsection{Binary outcomes (Klein-Spady with cross-validation)}
+
+We could again consider the \code{birthwt} data taken from the
+\pkg{MASS} package, and this time compute a semiparametric index
+model. We then compare confusion matrices and assess classification
+ability. The outcome is an indicator of low infant birthweight
+(0/1). We apply the method of \citet{KLEIN_SPADY:1993} with bandwidths
+selected via cross-validation. Note that for this example we conduct
+bandwidth selection and estimation in one step
+
+<<eval=TRUE,keep.source=TRUE>>=
+model.index <- npindex(low ~
+                       smoke +
+                       race +
+                       ht +
+                       ui +
+                       ftv +
+                       age +
+                       lwt,
+                       method = "kleinspady",
+                       gradients = TRUE,
+                       data = birthwt)
+summary(model.index)
+@ 
+
+It is interesting to compare this with the parametric Logit model's
+confusion matrix presented in Section~\ref{count section}.  A
+comparison of this model with the parametric model presented in
+Section~\ref{count section} reveals that it correctly classifies an
+additional 5/189 observations.
+
+\subsection{Continuous outcomes (Ichimura with cross-validation)}
+
+Next, we consider applying \citet{ICHIMURA:1993}'s single-index method
+which is appropriate for continuous outcomes, unlike that of
+\citet{KLEIN_SPADY:1993} (we override the default number of
+multistarts for the user's convenience as the global minimum appears
+to have been located in the first attempt). We again consider the
+\code{wage1} dataset found in \citet[p.~222]{WOOLDRIDGE:2003}.  Note
+that in this example we conduct bandwidth selection and estimation in
+one step.
+
+<<eval=TRUE,keep.source=TRUE>>=
+model <- npindex(lwage ~ female +
+                 married +
+                 educ +
+                 exper +
+                 tenure,
+                 data = wage1,
+                 nmulti = 1)
+summary(model)
+@ 
+
+It is interesting to compare this model with the parametric and
+nonparametric models presented in Section~\ref{wage1 section} as it
+provides an in-sample fit ($43.1\%$) that lies in between the
+misspecified parametric model ($40.4\%$) and fully nonparametric model
+($51.5\%$). Whether this model yields improved out-of-sample
+predictions could also be explored.
+
+\section{Semiparametric varying coefficient models}\label{varying
+  coefficient section}
+
+We revisit the \code{wage1} dataset found in
+\citet[p.~222]{WOOLDRIDGE:2003}, but assume that the researcher
+believes that the model's parameters may differ depending on one's
+sex. In this case, one might adopt a varying coefficient approach such
+as that found in \citet{LI_RACINE:2007b} and
+\citet{RACINE_OUYANG_LI:2007}. We compare a simple linear model with
+the semiparametric varying coefficient model.  Note that the $X$ data
+in the varying coefficient model must be of type \code{numeric}, so we
+create a 0/1 dummy variable from the qualitative variable for $X$, but
+of course for the nonparametric component we can simply treat these as
+unordered factors.  Note that we do bandwidth selection and estimation
+in one step.
+
+<<eval=TRUE,keep.source=TRUE>>=
+model.ols <- lm(lwage ~ female +
+                married +
+                educ +
+                exper +
+                tenure,
+                data = wage1)
+wage1.augmented <- wage1
+wage1.augmented$dfemale <- as.integer(wage1$female == "Male")
+wage1.augmented$dmarried <- as.integer(wage1$married == "Notmarried")
+model.scoef <- npscoef(lwage ~ dfemale +
+                       dmarried +
+                       educ +
+                       exper +
+                       tenure | female,
+                       betas = TRUE,
+                       data = wage1.augmented)
+summary(model.scoef)
+colMeans(coef(model.scoef))
+coef(model.ols)
+@
+
+It is again interesting to compare this model with the parametric and
+nonparametric models presented in Section~\ref{wage1 section}. It can be
+seen that the {\em average} values of the model's coefficients are in
+agreement with those from the linear specification, while the
+in-sample goodness of fit ($42.6\%$) lies in between the misspecified
+parametric model ($40.4\%$) and fully nonparametric model ($51.5\%$).
+
+\section{Writing your own kernel-based functions}
+
+The function \code{npksum} exists so that you can create your own
+kernel objects with or without a variable to be weighted (defaults to
+$1$). With the options available, you could create new nonparametric
+tests or even new kernel estimators. The convolution kernel option
+would allow you to create, say, the least squares cross-validation
+function for kernel density estimation.  \code{npksum} implements a
+variety of methods for computing multivariate kernel sums
+($p$-variate) defined over a set of possibly continuous and/or
+discrete data.
+
+By way of example, we construct a local constant kernel estimator with
+a bandwidth of, say, two years. Figure~\ref{lc npksum profile} plots
+the resulting estimate.
+
+<<eval=TRUE,keep.source=TRUE>>=
+fit.lc <- npksum(txdat = cps71$age, tydat = cps71$logwage, bws = 2)$ksum/
+  npksum(txdat = cps71$age, bws = 2)$ksum
+@ 
+
+The following code will generate Figure~\ref{lc npksum profile}.
+
+<<eval=FALSE, keep.source=TRUE>>=
+plot(cps71$age, cps71$logwage, xlab = "Age", ylab = "log(wage)")
+lines(cps71$age, fit.lc, col = "blue")
+@ 
+
+\begin{figure}[!ht]
+\begin{center}
+<<fig=TRUE,eval=TRUE,echo=FALSE,keep.source=TRUE>>=
+plot(cps71$age, cps71$logwage, xlab = "Age", ylab = "log(wage)", cex=.1)
+lines(cps71$age, fit.lc, col = "blue")
+@ 
+\caption{\label{lc npksum profile}A local constant kernel estimator
+  generated with \code{npksum} for the \code{cps71} dataset.}
+\end{center}
+\end{figure}
+
+\code{npksum} is exceedingly flexible, allowing for leave-one-out
+sums, weighted sums of matrices, raising the kernel function to
+different powers, the use of convolution kernels, and so forth. See
+\code{?npksum} for further details.
+
+\section{A parallel implementation}
+
+Data-driven bandwidth selection methods are, by their nature,
+computationally burdensome. However, many bandwidth selection methods
+lend themselves well to parallel computing approaches. High
+performance computing resources are becoming widely available, and
+multiple CPU desktop systems have become the norm and will continue to
+make inroads.
+
+When users have a large amount of data, serial bandwidth selection
+procedures can be infeasible. For this reason, we have developed an
+\proglang{MPI}-aware version of the \pkg{np} package that uses some of
+the functionality of the \pkg{Rmpi} package which we have tentatively
+called the \pkg{npRmpi} package and is available from the authors upon
+request (the Message Passing Interface (MPI) is an open library
+specification for parallel computation available for a range of
+computing platforms).  The functionality of \pkg{np} and \pkg{npRmpi}
+is identical, however, using \pkg{npRmpi} you could take advantage of
+a cluster computing environment or a multi-core/multi-CPU desktop
+machine thereby alleviating the computational burden associated with
+the nonparametric analysis of large datasets. Installation of this
+package, however, requires knowledge that goes beyond that which even
+seasoned \proglang{R} users may possess.  Having access to local
+expertise would be necessary for many users therefore this package is
+not available via CRAN.
+
+\section{Summary}
+
+The \pkg{np} package offers users of \proglang{R} a variety of
+nonparametric and semiparametric kernel-based methods that are capable
+of handling the mix of categorical and continuous data typically
+encountered by applied researchers. In this article we have described
+the functionality of the \pkg{np} package via a series of illustrative
+applications that may be of interest to applied econometricians
+interested in becoming familiar with these methods. We do not delve
+into details of the underlying estimators, rather we provide
+references where appropriate and direct the interested reader to those
+resources.
+
+The help files accompanying many functions found in the \pkg{np}
+package contain numerous examples which may be of interest to some
+readers, and we encourage readers to experiment with these examples in
+addition to those contained herein.
+
+Finally, we encourage readers who have successfully implemented new
+kernel-based methods using the \code{npksum} function to send such
+functions to us so that they can be included in future versions of the
+\pkg{np} package with appropriate acknowledgment of course.
+
+\section*{Acknowledgments}
+
+We are indebted to Achim Zeileis and to two anonymous referees whose
+comments and feedback have resulted in numerous improvements to the
+\pkg{np} package and to the exposition of this article. Racine would
+like to gratefully acknowledge support from the Natural Sciences and
+Engineering Research Council of Canada (\url{http://www.nserc.ca}),
+the Social Sciences and Humanities Research Council of Canada
+(\url{http://www.sshrc.ca}), and the Shared Hierarchical Academic
+Research Computing Network (\url{http://www.sharcnet.ca}).
+
+\bibliography{np}
+
+\end{document}

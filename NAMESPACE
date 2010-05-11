@@ -1,0 +1,265 @@
+useDynLib(np)
+import(stats)
+export(b.star
+       ,npudensbw
+       ,npudens
+       ,npudist
+       ,npregbw
+       ,npreg
+       ,npplreg
+       ,npplregbw
+       ,npcdensbw
+       ,npcdens
+       ,npcdist
+       ,npdeptest       
+       ,npsdeptest
+       ,npplot
+       ,npksum
+       ,npqreg
+       ,npcmstest
+       ,npconmode
+       ,npdeneqtest
+       ,npindex
+       ,npindexbw
+       ,npqcmstest       
+       ,npseed
+       ,npscoef
+       ,npscoefbw
+       ,npsigtest
+       ,npsymtest
+       ,npunitest       
+       ,uocquantile
+       ,se
+       ,gradients
+       )
+
+S3method(print,bandwidth)
+S3method(print,npdensity)
+S3method(print,npdistribution)
+S3method(print,rbandwidth)
+S3method(print,npregression)
+S3method(print,plbandwidth)
+S3method(print,plregression)
+S3method(print,conbandwidth)
+S3method(print,condensity)
+S3method(print,condistribution)
+S3method(print,npkernelsum)
+S3method(print,qregression)
+S3method(print,cmstest)
+S3method(print,conmode)
+S3method(print,deptest)
+S3method(print,sdeptest)
+S3method(print,sibandwidth)
+S3method(print,singleindex)
+S3method(print,sigtest)
+S3method(print,scbandwidth)
+S3method(print,smoothcoefficient)
+S3method(print,symtest)
+S3method(print,deneqtest)
+S3method(print,unitest)
+##
+
+
+S3method(plot, bandwidth)
+S3method(plot, rbandwidth)
+S3method(plot, conbandwidth)
+S3method(plot, plbandwidth)
+S3method(plot, sibandwidth)
+S3method(plot, scbandwidth)
+
+S3method(plot, npdensity)
+S3method(plot, npdistribution)
+S3method(plot, npregression)
+S3method(plot, plregression)
+S3method(plot, condensity)
+S3method(plot, condistribution)
+S3method(plot, qregression)
+S3method(plot, singleindex)
+S3method(plot, smoothcoefficient)
+
+S3method(fitted, npdensity)
+S3method(fitted, npdistribution)
+S3method(fitted, npregression)
+S3method(fitted, plregression)
+S3method(fitted, condensity)
+S3method(fitted, condistribution)
+S3method(fitted, conmode)
+S3method(fitted, qregression)
+S3method(fitted, singleindex)
+S3method(fitted, smoothcoefficient)
+
+S3method(residuals, npregression)
+S3method(residuals, plregression)
+S3method(residuals, singleindex)
+S3method(residuals, smoothcoefficient)
+
+S3method(coef, plregression)
+S3method(coef, singleindex)
+S3method(coef, sibandwidth)
+S3method(coef, smoothcoefficient)
+
+S3method(vcov, plregression)
+
+S3method(predict, npregression)
+S3method(predict, bandwidth)
+S3method(predict, conbandwidth)
+S3method(predict, condensity)
+S3method(predict, condistribution)
+S3method(predict, npdensity)
+S3method(predict, npdistribution)
+S3method(predict, plbandwidth)
+S3method(predict, plregression)
+S3method(predict, qregression)
+S3method(predict, rbandwidth)
+S3method(predict, scbandwidth)
+S3method(predict, sibandwidth)
+S3method(predict, singleindex)
+S3method(predict, smoothcoefficient)
+
+S3method(summary, bandwidth)
+S3method(summary, conbandwidth)
+S3method(summary, rbandwidth)
+S3method(summary, plbandwidth)
+S3method(summary, sibandwidth)
+S3method(summary, scbandwidth)
+
+S3method(summary, npdensity)
+S3method(summary, npdistribution)
+S3method(summary, condensity)
+S3method(summary, condistribution)
+S3method(summary, npregression)
+S3method(summary, cmstest)
+S3method(summary, conmode)
+S3method(summary, deptest)
+S3method(summary, sdeptest)
+S3method(summary, sigtest)
+S3method(summary, plregression)
+S3method(summary, qregression)
+S3method(summary, singleindex)
+S3method(summary, smoothcoefficient)
+S3method(summary, symtest)
+S3method(summary, deneqtest)
+S3method(summary, unitest)
+
+S3method(se, npdensity)
+S3method(se, npdistribution)
+S3method(se, condensity)
+S3method(se, condistribution)
+S3method(se, npregression)
+S3method(se, qregression)
+S3method(se, singleindex)
+S3method(se, smoothcoefficient)
+
+S3method(gradients, condensity)
+S3method(gradients, condistribution)
+S3method(gradients, npregression)
+S3method(gradients, qregression)
+S3method(gradients, singleindex)
+
+S3method(mode, conmode)
+
+S3method(quantile, qregression)
+
+S3method(npudensbw, NULL)
+S3method(npudensbw, formula)
+S3method(npudensbw, default)
+S3method(npudensbw, bandwidth)
+
+S3method(as.double,bandwidth)
+
+S3method(npudens, formula)
+S3method(npudens, call)
+S3method(npudens, default)
+S3method(npudens, bandwidth)
+
+S3method(npudist, formula)
+S3method(npudist, call)
+S3method(npudist, default)
+S3method(npudist, bandwidth)
+
+S3method(npregbw, NULL)
+S3method(npregbw, formula)
+S3method(npregbw, default)
+S3method(npregbw, rbandwidth)
+
+S3method(npreg, formula)
+S3method(npreg, call)
+S3method(npreg, default)
+S3method(npreg, rbandwidth)
+
+S3method(npsigtest, formula)
+S3method(npsigtest, call)
+S3method(npsigtest, default)
+S3method(npsigtest, npregression)
+S3method(npsigtest, rbandwidth)
+
+S3method(npplreg, formula)
+S3method(npplreg, call)
+S3method(npplreg, default)
+S3method(npplreg, plbandwidth)
+
+S3method(npplregbw, NULL)
+S3method(npplregbw, formula)
+S3method(npplregbw, default)
+S3method(npplregbw, plbandwidth)
+
+S3method(npcdensbw, NULL)
+S3method(npcdensbw, formula)
+S3method(npcdensbw, default)
+S3method(npcdensbw, conbandwidth)
+
+S3method(npcdens, formula)
+S3method(npcdens, call)
+S3method(npcdens, default)
+S3method(npcdens, conbandwidth)
+
+S3method(npcdist, formula)
+S3method(npcdist, default)
+S3method(npcdist, conbandwidth)
+
+S3method(npplot, rbandwidth)
+S3method(npplot, bandwidth)
+S3method(npplot, plbandwidth)
+S3method(npplot, conbandwidth)
+S3method(npplot, sibandwidth)
+S3method(npplot, scbandwidth)
+
+S3method(compute.bootstrap.errors, rbandwidth)
+S3method(compute.bootstrap.errors, bandwidth)
+S3method(compute.bootstrap.errors, conbandwidth)
+
+S3method(npksum, integer)
+S3method(npksum, numeric)
+S3method(npksum, formula)
+S3method(npksum, default)
+
+S3method(npqreg, formula)
+S3method(npqreg, call)
+S3method(npqreg, default)
+S3method(npqreg, conbandwidth)
+
+S3method(npconmode, formula)
+S3method(npconmode, call)
+S3method(npconmode, default)
+S3method(npconmode, conbandwidth)
+
+S3method(npindexbw, NULL)
+S3method(npindexbw, formula)
+S3method(npindexbw, default)
+S3method(npindexbw, sibandwidth)
+
+S3method(npscoefbw, NULL)
+S3method(npscoefbw, formula)
+S3method(npscoefbw, default)
+S3method(npscoefbw, scbandwidth)
+
+S3method(npindex, default)
+S3method(npindex, call)
+S3method(npindex, formula)
+S3method(npindex, sibandwidth)
+
+S3method(npscoef, default)
+S3method(npscoef, call)
+S3method(npscoef, formula)
+S3method(npscoef, scbandwidth)
+

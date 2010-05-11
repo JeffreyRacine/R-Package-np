@@ -1,0 +1,326 @@
+Changes from Version 0.30-7 to 0.30-8 [20-Apr-2010]
+
+* Implemented moment version of metric entropy in npsymtest and
+  npunitest with warnings about their use documented carefully and
+  exceptions trapped and warnings issuing when detected
+ 
+* Cleaned up print/summary output formatting of some functions
+
+Changes from Version 0.30-6 to 0.30-7 [15-Feb-2010]
+
+* Added function npunitest for entropy-based testing of equality of
+  univariate densities as described in Maasoumi and Racine (2002,
+  2009)
+
+* Updated vignette to reflect new functions (Table 1: np functions)
+
+Changes from Version 0.30-5 to 0.30-6 [3-Feb-2010]
+
+* Added function npsdeptest for entropy-based testing of nonlinear
+  serial dependence described in Granger, Maasoumi and Racine (2004)
+
+* Added function npdeptest for entropy-based testing of nonlinear
+  pairwise dependence described in Maasoumi and Racine (2002)
+
+* Added more bootstrap options to npsymtest (now both iid and
+  time-series bootstrapping are supported)
+
+* Cleaned up summary formatting in the vignette by adding
+  \usepackage[utf8x]{inputenc} to the Sweave file np.Rnw
+
+* Fixed issue with saving and restoring random seed when there was
+  none in the environment
+
+Changes from Version 0.30-4 to 0.30-5 [29-Jan-2010]
+
+* Added function npdeneqtest for integrated squared difference testing
+  of equality of densities as described in Maasoumi, Li, and Racine
+  (2009), Journal of Econometrics
+
+* Save random seed prior to setting seed in certain functions, then
+  restore seed after function completes
+
+Changes from Version 0.30-3 to 0.30-4 [27-Jan-2010]
+
+* Added function npsymtest for entropy-based testing of symmetry
+  described in Maasoumi and Racine (2009), Econometric Reviews
+
+* Added function b.star that automates block length selection for
+  the stationary and circular bootstrap
+
+* Cleaned up docs
+
+Changes from Version 0.30-2 to 0.30-3 [29-May-2009]
+
+* Corrected error in Epanechnikov convolution kernels for fixed and
+  generalized bandwidth objects
+
+* Changed default example in npscoef
+
+Changes from Version 0.30-1 to 0.30-2 [19-Apr-2009]
+
+* min(std,IQR/1.348) is the adaptive measure of spread. We now test
+  for the pathological case where IQR is zero but std > 0 and return
+  std in this instance
+
+Changes from Version 0.30-0 to 0.30-1 [29-Jan-2009]
+
+* predict now supports bandwidth, density, distribution, conbandwidth,
+  condensity, and condistribution objects
+
+* Consistently allow predictions for categorical values outside of
+  support of training data
+
+  Note that predictions based upon unconditional density objects
+  defined over categorical variables that lie outside the support of
+  the training data may no longer be true probabilities (i.e., as
+  defined over the training data and the extended/augmented support --
+  their sum may exceed one) and may therefore require renormalization
+  by the user 
+
+* Fixed a numerical issue which could hinder npregbw()'s cross
+  validation with higher-order kernels
+
+* Default nmulti in npplregbw() is now set correctly
+
+* Fixed a bug with the ridging routine in npscoefbw(), added ridging to
+  npscoef
+
+* Fixed trivial i/o issue with "Multistart 1 of" using npscoefbw()
+
+Changes from Version 0.20-4 to 0.30-0 [15-Jan-2009]
+
+* Added basic user-interrupt checking for all underlying C code so
+  that either <Ctrl-C> (Rterm) or the `STOP' icon (Rgui) will
+  interrupt all running processes. This has a number of desirable side
+  effects in addition to being able to interrupt C-based processes
+  including i) R no longer showing up as `not responding' under the
+  task manager (Windows) or the activity monitor (Mac OS X) and ii)
+  buffered output now being correctly displayed when using Rgui under
+  Windows and Mac OS X
+
+  Note that repeated interruption of large jobs can reduce available
+  memory under R - if this becomes an issue (i.e., you get a `cannot
+  allocate...' error under R) simply restart R (i.e., exit then run a
+  fresh R session)
+
+* Added a function npseed() that allows the user to set/reset the
+  random seed for all underlying C routines
+
+* Fixed a bug that caused npplregbw() to ignore any kernel options
+  for the regression of y on z
+
+* Refined certain constants used in the normal-reference density
+  bandwidth rule for increased accuracy
+
+* Moved from using the maximum likelihood estimate of variance
+  throughout to the degrees of freedom corrected estimate (all
+  variance estimates now change by the factor (n-1)/n)
+
+Changes from Version 0.20-3 to 0.20-4 [19-Nov-2008]
+
+* Using an adaptive measure of spread throughout.  The scale factor
+  reported for a bandwidth can appear to be small when the standard
+  deviation is inflated due to the presence of outliers.  Furthermore,
+  supplying a scale factor of, say, 1.06 for density estimation when
+  there are outliers that inflate the standard deviation may
+  oversmooth rather dramatically in the presence of outliers.  We now
+  use the measure found in Silverman (1986, equation (3.30)) which is
+  min(standard deviation, interquartile range/1.349). This robust
+  choice produces expected results for scale factors in the presence
+  of outliers
+
+Changes from Version 0.20-2 to 0.20-3 [14-Nov-2008]
+
+* Fixed a typo which caused predict() and plot() to abort when called
+  on plregression objects, and which also prevented print() and
+  summary() from printing information about the kernels used when
+  called on plregression objects
+
+* Fixed a typo which caused partially linear regressions to crash when
+  out-of-sample responses were provided with evaluation data
+
+Changes from Version 0.20-1 to 0.20-2 [02-Nov-2008]
+
+* Allow for evaluation outside of discrete support of factors in
+  npksum() and fixed a warning in jksum
+
+* Fixed a bug which lead to unpredictable behavior when there were
+  more categorical values for the training data than realisations
+
+Changes from Version 0.20-0 to 0.20-1 [13-Aug-2008]
+
+* Work-around for scale-factor issues during npregbw() cv when
+  changing the training data
+
+Changes from Version 0.14-3 to 0.20-0 [28-Jul-2008]
+
+* npksum() now supports an expanded set of kernels (including
+  convolution, derivative and integral), which can be selected via the
+  'operator' argument
+
+* Automatic bandwidth searches are now performed when attempting to
+  evaluate on data without bandwidths. This allows users to combine
+  bandwidth selection and estimation in one step
+
+* The npsigtest() interface is brought in line with other functions
+  (S3)
+
+* Significance tests can now be performed on npreg() outputs, so
+  npsigtest(modelname) is now supported
+
+* Added a vignette and faq. To see the vignette try
+    vignette("np",package="np")
+
+* summary() on npconmode() now properly retrieves names from bandwidth
+  objects
+
+* Fixed the 6th and 8th order epanechnikov kernels
+
+* Fixed some quietness issues
+
+* npplot() now returns data upon request for conditional densities
+
+* npreg() and npcdens() now take the appropriate limits in some
+  pathological cases
+
+* User supplied bandwidths now operate seamlessly with the formula
+  interface
+
+Changes from Version 0.14-2 to 0.14-3 [02-May-2008]
+
+* Fixed a glitch that only arose when using the `liracine' unordered
+  kernel in the presence of irrelevant variables. The upper bound for
+  numerical search was constrained to be (c-1)/c [that for the
+  aitchisonaitken unordered kernel] but ought to have been 1. The
+  summary output would therefore show a value of lambda hitting the
+  (smaller) upper bound (c-1)/1 when it may have hit the (larger)
+  upper bound 1
+
+Changes from Version 0.14-1 to 0.14-2 [11-Jan-2008]
+
+* Relaxed checking tolerances slightly to prevent spurious 'invalid
+  bandwidth' errors
+
+* Empty sections were removed from help files
+
+* example(foobar) now works again. This was disabled in 0.14-1 at the
+  request of the R maintainers in order to shorten the duration of R
+  CMD check. All examples remained in the help files but due to the
+  presence of `dontrun' they were not run when examples(foobar) is
+  requested. Now a limited subset are run while the full set of
+  examples remain in the documents
+
+Changes from Version 0.13-1 to 0.14-1 [18-Dec-2007]
+
+* Now use optim for minimisation in single index and smooth
+  coefficient models
+
+* Fixed bug in klein-spady objective function
+
+* Standard errors are now available in the case of no continuous
+  variables
+
+* Summary should look prettier, print additional information
+
+* Tidied up lingering issues with out-of-sample data and conditional
+  modes
+
+* Fixed error when plotting asymptotic errors with conditional
+  densities
+
+* Fixed a bug in npplot() with partially linear regressions and
+  plot.behavior='data' or 'plot-data'
+
+* Maximum default number of multistarts is 5
+
+* Least-squares cross-validation of conditional densities uses a new,
+  much faster algorithm
+
+* New, faster algorithm for least-squares cross-validation for both
+  local-constant and local linear regressions
+
+  Note that the estimator has changed somewhat: both cross-validation
+  and the estimator itself use a method of shrinking towards the local
+  constant estimator when singularity would otherwise lead to the
+  breakdown of the estimator. This arises in sparse data settings in
+  conjunction with small bandwidths for one or more regressor
+
+* Optimised smooth coefficient code, added ridging
+
+* Fixed bug in uniform CDF kernel
+
+* Fixed bug where npindexbw() would ignore bandwidth.compute = FALSE
+  and compute bandwidths when supplied with a preexisting bw object
+
+* Now can handle estimation out of discrete support
+
+* Summary would misreport the values of discrete scale factors which
+  were computed with bwscaling = TRUE
+
+Changes from Version 0.12-1 to 0.13-1 [03-May-2007]
+
+* Bandwidths are now checked for validity based on their variable and
+  kernel types
+
+* np now does a better job of preserving names of some 'y' data
+
+* Names of coefficients returned from coef() now match variable names
+
+* Fixed some corner cases in npksum() involving the dimensionality of
+  outputs
+
+* Fixed deprecation warnings in R 2.5.0 caused by use of $ on atomic
+  objects
+
+* Various and sundry bug fixes in npscoef()
+
+* npscoef() now handles discrete 'z' data
+
+* Predict now accepts the argument 'se.fit', like predict.lm
+
+* Fixed bug where incorrect asymptotic standard errors of gradients
+  for regression objects were being displayed in npplot()
+
+* Fixed bug where errors of gradients of regression objects were not
+  being returned in matrix form
+
+* vcov() now works with partially linear regression objects
+
+* Fixed detection of evaluation responses when using the formula
+  interface
+
+* Pre-computed bandwidth objects are now provided for some of the more
+  computationally burdensome examples
+
+* Added Jeffrey Wooldridge's WAGE1 dataset with qualitative variables
+  (married, female, nonwhite)
+
+* Predictions outside of discrete support for regressions and
+  conditional densities are now allowed
+
+* Fixed sign issue with scaling of standard errors in the single index
+  model
+
+* Fixed error when calculating some bandwidths/scale factors for
+  display purposes
+
+* Bug in passing certain arguments to npcdensbw() fixed
+
+* Added predict method for qregression objects
+
+* Proper normalisation for liracine kernel shown in summary
+
+* Fixed output bug ($\hat ~$H) in summary method for sigtest objects
+
+* Fixed regression with plotting of bootstrapped errors in perspective
+  plots
+
+* npcdist() no longer incorrectly calls npcdens()
+
+* Fixed spacing between var name and p-value in significance test
+  summaries
+
+Version 0.12-1 [19-Nov-2006]
+
+* Initial release of the np package on CRAN

@@ -1,0 +1,19 @@
+citHeader("To cite np in publications use:")
+
+citEntry(entry="Article",
+         title = "Nonparametric Econometrics: The np Package",
+         author = personList(as.person("Tristen Hayfield"),
+                             as.person("Jeffrey S. Racine")),
+         journal      = "Journal of Statistical Software",
+         year         = "2008",
+         volume       = "27",
+         number       = "5",
+         url          = "http://www.jstatsoft.org/v27/i05/",
+         
+         textVersion = 
+         paste("Tristen Hayfield and Jeffrey S. Racine (2008).", 
+               "Nonparametric Econometrics: The np Package.",
+               "Journal of Statistical Software 27(5).",
+               "URL http://www.jstatsoft.org/v27/i05/.")
+)
+
