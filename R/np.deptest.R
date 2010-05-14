@@ -23,8 +23,12 @@ npdeptest <- function(data.x = NULL,
 
   ## Save seed prior to setting
 
-  save.seed <- get(".Random.seed", .GlobalEnv)
-  set.seed(random.seed)
+  if(exists(".Random.seed", .GlobalEnv)) {
+    save.seed <- get(".Random.seed", .GlobalEnv)
+    exists.seed = TRUE
+  } else {
+    exists.seed = FALSE
+  }
 
   ## If the variable is a time series convert to type numeric
 
@@ -117,7 +121,7 @@ npdeptest <- function(data.x = NULL,
   console <- printPop(console)  
   
   ## Compute and save bandwidths (save for bootstrapping if requested)
-  
+
   bw.data.x <- npudensbw(~data.x)$bw
   bw.data.y <- npudensbw(~data.y)$bw
   bw.joint <- npudensbw(~data.x+data.y)$bw
@@ -159,7 +163,7 @@ npdeptest <- function(data.x = NULL,
 
   ## Restore seed
 
-  assign(".Random.seed", save.seed, .GlobalEnv)
+  if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
 
   if(bootstrap) {
 

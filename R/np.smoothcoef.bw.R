@@ -530,6 +530,7 @@ npscoefbw.default <-
            ## dummy arguments for scbandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder,
+           ukertype, okertype,
            optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit,
            ...){
@@ -548,7 +549,8 @@ npscoefbw.default <-
     ## bandwidth call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder")
+    margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
+               "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
