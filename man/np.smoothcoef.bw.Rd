@@ -198,6 +198,18 @@ npscoefbw(\dots)
   \code{2}.
   }
 
+  \item{ukertype}{
+    character string used to specify the unordered categorical kernel type.
+    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
+    \code{aitchisonaitken}.
+  }
+
+  \item{okertype}{
+    character string used to specify the ordered categorical kernel type.
+    Can be set as \code{wangvanryzin} or \code{liracine}. Defaults to
+    \code{wangvanryzin}.
+  }
+  
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
