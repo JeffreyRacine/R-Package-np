@@ -121,6 +121,8 @@ npsigtest.rbandwidth <- function(bws,
     exists.seed = FALSE
   }
 
+  set.seed(random.seed)
+
   boot.type <- match.arg(boot.type)
   boot.method <- match.arg(boot.method)  
 

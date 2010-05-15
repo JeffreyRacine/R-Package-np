@@ -2,6 +2,10 @@ Changes from Version 0.30-8 to 0.30-9 [xxx-May-2010]
 
 * Fixed issue where ukertype and okertype were being ignored by npscoef
 
+* Fixed regression (dating to version 0.30-4) where seed was not
+  initialized in functions npcmstest, npdeneqtest, npindexbw,
+  npsdeptest, npqcmstest, npsigtest, npsymtest, npunitest, and npplot
+
 * Fixed issue with saving and restoring random seed in npdeptest
 
 Changes from Version 0.30-7 to 0.30-8 [20-Apr-2010]

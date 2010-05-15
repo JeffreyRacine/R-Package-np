@@ -73,6 +73,8 @@ npqcmstest <- function(formula,
     exists.seed = FALSE
   }
 
+  set.seed(random.seed)
+
   distribution = match.arg(distribution)
   boot.method = match.arg(boot.method)
   bwydat = match.arg(bwydat)  

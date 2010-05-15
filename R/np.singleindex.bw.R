@@ -157,6 +157,8 @@ npindexbw.sibandwidth <-
       exists.seed = FALSE
     }
 
+    set.seed(random.seed)
+
     xdat = toFrame(xdat)
 
     if (missing(nmulti)){

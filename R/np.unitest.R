@@ -31,6 +31,8 @@ npunitest <- function(data.x = NULL,
     exists.seed = FALSE
   }
 
+  set.seed(random.seed)
+
   console <- newLineConsole()
   console <- printPush("Computing bandwidths...", console = console)
 

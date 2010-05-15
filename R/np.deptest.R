@@ -30,6 +30,8 @@ npdeptest <- function(data.x = NULL,
     exists.seed = FALSE
   }
 
+  set.seed(random.seed)
+
   ## If the variable is a time series convert to type numeric
 
   if(is.ts(data.x)) data.x <- as.numeric(data.x)

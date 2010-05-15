@@ -33,6 +33,8 @@ npdeneqtest <- function(x = NULL,
     exists.seed = FALSE
   }
 
+  set.seed(random.seed)
+
   ## First, define test statistic function. This will return the
   ## standardized and unstandardized test statistic along with its
   ## estimated variance.

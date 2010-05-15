@@ -29,6 +29,8 @@ npsymtest <- function(data = NULL,
     exists.seed = FALSE
   }
 
+  set.seed(random.seed)
+
   console <- newLineConsole()
   console <- printPush(paste(sep="", "Working..."), console = console)
   console <- printPop(console)
