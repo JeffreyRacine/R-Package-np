@@ -46,6 +46,8 @@ npscoefbw(\dots)
           bwtype,
           ckertype,
           ckerorder,
+          ukertype,
+          okertype,
           optim.method,
           optim.maxattempts,
           optim.reltol,
