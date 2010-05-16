@@ -31,6 +31,8 @@ int difftime(time_t t1, time_t t0)
 
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
+/* No zero divide allowing for negative or positive values */
+#define NZD(a) ((a) < 0 ? (MIN(-DBL_MIN,a)) : (MAX(DBL_MIN,a)))
 
 double **alloc_matd(int nrows, int ncols);
 double **alloc_tmatd(int nrows, int ncols);

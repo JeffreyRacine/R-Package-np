@@ -11,7 +11,7 @@
 #include "headers.h"
 #include "matrix.h"
 
-#ifdef MPI
+#ifdef MPI2
 
 #include "mpi.h"
 
@@ -153,7 +153,7 @@ double *log_likelihood)
 
 	double log_DBL_MIN = log(DBL_MIN);
 
-	#ifdef MPI
+	#ifdef MPI2
 	double log_likelihood_MPI;
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
@@ -197,12 +197,12 @@ double *log_likelihood)
 		lambda,
 		matrix_bandwidth_deriv) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -222,7 +222,7 @@ double *log_likelihood)
 		&INT_KERNEL_P,
 		&K_INT_KERNEL_P);
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Initialize log likelihood */
 
@@ -419,7 +419,7 @@ double *log_likelihood)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Initialize log likelihood */
 
@@ -681,7 +681,7 @@ double *cv)
 	double *p_xj2;
 	double *p_xi2;
 
-	#ifdef MPI
+	#ifdef MPI2
 	double cv_MPI;
 	int stride = ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
@@ -691,11 +691,11 @@ double *cv)
 
 	lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
-	#ifndef MPI
+	#ifndef MPI2
 	matrix_bandwidth = alloc_matd(num_obs,num_reg_continuous);
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 	matrix_bandwidth = alloc_matd(stride*iNum_Processors,num_reg_continuous);
 	#endif
 
@@ -726,7 +726,7 @@ double *cv)
 		return(1);
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	*cv = 0.0;
 
@@ -1039,7 +1039,7 @@ double *cv)
 	*cv /= (double) num_obs;
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	cv_MPI = 0.0;
 
@@ -1418,7 +1418,7 @@ double *cv)
 
 	double temp;
 
-	#ifdef MPI
+	#ifdef MPI2
 	double cv_MPI;
 	int stride = ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
@@ -1458,7 +1458,7 @@ double *cv)
 		return(1);
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	*cv = 0.0;
 
@@ -1479,7 +1479,7 @@ double *cv)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs; i++)
 			{
@@ -1532,9 +1532,7 @@ double *cv)
 
 			}
 
-			temp = prod_h*sum_ker_marginal;
-
-			pdf = sum_ker/temp;
+      pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			if(pdf > DBL_MIN)
 			{
@@ -1567,7 +1565,7 @@ double *cv)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs; i++)
 			{
@@ -1622,7 +1620,7 @@ double *cv)
 
 			}
 
-			pdf = sum_ker/(prod_h*sum_ker_marginal);
+			pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			if(pdf > DBL_MIN)
 			{
@@ -1648,7 +1646,7 @@ double *cv)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs; i++)
 			{
@@ -1717,7 +1715,7 @@ double *cv)
 
 			}
 
-			pdf = sum_ker/sum_ker_marginal;
+			pdf = sum_ker/NZD(sum_ker_marginal);
 
 			if(pdf > DBL_MIN)
 			{
@@ -1739,7 +1737,7 @@ double *cv)
 	*cv /= (double) num_obs;
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	cv_MPI = 0.0;
 
@@ -1760,7 +1758,7 @@ double *cv)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs; i++)
 			{
@@ -1813,9 +1811,7 @@ double *cv)
 
 			}
 
-			temp = prod_h*sum_ker_marginal;
-
-			pdf = sum_ker/temp;
+      pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			if(pdf > DBL_MIN)
 			{
@@ -1848,7 +1844,7 @@ double *cv)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs; i++)
 			{
@@ -1903,7 +1899,7 @@ double *cv)
 
 			}
 
-			pdf = sum_ker/(prod_h*sum_ker_marginal);
+			pdf = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			if(pdf > DBL_MIN)
 			{
@@ -1929,7 +1925,7 @@ double *cv)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs; i++)
 			{
@@ -1998,7 +1994,7 @@ double *cv)
 
 			}
 
-			pdf = sum_ker/sum_ker_marginal;
+			pdf = sum_ker/NZD(sum_ker_marginal);
 
 			if(pdf > DBL_MIN)
 			{
@@ -2076,7 +2072,7 @@ int itmax)
 	double **matrix_bandwidth = NULL;
 	double **matrix_bandwidth_deriv = NULL;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -2119,12 +2115,12 @@ int itmax)
 		lambda,
 		matrix_bandwidth_deriv) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -2138,7 +2134,7 @@ int itmax)
 
 	/* Conduct the estimation */
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	if(BANDWIDTH_den == 0)
 	{
@@ -2256,7 +2252,7 @@ int itmax)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	if(BANDWIDTH_den == 0)
 	{
@@ -2434,7 +2430,8 @@ double *SIGN)
 	int k;
 	int l = INT_MAX;
 
-	double epsilon;
+	const double epsilon = 1.0/num_obs_train;
+  double nepsilon;
 
 	double prod_kernel;
 
@@ -2474,7 +2471,7 @@ double *SIGN)
 
 	int num_reg_cat_cont;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -2541,12 +2538,12 @@ double *SIGN)
 		lambda,
 		matrix_bandwidth_deriv) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -2558,7 +2555,7 @@ double *SIGN)
 		#endif
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	if(int_ll == 0)
 	{
@@ -2574,7 +2571,7 @@ double *SIGN)
 			{
 			  R_CheckUserInterrupt();
 				sum_y_ker = sum_y_sq_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				for(l = 0; l < num_reg_continuous; l++)
 				{
@@ -2642,6 +2639,10 @@ double *SIGN)
 
 				}
 
+        /* Don't keep calling NZD for successive divides */
+
+        sum_ker = NZD(sum_ker);
+
 				*pointer_m = sum_y_ker/sum_ker;
 
 				temp_var = (sum_y_sq_ker/sum_ker) - ipow(*pointer_m++, 2);
@@ -2671,7 +2672,7 @@ double *SIGN)
 			{
 			  R_CheckUserInterrupt();
 				sum_y_ker = sum_y_sq_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				for(l = 0; l < num_reg_continuous; l++)
 				{
@@ -2739,6 +2740,10 @@ double *SIGN)
 
 				}
 
+        /* Don't keep calling NZD for successive divides */
+
+        sum_ker = NZD(sum_ker);
+
 				*pointer_m = sum_y_ker/sum_ker;
 
 				temp_var = (sum_y_sq_ker/sum_ker) - ipow(*pointer_m++, 2);
@@ -2769,7 +2774,7 @@ double *SIGN)
 			{
 			  R_CheckUserInterrupt();
 				sum_y_ker = sum_y_sq_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				for(l = 0; l < num_reg_continuous; l++)
 				{
@@ -2836,6 +2841,10 @@ double *SIGN)
 					}
 
 				}
+
+        /* Don't keep calling NZD for successive divides */
+
+        sum_ker = NZD(sum_ker);
 
 				*pointer_m = sum_y_ker/sum_ker;
 
@@ -3024,8 +3033,6 @@ double *SIGN)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs_train;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -3037,14 +3044,15 @@ double *SIGN)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs_train;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
+
 				}
 
 				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
@@ -3236,8 +3244,6 @@ double *SIGN)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs_train;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -3249,14 +3255,14 @@ double *SIGN)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs_train;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -3451,8 +3457,6 @@ double *SIGN)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs_train;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -3464,14 +3468,14 @@ double *SIGN)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs_train;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -3528,7 +3532,7 @@ double *SIGN)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	if(int_ll == 0)
 	{
@@ -3542,7 +3546,7 @@ double *SIGN)
 			{
 
 				sum_y_ker = sum_y_sq_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				for(l = 0; l < num_reg_continuous; l++)
 				{
@@ -3610,6 +3614,10 @@ double *SIGN)
 
 				}
 
+        /* Don't keep calling NZD for successive divides */
+
+        sum_ker = NZD(sum_ker);
+
 				mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 				temp_var = (sum_y_sq_ker/sum_ker) - ipow(mean[j-my_rank*stride],2);
 
@@ -3637,7 +3645,7 @@ double *SIGN)
 			{
 
 				sum_y_ker = sum_y_sq_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				for(l = 0; l < num_reg_continuous; l++)
 				{
@@ -3705,6 +3713,10 @@ double *SIGN)
 
 				}
 
+        /* Don't keep calling NZD for successive divides */
+
+        sum_ker = NZD(sum_ker);
+
 				mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 
 				temp_var = (sum_y_sq_ker/sum_ker) - ipow(*pointer_m++, 2);
@@ -3733,7 +3745,7 @@ double *SIGN)
 			{
 
 				sum_y_ker = sum_y_sq_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				for(l = 0; l < num_reg_continuous; l++)
 				{
@@ -3800,6 +3812,10 @@ double *SIGN)
 					}
 
 				}
+
+        /* Don't keep calling NZD for successive divides */
+
+        sum_ker = NZD(sum_ker);
 
 				mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 
@@ -3987,8 +4003,6 @@ double *SIGN)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs_train;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -4000,14 +4014,14 @@ double *SIGN)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs_train;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -4200,8 +4214,6 @@ double *SIGN)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs_train;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -4213,14 +4225,14 @@ double *SIGN)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs_train;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -4415,8 +4427,6 @@ double *SIGN)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs_train;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -4428,14 +4438,14 @@ double *SIGN)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs_train;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -4574,7 +4584,8 @@ double *mean)
 	int k;
 	int l;
 
-	double epsilon;
+	const double epsilon = 1.0/num_obs;
+  double nepsilon;
 
 	double prod_kernel;
 
@@ -4597,7 +4608,7 @@ double *mean)
 
 	int num_reg_cat_cont;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -4616,7 +4627,7 @@ double *mean)
 	lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 	matrix_bandwidth = alloc_matd(num_obs,num_reg_continuous);
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Conduct the estimation */
 
@@ -4663,7 +4674,7 @@ double *mean)
 			{
 
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -4699,19 +4710,7 @@ double *mean)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					*pointer_m++ = sum_y_ker/sum_ker;
-				}
-				else
-				{
-					if(int_DEBUG == 1)
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_leave_one_out()",j);
-					}
-					return(1);
-				}
+        *pointer_m++ = sum_y_ker/NZD(sum_ker);
 
 			}
 
@@ -4725,7 +4724,7 @@ double *mean)
 			{
 
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -4761,19 +4760,7 @@ double *mean)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					*pointer_m++ = sum_y_ker/sum_ker;
-				}
-				else
-				{
-					if(int_DEBUG == 1)
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_leave_one_out()",j);
-					}
-					return(1);
-				}
+        *pointer_m++ = sum_y_ker/NZD(sum_ker);
 
 			}
 
@@ -4787,7 +4774,7 @@ double *mean)
 			{
 
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -4823,19 +4810,7 @@ double *mean)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					*pointer_m++ = sum_y_ker/sum_ker;
-				}
-				else
-				{
-					if(int_DEBUG == 1)
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_leave_one_out()",j);
-					}
-					return(1);
-				}
+        *pointer_m++ = sum_y_ker/NZD(sum_ker);
 
 			}
 
@@ -5034,8 +5009,6 @@ double *mean)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -5047,14 +5020,14 @@ double *mean)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -5209,8 +5182,6 @@ double *mean)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -5222,14 +5193,14 @@ double *mean)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -5384,8 +5355,6 @@ double *mean)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -5397,14 +5366,14 @@ double *mean)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -5423,7 +5392,7 @@ double *mean)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Conduct the estimation - MPI-enables */
 
@@ -5472,7 +5441,7 @@ double *mean)
 			{
 
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -5508,20 +5477,7 @@ double *mean)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					mean[j-my_rank*stride] = sum_y_ker/sum_ker;
-				}
-				else
-				{
-					/* Don't print if you are using MPI */
-					if((int_DEBUG == 1)&&(my_rank == 0))
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_leave_one_out()",j);
-					}
-					return(1);
-				}
+        mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 			}
 
@@ -5533,7 +5489,7 @@ double *mean)
 			{
 
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -5569,20 +5525,7 @@ double *mean)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					mean[j-my_rank*stride] = sum_y_ker/sum_ker;
-				}
-				else
-				{
-					/* Don't print if you are using MPI */
-					if((my_rank == 0)&&(int_DEBUG == 1))
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_leave_one_out()",j);
-					}
-					return(1);
-				}
+        mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 			}
 
@@ -5593,7 +5536,7 @@ double *mean)
 			for(j=my_rank*stride; (j < num_obs) && (j < (my_rank+1)*stride); j++)
 			{
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -5629,20 +5572,7 @@ double *mean)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					mean[j-my_rank*stride] = sum_y_ker/sum_ker;
-				}
-				else
-				{
-					/* Don't print if you are using MPI */
-					if((my_rank == 0)&&(int_DEBUG == 1))
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_leave_one_out()",j);
-					}
-					return(1);
-				}
+        mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 			}
 
@@ -5843,7 +5773,6 @@ double *mean)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
 
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
@@ -5856,14 +5785,14 @@ double *mean)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -6018,8 +5947,6 @@ double *mean)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -6031,14 +5958,14 @@ double *mean)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -6193,8 +6120,6 @@ double *mean)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -6206,14 +6131,14 @@ double *mean)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -6290,7 +6215,8 @@ double **gradient)
 	int tmp_k;
 	int l;
 
-	double epsilon;
+	const double epsilon = 1.0/num_obs_train;
+  double nepsilon;
 
 	double prod_kernel;
 
@@ -6334,7 +6260,7 @@ double **gradient)
 
 	int num_reg_cat_cont;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -6348,7 +6274,7 @@ double **gradient)
 		num_reg_cat_cont = num_reg_continuous;
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	if(int_compute_gradient == 1)
 	{
@@ -6379,7 +6305,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						p_sum_ker_deriv = &sum_ker_deriv[0];
 						p_sum_y_ker_deriv = &sum_y_ker_deriv[0];
@@ -6461,6 +6387,10 @@ double **gradient)
 
 						}
 
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
+
 						*pointer_m = sum_y_ker/sum_ker;
 
 						/* gradient[0][] is that for _first_ continuous variable */
@@ -6487,7 +6417,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						p_sum_ker_deriv = &sum_ker_deriv[0];
 						p_sum_y_ker_deriv = &sum_y_ker_deriv[0];
@@ -6569,6 +6499,10 @@ double **gradient)
 
 						}
 
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
+
 						*pointer_m = sum_y_ker/sum_ker;
 
 						/* gradient[0][] is that for _first_ continuous variable */
@@ -6595,7 +6529,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						p_sum_ker_deriv = &sum_ker_deriv[0];
 						p_sum_y_ker_deriv = &sum_y_ker_deriv[0];
@@ -6677,6 +6611,10 @@ double **gradient)
 							pointer_yi++;
 
 						}
+
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
 
 						*pointer_m = sum_y_ker/sum_ker;
 
@@ -6858,8 +6796,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -6871,14 +6807,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+              XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -7036,8 +6972,6 @@ double **gradient)
 							}
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -7049,14 +6983,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+              XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -7216,8 +7150,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -7229,14 +7161,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+              XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -7282,7 +7214,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						pointer_yi = &vector_Y[0];
 						pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -7294,6 +7226,10 @@ double **gradient)
 							sum_y_ker += *pointer_yi++ * *pointer_matrix_weights_K++;
 
 						}
+
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
 
 						*pointer_m++ = sum_y_ker/sum_ker;
 
@@ -7315,7 +7251,7 @@ double **gradient)
 							{
 
 								sum_ker_deriv_scalar = sum_y_ker_deriv_scalar = 0.0;
-								sum_ker = DBL_MIN;
+								sum_ker = 0.0;
 
 								pointer_yi = &vector_Y[0];
 								pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -7327,6 +7263,10 @@ double **gradient)
 									sum_ker_deriv_scalar += *pointer_matrix_weights_K_deriv;
 									sum_y_ker_deriv_scalar += *pointer_yi++ * *pointer_matrix_weights_K_deriv++;
 								}
+
+                /* Don't keep calling NZD for successive divides */
+
+                sum_ker = NZD(sum_ker);
 
 								*pointer_gradient++ = (sum_y_ker_deriv_scalar - *pointer_m++ * sum_ker_deriv_scalar)/(*pointer_matrix_bandwidth * sum_ker);
 
@@ -7346,7 +7286,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						pointer_yi = &vector_Y[0];
 						pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -7358,6 +7298,10 @@ double **gradient)
 							sum_y_ker += *pointer_yi++ * *pointer_matrix_weights_K++;
 
 						}
+
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
 
 						*pointer_m++ = sum_y_ker/sum_ker;
 
@@ -7379,7 +7323,7 @@ double **gradient)
 							{
 
 								sum_ker_deriv_scalar = sum_y_ker_deriv_scalar = 0.0;
-								sum_ker = DBL_MIN;
+								sum_ker = 0.0;
 
 								pointer_yi = &vector_Y[0];
 								pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -7391,6 +7335,10 @@ double **gradient)
 									sum_ker_deriv_scalar += *pointer_matrix_weights_K_deriv;
 									sum_y_ker_deriv_scalar += *pointer_yi++ * *pointer_matrix_weights_K_deriv++;
 								}
+
+                /* Don't keep calling NZD for successive divides */
+
+                sum_ker = NZD(sum_ker);
 
 								*pointer_gradient++ = (sum_y_ker_deriv_scalar - *pointer_m++ * sum_ker_deriv_scalar)/(*pointer_matrix_bandwidth++ * sum_ker);
 
@@ -7410,7 +7358,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						pointer_yi = &vector_Y[0];
 						pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -7420,6 +7368,10 @@ double **gradient)
 							sum_ker += *pointer_matrix_weights_K;
 							sum_y_ker += *pointer_yi++ * *pointer_matrix_weights_K++;
 						}
+
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
 
 						*pointer_m++ = sum_y_ker/sum_ker;
 
@@ -7438,7 +7390,7 @@ double **gradient)
 							{
 
 								sum_ker_deriv_scalar = sum_y_ker_deriv_scalar = 0.0;
-								sum_ker = DBL_MIN;
+								sum_ker = 0.0;
 
 								pointer_yi = &vector_Y[0];
 								pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -7451,6 +7403,10 @@ double **gradient)
 									sum_ker_deriv_scalar += *pointer_matrix_weights_K_deriv;
 									sum_y_ker_deriv_scalar += *pointer_yi++ * *pointer_matrix_weights_K_deriv++;
 								}
+
+                /* Don't keep calling NZD for successive divides */
+
+                sum_ker = NZD(sum_ker);
 
 								/* Note - sum_ker is already divided by bw at i... */
 
@@ -7597,8 +7553,6 @@ double **gradient)
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
 
-						epsilon = 1.0/(double)num_obs_train;
-
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
 							XTKX[k][k] += epsilon;
@@ -7610,14 +7564,14 @@ double **gradient)
 						{
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
-								epsilon += 1.0/(double) num_obs_train;
 								XTKX[k][k] += epsilon;
+								nepsilon += epsilon;
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
 						XTKXINV = mat_inv( XTKX, XTKXINV );
 						/* Add epsilon times local constant estimator to first element of XTKY */
-						XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+            XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
@@ -7666,7 +7620,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 						pointer_yi = &vector_Y[0];
 
 						for(i=0; i < num_obs_train; i++)
@@ -7702,7 +7656,7 @@ double **gradient)
 
 						}
 
-						*pointer_m++ = sum_y_ker/sum_ker;
+						*pointer_m++ = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -7716,7 +7670,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 						pointer_yi = &vector_Y[0];
 
 						for(i=0; i < num_obs_train; i++)
@@ -7752,7 +7706,7 @@ double **gradient)
 
 						}
 
-						*pointer_m++ = sum_y_ker/sum_ker;
+						*pointer_m++ = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -7766,7 +7720,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 						pointer_yi = &vector_Y[0];
 
 						for(i=0; i < num_obs_train; i++)
@@ -7802,7 +7756,7 @@ double **gradient)
 
 						}
 
-						*pointer_m++ = sum_y_ker/sum_ker;
+						*pointer_m++ = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -7965,8 +7919,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -7978,14 +7930,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -8138,8 +8090,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -8151,14 +8101,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -8311,8 +8261,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -8324,14 +8272,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -8367,7 +8315,7 @@ double **gradient)
 				{
 
 					sum_y_ker = 0.0;
-					sum_ker = DBL_MIN;
+					sum_ker = 0.0;
 
 					pointer_yi = &vector_Y[0];
 					pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -8378,7 +8326,7 @@ double **gradient)
 						sum_y_ker += *pointer_yi++ * *pointer_matrix_weights_K++;
 					}
 
-					*pointer_m++ = sum_y_ker/sum_ker;
+					*pointer_m++ = sum_y_ker/NZD(sum_ker);
 
 				}
 
@@ -8519,8 +8467,6 @@ double **gradient)
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
 
-						epsilon = 1.0/(double)num_obs_train;
-
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
 							XTKX[k][k] += epsilon;
@@ -8532,14 +8478,14 @@ double **gradient)
 						{
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
-								epsilon += 1.0/(double) num_obs_train;
 								XTKX[k][k] += epsilon;
+								nepsilon += epsilon;
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
 						XTKXINV = mat_inv( XTKX, XTKXINV );
 						/* Add epsilon times local constant estimator to first element of XTKY */
-						XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+						XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
@@ -8561,7 +8507,7 @@ double **gradient)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	if(int_compute_gradient == 1)
 	{
@@ -8590,7 +8536,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						p_sum_ker_deriv = &sum_ker_deriv[0];
 						p_sum_y_ker_deriv = &sum_y_ker_deriv[0];
@@ -8672,6 +8618,10 @@ double **gradient)
 
 						}
 
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
+
 						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 
 						/* gradient[0][] is that for _first_ continuous variable */
@@ -8694,7 +8644,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						p_sum_ker_deriv = &sum_ker_deriv[0];
 						p_sum_y_ker_deriv = &sum_y_ker_deriv[0];
@@ -8776,6 +8726,10 @@ double **gradient)
 
 						}
 
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
+
 						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 
 						/* gradient[0][] is that for _first_ continuous variable */
@@ -8798,7 +8752,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						p_sum_ker_deriv = &sum_ker_deriv[0];
 						p_sum_y_ker_deriv = &sum_y_ker_deriv[0];
@@ -8880,6 +8834,10 @@ double **gradient)
 							pointer_yi++;
 
 						}
+
+            /* Don't keep calling NZD for successive divides */
+
+            sum_ker = NZD(sum_ker);
 
 						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 
@@ -9058,8 +9016,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -9071,14 +9027,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -9235,8 +9191,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -9248,14 +9202,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -9413,8 +9367,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -9426,14 +9378,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -9477,7 +9429,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						pointer_yi = &vector_Y[0];
 						pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -9490,7 +9442,7 @@ double **gradient)
 
 						}
 
-						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+						mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -9509,7 +9461,7 @@ double **gradient)
 							{
 
 								sum_ker_deriv_scalar = sum_y_ker_deriv_scalar = 0.0;
-								sum_ker = DBL_MIN;
+								sum_ker = 0.0;
 
 								pointer_yi = &vector_Y[0];
 								pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -9521,6 +9473,10 @@ double **gradient)
 									sum_ker_deriv_scalar += *pointer_matrix_weights_K_deriv;
 									sum_y_ker_deriv_scalar += *pointer_yi++ * *pointer_matrix_weights_K_deriv++;
 								}
+
+                /* Don't keep calling NZD for successive divides */
+                
+                sum_ker = NZD(sum_ker);
 
 								*pointer_gradient++ = (sum_y_ker_deriv_scalar - mean[j-my_rank*stride] * sum_ker_deriv_scalar)/(*pointer_matrix_bandwidth * sum_ker);
 
@@ -9538,7 +9494,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						pointer_yi = &vector_Y[0];
 						pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -9551,7 +9507,7 @@ double **gradient)
 
 						}
 
-						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+						mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -9570,7 +9526,7 @@ double **gradient)
 							{
 
 								sum_ker_deriv_scalar = sum_y_ker_deriv_scalar = 0.0;
-								sum_ker = DBL_MIN;
+								sum_ker = 0.0;
 
 								pointer_yi = &vector_Y[0];
 								pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -9582,6 +9538,10 @@ double **gradient)
 									sum_ker_deriv_scalar += *pointer_matrix_weights_K_deriv;
 									sum_y_ker_deriv_scalar += *pointer_yi++ * *pointer_matrix_weights_K_deriv++;
 								}
+
+                /* Don't keep calling NZD for successive divides */
+                
+                sum_ker = NZD(sum_ker);
 
 								*pointer_gradient++ = (sum_y_ker_deriv_scalar - mean[j-my_rank*stride] * sum_ker_deriv_scalar)/(*pointer_matrix_bandwidth++ * sum_ker);
 
@@ -9599,7 +9559,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 
 						pointer_yi = &vector_Y[0];
 						pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -9610,7 +9570,7 @@ double **gradient)
 							sum_y_ker += *pointer_yi++ * *pointer_matrix_weights_K++;
 						}
 
-						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+						mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -9626,7 +9586,7 @@ double **gradient)
 							{
 
 								sum_ker_deriv_scalar = sum_y_ker_deriv_scalar = 0.0;
-								sum_ker = DBL_MIN;
+								sum_ker = 0.0;
 
 								pointer_yi = &vector_Y[0];
 								pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -9639,6 +9599,10 @@ double **gradient)
 									sum_ker_deriv_scalar += *pointer_matrix_weights_K_deriv;
 									sum_y_ker_deriv_scalar += *pointer_yi++ * *pointer_matrix_weights_K_deriv++;
 								}
+
+                /* Don't keep calling NZD for successive divides */
+                
+                sum_ker = NZD(sum_ker);
 
 								/* Note - sum_ker is already divided by bw at i... */
 
@@ -9785,8 +9749,6 @@ double **gradient)
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
 
-						epsilon = 1.0/(double)num_obs_train;
-
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
 							XTKX[k][k] += epsilon;
@@ -9798,14 +9760,14 @@ double **gradient)
 						{
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
-								epsilon += 1.0/(double) num_obs_train;
 								XTKX[k][k] += epsilon;
+								nepsilon += epsilon;
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
 						XTKXINV = mat_inv( XTKX, XTKXINV );
 						/* Add epsilon times local constant estimator to first element of XTKY */
-						XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+						XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
@@ -9852,7 +9814,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 						pointer_yi = &vector_Y[0];
 
 						for(i=0; i < num_obs_train; i++)
@@ -9888,7 +9850,7 @@ double **gradient)
 
 						}
 
-						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+						mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -9900,7 +9862,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 						pointer_yi = &vector_Y[0];
 
 						for(i=0; i < num_obs_train; i++)
@@ -9936,7 +9898,7 @@ double **gradient)
 
 						}
 
-						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+						mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -9948,7 +9910,7 @@ double **gradient)
 					{
 
 						sum_y_ker = 0.0;
-						sum_ker = DBL_MIN;
+						sum_ker = 0.0;
 						pointer_yi = &vector_Y[0];
 
 						for(i=0; i < num_obs_train; i++)
@@ -9984,7 +9946,7 @@ double **gradient)
 
 						}
 
-						mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+						mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 					}
 
@@ -10147,8 +10109,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -10160,14 +10120,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -10320,8 +10280,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -10333,14 +10291,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -10493,8 +10451,6 @@ double **gradient)
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
-							epsilon = 1.0/(double)num_obs_train;
-
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
 								XTKX[k][k] += epsilon;
@@ -10506,14 +10462,14 @@ double **gradient)
 							{
 								for(k=0; k < num_reg_cat_cont + 1; k++)
 								{
-									epsilon += 1.0/(double) num_obs_train;
 									XTKX[k][k] += epsilon;
+									nepsilon += epsilon;
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
 							XTKXINV = mat_inv( XTKX, XTKXINV );
 							/* Add epsilon times local constant estimator to first element of XTKY */
-							XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
@@ -10547,7 +10503,7 @@ double **gradient)
 				{
 
 					sum_y_ker = 0.0;
-					sum_ker = DBL_MIN;
+					sum_ker = 0.0;
 
 					pointer_yi = &vector_Y[0];
 					pointer_matrix_weights_K = &matrix_weights_K[j][0];
@@ -10558,7 +10514,7 @@ double **gradient)
 						sum_y_ker += *pointer_yi++ * *pointer_matrix_weights_K++;
 					}
 
-					mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+					mean[j-my_rank*stride] = sum_y_ker/NZD(sum_ker);
 
 				}
 
@@ -10699,8 +10655,6 @@ double **gradient)
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
 
-						epsilon = 1.0/(double)num_obs_train;
-
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
 							XTKX[k][k] += epsilon;
@@ -10712,14 +10666,14 @@ double **gradient)
 						{
 							for(k=0; k < num_reg_cat_cont + 1; k++)
 							{
-								epsilon += 1.0/(double) num_obs_train;
 								XTKX[k][k] += epsilon;
+								nepsilon += epsilon;
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
 						XTKXINV = mat_inv( XTKX, XTKXINV );
 						/* Add epsilon times local constant estimator to first element of XTKY */
-						XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+						XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
@@ -10835,7 +10789,7 @@ double *log_likelihood)
 
 	/* Allocate memory for objects */
 
-	#ifdef MPI
+	#ifdef MPI2
 	double log_likelihood_MPI;
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
@@ -10876,12 +10830,12 @@ double *log_likelihood)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -10901,7 +10855,7 @@ double *log_likelihood)
 		&INT_KERNEL_P,
 		&K_INT_KERNEL_P);
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Initialize log likelihood */
 
@@ -10972,7 +10926,7 @@ double *log_likelihood)
 
 			}
 
-			pdf[j] = sum_ker/(prod_h*sum_ker_marginal);
+			pdf[j] = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P, prod_h ==1 */
 
@@ -11009,7 +10963,7 @@ double *log_likelihood)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11058,7 +11012,7 @@ double *log_likelihood)
 
 			}
 
-			pdf[j] = sum_ker/(prod_h*sum_ker_marginal);
+			pdf[j] = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P, prod_h ==1 */
 
@@ -11088,7 +11042,7 @@ double *log_likelihood)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = sum_ker_temp = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11153,6 +11107,10 @@ double *log_likelihood)
 
 			}
 
+      /* Don't keep calling NZD for successive divides */
+                
+      sum_ker_marginal = NZD(sum_ker_marginal);
+
 			pdf[j] = sum_ker/sum_ker_marginal;
 
 			/* stderr needs extra tmp I think */
@@ -11179,7 +11137,7 @@ double *log_likelihood)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Initialize log likelihood */
 
@@ -11201,7 +11159,7 @@ double *log_likelihood)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11250,7 +11208,7 @@ double *log_likelihood)
 
 			}
 
-			pdf[j-my_rank*stride] = sum_ker/(prod_h*sum_ker_marginal);
+			pdf[j-my_rank*stride] = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P, prod_h ==1 */
 
@@ -11287,7 +11245,7 @@ double *log_likelihood)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11336,7 +11294,7 @@ double *log_likelihood)
 
 			}
 
-			pdf[j-my_rank*stride] = sum_ker/(prod_h*sum_ker_marginal);
+			pdf[j-my_rank*stride] = sum_ker/(prod_h*NZD(sum_ker_marginal));
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P, prod_h ==1 */
 
@@ -11366,7 +11324,7 @@ double *log_likelihood)
 		{
 
 			sum_ker = sum_ker_temp = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11430,6 +11388,10 @@ double *log_likelihood)
 				sum_ker_temp += prod_kernel_cont*prod_kernel_cat/ipow(prod_h, 2);
 
 			}
+
+      /* Don't keep calling NZD for successive divides */
+                
+      sum_ker_marginal = NZD(sum_ker_marginal);
 
 			pdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
 			/* stderr needs extra tmp I think */
@@ -11537,7 +11499,7 @@ int itmax)
 	double **matrix_bandwidth_var = NULL;
 	double **matrix_bandwidth_reg = NULL;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -11579,12 +11541,12 @@ int itmax)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -11596,7 +11558,7 @@ int itmax)
 		#endif
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Conduct the estimation */
 
@@ -11607,7 +11569,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11657,7 +11619,7 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 		}
@@ -11670,7 +11632,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11720,7 +11682,7 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 		}
@@ -11733,7 +11695,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11788,7 +11750,7 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 		}
@@ -11796,7 +11758,7 @@ int itmax)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Conduct the estimation */
 
@@ -11807,7 +11769,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11857,7 +11819,7 @@ int itmax)
 
 			}
 
-			cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+			cdf[j-my_rank*stride] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j-my_rank*stride] = sqrt(cdf[j-my_rank*stride]*(1.0-cdf[j-my_rank*stride])/(double)num_obs_train);
 
 		}
@@ -11870,7 +11832,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11920,7 +11882,7 @@ int itmax)
 
 			}
 
-			cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+			cdf[j-my_rank*stride] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j-my_rank*stride] = sqrt(cdf[j-my_rank*stride]*(1.0-cdf[j-my_rank*stride])/(double)num_obs_train);
 
 		}
@@ -11933,7 +11895,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -11988,7 +11950,7 @@ int itmax)
 
 			}
 
-			cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+			cdf[j-my_rank*stride] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j-my_rank*stride] = sqrt(cdf[j-my_rank*stride]*(1.0-cdf[j-my_rank*stride])/(double)num_obs_train);
 
 		}
@@ -12073,7 +12035,7 @@ int itmax)
 	double **matrix_bandwidth_var = NULL;
 	double **matrix_bandwidth_reg = NULL;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -12121,7 +12083,7 @@ int itmax)
 		return(1);
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
   /* First stab could be brute force copy no saving */
 
@@ -12134,7 +12096,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12186,7 +12148,7 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 
 		}
 
@@ -12198,7 +12160,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12249,7 +12211,7 @@ int itmax)
 			}
 
       if(i != j) {
-        cdf[j] = sum_ker/sum_ker_marginal;
+        cdf[j] = sum_ker/NZD(sum_ker_marginal);
       }
 
 		}
@@ -12262,7 +12224,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12319,14 +12281,14 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 
 		}
 
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Conduct the estimation */
 
@@ -12337,7 +12299,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12389,7 +12351,7 @@ int itmax)
 
 			}
 
-			cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+			cdf[j-my_rank*stride] = sum_ker/NZD(sum_ker_marginal);
 
 		}
 
@@ -12401,7 +12363,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12453,7 +12415,7 @@ int itmax)
 
 			}
 
-			cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+			cdf[j-my_rank*stride] = sum_ker/NZD(sum_ker_marginal);
 
 		}
 
@@ -12465,7 +12427,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12522,7 +12484,7 @@ int itmax)
 
 			}
 
-			cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+			cdf[j-my_rank*stride] = sum_ker/NZD(sum_ker_marginal);
 
 		}
 
@@ -12817,7 +12779,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12867,7 +12829,7 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 		}
@@ -12880,7 +12842,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12930,7 +12892,7 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 		}
@@ -12943,7 +12905,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(i=0; i < num_obs_train; i++)
 			{
@@ -12998,7 +12960,7 @@ int itmax)
 
 			}
 
-			cdf[j] = sum_ker/sum_ker_marginal;
+			cdf[j] = sum_ker/NZD(sum_ker_marginal);
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 		}
@@ -13098,7 +13060,7 @@ double *log_likelihood)
 
 	double log_DBL_MIN = log(DBL_MIN);
 
-	#ifdef MPI
+	#ifdef MPI2
 	double log_likelihood_MPI;
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
@@ -13145,12 +13107,12 @@ double *log_likelihood)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -13172,7 +13134,7 @@ double *log_likelihood)
 		&INT_KERNEL_PM_HALF,
 		&DIFF_KER_PPM);
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Initialize log likelihood */
 
@@ -13194,7 +13156,7 @@ double *log_likelihood)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -13269,17 +13231,9 @@ double *log_likelihood)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of sum_ker_marginal
-																													 multiplied by other kernels */
+      sum_ker_marginal = NZD(sum_ker_marginal);
 
-			if(prod_h*sum_ker_marginal > 0.0)
-			{
-				pdf[j] = sum_ker/(prod_h*sum_ker_marginal);
-			}
-			else
-			{
-				pdf[j] = 0.0;
-			}
+      pdf[j] = sum_ker/(prod_h*sum_ker_marginal);
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P */
 
@@ -13304,18 +13258,10 @@ double *log_likelihood)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(prod_h*sum_ker_marginal > 0.0)
-				{
-					pdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][0]);
-				}
-				else
-				{
-					pdf_deriv[l][j] = 0.0;
-				}
-
+        pdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][0]);
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
-
+        
 				pdf_deriv_stderr[l][j] = sqrt(DIFF_KER_PPM /
 					(sum_ker_marginal * ipow(matrix_bandwidth_reg[l][0],2)));
 			}
@@ -13337,7 +13283,7 @@ double *log_likelihood)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -13412,17 +13358,9 @@ double *log_likelihood)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of sum_ker_marginal
-																													 multiplied by other kernels */
+      sum_ker_marginal = NZD(sum_ker_marginal);
 
-			if(prod_h*sum_ker_marginal > 0.0)
-			{
-				pdf[j] = sum_ker/(prod_h*sum_ker_marginal);
-			}
-			else
-			{
-				pdf[j] = 0.0;
-			}
+      pdf[j] = sum_ker/(prod_h*sum_ker_marginal);
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P */
 
@@ -13447,15 +13385,8 @@ double *log_likelihood)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(prod_h*sum_ker_marginal > 0.0)
-				{
-					pdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][j]);
-				}
-				else
-				{
-					pdf_deriv[l][j] = 0.0;
-				}
+        pdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][j]);
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 
@@ -13473,7 +13404,7 @@ double *log_likelihood)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = sum_ker_temp = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -13564,6 +13495,8 @@ double *log_likelihood)
 				}
 
 			}
+
+      sum_ker_marginal = NZD(sum_ker_marginal);
 
 			pdf[j] = sum_ker/sum_ker_marginal;
 			/* stderr needs extra tmp I think */
@@ -13591,14 +13524,8 @@ double *log_likelihood)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(sum_ker_marginal > 0.0)
-				{
-					pdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])/sum_ker_marginal;
-				}
-				else
-				{
-					pdf_deriv[l][j] = 0.0;
-				}
+        pdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])/sum_ker_marginal;
+
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 				/* 11/26/01 - dropped division by prod of bws, but need to revisit */
@@ -13611,7 +13538,7 @@ double *log_likelihood)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Initialize log likelihood */
 
@@ -13633,7 +13560,7 @@ double *log_likelihood)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -13708,17 +13635,9 @@ double *log_likelihood)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of sum_ker_marginal
-																													 multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(prod_h*sum_ker_marginal > 0.0)
-			{
-				pdf[j-my_rank*stride] = sum_ker/(prod_h*sum_ker_marginal);
-			}
-			else
-			{
-				pdf[j-my_rank*stride] = 0.0;
-			}
+      pdf[j-my_rank*stride] = sum_ker/(prod_h*sum_ker_marginal);
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P */
 
@@ -13743,15 +13662,8 @@ double *log_likelihood)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(prod_h*sum_ker_marginal > 0.0)
-				{
-					pdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][0]);
-				}
-				else
-				{
-					pdf_deriv[l][j-my_rank*stride] = 0.0;
-				}
+        pdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+        /(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][0]);
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 
@@ -13776,7 +13688,7 @@ double *log_likelihood)
 			}
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -13851,17 +13763,9 @@ double *log_likelihood)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of sum_ker_marginal
-																													 multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(prod_h*sum_ker_marginal > 0.0)
-			{
-				pdf[j-my_rank*stride] = sum_ker/(prod_h*sum_ker_marginal);
-			}
-			else
-			{
-				pdf[j-my_rank*stride] = 0.0;
-			}
+      pdf[j-my_rank*stride] = sum_ker/(prod_h*sum_ker_marginal);
 
 			/* With no continuous variables, need to drop K_INT_KERNEL_P */
 
@@ -13886,15 +13790,8 @@ double *log_likelihood)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(prod_h*sum_ker_marginal > 0.0)
-				{
-					pdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][j]);
-				}
-				else
-				{
-					pdf_deriv[l][j-my_rank*stride] = 0.0;
-				}
+        pdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /(prod_h*sum_ker_marginal*matrix_bandwidth_reg[l][j]);
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 
@@ -13912,7 +13809,7 @@ double *log_likelihood)
 		{
 
 			sum_ker = sum_ker_temp = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -14004,6 +13901,8 @@ double *log_likelihood)
 
 			}
 
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
+
 			pdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
 			/* stderr needs extra tmp I think */
 			/* With no continuous variables, need to drop K_INT_KERNEL_P */
@@ -14029,15 +13928,8 @@ double *log_likelihood)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(prod_h*sum_ker_marginal > 0.0)
-				{
-					pdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/sum_ker_marginal;
-				}
-				else
-				{
-					pdf_deriv[l][j-my_rank*stride] = 0.0;
-				}
+        pdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /sum_ker_marginal;
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 				/* 11/26/01 - dropped prod of bws in denom, need to revisit */
@@ -14137,12 +14029,12 @@ double **pdf_deriv_stderr)
 	double *pointer_me;
 	double *pointer_g;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	pdf_eval = alloc_vecd(num_obs_eval);
 	pdf_stderr = alloc_vecd(num_obs_eval);
@@ -14350,7 +14242,7 @@ double **pdf_deriv_stderr)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	pdf_eval = alloc_vecd(stride*iNum_Processors);
 	pdf_stderr = alloc_vecd(stride*iNum_Processors);
@@ -14656,7 +14548,7 @@ int itmax)
 	/* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
 	double DIFF_KER_PPM;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -14702,12 +14594,12 @@ int itmax)
 		matrix_bandwidth_reg,
 		lambda) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -14729,7 +14621,7 @@ int itmax)
 		&INT_KERNEL_PM_HALF,
 		&DIFF_KER_PPM);
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Conduct the estimation */
 
@@ -14740,7 +14632,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -14815,17 +14707,10 @@ int itmax)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of */
-			/* sum_ker_marginal multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(sum_ker_marginal > 0.0)
-			{
-				cdf[j] = sum_ker/sum_ker_marginal;
-			}
-			else
-			{
-				cdf[j] = 0.0;
-			}
+      cdf[j] = sum_ker/sum_ker_marginal;
+
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 			/* gradient[0][] is that for _first_ continuous variable */
@@ -14833,15 +14718,8 @@ int itmax)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(sum_ker_marginal*matrix_bandwidth_reg[l][0]);
-				}
-				else
-				{
-					cdf_deriv[l][j] = 0.0;
-				}
+        cdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /(sum_ker_marginal*matrix_bandwidth_reg[l][0]);
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 
@@ -14859,7 +14737,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -14934,17 +14812,10 @@ int itmax)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of */
-			/* sum_ker_marginal multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(sum_ker_marginal > 0.0)
-			{
-				cdf[j] = sum_ker/sum_ker_marginal;
-			}
-			else
-			{
-				cdf[j] = 0.0;
-			}
+      cdf[j] = sum_ker/sum_ker_marginal;
+
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
 			/* gradient[0][] is that for _first_ continuous variable */
@@ -14952,15 +14823,8 @@ int itmax)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(sum_ker_marginal*matrix_bandwidth_reg[l][j]);
-				}
-				else
-				{
-					cdf_deriv[l][j] = 0.0;
-				}
+        cdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /(sum_ker_marginal*matrix_bandwidth_reg[l][j]);
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 
@@ -14978,7 +14842,7 @@ int itmax)
 		{
 		  R_CheckUserInterrupt();
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -15055,17 +14919,9 @@ int itmax)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of */
-			/* sum_ker_marginal multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(sum_ker_marginal > 0.0)
-			{
-				cdf[j] = sum_ker/sum_ker_marginal;
-			}
-			else
-			{
-				cdf[j] = 0.0;
-			}
+      cdf[j] = sum_ker/sum_ker_marginal;
 
 			cdf_stderr[j] = sqrt(cdf[j]*(1.0-cdf[j])/(double)num_obs_train);
 
@@ -15074,15 +14930,8 @@ int itmax)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])/sum_ker_marginal;
-				}
-				else
-				{
-					cdf_deriv[l][j] = 0.0;
-				}
-
+        cdf_deriv[l][j] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])/sum_ker_marginal;
+        
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 				/* 11/28/01 - removed h^2 for adaptive due to alloc issues */
 
@@ -15095,7 +14944,7 @@ int itmax)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Conduct the estimation */
 
@@ -15108,7 +14957,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -15183,17 +15032,10 @@ int itmax)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of */
-			/* sum_ker_marginal multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(sum_ker_marginal > 0.0)
-			{
-				cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
-			}
-			else
-			{
-				cdf[j-my_rank*stride] = 0.0;
-			}
+      cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+
 			cdf_stderr[j-my_rank*stride] = sqrt(cdf[j-my_rank*stride]*(1.0-cdf[j-my_rank*stride])/(double)num_obs_train);
 
 			/* gradient[0][] is that for _first_ continuous variable */
@@ -15201,15 +15043,8 @@ int itmax)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(sum_ker_marginal*matrix_bandwidth_reg[l][0]);
-				}
-				else
-				{
-					cdf_deriv[l][j-my_rank*stride] = 0.0;
-				}
+        cdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /(sum_ker_marginal*matrix_bandwidth_reg[l][0]);
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 
@@ -15227,7 +15062,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -15302,33 +15137,21 @@ int itmax)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of */
-			/* sum_ker_marginal multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(sum_ker_marginal > 0.0)
-			{
-				cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
-			}
-			else
-			{
-				cdf[j-my_rank*stride] = 0.0;
-			}
+      cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+
 			cdf_stderr[j-my_rank*stride] = sqrt(cdf[j-my_rank*stride]*(1.0-cdf[j-my_rank*stride])/(double)num_obs_train);
 
 			/* gradient[0][] is that for _first_ continuous variable */
 
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
+
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
-						/(sum_ker_marginal*matrix_bandwidth_reg[l][j]);
-				}
-				else
-				{
-					cdf_deriv[l][j-my_rank*stride] = 0.0;
-				}
+        cdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])
+          /(sum_ker_marginal*matrix_bandwidth_reg[l][j]);
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 
@@ -15346,7 +15169,7 @@ int itmax)
 		{
 
 			sum_ker = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			for(l = 0; l < num_reg_continuous; l++)
 			{
@@ -15423,17 +15246,10 @@ int itmax)
 
 			}
 
-			/* If sum_ker_marginal = 0.0 then so does sum_ker since it is the elements of */
-			/* sum_ker_marginal multiplied by other kernels */
+			sum_ker_marginal = 	NZD(sum_ker_marginal);
 
-			if(sum_ker_marginal > 0.0)
-			{
-				cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
-			}
-			else
-			{
-				cdf[j-my_rank*stride] = 0.0;
-			}
+      cdf[j-my_rank*stride] = sum_ker/sum_ker_marginal;
+
 
 			cdf_stderr[j-my_rank*stride] = sqrt(cdf[j-my_rank*stride]*(1.0-cdf[j-my_rank*stride])/(double)num_obs_train);
 
@@ -15442,14 +15258,7 @@ int itmax)
 			for(l = 0; l < num_reg_continuous; l++)
 			{
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])/sum_ker_marginal;
-				}
-				else
-				{
-					cdf_deriv[l][j-my_rank*stride] = 0.0;
-				}
+        cdf_deriv[l][j-my_rank*stride] = (sum_ker_deriv[l]-(sum_ker/sum_ker_marginal)*sum_ker_marginal_deriv[l])/sum_ker_marginal;
 
 				/* grads definitely incorrect... dropped tmp_var after sqrt(, and using formula for regression */
 				/* 11/28/01 - removed h^2 for adaptive due to alloc issues */
@@ -15547,12 +15356,12 @@ int itmax)
 	double *pointer_me;
 	double *pointer_g;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	cdf_eval = alloc_vecd(num_obs_eval);
 	cdf_stderr = alloc_vecd(num_obs_eval);
@@ -15764,7 +15573,7 @@ int itmax)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	cdf_eval = alloc_vecd(stride*iNum_Processors);
 	cdf_stderr = alloc_vecd(stride*iNum_Processors);
@@ -16042,7 +15851,7 @@ double *cv)
 
 	/* Allocate memory for objects */
 
-	#ifdef MPI
+	#ifdef MPI2
 	double cv_MPI;
 	int stride = ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
@@ -16081,7 +15890,7 @@ double *cv)
 		return(1);
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Initialize cv function */
 
@@ -16291,7 +16100,7 @@ double *cv)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Initialize cv function */
 
@@ -16572,7 +16381,7 @@ double *cv)
 	double *pointer_k_x_kj;
 	double *pointer_k_convol_y;
 
-	#ifdef MPI
+	#ifdef MPI2
 	double cv_MPI;
 	int stride = ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
@@ -16612,7 +16421,7 @@ double *cv)
 		return(1);
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Initialize cv function */
 
@@ -16633,7 +16442,7 @@ double *cv)
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
-				sum_ker_marginal = DBL_MIN;
+				sum_ker_marginal = 0.0;
 
 				for(i=0; i < num_obs; i++)
 				{
@@ -16746,20 +16555,9 @@ double *cv)
 
 				/* First term has marginal density squared, second does not */
 
-				if(sum_ker_marginal > 0.0)
-				{
-					*cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-				}
-				else
-				{
-					if(int_VERBOSE == 1)
-					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-					}
-					*cv += DBL_MAX;
-				}
+        sum_ker_marginal = 	NZD(sum_ker_marginal);
 
+        *cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 			}
 
 			/* Don't forget!!! */
@@ -16777,7 +16575,7 @@ double *cv)
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
-				sum_ker_marginal = DBL_MIN;
+				sum_ker_marginal = 0.0;
 
 				for(i=0; i < num_obs; i++)
 				{
@@ -16890,19 +16688,9 @@ double *cv)
 
 				/* First term has marginal density squared, second does not */
 
-				if(sum_ker_marginal > 0.0)
-				{
-					*cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-				}
-				else
-				{
-					if(int_VERBOSE == 1)
-					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-					}
-					*cv += DBL_MAX;
-				}
+        sum_ker_marginal = 	NZD(sum_ker_marginal);
+
+        *cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 
 			}
 
@@ -16921,7 +16709,7 @@ double *cv)
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
-				sum_ker_marginal = DBL_MIN;
+				sum_ker_marginal = 0.0;
 
 				for(i=0; i < num_obs; i++)
 				{
@@ -17034,19 +16822,9 @@ double *cv)
 
 				/* First term has marginal density squared, second does not */
 
-				if(sum_ker_marginal > 0.0)
-				{
-					*cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-				}
-				else
-				{
-					if(int_VERBOSE == 1)
-					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-					}
-					*cv += DBL_MAX;
-				}
+        sum_ker_marginal = 	NZD(sum_ker_marginal);
+
+        *cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 
 			}
 
@@ -17104,7 +16882,7 @@ double *cv)
 
 			sum_ker = 0.0;
 			sum_ker_convol = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			pointer_k_xy = &matrix_weights_K_xy[j][0];
 			pointer_k_x = &matrix_weights_K_x[j][0];
@@ -17150,19 +16928,9 @@ double *cv)
 
 			/* First term has marginal density squared, second does not */
 
-			if(sum_ker_marginal > 0.0)
-			{
-				*cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-			}
-			else
-			{
-				if(int_VERBOSE == 1)
-				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-				}
-				*cv += DBL_MAX;
-			}
+      sum_ker_marginal = 	NZD(sum_ker_marginal);
+
+      *cv += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 
 		}
 
@@ -17177,7 +16945,7 @@ double *cv)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Initialize cv function */
 
@@ -17198,7 +16966,7 @@ double *cv)
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
-				sum_ker_marginal = DBL_MIN;
+				sum_ker_marginal = 0.0;
 
 				for(i=0; i < num_obs; i++)
 				{
@@ -17311,20 +17079,9 @@ double *cv)
 
 				/* First term has marginal density squared, second does not */
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-				}
-				else
-				{
-					if((int_VERBOSE == 1)&&(my_rank == 0))
-					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-					}
-					cv_MPI += DBL_MAX;
-				}
+        sum_ker_marginal = 	NZD(sum_ker_marginal);
 
+        cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 			}
 
 			/* Don't forget!!! */
@@ -17342,7 +17099,7 @@ double *cv)
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
-				sum_ker_marginal = DBL_MIN;
+				sum_ker_marginal = 0.0;
 
 				for(i=0; i < num_obs; i++)
 				{
@@ -17455,20 +17212,9 @@ double *cv)
 
 				/* First term has marginal density squared, second does not */
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-				}
-				else
-				{
-					if((int_VERBOSE == 1)&&(my_rank == 0))
-					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-					}
-					cv_MPI += DBL_MAX;
-				}
+        sum_ker_marginal = 	NZD(sum_ker_marginal);
 
+        cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 			}
 
 			/* Don't forget!!! */
@@ -17486,7 +17232,7 @@ double *cv)
 
 				sum_ker = 0.0;
 				sum_ker_convol = 0.0;
-				sum_ker_marginal = DBL_MIN;
+				sum_ker_marginal = 0.0;
 
 				for(i=0; i < num_obs; i++)
 				{
@@ -17599,20 +17345,9 @@ double *cv)
 
 				/* First term has marginal density squared, second does not */
 
-				if(sum_ker_marginal > 0.0)
-				{
-					cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-				}
-				else
-				{
-					if((int_VERBOSE == 1)&&(my_rank == 0))
-					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-					}
-					cv_MPI += DBL_MAX;
-				}
+        sum_ker_marginal = 	NZD(sum_ker_marginal);
 
+        cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 			}
 
 			cv_MPI /= (double) num_obs;
@@ -17669,7 +17404,7 @@ double *cv)
 
 			sum_ker = 0.0;
 			sum_ker_convol = 0.0;
-			sum_ker_marginal = DBL_MIN;
+			sum_ker_marginal = 0.0;
 
 			pointer_k_xy = &matrix_weights_K_xy[j][0];
 			pointer_k_x = &matrix_weights_K_x[j][0];
@@ -17715,20 +17450,9 @@ double *cv)
 
 			/* First term has marginal density squared, second does not */
 
-			if(sum_ker_marginal > 0.0)
-			{
-				cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
-			}
-			else
-			{
-				if((int_VERBOSE == 1)&&(my_rank == 0))
-				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_convolution_cv()");
-				}
-				cv_MPI += DBL_MAX;
-			}
+      sum_ker_marginal = 	NZD(sum_ker_marginal);
 
+      cv_MPI += (sum_ker_convol/sum_ker_marginal-2.0*sum_ker)/sum_ker_marginal;
 		}
 
 		/* Don't forget!!! */
@@ -17812,7 +17536,7 @@ double zero)
 	double **matrix_bandwidth_var = NULL;
 	double **matrix_bandwidth_reg = NULL;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -17855,12 +17579,12 @@ double zero)
 			matrix_bandwidth_reg,
 			lambda) == 1)
 		{
-			#ifndef MPI
+			#ifndef MPI2
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 			exit(EXIT_FAILURE);
 			#endif
-			#ifdef MPI
+			#ifdef MPI2
 			if(my_rank == 0)
 			{
 				printf("\n** Error: invalid bandwidth.");
@@ -17874,7 +17598,7 @@ double zero)
 
 	}
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	matrix_y = alloc_matd(2,2);
 
@@ -18102,7 +17826,7 @@ double zero)
 	free_mat(matrix_y, 2);
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	matrix_y = alloc_matd(2,2);
 
@@ -18402,7 +18126,8 @@ int *num_categories)
 	int k;
 	int l;
 
-	double epsilon;
+	const double epsilon = 1.0/num_obs;
+  double nepsilon;
 
 	double prod_kernel;
 
@@ -18431,13 +18156,13 @@ int *num_categories)
 	double aic_c = 0.0;
 	double sigmasq = 0.0;
 
-	#ifdef MPI
+	#ifdef MPI2
 	double trace_H_MPI = 0.0;
 	int stride = ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	mean = alloc_vecd(stride*iNum_Processors);
 	#endif
-	#ifndef MPI
+	#ifndef MPI2
 	mean = alloc_vecd(num_obs);
 	#endif
 
@@ -18455,7 +18180,7 @@ int *num_categories)
 	lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 	matrix_bandwidth = alloc_matd(num_obs,num_reg_continuous);
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	/* Conduct the estimation */
 
@@ -18502,7 +18227,7 @@ int *num_categories)
 			{
 			  R_CheckUserInterrupt();
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -18538,20 +18263,10 @@ int *num_categories)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					*pointer_m++ = sum_y_ker/sum_ker;
-					trace_H += prod_kernel_i_eq_j/sum_ker;
-				}
-				else
-				{
-					if(int_DEBUG == 1)
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_aic()",j);
-					}
-					return(DBL_MAX);
-				}
+        sum_ker = NZD(sum_ker);
+
+        *pointer_m++ = sum_y_ker/sum_ker;
+        trace_H += prod_kernel_i_eq_j/sum_ker;
 
 			}
 
@@ -18565,7 +18280,7 @@ int *num_categories)
 			{
 			  R_CheckUserInterrupt();
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -18601,21 +18316,10 @@ int *num_categories)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					*pointer_m++ = sum_y_ker/sum_ker;
-					trace_H += prod_kernel_i_eq_j/sum_ker;
-				}
-				else
-				{
-					if(int_DEBUG == 1)
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_aic()",j);
-					}
-					return(DBL_MAX);
-				}
+        sum_ker = NZD(sum_ker);
 
+        *pointer_m++ = sum_y_ker/sum_ker;
+        trace_H += prod_kernel_i_eq_j/sum_ker;
 			}
 
 		}
@@ -18628,7 +18332,7 @@ int *num_categories)
 			{
 			  R_CheckUserInterrupt();
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -18664,20 +18368,10 @@ int *num_categories)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					*pointer_m++ = sum_y_ker/sum_ker;
-					trace_H += prod_kernel_i_eq_j/sum_ker;
-				}
-				else
-				{
-					if(int_DEBUG == 1)
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_aic()",j);
-					}
-					return(DBL_MAX);
-				}
+        sum_ker = NZD(sum_ker);
+
+        *pointer_m++ = sum_y_ker/sum_ker;
+        trace_H += prod_kernel_i_eq_j/sum_ker;
 
 			}
 
@@ -18877,8 +18571,6 @@ int *num_categories)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -18890,14 +18582,14 @@ int *num_categories)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -19054,8 +18746,6 @@ int *num_categories)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -19067,14 +18757,14 @@ int *num_categories)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -19231,8 +18921,6 @@ int *num_categories)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -19244,14 +18932,14 @@ int *num_categories)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -19271,7 +18959,7 @@ int *num_categories)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	/* Conduct the estimation - MPI-enabled */
 
@@ -19321,7 +19009,7 @@ int *num_categories)
 			{
 
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -19357,21 +19045,10 @@ int *num_categories)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					mean[j-my_rank*stride] = sum_y_ker/sum_ker;
-					trace_H_MPI += prod_kernel_i_eq_j/sum_ker;
-				}
-				else
-				{
-					/* Don't print if you are using MPI */
-					if((int_DEBUG == 1)&&(my_rank == 0))
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_aic()",j);
-					}
-					return(DBL_MAX);
-				}
+        sum_ker = NZD(sum_ker);
+
+        mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+        trace_H_MPI += prod_kernel_i_eq_j/sum_ker;
 
 			}
 
@@ -19383,7 +19060,7 @@ int *num_categories)
 			{
 
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -19419,21 +19096,10 @@ int *num_categories)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					mean[j-my_rank*stride] = sum_y_ker/sum_ker;
-					trace_H_MPI += prod_kernel_i_eq_j/sum_ker;
-				}
-				else
-				{
-					/* Don't print if you are using MPI */
-					if((my_rank == 0)&&(int_DEBUG == 1))
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_aic()",j);
-					}
-					return(DBL_MAX);
-				}
+        sum_ker = NZD(sum_ker);
+
+        mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+        trace_H_MPI += prod_kernel_i_eq_j/sum_ker;
 
 			}
 
@@ -19444,7 +19110,7 @@ int *num_categories)
 			for(j=my_rank*stride; (j < num_obs) && (j < (my_rank+1)*stride); j++)
 			{
 				sum_y_ker = 0.0;
-				sum_ker = DBL_MIN;
+				sum_ker = 0.0;
 
 				pointer_yi = &vector_Y[0];
 
@@ -19480,21 +19146,10 @@ int *num_categories)
 
 				}
 
-				if(sum_ker > 0.0)
-				{
-					mean[j-my_rank*stride] = sum_y_ker/sum_ker;
-					trace_H_MPI += prod_kernel_i_eq_j/sum_ker;
-				}
-				else
-				{
-					/* Don't print if you are using MPI */
-					if((my_rank == 0)&&(int_DEBUG == 1))
-					{
-						printf("\r                                                                                        ");
-						printf("\r** sum_ker[%d]==0.0 in kernel_regression_categorical_aic()",j);
-					}
-					return(DBL_MAX);
-				}
+        sum_ker = NZD(sum_ker);
+
+        mean[j-my_rank*stride] = sum_y_ker/sum_ker;
+        trace_H_MPI += prod_kernel_i_eq_j/sum_ker;
 
 			}
 
@@ -19695,8 +19350,6 @@ int *num_categories)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -19708,14 +19361,14 @@ int *num_categories)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -19870,8 +19523,6 @@ int *num_categories)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -19883,14 +19534,14 @@ int *num_categories)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -20045,8 +19696,6 @@ int *num_categories)
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
 
-					epsilon = 1.0/(double)num_obs;
-
 					for(k=0; k < num_reg_cat_cont + 1; k++)
 					{
 						XTKX[k][k] += epsilon;
@@ -20058,14 +19707,14 @@ int *num_categories)
 					{
 						for(k=0; k < num_reg_cat_cont + 1; k++)
 						{
-							epsilon += 1.0/(double) num_obs;
 							XTKX[k][k] += epsilon;
+							nepsilon += epsilon;
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
 					XTKXINV = mat_inv( XTKX, XTKXINV );
 					/* Add epsilon times local constant estimator to first element of XTKY */
-					XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
@@ -20121,7 +19770,6 @@ int *num_categories)
 
 }
 
-
 int kernel_estimate_ate_categorical_leave_one_out(
 int KERNEL_reg,
 int KERNEL_unordered_reg,
@@ -20153,7 +19801,8 @@ double *tau)
 	int k;
 	int l;
 
-	double epsilon;
+	const double epsilon = 1.0/num_obs_train;
+  double nepsilon;
 
 	double prod_kernel;
 
@@ -20171,7 +19820,7 @@ double *tau)
 	MATRIX  XTKY;
 	MATRIX  DELTA;
 
-	#ifdef MPI
+	#ifdef MPI2
 	int stride = ceil((double) num_obs_train / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
@@ -20183,7 +19832,7 @@ double *tau)
 	XTKY = mat_creat( 2, 1, UNDEFINED );
 	DELTA = mat_creat( 2, 1, UNDEFINED );
 
-	#ifndef MPI
+	#ifndef MPI2
 
 	lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
@@ -20218,12 +19867,12 @@ double *tau)
 		matrix_bandwidth,
 		lambda) == 1)
 	{
-		#ifndef MPI
+		#ifndef MPI2
 		printf("\n** Error: invalid bandwidth.");
 		printf("\nProgram Terminated.\n");
 		exit(EXIT_FAILURE);
 		#endif
-		#ifdef MPI
+		#ifdef MPI2
 		if(my_rank == 0)
 		{
 			printf("\n** Error: invalid bandwidth.");
@@ -20303,8 +19952,6 @@ double *tau)
 
 				/* Add ridge factor - epsilon goes from zero to one/n*/
 
-				epsilon = 1.0/(double)num_obs_train;
-
 				for(k=0; k < 2; k++)
 				{
 					XTKX[k][k] += epsilon;
@@ -20316,14 +19963,14 @@ double *tau)
 				{
 					for(k=0; k <2; k++)
 					{
-						epsilon += 1.0/(double) num_obs_train;
 						XTKX[k][k] += epsilon;
+						nepsilon += epsilon;
 					}
 				} while (fabs(mat_det(XTKX)) == 0.0);
 
 				XTKXINV = mat_inv( XTKX, XTKXINV );
 				/* Add epsilon times local constant estimator to first element of XTKY */
-				XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+				XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 			}
 
@@ -20449,7 +20096,7 @@ double *tau)
 	}
 	#endif
 
-	#ifdef MPI
+	#ifdef MPI2
 
 	lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
@@ -20552,8 +20199,6 @@ double *tau)
 
 				/* Add ridge factor - epsilon goes from zero to one/n*/
 
-				epsilon = 1.0/(double)num_obs_train;
-
 				for(k=0; k < 2; k++)
 				{
 					XTKX[k][k] += epsilon;
@@ -20565,14 +20210,14 @@ double *tau)
 				{
 					for(k=0; k < 2; k++)
 					{
-						epsilon += 1.0/(double) num_obs_train;
 						XTKX[k][k] += epsilon;
+						nepsilon += epsilon;
 					}
 				} while (fabs(mat_det(XTKX)) == 0.0);
 
 				XTKXINV = mat_inv( XTKX, XTKXINV );
 				/* Add epsilon times local constant estimator to first element of XTKY */
-				XTKY[0][0] += epsilon*XTKY[0][0]/XTKX[0][0];
+				XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 			}
 
 			/*			XTKXINV = mat_inv( XTKX, XTKXINV );*/
@@ -20789,7 +20434,7 @@ double **gradient_categorical)
 
 	double *iord;
 
-	#ifdef MPI
+	#ifdef MPI2
 	num_obs_eval_alloc = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1)*iNum_Processors;
 	#else
 	num_obs_eval_alloc = num_obs_eval;
