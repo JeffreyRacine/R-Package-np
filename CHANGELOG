@@ -8,6 +8,11 @@ Changes from Version 0.30-8 to 0.30-9 [xxx-May-2010]
 
 * Fixed issue with saving and restoring random seed in npdeptest
 
+* Changes to codebase to modify method used to prevent division by
+  zero
+
+* New vignette for the npRmpi package (vignette("npRmpi",package="npRmpi"))
+
 Changes from Version 0.30-7 to 0.30-8 [20-Apr-2010]
 
 * Implemented moment version of metric entropy in npsymtest and

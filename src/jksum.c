@@ -1628,18 +1628,20 @@ double *cv){
   MPI_Allreduce(sum_ker_marginal, sum_ker_marginalf, num_obs, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
 
   for(j = 0; j < num_obs; j++){
-    if(sum_ker_marginalf[j] <= 0.0){
+    /*    if(sum_ker_marginalf[j] <= 0.0){
       *cv = DBL_MAX;
       break;
-    }
+      } jracine 16/05/10, test for zero respecting sign */
+    sum_ker_marginalf[j] =  NZD(sum_ker_marginalf[j]);
     *cv += (sum_ker_convolf[j]/sum_ker_marginalf[j]-2.0*sum_kerf[j])/sum_ker_marginalf[j];
   }
 #else
   for(j = 0; j < num_obs; j++){
-    if(sum_ker_marginal[j] <= 0.0){
+    /*    if(sum_ker_marginal[j] <= 0.0){
       *cv = DBL_MAX;
       break;
-    }
+      } jracine 16/05/10 */
+    sum_ker_marginal[j] =  NZD(sum_ker_marginal[j]);
     *cv += (sum_ker_convol[j]/sum_ker_marginal[j]-2.0*sum_ker[j])/sum_ker_marginal[j];
   }
 
