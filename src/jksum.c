@@ -2028,7 +2028,7 @@ int *num_categories){
       if(bwm == RBWM_CVAIC)
         traceH += XTKXINV[0][0]*aicc;
    
-      XTKY[0][0] += nepsilon*XTKY[0][0]/(MAX(DBL_MIN,KWM[0][0]));
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
       DELTA = mat_mul(XTKXINV, XTKY, DELTA);
       const double dy = vector_Y[j]-DELTA[0][0];
