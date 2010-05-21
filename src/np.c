@@ -19,6 +19,7 @@ int dest;
 int tag;
 int iSeed_my_rank;
 MPI_Status status;
+extern MPI_Comm	*comm;
 #endif
 
 /*
@@ -151,8 +152,8 @@ void np_set_seed(int * num){
 
 void np_mpi_init(int * mpi_status){
 #ifdef MPI2 
-  MPI_Comm_rank(MPI_COMM_WORLD, &my_rank);
-  MPI_Comm_size(MPI_COMM_WORLD, &iNum_Processors);
+  MPI_Comm_rank(comm[1], &my_rank);
+  MPI_Comm_size(comm[1], &iNum_Processors);
   mpi_status[MPI_RANKI] = my_rank;
   mpi_status[MPI_NUMPI] = iNum_Processors;
 #else

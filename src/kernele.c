@@ -22,6 +22,7 @@ extern  int tag;
 extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
+extern MPI_Comm	*comm;
 #endif
 
 #define IO_MIN_TRUE  1
@@ -208,7 +209,7 @@ double *log_likelihood)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -615,14 +616,14 @@ double *log_likelihood)
 
 	}
 
-	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(log_likelihood, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(log_likelihood, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -1348,8 +1349,8 @@ double *cv)
 	/* Now reduce */
 
 	cv_MPI /= (double) num_obs;
-	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -2016,8 +2017,8 @@ double *cv)
 	/* Now reduce */
 
 	cv_MPI /= (double) num_obs;
-	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -2126,7 +2127,7 @@ int itmax)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -2369,10 +2370,10 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -2549,7 +2550,7 @@ double *SIGN)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -4505,18 +4506,18 @@ double *SIGN)
 
 	/* Gather */
 
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(mean_stderr, stride, MPI_DOUBLE, mean_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(mean_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+	MPI_Gather(mean_stderr, stride, MPI_DOUBLE, mean_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(mean_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	for(l = 0; l < num_reg_continuous; l++)
 	{
 
-		MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Gather(&gradient_stderr[l][0], stride, MPI_DOUBLE, &gradient_stderr[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&gradient_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+		MPI_Gather(&gradient_stderr[l][0], stride, MPI_DOUBLE, &gradient_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&gradient_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
 	#endif
@@ -6159,8 +6160,8 @@ double *mean)
 
 	/* Gather */
 
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(mean, num_obs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(mean, num_obs, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -10696,8 +10697,8 @@ double **gradient)
 
 	/* Important - only one gather per module */
 
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	if(int_compute_gradient == 1)
 	{
@@ -10705,8 +10706,8 @@ double **gradient)
 		for(l = 0; l < num_reg_continuous; l++)
 		{
 
-			MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-			MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+			MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+			MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 		}
 
@@ -10841,7 +10842,7 @@ double *log_likelihood)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -11417,14 +11418,14 @@ double *log_likelihood)
 
 	}
 
-	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(log_likelihood, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(log_likelihood, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -11552,7 +11553,7 @@ int itmax)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -11957,10 +11958,10 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -12490,8 +12491,8 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	#endif
 
@@ -13118,7 +13119,7 @@ double *log_likelihood)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -13941,23 +13942,23 @@ double *log_likelihood)
 
 	}
 
-	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(pdf, stride, MPI_DOUBLE, pdf, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(pdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+	MPI_Gather(pdf_stderr, stride, MPI_DOUBLE, pdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(pdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	for(l = 0; l < num_reg_continuous; l++)
 	{
 
-		MPI_Gather(&pdf_deriv[l][0], stride, MPI_DOUBLE, &pdf_deriv[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&pdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Gather(&pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&pdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Gather(&pdf_deriv[l][0], stride, MPI_DOUBLE, &pdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&pdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+		MPI_Gather(&pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&pdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
 
-	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(log_likelihood, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&log_likelihood_MPI, log_likelihood, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(log_likelihood, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(prod_kernel_deriv);
@@ -14448,10 +14449,10 @@ double **pdf_deriv_stderr)
 	for(l = 0; l < num_reg_unordered+num_reg_ordered; l++)
 	{
 
-		MPI_Gather(&pdf_deriv[l][0], stride, MPI_DOUBLE, &pdf_deriv[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&pdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Gather(&pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&pdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Gather(&pdf_deriv[l][0], stride, MPI_DOUBLE, &pdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&pdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+		MPI_Gather(&pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &pdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&pdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
 	#endif
@@ -14605,7 +14606,7 @@ int itmax)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -15271,18 +15272,18 @@ int itmax)
 
 	}
 
-	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(cdf, stride, MPI_DOUBLE, cdf, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(cdf, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+	MPI_Gather(cdf_stderr, stride, MPI_DOUBLE, cdf_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(cdf_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	for(l = 0; l < num_reg_continuous; l++)
 	{
 
-		MPI_Gather(&cdf_deriv[l][0], stride, MPI_DOUBLE, &cdf_deriv[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&cdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Gather(&cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&cdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Gather(&cdf_deriv[l][0], stride, MPI_DOUBLE, &cdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&cdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+		MPI_Gather(&cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&cdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
 	#endif
@@ -15779,10 +15780,10 @@ int itmax)
 	for(l = 0; l < num_reg_unordered+num_reg_ordered; l++)
 	{
 
-		MPI_Gather(&cdf_deriv[l][0], stride, MPI_DOUBLE, &cdf_deriv[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&cdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Gather(&cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-		MPI_Bcast(&cdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+		MPI_Gather(&cdf_deriv[l][0], stride, MPI_DOUBLE, &cdf_deriv[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&cdf_deriv[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+		MPI_Gather(&cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, &cdf_deriv_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(&cdf_deriv_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	}
 	#endif
@@ -16305,8 +16306,8 @@ double *cv)
 
 	}
 
-	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -17464,8 +17465,8 @@ double *cv)
 		free_mat(matrix_weights_K_convol_y,stride*iNum_Processors);
 
 	}
-	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	free(lambda);
@@ -17590,7 +17591,7 @@ double zero)
 				printf("\n** Error: invalid bandwidth.");
 				printf("\nProgram Terminated.\n");
 			}
-			MPI_Barrier(MPI_COMM_WORLD);
+			MPI_Barrier(comm[1]);
 			MPI_Finalize();
 			exit(EXIT_FAILURE);
 			#endif
@@ -18063,11 +18064,11 @@ double zero)
 
 	/* Collect */
 
-	MPI_Gather(quan, stride, MPI_DOUBLE, quan, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(quan, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(quan, stride, MPI_DOUBLE, quan, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(quan, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Gather(quan_stderr, stride, MPI_DOUBLE, quan_stderr, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(quan_stderr, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(quan_stderr, stride, MPI_DOUBLE, quan_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(quan_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 	if(gradient_compute == 1)
 	{
@@ -18075,8 +18076,8 @@ double zero)
 		for(k = 0; k < num_reg_continuous; k++)
 		{
 
-			MPI_Gather(&quan_gradient[k][0], stride, MPI_DOUBLE, &quan_gradient[k][0], stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-			MPI_Bcast(&quan_gradient[k][0], num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+			MPI_Gather(&quan_gradient[k][0], stride, MPI_DOUBLE, &quan_gradient[k][0], stride, MPI_DOUBLE, 0, comm[1]);
+			MPI_Bcast(&quan_gradient[k][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 		}
 
@@ -19735,11 +19736,11 @@ int *num_categories)
 
 	/* Gather */
 
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(mean, num_obs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(mean, num_obs, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Reduce(&trace_H_MPI, &trace_H, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
-	MPI_Bcast(&trace_H, 1, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Reduce(&trace_H_MPI, &trace_H, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
+	MPI_Bcast(&trace_H, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	/* Now compute Hurvich, Simonoff, and Tsai's AICc */
@@ -19878,7 +19879,7 @@ double *tau)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 		#endif
@@ -20341,11 +20342,11 @@ double *tau)
 
 	}
 
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(mean, num_obs_train, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(mean, num_obs_train, MPI_DOUBLE, 0, comm[1]);
 
-	MPI_Gather(tau, stride, MPI_DOUBLE, tau, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(tau, num_obs_train, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(tau, stride, MPI_DOUBLE, tau, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(tau, num_obs_train, MPI_DOUBLE, 0, comm[1]);
 	#endif
 
 	mat_free( XTKX );

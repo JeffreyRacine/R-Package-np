@@ -26,6 +26,7 @@ extern  int tag;
 extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
+extern MPI_Comm	*comm;
 #endif
 
 extern int int_DEBUG;
@@ -215,7 +216,7 @@ double *kernel_sum)
 			printf("\n** Error: invalid bandwidth.");
 			printf("\nProgram Terminated.\n");
 		}
-		MPI_Barrier(MPI_COMM_WORLD);
+		MPI_Barrier(comm[1]);
 		MPI_Finalize();
 		exit(EXIT_FAILURE);
 #endif
@@ -540,8 +541,8 @@ double *kernel_sum)
 
 	}
 
-	MPI_Gather(kernel_sum, stride, MPI_DOUBLE, kernel_sum, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-	MPI_Bcast(kernel_sum, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+	MPI_Gather(kernel_sum, stride, MPI_DOUBLE, kernel_sum, stride, MPI_DOUBLE, 0, comm[1]);
+	MPI_Bcast(kernel_sum, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 #endif
 
 	free(lambda);
@@ -1318,9 +1319,9 @@ double *weighted_sum){
 
 #ifdef MPI2
   if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-    MPI_Allgather(weighted_sum + js * sum_element_length, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, MPI_COMM_WORLD);
+    MPI_Allgather(weighted_sum + js * sum_element_length, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
   } else if(BANDWIDTH_reg == BW_ADAP_NN){
-    MPI_Allreduce(ws, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+    MPI_Allreduce(ws, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
   }
 #endif
 
@@ -1623,9 +1624,9 @@ double *cv){
   }
 
 #ifdef MPI2
-  MPI_Allreduce(sum_ker, sum_kerf, num_obs, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  MPI_Allreduce(sum_ker_convol, sum_ker_convolf, num_obs, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-  MPI_Allreduce(sum_ker_marginal, sum_ker_marginalf, num_obs, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+  MPI_Allreduce(sum_ker, sum_kerf, num_obs, MPI_DOUBLE, MPI_SUM, comm[1]);
+  MPI_Allreduce(sum_ker_convol, sum_ker_convolf, num_obs, MPI_DOUBLE, MPI_SUM, comm[1]);
+  MPI_Allreduce(sum_ker_marginal, sum_ker_marginalf, num_obs, MPI_DOUBLE, MPI_SUM, comm[1]);
 
   for(j = 0; j < num_obs; j++){
     /*    if(sum_ker_marginalf[j] <= 0.0){
@@ -1838,9 +1839,6 @@ int *num_categories){
 
       //fprintf(stderr,"mj: %e\n",mean[ii2]/(MAX(DBL_MIN, mean[ii2+1])));
     }
-
-
-    
 
     //exit(1);
 

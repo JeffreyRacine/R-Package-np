@@ -21,6 +21,7 @@ extern  int tag;
 extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
+extern MPI_Comm	*comm;
 #endif
 
 /* This function generates the index for bootstrap samples of size n */
@@ -425,16 +426,16 @@ int int_k_nn, double *nn_distance)
         }
     }
 
-    MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&return_flag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
+    MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
 		if(return_flag > 0) {
 			free(vector_dist);
 			free(vector_unique_dist);
 			return(1);
 		}
 
-    MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+    MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, comm[1]);
 
 #endif
 
@@ -618,16 +619,16 @@ double *nn_distance)
 
     }
 
-    MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&return_flag, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
+    MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
 		if(return_flag > 0) {
 			free(vector_dist);                    /* Don't forget to free... */
 			free(vector_unique_dist);
 			return(1);
 		}
 
-    MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+    MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
 #endif
 

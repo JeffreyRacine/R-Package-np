@@ -1,6 +1,6 @@
 Package: np 
 Version: 0.30-9
-Date: 2010-05-15
+Date: 2010-05-16
 Depends: boot, cubature
 Suggests: quantreg, MASS
 Title: Nonparametric kernel smoothing methods for mixed data types

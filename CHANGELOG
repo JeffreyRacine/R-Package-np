@@ -1,4 +1,4 @@
-Changes from Version 0.30-8 to 0.30-9 [xxx-May-2010]
+Changes from Version 0.30-8 to 0.30-9 [17-May-2010]
 
 * Fixed issue where ukertype and okertype were being ignored by npscoef
 
