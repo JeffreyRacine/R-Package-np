@@ -172,8 +172,6 @@ double kernel_estimate_regression_categorical_aic_c(int int_ll,int KERNEL_reg,in
 
 double cv_func_regression_categorical_aic_c(double *vector_scale_factor);
 
-int kernel_estimate_ate_categorical_leave_one_out(int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double *vector_Y,double *vector_T,double *vector_scale_factor,int *num_categories,double *mean,double *tau);
-
 int unique(int num_obs, double *x);
 void spinner(int num);
 
