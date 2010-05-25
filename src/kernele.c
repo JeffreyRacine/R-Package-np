@@ -12564,13 +12564,28 @@ int itmax)
 	double **matrix_Y_ordered_eval;
 	double **matrix_Y_continuous_eval;
 
+	#ifdef MPI2
+	int stride = ceil((double) num_obs_train / (double) iNum_Processors);
+	if(stride < 1) stride = 1;
+	#endif
+
   /* Must declare and free cdf_eval */
 
+	#ifndef MPI2
   cdf_loo = alloc_vecd(num_obs_train);
 
 	matrix_Y_unordered_eval = alloc_matd(num_obs_train, num_reg_unordered);
 	matrix_Y_ordered_eval = alloc_matd(num_obs_train, num_reg_ordered);
 	matrix_Y_continuous_eval = alloc_matd(num_obs_train, num_reg_continuous);
+	#endif
+
+	#ifdef MPI2
+  cdf_loo = alloc_vecd(stride*iNum_Processors);
+
+	matrix_Y_unordered_eval = alloc_matd(stride*iNum_Processors, num_reg_unordered);
+	matrix_Y_ordered_eval = alloc_matd(stride*iNum_Processors, num_reg_ordered);
+	matrix_Y_continuous_eval = alloc_matd(stride*iNum_Processors, num_reg_continuous);
+	#endif
 
   /* XXX */
 
