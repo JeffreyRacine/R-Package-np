@@ -1,4 +1,5 @@
 #! /bin/sh
 /bin/rm -rf ./chm
 /bin/rm -rf ./config.*
-/bin/rm -rf src/*.so src/*.o src/*.d src/*.dll src/*.a src/*.rc src/Makedeps
+/bin/rm -rf src/*.so src/*.o src/*.d src/*.dll src/*.a src/*.rc src/Makedeps a.out.dSYM
+rm *~ */*~ */*/*~ */*bak
