@@ -138,7 +138,7 @@ npindex(bws, \dots)
   \code{\link{coef}}, \code{\link{vcov}}, \code{\link{se}},
   \code{\link{predict}}, and \code{\link{gradients}}, extract (or
   generate) estimated values, residuals, coefficients,
-  variance/covariance matrix, bootstrapped standard errors on estimates,
+  variance-covariance matrix, bootstrapped standard errors on estimates,
   predictions, and gradients, respectively, from the returned
   object. Furthermore, the functions \code{\link{summary}} and
   \code{\link{plot}} support objects of this type. The returned object
@@ -210,6 +210,9 @@ npindex(bws, \dots)
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+
+  \code{\link{vcov}} requires that \code{gradients=TRUE} be set and
+  currently supports the Klein and Spady estimator only.p
 }
 
 \examples{

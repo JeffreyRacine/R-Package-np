@@ -1,5 +1,5 @@
 singleindex = 
-  function(bws,  betavcov = NA, index, mean, merr = NA,
+  function(bws,  betavcov = NULL, index, mean, merr = NA,
            grad = NA, gerr = NA,
            mean.grad = NA, mean.gerr = NA,
            resid = NA,
@@ -81,8 +81,11 @@ coef.singleindex <- function(object, ...) {
 }
 vcov.singleindex <- function(object, ...) {
   tc <- object$betavcov
-  dimnames(tc) <- list(object$xnames,object$xnames)
-  return(tc)
+  if(!is.null(tc)) {
+    return(tc)
+  } else {
+    warning("variance-covariance matrix does not exist: verfity gradients=TRUE")
+  }
 }
 fitted.singleindex <- function(object, ...){
  object$mean 

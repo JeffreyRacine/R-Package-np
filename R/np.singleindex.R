@@ -371,6 +371,7 @@ npindex.sibandwidth <-
       ## Need to add... these are placeholders..
       q <- ncol(txdat)
       Bvcov <- matrix(NA,q,q)
+      dimnames(Bvcov) <- list(bws$xnames,bws$xnames)
 
     } else if(bws$method == "kleinspady" & gradients == TRUE) {
 
@@ -385,6 +386,8 @@ npindex.sibandwidth <-
       Bvcov <- matrix(0,q,q)
       Bvcov[-1,-1] <- solve(t(dg.db.ks[keep.ks,])%*%(dg.db.ks[keep.ks,]/(index.tmean[keep.ks]*
         (1-index.tmean[keep.ks]))))
+
+      dimnames(Bvcov) <- list(bws$xnames,bws$xnames)      
 
       ## Now export these in an S3 method...
 
