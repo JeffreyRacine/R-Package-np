@@ -1,5 +1,5 @@
 singleindex = 
-  function(bws, betasd = NA, betavcov = NA, index, mean, merr = NA,
+  function(bws,  betavcov = NA, index, mean, merr = NA,
            grad = NA, gerr = NA,
            mean.grad = NA, mean.gerr = NA,
            resid = NA,
@@ -13,7 +13,6 @@ singleindex =
 
     d = list(
       beta = bws$beta,
-      betasd = betasd,
       betavcov = betavcov,
       bw = bws$bw,
       bws = bws,

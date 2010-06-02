@@ -370,8 +370,7 @@ npindex.sibandwidth <-
 
       ## Need to add... these are placeholders..
       q <- ncol(txdat)
-      Bvcov <- matrix(0,q,q)
-      Berr = sqrt(diag(Bvcov))
+      Bvcov <- matrix(NA,q,q)
 
     } else if(bws$method == "kleinspady" & gradients == TRUE) {
 
@@ -386,7 +385,6 @@ npindex.sibandwidth <-
       Bvcov <- matrix(0,q,q)
       Bvcov[-1,-1] <- solve(t(dg.db.ks[keep.ks,])%*%(dg.db.ks[keep.ks,]/(index.tmean[keep.ks]*
         (1-index.tmean[keep.ks]))))
-      Berr = sqrt(diag(Bvcov))
 
       ## Now export these in an S3 method...
 
@@ -488,8 +486,7 @@ npindex.sibandwidth <-
     eval(parse(text=paste(
                  "singleindex(bws = bws, index = index.eval, mean = index.mean,",
                  ifelse(errors,"merr = index.merr,",""),
-                 ifelse(gradients,"grad = index.grad, mean.grad = colMeans(index.grad),",""),
-                 ifelse(gradients,"betasd = Berr, betavcov = Bvcov,",""),
+                 ifelse(gradients,"grad = index.grad, mean.grad = colMeans(index.grad), betavcov = Bvcov,",""),
                  ifelse(errors & gradients,"gerr = index.gerr, mean.gerr = index.mgerr,",""),
                  strres,
                  "ntrain = nrow(txdat),", strgof,

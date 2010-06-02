@@ -1,5 +1,9 @@
 Changes from Version 0.40-0 to 0.40-1 [xxx]
 
+* Added asymptotic standard errors to npindex for the Klein and Spady
+  estimator which, when gradients=TRUE, can be extracted via vcov(foo)
+  where foo is a npsingleindex object
+
 Changes from Version 0.30-9 to 0.40-0 [25-May-2010]
 
 * Modified codebase to enable dynamic spawning for interactive

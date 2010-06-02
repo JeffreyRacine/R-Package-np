@@ -53,9 +53,10 @@ npindex(bws, \dots)
   }
 
   \item{gradients}{
-    a logical value indicating that you want gradients computed and
-    returned in the resulting \code{singleindex} object. Defaults to
-    \code{FALSE}.
+    a logical value indicating that you want gradients and the
+    asymptotic covariance matrix for beta (Klein and Spady only)
+    computed and returned in the resulting \code{singleindex}
+    object. Defaults to \code{FALSE}.
   }
 
   \item{residuals}{
@@ -132,20 +133,22 @@ npindex(bws, \dots)
 
 \value{
 
-  \code{npindex} returns a \code{npsingleindex} object.   The generic
-  functions \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},
-  \code{\link{se}}, \code{\link{predict}}, and
-  \code{\link{gradients}}, extract (or generate) estimated values,
-  residuals, coefficients, bootstrapped standard
-  errors on estimates, predictions, and gradients, respectively, from
-  the returned object. Furthermore, the functions \code{\link{summary}}
-  and \code{\link{plot}} support objects of this type. The returned object
+  \code{npindex} returns a \code{npsingleindex} object.  The generic
+  functions \code{\link{fitted}}, \code{\link{residuals}},
+  \code{\link{coef}}, \code{\link{vcov}}, \code{\link{se}},
+  \code{\link{predict}}, and \code{\link{gradients}}, extract (or
+  generate) estimated values, residuals, coefficients,
+  variance/covariance matrix, bootstrapped standard errors on estimates,
+  predictions, and gradients, respectively, from the returned
+  object. Furthermore, the functions \code{\link{summary}} and
+  \code{\link{plot}} support objects of this type. The returned object
   has the following components:
 
   \item{eval}{ evaluation points }
   \item{mean}{ estimates of the regression function (conditional mean) at the
   evaluation points } 
   \item{beta}{ the model coefficients }
+  \item{betavcov}{ the asymptotic covariance matrix for the model coefficients (Klein and Spady only)}
   \item{merr}{ standard errors of the regression function estimates } 
   \item{grad}{ estimates of the gradients at each evaluation point }
   \item{gerr}{ standard errors of the gradient estimates }
