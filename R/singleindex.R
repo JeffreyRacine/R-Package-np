@@ -1,5 +1,5 @@
 singleindex = 
-  function(bws, index, mean, merr = NA,
+  function(bws, betasd = NA, betavcov = NA, index, mean, merr = NA,
            grad = NA, gerr = NA,
            mean.grad = NA, mean.gerr = NA,
            resid = NA,
@@ -13,6 +13,8 @@ singleindex =
 
     d = list(
       beta = bws$beta,
+      betasd = betasd,
+      betavcov = betavcov,
       bw = bws$bw,
       bws = bws,
       pregtype = bws$pregtype,
@@ -76,6 +78,11 @@ print.singleindex <- function(x, digits=NULL, ...){
 coef.singleindex <- function(object, ...) {
   tc <- object$beta
   names(tc) <- object$xnames
+  return(tc)
+}
+vcov.singleindex <- function(object, ...) {
+  tc <- object$betavcov
+  dimnames(tc) <- list(object$xnames,object$xnames)
   return(tc)
 }
 fitted.singleindex <- function(object, ...){

@@ -99,6 +99,7 @@ S3method(coef, sibandwidth)
 S3method(coef, smoothcoefficient)
 
 S3method(vcov, plregression)
+S3method(vcov, singleindex)
 
 S3method(predict, npregression)
 S3method(predict, bandwidth)
