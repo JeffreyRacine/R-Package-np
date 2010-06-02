@@ -212,7 +212,7 @@ npindex(bws, \dots)
   type.
 
   \code{\link{vcov}} requires that \code{gradients=TRUE} be set and
-  currently supports the Klein and Spady estimator only.p
+  currently supports the Klein and Spady estimator only.
 }
 
 \examples{
