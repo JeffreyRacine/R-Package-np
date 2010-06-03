@@ -362,9 +362,10 @@ npindex.sibandwidth <-
     if (no.ex) index.tmean <- index.mean
 
     ## June 3 2010, jracine, added vcov methods... thanks to Juan
-    ## Carlos Escanciano <jescanci@indiana.edu> for pushing me on
-    ## this... use index.tmean (training X) and index (tx) - need
-    ## gradients == TRUE in order for this to work
+    ## Carlos Escanciano <jescanci@indiana.edu> for pushing me on this
+    ## for the Klein and Spady estimator... use index.tmean (training
+    ## X) and index (tx) - need gradients == TRUE in order for this to
+    ## work
 
     if(bws$method == "ichimura" & gradients == TRUE) {
 
@@ -387,8 +388,7 @@ npindex.sibandwidth <-
 
       if(length(dim(tyindex))==1) tyindex <- matrix(tyindex,nrow=1,ncol=dim(tyindex))
 
-      ## xmex = X_i-\hat E(X_i|X_i'\beta), dimension k\times n. xmex
-      ## verified.
+      ## xmex = X_i-\hat E(X_i|X_i'\beta), dimension k\times n.
 
       xmex <- sapply(1:length(tydat),function(i){W[i,]-tyindex[,i]/tindex[i]})
 
