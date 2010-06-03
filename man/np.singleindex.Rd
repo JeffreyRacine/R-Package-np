@@ -54,9 +54,8 @@ npindex(bws, \dots)
 
   \item{gradients}{
     a logical value indicating that you want gradients and the
-    asymptotic covariance matrix for beta (Klein and Spady only)
-    computed and returned in the resulting \code{singleindex}
-    object. Defaults to \code{FALSE}.
+    asymptotic covariance matrix for beta computed and returned in the
+    resulting \code{singleindex} object. Defaults to \code{FALSE}.
   }
 
   \item{residuals}{
@@ -148,7 +147,7 @@ npindex(bws, \dots)
   \item{mean}{ estimates of the regression function (conditional mean) at the
   evaluation points } 
   \item{beta}{ the model coefficients }
-  \item{betavcov}{ the asymptotic covariance matrix for the model coefficients (Klein and Spady only)}
+  \item{betavcov}{ the asymptotic covariance matrix for the model coefficients}
   \item{merr}{ standard errors of the regression function estimates } 
   \item{grad}{ estimates of the gradients at each evaluation point }
   \item{gerr}{ standard errors of the gradient estimates }
@@ -211,8 +210,7 @@ npindex(bws, \dots)
   intended on mixed data types and will coerce the data to the same
   type.
 
-  \code{\link{vcov}} requires that \code{gradients=TRUE} be set and
-  currently supports the Klein and Spady estimator only.
+  \code{\link{vcov}} requires that \code{gradients=TRUE} be set.
 }
 
 \examples{
