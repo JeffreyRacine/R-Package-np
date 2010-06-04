@@ -1,9 +1,9 @@
 Changes from Version 0.40-0 to 0.40-1 [xxx]
 
 * Added asymptotic standard errors to npindex for the Klein and Spady
-  and Ichimura estimators which, when gradients=TRUE, can be extracted
-  via vcov(foo) where foo is a npsingleindex object (the Z-scores can
-  be obtained via Z <- coef(foo)[-1]/sqrt(diag(vcov(foo)))[-1])
+  and Ichimura parameter estimates which, when gradients=TRUE, can be
+  extracted via vcov(foo) where foo is a npsingleindex object (the
+  Z-scores can be obtained via Z<-coef(foo)[-1]/sqrt(diag(vcov(foo)))[-1])
 
 Changes from Version 0.30-9 to 0.40-0 [25-May-2010]
 
