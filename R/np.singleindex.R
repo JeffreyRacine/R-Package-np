@@ -318,8 +318,9 @@ npindex.sibandwidth <-
                                     bws=bws$bw)$ksum
 
       if(!no.ex & (no.ey | residuals)){
-        ## want to evaluate on training data for in sample errors even if evaluation x's
-        ## are different from training but no y's are specified
+        ## want to evaluate on training data for in sample errors even
+        ## if evaluation x's are different from training but no y's
+        ## are specified
         
         index.tmean <- npksum(txdat=index,
                               tydat=tydat,
@@ -369,6 +370,10 @@ npindex.sibandwidth <-
 
     if (no.ex) {
       index.tmean <- index.mean
+    }
+
+    if (no.ex & gradients) {
+      index.tgrad <- index.grad
     }
 
     ## 5/3/2010, jracine, added vcov methods... thanks to Juan Carlos
