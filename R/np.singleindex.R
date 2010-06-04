@@ -347,9 +347,10 @@ npindex.sibandwidth <-
 
       if(!no.ex & (no.ey | residuals)){
 
-        ## want to evaluate on training data for in sample errors even
+        ## Want to evaluate on training data for in sample errors even
         ## if evaluation x's are different from training but no y's
-        ## are specified
+        ## are specified. Also, needed for variance-covariance matrix
+        ## (uses on ly the training data)
 
         model <- npreg(txdat=index,
                        tydat=tydat,
@@ -368,7 +369,7 @@ npindex.sibandwidth <-
 
     if (no.ex) {
       index.tmean <- index.mean
-      index.tgrad <- index.grad
+      index.tgrad <- index.grad ## Only used if gradients=TRUE
     }
 
     ## 5/3/2010, jracine, added vcov methods... thanks to Juan Carlos
@@ -379,18 +380,26 @@ npindex.sibandwidth <-
 
     if(bws$method == "ichimura" & gradients == TRUE) {
 
-      ## First row & column of covariance matrix are zero due to
-      ## identification condition that beta_1=0. Note the n n^{-1} n
-      ## in V^{-1}\Sigma V^{-1} and the \sqrt{n} in the normalization
-      ## of \hat\beta will cancel.
+      ## First row & column of covariance matrix `Bvcov' are zero due
+      ## to identification condition that beta_1=0. Note the n n^{-1}
+      ## n in V^{-1}\Sigma V^{-1} and the \sqrt{n} in the
+      ## normalization of \hat\beta will cancel.
 
       q <- ncol(txdat)
       Bvcov <- matrix(0,q,q)
       dimnames(Bvcov) <- list(bws$xnames,bws$xnames)
 
+      ## Use the weight matrix so we can compute all expectations with
+      ## only one call to npksum (the kernel arguments x\beta do not
+      ## change, only the j for X_{ij} in E(X_{ij}|X_i'\beta)
+
       W <- txdat[,-1,drop=FALSE]
 
-      tyindex <- npksum(txdat = index, tydat = rep(1,length(tydat)), weights = W, bws = bws$bw)$ksum
+      tyindex <- npksum(txdat = index,
+                        tydat = rep(1,length(tydat)),
+                        weights = W,
+                        bws = bws$bw)$ksum
+
       tindex <- npksum(txdat = index, bws = bws$bw)$ksum
 
       ## Need to trap case where k-1=1... ksum will return a 1 D
@@ -407,7 +416,8 @@ npindex.sibandwidth <-
 
       if(is.vector(xmex)) xmex <- matrix(xmex,nrow=1,ncol=length(xmex))
 
-      ## g^{(1)}=dg/d\beta
+      ## g^{(1)}=dg/d\beta, first beta normalized to one so this
+      ## simplifies computation (beta's drop out)
 
       dg.db.sq <- (W*index.tgrad[,1])^2
 
