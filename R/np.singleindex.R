@@ -369,7 +369,6 @@ npindex.sibandwidth <-
 
     if (no.ex) {
       index.tmean <- index.mean
-      index.tgrad <- index.grad ## Only used if gradients=TRUE
     }
 
     ## 5/3/2010, jracine, added vcov methods... thanks to Juan Carlos
