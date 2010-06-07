@@ -394,7 +394,7 @@ npindex.sibandwidth <-
       Bvcov <- matrix(0,q,q)
 
       dg.db <- txdat[,-1,drop=FALSE]*index.tgrad[,1]
-      Vinv <- solve(t(dg.db)%*%(dg.db))
+      Vinv <- solve(t(dg.db)%*%dg.db)
       Sigma <- t(dg.db)%*%(dg.db*(tydat-index.tmean)^2)
       Bvcov[-1,-1] <- Vinv %*% Sigma %*% Vinv
     
