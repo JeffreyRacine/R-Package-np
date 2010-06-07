@@ -1417,8 +1417,6 @@ double *cv)
 
 	double log_DBL_MIN = log(DBL_MIN);
 
-	double temp;
-
 	#ifdef MPI2
 	double cv_MPI;
 	int stride = ceil((double) num_obs / (double) iNum_Processors);
@@ -2431,7 +2429,7 @@ double *SIGN)
 	int k;
 	int l = INT_MAX;
 
-	const double epsilon = 1.0/num_obs_train;
+	double epsilon = 1.0/num_obs_train;
   double nepsilon;
 
 	double prod_kernel;
@@ -4585,7 +4583,7 @@ double *mean)
 	int k;
 	int l;
 
-	const double epsilon = 1.0/num_obs;
+	double epsilon = 1.0/num_obs;
   double nepsilon;
 
 	double prod_kernel;
@@ -6216,7 +6214,7 @@ double **gradient)
 	int tmp_k;
 	int l;
 
-	const double epsilon = 1.0/num_obs_train;
+	double epsilon = 1.0/num_obs_train;
   double nepsilon;
 
 	double prod_kernel;
@@ -12574,26 +12572,26 @@ int itmax)
 	#ifndef MPI2
   cdf_loo = alloc_vecd(num_obs_train);
 
-	matrix_Y_unordered_eval = alloc_matd(num_obs_train, num_reg_unordered);
-	matrix_Y_ordered_eval = alloc_matd(num_obs_train, num_reg_ordered);
-	matrix_Y_continuous_eval = alloc_matd(num_obs_train, num_reg_continuous);
+	matrix_Y_unordered_eval = alloc_matd(num_obs_train, num_var_unordered);
+	matrix_Y_ordered_eval = alloc_matd(num_obs_train, num_var_ordered);
+	matrix_Y_continuous_eval = alloc_matd(num_obs_train, num_var_continuous);
 	#endif
 
 	#ifdef MPI2
   cdf_loo = alloc_vecd(stride*iNum_Processors);
 
-	matrix_Y_unordered_eval = alloc_matd(stride*iNum_Processors, num_reg_unordered);
-	matrix_Y_ordered_eval = alloc_matd(stride*iNum_Processors, num_reg_ordered);
-	matrix_Y_continuous_eval = alloc_matd(stride*iNum_Processors, num_reg_continuous);
+	matrix_Y_unordered_eval = alloc_matd(stride*iNum_Processors, num_var_unordered);
+	matrix_Y_ordered_eval = alloc_matd(stride*iNum_Processors, num_var_ordered);
+	matrix_Y_continuous_eval = alloc_matd(stride*iNum_Processors, num_var_continuous);
 	#endif
 
   /* XXX */
 
     /*    for(l=0; l < num_reg_unordered; l++)
-      for(j=0; j < num_obs_train; j++)
+      for(j=0; j < num_var_train; j++)
         matrix_Y_unordered_eval[l][j] = matrix_Y_unordered_train[l][i];
     
-    for(l=0; l < num_reg_ordered; l++)
+    for(l=0; l < num_var_ordered; l++)
       for(j=0; j < num_obs_train; j++)
       matrix_Y_ordered_eval[l][j] = matrix_Y_ordered_train[l][i];*/
     
@@ -12605,7 +12603,7 @@ int itmax)
     /* Require nested loops for ordered, unordered, and continuous -
        not implemented yet (Feb 7 2010) */
 
-    for(l=0; l < num_reg_continuous; l++)
+    for(l=0; l < num_var_continuous; l++)
       for(j=0; j < num_obs_train; j++)
         matrix_Y_continuous_eval[l][j] = matrix_Y_continuous_train[l][i];
 
@@ -12657,7 +12655,7 @@ int itmax)
 
     for(j=0; j < num_obs_train; j++) {
       indicator = 1.0;
-      for(l=0; l < num_reg_continuous; l++) {
+      for(l=0; l < num_var_continuous; l++) {
         indicator *= indfunc(matrix_Y_continuous_train[l][j]-matrix_Y_continuous_eval[l][j]);
       }
       *cv += ipow(indicator - cdf_loo[j],2);
@@ -18142,7 +18140,7 @@ int *num_categories)
 	int k;
 	int l;
 
-	const double epsilon = 1.0/num_obs;
+	double epsilon = 1.0/num_obs;
   double nepsilon;
 
 	double prod_kernel;
