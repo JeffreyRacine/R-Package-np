@@ -12587,8 +12587,8 @@ int itmax)
 
   /* XXX */
 
-    /*    for(l=0; l < num_reg_unordered; l++)
-      for(j=0; j < num_var_train; j++)
+    /*    for(l=0; l < num_var_unordered; l++)
+      for(j=0; j < num_obs_train; j++)
         matrix_Y_unordered_eval[l][j] = matrix_Y_unordered_train[l][i];
     
     for(l=0; l < num_var_ordered; l++)
@@ -12664,13 +12664,14 @@ int itmax)
   }
 
   /* Sum over all variables - need to be careful about denominator */
+  /* Note - we are only set up for 1 continuous Y at the moment */
 
   *cv /= (double) ipow(num_obs_train,1+num_reg_continuous);
 
   free(cdf_loo);
-	free_mat(matrix_Y_unordered_eval, num_reg_unordered);
-	free_mat(matrix_Y_ordered_eval, num_reg_ordered);
-	free_mat(matrix_Y_continuous_eval, num_reg_continuous);
+	free_mat(matrix_Y_unordered_eval, num_var_unordered);
+	free_mat(matrix_Y_ordered_eval, num_var_ordered);
+	free_mat(matrix_Y_continuous_eval, num_var_continuous);
 
 	return(0);
 
