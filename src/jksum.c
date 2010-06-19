@@ -1747,6 +1747,10 @@ int *num_categories){
     num_var_continuous_extern = 0; // rows in the y_mat
     num_var_ordered_extern = 0; // rows in weights
 
+    // workaround for bwscaling = TRUE
+    // really just want to get the full product kernel evaluated at zero
+
+    int_LARGE_SF = 1;
     kernel_weighted_sum_np(KERNEL_reg,
                            KERNEL_unordered_reg,
                            KERNEL_ordered_reg,
@@ -1776,6 +1780,7 @@ int *num_categories){
                            num_categories,
                            NULL,
                            &aicc);
+    int_LARGE_SF = 0;
     //fprintf(stderr,"\n%e\n",aicc);
   }
 
