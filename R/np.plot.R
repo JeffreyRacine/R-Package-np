@@ -677,7 +677,7 @@ npplot.rbandwidth <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf)
+    umf <- tmf <- eval(tmf, envir = environment(tt))
 
       ydat <- model.response(tmf)
       xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
@@ -1185,7 +1185,7 @@ npplot.scbandwidth <-
       tmf <- bws$call[c(1,m)]
       tmf[[1]] <- as.name("model.frame")
       tmf[["formula"]] <- tt
-      umf <- tmf <- eval(tmf)
+      umf <- tmf <- eval(tmf, envir = environment(tt))
       
       ydat <- model.response(tmf)
       xdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
@@ -1881,7 +1881,7 @@ npplot.plbandwidth <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf)
+    umf <- tmf <- eval(tmf, envir = environment(tt))
 
       ydat <- model.response(tmf)
       xdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
@@ -2531,7 +2531,7 @@ npplot.bandwidth <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf)
+    umf <- tmf <- eval(tmf, envir = environment(tt))
 
       xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
     } else {
@@ -3016,7 +3016,7 @@ npplot.conbandwidth <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf)
+    umf <- tmf <- eval(tmf, envir = environment(tt))
 
       ydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
       xdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
@@ -3751,7 +3751,7 @@ npplot.sibandwidth <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf)
+    umf <- tmf <- eval(tmf, envir = environment(tt))
 
       ydat <- model.response(tmf)
       xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]

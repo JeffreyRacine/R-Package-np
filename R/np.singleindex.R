@@ -61,7 +61,7 @@ npindex.formula <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf)
+    umf <- tmf <- eval(tmf, envir = environment(tt))
 
     tydat <- model.response(tmf)
     txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
