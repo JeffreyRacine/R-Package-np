@@ -1,9 +1,9 @@
 Changes from Version 0.40-1 to 0.40-2 [xxx]
 
 * Fixed a scope issue whereby a user would write a function that calls
-   an np/npRmpi command but objects passed to the user's function
-   (i.e. newdata) cannot be found in the environment yet they exist
-   outside of the function
+  an np/npRmpi command, however, objects passed to the user's function
+  and called by the np/npRmpi command (i.e. such as newdata) cannot be
+  found in the environment yet they exist outside of the function
 
 * Fixed issue with bwscaling=TRUE and bwmethod="cv.aic" in npreg
 
