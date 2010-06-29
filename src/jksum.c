@@ -1087,7 +1087,18 @@ double *weighted_sum){
   /* Declarations */
 
   int i,j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
-  int do_psum; 
+  int do_psum, switch_te; 
+
+#ifdef MPI2
+  // switch parallelisation strategies based on biggest stride
+ 
+  int stride = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
+
+  num_obs_eval_alloc = stride*iNum_Processors;
+
+#else
+  num_obs_eval_alloc = num_obs_eval;
+#endif
 
   const int KERNEL_reg_np = KERNEL_reg + OP_CFUN_OFFSETS[operator];
   const int KERNEL_unordered_reg_np = KERNEL_unordered_reg + OP_UFUN_OFFSETS[operator];
@@ -1096,7 +1107,7 @@ double *weighted_sum){
     (MAX(num_var_continuous_extern, 1) * MAX(num_var_ordered_extern, 1));
 
   double *lambda, **matrix_bandwidth, **matrix_eval_bandwidth = NULL, *m = NULL;
-  double *tprod, dband, *buf, *ws;
+  double *tprod, dband, *ws;
 
   double * const * const xtc = (BANDWIDTH_reg == BW_ADAP_NN)?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -1111,13 +1122,6 @@ double *weighted_sum){
     matrix_X_unordered_train:matrix_X_unordered_eval;
   double * const * const xo = (BANDWIDTH_reg == BW_ADAP_NN)?
     matrix_X_ordered_train:matrix_X_ordered_eval;
-
-#ifdef MPI2
-  int stride = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
-  num_obs_eval_alloc = stride*iNum_Processors;
-#else
-  num_obs_eval_alloc = num_obs_eval;
-#endif
 
   if (num_obs_eval == 0) {
     return(1);
@@ -1136,20 +1140,6 @@ double *weighted_sum){
 
   sum_element_length = MAX(num_var_continuous_extern, 1) * 
     MAX(num_var_ordered_extern, 1);
-
-  buf = alloc_vecd(num_obs_eval_alloc*sum_element_length);
-
-  /* clear memory in temporary buffer and in result */
-  if(gather_scatter){
-    for(i = 0; i < num_obs_eval_alloc*sum_element_length; i++){
-      buf[i] = weighted_sum[i];
-    }
-  }else{
-    for(i = 0; i < num_obs_eval_alloc*sum_element_length; i++){
-      buf[i] = 0.0;
-      weighted_sum[i] = 0.0;
-    }    
-  }
 
   /* assert(!(BANDWIDTH_reg == BW_ADAP_NN)); */
   /* Conduct the estimation */
@@ -1225,21 +1215,40 @@ double *weighted_sum){
     return(1);
   }
 
+  if(!gather_scatter)
+    for(i = 0; i < num_obs_eval_alloc*sum_element_length; i++){
+      weighted_sum[i] = 0.0;
+    }
+
   if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
 #ifdef MPI2
-    js = stride * my_rank;
-    je = MIN(num_obs_eval - 1, js + stride - 1);
+    if(!gather_scatter){
+      js = stride * my_rank;
+      je = MIN(num_obs_eval - 1, js + stride - 1);
+      ws = weighted_sum + js*sum_element_length;
+    } else {
+      js = 0;
+      je = num_obs_eval - 1;
+      ws = weighted_sum;
+    }
 #else
     js = 0;
     je = num_obs_eval - 1;
+    ws = weighted_sum;
 #endif
     
-    ws = weighted_sum + js * sum_element_length;
+
   } else {
 #ifdef MPI2
-    js = stride * my_rank;
-    je = MIN(num_obs_train - 1, js + stride - 1);
-    ws = buf;
+    if(!gather_scatter){
+      js = stride * my_rank;
+      je = MIN(num_obs_train - 1, js + stride - 1);
+      ws = weighted_sum;
+    } else {
+      js = 0;
+      je = num_obs_train - 1;
+      ws = weighted_sum;
+    }
 #else
     js = 0;
     je = num_obs_train - 1;
@@ -1317,13 +1326,17 @@ double *weighted_sum){
 
   }
 
+  if(!gather_scatter){ 
+    // gather_scatter is only used for the local-linear cv
+    // note: ll cv + adaptive_nn does not work in parallel
 #ifdef MPI2
-  if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-    MPI_Allgather(weighted_sum + js * sum_element_length, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
-  } else if(BANDWIDTH_reg == BW_ADAP_NN){
-    MPI_Allreduce(ws, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
-  }
+    if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
+      MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
+    } else if(BANDWIDTH_reg == BW_ADAP_NN){
+      MPI_Allreduce(MPI_IN_PLACE, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
+    }
 #endif
+  }
 
   free(lambda);
   free_tmat(matrix_bandwidth);
@@ -1332,7 +1345,6 @@ double *weighted_sum){
     free_tmat(matrix_eval_bandwidth);
 
   free(tprod);
-  free(buf);
   
   return(0);
 }
@@ -1699,16 +1711,26 @@ double *vector_scale_factor,
 int *num_categories){
 
   // note that mean has 2*num_obs allocated for npksum
-  int i, j, l, sf_flag = 0;
+  int i, j, l, sf_flag = 0, num_obs_eval_alloc, tsf;
 
   double cv = 0.0;
   double * lambda = NULL, * vsf = NULL;
   double ** matrix_bandwidth = NULL;
 
-  double aicc = 0.0;
+  double  * aicc;
   double traceH = 0.0;
 
   const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
+
+#ifdef MPI2
+    int stride = MAX(ceil((double) num_obs / (double) iNum_Processors),1);
+    num_obs_eval_alloc = stride*iNum_Processors;
+    aicc = (double *)malloc(stride*sizeof(double));
+#else
+    num_obs_eval_alloc = num_obs;
+    aicc = (double *)malloc(sizeof(double));
+#endif
+
 
   // Allocate memory for objects 
 
@@ -1749,6 +1771,7 @@ int *num_categories){
 
     // workaround for bwscaling = TRUE
     // really just want to get the full product kernel evaluated at zero
+    tsf = int_LARGE_SF;
 
     int_LARGE_SF = 1;
     kernel_weighted_sum_np(KERNEL_reg,
@@ -1779,8 +1802,11 @@ int *num_categories){
                            vector_scale_factor,
                            num_categories,
                            NULL,
-                           &aicc);
-    int_LARGE_SF = 0;
+                           aicc);
+    int_LARGE_SF = tsf;
+    num_var_continuous_extern = 0; 
+
+
     //fprintf(stderr,"\n%e\n",aicc);
   }
 
@@ -1791,7 +1817,7 @@ int *num_categories){
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
     double * lc_Y[2];
-    double * mean = (double *)malloc(2*num_obs*sizeof(double));
+    double * mean = (double *)malloc(2*num_obs_eval_alloc*sizeof(double));
 
     num_var_continuous_extern = 2; // columns in the y_mat
     num_var_ordered_extern = 0; // columns in weights
@@ -1830,6 +1856,9 @@ int *num_categories){
                            num_categories,
                            NULL,
                            mean);
+
+    num_var_continuous_extern = 0;
+
     
     // every even entry in mean is sum(y*kij)
     // every odd is sum(kij)
@@ -1840,7 +1869,7 @@ int *num_categories){
       const double dy = vector_Y[ii]-mean[ii2]/sk;
       cv += dy*dy;
       if(bwm == RBWM_CVAIC)
-        traceH += aicc/sk;
+        traceH += aicc[0]/sk;
 
       //fprintf(stderr,"mj: %e\n",mean[ii2]/(MAX(DBL_MIN, mean[ii2+1])));
     }
@@ -1930,13 +1959,109 @@ int *num_categories){
     }
 
 
-    for(j = 0; j < num_obs; j++){
+    for(j = 0; j < num_obs; j++){ // main loop
       nepsilon = 0.0;
 
       for(l = 0; l < (nrc1); l++){
         KWM[l] = &kwm[j*nrcc22+(l+1)*(nrc2)+1];
         XTKY[l] = &kwm[j*nrcc22+l+1];
       }
+
+#ifdef MPI2
+      if((j % iNum_Processors) == 0){
+
+        // some guys have to sit out the last calculation, but
+        // they still sync up afterwards
+        if((j+my_rank) < (num_obs-1)){
+
+          for(l = 0; l < (nrc2); l++){
+            XTKX[l] = PXTKX[l] + j + my_rank + 1;
+          }
+
+          for(l = 0; l < num_reg_continuous; l++)
+            PXC[l] = matrix_X_continuous[l] + j + my_rank + 1;
+
+          for(l = 0; l < num_reg_unordered; l++)
+            PXU[l] = matrix_X_unordered[l] + j + my_rank + 1;
+
+          for(l = 0; l < num_reg_ordered; l++)
+            PXO[l] = matrix_X_ordered[l] + j + my_rank + 1;
+        
+          for(l = 0; l < num_reg_continuous; l++){
+        
+            for(i = 0; i < (num_obs-j-1-my_rank); i++){
+              XTKX[l+2][i] = matrix_X_continuous[l][i+j+1+my_rank]-matrix_X_continuous[l][j+my_rank];
+            }
+            TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
+          }
+
+          for(l = 0; l < num_reg_unordered; l++)
+            TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
+
+          for(l = 0; l < num_reg_ordered; l++)
+            TORD[l][0] = matrix_X_ordered[l][j+my_rank];
+
+          num_var_continuous_extern = nrc2; // rows in the y_mat
+          num_var_ordered_extern = nrc2; // rows in weights
+
+          kernel_weighted_sum_np(KERNEL_reg,
+                                 KERNEL_unordered_reg,
+                                 KERNEL_ordered_reg,
+                                 BANDWIDTH_reg,
+                                 num_obs-j-my_rank-1,
+                                 1,
+                                 num_reg_unordered,
+                                 num_reg_ordered,
+                                 num_reg_continuous,
+                                 0, // we leave one out via the weight matrix
+                                 1, // kernel_pow = 1
+                                 (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
+                                 0, // do_smooth_coef_weights = FALSE (not implemented)
+                                 1, // symmetric
+                                 1, // gather-scatter sum
+                                 0, // no convolution
+                                 PXU, // TRAIN
+                                 PXO, 
+                                 PXC,
+                                 TUNO, // EVAL
+                                 TORD,
+                                 TCON,
+                                 XTKX,
+                                 XTKX,
+                                 sgn,
+                                 vsf,
+                                 num_categories,
+                                 NULL,
+                                 kwm+(j+my_rank)*nrcc22); // weighted sum
+
+          num_var_continuous_extern = 0; // set back to number of regressors
+          num_var_ordered_extern = 0; // always zero
+
+          // need to use reference weight to fix weight sum
+          for(int jj = j+my_rank+1; jj < num_obs; jj++){
+            const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-my_rank-1]);
+            for(int ii = 1; ii < nrc2; ii++){
+              kwm[jj*nrcc22+ii*nrc2] += RW*XTKX[ii][jj-j-my_rank-1]*sgn[ii];
+            }
+          }
+        }
+        // reduce all work arrays
+        const int nrem = num_obs % iNum_Processors;
+        const int nred = ((j+iNum_Processors) > num_obs) ? nrem : iNum_Processors;
+
+        MPI_Allreduce(MPI_IN_PLACE, kwm+j*nrcc22, nred*nrcc22, MPI_DOUBLE, MPI_SUM, comm[1]);
+      }
+
+      // due to a quirk of the algorithm in parallel, always need to re-symmetrise array
+
+      double * const tpk = kwm+j*nrcc22;
+      for (int jj = 0; jj < (nrc2); jj++){
+        for (int ii = (nrc1); ii > jj; ii--){
+          tpk[jj*(nrc2)+ii] = tpk[ii*(nrc2)+jj];
+        }
+      }
+
+#else
 
       if(j < (num_obs-1)){
 
@@ -1968,7 +2093,6 @@ int *num_categories){
         for(l = 0; l < num_reg_ordered; l++)
           TORD[l][0] = matrix_X_ordered[l][j];
       
-
         num_var_continuous_extern = nrc2; // rows in the y_mat
         num_var_ordered_extern = nrc2; // rows in weights
 
@@ -2001,6 +2125,10 @@ int *num_categories){
                                num_categories,
                                NULL,
                                kwm+j*nrcc22); // weighted sum
+
+        num_var_continuous_extern = 0; // set back to number of regressors
+        num_var_ordered_extern = 0; // always zero
+
         // need to use reference weight to fix weight sum
         for(int jj = j+1; jj < num_obs; jj++){
           const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-1]);
@@ -2016,12 +2144,13 @@ int *num_categories){
           }
         }
       }
+#endif
       
       // need to manipulate KWM pointers and XTKY - done
 
       if(bwm == RBWM_CVAIC){
-        KWM[0][0] += aicc;
-        XTKY[0][0] += aicc*vector_Y[j];
+        KWM[0][0] += aicc[0];
+        XTKY[0][0] += aicc[0]*vector_Y[j];
       }
 
       while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
@@ -2031,7 +2160,7 @@ int *num_categories){
       }
       
       if(bwm == RBWM_CVAIC)
-        traceH += XTKXINV[0][0]*aicc;
+        traceH += XTKXINV[0][0]*aicc[0];
    
       XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
@@ -2068,6 +2197,7 @@ int *num_categories){
     free(sgn);
   }
 
+  free(aicc);
   free(lambda);
   free_mat(matrix_bandwidth,num_reg_continuous);
 

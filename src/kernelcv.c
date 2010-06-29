@@ -133,10 +133,6 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
         return(DBL_MAX);
     }
 
-/* Compute the cross-validation function */
-/* Tristen's efficient code is broken under MPI, so we comment it out
-   here pending a fix */
-#ifndef MPI2
     if((BANDWIDTH_reg_extern == BW_FIXED)||(int_ll_extern == LL_LC)){ 
       return(np_kernel_estimate_regression_categorical_ls_aic(
         int_ll_extern,
@@ -156,11 +152,8 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
         &vector_scale_factor[1],
         num_categories_extern));
       } else {
-#endif
       return(cv_func_regression_categorical_ls_nn(vector_scale_factor));
-#ifndef MPI2
       }
-#endif
 }
 
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor)
@@ -678,10 +671,6 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
         return(DBL_MAX);
     }
 
-/* Compute the AIC_c function */
-/* Tristen's efficient code is broken under MPI, so we comment it out
-   here pending a fix */
-#ifndef MPI2
     if((BANDWIDTH_reg_extern == BW_FIXED)||(int_ll_extern == LL_LC)){
       return(np_kernel_estimate_regression_categorical_ls_aic(
         int_ll_extern,
@@ -701,7 +690,6 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
         &vector_scale_factor[1],
         num_categories_extern));
         } else {
-#endif
       return(kernel_estimate_regression_categorical_aic_c(
         int_ll_extern,
         KERNEL_reg_extern,
@@ -718,8 +706,6 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
         vector_Y_extern,
         &vector_scale_factor[1],
         num_categories_extern));
-#ifndef MPI2
     }
-#endif
 
 }

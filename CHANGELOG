@@ -1,4 +1,8 @@
-Changes from Version 0.40-1 to 0.40-2 [xxx]
+Changes from Version 0.40-1 to 0.40-3 [30-June-2010]
+
+* Fixed issue for npRmpi where the C code underlying regression
+  cross-validation (code in jksum.c) differs between np and npRmpi
+  (both are correct with the latter being a tad slower)
 
 * Fixed a scope issue whereby a user would write a function that calls
   an np/npRmpi command, however, objects passed to the user's function
