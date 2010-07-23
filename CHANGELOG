@@ -1,4 +1,11 @@
-Changes from Version 0.40-1 to 0.40-3 [30-June-2010]
+Changes from Version 0.40-1 to 0.40-3 [23-July-2010]
+
+* Added random seed (defaults to 42) to npscoefbw to ensure consistent
+  values for optimization for successive invocations on the same data
+
+* Fixed glitch in multistarting in npscoefbw whereby multistarting was
+  not working (always returned last computed function value and not
+  the minimum)
 
 * Fixed issue for npRmpi where the C code underlying regression
   cross-validation (code in jksum.c) differs between np and npRmpi

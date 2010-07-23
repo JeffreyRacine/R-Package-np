@@ -109,6 +109,7 @@ npscoefbw.scbandwidth <-
            zdat = NULL,
            bws,
            nmulti,
+           random.seed = 42,
            cv.iterate = FALSE,
            cv.num.iterations = 1,
            backfit.iterate = FALSE,
@@ -121,6 +122,17 @@ npscoefbw.scbandwidth <-
            optim.abstol = .Machine$double.eps,
            optim.maxit = 500,
            ...){
+    
+    ## Save seed prior to setting
+
+    if(exists(".Random.seed", .GlobalEnv)) {
+      save.seed <- get(".Random.seed", .GlobalEnv)
+      exists.seed = TRUE
+    } else {
+      exists.seed = FALSE
+    }
+    
+    set.seed(random.seed)
 
     miss.z <- missing(zdat)
     
@@ -486,6 +498,10 @@ npscoefbw.scbandwidth <-
         bws$sfactor[dati$iord] <- bws$sfactor[dati$iord]/nfactor
     }
 
+    ## Restore seed
+
+    if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
+    
     bws <- scbandwidth(bw = bws$bw,
                        bwmethod = bws$method,
                        bwscaling = bws$scaling,
@@ -514,14 +530,13 @@ npscoefbw.scbandwidth <-
     bws
   }
 
-
-
 npscoefbw.default <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
            bws,
            nmulti,
+           random.seed,
            cv.iterate,
            cv.num.iterations,
            backfit.iterate,

@@ -35,6 +35,7 @@ npscoefbw(\dots)
           zdat = NULL,
           bws,
           nmulti,
+          random.seed,
           cv.iterate,
           cv.num.iterations,
           backfit.iterate,
@@ -60,6 +61,7 @@ npscoefbw(\dots)
           zdat = NULL,
           bws,
           nmulti,
+          random.seed = 42,
           cv.iterate = FALSE,
           cv.num.iterations = 1,
           backfit.iterate = FALSE,
@@ -214,6 +216,11 @@ npscoefbw(\dots)
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
     points. Defaults to \code{min(5,ncol(xdat))}.
+  }
+
+  \item{random.seed}{
+    an integer used to seed R's random number generator. This ensures
+    replicability of the numerical search. Defaults to 42.
   }
 
   \item{optim.method}{ method used by \code{\link{optim}} for minimization of
