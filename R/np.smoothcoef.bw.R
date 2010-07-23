@@ -371,6 +371,7 @@ npscoefbw.scbandwidth <-
         if(optim.return$value < fval.min) {
           param <- optim.return$par
           min.overall <- optim.return$value
+          fval.min <- min.overall ## Added by jracine Jul 22 2010
           numimp.overall <- numimp + 1
           best.overall <- i
         }
