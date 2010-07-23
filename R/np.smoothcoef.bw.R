@@ -587,6 +587,7 @@ npscoefbw.default <-
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("zdat", "bandwidth.compute",
                "nmulti",
+               "random.seed",
                "cv.iterate",
                "cv.num.iterations",
                "backfit.iterate",

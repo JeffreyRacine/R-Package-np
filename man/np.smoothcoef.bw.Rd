@@ -439,7 +439,8 @@ npscoefbw(\dots)
 \seealso{
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-# EXAMPLE 1 (INTERFACE=FORMULA): 
+# EXAMPLE 1 (INTERFACE=FORMULA):
+set.seed(42)
 
 n <- 100
 x <- runif(n)
