@@ -13,6 +13,7 @@
 #include "headers.h"
 #include "matrix.h"
 
+#include "tree.h"
 
 
 #ifdef MPI2
@@ -34,6 +35,7 @@ extern int int_VERBOSE;
 extern int int_TAYLOR;
 extern int int_WEIGHTS;
 extern int int_LARGE_SF;
+extern int int_TREE;
 
 /*
 int int_LARGE_SF; 
@@ -121,6 +123,9 @@ extern double *vector_scale_factor_dep_met_univar_lag_extern;
 
 extern double y_min_extern;
 extern double y_max_extern;
+
+// tree
+extern KDT * kdt_extern;
 
 int kernel_convolution_weighted_sum(
 int KERNEL_reg,
@@ -783,6 +788,28 @@ double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8,
 double (* const allok[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine };
 double (* const alluk[])(int, double, int) = { np_uaa, np_uli_racine };
 
+// in cksup we define a scale length for all kernels, outside of which the kernel is 0
+// for fixed bandwidths and finite support kernels, only points within += 1 scale length
+// contribute at a given point of evaluation
+// when constructing the search box, in 1D the size of the box is
+// x_eval + [-RIGHT_SUPPORT,-LEFT_SUPPORT], the interval is reversed and negated because you want to know if 
+// the evaluation point is in the support of other points, not vice versa :)
+
+// as it stands, CDF's are only partially accelerated by the tree, but that is fixable
+#define SQRT5 2.23606797749979
+#define SQRT20 4.47213595499958
+
+double cksup[][2] = { {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
+		      {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
+		      {-1.0, 1.0},
+		      {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
+		      {-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},
+		      {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
+		      {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
+		      {-0.0, 0.0}, // PLEASE DON'T EVER USE THIS
+		      {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
+		      {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, 
+		      {-1.0, DBL_MAX} };
 
 /* 
    np_kernelv does weighted products of vectors - this is useful for 
@@ -796,7 +823,8 @@ void np_ckernelv(const int KERNEL,
                  const double * const xt, const int num_xt, 
                  const int do_xw,
                  const double x, const double h, 
-                 double * const result){
+                 double * const result,
+		 const NL * const nl){
 
   /* 
      this should be read as:
@@ -821,8 +849,17 @@ void np_ckernelv(const int KERNEL,
                                    np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8, 
                                    np_cdf_rect };
 
-  for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
-    result[i] = xw[j]*k[KERNEL]((x-xt[i])/h);
+  if(nl == NULL)
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+      result[i] = xw[j]*k[KERNEL]((x-xt[i])/h);
+  else{
+    for (int m = 0; m < nl->n; m++){
+      const int istart = kdt_extern->kdn[nl->node[m]].istart;
+      const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
+	result[i] = xw[j]*k[KERNEL]((x-xt[i])/h);
+    }
+  }
 
 }
 
@@ -849,7 +886,8 @@ void np_ukernelv(const int KERNEL,
                  const double * const xt, const int num_xt, 
                  const int do_xw,
                  const double x, const double lambda, const int ncat,
-                 double * const result){
+                 double * const result,
+		 const NL * const nl){
 
   /* 
      this should be read as:
@@ -865,9 +903,17 @@ void np_ukernelv(const int KERNEL,
   double (* const k[])(int, double, int) = { np_uaa, np_uli_racine,
                                              np_econvol_uaa, np_econvol_uli_racine };
 
-  for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
-    result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
-
+  if(nl == NULL)
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+      result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
+  else{
+    for (int m = 0; m < nl->n; m++){
+      const int istart = kdt_extern->kdn[nl->node[m]].istart;
+      const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
+	result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
+    }
+  }
 }
 
 void np_convol_okernelv(const int KERNEL, 
@@ -890,7 +936,8 @@ void np_okernelv(const int KERNEL,
                  const double * const xt, const int num_xt, 
                  const int do_xw,
                  const double x, const double lambda,
-                 double * const result){
+                 double * const result,
+		 const NL * const nl){
   
   /* 
      this should be read as:
@@ -905,8 +952,17 @@ void np_okernelv(const int KERNEL,
 
   double (* const k[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine };
 
-  for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
-    result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+  if(nl == NULL)
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+      result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+  else{
+    for (int m = 0; m < nl->n; m++){
+      const int istart = kdt_extern->kdn[nl->node[m]].istart;
+      const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
+	result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+    }
+  }
 }
 
 // W = A
@@ -921,7 +977,8 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                            const int symmetric,
                            const int gather_scatter,
                            const int bandwidth_divide, const double dband,
-                           double * const result){
+                           double * const result,
+			   const NL * const nl){
 
   int i,j,k, l = parallel_sum?which_k:0;
   const int kstride = (parallel_sum ? (MAX(ncol_A, 1)*MAX(ncol_B, 1)) : 0);
@@ -952,90 +1009,218 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     temp = weights[which_k];
     weights[which_k] = 0.0;
   }
+  
+  if(nl == NULL){
+    if(!gather_scatter){
+      if(!symmetric){
+	if(kpow == 1){
+	  for (k = 0; k < num_weights; k++, l+=linc)
+	    for (j = 0; j < max_A; j++)
+	      for (i = 0; i < max_B; i++)
+		result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+	} else { // kpow != 1
+	  for (k = 0; k < num_weights; k++, l+=linc)
+	    for (j = 0; j < max_A; j++)
+	      for (i = 0; i < max_B; i++)
+		result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+	}
+      } else { // symmetric
+	if(kpow == 1){
+	  for (k = 0; k < num_weights; k++, l+=linc){
+	    for (j = 0; j < max_A; j++){
+	      for (i = 0; i <= j; i++){
+		result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+	      }
+	    }
+	  }
+	} else { // kpow != 1
+	  for (k = 0; k < num_weights; k++, l+=linc){
+	    for (j = 0; j < max_A; j++){
+	      for (i = 0; i <= j; i++){
+		result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+	      }
+	    }
+	  }
+	}
 
-  if(!gather_scatter){
-    if(!symmetric){
-      if(kpow == 1){
-        for (k = 0; k < num_weights; k++, l+=linc)
-          for (j = 0; j < max_A; j++)
-            for (i = 0; i < max_B; i++)
-              result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
-      } else { // kpow != 1
-        for (k = 0; k < num_weights; k++, l+=linc)
-          for (j = 0; j < max_A; j++)
-            for (i = 0; i < max_B; i++)
-              result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+
+	for (j = 0; j < max_A; j++){
+	  for (i = (max_A-1); i > j; i--){
+	    result[j*max_B+i] = result[i*max_B+j];
+	  }
+	}
       }
-    } else { // symmetric
-      if(kpow == 1){
-        for (k = 0; k < num_weights; k++, l+=linc){
-          for (j = 0; j < max_A; j++){
-            for (i = 0; i <= j; i++){
-              result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
-            }
-          }
-        }
-      } else { // kpow != 1
-        for (k = 0; k < num_weights; k++, l+=linc){
-          for (j = 0; j < max_A; j++){
-            for (i = 0; i <= j; i++){
-              result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
-            }
-          }
-        }
-      }
+    } else { // gather_scatter
+      if(!symmetric){
+	if(kpow == 1){
+	  for (k = 0; k < num_weights; k++, l+=linc)
+	    for (j = 0; j < max_A; j++)
+	      for (i = 0; i < max_B; i++)
+		result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+	} else { // kpow != 1
+	  for (k = 0; k < num_weights; k++, l+=linc)
+	    for (j = 0; j < max_A; j++)
+	      for (i = 0; i < max_B; i++)
+		result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+	}
+      } else { // symmetric
+	if(kpow == 1){
+	  for (k = 0; k < num_weights; k++){
+	    for (j = 0; j < max_A; j++){
+	      for (i = 0; i <= j; i++){
+		const double tp = pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*weights[k]/db;
+		const double sgnp = tp*p_sgn[j*have_sgn]*p_sgn[i*have_sgn];
+		result[k*kstride+j*max_B+i] += tp;
+		result[(k+1)*max_AB+j*max_B+i] += sgnp;
+		//fprintf(stderr,"\nmax ab %d\tsgnp %e\tres %e",max_AB,sgnp,result[(k+1)*max_AB+j*max_B+i]);
+	      }
+	    }
+	    // insert reference weight in top right corner
+	    result[(k+1)*max_AB+max_B-1] = weights[k]/db;
+	  }
+	} else { // kpow != 1
+	  for (k = 0; k < num_weights; k++){
+	    for (j = 0; j < max_A; j++){
+	      for (i = 0; i <= j; i++){
+		result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*ipow(weights[k]/db, kpow);
+	      }
+	    }
+	  }
+	}
 
+	for (j = 0; j < max_A; j++){
+	  for (i = (max_A-1); i > j; i--){
+	    result[j*max_B+i] = result[i*max_B+j];
+	  }
+	}
 
-      for (j = 0; j < max_A; j++){
-        for (i = (max_A-1); i > j; i--){
-          result[j*max_B+i] = result[i*max_B+j];
-        }
       }
     }
-  } else { // gather_scatter
-    if(!symmetric){
-      if(kpow == 1){
-        for (k = 0; k < num_weights; k++, l+=linc)
-          for (j = 0; j < max_A; j++)
-            for (i = 0; i < max_B; i++)
-              result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
-      } else { // kpow != 1
-        for (k = 0; k < num_weights; k++, l+=linc)
-          for (j = 0; j < max_A; j++)
-            for (i = 0; i < max_B; i++)
-              result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
-      }
-    } else { // symmetric
-      if(kpow == 1){
-        for (k = 0; k < num_weights; k++){
-          for (j = 0; j < max_A; j++){
-            for (i = 0; i <= j; i++){
-              const double tp = pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*weights[k]/db;
-              const double sgnp = tp*p_sgn[j*have_sgn]*p_sgn[i*have_sgn];
-              result[k*kstride+j*max_B+i] += tp;
-              result[(k+1)*max_AB+j*max_B+i] += sgnp;
-              //fprintf(stderr,"\nmax ab %d\tsgnp %e\tres %e",max_AB,sgnp,result[(k+1)*max_AB+j*max_B+i]);
-            }
-          }
-          // insert reference weight in top right corner
-          result[(k+1)*max_AB+max_B-1] = weights[k]/db;
-        }
-      } else { // kpow != 1
-        for (k = 0; k < num_weights; k++){
-          for (j = 0; j < max_A; j++){
-            for (i = 0; i <= j; i++){
-              result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*ipow(weights[k]/db, kpow);
-            }
-          }
-        }
-      }
+  } else { // TREE SUPPORT
+    if(!gather_scatter){
+      if(!symmetric){
+	if(kpow == 1){
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++, l+=linc)
+	      for (j = 0; j < max_A; j++)
+		for (i = 0; i < max_B; i++)
+		  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+	  }
+	} else { // kpow != 1
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++, l+=linc)
+	      for (j = 0; j < max_A; j++)
+		for (i = 0; i < max_B; i++)
+		  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+	  }
+	}
+      } else { // symmetric
+	if(kpow == 1){
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++, l+=linc){
+	      for (j = 0; j < max_A; j++){
+		for (i = 0; i <= j; i++){
+		  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+		}
+	      }
+	    }
+	  }
+	} else { // kpow != 1
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++, l+=linc){
+	      for (j = 0; j < max_A; j++){
+		for (i = 0; i <= j; i++){
+		  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+		}
+	      }
+	    }
+	  }
+	}
 
-      for (j = 0; j < max_A; j++){
-        for (i = (max_A-1); i > j; i--){
-          result[j*max_B+i] = result[i*max_B+j];
-        }
-      }
 
+	for (j = 0; j < max_A; j++){
+	  for (i = (max_A-1); i > j; i--){
+	    result[j*max_B+i] = result[i*max_B+j];
+	  }
+	}
+      }
+    } else { // gather_scatter
+      if(!symmetric){
+	if(kpow == 1){
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++, l+=linc)
+	      for (j = 0; j < max_A; j++)
+		for (i = 0; i < max_B; i++)
+		  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+	  }
+	} else { // kpow != 1
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++, l+=linc)
+	      for (j = 0; j < max_A; j++)
+		for (i = 0; i < max_B; i++)
+		  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+	  }
+	}
+      } else { // symmetric
+	if(kpow == 1){
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++){
+	      for (j = 0; j < max_A; j++){
+		for (i = 0; i <= j; i++){
+		  const double tp = pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*weights[k]/db;
+		  const double sgnp = tp*p_sgn[j*have_sgn]*p_sgn[i*have_sgn];
+		  result[k*kstride+j*max_B+i] += tp;
+		  result[(k+1)*max_AB+j*max_B+i] += sgnp;
+		  //fprintf(stderr,"\nmax ab %d\tsgnp %e\tres %e",max_AB,sgnp,result[(k+1)*max_AB+j*max_B+i]);
+		}
+	      }
+	      // insert reference weight in top right corner
+	      result[(k+1)*max_AB+max_B-1] = weights[k]/db;
+	    }
+	  }
+	} else { // kpow != 1
+	  for (int m = 0; m < nl->n; m++){
+	    const int istart = kdt_extern->kdn[nl->node[m]].istart;
+	    const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+	    l = linc ? istart : l;
+	    for (k = istart; k < istart+nlev; k++){
+	      for (j = 0; j < max_A; j++){
+		for (i = 0; i <= j; i++){
+		  result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*ipow(weights[k]/db, kpow);
+		}
+	      }
+	    }
+	  }
+	}
+
+	for (j = 0; j < max_A; j++){
+	  for (i = (max_A-1); i > j; i--){
+	    result[j*max_B+i] = result[i*max_B+j];
+	  }
+	}
+
+      }
     }
   }
 
@@ -1088,6 +1273,11 @@ double *weighted_sum){
 
   int i,j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
   int do_psum, switch_te; 
+
+  int np_ks_tree_use = (int_TREE == NP_TREE_TRUE) && (operator != OP_CONVOLUTION) && (BANDWIDTH_reg == BW_FIXED);
+
+  NL nl = {.node = NULL, .n = 0, .nalloc = 0};
+  NL * pnl=  np_ks_tree_use ? &nl : NULL;
 
 #ifdef MPI2
   // switch parallelisation strategies based on biggest stride
@@ -1270,13 +1460,32 @@ double *weighted_sum){
 
     l = 0;
 
+    // do a hail mary, then generate the interaction list
+    // anything but a fixed bandwidth is not yet supported
+    // that includes convolutions 
+
+    if(np_ks_tree_use){
+      // reset the interaction node list
+      nl.n = 0;
+      double bb[kdt_extern->ndim*2];
+
+      for(i = 0; i < num_reg_continuous; i++){
+	bb[2*i] = -cksup[KERNEL_reg_np][1];
+	bb[2*i+1] = -cksup[KERNEL_reg_np][0];
+
+	bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + m[i]*bb[2*i]);
+	bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + m[i]*bb[2*i+1]);
+      }
+
+      boxSearch(kdt_extern, 0, bb, pnl);
+    }
     /* continuous first */
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
     if((BANDWIDTH_reg != BW_ADAP_NN) || (operator != OP_CONVOLUTION)){
       for(i=0; i < num_reg_continuous; i++, l++, m += mstep){
-        np_ckernelv(KERNEL_reg_np, xtc[i], num_xt, l, xc[i][j], *m, tprod);
+        np_ckernelv(KERNEL_reg_np, xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl);
         dband *= *m;
       }
     } else {
@@ -1291,7 +1500,7 @@ double *weighted_sum){
 
     for(i=0; i < num_reg_unordered; i++, l++){
       np_ukernelv(KERNEL_unordered_reg_np, xtu[i], num_xt, l, xu[i][j], 
-                  lambda[i], num_categories[i], tprod);
+                  lambda[i], num_categories[i], tprod, pnl);
     }
 
     /* ordered third */
@@ -1299,7 +1508,7 @@ double *weighted_sum){
       for(i=0; i < num_reg_ordered; i++, l++){
         np_okernelv(KERNEL_ordered_reg, xto[i], num_xt, l,
                     xo[i][j], lambda[num_reg_unordered+i], 
-                    tprod);
+                    tprod, pnl);
       }
     } else {
       for(i=0; i < num_reg_ordered; i++, l++){
@@ -1322,7 +1531,7 @@ double *weighted_sum){
                           symmetric,
                           gather_scatter,
                           bandwidth_divide, dband,
-                          ws);
+                          ws, pnl);
 
   }
 
@@ -1337,6 +1546,9 @@ double *weighted_sum){
     }
 #endif
   }
+
+  if(nl.node != NULL)
+    free(nl.node);
 
   free(lambda);
   free_tmat(matrix_bandwidth);

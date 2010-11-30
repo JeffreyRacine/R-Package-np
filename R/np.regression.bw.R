@@ -164,7 +164,8 @@ npregbw.rbandwidth <-
         ncon = bws$ncon,
         regtype = switch(bws$regtype,
           lc = REGTYPE_LC,
-          ll = REGTYPE_LL))
+          ll = REGTYPE_LL),
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
       myoptd = list(ftol=ftol, tol=tol, small=small)
 

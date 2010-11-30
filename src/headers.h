@@ -232,6 +232,9 @@ double np_cv_func_con_density_categorical_ls(double *vector_scale_factor);
 #define OP_DERIVATIVE  2
 #define OP_INTEGRAL    3
 
+#define NP_TREE_FALSE 0
+#define NP_TREE_TRUE  1
+
 static const int OP_CFUN_OFFSETS[4] = { 0, 9, 17, 26 };
 static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 
@@ -258,6 +261,7 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define RBW_NORDI 14
 #define RBW_NCONI 15
 #define RBW_LL 16
+#define RBW_DOTREEI 17
 
 #define RBW_FTOLD  0
 #define RBW_TOLD   1

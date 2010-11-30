@@ -682,6 +682,10 @@ USE_START_YES = 1
 NP_DO_DENS = 1
 NP_DO_DIST = 0
 
+## initially making an np-wide option via the 'options' mechanism
+DO_TREE_NO = 0
+DO_TREE_YES = 1
+
 ##kernel defs
 CKER_GAUSS = 0
 CKER_EPAN  = 4
