@@ -219,7 +219,7 @@ npscoef(bws, \dots)
 
   Li, Q. and J.S. Racine (2010), \dQuote{Smooth varying-coefficient
     estimation and inference for qualitative and quantitative data,}
-    Econometric Theory, 26, 1-31.
+    Econometric Theory, 26, 1607-1637
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
