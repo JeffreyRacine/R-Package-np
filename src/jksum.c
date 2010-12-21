@@ -2417,11 +2417,10 @@ int *num_categories){
 
   cv /= (double)num_obs;
   if(bwm == RBWM_CVAIC){
-    penalty = (1.0+traceH/((double)num_obs))/(1.0-(traceH+2.0)/((double)num_obs));
-    if(penalty < 0) {
+    if((1.0+traceH/((double)num_obs))/(1.0-(traceH+2.0)/((double)num_obs)) < 0) {
       cv = DBL_MAX;
     } else {
-      cv = log(cv) + penalty;
+      cv = log(cv) + (1.0+traceH/((double)num_obs))/(1.0-(traceH+2.0)/((double)num_obs));
     }
   }
   return(cv);
