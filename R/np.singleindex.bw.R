@@ -240,7 +240,8 @@ npindexbw.sibandwidth <-
                         tydat=W,
                         weights=W,
                         leave.one.out=TRUE,
-                        bandwidth.divide=TRUE,bws=c(h))$ksum
+                        bandwidth.divide=TRUE,bws=c(h),
+                        ...)$ksum
 
           denom <- tww[2,2,]
           denom[which(denom == 0.0)] <- ichimuraFloor
@@ -299,7 +300,8 @@ npindexbw.sibandwidth <-
                         tydat=W,
                         weights=W,
                         leave.one.out=TRUE,
-                        bandwidth.divide=TRUE,bws=c(h))$ksum
+                        bandwidth.divide=TRUE,bws=c(h),
+                        ...)$ksum
 
           denom <- tww[2,2,]
           denom[which(denom == 0.0)] <- kleinspadyFloor

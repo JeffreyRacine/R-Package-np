@@ -398,6 +398,7 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define KWS_SCOEFI 17
 #define KWS_WNCOLI 18
 #define KWS_YNCOLI 19
+#define KWS_DOTREEI 20
 
 #define CQ_TNOBSI 0
 #define CQ_ENOBSI   1

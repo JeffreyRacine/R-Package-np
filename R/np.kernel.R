@@ -248,7 +248,8 @@ npksum.default <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       smooth.coefficient = smooth.coefficient,
       wncol = dim.in[1],
-      yncol = dim.in[2])
+      yncol = dim.in[2],
+      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
     
 
     myout=

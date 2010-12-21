@@ -125,15 +125,21 @@ npconmode.conbandwidth <-
     tf = logical(enrow)
     indices = integer(enrow)
 
+    if(no.ey)
+      efac <- factor(bws$ydati$all.lev[[1]],levels = bws$ydati$all.lev[[1]], ordered = is.ordered(tydat[,1]))
+    else
+      efac <- factor(union(bws$ydati$all.lev[[1]], levels(eydat[,1])),
+                     levels = union(bws$ydati$all.lev[[1]], levels(eydat[,1])), ordered = is.ordered(tydat[,1]))
+
     tdensE <- parse(text = paste("npcdens(txdat = txdat, tydat = tydat,",
                       "exdat = ", ifelse(no.ex, "txdat", "exdat"), ",",
-                      "eydat = rep((bws$ydati$all.ulev[[1]])[i], enrow),",
+                      "eydat = rep(efac[i], enrow),",
                       "bws = bws)$condens"))
 
 
-    for(i in 1:nlevels(tydat[,1])){
+    for(i in 1:nlevels(efac)){
       tdens <- eval(tdensE)
-
+      
       tf = tdens > mdens
       indices[tf] = i
       mdens[tf] = tdens[tf]
@@ -144,7 +150,7 @@ npconmode.conbandwidth <-
                              ifelse(no.ey & !no.ex, "",
                                     paste("yeval = ", ifelse(no.ey, "tydat",
                                                              "eydat"), ",")),
-                             "conmode = (bws$ydati$all.ulev[[1]])[indices],",
+                             "conmode = efac[indices],",
                              "condens = mdens, ntrain = nrow(txdat),",
                              "trainiseval = no.ex)")))
     
