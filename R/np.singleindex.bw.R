@@ -52,10 +52,10 @@ npindexbw.formula <-
   }
 
 
-npindexbw.NULL <-
-  function(xdat = stop("training data xdat missing"),
-           ydat = stop("training data ydat missing"),
-           bws, ...){
+npindexbw.NULL <- function(xdat = stop("training data xdat missing"),
+                           ydat = stop("training data ydat missing"),
+                           bws,
+                           ...){
 
     xdat <- toFrame(xdat)
 
@@ -63,7 +63,8 @@ npindexbw.NULL <-
 
     tbw <- npindexbw.default(xdat = xdat,
                              ydat = ydat,
-                             bws = bws, ...)
+                             bws = bws,
+                             ...)
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -81,9 +82,18 @@ npindexbw.NULL <-
 npindexbw.default <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
-           bws, bandwidth.compute = TRUE,
-           nmulti, random.seed, optim.method, optim.maxattempts,
-           optim.reltol, optim.abstol, optim.maxit, ...){
+           bws,
+           bandwidth.compute = TRUE,
+           nmulti,
+           random.seed,
+           optim.method,
+           optim.maxattempts,
+           optim.reltol,
+           optim.abstol,
+           optim.maxit,
+           ckertype,
+           ckerorder,
+           ...){
 
     xdat <- toFrame(xdat)
 
@@ -102,27 +112,41 @@ npindexbw.default <-
       stop(paste("manually specified 'bws' must be a numeric vector of length ncol(xdat)+1.",
                  "See documentation for details."))
 
-    tbw <- sibandwidth(beta = bws[1:ncol(xdat)],
-                       h = bws[ncol(xdat)+1], ...,
-                       nobs = dim(xdat)[1],
-                       xdati = untangle(xdat),
-                       ydati = untangle(data.frame(ydat)),
-                       xnames = names(xdat),
-                       ynames = deparse(substitute(ydat)),
-                       bandwidth = bws[ncol(xdat)+1],
-                       bandwidth.compute = bandwidth.compute)
+    mc.names <- names(match.call(expand.dots = FALSE))
+    margs <- c("ckertype","ckerorder")
 
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
+
+    tbw <- eval(parse(text=paste("sibandwidth(beta = bws[1:ncol(xdat)]",
+                        ifelse(any.m, ",",""),
+                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
+                        ", h = bws[ncol(xdat)+1],",
+                        "nobs = dim(xdat)[1],",
+                        "xdati = untangle(xdat),",
+                        "ydati = untangle(data.frame(ydat)),",
+                        "xnames = names(xdat),",
+                        "ynames = deparse(substitute(ydat)),",
+                        "bandwidth = bws[ncol(xdat)+1],",
+                        "bandwidth.compute = bandwidth.compute)")))
 
     if (tbw$method == "kleinspady" & !setequal(ydat,c(0,1))) 
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("nmulti","random.seed", "optim.method", "optim.maxattempts",
-               "optim.reltol", "optim.abstol", "optim.maxit")
+    margs <- c("nmulti",
+               "random.seed",
+               "optim.method",
+               "optim.maxattempts",
+               "optim.reltol",
+               "optim.abstol",
+               "optim.maxit",
+               "ckertype",
+               "ckerorder")
     
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
-    
+
     if (bandwidth.compute)
       tbw <- eval(parse(text=paste("npindexbw.sibandwidth(xdat=xdat, ydat=ydat, bws=tbw",
                           ifelse(any.m, ",",""),
@@ -140,12 +164,17 @@ npindexbw.default <-
 npindexbw.sibandwidth <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
-           bws, bandwidth.compute = TRUE, nmulti, random.seed = 42,
+           bws,
+           bandwidth.compute = TRUE,
+           nmulti,
+           random.seed = 42,
            optim.method = c("Nelder-Mead", "BFGS", "CG"),
            optim.maxattempts = 10,
            optim.reltol = sqrt(.Machine$double.eps),
            optim.abstol = .Machine$double.eps,
            optim.maxit = 500,
+           ckertype,
+           ckerorder,
            ...){
 
     ## Save seed prior to setting
@@ -240,7 +269,10 @@ npindexbw.sibandwidth <-
                         tydat=W,
                         weights=W,
                         leave.one.out=TRUE,
-                        bandwidth.divide=TRUE,bws=c(h))$ksum
+                        bandwidth.divide=TRUE,
+                        bws=c(h),
+                        ckertype=ckertype,
+                        ckerorder=ckerorder)$ksum
 
           denom <- tww[2,2,]
           denom[which(denom == 0.0)] <- ichimuraFloor
@@ -255,7 +287,7 @@ npindexbw.sibandwidth <-
         ## return an infinite penalty for negative h
 
         if(h > 0) {
-          return(sum.squares.leave.one.out(xdat,ydat,beta,h))
+          return(sum.squares.leave.one.out(xdat=xdat,ydat=ydat,beta=beta,h=h))
         } else {
           return(ichimuraMaxPenalty)
         }
@@ -299,7 +331,10 @@ npindexbw.sibandwidth <-
                         tydat=W,
                         weights=W,
                         leave.one.out=TRUE,
-                        bandwidth.divide=TRUE,bws=c(h))$ksum
+                        bandwidth.divide=TRUE,
+                        bws=c(h),
+                        ckertype=ckertype,
+                        ckerorder=ckerorder)$ksum
 
           denom <- tww[2,2,]
           denom[which(denom == 0.0)] <- kleinspadyFloor
@@ -321,7 +356,7 @@ npindexbw.sibandwidth <-
         ## return an infinite penalty for negative h
 
         if(h > 0) {
-          return(sum.log.leave.one.out(xdat,ydat,beta,h))
+          return(sum.log.leave.one.out(xdat=xdat,ydat=ydat,beta=beta,h=h))
         } else {
           ## No natural counterpart to var of y here, unlike Ichimura above...
           return(sqrt(.Machine$double.xmax))
@@ -344,7 +379,9 @@ npindexbw.sibandwidth <-
                            maxit=optim.maxit)
       } else if(bws$method == "kleinspady"){
         optim.fn <- kleinspady
-        optim.control <- c(reltol=optim.reltol,maxit=optim.maxit)
+        optim.control <- c(abstol=optim.abstol, ## added jracine jan 20 2011 (was in ichimura but not kleinspady)
+                           reltol=optim.reltol,
+                           maxit=optim.maxit)
       }
 
       for(i in 1:nmulti) {

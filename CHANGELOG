@@ -1,3 +1,8 @@
+Changes from Version 0.40-3 to 0.50-0 [23-July-2010]
+
+* Fixed issue with negative penalties being returned by cv.aic (ought
+  to have been +infinity)
+
 Changes from Version 0.40-1 to 0.40-3 [23-July-2010]
 
 * Added random seed (defaults to 42) to npscoefbw to ensure consistent

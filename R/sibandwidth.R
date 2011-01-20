@@ -1,5 +1,6 @@
 sibandwidth <-
-  function(beta, h,
+  function(beta,
+           h,
            method=c("ichimura","kleinspady"),
            ckertype = c("gaussian", "epanechnikov","uniform"), 
            ckerorder = c(2,4,6,8),
