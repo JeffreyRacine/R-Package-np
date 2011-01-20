@@ -173,8 +173,8 @@ npindexbw.sibandwidth <-
            optim.reltol = sqrt(.Machine$double.eps),
            optim.abstol = .Machine$double.eps,
            optim.maxit = 500,
-           ckertype,
-           ckerorder,
+           ckertype = c("gaussian", "epanechnikov","uniform"), 
+           ckerorder = c(2,4,6,8),           
            ...){
 
     ## Save seed prior to setting
@@ -203,6 +203,18 @@ npindexbw.sibandwidth <-
       
       warning(paste("xdat has one dimension. Using a single index model to reduce",
                     "dimensionality is unnecessary."))
+    }
+
+    ckertype = match.arg(ckertype)
+
+    if(missing(ckerorder))
+      ckerorder = 2
+    else if (ckertype == "uniform")
+      warning("ignoring kernel order specified with uniform kernel type")
+    else {
+      kord = eval(formals()$ckerorder) 
+      if (!any(kord == ckerorder))
+        stop("ckerorder must be one of ", paste(kord,collapse=" "))
     }
 
     optim.method <- match.arg(optim.method)
@@ -254,7 +266,7 @@ npindexbw.sibandwidth <-
 
         ## Next we define the sum of squared leave-one-out residuals
 
-        sum.squares.leave.one.out <- function(xdat,ydat,beta,h) {
+        sum.squares.leave.one.out <- function(xdat,ydat,beta,h,ckertype,ckerorder) {
 
           ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
           
@@ -287,7 +299,7 @@ npindexbw.sibandwidth <-
         ## return an infinite penalty for negative h
 
         if(h > 0) {
-          return(sum.squares.leave.one.out(xdat=xdat,ydat=ydat,beta=beta,h=h))
+          return(sum.squares.leave.one.out(xdat=xdat,ydat=ydat,beta=beta,h=h,ckertype=ckertype,ckerorder=ckerorder))
         } else {
           return(ichimuraMaxPenalty)
         }
@@ -316,7 +328,7 @@ npindexbw.sibandwidth <-
 
         ## Next we define the sum of logs
 
-        sum.log.leave.one.out <- function(xdat,ydat,beta,h) {
+        sum.log.leave.one.out <- function(xdat,ydat,beta,h,ckertype,ckerorder) {
 
           ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
           
@@ -356,7 +368,7 @@ npindexbw.sibandwidth <-
         ## return an infinite penalty for negative h
 
         if(h > 0) {
-          return(sum.log.leave.one.out(xdat=xdat,ydat=ydat,beta=beta,h=h))
+          return(sum.log.leave.one.out(xdat=xdat,ydat=ydat,beta=beta,h=h,ckertype=ckertype,ckerorder=ckerorder))
         } else {
           ## No natural counterpart to var of y here, unlike Ichimura above...
           return(sqrt(.Machine$double.xmax))
