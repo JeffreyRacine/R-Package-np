@@ -115,20 +115,15 @@ npindexbw.default <-
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("ckertype","ckerorder")
 
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
-
-    tbw <- eval(parse(text=paste("sibandwidth(beta = bws[1:ncol(xdat)]",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ", h = bws[ncol(xdat)+1],",
-                        "nobs = dim(xdat)[1],",
-                        "xdati = untangle(xdat),",
-                        "ydati = untangle(data.frame(ydat)),",
-                        "xnames = names(xdat),",
-                        "ynames = deparse(substitute(ydat)),",
-                        "bandwidth = bws[ncol(xdat)+1],",
-                        "bandwidth.compute = bandwidth.compute)")))
+    tbw <- sibandwidth(beta = bws[1:ncol(xdat)],
+                       h = bws[ncol(xdat)+1], ...,
+                       nobs = dim(xdat)[1],
+                       xdati = untangle(xdat),
+                       ydati = untangle(data.frame(ydat)),
+                       xnames = names(xdat),
+                       ynames = deparse(substitute(ydat)),
+                       bandwidth = bws[ncol(xdat)+1],
+                       bandwidth.compute = bandwidth.compute)
 
     if (tbw$method == "kleinspady" & !setequal(ydat,c(0,1))) 
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
