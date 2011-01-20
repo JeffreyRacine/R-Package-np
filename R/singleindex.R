@@ -47,8 +47,7 @@ singleindex =
       confusion.matrix = confusion.matrix,
       CCR.byoutcome = CCR.byoutcome,
       CCR.overall = CCR.overall,
-      fit.mcfadden = fit.mcfadden
-      )
+      fit.mcfadden = fit.mcfadden)
 
     class(d) = "singleindex"
 

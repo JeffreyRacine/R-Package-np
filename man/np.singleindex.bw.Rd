@@ -35,6 +35,8 @@ npindexbw(\dots)
           optim.reltol,
           optim.abstol,
           optim.maxit,
+          ckertype,
+          ckerorder,
           \dots)
 
 \method{npindexbw}{sibandwidth}(xdat = stop("training data xdat missing"),
@@ -48,6 +50,8 @@ npindexbw(\dots)
           optim.reltol = sqrt(.Machine$double.eps),
           optim.abstol = .Machine$double.eps,
           optim.maxit = 500,
+          ckertype = c("gaussian", "epanechnikov","uniform"), 
+          ckerorder = c(2,4,6,8),
           \dots)
 
 }
@@ -180,6 +184,19 @@ npindexbw(\dots)
     maximum number of iterations used by \code{\link{optim}}. Defaults
      to \code{500}.
    }
+
+  \item{ckertype}{
+    character string used to specify the continuous kernel type.
+    Can be set as \code{gaussian}, \code{epanechnikov}, or
+    \code{uniform}. Defaults to \code{gaussian}.
+  }
+
+  \item{ckerorder}{
+    numeric value specifying kernel order (one of
+    \code{(2,4,6,8)}). Kernel order specified along with a
+  \code{uniform} continuous kernel type will be ignored. Defaults to
+  \code{2}.
+  }
 
   \item{\dots}{
     additional arguments supplied to specify the parameters to the
