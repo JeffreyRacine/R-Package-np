@@ -53,7 +53,24 @@ npindex <-
   }
 
 npindex.formula <-
-  function(bws, data = NULL, newdata = NULL, ...){
+  function(bws,
+           data = NULL,
+           newdata = NULL,
+           ckertype = c("gaussian", "epanechnikov","uniform"), 
+           ckerorder = c(2,4,6,8),           
+           ...){
+
+    ckertype = match.arg(ckertype)
+
+    if(missing(ckerorder))
+      ckerorder = 2
+    else if (ckertype == "uniform")
+      warning("ignoring kernel order specified with uniform kernel type")
+    else {
+      kord = eval(formals()$ckerorder) 
+      if (!any(kord == ckerorder))
+        stop("ckerorder must be one of ", paste(kord,collapse=" "))
+    }
 
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -81,7 +98,7 @@ npindex.formula <-
     ev <-
     eval(parse(text=paste("npindex(txdat = txdat, tydat = tydat,",
                  ifelse(has.eval,paste("exdat = exdat,",ifelse(has.ey,"eydat = eydat,","")),""),
-                 "bws = bws, ...)")))
+                 "bws = bws, ckertype = ckertype, ckerorder = ckerorder,...)")))
     ev$rows.omit <- as.vector(attr(umf,"na.action"))
     ev$nobs.omit <- length(ev$rows.omit)
     ev
@@ -91,10 +108,19 @@ npindex.call <-
   function(bws, ...) {
     npindex(txdat = eval(bws$call[["xdat"]], environment(bws$call)),
             tydat = eval(bws$call[["ydat"]], environment(bws$call)),
-            bws = bws, ...)
+            bws = bws,
+            ckertype = bws$ckertype,
+            ckerorder = bws$ckerorder,
+            ...)
   }
 
-npindex.default <- function(bws, txdat, tydat, ...){
+npindex.default <- function(bws,
+                            txdat,
+                            tydat,
+                            ckertype,
+                            ckerorder,
+                            ...){
+
   sc.names <- names(sys.call())
 
   ## here we check to see if the function was called with tdat =
@@ -120,11 +146,11 @@ npindex.default <- function(bws, txdat, tydat, ...){
                    ifelse(no.txdat, "", "txdat,"))
   ty.str <- ifelse(tydat.named, "ydat = tydat,",
                    ifelse(no.tydat, "", "tydat,"))
-  
+
   tbw <- eval(parse(text = paste("npindexbw(",
                       ifelse(bws.named,                             
                              paste(tx.str, ty.str,
-                                   "bws = bws, bandwidth.compute = FALSE,"),
+                                   "bws = bws, bandwidth.compute = FALSE, ckertype = ckertype, ckerorder = ckerorder,"),
                              paste(ifelse(no.bws, "", "bws,"), tx.str, ty.str)),
                       "call = mc, ...",")",sep="")))
 
@@ -162,8 +188,9 @@ npindex.default <- function(bws, txdat, tydat, ...){
                        ifelse(no.tydat,"",",tydat"))
     }
   }
-  
-  eval(parse(text=paste("npindex(bws = tbw", tx.str, ty.str, ",...)")))
+
+  eval(parse(text=paste("npindex(bws = tbw", tx.str, ty.str, ", ckertype = ckertype, ckerorder = ckerorder,...)")))
+
 }
 
 npindex.sibandwidth <-
@@ -175,13 +202,26 @@ npindex.sibandwidth <-
            gradients = FALSE,
            residuals = FALSE,
            errors = FALSE,
-           boot.num = 399, ...) {
+           boot.num = 399,
+           ckertype = c("gaussian", "epanechnikov","uniform"), 
+           ckerorder = c(2,4,6,8),           
+           ...) {
 
-  
+    ckertype = match.arg(ckertype)
+
+    if(missing(ckerorder))
+      ckerorder = 2
+    else if (ckertype == "uniform")
+      warning("ignoring kernel order specified with uniform kernel type")
+    else {
+      kord = eval(formals()$ckerorder) 
+      if (!any(kord == ckerorder))
+        stop("ckerorder must be one of ", paste(kord,collapse=" "))
+    }
+
     no.ex = missing(exdat)
     no.ey = missing(eydat)
     
-
     ## if no.ex then if !no.ey then ey and tx must match, to get
     ## oos errors alternatively if no.ey you get is errors if
     ## !no.ex then if !no.ey then ey and ex must match, to get
@@ -312,10 +352,14 @@ npindex.sibandwidth <-
       index.mean <- npksum(txdat=index,
                            tydat=tydat,
                            exdat=index.eval,
-                           bws=bws$bw)$ksum/
+                           bws=bws$bw,
+                           ckertype=ckertype,
+                           ckerorder=ckerorder)$ksum/
                              npksum(txdat=index,
                                     exdat=index.eval,
-                                    bws=bws$bw)$ksum
+                                    bws=bws$bw,
+                                    ckertype=ckertype,
+                                    ckerorder=ckerorder)$ksum
 
       if(!no.ex & (no.ey | residuals)){
         ## want to evaluate on training data for in sample errors even
@@ -324,9 +368,13 @@ npindex.sibandwidth <-
         
         index.tmean <- npksum(txdat=index,
                               tydat=tydat,
-                              bws=bws$bw)$ksum/
+                              bws=bws$bw,
+                              ckertype=ckertype,
+                              ckerorder=ckerorder)$ksum/
                                 npksum(txdat=index,
-                                       bws=bws$bw)$ksum
+                                       bws=bws$bw,
+                                       ckertype=ckertype,
+                                       ckerorder=ckerorder)$ksum
       }
 
     } else if(gradients==TRUE) {
@@ -336,6 +384,8 @@ npindex.sibandwidth <-
                      exdat=index.eval,
                      bws=bws$bw,
                      regtype="lc",
+                     ckertype=ckertype,
+                     ckerorder=ckerorder,
                      gradients=TRUE)
 
       index.mean <- model$mean
@@ -357,6 +407,8 @@ npindex.sibandwidth <-
                        tydat=tydat,
                        bws=bws$bw,
                        regtype="lc",
+                       ckertype=ckertype,
+                       ckerorder=ckerorder,
                        gradients=TRUE)
 
         index.tmean <- model$mean
@@ -402,9 +454,14 @@ npindex.sibandwidth <-
       tyindex <- npksum(txdat = index,
                         tydat = rep(1,length(tydat)),
                         weights = W,
-                        bws = bws$bw)$ksum
+                        bws = bws$bw,
+                        ckertype=ckertype,
+                        ckerorder=ckerorder)$ksum
 
-      tindex <- npksum(txdat = index, bws = bws$bw)$ksum
+      tindex <- npksum(txdat = index,
+                       bws = bws$bw,
+                       ckertype=ckertype,
+                       ckerorder=ckerorder)$ksum
 
       ## Need to trap case where k-1=1... ksum will return a 1 D
       ## array, need a 1 x n matrix
@@ -477,7 +534,10 @@ npindex.sibandwidth <-
           txdat = rindex,
           tydat = tydat[indices],
           exdat = index.eval,
-          bws = bws$bw)[c('mean','grad')]
+          bws = bws$bw,
+          ckertype=ckertype,
+          ckerorder=ckerorder,
+          )[c('mean','grad')]
 
         c(model$mean, model$grad, mean(model$grad))
       }
@@ -485,9 +545,17 @@ npindex.sibandwidth <-
     } else {
       boofun = function(data, indices){
         rindex = txdat[indices,] %*% bws$beta
-        npksum(txdat = rindex, tydat = tydat[indices], exdat = index.eval,
-               bws = bws$bw)$ksum/
-                 npksum(txdat = rindex, exdat = index.eval, bws=bws$bw)$ksum
+        npksum(txdat = rindex,
+               tydat = tydat[indices],
+               exdat = index.eval,
+               bws = bws$bw,
+               ckertype=ckertype,
+               ckerorder=ckerorder)$ksum/
+                 npksum(txdat = rindex,
+                        exdat = index.eval,
+                        bws=bws$bw,
+                        ckertype=ckertype,
+                        ckerorder=ckerorder)$ksum
       }
     }
 
@@ -553,7 +621,6 @@ npindex.sibandwidth <-
            CCR.byoutcome =  CCR.byoutcome, fit.mcfadden = fit.mcfadden,"
       strres = ""
     }
-
 
     eval(parse(text=paste(
                  "singleindex(bws = bws, index = index.eval, mean = index.mean,",
