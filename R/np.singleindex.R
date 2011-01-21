@@ -117,9 +117,21 @@ npindex.call <-
 npindex.default <- function(bws,
                             txdat,
                             tydat,
-                            ckertype,
-                            ckerorder,
+                            ckertype = c("gaussian", "epanechnikov","uniform"), 
+                            ckerorder = c(2,4,6,8),           
                             ...){
+
+  ckertype = match.arg(ckertype)
+
+  if(missing(ckerorder))
+    ckerorder = 2
+  else if (ckertype == "uniform")
+    warning("ignoring kernel order specified with uniform kernel type")
+  else {
+    kord = eval(formals()$ckerorder) 
+    if (!any(kord == ckerorder))
+      stop("ckerorder must be one of ", paste(kord,collapse=" "))
+  }
 
   sc.names <- names(sys.call())
 
@@ -190,6 +202,7 @@ npindex.default <- function(bws,
   }
 
   eval(parse(text=paste("npindex(bws = tbw", tx.str, ty.str, ", ckertype = ckertype, ckerorder = ckerorder,...)")))
+#  eval(parse(text=paste("npindex(bws = tbw", tx.str, ty.str, ",...)")))  
 
 }
 
