@@ -48,6 +48,8 @@ npindex(bws, \dots)
         residuals = FALSE,
         errors = FALSE,
         boot.num = 399,
+        ckertype = c("gaussian", "epanechnikov","uniform"), 
+        ckerorder = c(2,4,6,8),
         \dots)
 }
 

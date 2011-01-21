@@ -1,10 +1,10 @@
-Changes from Version 0.40-3 to 0.40-4 [20-Jan-2011]
+Changes from Version 0.40-3 to 0.40-4 [21-Jan-2011]
 
 * Fixed issue with ckertype and ckerorder not being propagated in
   np.singleindex.bw.R
 
-* Fixed issue with negative penalties being returned by cv.aic (ought
-  to have been +infinity)
+* Fixed issue with negative penalties being returned by cv.aic in
+  npregbw (ought to have been +infinity)
 
 Changes from Version 0.40-1 to 0.40-3 [23-July-2010]
 
