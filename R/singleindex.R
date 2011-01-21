@@ -6,7 +6,7 @@ singleindex =
            ntrain, trainiseval = FALSE, residuals = FALSE,
            gradients = FALSE, xtra = NA,
            confusion.matrix = NA, CCR.overall = NA,
-           CCR.byoutcome =  NA, fit.mcfadden = NA#, ckertype, ckerorder
+           CCR.byoutcome =  NA, fit.mcfadden = NA
            ){
 
     if (missing(bws) | missing(index) | missing(mean) | missing(ntrain))
@@ -17,8 +17,6 @@ singleindex =
       betavcov = betavcov,
       bw = bws$bw,
       bws = bws,
-#      ckertype = bws$ckertype,
-#      ckerorder = bws$ckerorder,      
       pregtype = bws$pregtype,
       pmethod = bws$pmethod,
       xnames = bws$xnames,
