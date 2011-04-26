@@ -432,7 +432,7 @@ npindexbw.sibandwidth <-
           
           if (ncol(xdat) != 1){
             if (setequal(bws$beta[2:ncol(xdat)],c(0)))
-              beta <- coef(ols.fit)[3:ncol(ols.fit$x)]
+              beta <- coef(ols.fit)[3:ncol(ols.fit$x)]/(coef(ols.fit)[2])
             else
               beta = bws$beta[2:ncol(xdat)]
           } else { beta = numeric(0) }
@@ -449,7 +449,7 @@ npindexbw.sibandwidth <-
           ## Random initialization used for remaining multistarts
 
           beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
-          beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
+          beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]/(coef(ols.fit)[2])
           if(IQR(fit) > 0) {
             h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
           } else {
@@ -462,7 +462,7 @@ npindexbw.sibandwidth <-
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
           attempts <- attempts + 1
           beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
-          beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
+          beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]/(coef(ols.fit)[2])
           if(IQR(fit) > 0) {
             h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
           } else {
