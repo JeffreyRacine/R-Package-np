@@ -116,11 +116,10 @@ n <- 1500
 ## 2) E(z|u) !=0 hence we have endogeneity
 
 ## 3) Suppose there exists an instrument w such that z = beta w + v
-## (linear function of the instrument).
 
 ## 4) We generate v, w, and generate u such that u and z are
-## correlated. To achieve this we express u as a function of v (i.e. u
-## = gamma v + eps)
+## correlated. To achieve this we express u as a function of v (i.e. u =
+## gamma v + eps)
 
 v <- rnorm(n,mean=0,sd=0.27)
 eps <- rnorm(n,mean=0,sd=0.05)
@@ -157,15 +156,13 @@ phi <- fun1
 
 phihat.iv <- npregiv(y=y,z=z,w=w)$phihat
 
-## Now the non-iv local linear estimator
+## Now the non-iv local linear estimator of E(y|z)
 
-phihat <- fitted(npreg(y~z,regtype="ll"))
+ll.mean <- fitted(npreg(y~z,regtype="ll"))
 
-## Now generate a plot... we construct the plot for 99% of the data
-## (naturally estimates use full sample)
-
-## For the plots, restrict attention to the bulk of the data (trim out
-## 1/2 of one percent, 1/4 of one percent from each tail of y and z)
+## For the plots, restrict focal attention to the bulk of the data
+## (i.e. for the plotting area trim out 1/4 of one percent from each
+## tail of y and z)
 
 trim <- 0.0025
 
@@ -181,7 +178,7 @@ points(z,y,type="p",cex=.25,col="grey")
 
 lines(z,phihat.iv,col="blue",lwd=2,lty=2)
 
-lines(z,phihat,col="red",lwd=2,lty=3)
+lines(z,ll.mean,col="red",lwd=2,lty=3)
 
 legend(quantile(z,trim),quantile(y,1-trim),
        c("phi(z)","Nonparametric IV","Nonparametric (non-IV)"),
