@@ -1,11 +1,11 @@
 \name{npregiv}
 \alias{npregiv}
-%- Also NEED an '\alias' for EACH other topic documented here.
+
 \title{
 Nonparametric Instrumental Regression
 }
 \description{
-This function conducts nonparametric estimation of an instrumental
+\code{npregiv} computes nonparametric estimation of an instrumental
 regression function \eqn{\varphi}{phi} defined by conditional moment
 restrictions stemming from a structural econometric model: \eqn{E [Y -
 \varphi (Z) | W ] = 0}{E [Y - phi (Z) | W ] = 0}, and involving
@@ -14,8 +14,8 @@ function \eqn{\varphi}{phi} is the solution of an ill-posed inverse
 problem and the estimation procedure is based on Tikhonov
 regularization.
 
-This function implements the approach of S. Darolles, Y. Fan,
-J.P. Florens and E. Renault (forthcoming, Econometrica).
+\code{npregiv} is an implementation of the approach of S. Darolles,
+Y. Fan, J.P. Florens and E. Renault (forthcoming, Econometrica).
 }
 \usage{
 npregiv(y,
@@ -28,7 +28,7 @@ npregiv(y,
         alpha.max = 1,
         p = 1)
 }
-%- maybe also 'usage' for other objects documented here.
+
 \arguments{
   \item{y}{
     a one (1) dimensional numeric or integer vector of dependent data, each
@@ -81,7 +81,7 @@ npregiv(y,
 \references{
   
   Darolles, S. and Y. Fan and J.P. Florens and E. Renault (forthcoming),
-  \dQuote{Nonparametric Instrumental Regression}, Econometrica.
+  \dQuote{Nonparametric Instrumental Regression,} Econometrica.
 
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
   and Practice,} Princeton University Press.
@@ -95,7 +95,7 @@ npregiv(y,
  \email{samuele.centorrino@univ-tlse1.fr}
 }
 \note{
-This function lacks much functionality.
+This function should be considered to be in `beta test' status until further notice.
 }
 
 \seealso{
@@ -143,6 +143,7 @@ y2 <- fun2(z) + u
 ## considering:
 
 y <- y1
+phi <- fun1
 
 ## sort on z
 
@@ -150,8 +151,6 @@ ivdata <- data.frame(y,z,w)
 ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w)
 attach(ivdata)
-
-phi <- fun1
 
 phihat.iv <- npregiv(y=y,z=z,w=w)$phihat
 
