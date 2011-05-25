@@ -1,3 +1,11 @@
+Changes from Version 0.40-5 to 0.40-6 [26-May-2011]
+
+* Added a new function npregiv that conducts nonparametric
+  instrumental regression a la Darolles, Fan, Florens and Renault
+  (2011, forthcoming, Econometrica). Note that this function accepts
+  univariate instruments only and currently returns the fitted phi(z)
+  (i.e. lacks much functionality relative to other np functions)
+
 Changes from Version 0.40-4 to 0.40-5 [26-Apr-2011]
 
 * Fixed issue with npindexbw where, for certain problems, starting
