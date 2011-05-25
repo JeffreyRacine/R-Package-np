@@ -5,9 +5,6 @@
 Nonparametric Instrumental Regression
 }
 \description{
-This function implements the approach of S. Darolles, Y. Fan,
-J.P. Florens and E. Renault (forthcoming, Econometrica).
-
 This function conducts nonparametric estimation of an instrumental
 regression function \eqn{\varphi}{phi} defined by conditional moment
 restrictions stemming from a structural econometric model: \eqn{E [Y -
@@ -17,6 +14,8 @@ function \eqn{\varphi}{phi} is the solution of an ill-posed inverse
 problem and the estimation procedure is based on Tikhonov
 regularization.
 
+This function implements the approach of S. Darolles, Y. Fan,
+J.P. Florens and E. Renault (forthcoming, Econometrica).
 }
 \usage{
 npregiv(y,
@@ -172,6 +171,7 @@ curve(phi,min(z),max(z),
       ylab="Y",
       xlab="Z",
       main="Nonparametric IV (Darolles, Fan, Florens and Renault (2011))",
+      
       lwd=2,lty=1)
 
 points(z,y,type="p",cex=.25,col="grey")
@@ -181,7 +181,9 @@ lines(z,phihat.iv,col="blue",lwd=2,lty=2)
 lines(z,ll.mean,col="red",lwd=2,lty=3)
 
 legend(quantile(z,trim),quantile(y,1-trim),
-       c("phi(z)","Nonparametric IV","Nonparametric (non-IV)"),
+       c(expression(paste(varphi(z))),
+         expression(paste("Nonparametric ",hat(varphi)(z))),
+         "Nonparametric E(y|z)"),
        lty=c(1,2,3),
        col=c("black","blue","red"),
        lwd=c(2,2,2))
