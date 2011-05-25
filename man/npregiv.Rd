@@ -170,20 +170,19 @@ curve(phi,min(z),max(z),
       ylab="Y",
       xlab="Z",
       main="Nonparametric IV (Darolles, Fan, Florens and Renault (2011))",
-      
       lwd=2,lty=1)
 
 points(z,y,type="p",cex=.25,col="grey")
 
 lines(z,phihat.iv,col="blue",lwd=2,lty=2)
 
-lines(z,ll.mean,col="red",lwd=2,lty=3)
+lines(z,ll.mean,col="red",lwd=2,lty=4)
 
 legend(quantile(z,trim),quantile(y,1-trim),
        c(expression(paste(varphi(z))),
          expression(paste("Nonparametric ",hat(varphi)(z))),
          "Nonparametric E(y|z)"),
-       lty=c(1,2,3),
+       lty=c(1,2,4),
        col=c("black","blue","red"),
        lwd=c(2,2,2))
 
