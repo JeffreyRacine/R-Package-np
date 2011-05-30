@@ -1,4 +1,4 @@
-## $Id: npregiv.R,v 1.3 2011/05/25 08:45:27 jracine Exp jracine $
+## $Id: npregiv.R,v 1.8 2011/05/30 19:17:35 jracine Exp jracine $
 
 ## This functions accepts the following arguments:
 
@@ -11,10 +11,10 @@
 ## weval: optional evaluation data for the instrument
 
 ## alpha.min: minimum value when conducting 1-dimensional search for
-##            optimal Tihhonov regularization parameter alpha
+##            optimal Tikhonov regularization parameter alpha
 
 ## alpha.max: maximum value when conducting 1-dimensional search for
-##            optimal Tihhonov regularization parameter alpha
+##            optimal Tikhonov regularization parameter alpha
 
 ## p: order of the local polynomial kernel estimator (p=0 is local
 ##    constant, p=1 local linear etc.)
@@ -78,15 +78,8 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   
   ## phi:   the vector of estimated values for the unknown function at the evaluation points
   
-  tikh <- function(alpha,CZ,CY,Cr,r){
-    if(length(CY) != length(CZ))
-      stop("The projection matrices should have the same dimension")
-    
-    Id <- diag(length(r))	
-    invmat <- solve(alpha*Id + CY%*%CZ)         
-    phi <- invmat %*% (Cr %*% r)
-    
-    return(phi)
+  tikh <- function(alpha,CZ,CY,Cr.r){
+    return(solve(alpha*diag(length(Cr.r)) + CY%*%CZ) %*% Cr.r)
   }
   
   ## This function applies the iterated Tikhonov approach which
@@ -117,19 +110,13 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   ## SSalpha: (scalar) value of the sum of square residuals criterion
   ## which is a function of alpha (see (3.10) of Feve & Florens (2010)
   
-  ittik <- function(alpha,CZ,CY,Cr,r) {
-    if(length(CY) != length(CZ))
-      stop("The projection matrices should have the same dimension")
-    
-    Id <- diag(length(r))
-    invmat <- solve(alpha*Id + CY%*%CZ)
-    phi <- invmat %*% (Cr + alpha*invmat%*%Cr) %*% r
-    SSalpha <- (1/alpha)*(crossprod((CZ%*%phi - r),(CZ%*%phi - r)))
-    
-    return(SSalpha)
+  ittik <- function(alpha,CZ,CY,Cr.r,r) {
+    invmat <- solve(alpha*diag(length(Cr.r)) + CY%*%CZ)
+    phi <- invmat %*% Cr.r + alpha * invmat %*% invmat %*% Cr.r        
+    return(sum((CZ%*%phi - r)^2)/alpha)    
   }
 
-  ## $Id: cons_lib.R,v 1.5 2009/01/23 18:48:21 jracine Exp jracine $
+  ## $Id: npregiv.R,v 1.8 2011/05/30 19:17:35 jracine Exp jracine $
 
   ## This function returns the weight matrix for a local polynomial
   ## mean, gradient of pth order, or cross-partial. The function
@@ -351,7 +338,7 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
           Ridge.mat[,1] <- ridge*g.hat.weights
   
           ## First partials... note that this presumes a second order
-          ## gaussian kernel.
+          ## Gaussian kernel.
   
           for(m in 1:k) {
             
@@ -409,7 +396,7 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   
   }
     
-  ## $Id: glp_lib.R,v 1.20 2011/01/31 21:16:27 jracine Exp jracine $
+  ## $Id: npregiv.R,v 1.8 2011/05/30 19:17:35 jracine Exp jracine $
   
   ## Functions for generalized local polynomial regression
   
@@ -452,7 +439,7 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
       xdat.numeric <- as.data.frame(xdat[,xdat.col.numeric])
     }
   
-    if(length(degree) != ncol(xdat.numeric)) stop(" degree vector and number of numeric predictors incompatable")
+    if(length(degree) != ncol(xdat.numeric)) stop(" degree vector and number of numeric predictors incompatible")
   
     if(all(degree == 0) | k == 0) {
   
@@ -1104,7 +1091,7 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   if(missing(y)) stop("You must provide y")
   if(missing(z)) stop("You must provide z")
   if(missing(w)) stop("You must provide w")
-  if(NCOL(y) > 1) stop("y must be univariat")
+  if(NCOL(y) > 1) stop("y must be univariate")
   if(NCOL(z) > 1) stop("z must be univariate")
   if(NCOL(w) > 1) stop("w must be univariate")  
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
@@ -1116,70 +1103,52 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   if(is.null(zeval)) zeval <- z
   if(is.null(weval)) weval <- w  
 
-  ## First we consider optimal bandwidths for solving E(phi(y)|z)=z
-  ## (equation (3.2) in Feve and Florens (2010))
-  
   ## Now y=phi(z) + u, hence E(y|w)=E(phi(z)|w) so we need two
   ## bandwidths, one for y on w and one for phi(z) on w (in the first
-  ## step we use z on w).
-  
-  ## NOTE: in what follows E(y|w) is denoted r.
-  
-  ## First we conduct local polynomial kernel regression of Y on Z to get
-  ## the bandwidths.
+  ## step we use z as a proxy for phi(z) and use bandwidths for z on
+  ## w).
 
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Computing bandwidths for y on w...", console)
-  hyw <- glpcv(ydat=y,xdat=w,degree=rep(p,NCOL(w)))
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing bandwidths for z on w...", console)
-  hzw <- glpcv(ydat=z,xdat=w,degree=rep(p,NCOL(w)))
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing weights for y on w...", console)
-  KYWs <- Kmat.lp(mydata.train=data.frame(w),mydata.eval=data.frame(w=weval),bws=hyw$bw,p=p)
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing weights for z on w...", console)
-  KZWs <- Kmat.lp(mydata.train=data.frame(w),mydata.eval=data.frame(w=weval),bws=hzw$bw,p=p)
-  
-  ## r is the conditional expectation of y given w
-  
-  r <- KYWs%*%y
+  console <- printPush("Computing bandwidths for E(y|w)...", console)
+  hyw <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)))
+  console <- printPush("Computing E(y|w)...", console)  
+  E.y.w <- glpreg(tydat=y, txdat=w, eydat=y, exdat=w, bws=hyw$bw, degree=rep(p, NCOL(w)))$mean
 
-  ## KYWS no longer used, save memory
-
-  rm(KYWs)
-  
-  ## define E(r|z)=E(E(phi(z)|w)|z) 
-  
-  ## We conduct local polynomial kernel regression of Z on Y we
+  ## We conduct local polynomial kernel regression of z on y we
   ## require two bandwidths, one for r onto z and one for the object
   ## in w space onto z space
   
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Computing bandwidths for r on z...", console)
-  hrz <- glpcv(ydat=r,xdat=z,degree=rep(p,NCOL(z)))
+  console <- printPush("Computing bandwidths for E(E(y|w)|z)...", console)
+  hywz <- glpcv(ydat=E.y.w, xdat=z, degree=rep(p, NCOL(z)))
+  console <- printPush("Computing E(E(y|w)|z)...", console)  
+  E.E.y.w.z <- glpreg(tydat=E.y.w, txdat=z, eydat=E.y.w, exdat=z, bws=hywz$bw, degree=rep(p, NCOL(z)))$mean
+
+  ## Here we use z as a proxy for phi(z) in the first stage
+
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Computing bandwidths for w on z...", console)
-  hwz <- glpcv(ydat=w,xdat=z,degree=rep(p,NCOL(z)))
+  console <- printPush("Computing bandwidths for E(z|w) (first stage treat z as phi(z))...", console)
+  hzw <- glpcv(ydat=z, xdat=w, degree=rep(p, NCOL(w)))
+  console <- printClear(console)
+  console <- printPop(console)
+  console <- printPush("Computing weights for E(z|w) (first stage treat z as phi(z))...", console)
+  KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hzw$bw, p=rep(p, NCOL(w)))
   
-  ## Next we define the two kernel functions, the kernel weights for r
-  ## onto z and w onto z
-  
+  ## define E(r|z)=E(E(phi(z)|w)|z) 
+  ## E(z|w)
+  E.z.w <- KZWs%*%z
+
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Computing weights for r on z...", console)
-  KRZs <- Kmat.lp(mydata.train=data.frame(z),mydata.eval=data.frame(z=zeval),bws=hrz$bw,p=p)
+  console <- printPush("Computing bandwidths for E(E(z|w)|z)...", console)
+  hwz <- glpcv(ydat=E.z.w, xdat=z, degree=rep(p, NCOL(z)))
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Computing weights for w on z...", console)
-  KWZs <- Kmat.lp(mydata.train=data.frame(z),mydata.eval=data.frame(z=zeval),bws=hwz$bw,p=p)
+  console <- printPush("Computing weights for E(E(z|w)|z)...", console)
+  KWZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hwz$bw, p=p)
   
   ## Next, we minimize the function ittik to obtain the optimal value
   ## of alpha (here we use the iterated Tikhonov function) to
@@ -1193,66 +1162,57 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   console <- printClear(console)
   console <- printPop(console)
   console <- printPush("Numerically solving for alpha...", console)
-  alpha1 <- optimize(ittik, c(alpha.min,alpha.max), CZ = KZWs, CY = KWZs, Cr = KRZs, r = r)$minimum
+  alpha1 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
   
   ## Finally, we conduct regularized Tikhonov regression using this
   ## optimal alpha.
   
-  mized <- as.vector(tikh(alpha1, CZ = KZWs, CY = KWZs, Cr=KRZs, r = r))
+  phihat <- as.vector(tikh(alpha1, CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z))
 
   ## KWZs and KZWS no longer used, save memory
 
-  rm(KWZs,KZWs)
+  rm(KWZs, KZWs)
   
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Computing bandwidths for phi on w...", console)
-  hphiw <- glpcv(ydat=mized,xdat=w,degree=rep(p,NCOL(w)))
-  
-  ## Here we need to generate the kernel weights for the local
-  ## polynomial estimator. This corresponds to C_z below (3.8) in Feve &
-  ## Florens (2010).
+  console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
+  hphiw <- glpcv(ydat=phihat, xdat=w, degree=rep(p, NCOL(w)))
+  console <- printClear(console)
+  console <- printPop(console)
+  console <- printPush("Computing weights for E(phi(z)|w)...", console)
+  KPHWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)))
+
+  ## Conduct kernel regression of E(phi(z)|w) on z (we need weights so just use them)
+
+  E.phi.w.z <- as.vector(KPHWs%*%phihat)
   
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Computing weights for phi on w...", console)
-  KPHWs <- Kmat.lp(mydata.train=data.frame(w),mydata.eval=data.frame(w=weval),bws=hphiw$bw,p=p)
-  
-  ## Conduct kernel regression of E(phi(z)|w) on z
+  console <- printPush("Iterating and recomputing bandwidths for E(E(phi(z)|w)|z)...", console)
+  hphiwz2 <- glpcv(ydat=E.phi.w.z, xdat=z, degree=rep(p, NCOL(z)))
   
   console <- printClear(console)
   console <- printPop(console)
-  console <- printPush("Iterating and recomputing bandwidths for rhat on z...", console)
-  hwz2 <- glpcv(ydat=as.vector(KPHWs%*%mized),xdat=z,degree=rep(p,NCOL(z)))
+  console <- printPush("Iterating and recomputing weights for E(E(phi(z)|w)|z)...", console)
+  KWZ2s <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz2$bw, p=rep(p, NCOL(z)))
   
-  ## Here we need to generate the kernel weights for the local
-  ## polynomial estimator. This corresponds to C_y below (3.8) in Feve &
-  ## Florens (2010).
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Iterating and recomputing weights for w on z...", console)
-  KWZ2s <- Kmat.lp(mydata.train=data.frame(z),mydata.eval=data.frame(z=zeval),bws=hwz2$bw,p=p)
-  
-  ## Next, we minimize the function ittik to obtain the optimal value of
-  ## alpha (here we use the iterated Tikhonov approach) to determine the
-  ## optimal alpha for the non-iterated scheme.
+  ## Next, we minimize the function ittik to obtain the optimal value
+  ## of alpha (here we use the iterated Tikhonov approach) to
+  ## determine the optimal alpha for the non-iterated scheme.
   
   console <- printClear(console)
   console <- printPop(console)
   console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-  alpha2 <- optimize(ittik,c(alpha.min,alpha.max), CZ = KPHWs, CY = KWZ2s, Cr = KRZs, r = r)$minimum
+  alpha2 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
   
   ## Finally, we conduct regularized Tikhonov regression using this
-  ## optimal alpha.
+  ## optimal alpha and the updated bandwidths.
 
-  mized2 <- as.vector(tikh(alpha2, CZ = KPHWs, CY = KWZ2s, Cr = KRZs, r = r))
+  phihat2 <- as.vector(tikh(alpha2, CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z))
   
   console <- printClear(console)
   console <- printPop(console)
 
-  return(list(phihat=mized2,alpha=alpha2))
+  return(list(phihat=phihat2, alpha=alpha2))
   
 }
-
-

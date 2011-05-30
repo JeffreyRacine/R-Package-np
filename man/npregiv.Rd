@@ -83,6 +83,10 @@ npregiv(y,
   Darolles, S. and Y. Fan and J.P. Florens and E. Renault (forthcoming),
   \dQuote{Nonparametric Instrumental Regression,} Econometrica.
 
+  Feve, F. and J.P. Florens (2010), \dQuote{The practice of
+  non-parametric estimation by solving inverse problems: the example of
+  transformation models,} Econometrics Journal, 13, S1-S27.
+
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
   and Practice,} Princeton University Press.
 
@@ -125,9 +129,9 @@ eps <- rnorm(n,mean=0,sd=0.05)
 u <- -0.5*v + eps
 w <- rnorm(n,mean=0,sd=1)
 
-# In Darolles et al (2011) there exist two DGPs. The first is
-# phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-# discontinuous and has a kink at zero).
+## In Darolles et al (2011) there exist two DGPs. The first is
+## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
+## discontinuous and has a kink at zero).
 
 fun1 <- function(z) { z^2 }
 fun2 <- function(z) { exp(-abs(z)) }
