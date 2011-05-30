@@ -226,7 +226,7 @@ curve(phi,min(z),max(z),
      ylim=quantile(y,c(trim,1-trim)),
       ylab="Y",
       xlab="Z",
-      main="Nonparametric IV (Darolles, Fan, Florens and Renault (2011))",
+      main="Nonparametric Instrumental Regression",
       lwd=2,lty=1)
 
 points(z,y,type="p",cex=.25,col="grey")
