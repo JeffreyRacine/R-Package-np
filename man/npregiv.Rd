@@ -11,11 +11,14 @@ restrictions stemming from a structural econometric model: \eqn{E [Y -
 \varphi (Z) | W ] = 0}{E [Y - phi (Z) | W ] = 0}, and involving
 endogenous variables \eqn{Y} and \eqn{Z} and instruments \eqn{W}. The
 function \eqn{\varphi}{phi} is the solution of an ill-posed inverse
-problem and the estimation procedure is based on Tikhonov
-regularization.
+problem.
 
-\code{npregiv} is an implementation of the approach of S. Darolles,
-Y. Fan, J.P. Florens and E. Renault (forthcoming, Econometrica).
+When \code{method="Tikhonov"}, \code{npregiv} uses the approach of
+Darolles, Fan, Florens and Renault (forthcoming) modified for local
+polynomial kernel regression of any order (Darolles et al use local constant
+kernel weighting). When \code{method="Landweber-Fridman"},
+\code{npregiv} uses the approach of Horowitz (2011) again using local
+polynomial kernel regresion.
 }
 \usage{
 npregiv(y,
@@ -24,9 +27,14 @@ npregiv(y,
         yeval = NULL,
         zeval = NULL,
         weval = NULL,
+        p = 1,
         alpha.min = 1e-10,
         alpha.max = 1,
-        p = 1)
+        tol = .Machine$double.eps^0.25,
+        num.iterations = 10,
+        constant = 0.5,
+        method = c("Landweber-Fridman","Tikhonov"),
+        ...)
 }
 
 \arguments{
@@ -42,37 +50,65 @@ npregiv(y,
   }
   \item{w}{
     a one (1) dimensional numeric or integer vector for the instrument.
-}
+  }
   \item{yeval}{
     a one (1) dimensional numeric or integer vector on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{y}.
-}
+  }
   \item{zeval}{
     a one (1) dimensional numeric or integer vector on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{z}.
-}
+  }
   \item{weval}{
     a one (1) dimensional numeric or integer vector on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{w}.
-}
-  \item{alpha.min}{
-    mimimum of search range for \eqn{\alpha}{alpha}, the Tikhonov
-    regularization parameter.
-}
-  \item{alpha.max}{
-    maximum of search range for \eqn{\alpha}{alpha}, the Tikhonov
-    regularization parameter.
-}
+  }
   \item{p}{
     the order of the local polynomial regression (defaults to
     \code{p=1}, i.e. local linear)
-}
+  }
+  \item{alpha.min}{
+    minimum of search range for \eqn{\alpha}{alpha}, the Tikhonov
+    regularization parameter, when using
+    Tikhonov regularization.
+  }
+  \item{alpha.max}{
+    maximum of search range for \eqn{\alpha}{alpha}, the Tikhonov
+    regularization parameter, when using
+    Tikhonov regularization.
+  }
+  \item{tol}{
+    the search tolerance for \code{optimize} when solving for
+    \eqn{\alpha}{alpha}, the Tikhonov regularization parameter, when using
+    Tikhonov regularization.
+  }
+  \item{num.iterations}{
+    an integer indicating the number of iterations to conduct when using
+    Landweber-Fridman regularization.
+  }
+  \item{constant}{
+    the constant to use when using Landweber-Fridman regularization.
+  }
+  \item{method}{
+    the regularization method employed (defaults to \code{"Tikhonov"}, see
+    Darolles, Fan, Florens and Renault (forthcoming); see Horowitz
+    (2011) for details for \code{"Landweber-Fridman"}).
+  }
+  \item{...}{
+    additional arguments supplied to \code{crs}.
+  }
 }
 \details{
-  TBA
+  Tikhonov regularization requires computation of weight matrices of
+  dimension \eqn{n\times n}{n x n} which can be computationally costly
+  in terms of memory requirements and may be unsuitable for large
+  datasets. Landweber-Fridman will be preferred in such settings as it
+  does not require construction and storage of these weight matrices
+  while it also avoids the need for numerical optimization methods to
+  determine \eqn{\alpha}{alpha}.
 }
 \value{
   \code{npregiv} returns a list with components \code{phihat} and
@@ -80,6 +116,12 @@ npregiv(y,
 }
 \references{
   
+  Carrasco, M. and J.P. Florens and E. Renault (2007), \dQuote{Linear
+  Inverse Problems in Structural Econometrics Estimation Based on
+  Spectral Decomposition and Regularization,} In: James J. Heckman and
+  Edward E. Leamer, Editor(s), Handbook of Econometrics, Elsevier, 2007,
+  Volume 6, Part 2, Chapter 77, Pages 5633-5751
+
   Darolles, S. and Y. Fan and J.P. Florens and E. Renault (forthcoming),
   \dQuote{Nonparametric Instrumental Regression,} Econometrica.
 
@@ -87,8 +129,19 @@ npregiv(y,
   non-parametric estimation by solving inverse problems: the example of
   transformation models,} Econometrics Journal, 13, S1-S27.
 
-  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
-  and Practice,} Princeton University Press.
+  Fridman, V. M. (1956), \dQuote{A Method of Successive Approximations
+  for Fredholm Integral Equations of the First Kind,} Uspeskhi,
+  Math. Nauk., 11, 233-334, in Russian.
+
+  Horowitz, J.L. (2011), \dQuote{Applied Nonparametric Instrumental
+  Variables Estimation,}, Econometrica, 79, 347-394.
+  
+  Landweber, L. (1951), \dQuote{An iterative formula for Fredholm
+  integral equations of the first kind,} American Journal of
+  Mathematics, 73, 615-24.
+
+  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics:
+  Theory and Practice,} Princeton University Press.
 
   Li, Q. and J.S. Racine (2004), \dQuote{Cross-validated local linear
   nonparametric regression,} Statistica Sinica, 14, 485-512.

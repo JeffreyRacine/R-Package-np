@@ -24,7 +24,19 @@
 ## phihat: the IV estimator of phi(y)
 ## alpha:  the Tikhonov regularization parameter
 
-npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alpha.max=1,p=1) {
+npregiv <- function(y,
+                    z,
+                    w,
+                    yeval=NULL,
+                    zeval=NULL,
+                    weval=NULL,
+                    p=1,
+                    alpha.min=1.0e-10,
+                    alpha.max=1,
+                    num.iterations=10,
+                    constant=0.5,
+                    method=c("Landweber-Fridman","Tikhonov"),
+                    ...) {
 
   ## This function was constructed initially by Samuele Centorrino
   ## <samuele.centorrino@univ-tlse1.fr> to reproduce illustrations in
@@ -1085,9 +1097,9 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   ## Here is where the function `npregiv' really begins:
 
   console <- newLineConsole()
-
+    
   ## Basic error checking
-
+  
   if(missing(y)) stop("You must provide y")
   if(missing(z)) stop("You must provide z")
   if(missing(w)) stop("You must provide w")
@@ -1097,122 +1109,169 @@ npregiv <- function(y,z,w,yeval=NULL,zeval=NULL,weval=NULL,alpha.min=1.0e-10,alp
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
   if(p < 0) stop("p must be a non-negative integer")
 
+  method <- match.arg(method)
+  
   ## Check for evaluation data
-
+  
   if(is.null(yeval)) yeval <- y
   if(is.null(zeval)) zeval <- z
   if(is.null(weval)) weval <- w  
+    
+  if(method=="Tikhonov") {
+  
+    ## Now y=phi(z) + u, hence E(y|w)=E(phi(z)|w) so we need two
+    ## bandwidths, one for y on w and one for phi(z) on w (in the first
+    ## step we use z as a proxy for phi(z) and use bandwidths for z on
+    ## w).
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing bandwidths for E(y|w)...", console)
+    hyw <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)),...)
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing E(y|w)...", console)  
+    E.y.w <- glpreg(tydat=y, txdat=w, eydat=y, exdat=w, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
+    
+    ## We conduct local polynomial kernel regression of z on y we
+    ## require two bandwidths, one for r onto z and one for the object
+    ## in w space onto z space
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing bandwidths for E(E(y|w)|z)...", console)
+    hywz <- glpcv(ydat=E.y.w, xdat=z, degree=rep(p, NCOL(z)),...)
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing E(E(y|w)|z)...", console)  
+    E.E.y.w.z <- glpreg(tydat=E.y.w, txdat=z, eydat=E.y.w, exdat=z, bws=hywz$bw, degree=rep(p, NCOL(z)),...)$mean
+    
+    ## Here we use z as a proxy for phi(z) in the first stage
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing bandwidths for E(z|w) (first stage treat z as phi(z))...", console)
+    hzw <- glpcv(ydat=z, xdat=w, degree=rep(p, NCOL(w)),...)
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing weights for E(z|w) (first stage treat z as phi(z))...", console)
+    KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hzw$bw, p=rep(p, NCOL(w)),...)
+    
+    ## define E(r|z)=E(E(phi(z)|w)|z) 
+    ## E(z|w)
+    E.z.w <- KZWs%*%z
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing bandwidths for E(E(z|w)|z)...", console)
+    hwz <- glpcv(ydat=E.z.w, xdat=z, degree=rep(p, NCOL(z)),...)
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing weights for E(E(z|w)|z)...", console)
+    KWZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hwz$bw, p=rep(p, NCOL(w)),...)
+    
+    ## Next, we minimize the function ittik to obtain the optimal value
+    ## of alpha (here we use the iterated Tikhonov function) to
+    ## determine the optimal alpha for the non-iterated scheme. Note
+    ## that the function `optimize' accepts bounds on the search (in
+    ## this case alpha.min to alpha.max))
+    
+    ## E(r|z)=E(E(phi(z)|w)|z)
+    ## \phi^\alpha = (\alpha I+CzCw)^{-1}Cr x r
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Numerically solving for alpha...", console)
+    alpha1 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    
+    ## Finally, we conduct regularized Tikhonov regression using this
+    ## optimal alpha.
+    
+    phihat <- as.vector(tikh(alpha1, CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z))
+    
+    ## KWZs and KZWS no longer used, save memory
+    
+    rm(KWZs, KZWs)
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
+    hphiw <- glpcv(ydat=phihat, xdat=w, degree=rep(p, NCOL(w)),...)
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing weights for E(phi(z)|w)...", console)
+    KPHWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)),...)
+    
+    ## Conduct kernel regression of E(phi(z)|w) on z (we need weights so just use them)
+    
+    E.phi.w.z <- as.vector(KPHWs%*%phihat)
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Iterating and recomputing bandwidths for E(E(phi(z)|w)|z)...", console)
+    hphiwz2 <- glpcv(ydat=E.phi.w.z, xdat=z, degree=rep(p, NCOL(z)))
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Iterating and recomputing weights for E(E(phi(z)|w)|z)...", console)
+    KWZ2s <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz2$bw, p=rep(p, NCOL(z)),...)
+    
+    ## Next, we minimize the function ittik to obtain the optimal value
+    ## of alpha (here we use the iterated Tikhonov approach) to
+    ## determine the optimal alpha for the non-iterated scheme.
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
+    alpha2 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    
+    ## Finally, we conduct regularized Tikhonov regression using this
+    ## optimal alpha and the updated bandwidths.
+    
+    phihat2 <- as.vector(tikh(alpha2, CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z))
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    
+    return(list(phihat=phihat2, alpha=alpha2))
+    
+  } else {
 
-  ## Now y=phi(z) + u, hence E(y|w)=E(phi(z)|w) so we need two
-  ## bandwidths, one for y on w and one for phi(z) on w (in the first
-  ## step we use z as a proxy for phi(z) and use bandwidths for z on
-  ## w).
+    ## Landweber-Fridman
 
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing bandwidths for E(y|w)...", console)
-  hyw <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)))
-  console <- printPush("Computing E(y|w)...", console)  
-  E.y.w <- glpreg(tydat=y, txdat=w, eydat=y, exdat=w, bws=hyw$bw, degree=rep(p, NCOL(w)))$mean
+    ## We begin the iteration computing phi.0 and phi.1 directly, then
+    ## interate.
+    
+    phi.mat <- matrix(NA,nrow=length(y),ncol=num.iterations)
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing phi(z)...", console)
 
-  ## We conduct local polynomial kernel regression of z on y we
-  ## require two bandwidths, one for r onto z and one for the object
-  ## in w space onto z space
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing bandwidths for E(E(y|w)|z)...", console)
-  hywz <- glpcv(ydat=E.y.w, xdat=z, degree=rep(p, NCOL(z)))
-  console <- printPush("Computing E(E(y|w)|z)...", console)  
-  E.E.y.w.z <- glpreg(tydat=E.y.w, txdat=z, eydat=E.y.w, exdat=z, bws=hywz$bw, degree=rep(p, NCOL(z)))$mean
+    h <- glpcv(ydat=y, xdat=z, degree=rep(p, NCOL(z)),...)
+    phi.0 <- glpreg(tydat=y, txdat=z, eydat=y, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    resid <- y - phi.0
+    h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
+    resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+    h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
+    phi.mat[,1] <- phi.0 + glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    
+    for(j in 2:num.iterations) {
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush(paste("Computing phi(z) for iteration ", j, " of ", num.iterations,sep=""),console)
+      resid <- y - phi.mat[,j-1]
+      h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
+      resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+      h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
+      phi.mat[,j] <- phi.mat[,j-1] + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    }
+    
+    console <- printClear(console)
+    console <- printPop(console)
 
-  ## Here we use z as a proxy for phi(z) in the first stage
+    return(list(phihat=phi.mat[,num.iterations],num.iterations=num.iterations))
 
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing bandwidths for E(z|w) (first stage treat z as phi(z))...", console)
-  hzw <- glpcv(ydat=z, xdat=w, degree=rep(p, NCOL(w)))
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing weights for E(z|w) (first stage treat z as phi(z))...", console)
-  KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hzw$bw, p=rep(p, NCOL(w)))
-  
-  ## define E(r|z)=E(E(phi(z)|w)|z) 
-  ## E(z|w)
-  E.z.w <- KZWs%*%z
-
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing bandwidths for E(E(z|w)|z)...", console)
-  hwz <- glpcv(ydat=E.z.w, xdat=z, degree=rep(p, NCOL(z)))
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing weights for E(E(z|w)|z)...", console)
-  KWZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hwz$bw, p=p)
-  
-  ## Next, we minimize the function ittik to obtain the optimal value
-  ## of alpha (here we use the iterated Tikhonov function) to
-  ## determine the optimal alpha for the non-iterated scheme. Note
-  ## that the function `optimize' accepts bounds on the search (in
-  ## this case alpha.min to alpha.max))
-  
-  ## E(r|z)=E(E(phi(z)|w)|z)
-  ## \phi^\alpha = (\alpha I+CzCw)^{-1}Cr x r
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Numerically solving for alpha...", console)
-  alpha1 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
-  
-  ## Finally, we conduct regularized Tikhonov regression using this
-  ## optimal alpha.
-  
-  phihat <- as.vector(tikh(alpha1, CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z))
-
-  ## KWZs and KZWS no longer used, save memory
-
-  rm(KWZs, KZWs)
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
-  hphiw <- glpcv(ydat=phihat, xdat=w, degree=rep(p, NCOL(w)))
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Computing weights for E(phi(z)|w)...", console)
-  KPHWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)))
-
-  ## Conduct kernel regression of E(phi(z)|w) on z (we need weights so just use them)
-
-  E.phi.w.z <- as.vector(KPHWs%*%phihat)
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Iterating and recomputing bandwidths for E(E(phi(z)|w)|z)...", console)
-  hphiwz2 <- glpcv(ydat=E.phi.w.z, xdat=z, degree=rep(p, NCOL(z)))
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Iterating and recomputing weights for E(E(phi(z)|w)|z)...", console)
-  KWZ2s <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz2$bw, p=rep(p, NCOL(z)))
-  
-  ## Next, we minimize the function ittik to obtain the optimal value
-  ## of alpha (here we use the iterated Tikhonov approach) to
-  ## determine the optimal alpha for the non-iterated scheme.
-  
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-  alpha2 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
-  
-  ## Finally, we conduct regularized Tikhonov regression using this
-  ## optimal alpha and the updated bandwidths.
-
-  phihat2 <- as.vector(tikh(alpha2, CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z))
-  
-  console <- printClear(console)
-  console <- printPop(console)
-
-  return(list(phihat=phihat2, alpha=alpha2))
+  }
   
 }
