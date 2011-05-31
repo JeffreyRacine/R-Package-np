@@ -15,10 +15,11 @@ problem.
 
 When \code{method="Tikhonov"}, \code{npregiv} uses the approach of
 Darolles, Fan, Florens and Renault (forthcoming) modified for local
-polynomial kernel regression of any order (Darolles et al use local constant
-kernel weighting). When \code{method="Landweber-Fridman"},
+polynomial kernel regression of any order (Darolles et al use local
+constant kernel weighting which corresponds to setting \code{p=0}; see
+below for details). When \code{method="Landweber-Fridman"},
 \code{npregiv} uses the approach of Horowitz (2011) again using local
-polynomial kernel regresion.
+polynomial kernel regression (Horowitz uses B-spline weighting).
 }
 \usage{
 npregiv(y,
@@ -169,9 +170,9 @@ n <- 1500
 
 ## 1) y = phi(z) + u
 
-## 2) E(u|z) !=0 hence we have endogeneity
+## 2) E(u|z) != 0 (endogeneity present)
 
-## 3) Suppose there exists an instrument w such that z = beta w + v and
+## 3) Suppose there exists an instrument w such that z = f(w) + v and
 ## E(u|w) = 0
 
 ## 4) We generate v, w, and generate u such that u and z are

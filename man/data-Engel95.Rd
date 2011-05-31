@@ -1,12 +1,13 @@
 \name{Engel95}
 \docType{data}
 \alias{Engel95}
-\title{ British Family Expenditure Survey  }
+\title{ 1995 British Family Expenditure Survey  }
 \description{
-British cross-section data consisting of a random sample taken from the British
-Family Expenditure Survey. The households consist of married
-couples with an employed head-of-household between the ages of 25
-and 55 years. There are 1655 household-level observations in total.
+British cross-section data consisting of a random sample taken from
+the British Family Expenditure Survey for 1995. The households consist
+of married couples with an employed head-of-household between the ages
+of 25 and 55 years. There are 1655 household-level observations in
+total.
 }
 \usage{data("Engel95")}
 \format{ A data frame with 10 columns, and 1655 rows.
