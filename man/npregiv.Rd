@@ -91,7 +91,7 @@ npregiv(y,
   \item{num.iterations}{
   an integer indicating both the minimum number of iterations to conduct
   and the number of iterations for which
-  \eqn{||E(y|w)−E(\varphi_k(z)|w)||^2 }{||E(y|w)−E(phi(z)|w)||^2 } must
+  \eqn{||E(y|w)-E(\varphi_k(z)|w)||^2 }{||E(y|w)-E(phi(z)|w)||^2 } must
   remain unchanged in order for iteration to terminate when using
   Landweber-Fridman regularization.
   }
@@ -121,8 +121,8 @@ npregiv(y,
   determine \eqn{\alpha}{alpha}.
   
   \code{method="Landweber-Fridman"} uses an optimal stopping rule
-  whereby if \eqn{||E(y|w)−E(\varphi_k(z)|w)||^2
-  }{||E(y|w)−E(phi(z)|w)||^2 } is unchanged for at least
+  whereby if \eqn{||E(y|w)-E(\varphi_k(z)|w)||^2
+  }{||E(y|w)-E(phi(z)|w)||^2 } is unchanged for at least
   \code{num.iterations} then iteration terminates. However, if
   insufficient training is conducted the estimates can be overly noisy
   and iteration may fail to terminate when \code{num.iterations} is
