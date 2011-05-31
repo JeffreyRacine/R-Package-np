@@ -33,7 +33,9 @@ npregiv <- function(y,
                     p=1,
                     alpha.min=1.0e-10,
                     alpha.max=1,
-                    num.iterations=10,
+                    tol=.Machine$double.eps^0.25,
+                    num.iterations=5,
+                    max.iterations=25,
                     constant=0.5,
                     method=c("Landweber-Fridman","Tikhonov"),
                     ...) {
@@ -1106,7 +1108,9 @@ npregiv <- function(y,
   if(NCOL(y) > 1) stop("y must be univariate")
   if(NCOL(z) > 1) stop("z must be univariate")
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
+  if(num.iterations < 2) stop("num.iterations must be at least 2")
   if(p < 0) stop("p must be a non-negative integer")
+  if(max.iterations < num.iterations) stop("max.iterations must be larger than num.iterations")
 
   method <- match.arg(method)
   
@@ -1181,7 +1185,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Numerically solving for alpha...", console)
-    alpha1 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    alpha1 <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha.
@@ -1222,7 +1226,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-    alpha2 <- optimize(ittik, c(alpha.min, alpha.max), CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    alpha2 <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KPHWs, CY = KWZ2s, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha and the updated bandwidths.
@@ -1243,37 +1247,105 @@ npregiv <- function(y,
     
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush(paste("Computing bandwidths and phi(z) for iteration ", 0, " of ", num.iterations,"...",sep=""),console)
+    console <- printPush(paste("Computing bandwidths and E(y|z) for iteration ", 0, " of at least ", num.iterations,"...",sep=""),console)
 
     h <- glpcv(ydat=y, xdat=z, degree=rep(p, NCOL(z)),...)
     phi.0 <- glpreg(tydat=y, txdat=z, eydat=y, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
     
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush(paste("Computing bandwidths and phi(z) for iteration ", 1, " of ", num.iterations,"...",sep=""),console)
+    console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", 1, " of at least ", num.iterations,"...",sep=""),console)
 
     resid <- y - phi.0
     h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
     resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", 1, " of at least ", num.iterations,"...",sep=""),console)
+
     h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
     phi.j.m.1 <- phi.0 + glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
     
+    ## For the stopping rule
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush(paste("Computing bandwidths and E(y|w) for stopping rule...",sep=""),console)
+
+    norm.stop <- numeric()
+    h <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)),...)
+    E.y.w <- glpreg(tydat=y, txdat=w, eydat=y, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+    phihat <- phi.j.m.1
+
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush(paste("Computing bandwidths and E(phi(z)|w) for stopping rule...",sep=""),console)
+
+    h.E.phi.w <- glpcv(ydat=phi.j.m.1, xdat=w, degree=rep(p, NCOL(w)),...)
+    E.phi.w <- glpreg(tydat=phi.j.m.1, txdat=w, eydat=phi.j.m.1, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
+    norm.stop[1] <- sum((E.y.w-E.phi.w)^2)
+
     for(j in 2:num.iterations) {
       console <- printClear(console)
       console <- printPop(console)
-      console <- printPush(paste("Computing bandwidths and phi(z) for iteration ", j, " of ", num.iterations,"...",sep=""),console)
+      console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", j, " of at least ", num.iterations,"...",sep=""),console)
+
       resid <- y - phi.j.m.1
       h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
       resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j, " of at least ", num.iterations,"...",sep=""),console)
+
       h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
       phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
       phi.j.m.1 <- phi.j
+
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush(paste("Computing stopping rule for iteration ", j, " of at least ", num.iterations,"...",sep=""),console)
+      ## For the stopping rule (use same smoothing as original)
+      E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
+      norm.stop[j] <- sum((E.y.w-E.phi.w)^2)
+    }
+
+    ## If the last num.iterations normed differences are unchanged, stop
+
+    while((sum(norm.stop[(j-num.iterations+2):j]-norm.stop[(j-num.iterations+1):(j-1)]) != 0) && j < max.iterations) {
+      j <- j+1
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", j, "of a maximum of ", max.iterations, "...",sep=""),console)
+
+      resid <- y - phi.j.m.1
+      h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
+      resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j, "of a maximum of ", max.iterations, "...",sep=""),console)
+
+      h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
+      phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+      phi.j.m.1 <- phi.j
+
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush(paste("Computing stopping rule for iteration ", j, "of a maximum of ", max.iterations, "...",sep=""),console)
+
+      ## For the stopping rule (use same smoothing as original)
+      E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
+      norm.stop[j] <- sum((E.y.w-E.phi.w)^2)
     }
     
     console <- printClear(console)
     console <- printPop(console)
 
-    return(list(phihat=phi.j,num.iterations=num.iterations))
+    if(j == max.iterations) warning("max.iterations reached: increase max.iterations or inspect norm.stop vector")
+
+    return(list(phihat=phi.j, num.iterations=j, norm.stop=norm.stop))
 
   }
   

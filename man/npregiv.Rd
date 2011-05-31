@@ -32,12 +32,12 @@ npregiv(y,
         alpha.min = 1e-10,
         alpha.max = 1,
         tol = .Machine$double.eps^0.25,
-        num.iterations = 10,
+        num.iterations = 5,
+        max.iterations = 25,
         constant = 0.5,
         method = c("Landweber-Fridman","Tikhonov"),
         ...)
 }
-
 \arguments{
   \item{y}{
     a one (1) dimensional numeric or integer vector of dependent data, each
@@ -89,8 +89,15 @@ npregiv(y,
     Tikhonov regularization.
   }
   \item{num.iterations}{
-    an integer indicating the number of iterations to conduct when using
-    Landweber-Fridman regularization.
+  an integer indicating both the minimum number of iterations to conduct
+  and the number of iterations for which
+  \eqn{||E(y|w)−E(\varphi_k(z)|w)||^2 }{||E(y|w)−E(phi(z)|w)||^2 } must
+  remain unchanged in order for iteration to terminate when using
+  Landweber-Fridman regularization.
+  }
+  \item{max.iterations}{
+  an integer indicating the maximum number of iterations permitted
+    before termination occurs.
   }
   \item{constant}{
     the constant to use when using Landweber-Fridman regularization.
@@ -112,10 +119,22 @@ npregiv(y,
   does not require construction and storage of these weight matrices
   while it also avoids the need for numerical optimization methods to
   determine \eqn{\alpha}{alpha}.
+  
+  \code{method="Landweber-Fridman"} uses an optimal stopping rule
+  whereby if \eqn{||E(y|w)−E(\varphi_k(z)|w)||^2
+  }{||E(y|w)−E(phi(z)|w)||^2 } is unchanged for at least
+  \code{num.iterations} then iteration terminates. However, if
+  insufficient training is conducted the estimates can be overly noisy
+  and iteration may fail to terminate when \code{num.iterations} is
+  large. To best guard against this eventuality set \code{nmulti} to a
+  larger number than the default \code{nmulti=0} for
+  \code{\link{npreg}}.
+  
 }
 \value{
-  \code{npregiv} returns a list with components \code{phihat} and
-    \code{alpha}.
+  \code{crsiv} returns a list with components \code{phihat} and either
+  \code{alpha} when \code{method="Tikhonov"} or \code{num.iterations}
+  when \code{method="Landweber-Fridman"} and \code{norm.stop}.
 }
 \references{
   
@@ -213,7 +232,8 @@ ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w)
 attach(ivdata)
 
-phihat.iv <- npregiv(y=y,z=z,w=w)$phihat
+model.iv <- npregiv(y=y,z=z,w=w)
+phihat.iv <- model.iv$phihat
 
 ## Now the non-iv local linear estimator of E(y|z)
 
