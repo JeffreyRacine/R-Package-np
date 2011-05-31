@@ -1105,7 +1105,6 @@ npregiv <- function(y,
   if(missing(w)) stop("You must provide w")
   if(NCOL(y) > 1) stop("y must be univariate")
   if(NCOL(z) > 1) stop("z must be univariate")
-  if(NCOL(w) > 1) stop("w must be univariate")  
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
   if(p < 0) stop("p must be a non-negative integer")
 
@@ -1155,7 +1154,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weights for E(z|w) (first stage treat z as phi(z))...", console)
-    KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hzw$bw, p=rep(p, NCOL(w)),...)
+    KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hzw$bw, p=rep(p, NCOL(w)))
     
     ## define E(r|z)=E(E(phi(z)|w)|z) 
     ## E(z|w)
@@ -1168,7 +1167,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weights for E(E(z|w)|z)...", console)
-    KWZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hwz$bw, p=rep(p, NCOL(w)),...)
+    KWZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hwz$bw, p=rep(p, NCOL(w)))
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov function) to
@@ -1200,7 +1199,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weights for E(phi(z)|w)...", console)
-    KPHWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)),...)
+    KPHWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)))
     
     ## Conduct kernel regression of E(phi(z)|w) on z (we need weights so just use them)
     
@@ -1214,7 +1213,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Iterating and recomputing weights for E(E(phi(z)|w)|z)...", console)
-    KWZ2s <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz2$bw, p=rep(p, NCOL(z)),...)
+    KWZ2s <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz2$bw, p=rep(p, NCOL(z)))
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov approach) to
@@ -1242,40 +1241,39 @@ npregiv <- function(y,
     ## We begin the iteration computing phi.0 and phi.1 directly, then
     ## interate.
     
-    phi.mat <- matrix(NA,nrow=length(y),ncol=num.iterations)
-    
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush(paste("Computing phi(z) for iteration ", 0, " of ", num.iterations,"...",sep=""),console)
+    console <- printPush(paste("Computing bandwidths and phi(z) for iteration ", 0, " of ", num.iterations,"...",sep=""),console)
 
     h <- glpcv(ydat=y, xdat=z, degree=rep(p, NCOL(z)),...)
     phi.0 <- glpreg(tydat=y, txdat=z, eydat=y, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
     
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush(paste("Computing phi(z) for iteration ", 1, " of ", num.iterations,"...",sep=""),console)
+    console <- printPush(paste("Computing bandwidths and phi(z) for iteration ", 1, " of ", num.iterations,"...",sep=""),console)
 
     resid <- y - phi.0
     h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
     resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
     h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
-    phi.mat[,1] <- phi.0 + glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    phi.j.m.1 <- phi.0 + glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
     
     for(j in 2:num.iterations) {
       console <- printClear(console)
       console <- printPop(console)
-      console <- printPush(paste("Computing phi(z) for iteration ", j, " of ", num.iterations,"...",sep=""),console)
-      resid <- y - phi.mat[,j-1]
+      console <- printPush(paste("Computing bandwidths and phi(z) for iteration ", j, " of ", num.iterations,"...",sep=""),console)
+      resid <- y - phi.j.m.1
       h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
       resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
       h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
-      phi.mat[,j] <- phi.mat[,j-1] + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+      phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+      phi.j.m.1 <- phi.j
     }
     
     console <- printClear(console)
     console <- printPop(console)
 
-    return(list(phihat=phi.mat[,num.iterations],num.iterations=num.iterations))
+    return(list(phihat=phi.j,num.iterations=num.iterations))
 
   }
   
