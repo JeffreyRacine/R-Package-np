@@ -1246,10 +1246,15 @@ npregiv <- function(y,
     
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing phi(z)...", console)
+    console <- printPush(paste("Computing phi(z) for iteration ", 0, " of ", num.iterations,"...",sep=""),console)
 
     h <- glpcv(ydat=y, xdat=z, degree=rep(p, NCOL(z)),...)
     phi.0 <- glpreg(tydat=y, txdat=z, eydat=y, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush(paste("Computing phi(z) for iteration ", 1, " of ", num.iterations,"...",sep=""),console)
+
     resid <- y - phi.0
     h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
     resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
@@ -1259,7 +1264,7 @@ npregiv <- function(y,
     for(j in 2:num.iterations) {
       console <- printClear(console)
       console <- printPop(console)
-      console <- printPush(paste("Computing phi(z) for iteration ", j, " of ", num.iterations,sep=""),console)
+      console <- printPush(paste("Computing phi(z) for iteration ", j, " of ", num.iterations,"...",sep=""),console)
       resid <- y - phi.mat[,j-1]
       h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
       resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
