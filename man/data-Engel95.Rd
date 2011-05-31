@@ -44,7 +44,7 @@ total.
 ## Landweber-Fridman iteration of Fredholm integral equations of the
 ## first kind.
 
-## We consider an equation with an endogenous regression (`z') and an
+## We consider an equation with an endogenous regressor (`z') and an
 ## instrument (`w'). Let y = phi(z) + u where phi(z) is the function of
 ## interest. Here E(u|z) is not zero hence the conditional mean E(y|z)
 ## does not coincide with the function of interest, but if there exists
