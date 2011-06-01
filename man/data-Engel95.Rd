@@ -62,12 +62,14 @@ attach(Engel95)
 model.iv <- npregiv(y=food,z=logexp,w=logwages,method="Landweber-Fridman")
 phihat <- model.iv$phihat
 
+## Compute the non-IV regression (i.e. regress y on z)
+
 ghat <- npreg(food~logexp,regtype="ll")
 
 plot(logexp,food,
      ylab="Food Budget Share",
      xlab="log(Total Expenditure)",
-     main="Iterated Nonparametric Instrumental Variables",
+     main="Nonparametric Instrumental Kernel Regression",
      type="p",
      cex=.5,
      col="lightgrey")

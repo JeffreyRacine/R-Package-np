@@ -33,7 +33,7 @@ npregiv(y,
         alpha.max = 1,
         tol = .Machine$double.eps^0.25,
         num.iterations = 5,
-        max.iterations = 25,
+        max.iterations = 100,
         constant = 0.5,
         method = c("Landweber-Fridman","Tikhonov"),
         ...)
@@ -66,7 +66,7 @@ npregiv(y,
   }
   \item{weval}{
     a \eqn{q}-variate data frame of instruments on which the regression
-    will be estimated (evaluation data).By default, evaluation
+    will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{w}.
   }
   \item{p}{
@@ -103,9 +103,10 @@ npregiv(y,
     the constant to use when using Landweber-Fridman regularization.
   }
   \item{method}{
-    the regularization method employed (defaults to \code{"Tikhonov"}, see
-    Darolles, Fan, Florens and Renault (forthcoming); see Horowitz
-    (2011) for details for \code{"Landweber-Fridman"}).
+  the regularization method employed (defaults to
+  \code{"Landweber-Fridman"}, see Horowitz (2011) for details; see
+  Darolles, Fan, Florens and Renault (forthcoming) for details on
+  \code{"Tikhonov"}).
   }
   \item{...}{
     additional arguments supplied to \code{crs}.
