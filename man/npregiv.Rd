@@ -257,8 +257,8 @@ ll.mean <- fitted(npreg(y~z,regtype="ll"))
 trim <- 0.0025
 
 curve(phi,min(z),max(z),
-     xlim=quantile(z,c(trim,1-trim)),
-     ylim=quantile(y,c(trim,1-trim)),
+      xlim=quantile(z,c(trim,1-trim)),
+      ylim=quantile(y,c(trim,1-trim)),
       ylab="Y",
       xlab="Z",
       main="Nonparametric Instrumental Kernel Regression",
