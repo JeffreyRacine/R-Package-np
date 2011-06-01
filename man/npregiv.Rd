@@ -145,7 +145,7 @@ npregiv(y,
 \value{
   \code{crsiv} returns a list with components \code{phihat} and either
   \code{alpha} when \code{method="Tikhonov"} or \code{num.iterations}
-  when \code{method="Landweber-Fridman"} and \code{norm.stop}.
+   and \code{norm.stop} when \code{method="Landweber-Fridman"}.
 }
 \references{
   
