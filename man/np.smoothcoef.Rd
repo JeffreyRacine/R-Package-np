@@ -264,7 +264,7 @@ bw <- npscoefbw(y~x|z)
 model <- npscoef(bw)
 plot(model)
 
-% \dontrun{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=DATA FRAME): 
 
 n <- 250
@@ -274,7 +274,7 @@ y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
 bw <- npscoefbw(xdat=x, ydat=y, zdat=z)
 model <- npscoef(bw)
 plot(model)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}
 
