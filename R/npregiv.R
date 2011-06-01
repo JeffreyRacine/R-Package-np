@@ -1135,7 +1135,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing E(y|w)...", console)  
-    E.y.w <- glpreg(tydat=y, txdat=w, eydat=y, exdat=w, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
+    E.y.w <- glpreg(tydat=y, txdat=w, eydat=yeval, exdat=weval, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
     
     ## We conduct local polynomial kernel regression of z on y we
     ## require two bandwidths, one for r onto z and one for the object
@@ -1148,7 +1148,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing E(E(y|w)|z)...", console)  
-    E.E.y.w.z <- glpreg(tydat=E.y.w, txdat=z, eydat=E.y.w, exdat=z, bws=hywz$bw, degree=rep(p, NCOL(z)),...)$mean
+    E.E.y.w.z <- glpreg(tydat=E.y.w, txdat=z, eydat=E.y.w, exdat=zeval, bws=hywz$bw, degree=rep(p, NCOL(z)),...)$mean
     
     ## Here we use z as a proxy for phi(z) in the first stage
     
@@ -1251,7 +1251,7 @@ npregiv <- function(y,
     console <- printPush(paste("Computing bandwidths and E(y|z) for iteration ", 0, " of at least ", start.iterations,"...",sep=""),console)
 
     h <- glpcv(ydat=y, xdat=z, degree=rep(p, NCOL(z)),...)
-    phi.0 <- glpreg(tydat=y, txdat=z, eydat=y, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    phi.0 <- glpreg(tydat=y, txdat=z, eydat=yeval, exdat=zeval, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1259,14 +1259,14 @@ npregiv <- function(y,
 
     resid <- y - phi.0
     h <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
-    resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+    resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=weval, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
 
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", 1, " of at least ", start.iterations,"...",sep=""),console)
 
     h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
-    phi.j.m.1 <- phi.0 + glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    phi.j.m.1 <- phi.0 + glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=zeval, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
     
     ## For the stopping rule
     
@@ -1276,7 +1276,7 @@ npregiv <- function(y,
 
     norm.stop <- numeric()
     h <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)),...)
-    E.y.w <- glpreg(tydat=y, txdat=w, eydat=y, exdat=w, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+    E.y.w <- glpreg(tydat=y, txdat=w, eydat=yeval, exdat=weval, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
     phihat <- phi.j.m.1
 
     console <- printClear(console)
@@ -1284,7 +1284,7 @@ npregiv <- function(y,
     console <- printPush(paste("Computing bandwidths and E(phi(z)|w) for stopping rule...",sep=""),console)
 
     h.E.phi.w <- glpcv(ydat=phi.j.m.1, xdat=w, degree=rep(p, NCOL(w)),...)
-    E.phi.w <- glpreg(tydat=phi.j.m.1, txdat=w, eydat=phi.j.m.1, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
+    E.phi.w <- glpreg(tydat=phi.j.m.1, txdat=w, eydat=phi.j.m.1, exdat=weval, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
     norm.stop[1] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
 
     ascending <- FALSE
@@ -1297,14 +1297,14 @@ npregiv <- function(y,
 
       resid <- y - phi.j.m.1
       h.resid.w <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
-      resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h.resid.w$bw, degree=rep(p, NCOL(w)),...)$mean
+      resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=weval, bws=h.resid.w$bw, degree=rep(p, NCOL(w)),...)$mean
 
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j, " of at least ", start.iterations,"...",sep=""),console)
 
       h.resid.fitted.z <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
-      phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h.resid.fitted.z$bw, degree=rep(p, NCOL(z)),...)$mean
+      phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=zeval, bws=h.resid.fitted.z$bw, degree=rep(p, NCOL(z)),...)$mean
       phi.j.m.1 <- phi.j
 
       console <- printClear(console)
@@ -1312,7 +1312,7 @@ npregiv <- function(y,
       console <- printPush(paste("Computing stopping rule for iteration ", j, " of at least ", start.iterations,"...",sep=""),console)
 
       ## For the stopping rule (use same smoothing as original)
-      E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
+      E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=weval, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
       norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
 
       if(norm.stop[j] > norm.stop[j-1]) {
@@ -1343,7 +1343,7 @@ npregiv <- function(y,
           console <- printPush(paste("Computing E(y-phi(z)|w) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
         }
         
-        resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h.resid.w$bw, degree=rep(p, NCOL(w)),...)$mean
+        resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=weval, bws=h.resid.w$bw, degree=rep(p, NCOL(w)),...)$mean
         
         console <- printClear(console)
         console <- printPop(console)
@@ -1355,7 +1355,7 @@ npregiv <- function(y,
           console <- printPush(paste("Computing E(E(y-phi(z)|w)|z) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
         }
         
-        phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h.resid.fitted.z$bw, degree=rep(p, NCOL(z)),...)$mean
+        phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=zeval, bws=h.resid.fitted.z$bw, degree=rep(p, NCOL(z)),...)$mean
         phi.j.m.1 <- phi.j
         
         console <- printClear(console)
@@ -1363,7 +1363,7 @@ npregiv <- function(y,
         console <- printPush(paste("Computing stopping rule for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
         
         ## For the stopping rule (use same smoothing as original)
-        E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
+        E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=weval, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
         norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
         
         if(norm.stop[j] > norm.stop[j-1]) break()

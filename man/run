@@ -28,7 +28,7 @@ sed -i bak -f sed_run.scr np.singleindex.bw.Rd
 sed -i bak -f sed_run.scr np.smoothcoef.Rd
 sed -i bak -f sed_run.scr np.smoothcoef.bw.Rd
 sed -i bak -f sed_run.scr np.symtest.Rd
-sed -i bak -f sed_run.scr np.unitest.dR
+sed -i bak -f sed_run.scr np.unitest.Rd
 sed -i bak -f sed_run.scr np.sdeptest.Rd
 sed -i bak -f sed_run.scr se.Rd
 sed -i bak -f sed_run.scr uocquantile.Rd
