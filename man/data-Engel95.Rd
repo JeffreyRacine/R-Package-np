@@ -66,9 +66,17 @@ phihat <- model.iv$phihat
 
 ghat <- npreg(food~logexp,regtype="ll")
 
+## For the plots, restrict focal attention to the bulk of the data
+## (i.e. for the plotting area trim out 1/4 of one percent from each
+## tail of y and z)
+
+trim <- 0.0025
+
 plot(logexp,food,
      ylab="Food Budget Share",
      xlab="log(Total Expenditure)",
+     xlim=quantile(logexp,c(trim,1-trim)),
+     ylim=quantile(food,c(trim,1-trim)),
      main="Nonparametric Instrumental Kernel Regression",
      type="p",
      cex=.5,
