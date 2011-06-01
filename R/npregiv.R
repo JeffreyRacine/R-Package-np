@@ -1287,6 +1287,8 @@ npregiv <- function(y,
     E.phi.w <- glpreg(tydat=phi.j.m.1, txdat=w, eydat=phi.j.m.1, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
     norm.stop[1] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
 
+    ascending <- FALSE
+
     for(j in 2:start.iterations) {
 
       console <- printClear(console)
@@ -1313,7 +1315,10 @@ npregiv <- function(y,
       E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
       norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
 
-      if(norm.stop[j] > norm.stop[j-1]) break()
+      if(norm.stop[j] > norm.stop[j-1]) {
+        ascending <- TRUE
+        break()
+      }
 
     }
 
@@ -1321,46 +1326,49 @@ npregiv <- function(y,
     ## AND we have not reached max.iterations AND the stopping
     ## criterion is not ascending, stop.
 
-    while((sum(norm.stop[(j-start.iterations+2):j]-norm.stop[(j-start.iterations+1):(j-1)]) != 0) && (j < max.iterations)) {
-
-      j <- j+1
-
-      resid <- y - phi.j.m.1
-
-      console <- printClear(console)
-      console <- printPop(console)
-
-      if(iterate.smoothing) {
-        console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
-        h.resid.w <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
-      } else {
-        console <- printPush(paste("Computing E(y-phi(z)|w) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
+    if(!ascending) {
+      while((sum(norm.stop[(j-start.iterations+2):j]-norm.stop[(j-start.iterations+1):(j-1)]) != 0) && (j < max.iterations)) {
+        
+        j <- j+1
+        
+        resid <- y - phi.j.m.1
+        
+        console <- printClear(console)
+        console <- printPop(console)
+        
+        if(iterate.smoothing) {
+          console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
+          h.resid.w <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
+        } else {
+          console <- printPush(paste("Computing E(y-phi(z)|w) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
+        }
+        
+        resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h.resid.w$bw, degree=rep(p, NCOL(w)),...)$mean
+        
+        console <- printClear(console)
+        console <- printPop(console)
+        
+        if(iterate.smoothing) {
+          console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
+          h.resid.fitted.z <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
+        } else {
+          console <- printPush(paste("Computing E(E(y-phi(z)|w)|z) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
+        }
+        
+        phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h.resid.fitted.z$bw, degree=rep(p, NCOL(z)),...)$mean
+        phi.j.m.1 <- phi.j
+        
+        console <- printClear(console)
+        console <- printPop(console)
+        console <- printPush(paste("Computing stopping rule for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
+        
+        ## For the stopping rule (use same smoothing as original)
+        E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
+        norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
+        
+        if(norm.stop[j] > norm.stop[j-1]) break()
+        
       }
-
-      resid.fitted <- glpreg(tydat=resid, txdat=w, eydat=resid, exdat=w, bws=h.resid.w$bw, degree=rep(p, NCOL(w)),...)$mean
-
-      console <- printClear(console)
-      console <- printPop(console)
-
-      if(iterate.smoothing) {
-        console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
-        h.resid.fitted.z <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
-      } else {
-        console <- printPush(paste("Computing E(E(y-phi(z)|w)|z) for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
-      }
-      
-      phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=z, bws=h.resid.fitted.z$bw, degree=rep(p, NCOL(z)),...)$mean
-      phi.j.m.1 <- phi.j
-
-      console <- printClear(console)
-      console <- printPop(console)
-      console <- printPush(paste("Computing stopping rule for iteration ", j, " of a maximum of ", max.iterations, "...",sep=""),console)
-
-      ## For the stopping rule (use same smoothing as original)
-      E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=w, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
-      norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
-
-      if(norm.stop[j] > norm.stop[j-1]) break()
 
     }
     
