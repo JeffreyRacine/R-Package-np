@@ -1,10 +1,15 @@
-Changes from Version 0.40-5 to 0.40-6 [26-May-2011]
+Changes from Version 0.40-5 to 0.40-6 [1-Jun-2011]
 
 * Added a new function npregiv that conducts nonparametric
   instrumental regression a la Darolles, Fan, Florens and Renault
-  (2011, forthcoming, Econometrica). Note that this function accepts
-  univariate instruments only and currently returns the fitted phi(z)
-  (i.e. lacks much functionality relative to other np functions)
+  (2011, forthcoming, Econometrica) and Horowitz (2011,
+  Econometrica). Note that this function currently returns the fitted
+  phi(z) (i.e. lacks much functionality relative to other np
+  functions) and is in `beta status' until further notice.
+
+* Added a new dataset `Engel95' that allows one to estimate Engel
+  curves using the new nonparametric instrumental regression function
+  npregiv.
 
 Changes from Version 0.40-4 to 0.40-5 [26-Apr-2011]
 
