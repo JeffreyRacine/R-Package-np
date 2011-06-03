@@ -224,7 +224,7 @@ w <- rnorm(n,mean=0,sd=1)
 fun1 <- function(z) { z^2 }
 fun2 <- function(z) { exp(-abs(z)) }
 
-z <- 0.4*w + v
+z <- 0.2*w + v
 
 ## Generate two y vectors for each function.
 
