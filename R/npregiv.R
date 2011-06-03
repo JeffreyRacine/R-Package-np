@@ -1124,9 +1124,9 @@ npregiv <- function(y,
   if(method=="Tikhonov") {
   
     ## Now y=phi(z) + u, hence E(y|w)=E(phi(z)|w) so we need two
-    ## bandwidths, one for y on w and one for phi(z) on w (in the first
-    ## step we use z as a proxy for phi(z) and use bandwidths for z on
-    ## w).
+    ## bandwidths, one for y on w and one for phi(z) on w (in the
+    ## first step we use E(y|w) as a proxy for phi(z) and use
+    ## bandwidths for y on w).
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1134,12 +1134,11 @@ npregiv <- function(y,
     hyw <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)),...)
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing E(y|w)...", console)  
+    console <- printPush("Computing weight matrix and E(y|w) (first stage approximate phi(z) by E(y|w))...", console)  
     E.y.w <- glpreg(tydat=y, txdat=w, eydat=yeval, exdat=weval, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
+    KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hyw$bw, p=rep(p, NCOL(w)))
     
-    ## We conduct local polynomial kernel regression of z on y we
-    ## require two bandwidths, one for r onto z and one for the object
-    ## in w space onto z space
+    ## We conduct local polynomial kernel regression of E(y|w) on z
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1147,32 +1146,9 @@ npregiv <- function(y,
     hywz <- glpcv(ydat=E.y.w, xdat=z, degree=rep(p, NCOL(z)),...)
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing E(E(y|w)|z)...", console)  
+    console <- printPush("Computing weight matrix and E(E(y|w)|z)...", console)  
     E.E.y.w.z <- glpreg(tydat=E.y.w, txdat=z, eydat=E.y.w, exdat=zeval, bws=hywz$bw, degree=rep(p, NCOL(z)),...)$mean
-    
-    ## Here we use z as a proxy for phi(z) in the first stage
-    
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing bandwidths for E(z|w) (first stage treat z as phi(z))...", console)
-    hzw <- glpcv(ydat=z, xdat=w, degree=rep(p, NCOL(w)),...)
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing weights for E(z|w) (first stage treat z as phi(z))...", console)
-    KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hzw$bw, p=rep(p, NCOL(w)))
-    
-    ## define E(r|z)=E(E(phi(z)|w)|z) 
-    ## E(z|w)
-    E.z.w <- KZWs%*%z
-    
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing bandwidths for E(E(z|w)|z)...", console)
-    hwz <- glpcv(ydat=E.z.w, xdat=z, degree=rep(p, NCOL(z)),...)
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing weights for E(E(z|w)|z)...", console)
-    KWZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hwz$bw, p=rep(p, NCOL(w)))
+    KRZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hywz$bw, p=rep(p, NCOL(w)))
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov function) to
@@ -1186,16 +1162,16 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Numerically solving for alpha...", console)
-    alpha1 <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    alpha1 <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KZWs, CY = KRZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha.
     
-    phihat <- as.vector(tikh(alpha1, CZ = KZWs, CY = KWZs, Cr.r = E.E.y.w.z))
+    phihat <- as.vector(tikh(alpha1, CZ = KZWs, CY = KRZs, Cr.r = E.E.y.w.z))
     
-    ## KWZs and KZWS no longer used, save memory
+    ## KRZs and KZWS no longer used, save memory
     
-    rm(KWZs, KZWs)
+    rm(KRZs, KZWs)
     
     console <- printClear(console)
     console <- printPop(console)
