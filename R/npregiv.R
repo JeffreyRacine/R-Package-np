@@ -1136,7 +1136,7 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing weight matrix and E(y|w) (first stage approximate phi(z) by E(y|w))...", console)  
     E.y.w <- glpreg(tydat=y, txdat=w, eydat=yeval, exdat=weval, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
-    KZWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hyw$bw, p=rep(p, NCOL(w)))
+    KYW <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hyw$bw, p=rep(p, NCOL(w)))
     
     ## We conduct local polynomial kernel regression of E(y|w) on z
     
@@ -1148,7 +1148,7 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing weight matrix and E(E(y|w)|z)...", console)  
     E.E.y.w.z <- glpreg(tydat=E.y.w, txdat=z, eydat=E.y.w, exdat=zeval, bws=hywz$bw, degree=rep(p, NCOL(z)),...)$mean
-    KRZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hywz$bw, p=rep(p, NCOL(w)))
+    KYWZ <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hywz$bw, p=rep(p, NCOL(z)))
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov function) to
@@ -1162,16 +1162,16 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Numerically solving for alpha...", console)
-    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KZWs, CY = KRZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha.
     
-    phihat <- as.vector(tikh(alpha, CZ = KZWs, CY = KRZs, Cr.r = E.E.y.w.z))
+    phihat <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
     
-    ## KRZs and KZWS no longer used, save memory
+    ## KYWZ and KYWS no longer used, save memory
     
-    rm(KRZs, KZWs)
+    rm(KYWZ, KYW)
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1181,7 +1181,7 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing weights for E(phi(z)|w)...", console)
     E.phihat.w <- glpreg(tydat=phihat, txdat=w, eydat=phihat, exdat=weval, bws=hphiw$bw, degree=rep(p, NCOL(w)),...)$mean
-    KPHIWs <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)))
+    KPHIW <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)))
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1190,7 +1190,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Iterating and recomputing weights for E(E(phi(z)|w)|z)...", console)
-    KPHIZs <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz$bw, p=rep(p, NCOL(z)))
+    KPHIZ <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz$bw, p=rep(p, NCOL(z)))
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov approach) to
@@ -1199,12 +1199,12 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KPHIWs, CY = KPHIZs, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KPHIW, CY = KPHIZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha and the updated bandwidths.
     
-    phihat <- as.vector(tikh(alpha, CZ = KPHIWs, CY = KPHIZs, Cr.r = E.E.y.w.z))
+    phihat <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIZ, Cr.r = E.E.y.w.z))
     
     console <- printClear(console)
     console <- printPop(console)

@@ -155,7 +155,7 @@ Sys.sleep(5)
 yt <- ar.series(0.0,rnorm(n))
 npsdeptest(yt,lag.num=2,boot.num=99,method="summation")
 
-\dontrun{
+% \dontrun{
 
 ## Stationary persistent time-series
 
@@ -169,7 +169,7 @@ Sys.sleep(5)
 yt <- ar.series(0.0,rnorm(n))
 npsdeptest(yt,lag.num=2,boot.num=99,method="integration")
 
-} % enddontrun
+% } % enddontrun
 
 }
 \keyword{ univar }

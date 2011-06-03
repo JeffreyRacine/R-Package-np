@@ -226,7 +226,7 @@ legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"),
 
 detach(Italy)
 
-\dontrun{
+% \dontrun{
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
 # bivariate nonparametric quantile regression estimate for Giovanni
@@ -265,6 +265,6 @@ legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"),
        lty=c(2, 3, 2), col=c("red", "blue", "red"))
 
 detach(Italy)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}

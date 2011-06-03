@@ -207,7 +207,7 @@ X <- data.frame(age)
 
 npqcmstest(model = model, xdat = X, ydat = logwage, tau=0.5)
 
-\dontrun{
+% \dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -228,6 +228,6 @@ X <- data.frame(age)
 npqcmstest(model = model, xdat = X, ydat = logwage, tau=0.5)
 
 detach(cps71)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{ nonparametric }

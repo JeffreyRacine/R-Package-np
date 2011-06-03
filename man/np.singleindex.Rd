@@ -268,7 +268,7 @@ model <- npindex(bws=bw, gradients=TRUE)
 
 summary(model)
 
-\dontrun{
+% \dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -523,6 +523,6 @@ persp(x1.seq,
       main="Estimated Semiparametric Probability Perspective", 
       theta=310, 
       phi=25)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}
