@@ -5,7 +5,7 @@ library(np)
 ## <samuele.centorrino@univ-tlse1.fr>
 
 set.seed(42)
-n <- 500
+n <- 1500
 nmulti <- 2
 
 v  <- rnorm(n,mean=0,sd=.27)
