@@ -1190,7 +1190,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Iterating and recomputing weights for E(E(phi(z)|w)|z)...", console)
-    KPHIZ <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz$bw, p=rep(p, NCOL(z)))
+    KPHIWZ <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz$bw, p=rep(p, NCOL(z)))
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov approach) to
@@ -1199,12 +1199,12 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KPHIW, CY = KPHIZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha and the updated bandwidths.
     
-    phihat <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIZ, Cr.r = E.E.y.w.z))
+    phihat <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z))
     
     console <- printClear(console)
     console <- printPop(console)
