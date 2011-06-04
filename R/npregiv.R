@@ -32,7 +32,7 @@ npregiv <- function(y,
                     weval=NULL,
                     p=1,
                     alpha.min=1.0e-10,
-                    alpha.max=1,
+                    alpha.max=1.0e-01,
                     tol=.Machine$double.eps^0.25,
                     start.iterations=10,
                     max.iterations=100,
@@ -1134,7 +1134,7 @@ npregiv <- function(y,
     hyw <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)),...)
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing weight matrix and E(y|w) (first stage approximate phi(z) by E(y|w))...", console)  
+    console <- printPush("Computing weight matrix and E(y|w)...", console)  
     E.y.w <- glpreg(tydat=y, txdat=w, eydat=yeval, exdat=weval, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
     KYW <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hyw$bw, p=rep(p, NCOL(w)))
     
@@ -1167,6 +1167,9 @@ npregiv <- function(y,
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha.
     
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing initial phi(z) estimate...", console)
     phihat <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
     
     ## KYWZ and KYWS no longer used, save memory
@@ -1179,17 +1182,17 @@ npregiv <- function(y,
     hphiw <- glpcv(ydat=phihat, xdat=w, degree=rep(p, NCOL(w)),...)
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing weights for E(phi(z)|w)...", console)
+    console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
     E.phihat.w <- glpreg(tydat=phihat, txdat=w, eydat=phihat, exdat=weval, bws=hphiw$bw, degree=rep(p, NCOL(w)),...)$mean
     KPHIW <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, NCOL(w)))
     
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Iterating and recomputing bandwidths for E(E(phi(z)|w)|z)...", console)
+    console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
     hphiwz <- glpcv(ydat=E.phihat.w, xdat=z, degree=rep(p, NCOL(z)))
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Iterating and recomputing weights for E(E(phi(z)|w)|z)...", console)
+    console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
     KPHIWZ <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz$bw, p=rep(p, NCOL(z)))
     
     ## Next, we minimize the function ittik to obtain the optimal value
@@ -1204,10 +1207,16 @@ npregiv <- function(y,
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha and the updated bandwidths.
     
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing final phi(z) estimate...", console)
     phihat <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z))
     
     console <- printClear(console)
     console <- printPop(console)
+
+    if((alpha-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",alpha,") is close to the search minimum (",alpha.min,")",sep=""))
+    if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",alpha,") is close to the search maximum (",alpha.max,")",sep=""))
     
     return(list(phihat=phihat, alpha=alpha))
     
