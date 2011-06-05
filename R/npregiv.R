@@ -1125,6 +1125,7 @@ npregiv <- function(y,
 
   ## Need to determine how many x, w, z are numeric
 
+  z <- data.frame(z)
   w <- data.frame(w)
   if(!is.null(x)) z <- data.frame(z,x)
   if(!is.null(xeval)) zeval <- data.frame(zeval,xeval)
