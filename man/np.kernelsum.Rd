@@ -287,7 +287,7 @@ legend(1, .4,
        col=c("black", "blue", "red"), 
        lty=c(1, 1, 1))
 
-% \dontrun{
+\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -498,6 +498,6 @@ kernel <- npksum(txdat=x,exdat=x.eval,bws=1,
 
 plot(x.eval,kernel,type="l",xlab="X",ylab="Kernel Function") 
 abline(0,0)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }

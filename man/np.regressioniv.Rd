@@ -25,9 +25,10 @@ polynomial kernel regression (Horowitz uses B-spline weighting).
 npregiv(y,
         z,
         w,
-        yeval = NULL,
+        x = NULL,
         zeval = NULL,
         weval = NULL,
+        zeval = NULL,
         p = 1,
         alpha.min = 1e-10,
         alpha.max = 1e-01,
@@ -56,7 +57,7 @@ npregiv(y,
     combination thereof.
   }
   \item{x}{
-    a \eqn{r}-variate data frame of exdogenous regressors. The data
+    a \eqn{r}-variate data frame of exogenous regressors. The data
     types may be continuous, discrete (unordered and ordered factors),
     or some combination thereof.
   }
@@ -122,8 +123,8 @@ npregiv(y,
   determine \eqn{\alpha}{alpha}.
   
   \code{method="Landweber-Fridman"} uses an optimal stopping rule
-  whereby if \eqn{||E(y|w)-E(\varphi_k(z)|w)||^2
-  }{||E(y|w)-E(phi(z)|w)||^2 } is unchanged for at least
+  whereby if \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2
+  }{||E(y|w)-E(phi(z,x)|w)||^2 } is unchanged for at least
   \code{num.iterations} then iteration terminates. However, if
   insufficient training is conducted the estimates can be overly noisy
   and iteration may fail to terminate when \code{num.iterations} is
@@ -133,9 +134,9 @@ npregiv(y,
 
   When using \code{method="Landweber-Fridman"}, iteration will terminate
   when either \code{start.iterations} have passed with no change in the
-  value of \eqn{||E(y|w)-E(\varphi_k(z)|w)||^2
-  }{||E(y|w)-E(phi(z)|w)||^2 } or we hit \code{max.iterations} or
-  \eqn{||E(y|w)-E(\varphi_k(z)|w)||^2 }{||E(y|w)-E(phi(z)|w)||^2 } stops
+  value of \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2
+  }{||E(y|w)-E(phi(z,x)|w)||^2 } or we hit \code{max.iterations} or
+  \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2 }{||E(y|w)-E(phi(z,x)|w)||^2 } stops
   falling in value and starts rising.
 }
 \value{
@@ -188,7 +189,7 @@ This function should be considered to be in `beta test' status until further not
 \code{\link{npreg}}
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
 
@@ -275,6 +276,6 @@ legend(quantile(z,trim),quantile(y,1-trim),
        col=c("black","blue","red"),
        lwd=c(2,2,2))
        
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ instrument }

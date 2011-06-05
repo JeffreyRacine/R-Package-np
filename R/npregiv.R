@@ -3,12 +3,13 @@
 ## This functions accepts the following arguments:
 
 ## y: univariate outcome
-## z: endogenous predictor
-## w: instrument
+## z: endogenous predictors
+## w: instruments
+## x: exogenous predictors
 
-## yeval: optional evaluation data for the univariate outcome
-## zeval: optional evaluation data for the endogenous predictor
+## zeval: optional evaluation data for the endogenous predictors
 ## weval: optional evaluation data for the instrument
+## xeval: optional evaluation data for the exogenous predictors
 
 ## alpha.min: minimum value when conducting 1-dimensional search for
 ##            optimal Tikhonov regularization parameter alpha
@@ -28,7 +29,6 @@ npregiv <- function(y,
                     z,
                     w,
                     x=NULL,
-                    yeval=NULL,
                     zeval=NULL,
                     weval=NULL,
                     xeval=NULL,
@@ -1116,7 +1116,6 @@ npregiv <- function(y,
   
   ## Check for evaluation data
   
-  if(is.null(yeval)) yeval <- y
   if(is.null(zeval)) zeval <- z
   if(is.null(weval)) weval <- w
   if(is.null(weval)) xeval <- x
@@ -1138,7 +1137,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weight matrix and E(y|w)...", console)  
-    E.y.w <- glpreg(tydat=y, txdat=w, eydat=yeval, exdat=weval, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
+    E.y.w <- glpreg(tydat=y, txdat=w, exdat=weval, bws=hyw$bw, degree=rep(p, NCOL(w)),...)$mean
     KYW <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hyw$bw, p=rep(p, NCOL(w)))
     
     ## We conduct local polynomial kernel regression of E(y|w) on z
@@ -1235,7 +1234,7 @@ npregiv <- function(y,
     console <- printPush(paste("Computing bandwidths and E(y|z) for iteration ", 0, " of at least ", iterate.max,"...",sep=""),console)
 
     h <- glpcv(ydat=y, xdat=z, degree=rep(p, NCOL(z)),...)
-    phi.0 <- glpreg(tydat=y, txdat=z, eydat=yeval, exdat=zeval, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
+    phi.0 <- glpreg(tydat=y, txdat=z, exdat=zeval, bws=h$bw, degree=rep(p, NCOL(z)),...)$mean
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1260,7 +1259,7 @@ npregiv <- function(y,
 
     norm.stop <- numeric()
     h <- glpcv(ydat=y, xdat=w, degree=rep(p, NCOL(w)),...)
-    E.y.w <- glpreg(tydat=y, txdat=w, eydat=yeval, exdat=weval, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
+    E.y.w <- glpreg(tydat=y, txdat=w, exdat=weval, bws=h$bw, degree=rep(p, NCOL(w)),...)$mean
     phihat <- phi.j.m.1
 
     console <- printClear(console)
