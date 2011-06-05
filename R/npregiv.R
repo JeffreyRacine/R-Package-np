@@ -1262,7 +1262,7 @@ npregiv <- function(y,
 
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ...",sep=""),console)
+    console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration 1...",sep=""),console)
 
     h <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, num.z.numeric),...)
     phi.j.m.1 <- phi.0 + glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=zeval, bws=h$bw, degree=rep(p, num.z.numeric),...)$mean
