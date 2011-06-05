@@ -30,6 +30,7 @@ npregiv(y,
         weval = NULL,
         xeval = NULL,
         p = 1,
+        alpha = NULL,
         alpha.min = 1e-10,
         alpha.max = 1e-01,
         alpha.tol = .Machine$double.eps^0.25,
@@ -80,6 +81,10 @@ npregiv(y,
     the order of the local polynomial regression (defaults to
     \code{p=1}, i.e. local linear)
   }
+  \item{alpha}{
+    a numeric scaler that, if supplied, is used rather than numerically
+    solving for \code{alpha}, when using \code{method="Tikhonov"}.
+    }
   \item{alpha.min}{
     minimum of search range for \eqn{\alpha}{alpha}, the Tikhonov
     regularization parameter, when using \code{method="Tikhonov"}.

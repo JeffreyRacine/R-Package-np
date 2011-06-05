@@ -33,6 +33,7 @@ npregiv <- function(y,
                     weval=NULL,
                     xeval=NULL,
                     p=1,
+                    alpha=NULL,
                     alpha.min=1.0e-10,
                     alpha.max=1.0e-01,
                     alpha.tol=.Machine$double.eps^0.25,
@@ -1112,6 +1113,8 @@ npregiv <- function(y,
   if(iterate.max < 2) stop("iterate.max must be at least 2")
   if(p < 0) stop("p must be a non-negative integer")
 
+  if(!is.null(alpha) && alpha <= 0) stop("alpha must be positive")
+
   method <- match.arg(method)
   
   ## Check for evaluation data
@@ -1160,12 +1163,14 @@ npregiv <- function(y,
     
     ## E(r|z)=E(E(phi(z)|w)|z)
     ## \phi^\alpha = (\alpha I+CzCw)^{-1}Cr x r
-    
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Numerically solving for alpha...", console)
-    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
-    
+
+    if(is.null(alpha)) {
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush("Numerically solving for alpha...", console)
+      alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    }
+      
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha.
     
@@ -1201,10 +1206,12 @@ npregiv <- function(y,
     ## of alpha (here we use the iterated Tikhonov approach) to
     ## determine the optimal alpha for the non-iterated scheme.
     
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-    alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    if(is.null(alpha)) {
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
+      alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+    }
     
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha and the updated bandwidths.
