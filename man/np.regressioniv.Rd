@@ -30,11 +30,10 @@ npregiv(y,
         weval = NULL,
         p = 1,
         alpha.min = 1e-10,
-        alpha.max = 1,
-        tol = .Machine$double.eps^0.25,
-        start.iterations = 10,
-        max.iterations = 100,
-        iterate.smoothing = TRUE,
+        alpha.max = 1e-01,
+        alpha.tol = .Machine$double.eps^0.25,
+        iterate.max = 100,
+        iterate.tol = 1.0e-05,
         constant = 0.5,
         method = c("Landweber-Fridman","Tikhonov"),
         ...)
@@ -76,45 +75,36 @@ npregiv(y,
   }
   \item{alpha.min}{
     minimum of search range for \eqn{\alpha}{alpha}, the Tikhonov
-    regularization parameter, when using
-    Tikhonov regularization.
-  }
+    regularization parameter, when using \code{method="Tikhonov"}.
+}
   \item{alpha.max}{
     maximum of search range for \eqn{\alpha}{alpha}, the Tikhonov
-    regularization parameter, when using
-    Tikhonov regularization.
+    regularization parameter, when using  \code{method="Tikhonov"}.
   }
-  \item{tol}{
-    the search tolerance for \code{optimize} when solving for
-    \eqn{\alpha}{alpha}, the Tikhonov regularization parameter, when using
-    Tikhonov regularization.
-  }
-  \item{start.iterations}{
-    an integer indicating the minimum number of iterations to conduct
-    when using Landweber-Fridman regularization (here at each iteration
-    the smoothing parameters are refined and optimized).
-  }
-  \item{max.iterations}{
-    an integer indicating the maximum number of iterations permitted
-    before termination occurs.
-  }
-  \item{iterate.smoothing}{
-    a logical value indicating whether, after the initial
-    \code{start.iterations} have been conducted, to continue to optimize the
-    smoothing parameters for each successive iteration.
-  }
-  \item{constant}{
-    the constant to use when using Landweber-Fridman regularization.
-  }
-  \item{method}{
+\item{alpha.tol}{
+  the search tolerance for \code{optimize} when solving for
+  \eqn{\alpha}{alpha}, the Tikhonov regularization parameter, when using
+  when using \code{method="Tikhonov"}.
+}
+\item{iterate.max}{
+  an integer indicating the maximum number of iterations permitted
+  before termination occurs when using \code{method="Landweber-Fridman"}.
+}
+\item{iterate.tol}{
+  the search tolerance for the stopping rule when using \code{method="Landweber-Fridman"}.
+}
+\item{constant}{
+  the constant to use when using  \code{method="Landweber-Fridman"}.
+}
+\item{method}{
   the regularization method employed (defaults to
-  \code{"Landweber-Fridman"}, see Horowitz (2011) for details; see
-  Darolles, Fan, Florens and Renault (forthcoming) for details on
-  \code{"Tikhonov"}).
-  }
-  \item{...}{
-    additional arguments supplied to \code{\link{npksum}}.
-  }
+   \code{"Landweber-Fridman"}, see see Horowitz (2011); see Darolles,
+   Fan, Florens and Renault (forthcoming) for details for
+   \code{"Tikhonov"}).
+}
+\item{...}{
+  additional arguments supplied to \code{\link{npksum}}.
+}
 }
 \details{
   Tikhonov regularization requires computation of weight matrices of
