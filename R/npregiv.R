@@ -1217,8 +1217,8 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
 
-    if((alpha-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",alpha,") is close to the search minimum (",alpha.min,")",sep=""))
-    if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",alpha,") is close to the search maximum (",alpha.max,")",sep=""))
+    if((alpha-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
+    if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
     
     return(list(phihat=phihat, alpha=alpha))
     
@@ -1274,7 +1274,7 @@ npregiv <- function(y,
 
       console <- printClear(console)
       console <- printPop(console)
-      console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", j, " of maximum ", iterate.max,"...",sep=""),console)
+      console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", j,"...",sep=""),console)
 
       resid <- y - phi.j.m.1
       h.resid.w <- glpcv(ydat=resid, xdat=w, degree=rep(p, NCOL(w)),...)
@@ -1282,7 +1282,7 @@ npregiv <- function(y,
 
       console <- printClear(console)
       console <- printPop(console)
-      console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j, " of maximum ", iterate.max,"...",sep=""),console)
+      console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j,"...",sep=""),console)
 
       h.resid.fitted.z <- glpcv(ydat=resid.fitted, xdat=z, degree=rep(p, NCOL(z)),...)
       phi.j <- phi.j.m.1 + constant*glpreg(tydat=resid.fitted, txdat=z, eydat=resid.fitted, exdat=zeval, bws=h.resid.fitted.z$bw, degree=rep(p, NCOL(z)),...)$mean
@@ -1290,7 +1290,7 @@ npregiv <- function(y,
 
       console <- printClear(console)
       console <- printPop(console)
-      console <- printPush(paste("Computing stopping rule for iteration ", j, " of maximum ", iterate.max,"...",sep=""),console)
+      console <- printPush(paste("Computing stopping rule for iteration ", j,"...",sep=""),console)
 
       ## For the stopping rule (use same smoothing as original)
       E.phi.w <- glpreg(tydat=phi.j, txdat=w, eydat=phi.j, exdat=weval, bws=h.E.phi.w$bw, degree=rep(p, NCOL(w)),...)$mean
