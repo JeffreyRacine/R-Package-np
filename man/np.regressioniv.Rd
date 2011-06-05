@@ -5,7 +5,7 @@
 Nonparametric Instrumental Regression
 }
 \description{
-\code{crsiv} computes nonparametric estimation of an instrumental
+\code{npregiv} computes nonparametric estimation of an instrumental
 regression function \eqn{\varphi}{phi} defined by conditional moment
 restrictions stemming from a structural econometric model: \eqn{E [Y -
 \varphi (Z,X) | W ] = 0}{E [Y - phi (Z,X) | W ] = 0}, and involving
