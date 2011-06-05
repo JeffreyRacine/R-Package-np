@@ -5,13 +5,13 @@
 Nonparametric Instrumental Regression
 }
 \description{
-\code{npregiv} computes nonparametric estimation of an instrumental
+\code{crsiv} computes nonparametric estimation of an instrumental
 regression function \eqn{\varphi}{phi} defined by conditional moment
 restrictions stemming from a structural econometric model: \eqn{E [Y -
-\varphi (Z) | W ] = 0}{E [Y - phi (Z) | W ] = 0}, and involving
-endogenous variables \eqn{Y} and \eqn{Z} and instruments \eqn{W}. The
-function \eqn{\varphi}{phi} is the solution of an ill-posed inverse
-problem.
+\varphi (Z,X) | W ] = 0}{E [Y - phi (Z,X) | W ] = 0}, and involving
+endogenous variables \eqn{Y} and \eqn{Z} and exogenous variables
+\eqn{X} and instruments \eqn{W}. The function \eqn{\varphi}{phi} is the
+solution of an ill-posed inverse problem.
 
 When \code{method="Tikhonov"}, \code{npregiv} uses the approach of
 Darolles, Fan, Florens and Renault (forthcoming) modified for local
@@ -46,21 +46,22 @@ npregiv(y,
   }
 
   \item{z}{
-    a one (1) dimensional numeric or integer vector for the endogenous
-    regressor.
+    a \eqn{p}-variate data frame of endogenous regressors. The data
+    types may be continuous, discrete (unordered and ordered factors),
+    or some combination thereof.
   }
   \item{w}{
     a \eqn{q}-variate data frame of instruments. The data types may be
     continuous, discrete (unordered and ordered factors), or some
     combination thereof.
   }
-  \item{yeval}{
-    a one (1) dimensional numeric or integer vector on which the
-    regression will be estimated (evaluation data). By default, evaluation
-    takes place on the data provided by \code{y}.
+  \item{x}{
+    a \eqn{r}-variate data frame of exdogenous regressors. The data
+    types may be continuous, discrete (unordered and ordered factors),
+    or some combination thereof.
   }
   \item{zeval}{
-    a one (1) dimensional numeric or integer vector on which the
+    a \eqn{p}-variate data frame of endogenous predictors on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{z}.
   }
@@ -68,6 +69,11 @@ npregiv(y,
     a \eqn{q}-variate data frame of instruments on which the regression
     will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{w}.
+  }
+  \item{xeval}{
+    a \eqn{r}-variate data frame of exogenous regressors on which the
+    regression will be estimated (evaluation data). By default,
+    evaluation takes place on the data provided by \code{x}.
   }
   \item{p}{
     the order of the local polynomial regression (defaults to
