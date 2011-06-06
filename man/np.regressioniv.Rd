@@ -63,7 +63,7 @@ npregiv(y,
     or some combination thereof.
   }
   \item{zeval}{
-    a \eqn{p}-variate data frame of endogenous predictors on which the
+    a \eqn{p}-variate data frame of endogenous regressors on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{z}.
   }
