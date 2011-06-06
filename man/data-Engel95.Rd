@@ -88,7 +88,7 @@ lines(logexp,fitted(ghat),col="red",lwd=2,lty=4)
 
 legend(quantile(logexp,trim),quantile(food,1-trim),
        c(expression(paste("Nonparametric IV: ",hat(varphi)(logexp))),
-         "Nonparametric Regression: E(y|z)"),
+         "Nonparametric Regression: E(food | logexp)"),
        lty=c(2,4),
        col=c("blue","red"),
        lwd=c(2,2))
