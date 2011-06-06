@@ -81,3 +81,4 @@ legend(quantile(z,trim),quantile(y,1-trim),
        col=c("black","blue","red"),
        lwd=c(1,2,2))
 
+detach(ivdata)
