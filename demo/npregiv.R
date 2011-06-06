@@ -44,15 +44,17 @@ ll.mean <- fitted(npreg(y~z,nmulti=nmulti,regtype="ll"))
 
 trim <- 0.0025
 
-if(method=="Tikhonov") {
+if(method=="Tikhonov")  {
 
-  subtext <- paste("Tikhonov: alpha = ",
-                   formatC(model.iv$alpha,digits=4,format="f"),sep="")
+  subtext <- paste("Tikhonov alpha = ",
+                   formatC(model.iv$alpha,digits=3,format="fg"),
+                   ", n = ", n, sep="")
 
 } else {
 
-  subtext <- paste("Landweber-Fridman: iterations = ",
-                   model.iv$num.iterations,sep="")
+  subtext <- paste("Landweber-Fridman iterations = ",
+                   model.iv$num.iterations,
+                   ", n = ", n,sep="")
 
 }
 
@@ -73,7 +75,7 @@ lines(z,phihat.iv,col="blue",lwd=2,lty=2)
 
 lines(z,ll.mean,col="red",lwd=2,lty=4)
 
-legend(quantile(z,trim),quantile(y,1-trim),
+legend(x="top",inset=c(.01,.01),
        c(expression(paste(varphi(z),", E(y|z)",sep="")),
          expression(paste("Nonparametric ",hat(varphi)(z))),
          "Nonparametric E(y|z)"),
@@ -81,4 +83,4 @@ legend(quantile(z,trim),quantile(y,1-trim),
        col=c("black","blue","red"),
        lwd=c(1,2,2))
 
-detach(ivdata)
+
