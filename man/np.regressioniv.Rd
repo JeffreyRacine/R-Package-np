@@ -58,7 +58,7 @@ npregiv(y,
     combination thereof.
   }
   \item{x}{
-    a \eqn{r}-variate data frame of exogenous regressors. The data
+    an \eqn{r}-variate data frame of exogenous regressors. The data
     types may be continuous, discrete (unordered and ordered factors),
     or some combination thereof.
   }
@@ -73,7 +73,7 @@ npregiv(y,
     takes place on the data provided by \code{w}.
   }
   \item{xeval}{
-    a \eqn{r}-variate data frame of exogenous regressors on which the
+    an \eqn{r}-variate data frame of exogenous regressors on which the
     regression will be estimated (evaluation data). By default,
     evaluation takes place on the data provided by \code{x}.
   }
