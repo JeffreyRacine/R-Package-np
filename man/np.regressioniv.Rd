@@ -110,7 +110,7 @@ npregiv(y,
 }
 \item{method}{
   the regularization method employed (defaults to
-   \code{"Landweber-Fridman"}, see see Horowitz (2011); see Darolles,
+   \code{"Landweber-Fridman"}, see Horowitz (2011); see Darolles,
    Fan, Florens and Renault (forthcoming) for details for
    \code{"Tikhonov"}).
 }
