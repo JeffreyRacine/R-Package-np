@@ -86,7 +86,7 @@ lines(logexp,phihat,col="blue",lwd=2,lty=2)
 
 lines(logexp,fitted(ghat),col="red",lwd=2,lty=4)
 
-legend(quantile(logexp,trim),quantile(food,1-trim)
+legend(quantile(logexp,trim),quantile(food,1-trim),
        c(expression(paste("Nonparametric IV: ",hat(varphi)(logexp))),
          "Nonparametric Regression: E(y|z)"),
        lty=c(2,4),
