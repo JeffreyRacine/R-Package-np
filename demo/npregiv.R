@@ -5,8 +5,10 @@ library(np)
 ## <samuele.centorrino@univ-tlse1.fr>
 
 set.seed(42)
-n <- 1500
-nmulti <- 2
+n <- as.numeric(readline(prompt="Input the number of observations desired: "))
+method <- as.numeric(readline(prompt="Input the method (0=Landweber-Fridman, 1=Tikhonov): "))
+method <- ifelse(method==0,"Landweber-Fridman","Tikhonov")
+nmulti <- as.numeric(readline(prompt="Input the number of multistarts desired (e.g. 2): "))
 
 v  <- rnorm(n,mean=0,sd=.27)
 eps <- rnorm(n,mean=0,sd=0.05)
@@ -29,7 +31,7 @@ ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w)
 attach(ivdata)
 
-model.iv <- npregiv(y=y,z=z,w=w,nmulti=nmulti,method="Tikhonov")
+model.iv <- npregiv(y=y,z=z,w=w,nmulti=nmulti,method=method)
 phihat.iv <- model.iv$phihat
 
 ## Now the non-iv local linear estimator of E(y|z)
@@ -42,15 +44,27 @@ ll.mean <- fitted(npreg(y~z,nmulti=nmulti,regtype="ll"))
 
 trim <- 0.0025
 
+if(method=="Tikhonov") {
+
+  subtext <- paste("Tikhonov: alpha = ",
+                   formatC(model.iv$alpha,digits=4,format="f"),sep="")
+
+} else {
+
+  subtext <- paste("Landweber-Fridman: iterations = ",
+                   model.iv$num.iterations,sep="")
+
+}
+
 curve(phi,min(z),max(z),
       xlim=quantile(z,c(trim,1-trim)),
       ylim=quantile(y,c(trim,1-trim)),
       ylab="Y",
       xlab="Z",
       main="Nonparametric Instrumental Kernel Regression",
-      sub=paste("Tikhonov: alpha = ",formatC(model.iv$alpha,digits=4,format="f")),
+      sub=subtext,
       lwd=1,lty=1)
-
+  
 points(z,y,type="p",cex=.25,col="grey")
 
 lines(z,eyz(z))
@@ -67,40 +81,3 @@ legend(quantile(z,trim),quantile(y,1-trim),
        col=c("black","blue","red"),
        lwd=c(1,2,2))
 
-model.iv <- npregiv(y=y,z=z,w=w,nmulti=nmulti,method="Landweber-Fridman")
-phihat.iv <- model.iv$phihat
-
-## Now the non-iv local linear estimator of E(y|z)
-
-ll.mean <- fitted(npreg(y~z,nmulti=nmulti,regtype="ll"))
-
-## For the plots, restrict focal attention to the bulk of the data
-## (i.e. for the plotting area trim out 1/4 of one percent from each
-## tail of y and z)
-
-trim <- 0.0025
-
-curve(phi,min(z),max(z),
-      xlim=quantile(z,c(trim,1-trim)),
-      ylim=quantile(y,c(trim,1-trim)),
-      ylab="Y",
-      xlab="Z",
-      main="Nonparametric Instrumental Kernel Regression",
-      sub=paste("Landweber-Fridman: iterations = ", model.iv$num.iterations,sep=""),
-      lwd=1,lty=1)
-
-points(z,y,type="p",cex=.25,col="grey")
-
-lines(z,eyz(z),lwd=1,lty=1)
-
-lines(z,phihat.iv,col="blue",lwd=2,lty=2)
-
-lines(z,ll.mean,col="red",lwd=2,lty=4)
-
-legend(quantile(z,trim),quantile(y,1-trim),
-       c(expression(paste(varphi(z),", E(y|z)",sep="")),
-         expression(paste("Nonparametric ",hat(varphi)(z))),
-         "Nonparametric E(y|z)"),
-       lty=c(1,2,4),
-       col=c("black","blue","red"),
-       lwd=c(1,2,2))
