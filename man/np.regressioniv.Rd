@@ -82,7 +82,7 @@ npregiv(y,
     \code{p=1}, i.e. local linear)
   }
   \item{alpha}{
-    a numeric scaler that, if supplied, is used rather than numerically
+    a numeric scalar that, if supplied, is used rather than numerically
     solving for \code{alpha}, when using \code{method="Tikhonov"}.
     }
   \item{alpha.min}{
