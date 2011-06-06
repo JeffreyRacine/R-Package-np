@@ -127,28 +127,26 @@ npregiv(y,
   while it also avoids the need for numerical optimization methods to
   determine \eqn{\alpha}{alpha}.
   
-  \code{method="Landweber-Fridman"} uses an optimal stopping rule
-  whereby if \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2
-  }{||E(y|w)-E(phi(z,x)|w)||^2 } is unchanged for at least
-  \code{num.iterations} then iteration terminates. However, if
-  insufficient training is conducted the estimates can be overly noisy
-  and iteration may fail to terminate when \code{num.iterations} is
-  large. To best guard against this eventuality set \code{nmulti} to a
-  larger number than the default \code{nmulti=0} for
-  \code{\link{npreg}}.
+  \code{method="Landweber-Fridman"} uses an optimal stopping rule based
+  upon \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2
+  }{||E(y|w)-E(phi(z,x)|w)||^2 }. However, if insufficient training is
+  conducted the estimates can be overly noisy. To best guard against
+  this eventuality set \code{nmulti} to a larger number than the default
+  \code{nmulti=0} for \code{\link{npreg}}.
 
   When using \code{method="Landweber-Fridman"}, iteration will terminate
-  when either \code{start.iterations} have passed with no change in the
-  value of \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2
-  }{||E(y|w)-E(phi(z,x)|w)||^2 } or we hit \code{max.iterations} or
-  \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2 }{||E(y|w)-E(phi(z,x)|w)||^2 } stops
-  falling in value and starts rising.
+  when either the change in the value of
+  \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
+  }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } from iteration to iteration is
+  less than \code{iterate.tol} or we hit \code{max.iterations} or
+  \eqn{||E((y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
+  }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
+  starts rising.  } \value{ \code{npregiv} returns a list with
+  components \code{phihat} and either \code{alpha} when
+  \code{method="Tikhonov"} or \code{num.iterations} and \code{norm.stop}
+  when \code{method="Landweber-Fridman"}.
 }
-\value{
-  \code{npregiv} returns a list with components \code{phihat} and either
-  \code{alpha} when \code{method="Tikhonov"} or \code{num.iterations}
-   and \code{norm.stop} when \code{method="Landweber-Fridman"}.
-}
+
 \references{
   
   Carrasco, M. and J.P. Florens and E. Renault (2007), \dQuote{Linear
