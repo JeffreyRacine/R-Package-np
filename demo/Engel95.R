@@ -1,5 +1,4 @@
-rm(list=ls())
-library(np)
+require(np)
 
 ## Example - compute nonparametric instrumental regression using
 ## Landweber-Fridman iteration of Fredholm integral equations of the
