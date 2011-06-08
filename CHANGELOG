@@ -1,3 +1,9 @@
+Changes from Version 0.40-6 to 0.40-7 [8-Jun-2011]
+
+* Function npregiv now supports exogenous X and multivariate Z and W.
+
+* demo(npregiv) provides a useful illustration.
+
 Changes from Version 0.40-5 to 0.40-6 [1-Jun-2011]
 
 * Added a new function npregiv that conducts nonparametric

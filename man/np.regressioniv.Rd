@@ -141,7 +141,9 @@ npregiv(y,
   less than \code{iterate.tol} or we hit \code{iterate.max} or
   \eqn{||E((y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
-  starts rising.  } \value{ \code{npregiv} returns a list with
+  starts rising.  }
+
+\value{ \code{npregiv} returns a list with
   components \code{phihat} and either \code{alpha} when
   \code{method="Tikhonov"} or \code{num.iterations} and \code{norm.stop}
   when \code{method="Landweber-Fridman"}.
