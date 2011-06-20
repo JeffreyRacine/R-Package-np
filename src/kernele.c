@@ -2430,7 +2430,7 @@ double *SIGN)
 	int l = INT_MAX;
 
 	double epsilon = 1.0/num_obs_train;
-  double nepsilon;
+  double nepsilon = 0.0;
 
 	double prod_kernel;
 
@@ -4584,7 +4584,7 @@ double *mean)
 	int l;
 
 	double epsilon = 1.0/num_obs;
-  double nepsilon;
+  double nepsilon = 0.0;
 
 	double prod_kernel;
 
@@ -6215,7 +6215,7 @@ double **gradient)
 	int l;
 
 	double epsilon = 1.0/num_obs_train;
-  double nepsilon;
+  double nepsilon = 0.0;
 
 	double prod_kernel;
 
@@ -18142,7 +18142,7 @@ int *num_categories)
 	int l;
 
 	double epsilon = 1.0/num_obs;
-  double nepsilon;
+  double nepsilon = 0.0;
 
 	double prod_kernel;
 
