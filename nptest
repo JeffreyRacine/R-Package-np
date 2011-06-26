@@ -1,8 +1,0 @@
-#!/bin/sh
-
-cd np
-tar zcvf ../nptest/tmp.tar.gz
-cd ../nptest
-tar zxvf tmp.tar.gz
-cd ../
-R CMD INSTALL nptest
