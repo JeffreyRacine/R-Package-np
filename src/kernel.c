@@ -456,7 +456,7 @@ double kernel_deriv(int KERNEL, double z)
 
 /* Completed 11/25/97 */
 
-/* Revisited for two fucking days 5/19/99 - 5/20/99 for grades data set. */
+/* Revisited for two days 5/19/99 - 5/20/99 for grades data set. */
 /* No bugs at all - data has numerous ties!!! (Not continuous). */
 /* However, beefed up by using 20 decimals for all kernels. */
 
