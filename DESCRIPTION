@@ -4,7 +4,7 @@ Date: 2011-06-23
 Depends: boot, cubature
 Suggests: quantreg, MASS
 Title: Nonparametric kernel smoothing methods for mixed data types
-Author: Tristen Hayfield <hayfield@phys.ethz.ch>, Jeffrey S. Racine
+Author: Tristen Hayfield <hayfield@mpia.de>, Jeffrey S. Racine
         <racinej@mcmaster.ca>
 Maintainer: Jeffrey S. Racine <racinej@mcmaster.ca>
 Description: This package provides a variety of nonparametric (and

@@ -221,7 +221,7 @@
 }
 
 \author{
-  Tristen Hayfield <hayfield@phys.ethz.ch>, Jeffrey S. Racine
+  Tristen Hayfield <hayfield@mpia.de>, Jeffrey S. Racine
   <racinej@mcmaster.ca>
 
   Maintainer: Jeffrey S. Racine <racinej@mcmaster.ca>

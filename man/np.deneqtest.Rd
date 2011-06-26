@@ -67,7 +67,7 @@ npdeneqtest(x = NULL,
     Continuous Data,} Journal of Econometrics, 148, pp 186-200.
 }
 \author{
-    Tristen Hayfield \email{hayfield@phys.ethz.ch}, Jeffrey S. Racine
+    Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine
     \email{racinej@mcmaster.ca}
 }
 

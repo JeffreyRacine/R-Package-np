@@ -171,7 +171,7 @@ npqcmstest(formula,
 
 }
 \author{
-    Tristen Hayfield \email{hayfield@phys.ethz.ch}, Jeffrey S. Racine
+    Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine
     \email{racinej@mcmaster.ca}
 }
 
