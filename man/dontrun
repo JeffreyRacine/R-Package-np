@@ -1,3 +1,5 @@
+sed -i bak -f sed_dontrun.scr b.star.Rd
+sed -i bak -f sed_dontrun.scr npseed.Rd
 sed -i bak -f sed_dontrun.scr data-cps71.Rd
 sed -i bak -f sed_dontrun.scr data-Engel95.Rd
 sed -i bak -f sed_dontrun.scr data-italy.Rd
