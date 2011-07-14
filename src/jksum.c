@@ -1524,7 +1524,7 @@ double *weighted_sum){
 
     np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
                           matrix_Y, num_var_continuous_extern,
-                          tprod, num_obs_train,
+                          tprod, num_xt,
                           leave_one_out, j,
                           kernel_pow,
                           do_psum,
