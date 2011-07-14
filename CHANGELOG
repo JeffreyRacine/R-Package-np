@@ -1,3 +1,5 @@
+* Fixed bug in jksum.c for adaptive bandwidths and matrix tydat
+
 Changes from Version 0.40-6 to 0.40-7 [8-Jun-2011]
 
 * Function npregiv now supports exogenous X and multivariate Z and W.
