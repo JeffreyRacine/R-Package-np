@@ -33,8 +33,11 @@ npplregbw.formula <-
         mf[mc.mf] <- call[mc.call]
     }
 
+    mf.x <- mf
+    
     mf[[1]] <- as.name("model.frame")
-
+    mf.x[[1]] <- as.name("model.matrix")
+    
     ## mangle formula ...
     chromoly <- explodePipe(mf[["formula"]])
 
@@ -43,14 +46,20 @@ npplregbw.formula <-
 
     ## make formula evaluable, then eval
     bronze <- lapply(chromoly, paste, collapse = " + ")
-    mf[["formula"]] <- as.formula(paste(bronze[[1]]," ~ ", bronze[[2]], " + ", bronze[[3]]),
+
+    mf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
                                   env = environment(formula))
+
+    mf[["formula"]] <- as.formula(paste(bronze[[1]]," ~ ", bronze[[3]]),
+                                  env = environment(formula))
+    
     mf <- eval(mf, parent.frame())
+    mf.x <- eval(mf.x,parent.frame())
     
     ydat <- model.response(mf)
-    xdat <- mf[, chromoly[[2]], drop = FALSE]
+    xdat <- mf.x[,-1, drop = FALSE]
     zdat <- mf[, chromoly[[3]], drop = FALSE]
-    
+
     tbw <- npplregbw(xdat = xdat, ydat = ydat, zdat = zdat, ...)
 
     ## clean up (possible) inconsistencies due to recursion ...
