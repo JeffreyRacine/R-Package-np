@@ -1,7 +1,7 @@
 sibandwidth <-
-  function(beta,
-           h,
+  function(beta, h,
            method=c("ichimura","kleinspady"),
+           bwtype = c("fixed","generalized_nn","adaptive_nn"),
            ckertype = c("gaussian", "epanechnikov","uniform"), 
            ckerorder = c(2,4,6,8),
            fval = NA,
@@ -20,7 +20,8 @@ sibandwidth <-
   regtype = "lc"
   method = match.arg(method)
   ckertype = match.arg(ckertype)
-
+  bwtype <- match.arg(bwtype)
+  
   if(missing(ckerorder))
     ckerorder = 2
   else if (ckertype == "uniform")
@@ -60,6 +61,11 @@ sibandwidth <-
     numimp = numimp,
     fval.vector = fval.vector,
     pscaling = "Bandwidth(s)",
+    type = bwtype,
+    ptype = switch( bwtype,
+      fixed = "Fixed",
+      generalized_nn = "Generalized Nearest Neighbour",
+      adaptive_nn = "Adaptive Nearest Neighbour" ),
     ckertype = ckertype,    
     ckerorder = ckerorder,
     pckertype = switch(ckertype,
