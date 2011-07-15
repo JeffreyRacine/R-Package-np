@@ -57,7 +57,7 @@ npplregbw.formula <-
     mf.x <- eval(mf.x,parent.frame())
     
     ydat <- model.response(mf)
-    xdat <- mf.x
+    xdat <- mf.x[,-1, drop = FALSE]
     zdat <- mf[, chromoly[[3]], drop = FALSE]
 
     tbw <- npplregbw(xdat = xdat, ydat = ydat, zdat = zdat, ...)
