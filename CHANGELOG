@@ -1,4 +1,14 @@
-* Fixed bug in jksum.c for adaptive bandwidths and matrix tydat
+* Fixed regression in npindex when gradients=TRUE and errors=TRUE
+
+* Function npindex/npindexbw now accepts additional arguments and
+  implements this properly (i.e. proper implementation by Tristen of
+  Version 0.38-39 change for npindex)
+
+* Function npplreg now supports factors in the parametric part just
+  like lm()
+
+* Fixed bug (malloc error) in jksum.c for adaptive bandwidths and
+  matrix tydat
 
 Changes from Version 0.40-6 to 0.40-7 [8-Jun-2011]
 
@@ -70,7 +80,7 @@ Changes from Version 0.30-9 to 0.40-0 [25-May-2010]
 
 Changes from Version 0.30-8 to 0.30-9 [17-May-2010]
 
-* Fixed issue where ukertype and okertype were being ignored by npscoef
+* Fixed issue where ukertype and okertype were being ignored by npindex
 
 * Fixed regression (dating to version 0.30-4) where random.seed=42 was
   not initialized in functions npcmstest, npdeneqtest, npindexbw,
