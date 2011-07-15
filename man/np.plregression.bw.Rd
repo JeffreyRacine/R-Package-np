@@ -325,7 +325,7 @@ Z <- data.frame(ordered(z1), z2)
 # Compute data-driven bandwidths... this may take a minute or two
 # depending on the speed of your computer...
 
-bw <- npplregbw(formula=y~x1+ordered(x2)|ordered(z1)+z2, tol=.1, ftol=.1)
+bw <- npplregbw(formula=y~x1+ordered(x2)|ordered(z1)+z2)
 
 summary(bw)
 
@@ -333,7 +333,7 @@ summary(bw)
 
 # Note - the default is to use the local constant estimator. If you wish
 # to use instead a local linear estimator, this is accomplished via
-# npplregbw(xdat=X, zdat=Z, ydat=y, regtype="ll", tol=.1, ftol=.1)
+# npplregbw(xdat=X, zdat=Z, ydat=y, regtype="ll")
 
 # Note - see the example for npudensbw() for multiple illustrations
 # of how to change the kernel function, kernel order, and so forth.
@@ -381,13 +381,13 @@ Z <- data.frame(ordered(z1), z2)
 # Compute data-driven bandwidths... this may take a minute or two
 # depending on the speed of your computer...
 
-bw <- npplregbw(xdat=X, zdat=Z, ydat=y, tol=.1, ftol=.1)
+bw <- npplregbw(xdat=X, zdat=Z, ydat=y)
 
 summary(bw)
 
 # Note - the default is to use the local constant estimator. If you wish
 # to use instead a local linear estimator, this is accomplished via
-# npplregbw(xdat=X, zdat=Z, ydat=y, regtype="ll", tol=.1, ftol=.1)
+# npplregbw(xdat=X, zdat=Z, ydat=y, regtype="ll")
 
 # Note - see the example for npudensbw() for multiple illustrations
 # of how to change the kernel function, kernel order, and so forth.

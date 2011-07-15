@@ -451,11 +451,9 @@ Sys.sleep(5)
 
 # If you preferred, say, nearest-neighbor bandwidths and a generalized
 # kernel estimator for the continuous variable, you would use the
-# bwtype="generalized_nn" argument (we override the default tolerances
-# to speed things up a bit - don't of course do this in general).
+# bwtype="generalized_nn" argument.
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bwtype = "generalized_nn",
-                tol=.1, ftol=.1)
+bw <- npudensbw(formula=~ordered(year)+gdp, bwtype = "generalized_nn")
 
 summary(bw)
 
@@ -466,10 +464,9 @@ Sys.sleep(5)
 # Next, compute bandwidths using likelihood cross-validation, fixed
 # bandwidths, and a second order Gaussian kernel for the continuous
 # variable (default).  Note - this may take a few minutes depending on
-# the speed of your computer (we override the default tolerances to
-# speed things up a bit - don't of course do this in general).
+# the speed of your computer.
 
-bw <- npudensbw(formula=~ordered(year)+gdp, tol=.1, ftol=.1)
+bw <- npudensbw(formula=~ordered(year)+gdp)
 
 summary(bw)
 
@@ -481,7 +478,7 @@ Sys.sleep(5)
 # can either provide a vector of bandwidths as in bws=c(...) or a
 # bandwidth object from a previous run, as in
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bws=c(1, 1), tol=.1, ftol=.1)
+bw <- npudensbw(formula=~ordered(year)+gdp, bws=c(1, 1))
 
 summary(bw)
 
@@ -557,10 +554,9 @@ Sys.sleep(5)
 
 # If you preferred, say, nearest-neighbor bandwidths and a generalized
 # kernel estimator for the continuous variable, you would use the
-# bwtype="generalized_nn" argument (we override the default tolerances
-# to speed things up a bit - don't of course do this in general).
+# bwtype="generalized_nn" argument.
 
-bw <- npudensbw(dat=data, bwtype = "generalized_nn", tol=.1, ftol=.1)
+bw <- npudensbw(dat=data, bwtype = "generalized_nn")
 
 summary(bw)
 
@@ -571,10 +567,9 @@ Sys.sleep(5)
 # Next, compute bandwidths using likelihood cross-validation, fixed
 # bandwidths, and a second order Gaussian kernel for the continuous
 # variable (default).  Note - this may take a few minutes depending on
-# the speed of your computer (we override the default tolerances to
-# speed things up a bit - don't of course do this in general).
+# the speed of your computer.
 
-bw <- npudensbw(dat=data, tol=.1, ftol=.1)
+bw <- npudensbw(dat=data)
 
 summary(bw)
 
@@ -586,7 +581,7 @@ Sys.sleep(5)
 # can either provide a vector of bandwidths as in bws=c(...) or a
 # bandwidth object from a previous run, as in
 
-bw <- npudensbw(dat=data, bws=c(1, 1), tol=.1, ftol=.1)
+bw <- npudensbw(dat=data, bws=c(1, 1))
 
 summary(bw)
 

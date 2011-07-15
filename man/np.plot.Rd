@@ -572,13 +572,11 @@ attach(Italy)
 
 data <- data.frame(ordered(year), gdp)
 
-# Compute bandwidths using likelihood cross-validation (default). We
-# override the default tolerances for the search method as the objective
-# function is well-behaved (don't of course do this in general). Note
+# Compute bandwidths using likelihood cross-validation (default). Note
 # that this may take a minute or two depending on the speed of your
 # computer...
 
-bw <- npudensbw(dat=data, tol=.1, ftol=.1)
+bw <- npudensbw(dat=data)
 
 # You can always do things manually, as the following example demonstrates
 
@@ -635,12 +633,7 @@ y <- 1 + x1 + x2 + x3 + x4 + rnorm(n)
 
 X <- data.frame(x1, x2, x3, ordered(x4))
 
-# We override the default tolerances for the search method as the
-# objective function is well-behaved (don't of course do this in
-# general).
-
-bw <- npregbw(xdat=X, ydat=y, regtype="ll",
-              bwmethod="cv.aic", tol=.1, ftol=.1)
+bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic")
 
 npplot(bws=bw)
 

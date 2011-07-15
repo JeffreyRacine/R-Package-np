@@ -196,12 +196,11 @@ npqreg(bws, \dots)
 data("Italy")
 attach(Italy)
 
-# First, compute the likelihood cross-validation bandwidths (default). We
-# override the default tolerances for the search method as the objective
-# function is well-behaved (don't of course do this in general).  Note -
-# this may take a few minutes depending on the speed of your computer...
+# First, compute the likelihood cross-validation bandwidths (default).
+# Note - this may take a few minutes depending on the speed of your
+# computer...
 
-bw <- npcdensbw(formula=gdp~ordered(year), tol=.1, ftol=.1)
+bw <- npcdensbw(formula=gdp~ordered(year))
 
 # Note - numerical search for computing the quantiles will take a
 # minute or so...
@@ -236,12 +235,11 @@ data("Italy")
 attach(Italy)
 data <- data.frame(ordered(year), gdp)
 
-# First, compute the likelihood cross-validation bandwidths (default). We
-# override the default tolerances for the search method as the objective
-# function is well-behaved (don't of course do this in general).  Note -
-# this may take a few minutes depending on the speed of your computer...
+# First, compute the likelihood cross-validation bandwidths (default).
+# Note - this may take a few minutes depending on the speed of your
+# computer...
 
-bw <- npcdensbw(xdat=ordered(year), ydat=gdp, tol=.1, ftol=.1)
+bw <- npcdensbw(xdat=ordered(year), ydat=gdp)
 
 # Note - numerical search for computing the quantiles will take a
 # minute or so...

@@ -244,11 +244,9 @@ data("Italy")
 attach(Italy)
 
 # First, compute the least-squares cross-validated bandwidths for the
-# local constant estimator (default). We override the default tolerances
-# for the search method as the objective function is well-behaved (don't
-# of course do this in general).
+# local constant estimator (default).
 
-bw <- npregbw(formula=gdp~ordered(year), tol=.1, ftol=.1)
+bw <- npregbw(formula=gdp~ordered(year))
 
 # Now take these bandwidths and fit the model and gradients
 
@@ -284,11 +282,9 @@ data("Italy")
 attach(Italy)
 
 # First, compute the least-squares cross-validated bandwidths for the
-# local constant estimator (default). We override the default tolerances
-# for the search method as the objective function is well-behaved (don't
-# of course do this in general).
+# local constant estimator (default).
 
-bw <- npregbw(xdat=ordered(year), ydat=gdp, tol=.1, ftol=.1)
+bw <- npregbw(xdat=ordered(year), ydat=gdp)
 
 # Now take these bandwidths and fit the model and gradients
 
@@ -379,18 +375,13 @@ Sys.sleep(5)
 data("oecdpanel")
 attach(oecdpanel)
 
-# We override the default tolerances for the search method as the
-# objective function is well-behaved (don't of course do this in
-# general).
-
 bw <- npregbw(formula=growth~
               factor(oecd)+
               factor(year)+
               initgdp+
               popgro+
               inv+
-              humancap,
-              tol=.1, ftol=.1)
+              humancap)
 
 npplot(bws=bw, plot.errors.method="asymptotic")
 
@@ -408,11 +399,7 @@ attach(oecdpanel)
 y <- growth
 X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
-# We override the default tolerances for the search method as the
-# objective function is well-behaved (don't of course do this in
-# general).
-
-bw <- npregbw(xdat=X, ydat=y, tol=.1, ftol=.1)
+bw <- npregbw(xdat=X, ydat=y)
 
 npplot(bws=bw, plot.errors.method="asymptotic")
 
@@ -533,8 +520,7 @@ persp(xs, zs, dgp, xlab="x1", ylab="x2", zlab="y", main="True DGP")
 
 # Next, compute a local linear fit and plot that
 
-bw <- npregbw(formula=y~x+z, regtype="ll", bwmethod="cv.aic",
-                       tol=.01, ftol=.01)
+bw <- npregbw(formula=y~x+z, regtype="ll", bwmethod="cv.aic")
 fit <- fitted(npreg(bws=bw, newdata=X.eval))
 fit.mat <- matrix(fit, 30, 30)
 
@@ -583,8 +569,7 @@ persp(xs, zs, dgp, xlab="x1", ylab="x2", zlab="y", main="True DGP")
 
 # Next, compute a local linear fit and plot that
 
-bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic",
-                       tol=.01, ftol=.01)
+bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic")
 fit <- fitted(npreg(exdat=X.eval, bws=bw))
 fit.mat <- matrix(fit, 30, 30)
 

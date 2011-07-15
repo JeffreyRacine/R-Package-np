@@ -245,13 +245,7 @@ model <- lm(growth ~ oecd +
 
 X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
-# Note - we override the default tolerances for the sake of this example
-# (don't of course do this in general). This example may take a few
-# minutes depending on the speed of your computer (data-driven bandwidth
-# selection is, by its nature, time consuming, while the bootstrapping
-# also takes some time).
-
-npcmstest(model = model, xdat = X, ydat = growth, tol=.1, ftol=.1)
+npcmstest(model = model, xdat = X, ydat = growth)
 
 detach(oecdpanel)
 % } % enddontrun

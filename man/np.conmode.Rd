@@ -197,8 +197,7 @@ cm <- table(low, ifelse(fitted(model.logit)>0.5, 1, 0))
 ccr <- sum(diag(cm))/sum(cm)
 
 # Now do the same with a nonparametric model.  Note - this may take a
-# few minutes depending on the speed of your computer... we override the
-# default search tolerances for speed considerations...
+# few minutes depending on the speed of your computer... 
 
 bw <- npcdensbw(formula=factor(low)~factor(smoke)+
                 factor(race)+
@@ -206,8 +205,7 @@ bw <- npcdensbw(formula=factor(low)~factor(smoke)+
                 factor(ui)+
                 ordered(ftv)+
                 age+
-                lwt,
-                tol=.1, ftol=.1)
+                lwt)
 
 model.np <- npconmode(bws=bw)
 
@@ -275,10 +273,9 @@ X <- data.frame(factor(smoke),
 y <- factor(low)
 
 # Note - this may take a few minutes depending on the speed of your
-# computer... we override the default search tolerances for speed
-# considerations...
+# computer... 
 
-bw <- npcdensbw(xdat=X, ydat=y, tol=.1, ftol=.1)
+bw <- npcdensbw(xdat=X, ydat=y)
 
 model.np <- npconmode(bws=bw)
 

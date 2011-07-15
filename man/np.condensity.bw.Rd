@@ -420,14 +420,12 @@ npcdensbw(\dots)
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
 # likelihood cross-validated bandwidths (default) using a second-order
 # Gaussian kernel (default). Note - this may take a minute or two
-# depending on the speed of your computer. We override the default
-# tolerances for the search method as the objective function is
-# well-behaved (don't of course do this in general).
+# depending on the speed of your computer.
 
 data("Italy")
 attach(Italy)
 
-bw <- npcdensbw(formula=gdp~ordered(year), tol=.1, ftol=.1)
+bw <- npcdensbw(formula=gdp~ordered(year))
 
 # The object bw can be used for further estimation using
 # npcdens(), plotting using npplot() etc. Entering the name of
@@ -446,14 +444,12 @@ detach(Italy)
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute the
 # likelihood cross-validated bandwidths (default) using a second-order
 # Gaussian kernel (default). Note - this may take a minute or two
-# depending on the speed of your computer. We override the default
-# tolerances for the search method as the objective function is
-# well-behaved (don't of course do this in general).
+# depending on the speed of your computer.
 
 data("Italy")
 attach(Italy)
 
-bw <- npcdensbw(xdat=ordered(year), ydat=gdp, tol=.1, ftol=.1)
+bw <- npcdensbw(xdat=ordered(year), ydat=gdp)
 
 # The object bw can be used for further estimation using
 # npcdens(), plotting using npplot() etc. Entering the name of

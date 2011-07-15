@@ -208,11 +208,9 @@ npudens(bws, \dots)
 data("Italy")
 attach(Italy)
 
-# Compute bandwidths using likelihood cross-validation (default), but we
-# override the default search tolerances to speed things up as this is a
-# well-behaved dataset (don't of course do this in general).
+# Compute bandwidths using likelihood cross-validation (default).
 
-bw <- npudensbw(formula=~ordered(year)+gdp, tol=.01, ftol=.01)
+bw <- npudensbw(formula=~ordered(year)+gdp)
 
 # At this stage you could use npudens() to do a variety of
 # things. Here we compute the npudens() object and place it in fhat.
@@ -286,11 +284,9 @@ attach(Italy)
 
 data <- data.frame(year=ordered(year), gdp)
 
-# Compute bandwidths using likelihood cross-validation (default), but we
-# override the default search tolerances to speed things up as this is a
-# well-behaved dataset (don't of course do this in general).
+# Compute bandwidths using likelihood cross-validation (default).
 
-bw <- npudensbw(dat=data, tol=.01, ftol=.01)
+bw <- npudensbw(dat=data)
 
 # At this stage you could use npudens() to do a variety of
 # things. Here we compute the npudens() object and place it in fhat.

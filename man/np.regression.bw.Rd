@@ -387,7 +387,7 @@ attach(Italy)
 # Compute the least-squares cross-validated bandwidths for the local
 # constant estimator (default)
 
-bw <- npregbw(formula=gdp~ordered(year), tol=.1, ftol=.1)
+bw <- npregbw(formula=gdp~ordered(year))
 
 summary(bw)
 
@@ -433,7 +433,7 @@ attach(Italy)
 # Compute the least-squares cross-validated bandwidths for the local
 # constant estimator (default)
 
-bw <- npregbw(xdat=ordered(year), ydat=gdp, tol=.1, ftol=.1)
+bw <- npregbw(xdat=ordered(year), ydat=gdp)
 
 summary(bw)
 

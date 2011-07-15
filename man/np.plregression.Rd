@@ -252,12 +252,10 @@ z2 <- rnorm(n)
 
 y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
 
-# First, compute data-driven bandwidths.  We override the default
-# tolerances for the search method as the objective function is
-# well-behaved (don't of course do this in general). This may take a few
-# minutes depending on the speed of your computer...
+# First, compute data-driven bandwidths. This may take a few minutes
+# depending on the speed of your computer...
 
-bw <- npplregbw(formula=y~x1+ordered(x2)|ordered(z1)+z2, tol=.1, ftol=.1)
+bw <- npplregbw(formula=y~x1+ordered(x2)|ordered(z1)+z2)
 
 # Next, compute the partially linear fit
 
@@ -331,12 +329,10 @@ y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
 X <- data.frame(x1, ordered(x2))
 Z <- data.frame(ordered(z1), z2)
 
-# First, compute data-driven bandwidths.  We override the default
-# tolerances for the search method as the objective function is
-# well-behaved (don't of course do this in general). This may take a few
-# minutes depending on the speed of your computer...
+# First, compute data-driven bandwidths. This may take a few minutes
+# depending on the speed of your computer...
 
-bw <- npplregbw(xdat=X, zdat=Z, ydat=y, tol=.1, ftol=.1)
+bw <- npplregbw(xdat=X, zdat=Z, ydat=y)
 
 # Next, compute the partially linear fit
 
