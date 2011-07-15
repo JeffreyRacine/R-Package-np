@@ -441,7 +441,7 @@ summary(bw)
 
 detach(Italy)
 
-\dontrun{
+% \dontrun{
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute the
 # likelihood cross-validated bandwidths (default) using a second-order
@@ -466,7 +466,7 @@ summary(bw)
 # of how to change the kernel function, kernel order, and so forth.
 
 detach(Italy)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}
 

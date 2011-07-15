@@ -238,7 +238,7 @@ fhat <- npcdens(bws=bw)
 
 summary(fhat)
 
-\dontrun{
+% \dontrun{
 
 # Call the npplot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
@@ -491,7 +491,7 @@ persp(x1.seq,
       main="Estimated Nonparametric Probability Perspective", 
       theta=310, 
       phi=25)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}
 

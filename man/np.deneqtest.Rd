@@ -117,7 +117,7 @@ sample.B <- data.frame(x=rchisq(n,df=5))
 
 npdeneqtest(sample.A,sample.B,boot.num=99)
 
-\dontrun{
+% \dontrun{
 ## Mixed datatypes, distributions are equal
 
 sample.A <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
@@ -133,7 +133,7 @@ sample.A <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
 sample.B <- data.frame(a=rnorm(n,sd=10),b=factor(rbinom(n,2,.25)))
 
 npdeneqtest(sample.A,sample.B,boot.num=99)
-} % enddontrun
+% } % enddontrun
 }
 
 \keyword{ nonparametric }

@@ -25,8 +25,6 @@ npindex(bws, \dots)
 \method{npindex}{formula}(bws,
         data = NULL,
         newdata = NULL,
-        ckertype = c("gaussian", "epanechnikov","uniform"), 
-        ckerorder = c(2,4,6,8),
         \dots)
 
 \method{npindex}{call}(bws,
@@ -35,8 +33,6 @@ npindex(bws, \dots)
 \method{npindex}{default}(bws,
         txdat,
         tydat,
-        ckertype = c("gaussian", "epanechnikov","uniform"), 
-        ckerorder = c(2,4,6,8),
         \dots) 
 
 \method{npindex}{sibandwidth}(bws,
@@ -48,8 +44,6 @@ npindex(bws, \dots)
         residuals = FALSE,
         errors = FALSE,
         boot.num = 399,
-        ckertype = c("gaussian", "epanechnikov","uniform"), 
-        ckerorder = c(2,4,6,8),
         \dots)
 }
 
@@ -120,19 +114,6 @@ npindex(bws, \dots)
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
     \code{txdat}. Defaults to the training data used to
     compute the bandwidth object.
-  }
-
-  \item{ckertype}{
-    character string used to specify the continuous kernel type.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
-  }
-
-  \item{ckerorder}{
-    numeric value specifying kernel order (one of
-    \code{(2,4,6,8)}). Kernel order specified along with a
-  \code{uniform} continuous kernel type will be ignored. Defaults to
-  \code{2}.
   }
 
   \item{exdat}{
@@ -268,7 +249,7 @@ model <- npindex(bws=bw, gradients=TRUE)
 
 summary(model)
 
-\dontrun{
+% \dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -523,6 +504,6 @@ persp(x1.seq,
       main="Estimated Semiparametric Probability Perspective", 
       theta=310, 
       phi=25)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}

@@ -391,7 +391,7 @@ bw <- npregbw(formula=gdp~ordered(year), tol=.1, ftol=.1)
 
 summary(bw)
 
-\dontrun{
+% \dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -466,6 +466,6 @@ summary(bw)
 # order, bandwidth type and so forth.
 
 detach(Italy)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}

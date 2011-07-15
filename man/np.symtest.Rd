@@ -160,7 +160,7 @@ Sys.sleep(5)
 y <- rnorm(n)
 npsymtest(y,boot.num=99)
 
-\dontrun{
+% \dontrun{
 
 ## Time-series bootstrap
 
@@ -184,7 +184,7 @@ npsymtest(yt,boot.num=99,boot.method="geom")
 yt <- ar.series(0.5,rnorm(n))
 npsymtest(yt,boot.num=99,boot.method="geom")
 
-} % enddontrun
+% } % enddontrun
 
 }
 \keyword{ univar }

@@ -267,7 +267,7 @@ pl <- npplreg(bws=bw)
 
 summary(pl)
 
-\dontrun{
+% \dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -387,6 +387,6 @@ npplot(bws=bw)
 npplot(bws=bw,
        plot.errors.boot.num=25, 
        plot.errors.method="bootstrap")
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}

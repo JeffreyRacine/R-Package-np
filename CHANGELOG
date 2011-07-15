@@ -1,11 +1,15 @@
+Changes from Version 0.40-7 to 0.40-8 [15-July-2011]
+
+* Fixed issue where calling npplot resets system seed
+
 * Fixed regression in npindex when gradients=TRUE and errors=TRUE
 
 * Function npindex/npindexbw now accepts additional arguments and
   implements this properly (i.e. proper implementation by Tristen of
-  Version 0.38-39 change for npindex)
+  Version 0.30-8/0.30-9 change for npindex)
 
 * Function npplreg now supports factors in the parametric part just
-  like lm()
+  like lm() does
 
 * Fixed bug (malloc error) in jksum.c for adaptive bandwidths and
   matrix tydat
