@@ -632,10 +632,10 @@ npplot <- function(bws = stop("'bws' has not been set"), ..., random.seed = 42){
 
   set.seed(random.seed)
 
-  UseMethod("npplot",bws)
-
   ## Restore seed
-  if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
+  on.exit(if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv))
+
+  UseMethod("npplot",bws)
 }
 
 npplot.rbandwidth <-
