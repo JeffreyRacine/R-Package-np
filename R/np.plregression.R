@@ -33,7 +33,7 @@ npplreg.formula <-
 
     bronze <- lapply(bws$chromoly, paste, collapse = " + ")
 
-    tmf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
+    tmf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]], " -1"),
                                   env = environment(tt))
 
     tmf[["formula"]] <- tt
@@ -41,7 +41,7 @@ npplreg.formula <-
     tmf.x <- eval(tmf.x, envir = environment(tt))
     
     tydat <- model.response(tmf)
-    txdat <- tmf.x[, -1, drop = FALSE]
+    txdat <- tmf.x
     tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
 
     if ((has.eval <- !is.null(newdata))) {
@@ -49,14 +49,14 @@ npplreg.formula <-
         tt <- delete.response(tt)
       
       umf <- emf <- model.frame(tt, data = newdata)
-      emf.x <- model.matrix(as.formula(paste(" ~ ", bronze[[2]]),
+      emf.x <- model.matrix(as.formula(paste(" ~ ", bronze[[2]], " -1"),
                                   env = environment(tt)),
                             data = newdata)
       
       if (has.ey)
         eydat <- model.response(emf)
 
-      exdat <- emf.x[, -1, drop = FALSE]
+      exdat <- emf.x
       ezdat <- emf[, bws$chromoly[[3]], drop = FALSE]
     }
 
