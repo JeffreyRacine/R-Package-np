@@ -214,6 +214,9 @@ double cv_func_regression_categorical_ls_nn(double *vector_scale_factor)
         return(DBL_MAX);
     }
 
+    py = &vector_Y_extern[0];
+    pm = &mean[0];
+
     for(i=0;i<num_obs_train_extern;i++)
     {
         cv += ipow((*py++ - *pm++),2);
