@@ -591,20 +591,7 @@ compute.bootstrap.errors.sibandwidth =
   }
 
 
-
-trim.quantiles = function(dat, trim){
-  if (sign(trim) == sign(-1)){
-    trim = abs(trim)
-    tq = quantile(dat, probs = c(0.0, 0.0+trim, 1.0-trim,1.0))
-    tq = c(2.0*tq[1]-tq[2], 2.0*tq[4]-tq[3])
-  }
-  else {
-    tq = quantile(dat, probs = c(0.0+trim, 1.0-trim))
-  }
-  tq
-}
-
-uocquantile = function(x, prob) {
+uocquantile <- function(x, prob) {
   if (is.ordered(x)){
     tq = unclass(table(x))
     tq = tq / sum(tq)
@@ -619,6 +606,20 @@ uocquantile = function(x, prob) {
     quantile(x, probs = prob)
   }
 }
+
+
+trim.quantiles <- function(dat, trim){
+  if (sign(trim) == sign(-1)){
+    trim <- xabs(trim)
+    tq <- quantile(dat, probs = c(0.0, 0.0+trim, 1.0-trim,1.0))
+    tq <- c(2.0*tq[1]-tq[2], 2.0*tq[4]-tq[3])
+  }
+  else {
+    tq <- quantile(dat, probs = c(0.0+trim, 1.0-trim))
+  }
+  tq
+}
+
 
 
 npplot <- function(bws = stop("'bws' has not been set"), ..., random.seed = 42){
@@ -1876,15 +1877,33 @@ npplot.plbandwidth <-
       stop("one of, but not both, xdat and ydat was specified")
     else if(all(miss.xyz) && !is.null(bws$formula)){
       tt <- terms(bws)
-    m <- match(c("formula", "data", "subset", "na.action"),
+      m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
-    tmf <- bws$call[c(1,m)]
-    tmf[[1]] <- as.name("model.frame")
-    tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf, envir = environment(tt))
 
+      tmf.xf <- tmf.x <- tmf <- bws$call[c(1,m)]
+      tmf.x[[1]] <- as.name("model.matrix")
+      tmf.xf[[1]] <- tmf[[1]] <- as.name("model.frame")
+      tmf[["formula"]] <- tt
+      umf <- tmf <- eval(tmf, envir = environment(tt))
+
+      bronze <- lapply(bws$chromoly, paste, collapse = " + ")
+
+      tmf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
+                                      env = environment(formula))
+      tmf.x <- eval(tmf.x,parent.frame())
+
+      tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
+                                      env = environment(formula))
+      tmf.xf <- eval(tmf.xf,parent.frame())
+      
       ydat <- model.response(tmf)
-      xdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
+      xdat <- as.data.frame(tmf.x[,-1, drop = FALSE])
+      
+      cc <- attr(tmf.x,'assign')[-1]
+    
+      for(i in 1:length(cc))
+        xdat[,i] <- cast(xdat[,i], tmf.xf[,cc[i]], same.levels = FALSE)
+
       zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
     } else {
       if(all(miss.xyz) && !is.null(bws$call)){

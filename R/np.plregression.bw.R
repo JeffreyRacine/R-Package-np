@@ -33,10 +33,11 @@ npplregbw.formula <-
         mf[mc.mf] <- call[mc.call]
     }
 
-    mf.x <- mf
+    mf.xf <- mf.x <- mf
     
     mf[[1]] <- as.name("model.frame")
     mf.x[[1]] <- as.name("model.matrix")
+    mf.xf[[1]] <- as.name("model.frame")
     
     ## mangle formula ...
     chromoly <- explodePipe(mf[["formula"]])
@@ -50,14 +51,25 @@ npplregbw.formula <-
     mf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
                                   env = environment(formula))
 
+    mf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
+                                    env = environment(formula))
+
     mf[["formula"]] <- as.formula(paste(bronze[[1]]," ~ ", bronze[[3]]),
                                   env = environment(formula))
     
     mf <- eval(mf, parent.frame())
     mf.x <- eval(mf.x,parent.frame())
+    mf.xf <- eval(mf.xf,parent.frame())
+
     
     ydat <- model.response(mf)
-    xdat <- mf.x[,-1, drop = FALSE]
+    xdat <- as.data.frame(mf.x[,-1, drop = FALSE])
+
+    cc <- attr(mf.x,'assign')[-1]
+    
+    for(i in 1:length(cc))
+      xdat[,i] <- cast(xdat[,i], mf.xf[,cc[i]], same.levels = FALSE)
+      
     zdat <- mf[, chromoly[[3]], drop = FALSE]
 
     tbw <- npplregbw(xdat = xdat, ydat = ydat, zdat = zdat, ...)

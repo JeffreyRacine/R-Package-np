@@ -26,9 +26,10 @@ npplreg.formula <-
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
-    tmf.x <- tmf <- bws$call[c(1,m)]
+    tmf.xf <- tmf.x <- tmf <- bws$call[c(1,m)]
     
     tmf[[1]] <- as.name("model.frame")
+    tmf.xf[[1]] <- as.name("model.frame")
     tmf.x[[1]] <- as.name("model.matrix")
 
     bronze <- lapply(bws$chromoly, paste, collapse = " + ")
@@ -36,12 +37,22 @@ npplreg.formula <-
     tmf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
                                   env = environment(tt))
 
+    tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
+                                  env = environment(tt))
+
     tmf[["formula"]] <- tt
     umf <- tmf <- eval(tmf, envir = environment(tt))
     tmf.x <- eval(tmf.x, envir = environment(tt))
+    tmf.xf <- eval(tmf.xf, envir = environment(tt))
     
     tydat <- model.response(tmf)
-    txdat <- tmf.x[, -1, drop = FALSE]
+    txdat <- as.data.frame(tmf.x[, -1, drop = FALSE])
+
+    cc <- attr(tmf.x,'assign')[-1]
+    
+    for(i in 1:length(cc))
+      txdat[,i] <- cast(txdat[,i], tmf.xf[,cc[i]], same.levels = FALSE)
+
     tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
 
     if ((has.eval <- !is.null(newdata))) {
@@ -53,10 +64,20 @@ npplreg.formula <-
                                   env = environment(tt)),
                             data = newdata)
       
+      emf.xf <- model.frame(as.formula(paste(" ~ ", bronze[[2]]),
+                                  env = environment(tt)),
+                            data = newdata)
+      
       if (has.ey)
         eydat <- model.response(emf)
 
-      exdat <- emf.x[, -1, drop = FALSE]
+      exdat <- as.data.frame(emf.x[, -1, drop = FALSE])
+
+      cc <- attr(emf.x,'assign')[-1]
+    
+      for(i in 1:length(cc))
+        exdat[,i] <- cast(exdat[,i], emf.xf[,cc[i]], same.levels = FALSE)
+
       ezdat <- emf[, bws$chromoly[[3]], drop = FALSE]
     }
 

@@ -170,18 +170,26 @@ toFrame <- function(frame) {
 }
 
 
-cast <- function(a, b){
-  if (is.ordered(b))
-    ordered(a, levels = levels(b))
-  else if (is.factor(b))
-    factor(a, levels = levels(b))
+cast <- function(a, b, same.levels = TRUE){
+  if(is.ordered(b)){
+    if(same.levels)
+      ordered(a, levels = levels(b))
+    else
+      ordered(a)
+  }   
+  else if(is.factor(b)){
+    if(same.levels)
+      factor(a, levels = levels(b))
+    else
+      factor(a)
+  }
   else if (coarseclass(b) == "numeric")
     as.double(a)
   else if (is.data.frame(b)) {
     if (dim(a)[2] == dim(b)[2]){
       r = data.frame(a)
       for (i in 1: length(b))
-        r[,i] = cast(a[,i],b[,i])
+        r[,i] = cast(a[,i],b[,i], same.levels = same.levels)
       r
     } else { stop("a could not be cast as b") }
   }
