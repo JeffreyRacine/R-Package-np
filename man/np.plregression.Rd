@@ -241,13 +241,13 @@ npplreg(bws, \dots)
 # estimates from the partially linear model with those from a correctly
 # specified parametric model...
 
-set.seed(123)
+set.seed(42)
 
 n <- 250
 x1 <- rnorm(n)
-x2 <- rbinom(n, 5, .3)
+x2 <- rbinom(n, 1, .5)
 
-z1 <- rbinom(n, 2, .3)
+z1 <- rbinom(n, 1, .5)
 z2 <- rnorm(n)
 
 y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
@@ -255,7 +255,7 @@ y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
 # First, compute data-driven bandwidths. This may take a few minutes
 # depending on the speed of your computer...
 
-bw <- npplregbw(formula=y~x1+ordered(x2)|ordered(z1)+z2)
+bw <- npplregbw(formula=y~x1+factor(x2)|factor(z1)+z2)
 
 # Next, compute the partially linear fit
 
@@ -279,7 +279,7 @@ coef(pl, errors = TRUE)
 # Compare the partially linear results to those from a correctly
 # specified model's coefficients for x1 and x2
 
-ols <- lm(y~x1+x2+z1+I(sin(z2)))
+ols <- lm(y~x1+factor(x2)+factor(z1)+I(sin(z2)))
 
 # The intercept is coef()[1], and those for x1 and x2 are coef()[2] and
 # coef()[3]. The standard errors are the square root of the diagonal of
@@ -315,19 +315,19 @@ npplot(bws=bw,
 # estimates from the partially linear model with those from a correctly
 # specified parametric model...
 
-set.seed(123)
+set.seed(42)
 
 n <- 250
 x1 <- rnorm(n)
-x2 <- rbinom(n, 5, .3)
+x2 <- rbinom(n, 1, .5)
 
-z1 <- rbinom(n, 2, .3)
+z1 <- rbinom(n, 1, .5)
 z2 <- rnorm(n)
 
 y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
 
-X <- data.frame(x1, ordered(x2))
-Z <- data.frame(ordered(z1), z2)
+X <- data.frame(x1, factor(x2))
+Z <- data.frame(factor(z1), z2)
 
 # First, compute data-driven bandwidths. This may take a few minutes
 # depending on the speed of your computer...
@@ -354,7 +354,7 @@ coef(pl, errors = TRUE)
 # Compare the partially linear results to those from a correctly
 # specified model's coefficients for x1 and x2
 
-ols <- lm(y~x1+x2+z1+I(sin(z2)))
+ols <- lm(y~x1+factor(x2)+factor(z1)+I(sin(z2)))
 
 # The intercept is coef()[1], and those for x1 and x2 are coef()[2] and
 # coef()[3]. The standard errors are the square root of the diagonal of
