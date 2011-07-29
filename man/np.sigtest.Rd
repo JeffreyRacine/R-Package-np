@@ -202,7 +202,7 @@ bw <- npregbw(formula=y~factor(z)+x1+x2,regtype="ll",bwmethod="cv.aic")
 
 npsigtest(bws=bw)
 
-% \dontrun{
+\dontrun{
 
 # If you wished, you could conduct the test for, say, variables 1 and 3
 # only, as in
@@ -243,6 +243,6 @@ npsigtest(bws=bw)
 # only, as in
 
 npsigtest(bws=bw,index=c(1,3))
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }

@@ -398,7 +398,7 @@ bw <- npudensbw(formula=~ordered(year)+gdp, bwmethod="normal-reference")
 
 summary(bw)
 
-% \dontrun{
+\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -586,6 +586,6 @@ bw <- npudensbw(dat=data, bws=c(1, 1))
 summary(bw)
 
 detach(Italy)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}

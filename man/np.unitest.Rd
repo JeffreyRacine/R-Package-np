@@ -162,14 +162,14 @@ npunitest(x,y,boot.num=99)
 
 Sys.sleep(5)
 
-% \dontrun{
+\dontrun{
 ## Two sample t-test for equality of means
 t.test(x,y)
 ## F test for equality of variances and asymptotic
 ## critical values
 F <- var(x)/var(y)
 qf(c(0.025,0.975),df1=n-1,df2=n-1)
-% } % enddontrun
+} % enddontrun
 
 ## Plot the nonparametric density estimates on the same axes
 

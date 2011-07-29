@@ -332,7 +332,7 @@ bw <- npindexbw(formula=y~x1+x2, method="ichimura")
 
 summary(bw)
 
-% \dontrun{
+\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -405,6 +405,6 @@ X <- cbind(x1, x2)
 bw <- npindexbw(xdat=X, ydat=y, method="kleinspady")
 
 summary(bw)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}

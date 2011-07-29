@@ -329,7 +329,7 @@ bw <- npplregbw(formula=y~x1+factor(x2)|factor(z1)+z2)
 
 summary(bw)
 
-% \dontrun{
+\dontrun{
 
 # Note - the default is to use the local constant estimator. If you wish
 # to use instead a local linear estimator, this is accomplished via
@@ -414,6 +414,6 @@ bw$bw[[2]] # X[,1] on Z
 bw$bw[[2]]$bw[1] <- 0.00054
 
 summary(bw)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}

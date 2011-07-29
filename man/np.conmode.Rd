@@ -221,7 +221,7 @@ summary(model.np)
 
 detach(birthwt)
 
-% \dontrun{
+\dontrun{
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we use the
 # birthweight data taken from the MASS library, and compute a parametric
@@ -290,7 +290,7 @@ ccr
 summary(model.np)
 
 detach(birthwt)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
 

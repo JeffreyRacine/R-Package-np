@@ -222,7 +222,7 @@ fhat <- npudens(bws=bw)
 
 summary(fhat)
 
-% \dontrun{
+\dontrun{
 
 # Next, we illustrate how to create a grid of `evaluation data' and feed
 # it to the perspective plotting routines in R, among others.
@@ -401,7 +401,7 @@ plot(bw, xtrim=-0.2)
 plot(bw, cdf=TRUE)
 
 detach(faithful)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
 

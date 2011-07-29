@@ -254,7 +254,7 @@ model <- npreg(bws = bw, gradients = TRUE)
 
 summary(model)
 
-% \dontrun{
+\dontrun{
 
 # Use plot() to visualize the regression function, add bootstrap
 # error bars, and overlay the data on the same plot.
@@ -577,7 +577,7 @@ screen(2)
 
 persp(xs, zs, fit.mat, xlab="x1", ylab="x2", zlab="y",
       main="Local linear estimate")
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}
 

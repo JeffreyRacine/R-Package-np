@@ -188,7 +188,7 @@ lines(age, fitted(model))
 
 npcmstest(model = model, xdat = age, ydat = logwage)
 
-% \dontrun{
+\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 
@@ -248,6 +248,6 @@ X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 npcmstest(model = model, xdat = X, ydat = growth)
 
 detach(oecdpanel)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }
