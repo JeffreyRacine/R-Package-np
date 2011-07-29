@@ -1,5 +1,5 @@
 Package: np
-Version: 0.40-8
+Version: 0.40-9
 Date: 2011-07-29
 Depends: boot, cubature
 Suggests: quantreg, MASS
