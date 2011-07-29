@@ -1272,7 +1272,7 @@ double *weighted_sum){
   /* Declarations */
 
   int i,j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
-  int do_psum, switch_te; 
+  int do_psum; 
 
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE) && (operator != OP_CONVOLUTION) && (BANDWIDTH_reg == BW_FIXED);
 
@@ -1524,7 +1524,7 @@ double *weighted_sum){
 
     np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
                           matrix_Y, num_var_continuous_extern,
-                          tprod, num_obs_train,
+                          tprod, num_xt,
                           leave_one_out, j,
                           kernel_pow,
                           do_psum,
