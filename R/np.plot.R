@@ -610,7 +610,7 @@ uocquantile <- function(x, prob) {
 
 trim.quantiles <- function(dat, trim){
   if (sign(trim) == sign(-1)){
-    trim <- xabs(trim)
+    trim <- abs(trim)
     tq <- quantile(dat, probs = c(0.0, 0.0+trim, 1.0-trim,1.0))
     tq <- c(2.0*tq[1]-tq[2], 2.0*tq[4]-tq[3])
   }

@@ -19,7 +19,7 @@
 
   A separate local-linear \code{rbandwidth} object (`\code{bw}') has
   been computed for the user's convenience which can be used to
-  visualize this dataset using \code{\link{npplot}(bws=bw)}.
+  visualize this dataset using \code{\link{plot}(bw)}.
   
   \describe{
 

@@ -264,11 +264,11 @@ contour(as.integer(levels(year.seq)),
 
 Sys.sleep(5)
 
-# Alternatively, you could use the npplot() command (<ctrl>-C will
+# Alternatively, you could use the plot() command (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-npplot(bws=bw)
+plot(bw)
 
 detach(Italy)
 
@@ -338,11 +338,11 @@ contour(as.integer(levels(year.seq)),
 
 Sys.sleep(5)
 
-# Alternatively, you could use the npplot() command (<ctrl>-C will
+# Alternatively, you could use the plot() command (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-npplot(bws=bw)
+plot(bw)
 
 detach(Italy)
 
@@ -366,11 +366,11 @@ summary(bw)
 # -0.2 to extend the plot outside the support of the data (i.e., extend
 # the tails of the estimate to meet the horizontal axis).
 
-npplot(bws=bw, xtrim=-0.2)
+plot(bw, xtrim=-0.2)
 
 # Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt)
 
-npplot(bws=bw, cdf=TRUE)
+plot(bw, cdf=TRUE)
 
 detach(faithful)
 
@@ -394,11 +394,11 @@ summary(bw)
 # -0.2 to extend the plot outside the support of the data (i.e., extend
 # the tails of the estimate to meet the horizontal axis).
 
-npplot(bws=bw, xtrim=-0.2)
+plot(bw, xtrim=-0.2)
 
 # Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt)
 
-npplot(bws=bw, cdf=TRUE)
+plot(bw, cdf=TRUE)
 
 detach(faithful)
 % } % enddontrun

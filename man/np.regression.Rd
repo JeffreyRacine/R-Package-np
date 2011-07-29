@@ -256,7 +256,7 @@ summary(model)
 
 % \dontrun{
 
-# Use npplot() to visualize the regression function, add bootstrap
+# Use plot() to visualize the regression function, add bootstrap
 # error bars, and overlay the data on the same plot.
 
 # Note - this may take a minute or two depending on the speed of your
@@ -265,7 +265,7 @@ summary(model)
 # all computations are completed (if you use
 # plot.errors.method="asymptotic" the figure will instantly appear).
 
-npplot(bws=bw, plot.errors.method="bootstrap")
+plot(bw, plot.errors.method="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
 detach(Italy)
@@ -292,7 +292,7 @@ model <- npreg(bws = bw, gradients = TRUE)
 
 summary(model)
 
-# Use npplot() to visualize the regression function, add bootstrap
+# Use plot() to visualize the regression function, add bootstrap
 # error bars, and overlay the data on the same plot.
 
 # Note - this may take a minute or two depending on the speed of your
@@ -301,7 +301,7 @@ summary(model)
 # all computations are completed (if you use
 # plot.errors.method="asymptotic" the figure will instantly appear).
 
-npplot(bws=bw, plot.errors.method="bootstrap")
+plot(bw, plot.errors.method="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
 detach(Italy)
@@ -321,7 +321,7 @@ bw <- npregbw(logwage~age, regtype="ll", bwmethod="cv.aic")
 
 # Next, plot the regression function...
 
-npplot(bws=bw, plot.errors.method="asymptotic")
+plot(bw, plot.errors.method="asymptotic")
 points(age, logwage, cex=.2, col="red")
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -330,7 +330,7 @@ Sys.sleep(5)
 
 # Next, plot the derivative...
 
-npplot(bws=bw, plot.errors.method="asymptotic", gradient=TRUE)
+plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
 
 detach(cps71)
 
@@ -349,7 +349,7 @@ bw <- npregbw(xdat=age, ydat=logwage, regtype="ll", bwmethod="cv.aic")
 
 # Next, plot the regression function...
 
-npplot(bws=bw, plot.errors.method="asymptotic")
+plot(bw, plot.errors.method="asymptotic")
 points(age, logwage, cex=.2, col="red")
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -358,7 +358,7 @@ Sys.sleep(5)
 
 # Next, plot the derivative...
 
-npplot(bws=bw, plot.errors.method="asymptotic", gradient=TRUE)
+plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
 
 detach(cps71)
 
@@ -383,7 +383,7 @@ bw <- npregbw(formula=growth~
               inv+
               humancap)
 
-npplot(bws=bw, plot.errors.method="asymptotic")
+plot(bw, plot.errors.method="asymptotic")
 
 detach(oecdpanel)
 
@@ -401,7 +401,7 @@ X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
 bw <- npregbw(xdat=X, ydat=y)
 
-npplot(bws=bw, plot.errors.method="asymptotic")
+plot(bw, plot.errors.method="asymptotic")
 
 detach(oecdpanel)
 
@@ -438,7 +438,7 @@ bw <- npregbw(formula=len~factor(supp)+ordered(dose))
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-npplot(bws=bw, plot.errors.method="bootstrap", plot.errors.type="quantile")
+plot(bw, plot.errors.method="bootstrap", plot.errors.type="quantile")
 
 detach(ToothGrowth)
 
@@ -477,7 +477,7 @@ bw <- npregbw(X, y)
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-npplot(bws=bw, plot.errors.method="bootstrap", plot.errors.type="quantile")
+plot(bw, plot.errors.method="bootstrap", plot.errors.type="quantile")
 
 detach(ToothGrowth)
 

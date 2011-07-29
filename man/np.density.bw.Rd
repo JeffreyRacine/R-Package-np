@@ -392,7 +392,7 @@ data <- data.frame(ordered(year), gdp)
 # order Gaussian kernel, fixed bandwidths). Note that the bandwidth
 # object you compute inherits all properties of the estimator (kernel
 # type, kernel order, estimation method) and can be fed directly into
-# the plotting utility npplot() or into the npudens() function.
+# the plotting utility plot() or into the npudens() function.
 
 bw <- npudensbw(formula=~ordered(year)+gdp, bwmethod="normal-reference")
 
@@ -498,7 +498,7 @@ data <- data.frame(ordered(year), gdp)
 # order Gaussian kernel, fixed bandwidths). Note that the bandwidth
 # object you compute inherits all properties of the estimator (kernel
 # type, kernel order, estimation method) and can be fed directly into
-# the plotting utility npplot() or into the npudens() function.
+# the plotting utility plot() or into the npudens() function.
 
 bw <- npudensbw(dat=data, bwmethod="normal-reference")
 

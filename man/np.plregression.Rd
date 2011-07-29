@@ -292,10 +292,10 @@ sqrt(diag(vcov(ols)))[2:3]
 
 Sys.sleep(5)
 
-# Plot the regression surfaces via npplot() (i.e., plot the `partial
+# Plot the regression surfaces via plot() (i.e., plot the `partial
 # regression surface plots').
 
-npplot(bws=bw)
+plot(bw)
 
 # Note - to plot regression surfaces with variability bounds constructed
 # from bootstrapped standard errors, use the following (note that this
@@ -305,9 +305,9 @@ npplot(bws=bw)
 # in order to quickly compute standard errors in this instance - don't
 # of course do this in general)
 
-npplot(bws=bw,
-       plot.errors.boot.num=25, 
-       plot.errors.method="bootstrap")
+plot(bw,
+     plot.errors.boot.num=25, 
+     plot.errors.method="bootstrap")
 
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we simulate an
@@ -367,10 +367,10 @@ sqrt(diag(vcov(ols)))[2:3]
 
 Sys.sleep(5)
 
-# Plot the regression surfaces via npplot() (i.e., plot the `partial
+# Plot the regression surfaces via plot() (i.e., plot the `partial
 # regression surface plots').
 
-npplot(bws=bw)
+plot(bw)
 
 # Note - to plot regression surfaces with variability bounds constructed
 # from bootstrapped standard errors, use the following (note that this
@@ -380,9 +380,9 @@ npplot(bws=bw)
 # in order to quickly compute standard errors in this instance - don't
 # of course do this in general)
 
-npplot(bws=bw,
-       plot.errors.boot.num=25, 
-       plot.errors.method="bootstrap")
+plot(bw,
+     plot.errors.boot.num=25, 
+     plot.errors.method="bootstrap")
 % } % enddontrun
 }
 \keyword{nonparametric}

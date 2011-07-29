@@ -18,7 +18,7 @@ dataset \code{"wage"} plus additional objects \code{"bw.all"} and
     Two local-linear \code{rbandwidth} objects (`\code{bw.all}' and
     `\code{bw.subset}') have been computed for the user's convenience
     which can be used to visualize this dataset using
-    \code{\link{npplot}(bws=bw.all)}
+    \code{\link{plot}(bw.all)}
   
 \describe{
     \item{wage}{column 1, of type \code{numeric}, average hourly earnings}

@@ -238,17 +238,17 @@ summary(fhat)
 
 % \dontrun{
 
-# Call the npplot() function to visualize the results (<ctrl>-C will
+# Call the plot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-npplot(bws=bw)
+plot(bw)
 
-# To plot the conditional distribution we use cdf=TRUE in npplot
+# To plot the conditional distribution we use cdf=TRUE in plot
 # (<ctrl>-C will interrupt on *NIX systems, <esc> will interrupt on MS
 # Windows systems)
 
-npplot(bws=bw, cdf=TRUE)
+plot(bw, cdf=TRUE)
 
 detach(Italy)
 
@@ -264,7 +264,7 @@ attach(Italy)
 # First, compute the bandwidths... note that this may take a minute or
 # two depending on the speed of your computer. 
 
-# Note - we cast `X' and `y' as data frames so that npplot() can
+# Note - we cast `X' and `y' as data frames so that plot() can
 # automatically grab names (this looks like overkill, but in
 # multivariate settings you would do this anyway, so may as well get in
 # the habit).
@@ -283,16 +283,16 @@ fhat <- npcdens(bws=bw)
 
 summary(fhat)
 
-# Call the npplot() function to visualize the results (<ctrl>-C will
+# Call the plot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows systems).
 
-npplot(bws=bw)
+plot(bw)
 
-# To plot the conditional distribution we use cdf=TRUE in npplot
+# To plot the conditional distribution we use cdf=TRUE in plot
 # (<ctrl>-C will interrupt on *NIX systems, <esc> will interrupt on MS
 # Windows systems)
 
-npplot(bws=bw, cdf=TRUE)
+plot(bw, cdf=TRUE)
 
 detach(Italy)
 
@@ -314,12 +314,12 @@ summary(bw)
 # Plot the density function (<ctrl>-C will interrupt on *NIX systems,
 # <esc> will interrupt on MS Windows systems).
 
-npplot(bws=bw)
+plot(bw)
 
 # Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt on
 # *NIX systems, <esc> will interrupt on MS Windows systems)
 
-npplot(bws=bw, cdf=TRUE)
+plot(bw, cdf=TRUE)
 
 detach(faithful)
 
@@ -334,7 +334,7 @@ attach(faithful)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-# Note - we cast `X' and `y' as data frames so that npplot() can
+# Note - we cast `X' and `y' as data frames so that plot() can
 # automatically grab names (this looks like overkill, but in
 # multivariate settings you would do this anyway, so may as well get in
 # the habit).
@@ -349,12 +349,12 @@ summary(bw)
 # Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
 # <esc> will interrupt on MS Windows systems)
 
-npplot(bws=bw)
+plot(bw)
 
 # Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt on
 # *NIX systems, <esc> will interrupt on MS Windows systems)
 
-npplot(bws=bw, cdf=TRUE)
+plot(bw, cdf=TRUE)
 
 detach(faithful)
 

@@ -428,7 +428,7 @@ attach(Italy)
 bw <- npcdensbw(formula=gdp~ordered(year))
 
 # The object bw can be used for further estimation using
-# npcdens(), plotting using npplot() etc. Entering the name of
+# npcdens(), plotting using plot() etc. Entering the name of
 # the object provides useful summary information, and names() will also
 # provide useful information.
 
@@ -452,7 +452,7 @@ attach(Italy)
 bw <- npcdensbw(xdat=ordered(year), ydat=gdp)
 
 # The object bw can be used for further estimation using
-# npcdens(), plotting using npplot() etc. Entering the name of
+# npcdens(), plotting using plot() etc. Entering the name of
 # the object provides useful summary information, and names() will also
 # provide useful information.
 
