@@ -368,9 +368,9 @@ set.seed(42)
 
 n <- 250
 x1 <- rnorm(n)
-x2 <- rbinom(n, 5, .3)
+x2 <- rbinom(n, 1, .5)
 
-z1 <- rbinom(n, 2, .3)
+z1 <- rbinom(n, 1, .5)
 z2 <- rnorm(n)
 
 y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
