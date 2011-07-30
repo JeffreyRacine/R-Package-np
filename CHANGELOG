@@ -1,3 +1,7 @@
+Changes from Version 0.40-8 to 0.40-9 [30-July-2011]
+
+* Renamed COPYING file to COPYRIGHTS
+
 Changes from Version 0.40-7 to 0.40-8 [29-July-2011]
 
 * Fixed issue where calling npplot resets system seed
@@ -13,6 +17,9 @@ Changes from Version 0.40-7 to 0.40-8 [29-July-2011]
 
 * Function npplreg now supports factors in the parametric part just
   like lm() does
+
+* Fixed glitch in jksum.c where the use of weights and adaptive bws
+  could segfault.
 
 Changes from Version 0.40-6 to 0.40-7 [8-Jun-2011]
 
