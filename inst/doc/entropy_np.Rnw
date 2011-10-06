@@ -92,7 +92,8 @@ functions are summarized in Table \ref{np function table} below.
 \code{npdeneqtest} &  Nonparametric Test for Equality of Densities & \citet{LI_MAASOUMI_RACINE:2009} \\
 \code{npdeptest} &  Nonparametric Entropy Test for Pairwise Dependence & \citet{MAASOUMI_RACINE:2002} \\
 \code{npsdeptest} & Nonparametric Entropy Test for Serial Nonlinear Dependence& \citet{GRANGER_MAASOUMI_RACINE:2004}\\
-\code{npsymtest} & Nonparametric Entropy Test for Asymmetry& \citet{MAASOUMI_RACINE:2009}\\
+\code{npsymtest} & Nonparametric Entropy Test for Asymmetry&
+\citet{RACINE_MAASOUMI:2007}, \citet{MAASOUMI_RACINE:2009}\\
 \code{npunitest} &  Nonparametric Entropy Test for Univariate Density Equality & \citet{MAASOUMI_RACINE:2002}\\
 \hline
     \end{tabular}
@@ -276,13 +277,14 @@ against the alternative:
   H_{1}:f(y)\ne f(\tilde y)\mbox{ on a set with positive measure}.\nonumber
 \end{equation*}
 
-The function \code{npsymtest} computes the nonparametric metric entropy
-(normalized Hellinger of \citet{GRANGER_MAASOUMI_RACINE:2004})
+The function \code{npsymtest} computes the nonparametric metric
+entropy (normalized Hellinger of \citet{GRANGER_MAASOUMI_RACINE:2004})
 outlined in \citet{MAASOUMI_RACINE:2009} for testing the null of
 symmetry using the densities/probabilities of the data and the rotated
-data, $f(y)$ and $f(\tilde y)$, respectively. $Y$ must be univariate
-and can be a time series, continuous, or even categorical valued so
-long as the outcomes are not character strings.
+data, $f(y)$ and $f(\tilde y)$, respectively, and in
+\citet{RACINE_MAASOUMI:2007}. $Y$ must be univariate and can be a time
+series, continuous, or even categorical valued so long as the outcomes
+are not character strings.
 
 For bootstrapping the null distribution of the statistic, ‘iid’
 conducts simple random resampling, while ‘geom’ conducts stationary
