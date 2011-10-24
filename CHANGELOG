@@ -1,3 +1,8 @@
+Changes from Version 0.40-9 to 0.40-10 [24-Oct-2011]
+
+* Modified Silverman's adaptive measure of spread to reflect changes
+  in sd() (sd on matrix deprecated)
+
 Changes from Version 0.40-8 to 0.40-9 [30-July-2011]
 
 * Renamed COPYING file to COPYRIGHTS

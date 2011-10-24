@@ -1,7 +1,14 @@
-## what is a badord? ... an ordered factor of numeric values
-## to treat them properly one must preserve the numeric value, ie. scale
-## not just their sorted order
-## Actually, the ord/badord paradigm must go, in place of levels caching
+## what is a badord? ... an ordered factor of numeric values to treat
+## them properly one must preserve the numeric value, ie. scale not
+## just their sorted order Actually, the ord/badord paradigm must go,
+## in place of levels caching
+
+matrix.sd <- function(x, na.rm=FALSE) {
+  if(is.matrix(x)) apply(x, 2, sd, na.rm=na.rm)
+  else if(is.vector(x)) sd(x, na.rm=na.rm)
+  else if(is.data.frame(x)) sapply(x, sd, na.rm=na.rm)
+  else sd(as.vector(x), na.rm=na.rm)
+}
 
 npseed <- function(seed){
   .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "np")
@@ -642,19 +649,13 @@ SIGNfunc <- function(y,y.fit) {
   sum(sign(y) == sign(y.fit))/length(y)
 }
 
-## Nov 18, using adaptive measure of spread, modified so that IQR can
-## handle data frames
 
 EssDee <- function(y){
-  t.ret <- numeric(0)
-  if(ifelse(is.vector(y), length(y), prod(dim(y))) > 0){
-    n <- ifelse(is.vector(y), length(y), nrow(y))
-    IQR.vec <- sapply(1:ncol(as.data.frame(y)),function(i){IQR(as.data.frame(y)[,i])})/(qnorm(.25,lower.tail=F)*2)
-    sd.vec <- sd(y)
-    ## April 19 2009 - test for IQR equal to zero
-    t.ret <- ifelse(sd.vec<IQR.vec|IQR.vec==0,sd.vec,IQR.vec)
-  }
-  return(t.ret)
+
+  sd.vec <- apply(as.matrix(y),2,sd)
+  IQR.vec <- apply(as.matrix(y),2,IQR)/(qnorm(.25,lower.tail=F)*2)
+  return(ifelse(sd.vec<IQR.vec|IQR.vec==0,sd.vec,IQR.vec))
+  
 }
 
 ### holding place for some generic methods

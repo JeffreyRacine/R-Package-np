@@ -528,7 +528,7 @@ npindex.sibandwidth <-
           index.gerr[,i] = abs(bws$beta[i])*index.gerr[,i]
 
 
-        index.mgerr = sd(boot.out$t[,2*length(index.eval)+1])
+        index.mgerr = boot.out$t[,2*length(index.eval)+1]
         index.mgerr = abs(bws$beta)*index.mgerr
       }
     }
