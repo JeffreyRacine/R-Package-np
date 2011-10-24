@@ -1,3 +1,7 @@
+Changes from Version 0.40-10 to 0.40-11 [24-Oct-2011]
+
+* Corrected regression in single index errors
+
 Changes from Version 0.40-9 to 0.40-10 [24-Oct-2011]
 
 * Modified Silverman's adaptive measure of spread to reflect changes
