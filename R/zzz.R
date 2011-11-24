@@ -1,5 +1,5 @@
 .onAttach <- function (lib, pkg) {
-	packageStartupMessage("Nonparametric Kernel Methods for Mixed Datatypes (version 0.40-11)", domain = NULL,  appendLF = TRUE)
+	packageStartupMessage("Nonparametric Kernel Methods for Mixed Datatypes (version 0.40-12)", domain = NULL,  appendLF = TRUE)
 
   if(is.null(options('np.messages')$np.messages))
     options(np.messages = TRUE)

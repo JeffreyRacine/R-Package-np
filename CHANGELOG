@@ -1,3 +1,8 @@
+Changes from Version 0.40-11 to 0.40-12 [24-Nov-2011]
+
+* Added option (user request) to hold the bandwidth fixed but optimize
+  the parameters in the single index model
+
 Changes from Version 0.40-10 to 0.40-11 [24-Oct-2011]
 
 * Corrected regression in single index errors
