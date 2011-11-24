@@ -83,7 +83,7 @@ npindexbw.default <-
            ydat = stop("training data ydat missing"),
            bws, bandwidth.compute = TRUE,
            nmulti, random.seed, optim.method, optim.maxattempts,
-           optim.reltol, optim.abstol, optim.maxit, ...){
+           optim.reltol, optim.abstol, optim.maxit, only.optimize.beta, ...){
 
     xdat <- toFrame(xdat)
 
@@ -118,7 +118,7 @@ npindexbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("nmulti","random.seed", "optim.method", "optim.maxattempts",
-               "optim.reltol", "optim.abstol", "optim.maxit")
+               "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta")
     
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
@@ -146,6 +146,7 @@ npindexbw.sibandwidth <-
            optim.reltol = sqrt(.Machine$double.eps),
            optim.abstol = .Machine$double.eps,
            optim.maxit = 500,
+           only.optimize.beta = FALSE,
            ...){
 
     ## Save seed prior to setting
@@ -263,6 +264,8 @@ npindexbw.sibandwidth <-
 
       }
 
+      ichimura.nobw <- function(param,h){ return(ichimura(c(param,h))) }
+
       ## We define ichimura's objective function. Since we normalize beta_1
       ## to equal 1, we only worry about beta_2...beta_k in the index
       ## function for these internals, and when computing the leave-one-out
@@ -331,6 +334,7 @@ npindexbw.sibandwidth <-
 
       }
 
+      kleinspady.nobw <- function(param,h){ return(kleinspady(c(param,h))) }
       ## Now we implement multistarting
 
       fval.min <- .Machine$double.xmax
@@ -340,12 +344,12 @@ npindexbw.sibandwidth <-
       console <- newLineConsole()
 
       if(bws$method == "ichimura"){
-        optim.fn <- ichimura
+        optim.fn <- if(only.optimize.beta) ichimura.nobw else ichimura
         optim.control <- c(abstol=optim.abstol,
                            reltol=optim.reltol,
                            maxit=optim.maxit)
       } else if(bws$method == "kleinspady"){
-        optim.fn <- kleinspady
+        optim.fn <- if(only.optimize.beta) kleinspady.nobw else  kleinspady
         optim.control <- c(reltol=optim.reltol,maxit=optim.maxit)
       }
 
@@ -373,7 +377,7 @@ npindexbw.sibandwidth <-
             else
               beta = bws$beta[2:ncol(xdat)]
           } else { beta = numeric(0) }
-
+          
           if (bws$bw == 0)
             if(IQR(fit) > 0) {
               h <- (4/3)^0.2*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
@@ -387,36 +391,42 @@ npindexbw.sibandwidth <-
 
           beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
           beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
-          if(IQR(fit) > 0) {
-            h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
-          } else {
-            h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
+          if(!only.optimize.beta){
+            if(IQR(fit) > 0) {
+              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
+            } else {
+              h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
+            }
           }
         }
-        
-        suppressWarnings(optim.return <- optim(c(beta,h),fn=optim.fn,gr=NULL,method=optim.method,control=optim.control))
+
+        optim.parm <- if(only.optimize.beta) beta else c(beta,h)
+
+        topt <- parse(text=paste("optim(optim.parm,fn=optim.fn,gr=NULL,method=optim.method,control=optim.control", ifelse(only.optimize.beta, ',h)',')')))        
+        suppressWarnings(optim.return <- eval(topt))
         attempts <- 0
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
           attempts <- attempts + 1
           beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
           beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
-          if(IQR(fit) > 0) {
-            h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
-          } else {
-            h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
+          if(!only.optimize.beta){
+            if(IQR(fit) > 0) {
+              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
+            } else {
+              h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
+            }
           }
           optim.control <- lapply(optim.control,'*',10.0)
-          suppressWarnings(optim.return <- optim(c(beta,h),fn=optim.fn,gr=NULL,method=optim.method,control=optim.control))
+          suppressWarnings(optim.return <- eval(topt))
         }
         
 
         if(optim.return$convergence != 0)
           stop(paste("optim failed to converge after optim.maxattempts = ", optim.maxattempts, " iterations."))
 
-
         fval.value[i] <- optim.return$value       
         if(optim.return$value < fval.min) {        
-          param <- optim.return$par
+          param <- if(only.optimize.beta) c(optim.return$par,h) else optim.return$par
           fval.min <- optim.return$value
           numimp <- numimp + 1
           best <- i
@@ -467,7 +477,8 @@ npindexbw.sibandwidth <-
                        bandwidth = bws$bw,
                        rows.omit = rows.omit,
                        bandwidth.compute = bandwidth.compute,
-                       optim.method = optim.method)
+                       optim.method = optim.method,
+                       only.optimize.beta = only.optimize.beta)
 
 
     bws

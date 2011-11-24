@@ -14,7 +14,9 @@ sibandwidth <-
            ynames = character(1),
            sfactor = NA, bandwidth = NA,
            rows.omit = NA, bandwidth.compute = TRUE,
-           optim.method = "NA", ...){
+           optim.method = "NA",
+           only.optimize.beta = FALSE,
+           ...){
 
   ndim = length(beta)
   regtype = "lc"
@@ -96,6 +98,9 @@ sibandwidth <-
     list(ckertype = ckertype,
          pckertype = mybw$pckertype))
 
+  if(only.optimize.beta)
+    mybw$pmethod <- ifelse(only.optimize.beta, paste("Pilot (bandwidth) +",mybw$pmethod, "(beta)"), mybw$pmethod)
+  
   if(!bandwidth.compute)
     mybw$pmethod <- "Manual"
 
