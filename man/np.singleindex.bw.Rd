@@ -35,6 +35,7 @@ npindexbw(\dots)
           optim.reltol,
           optim.abstol,
           optim.maxit,
+          only.optimize.beta,
           \dots)
 
 \method{npindexbw}{sibandwidth}(xdat = stop("training data xdat missing"),
@@ -48,6 +49,7 @@ npindexbw(\dots)
           optim.reltol = sqrt(.Machine$double.eps),
           optim.abstol = .Machine$double.eps,
           optim.maxit = 500,
+          only.optimize.beta = FALSE,
           \dots)
 
 }
@@ -179,6 +181,11 @@ npindexbw(\dots)
   \item{optim.maxit}{
     maximum number of iterations used by \code{\link{optim}}. Defaults
      to \code{500}.
+   }
+
+   \item{only.optimize.beta}{
+     signals the routine to only minimize the objective function with
+     respect to beta
    }
 
   \item{\dots}{
