@@ -33,8 +33,11 @@ npksum(\dots)
        tydat,
        exdat,
        weights,
-       leave.one.out, kernel.pow, bandwidth.divide,
-       operator, smooth.coefficient,
+       leave.one.out,
+       kernel.pow,
+       bandwidth.divide,
+       operator,
+       smooth.coefficient,
        \dots)
 }
 
