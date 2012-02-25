@@ -6,7 +6,8 @@ export(b.star
        ,npudist
        ,npregbw
        ,npreg
-       ,npregiv       
+       ,npregiv
+       ,npregivderiv              
        ,npplreg
        ,npplregbw
        ,npcdensbw

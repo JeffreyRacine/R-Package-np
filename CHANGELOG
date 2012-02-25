@@ -1,3 +1,11 @@
+Changes from Version 0.40-12 to 0.40-13 [24-Nov-2011]
+
+* Added more passable parameters to npregiv() (multistarting,
+  parameters passed to optim() for cross-validation)
+
+* Added new function npregivderiv() that implements the IV derivative
+  method of Florens and Racine (2012)
+
 Changes from Version 0.40-11 to 0.40-12 [24-Nov-2011]
 
 * Added option (user request) to hold the bandwidth fixed but optimize
