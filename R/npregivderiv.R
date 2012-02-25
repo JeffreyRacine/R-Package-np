@@ -64,7 +64,7 @@ npregivderiv <- function(y,
                          optim.abstol=.Machine$double.eps,
                          optim.maxit=500,
                          iterate.max=100,
-                         iterate.tol=1.0e-05,
+                         iterate.tol=1.0e-04,
                          constant=0.5,
                          start.phi.zero=TRUE,
                          ...) {
@@ -1432,23 +1432,10 @@ npregivderiv <- function(y,
 
     phi.prime <- phi.prime + constant*T.star.mu
 
-    ## If we are below stopping tolerance then break
+    ## If stopping rule criterion increases or we are below stopping
+    ## tolerance then break
 
-    if((norm.stop[j-1]-norm.stop[j]) < iterate.tol) break()
-
-    ## XXX NEED TO BE CONSISTENT WITH CRSIV CODE (BELOW IS NOT). I
-    ## am using relative tolerance as the stopping criterion, not
-    ## the _difference_ in relative tolerance (which oddly I used in
-    ## crsiv???) At least these are marked as beta...
-
-#    if(norm.stop[j] < iterate.tol) break()
-
-    ## If objective increases then break, but in this case phihat
-    ## ought to be phij.m.1
-
-    if(norm.stop[j] > norm.stop[j-1]) {
-      break()
-    }
+    if((norm.stop[j] > norm.stop[j-1]) || norm.stop[j] < iterate.tol) break()
 
   }
 

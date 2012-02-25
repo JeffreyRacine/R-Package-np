@@ -42,7 +42,7 @@ npregiv(y,
         alpha.max = 1e-01,
         alpha.tol = .Machine$double.eps^0.25,
         iterate.max = 100,
-        iterate.tol = 1.0e-05,
+        iterate.tol = 1.0e-04,
         constant = 0.5,
         method = c("Landweber-Fridman","Tikhonov"),
         ...)

@@ -45,7 +45,7 @@ npregiv <- function(y,
                     alpha.max=1.0e-01,
                     alpha.tol=.Machine$double.eps^0.25,
                     iterate.max=100,
-                    iterate.tol=1.0e-05,
+                    iterate.tol=1.0e-04,
                     constant=0.5,
                     method=c("Landweber-Fridman","Tikhonov"),
                     ...) {
@@ -1520,10 +1520,13 @@ npregiv <- function(y,
 
       norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
 
-      ## If objective increases or we are below stopping tolerance then break
+      ## If stopping rule criterion increases or we are below stopping
+      ## tolerance then break
 
-      if((norm.stop[j] > norm.stop[j-1]) || ((norm.stop[j-1]-norm.stop[j]) < iterate.tol)) break()
+#      if((norm.stop[j] > norm.stop[j-1]) || ((norm.stop[j-1]-norm.stop[j]) < iterate.tol)) break()
 
+      if((norm.stop[j] > norm.stop[j-1]) || norm.stop[j] < iterate.tol) break()
+      
     }
 
     console <- printClear(console)

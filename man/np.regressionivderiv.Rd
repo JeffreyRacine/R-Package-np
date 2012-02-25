@@ -32,7 +32,7 @@ npregivderiv(y,
              optim.abstol = .Machine$double.eps,
              optim.maxit = 500,
              iterate.max = 100,
-             iterate.tol = 1.0e-05,
+             iterate.tol = 1.0e-04,
              constant = 0.5,
              start.phi.zero = TRUE,
              ...)
@@ -146,7 +146,7 @@ npregivderiv(y,
 }
 \item{start.phi.zero}{
   a logical value indicating to comments Landweber-Fridman assuming
-  \eqn{\varpphi_{-1}=0}{phi[-1]=0} (default) or instead begin from
+  \eqn{\varphi_{-1}=0}{phi[-1]=0} (default) or instead begin from
   \eqn{E(y|z)}
 }
 \item{...}{
@@ -156,7 +156,7 @@ npregivderiv(y,
 \details{
 
   Note that Landweber-Fridman iteration presumes that
-  \eqn{\varpphi_{-1}=0}{phi[-1]=0}, and so for derivative estimation we
+  \eqn{\varphi_{-1}=0}{phi[-1]=0}, and so for derivative estimation we
   commence iterating from a model having derivatives all equal to
   zero. Given this starting point it may require a fairly large number
   of iterations in order to converge. Other perhaps more reasonable
