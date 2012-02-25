@@ -1071,14 +1071,6 @@ npregivderiv <- function(y,
 
   ## We begin the iteration computing phi.prime.0
 
-  console <- printClear(console)
-  console <- printPop(console)
-  if(is.null(x)) {
-    console <- printPush(paste("Computing optimal smoothing for f(z), S(z) and phi(z) for iteration 1...",sep=""),console)
-  } else {
-    console <- printPush(paste("Computing optimal smoothing  f(z), S(z) and phi(z,x) for iteration 1...",sep=""),console)
-  }
-
   ## Note - here I am only treating the univariate case, so let's
   ## throw a stop with warning for now...
 
@@ -1086,6 +1078,14 @@ npregivderiv <- function(y,
 
   ## For all results we need the density function for Z and the
   ## survivor function for Z (1-CDF of Z)
+
+  console <- printClear(console)
+  console <- printPop(console)
+  if(is.null(x)) {
+    console <- printPush(paste("Computing optimal smoothing for f(z) and S(z) for iteration 1...",sep=""),console)
+  } else {
+    console <- printPush(paste("Computing optimal smoothing  f(z) and S(z) for iteration 1...",sep=""),console)
+  }
 
   ## Let's compute the bandwidth object for the unconditional
   ## density for the moment. Use the normal-reference rule for speed
@@ -1101,6 +1101,14 @@ npregivderiv <- function(y,
   ## npregiv). Here we start with E(Y|Z) rather than zero
 
   if(!start.phi.zero) {
+
+    console <- printClear(console)
+    console <- printPop(console)
+    if(is.null(x)) {
+      console <- printPush(paste("Computing optimal smoothing for E(y|z) for iteration 1...",sep=""),console)
+    } else {
+      console <- printPush(paste("Computing optimal smoothing  for E(y|z,x) for iteration 1...",sep=""),console)
+    }
 
     h <- glpcv(ydat=y,
                xdat=z,
@@ -1136,6 +1144,14 @@ npregivderiv <- function(y,
     ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
     ## term in the series), \mu_{0,i} is Y_i.
 
+    console <- printClear(console)
+    console <- printPop(console)
+    if(is.null(x)) {
+      console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
+    } else {
+      console <- printPush(paste("Computing optimal smoothing  for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
+    }
+
     ## For stopping rule...
     
     hyw <- glpcv(ydat=y,
@@ -1169,6 +1185,14 @@ npregivderiv <- function(y,
     
     mean.mu <- mean(mu)
     
+    console <- printClear(console)
+    console <- printPop(console)
+    if(is.null(x)) {
+      console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
+    } else {
+      console <- printPush(paste("Computing optimal smoothing  for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
+    }
+
     ## Next, we regress require \mu_{0,i} W
     
     hyw <- glpcv(ydat=y,
@@ -1234,6 +1258,14 @@ npregivderiv <- function(y,
   ## the integral with respect to z, so subtract the mean here
 
   phi <- phi - mean(phi) + mean(y)
+
+  console <- printClear(console)
+  console <- printPop(console)
+  if(is.null(x)) {
+    console <- printPush(paste("Computing optimal smoothing for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
+  } else {
+    console <- printPush(paste("Computing optimal smoothing  for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
+  }
 
   ## For the stopping rule, we require E.phi.w
 
@@ -1311,9 +1343,9 @@ npregivderiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     if(is.null(x)) {
-      console <- printPush(paste("Computing optimal smoothing  f(z), S(z) and phi(z) for iteration ", j,"...",sep=""),console)
+      console <- printPush(paste("Computing optimal smoothing  E(phi(z)|w) for iteration ", j,"...",sep=""),console)
     } else {
-      console <- printPush(paste("Computing optimal smoothing  f(z), S(z) and phi(z,x) for iteration ", j,"...",sep=""),console)
+      console <- printPush(paste("Computing optimal smoothing   E(phi(z)|w) for iteration ", j,"...",sep=""),console)
     }
 
     ## NOTE - this presumes univariate z case... in general this would
