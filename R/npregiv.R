@@ -651,7 +651,7 @@ npregiv <- function(y,
         W.eval[i,, drop = FALSE] %*% coef.mat[,i]
       })
       
-      return(list(mean = mhat,grad = t(coef.mat[-1,])))
+      return(list(mean = mhat,grad = as.matrix(t(coef.mat[-1,]))))
       
     }
     
@@ -663,9 +663,9 @@ npregiv <- function(y,
                              degree=NULL,
                              W=NULL,
                              ...) {
-  
+    
     ## Don't think this error checking is robust
-  
+    
     if(is.null(ydat)) stop("Error: You must provide y data")
     if(is.null(xdat)) stop("Error: You must provide X data")  
     if(is.null(W)) stop("Error: You must provide a weighting matrix W")

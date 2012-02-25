@@ -569,7 +569,7 @@ npregivderiv <- function(y,
         W.eval[i,, drop = FALSE] %*% coef.mat[,i]
       })
 
-      return(list(mean = mhat,grad = t(coef.mat[-1,])))
+      return(list(mean = mhat,grad = as.matrix(t(coef.mat[-1,]))))
 
     }
 
@@ -1122,23 +1122,12 @@ npregivderiv <- function(y,
                optim.maxit=optim.maxit,
                ...)
 
-    if(p > 0) {
-      phi.prime <- glpreg(tydat=y,
-                          txdat=z,
-                          exdat=zeval,
-                          bws=h$bw,
-                          degree=rep(p, num.z.numeric),
-                          ...)$grad[1,] ## Note - grad column by row?
-    } else {
-
-      phi.prime <- gradients(npreg(tydat=y,
-                                   txdat=z,
-                                   exdat=zeval,
-                                   bws=h$bw,
-                                   gradients=TRUE,
-                                   ...))[,1]
-
-    }
+    phi.prime <- glpreg(tydat=y,
+                        txdat=z,
+                        exdat=zeval,
+                        bws=h$bw,
+                        degree=rep(p, num.z.numeric),
+                        ...)$grad[,1]
 
     ## Step 1 - begin iteration - for this we require \varphi_0. To
     ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
@@ -1343,9 +1332,9 @@ npregivderiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     if(is.null(x)) {
-      console <- printPush(paste("Computing optimal smoothing  E(phi(z)|w) for iteration ", j,"...",sep=""),console)
+      console <- printPush(paste("Computing optimal smoothing  E(phi|w) for iteration ", j,"...",sep=""),console)
     } else {
-      console <- printPush(paste("Computing optimal smoothing   E(phi(z)|w) for iteration ", j,"...",sep=""),console)
+      console <- printPush(paste("Computing optimal smoothing   E(phi|w) for iteration ", j,"...",sep=""),console)
     }
 
     ## NOTE - this presumes univariate z case... in general this would
