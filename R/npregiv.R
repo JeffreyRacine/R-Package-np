@@ -651,7 +651,7 @@ npregiv <- function(y,
         W.eval[i,, drop = FALSE] %*% coef.mat[,i]
       })
       
-      return(list(mean = mhat,grad = as.matrix(t(coef.mat[-1,]))))
+      return(list(mean = mhat,grad = t(coef.mat[-1,])))
       
     }
     

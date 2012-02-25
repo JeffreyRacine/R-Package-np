@@ -569,7 +569,7 @@ npregivderiv <- function(y,
         W.eval[i,, drop = FALSE] %*% coef.mat[,i]
       })
 
-      return(list(mean = mhat,grad = as.matrix(t(coef.mat[-1,]))))
+      return(list(mean = mhat,grad = t(coef.mat[-1,])))
 
     }
 
@@ -1122,12 +1122,33 @@ npregivderiv <- function(y,
                optim.maxit=optim.maxit,
                ...)
 
-    phi.prime <- glpreg(tydat=y,
-                        txdat=z,
-                        exdat=zeval,
-                        bws=h$bw,
-                        degree=rep(p, num.z.numeric),
-                        ...)$grad[,1]
+    if(p == 0) {
+
+      phi.prime <- gradients(npreg(tydat=y,
+                                   txdat=z,
+                                   exdat=zeval,
+                                   bws=h$bw,
+                                   gradients=TRUE))[,1]
+
+    } else {
+
+      grad.object <- glpreg(tydat=y,
+                            txdat=z,
+                            exdat=zeval,
+                            bws=h$bw,
+                            degree=rep(p, num.z.numeric),
+                            ...)$grad
+
+      ## Not sure why this object switches rows and columns, but too
+      ## some time to track down (waste!).
+
+      if(p == 1) {
+        phi.prime <- grad.object[1,]
+      } else {
+        phi.prime <- grad.object[,1]
+      }
+
+    }
 
     ## Step 1 - begin iteration - for this we require \varphi_0. To
     ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
