@@ -34,6 +34,7 @@ npregivderiv(y,
              iterate.max = 100,
              iterate.tol = 1.0e-05,
              constant = 0.5,
+             start.phi.zero = TRUE,
              ...)
 }
 \arguments{
@@ -135,19 +136,38 @@ npregivderiv(y,
    }
 \item{iterate.max}{
   an integer indicating the maximum number of iterations permitted
-  before termination occurs when using \code{method="Landweber-Fridman"}.
+  before termination occurs for Landweber-Fridman iteration
 }
 \item{iterate.tol}{
-  the search tolerance for the stopping rule when using \code{method="Landweber-Fridman"}.
+  the search tolerance for the stopping rule for Landweber-Fridman iteration
 }
 \item{constant}{
-  the constant to use when using  \code{method="Landweber-Fridman"}.
+  the constant to use for Landweber-Fridman iteration
+}
+\item{start.phi.zero}{
+  a logical value indicating to comments Landweber-Fridman assuming
+  \eqn{\varpphi_{-1}=0}{phi[-1]=0} (default) or instead begin from
+  \eqn{E(y|z)}
 }
 \item{...}{
   additional arguments supplied to \code{\link{npksum}}.
 }
 }
 \details{
+
+  Note that Landweber-Fridman iteration presumes that
+  \eqn{\varpphi_{-1}=0}{phi[-1]=0}, and so for derivative estimation we
+  commence iterating from a model having derivatives all equal to
+  zero. Given this starting point it may require a fairly large number
+  of iterations in order to converge. Other perhaps more reasonable
+  starting values might present themselves. When \code{start.phi.zero}
+  is set to \code{FALSE} iteration will commence instead using
+  derivatives from the conditional mean model \eqn{E(y|z)}. Should the
+  default iteration terminate quickly or you are concerned about your
+  results, it would be prudent to verify that this alternative starting
+  value produces the same result. Also, check the norm.stop vector for
+  any anomalies (such as the error criterion increasing immediately).
+  
   Landweber-Fridman iteration uses an optimal stopping rule based upon
   \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2 }{||E(y|w)-E(phi(z,x)|w)||^2
   }. However, if insufficient training is conducted the estimates can be
@@ -218,8 +238,8 @@ This function should be considered to be in `beta test' status until further not
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
 
-set.seed(42)
-n <- 1500
+set.seed(24)
+n <- 1000
 
 ## The DGP is as follows:
 
@@ -263,16 +283,16 @@ phi <- fun1
 
 ivdata <- data.frame(y,z,w,u,v)
 ivdata <- ivdata[order(ivdata$z),]
-rm(y,z,w,u.v)
+rm(y,z,w,u,v)
 attach(ivdata)
 
-model.iv <- npregivderiv(y=y,z=z,w=w)
-phihat.iv <- model.iv$phihat
+model.ivderiv <- npregivderiv(y=y,z=z,w=w)
+phihat.ivderiv <- model.ivderiv$phihat
 
-ylim <-c(quantile(c(gradients(model),output$phi.prime),trim),
-         quantile(c(gradients(model),output$phi.prime),1-trim))
+ylim <-c(quantile(model.ivderiv$phi.prime,trim),
+         quantile(model.ivderiv$phi.prime,1-trim))
 
-plot(z,output$phi.prime,
+plot(z,model.ivderiv$phi.prime,
      xlim=quantile(z,c(trim,1-trim)),
      main="",
      ylim=ylim,

@@ -66,6 +66,7 @@ npregivderiv <- function(y,
                          iterate.max=100,
                          iterate.tol=1.0e-05,
                          constant=0.5,
+                         start.phi.zero=TRUE,
                          ...) {
 
   ## First internal to this function we adopt the identical code in
@@ -1036,7 +1037,7 @@ npregivderiv <- function(y,
   if(optim.reltol <= 0) stop("optim.reltol must be positive")
   if(optim.abstol <= 0) stop("optim.abstol must be positive")
   if(optim.maxit <= 0) stop("optim.maxit must be a positive integer")
-  if(iterate.max < 2) stop("iterate.max must be a positive integer")
+  if(iterate.max < 2) stop("iterate.max must be at least 2")
   if(iterate.tol <= 0) stop("iterate.tol must be positive")
   if(constant <= 0 || constant >= 1) stop("constant must lie in the range (0,1)")
 
@@ -1086,33 +1087,24 @@ npregivderiv <- function(y,
   ## For all results we need the density function for Z and the
   ## survivor function for Z (1-CDF of Z)
 
-  cat(paste("\rIteration ", 1, " of at most ", iterate.max,sep=""))
-
   ## Let's compute the bandwidth object for the unconditional
   ## density for the moment. Use the normal-reference rule for speed
   ## considerations.
 
   bw <- npudensbw(dat=z,bwmethod="normal-reference")
   model.fz <- npudens(tdat=z,bws=bw)
-  f.z <- predict(model.fz,newdata=evaldata)
+  f.z <- predict(model.fz,newdata=zeval)
   model.Sz <- npudist(tdat=z,bws=bw)
-  S.z <- 1-predict(model.Sz,newdata=evaldata)
+  S.z <- 1-predict(model.Sz,newdata=zeval)
 
-  ## Step 1 - begin iteration - for this we require \varphi_0. To
-  ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
-  ## term in the series), \mu_{0,i} is Y_i.
+  ## Potential alternative starting rule (consistent with
+  ## npregiv). Here we start with E(Y|Z) rather than zero
 
-  mu <- y
+  if(!start.phi.zero) {
 
-  ## We also require the mean of \miu_{0,i}
-
-  mean.mu <- mean(mu)
-
-  ## Next, we regress require \mu_{0,i} W
-
-  hyw <- glpcv(ydat=y,
-               xdat=w,
-               degree=rep(p, num.w.numeric),
+    h <- glpcv(ydat=y,
+               xdat=z,
+               degree=rep(p, num.z.numeric),
                nmulti=nmulti,
                random.seed=random.seed,
                optim.maxattempts=optim.maxattempts,
@@ -1122,43 +1114,114 @@ npregivderiv <- function(y,
                optim.maxit=optim.maxit,
                ...)
 
-  E.y.w <- glpreg(tydat=mu,
-                  txdat=w,
-                  exdat=weval,
-                  bws=hyw$bw,
-                  degree=rep(p, num.w.numeric),
-                  ...)$mean
+    if(p > 0) {
+      phi.prime <- glpreg(tydat=y,
+                          txdat=z,
+                          exdat=zeval,
+                          bws=h$bw,
+                          degree=rep(p, num.z.numeric),
+                          ...)$grad[1,] ## Note - grad column by row?
+    } else {
 
-  ## We require the mean of the fitted values
+      phi.prime <- gradients(npreg(tydat=y,
+                                   txdat=z,
+                                   exdat=zeval,
+                                   bws=h$bw,
+                                   gradients=TRUE,
+                                   ...))[,1]
 
-  mean.predicted.E.mu.w <- mean(E.y.w)
+    }
 
-  ## We need the mean of the fitted values for this (we readily
-  ## compute the CDF not the survivor, so anything that is weighted
-  ## by the survivor kernel can be expressed as the mean of that
-  ## being weighted minus the weighting using the CDF kernel).
-  ## Next, we need the weighted sum of the survivor kernel where the
-  ## weights are E[\mu_{0,i}|W]. We can write this as the mean of the
-  ## \mu_{0,i} minus the weighted sum using the CDF kernel, i.e. if
-  ## K is a CDF kernel, then n^{-1}\sum_j \bar K() \mu_{0,i} =
-  ## n^{-1}\sum_j (1- K()) \mu_{0,i} = n^{-1}\sum_j\mu_{0,i}-
-  ## n^{-1}\sum_j K() \mu_{0,i}
+    ## Step 1 - begin iteration - for this we require \varphi_0. To
+    ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
+    ## term in the series), \mu_{0,i} is Y_i.
 
-  ## Now we compute T^* applied to E.y.w, and this is phi.prime.0 for
-  ## j=0.
+    ## For stopping rule...
+    
+    hyw <- glpcv(ydat=y,
+                 xdat=w,
+                 degree=rep(p, num.w.numeric),
+                 nmulti=nmulti,
+                 random.seed=random.seed,
+                 optim.maxattempts=optim.maxattempts,
+                 optim.method=optim.method,
+                 optim.reltol=optim.reltol,
+                 optim.abstol=optim.abstol,
+                 optim.maxit=optim.maxit,
+                 ...)
+    
+    E.y.w <- glpreg(tydat=y,
+                    txdat=w,
+                    exdat=weval,
+                    bws=hyw$bw,
+                    degree=rep(p, num.w.numeric),
+                    ...)$mean
 
-  ## CDF weighted sum (but we need survivor weighted sum...)
+  } else {
+    
+    ## Step 1 - begin iteration - for this we require \varphi_0. To
+    ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
+    ## term in the series), \mu_{0,i} is Y_i.
+    
+    mu <- y
+    
+    ## We also require the mean of \miu_{0,i}
+    
+    mean.mu <- mean(mu)
+    
+    ## Next, we regress require \mu_{0,i} W
+    
+    hyw <- glpcv(ydat=y,
+                 xdat=w,
+                 degree=rep(p, num.w.numeric),
+                 nmulti=nmulti,
+                 random.seed=random.seed,
+                 optim.maxattempts=optim.maxattempts,
+                 optim.method=optim.method,
+                 optim.reltol=optim.reltol,
+                 optim.abstol=optim.abstol,
+                 optim.maxit=optim.maxit,
+                 ...)
+    
+    E.y.w <- glpreg(tydat=mu,
+                    txdat=w,
+                    exdat=weval,
+                    bws=hyw$bw,
+                    degree=rep(p, num.w.numeric),
+                    ...)$mean
+    
+    ## We require the mean of the fitted values
+    
+    mean.predicted.E.mu.w <- mean(E.y.w)
+    
+    ## We need the mean of the fitted values for this (we readily
+    ## compute the CDF not the survivor, so anything that is weighted
+    ## by the survivor kernel can be expressed as the mean of that
+    ## being weighted minus the weighting using the CDF kernel).
+    ## Next, we need the weighted sum of the survivor kernel where the
+    ## weights are E[\mu_{0,i}|W]. We can write this as the mean of the
+    ## \mu_{0,i} minus the weighted sum using the CDF kernel, i.e. if
+    ## K is a CDF kernel, then n^{-1}\sum_j \bar K() \mu_{0,i} =
+    ## n^{-1}\sum_j (1- K()) \mu_{0,i} = n^{-1}\sum_j\mu_{0,i}-
+    ## n^{-1}\sum_j K() \mu_{0,i}
+    
+    ## Now we compute T^* applied to E.y.w, and this is phi.prime.0 for
+    ## j=0.
+    
+    ## CDF weighted sum (but we need survivor weighted sum...)
+    
+    cdf.weighted.average <- npksum(txdat=z,
+                                   exdat=zeval,
+                                   tydat=as.matrix(E.y.w),
+                                   operator="integral",
+                                   bws=bw$bw)$ksum/length(y)
+    
+    survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
-  cdf.weighted.average <- npksum(txdat=z,
-                                 exdat=zeval,
-                                 tydat=as.matrix(E.y.w),
-                                 operator="integral",
-                                 bws=bw$bw)$ksum/length(y)
+    phi.prime <- (survivor.weighted.average - S.z*mean.mu)/f.z
 
-  survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
-
-  phi.prime <- (survivor.weighted.average - S.z*mean.mu)/f.z
-
+  }  
+  
   ## Now we can compute phi.0 by integrating phi.prime.0 up to each
   ## sample realization (here we use the trapezoidal rule)
 
@@ -1197,6 +1260,9 @@ npregivderiv <- function(y,
   norm.stop <- numeric()
 
   norm.stop[1] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
+
+#  plot(w[,1],E.y.w,col="red")
+#  points(w[,1],E.phi.w,col="red")  
 
   ## Now we compute mu.0 (a residual of sorts)
 
@@ -1240,11 +1306,7 @@ npregivderiv <- function(y,
 
   ## This we iterate...
 
-  par(mfrow=c(1,2))
-
   for(j in 2:iterate.max) {
-
-    cat(paste("\rIteration ", j, " of at most ", iterate.max,sep=""))
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1288,6 +1350,9 @@ npregivderiv <- function(y,
 
     norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
 
+#    plot(w[,1],E.y.w,col="red")
+#    points(w[,1],E.phi.w,col="red")  
+
     ## Now we compute mu.0 (a residual of sorts)
 
     mu <- y - phi
@@ -1320,20 +1385,21 @@ npregivderiv <- function(y,
 
     T.star.mu <- (survivor.weighted.average-S.z*mean.mu)/f.z
 
-    ## Now we update, this provides phi.prime.1, and now we can iterate until convergence...
+    ## Now we update, this provides phi.prime.1, and now we can
+    ## iterate until convergence...
 
     phi.prime <- phi.prime + constant*T.star.mu
 
     ## If we are below stopping tolerance then break
 
-#      if((norm.stop[j-1]-norm.stop[j]) < iterate.tol) break()
+    if((norm.stop[j-1]-norm.stop[j]) < iterate.tol) break()
 
     ## XXX NEED TO BE CONSISTENT WITH CRSIV CODE (BELOW IS NOT). I
     ## am using relative tolerance as the stopping criterion, not
     ## the _difference_ in relative tolerance (which oddly I used in
     ## crsiv???) At least these are marked as beta...
 
-    if(norm.stop[j] < iterate.tol) break()
+#    if(norm.stop[j] < iterate.tol) break()
 
     ## If objective increases then break, but in this case phihat
     ## ought to be phij.m.1
