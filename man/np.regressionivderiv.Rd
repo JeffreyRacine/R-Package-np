@@ -2,7 +2,7 @@
 \alias{npregivderiv}
 
 \title{
-Nonparametric Instrumental Regression Partial Derivative
+Nonparametric Instrumental Regression Partial Derivative Estimation
 }
 \description{
 \code{npregivderiv} uses the approach of Florens and Racine (2012) to
