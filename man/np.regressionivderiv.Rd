@@ -257,9 +257,9 @@ This function should be considered to be in `beta test' status until further not
 set.seed(42)
 n <- 1500
 
-## For trimming the plot
+## For trimming the plot (trim .5\% from each tail)
 
-trim <- 0.0025
+trim <- 0.005
 
 ## The DGP is as follows:
 
