@@ -261,7 +261,7 @@ This function should be considered to be in `beta test' status until further not
 }
 
 \seealso{
-\code{\link{npreg}}
+\code{\link{npregivderiv},\link{npreg}}
 }
 \examples{
 \dontrun{

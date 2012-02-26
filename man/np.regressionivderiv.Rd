@@ -11,9 +11,9 @@ instrumental regression function \eqn{\varphi}{phi} defined by
 conditional moment restrictions stemming from a structural econometric
 model: \eqn{E [Y - \varphi (Z,X) | W ] = 0}{E [Y - phi (Z,X) | W ] = 0},
 and involving endogenous variables \eqn{Y} and \eqn{Z} and exogenous
-variables \eqn{X} and instruments \eqn{W}. The function
+variables \eqn{X} and instruments \eqn{W}. The derivative function
 \eqn{\varphi'}{phi'} is the solution of an ill-posed inverse problem,
-and used Landweber-Fridman regularization.
+and is computed using Landweber-Fridman regularization.
 }
 \usage{
 npregivderiv(y,
@@ -200,7 +200,7 @@ npregivderiv(y,
   starts rising.  }
 
 \value{ \code{npregivderiv} returns a list with components
-  \code{phihat}, \code{phi}, \code{num.iterations} and \code{norm.stop}.
+  \code{phi.prime}, \code{phi}, \code{num.iterations} and \code{norm.stop}.
 }
 
 \references{
@@ -214,12 +214,12 @@ npregivderiv(y,
   Darolles, S. and Y. Fan and J.P. Florens and E. Renault (forthcoming),
   \dQuote{Nonparametric Instrumental Regression,} Econometrica.
 
-  Florens, J.P. and J.S. Racine (2012), \dQuote{Nonparametric
-  Instrumental Variables Estimation of Marginal Effects,} Working Paper.
-
   Feve, F. and J.P. Florens (2010), \dQuote{The practice of
   non-parametric estimation by solving inverse problems: the example of
   transformation models,} Econometrics Journal, 13, S1-S27.
+
+  Florens, J.P. and J.S. Racine (2012), \dQuote{Nonparametric
+  Instrumental Variables Estimation of Marginal Effects,} Working Paper.
 
   Fridman, V. M. (1956), \dQuote{A Method of Successive Approximations
   for Fredholm Integral Equations of the First Kind,} Uspeskhi,
@@ -247,7 +247,7 @@ This function should be considered to be in `beta test' status until further not
 }
 
 \seealso{
-\code{\link{npreg}}
+\code{\link{npregiv},\link{npreg}}
 }
 \examples{
 \dontrun{
@@ -255,7 +255,7 @@ This function should be considered to be in `beta test' status until further not
 ## <samuele.centorrino@univ-tlse1.fr>
 
 set.seed(42)
-n <- 1000
+n <- 1500
 
 ## For trimming the plot
 
@@ -306,8 +306,7 @@ ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w,u,v)
 attach(ivdata)
 
-model.ivderiv <- npregivderiv(y=y,z=z,w=w,start.phi.zero=FALSE)
-phihat.ivderiv <- model.ivderiv$phihat
+model.ivderiv <- npregivderiv(y=y,z=z,w=w)
 
 ylim <-c(quantile(model.ivderiv$phi.prime,trim),
          quantile(model.ivderiv$phi.prime,1-trim))
@@ -320,6 +319,7 @@ plot(z,model.ivderiv$phi.prime,
      ylab="Derivative",
      type="l",
      lwd=2)
+rug(z)     
 } % enddontrun
 }
 \keyword{ instrument }
