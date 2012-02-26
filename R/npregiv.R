@@ -48,6 +48,7 @@ npregiv <- function(y,
                     iterate.tol=1.0e-04,
                     constant=0.5,
                     method=c("Landweber-Fridman","Tikhonov"),
+                    stop.on.increase=TRUE,
                     ...) {
 
   ## This function was constructed initially by Samuele Centorrino
@@ -1111,6 +1112,8 @@ npregiv <- function(y,
   console <- newLineConsole()
     
   ## Basic error checking
+
+  if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")  
   
   if(missing(y)) stop("You must provide y")
   if(missing(z)) stop("You must provide z")
@@ -1523,9 +1526,8 @@ npregiv <- function(y,
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
 
-#      if((norm.stop[j] > norm.stop[j-1]) || ((norm.stop[j-1]-norm.stop[j]) < iterate.tol)) break()
-
-      if((norm.stop[j] > norm.stop[j-1]) || norm.stop[j] < iterate.tol) break()
+      if(norm.stop[j] < iterate.tol) break()
+      if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) break()
       
     }
 

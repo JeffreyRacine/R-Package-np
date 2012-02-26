@@ -34,7 +34,9 @@ npregivderiv(y,
              iterate.max = 100,
              iterate.tol = 1.0e-04,
              constant = 0.5,
-             start.phi.zero = TRUE,
+             start.phi.zero = FALSE,
+             smooth.while.iterating = TRUE,
+             stop.on.increase = TRUE,
              ...)
 }
 \arguments{
@@ -145,14 +147,28 @@ npregivderiv(y,
   the constant to use for Landweber-Fridman iteration
 }
 \item{start.phi.zero}{
-  a logical value indicating to comments Landweber-Fridman assuming
-  \eqn{\varphi_{-1}=0}{phi[-1]=0} (default) or instead begin from
-  \eqn{E(y|z)}
+  a logical value indicating whether to commence Landweber-Fridman
+  assuming \eqn{\varphi_{-1}=0}{phi[-1]=0} (proper Landweber-Fridman) or
+  instead begin from \eqn{E(y|z)} (defaults to \code{FALSE}, see details
+  below)
 }
-\item{...}{
+\item{smooth.while.iterating}{
+  a logical value indicating whether to re-smooth
+  \eqn{E(\varphi|w)}{E(phi|w)} during Landweber-Fridman iteration
+  (defaults to \code{TRUE})
+}
+\item{stop.on.increase}{
+  a logical value (defaults to \code{TRUE}) indicating whether to halt
+  iteration if the stopping criterion (see below) increases over the
+  course of one iteration (i.e. it may be above the iteration tolerance
+  but increased)
+}
+\item{...}{ 
   additional arguments supplied to \code{\link{npksum}}.
 }
+
 }
+
 \details{
 
   Note that Landweber-Fridman iteration presumes that
@@ -238,8 +254,12 @@ This function should be considered to be in `beta test' status until further not
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
 
-set.seed(24)
+set.seed(42)
 n <- 1000
+
+## For trimming the plot
+
+trim <- 0.0025
 
 ## The DGP is as follows:
 
@@ -286,7 +306,7 @@ ivdata <- ivdata[order(ivdata$z),]
 rm(y,z,w,u,v)
 attach(ivdata)
 
-model.ivderiv <- npregivderiv(y=y,z=z,w=w)
+model.ivderiv <- npregivderiv(y=y,z=z,w=w,start.phi.zero=FALSE)
 phihat.ivderiv <- model.ivderiv$phihat
 
 ylim <-c(quantile(model.ivderiv$phi.prime,trim),

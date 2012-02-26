@@ -66,7 +66,9 @@ npregivderiv <- function(y,
                          iterate.max=100,
                          iterate.tol=1.0e-04,
                          constant=0.5,
-                         start.phi.zero=TRUE,
+                         start.phi.zero=FALSE,
+                         smooth.while.iterating=TRUE,
+                         stop.on.increase=TRUE,
                          ...) {
 
   ## First internal to this function we adopt the identical code in
@@ -1030,10 +1032,15 @@ npregivderiv <- function(y,
 
   ## Basic error checking
 
+  if(!is.logical(start.phi.zero)) stop("start.phi.zero must be logical (TRUE/FALSE)")
+  if(!is.logical(smooth.while.iterating)) stop("smooth.while.iterating must be logical (TRUE/FALSE)")
+  if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")  
+
+  optim.method <- match.arg(optim.method)
+
   if(p < 0) stop("The order of the local polynomial must be a positive integer")
   if(nmulti < 1) stop("The number of multistarts must be a positive integer")
   if(optim.maxattempts < 1) stop("The maximum number of optim attempts must be a positive integer")
-  optim.method <- match.arg(optim.method)
   if(optim.reltol <= 0) stop("optim.reltol must be positive")
   if(optim.abstol <= 0) stop("optim.abstol must be positive")
   if(optim.maxit <= 0) stop("optim.maxit must be a positive integer")
@@ -1350,12 +1357,22 @@ npregivderiv <- function(y,
 
   for(j in 2:iterate.max) {
 
-    console <- printClear(console)
-    console <- printPop(console)
-    if(is.null(x)) {
-      console <- printPush(paste("Computing optimal smoothing  E(phi|w) for iteration ", j,"...",sep=""),console)
+    if(smooth.while.iterating) {
+      console <- printClear(console)
+      console <- printPop(console)
+      if(is.null(x)) {
+        console <- printPush(paste("Computing optimal smoothing  E(phi|w) for iteration ", j,"...",sep=""),console)
+      } else {
+        console <- printPush(paste("Computing optimal smoothing   E(phi|w) for iteration ", j,"...",sep=""),console)
+      }
     } else {
-      console <- printPush(paste("Computing optimal smoothing   E(phi|w) for iteration ", j,"...",sep=""),console)
+      console <- printClear(console)
+      console <- printPop(console)
+      if(is.null(x)) {
+        console <- printPush(paste("Computing E(phi|w) for iteration ", j,"...",sep=""),console)
+      } else {
+        console <- printPush(paste("Computing E(phi|w) for iteration ", j,"...",sep=""),console)
+      }
     }
 
     ## NOTE - this presumes univariate z case... in general this would
@@ -1370,17 +1387,21 @@ npregivderiv <- function(y,
 
     ## For the stopping rule, we require E.phi.w
 
-    h.E.phi.w <- glpcv(ydat=phi,
-                       xdat=w,
-                       degree=rep(p, num.w.numeric),
-                       nmulti=nmulti,
-                       random.seed=random.seed,
-                       optim.maxattempts=optim.maxattempts,
-                       optim.method=optim.method,
-                       optim.reltol=optim.reltol,
-                       optim.abstol=optim.abstol,
-                       optim.maxit=optim.maxit,
-                       ...)
+    if(smooth.while.iterating) {
+
+      h.E.phi.w <- glpcv(ydat=phi,
+                         xdat=w,
+                         degree=rep(p, num.w.numeric),
+                         nmulti=nmulti,
+                         random.seed=random.seed,
+                         optim.maxattempts=optim.maxattempts,
+                         optim.method=optim.method,
+                         optim.reltol=optim.reltol,
+                         optim.abstol=optim.abstol,
+                         optim.maxit=optim.maxit,
+                         ...)
+      
+    }
 
     E.phi.w <- glpreg(tydat=phi,
                       txdat=w,
@@ -1435,7 +1456,8 @@ npregivderiv <- function(y,
     ## If stopping rule criterion increases or we are below stopping
     ## tolerance then break
 
-    if((norm.stop[j] > norm.stop[j-1]) || norm.stop[j] < iterate.tol) break()
+    if(norm.stop[j] < iterate.tol) break()
+    if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) break()    
 
   }
 

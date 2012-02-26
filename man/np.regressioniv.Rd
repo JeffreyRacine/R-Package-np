@@ -45,6 +45,7 @@ npregiv(y,
         iterate.tol = 1.0e-04,
         constant = 0.5,
         method = c("Landweber-Fridman","Tikhonov"),
+        stop.on.increase = TRUE,
         ...)
 }
 \arguments{
@@ -176,6 +177,12 @@ npregiv(y,
    \code{"Landweber-Fridman"}, see Horowitz (2011); see Darolles,
    Fan, Florens and Renault (forthcoming) for details for
    \code{"Tikhonov"}).
+}
+\item{stop.on.increase}{
+  a logical value (defaults to \code{TRUE}) indicating whether to halt
+  iteration if the stopping criterion (see below) increases over the
+  course of one iteration (i.e. it may be above the iteration tolerance
+  but increased)
 }
 \item{...}{
   additional arguments supplied to \code{\link{npksum}}.
