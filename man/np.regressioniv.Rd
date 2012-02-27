@@ -14,7 +14,7 @@ endogenous variables \eqn{Y} and \eqn{Z} and exogenous variables
 solution of an ill-posed inverse problem.
 
 When \code{method="Tikhonov"}, \code{npregiv} uses the approach of
-Darolles, Fan, Florens and Renault (forthcoming) modified for local
+Darolles, Fan, Florens and Renault (2011) modified for local
 polynomial kernel regression of any order (Darolles et al use local
 constant kernel weighting which corresponds to setting \code{p=0}; see
 below for details). When \code{method="Landweber-Fridman"},
@@ -175,7 +175,7 @@ npregiv(y,
 \item{method}{
   the regularization method employed (defaults to
    \code{"Landweber-Fridman"}, see Horowitz (2011); see Darolles,
-   Fan, Florens and Renault (forthcoming) for details for
+   Fan, Florens and Renault (2011) for details for
    \code{"Tikhonov"}).
 }
 \item{stop.on.increase}{
@@ -227,12 +227,16 @@ npregiv(y,
   Edward E. Leamer, Editor(s), Handbook of Econometrics, Elsevier, 2007,
   Volume 6, Part 2, Chapter 77, Pages 5633-5751
 
-  Darolles, S. and Y. Fan and J.P. Florens and E. Renault (forthcoming),
-  \dQuote{Nonparametric Instrumental Regression,} Econometrica.
-
+  Darolles, S. and Y. Fan and J.P. Florens and E. Renault (2011),
+  \dQuote{Nonparametric Instrumental Regression,} Econometrica, 79,
+  1541-1565.
+  
   Feve, F. and J.P. Florens (2010), \dQuote{The practice of
   non-parametric estimation by solving inverse problems: the example of
   transformation models,} Econometrics Journal, 13, S1-S27.
+
+  Florens, J.P. and J.S. Racine (2012), \dQuote{Nonparametric
+  Instrumental Derivatives,} Working Paper.
 
   Fridman, V. M. (1956), \dQuote{A Method of Successive Approximations
   for Fredholm Integral Equations of the First Kind,} Uspeskhi,
