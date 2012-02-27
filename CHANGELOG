@@ -1,10 +1,10 @@
-Changes from Version 0.40-12 to 0.40-13 [24-Nov-2011]
-
-* Added more passable parameters to npregiv() (multistarting,
-  parameters passed to optim() for cross-validation)
+Changes from Version 0.40-12 to 0.40-13 [27-Feb-2012]
 
 * Added new function npregivderiv() that implements the IV derivative
   method of Florens and Racine (2012)
+
+* Added more passable parameters to npregiv() (multistarting,
+  parameters passed to optim() for cross-validation)
 
 Changes from Version 0.40-11 to 0.40-12 [24-Nov-2011]
 
