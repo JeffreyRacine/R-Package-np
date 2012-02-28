@@ -63,7 +63,7 @@ se.npdistribution <- function(x){ x$derr }
 plot.npdistribution <- function(x, ...) { npplot(bws = x$bws, ...) }
 
 predict.npdistribution <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npudist(bws = object$bws, ...), env = parent.frame())
+  tr <- eval(npudist(bws = object$bws, ...), envir = parent.frame())
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs))

@@ -82,7 +82,7 @@ gradients.npregression <- function(x, errors = FALSE, ...) {
     return(x$gerr)
 }
 predict.npregression <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npreg(bws = object$bws, ...), env = parent.frame())
+  tr <- eval(npreg(bws = object$bws, ...), envir = parent.frame())
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

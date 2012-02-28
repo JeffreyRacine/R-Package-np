@@ -133,7 +133,7 @@ coef.sibandwidth <- function(object, ...) {
  return(tc)
 }
 plot.sibandwidth <- function(...) { npplot(...) }
-predict.sibandwidth <- function(...) { eval(npindex(...), env = parent.frame()) }
+predict.sibandwidth <- function(...) { eval(npindex(...), envir = parent.frame()) }
 
 summary.sibandwidth <- function(object, ...){
   cat("\nSingle Index Model",

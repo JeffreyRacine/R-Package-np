@@ -166,7 +166,7 @@ toFrame <- function(frame) {
       stop(deparse(substitute(frame))," must be a data frame, matrix, vector, or factor")
 
     if(!is.matrix(frame))
-      t.names <- deparse(eval(substitute(substitute(frame)), env = parent.frame()))
+      t.names <- deparse(eval(substitute(substitute(frame)), envir = parent.frame()))
     
     frame <- data.frame(frame, check.names=FALSE)
     

@@ -170,7 +170,7 @@ print.scbandwidth <- function(x, digits=NULL, ...){
 }
 
 plot.scbandwidth <- function(...) { npplot(...)  }
-predict.scbandwidth <- function(...) { eval(npscoef(...), env = parent.frame()) }
+predict.scbandwidth <- function(...) { eval(npscoef(...), envir = parent.frame()) }
 
 summary.scbandwidth <- function(object, ...){
   cat("\nSmooth Coefficient Regression",

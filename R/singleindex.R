@@ -95,7 +95,7 @@ residuals.singleindex <- function(object, ...) {
 }
 predict.singleindex <- function(object, se.fit = FALSE, ...) {
   tr <- eval(npindex(bws = object$bws, errors = se.fit, boot.num = 99, ...),
-             env = parent.frame())
+             envir = parent.frame())
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

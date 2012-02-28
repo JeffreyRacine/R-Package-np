@@ -99,7 +99,7 @@ residuals.plregression <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npplreg(bws = object$bw, residuals =TRUE)$resid) } 
 }
 predict.plregression <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npplreg(bws = object$bw, ...), env = parent.frame())
+  tr <- eval(npplreg(bws = object$bw, ...), envir = parent.frame())
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

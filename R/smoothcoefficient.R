@@ -85,7 +85,7 @@ residuals.smoothcoefficient <- function(object, ...) {
 }
 se.smoothcoefficient <- function(x){ x$merr }
 predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npscoef(bws = object$bws, ...), env = parent.frame())
+  tr <- eval(npscoef(bws = object$bws, ...), envir = parent.frame())
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

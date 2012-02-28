@@ -870,7 +870,7 @@ npregivderiv <- function(y,
     ## First initialize initial search values of the vector of
     ## bandwidths to lie in [0,1]
 
-    if(debug) write(c("cv",paste(rep("x",num.bw),seq(1:num.bw),sep="")),file="optim.debug",ncol=(num.bw+1))
+    if(debug) write(c("cv",paste(rep("x",num.bw),seq(1:num.bw),sep="")),file="optim.debug",ncolumns=(num.bw+1))
 
     ## Pass in the local polynomial weight matrix rather than
     ## recomputing with each iteration.
@@ -889,7 +889,7 @@ npregivderiv <- function(y,
         lscv <- maxPenalty
       }
 
-      if(debug) write(c(lscv,bw.gamma),file="optim.debug",ncol=(num.bw+1),append=TRUE)
+      if(debug) write(c(lscv,bw.gamma),file="optim.debug",ncolumns=(num.bw+1),append=TRUE)
       return(lscv)
     }
 
@@ -905,7 +905,7 @@ npregivderiv <- function(y,
         aicc <- maxPenalty
       }
 
-      if(debug) write(c(aicc,bw.gamma),file="optim.debug",ncol=(num.bw+1),append=TRUE)
+      if(debug) write(c(aicc,bw.gamma),file="optim.debug",ncolumns=(num.bw+1),append=TRUE)
       return(aicc)
     }
 
@@ -1007,11 +1007,11 @@ npregivderiv <- function(y,
         best <- iMulti
         if(debug) {
           if(iMulti==1) {
-            write(cbind(iMulti,t(bw.opt)),"bandwidth.out",ncol=(1+length(bw.opt)))
-            write(cbind(iMulti,fv),"optim.out",ncol=2)
+            write(cbind(iMulti,t(bw.opt)),"bandwidth.out",ncolumns=(1+length(bw.opt)))
+            write(cbind(iMulti,fv),"optim.out",ncolumns=2)
           } else {
-            write(cbind(iMulti,t(bw.opt)),"bandwidth.out",ncol=(1+length(bw.opt)),append=TRUE)
-            write(cbind(iMulti,fv),"optim.out",ncol=2,append=TRUE)
+            write(cbind(iMulti,t(bw.opt)),"bandwidth.out",ncolumns=(1+length(bw.opt)),append=TRUE)
+            write(cbind(iMulti,fv),"optim.out",ncolumns=2,append=TRUE)
           }
         }
       }

@@ -142,7 +142,7 @@ print.plbandwidth <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-predict.plbandwidth <- function(...) { eval(npplreg(...), env = parent.frame()) }
+predict.plbandwidth <- function(...) { eval(npplreg(...), envir = parent.frame()) }
 plot.plbandwidth <- function(...) { npplot(...) }
 
 summary.plbandwidth <- function(object, ...){

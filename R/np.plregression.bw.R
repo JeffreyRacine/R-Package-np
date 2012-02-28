@@ -166,7 +166,7 @@ npplregbw.plbandwidth =
               bws = bws$bw[[i+1]], nmulti = nmulti, ...)
     }
 
-    bws <- plbandwidth(bw = bws$bw,
+    bws <- plbandwidth(bws = bws$bw,
                        regtype = bws$regtype,
                        bwmethod = bws$method,
                        bwscaling = bws$scaling,
