@@ -290,7 +290,7 @@ toMatrix <- function(data) {
 ## to die a noisy death anyhow ...
 succeedWithResponse <- function(tt, frame){
   !any(class(try(eval(expr = attr(tt, "variables"),
-                      envir = frame, encl = NULL), silen = TRUE)) == "try-error")
+                      envir = frame, enclos = NULL), silent = TRUE)) == "try-error")
 }
 
 ## determine whether a bandwidth

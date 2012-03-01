@@ -37,6 +37,7 @@ npregivderiv(y,
              start.phi.zero = FALSE,
              smooth.while.iterating = TRUE,
              stop.on.increase = TRUE,
+             smooth.residuals = FALSE,
              ...)
 }
 \arguments{
@@ -163,6 +164,12 @@ npregivderiv(y,
   course of one iteration (i.e. it may be above the iteration tolerance
   but increased)
 }
+\item{smooth.residuals}{
+  a logical value (defaults to \code{FALSE}) indicating whether to
+  optimize bandidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
+  on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
+  \eqn{w}
+ }
 \item{...}{ 
   additional arguments supplied to \code{\link{npksum}}.
 }

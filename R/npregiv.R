@@ -1393,13 +1393,13 @@ npregiv <- function(y,
                optim.maxit=optim.maxit,
                ...)
 
-    phi.j.m.1 <- phi.0 + glpreg(tydat=resid.fitted,
-                                txdat=z,
-                                eydat=resid.fitted,
-                                exdat=zeval,
-                                bws=h$bw,
-                                degree=rep(p, num.z.numeric),
-                                ...)$mean
+    phi.j.m.1 <- phi.0 + constant*glpreg(tydat=resid.fitted,
+                                         txdat=z,
+                                         eydat=resid.fitted,
+                                         exdat=zeval,
+                                         bws=h$bw,
+                                         degree=rep(p, num.z.numeric),
+                                         ...)$mean
     
     ## For the stopping rule
     
@@ -1505,8 +1505,6 @@ npregiv <- function(y,
                                            bws=h.resid.fitted.z$bw,
                                            degree=rep(p, num.z.numeric),
                                            ...)$mean
-      phi.j.m.1 <- phi.j
-
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush(paste("Computing stopping rule for iteration ", j,"...",sep=""),console)
@@ -1527,8 +1525,13 @@ npregiv <- function(y,
       ## tolerance then break
 
       if(norm.stop[j] < iterate.tol) break()
-      if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) break()
+      if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
+        phi.j <- phi.j.m.1 
+        break()
+      }
       
+      phi.j.m.1 <- phi.j
+
     }
 
     console <- printClear(console)

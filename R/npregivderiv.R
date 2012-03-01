@@ -69,6 +69,7 @@ npregivderiv <- function(y,
                          start.phi.zero=FALSE,
                          smooth.while.iterating=TRUE,
                          stop.on.increase=TRUE,
+                         smooth.residuals=FALSE,
                          ...) {
 
   ## First internal to this function we adopt the identical code in
@@ -1035,6 +1036,7 @@ npregivderiv <- function(y,
   if(!is.logical(start.phi.zero)) stop("start.phi.zero must be logical (TRUE/FALSE)")
   if(!is.logical(smooth.while.iterating)) stop("smooth.while.iterating must be logical (TRUE/FALSE)")
   if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")  
+  if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")  
 
   optim.method <- match.arg(optim.method)
 
@@ -1321,6 +1323,32 @@ npregivderiv <- function(y,
 
   mean.mu <- mean(mu)
 
+  if(smooth.residuals) {
+    
+    if(is.null(x)) {
+      console <- printPush(paste("Computing optimal smoothing for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
+    } else {
+      console <- printPush(paste("Computing optimal smoothing  for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
+    }
+
+    ## Additional smoothing on top of the stopping rule required,
+    ## but we have computed the stopping rule so reuse the bandwidth
+    ## vector to be passed below
+    
+    h.E.phi.w <- glpcv(ydat=mu,
+                       xdat=w,
+                       degree=rep(p, num.w.numeric),
+                       nmulti=nmulti,
+                       random.seed=random.seed,
+                       optim.maxattempts=optim.maxattempts,
+                       optim.method=optim.method,
+                       optim.reltol=optim.reltol,
+                       optim.abstol=optim.abstol,
+                       optim.maxit=optim.maxit,
+                       ...)
+    
+  }
+
   ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
 
   predicted.E.mu.w <- glpreg(tydat=mu,
@@ -1357,6 +1385,11 @@ npregivderiv <- function(y,
 
   for(j in 2:iterate.max) {
 
+    ## Save previous in case stop norm increases
+
+    phi.j.m.1 <- phi
+    phi.prime.j.m.1 <- phi.prime
+
     if(smooth.while.iterating) {
       console <- printClear(console)
       console <- printPop(console)
@@ -1389,18 +1422,18 @@ npregivderiv <- function(y,
 
     if(smooth.while.iterating) {
 
-      h.E.phi.w <- glpcv(ydat=phi,
-                         xdat=w,
-                         degree=rep(p, num.w.numeric),
-                         nmulti=nmulti,
-                         random.seed=random.seed,
-                         optim.maxattempts=optim.maxattempts,
-                         optim.method=optim.method,
-                         optim.reltol=optim.reltol,
-                         optim.abstol=optim.abstol,
-                         optim.maxit=optim.maxit,
-                         ...)
-      
+        h.E.phi.w <- glpcv(ydat=phi,
+                           xdat=w,
+                           degree=rep(p, num.w.numeric),
+                           nmulti=nmulti,
+                           random.seed=random.seed,
+                           optim.maxattempts=optim.maxattempts,
+                           optim.method=optim.method,
+                           optim.reltol=optim.reltol,
+                           optim.abstol=optim.abstol,
+                           optim.maxit=optim.maxit,
+                           ...)
+
     }
 
     E.phi.w <- glpreg(tydat=phi,
@@ -1423,6 +1456,26 @@ npregivderiv <- function(y,
     ## Now we repeat this entire process using mu = y = phi.0 rather than y
 
     mean.mu <- mean(mu)
+
+    if(smooth.residuals) {
+
+      ## Additional smoothing on top of the stopping rule required,
+      ## but we have computed the stopping rule so reuse the bandwidth
+      ## vector to be passed below
+
+      h.E.phi.w <- glpcv(ydat=mu,
+                           xdat=w,
+                           degree=rep(p, num.w.numeric),
+                           nmulti=nmulti,
+                           random.seed=random.seed,
+                           optim.maxattempts=optim.maxattempts,
+                           optim.method=optim.method,
+                           optim.reltol=optim.reltol,
+                           optim.abstol=optim.abstol,
+                           optim.maxit=optim.maxit,
+                           ...)
+
+    }
 
     ## Next, we regress require \mu_{0,i} W
 
@@ -1457,7 +1510,11 @@ npregivderiv <- function(y,
     ## tolerance then break
 
     if(norm.stop[j] < iterate.tol) break()
-    if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) break()    
+    if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
+      phi <- phi.j.m.1 
+      phi.prime <- phi.prime.j.m.1
+      break()
+    }
 
   }
 
