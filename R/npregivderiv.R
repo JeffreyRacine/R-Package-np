@@ -69,7 +69,7 @@ npregivderiv <- function(y,
                          start.phi.zero=FALSE,
                          smooth.while.iterating=TRUE,
                          stop.on.increase=TRUE,
-                         smooth.residuals=FALSE,
+                         smooth.residuals=TRUE,
                          ...) {
 
   ## First internal to this function we adopt the identical code in
@@ -1200,7 +1200,7 @@ npregivderiv <- function(y,
     
     mu <- y
     
-    ## We also require the mean of \miu_{0,i}
+    ## We also require the mean of \miu_{0,i} shortly...
     
     mean.mu <- mean(mu)
     
@@ -1212,7 +1212,7 @@ npregivderiv <- function(y,
       console <- printPush(paste("Computing optimal smoothing  for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
     }
 
-    ## Next, we regress require \mu_{0,i} W
+    ## Next, we regress require \mu_{0,i} W (for first iteration mu is y)
     
     hyw <- glpcv(ydat=y,
                  xdat=w,
@@ -1226,7 +1226,7 @@ npregivderiv <- function(y,
                  optim.maxit=optim.maxit,
                  ...)
     
-    E.y.w <- glpreg(tydat=mu,
+    E.y.w <- glpreg(tydat=y,
                     txdat=w,
                     exdat=weval,
                     bws=hyw$bw,
@@ -1331,11 +1331,12 @@ npregivderiv <- function(y,
       console <- printPush(paste("Computing optimal smoothing  for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
     }
 
-    ## Additional smoothing on top of the stopping rule required,
-    ## but we have computed the stopping rule so reuse the bandwidth
-    ## vector to be passed below
+    ## Additional smoothing on top of the stopping rule required, but
+    ## we have computed the stopping rule so reuse the bandwidth
+    ## vector to be passed below. Here we compute the bandwidth
+    ## optimal for the regression of mu on w.
     
-    h.E.phi.w <- glpcv(ydat=mu,
+    h.E.mu.w <- glpcv(ydat=mu,
                        xdat=w,
                        degree=rep(p, num.w.numeric),
                        nmulti=nmulti,
@@ -1347,17 +1348,21 @@ npregivderiv <- function(y,
                        optim.maxit=optim.maxit,
                        ...)
     
+    ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
+
+    predicted.E.mu.w <- glpreg(tydat=mu,
+                               txdat=w,
+                               eydat=mu,
+                               exdat=weval,
+                               bws=h.E.mu.w$bw,
+                               degree=rep(p, num.w.numeric),
+                               ...)$mean
+
+  } else {
+
+    predicted.E.mu.w <- E.y.w - E.phi.w
+
   }
-
-  ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
-
-  predicted.E.mu.w <- glpreg(tydat=mu,
-                             txdat=w,
-                             eydat=mu,
-                             exdat=weval,
-                             bws=h.E.phi.w$bw,
-                             degree=rep(p, num.w.numeric),
-                             ...)$mean
 
   ## We again require the mean of the fitted values
 
@@ -1458,35 +1463,46 @@ npregivderiv <- function(y,
     mean.mu <- mean(mu)
 
     if(smooth.residuals) {
-
-      ## Additional smoothing on top of the stopping rule required,
-      ## but we have computed the stopping rule so reuse the bandwidth
-      ## vector to be passed below
-
-      h.E.phi.w <- glpcv(ydat=mu,
-                           xdat=w,
-                           degree=rep(p, num.w.numeric),
-                           nmulti=nmulti,
-                           random.seed=random.seed,
-                           optim.maxattempts=optim.maxattempts,
-                           optim.method=optim.method,
-                           optim.reltol=optim.reltol,
-                           optim.abstol=optim.abstol,
-                           optim.maxit=optim.maxit,
-                           ...)
-
+    
+      if(is.null(x)) {
+        console <- printPush(paste("Computing optimal smoothing for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
+      } else {
+        console <- printPush(paste("Computing optimal smoothing  for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
+      }
+      
+      ## Additional smoothing on top of the stopping rule required, but
+      ## we have computed the stopping rule so reuse the bandwidth
+      ## vector to be passed below. Here we compute the bandwidth
+      ## optimal for the regression of mu on w.
+      
+      h.E.mu.w <- glpcv(ydat=mu,
+                        xdat=w,
+                        degree=rep(p, num.w.numeric),
+                        nmulti=nmulti,
+                        random.seed=random.seed,
+                        optim.maxattempts=optim.maxattempts,
+                        optim.method=optim.method,
+                        optim.reltol=optim.reltol,
+                        optim.abstol=optim.abstol,
+                        optim.maxit=optim.maxit,
+                        ...)
+      
+      ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
+      
+      predicted.E.mu.w <- glpreg(tydat=mu,
+                                 txdat=w,
+                                 eydat=mu,
+                                 exdat=weval,
+                                 bws=h.E.mu.w$bw,
+                                 degree=rep(p, num.w.numeric),
+                                 ...)$mean
+      
+    } else {
+      
+      predicted.E.mu.w <- E.y.w - E.phi.w
+      
     }
-
-    ## Next, we regress require \mu_{0,i} W
-
-    predicted.E.mu.w <- glpreg(tydat=mu,
-                               txdat=w,
-                               eydat=mu,
-                               exdat=weval,
-                               bws=h.E.phi.w$bw,
-                               degree=rep(p, num.w.numeric),
-                               ...)$mean
-
+    
     mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
     ## Now we compute T^* applied to mu
