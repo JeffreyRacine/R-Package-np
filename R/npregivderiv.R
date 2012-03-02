@@ -1093,7 +1093,7 @@ npregivderiv <- function(y,
   if(is.null(x)) {
     console <- printPush(paste("Computing optimal smoothing for f(z) and S(z) for iteration 1...",sep=""),console)
   } else {
-    console <- printPush(paste("Computing optimal smoothing  f(z) and S(z) for iteration 1...",sep=""),console)
+    console <- printPush(paste("Computing optimal smoothing for f(z) and S(z) for iteration 1...",sep=""),console)
   }
 
   ## Let's compute the bandwidth object for the unconditional
@@ -1116,7 +1116,7 @@ npregivderiv <- function(y,
     if(is.null(x)) {
       console <- printPush(paste("Computing optimal smoothing for E(y|z) for iteration 1...",sep=""),console)
     } else {
-      console <- printPush(paste("Computing optimal smoothing  for E(y|z,x) for iteration 1...",sep=""),console)
+      console <- printPush(paste("Computing optimal smoothing for E(y|z,x) for iteration 1...",sep=""),console)
     }
 
     h <- glpcv(ydat=y,
@@ -1165,11 +1165,7 @@ npregivderiv <- function(y,
 
     console <- printClear(console)
     console <- printPop(console)
-    if(is.null(x)) {
-      console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
-    } else {
-      console <- printPush(paste("Computing optimal smoothing  for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
-    }
+    console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
 
     ## For stopping rule...
     
@@ -1206,11 +1202,7 @@ npregivderiv <- function(y,
     
     console <- printClear(console)
     console <- printPop(console)
-    if(is.null(x)) {
-      console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
-    } else {
-      console <- printPush(paste("Computing optimal smoothing  for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
-    }
+    console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
 
     ## Next, we regress require \mu_{0,i} W (for first iteration mu is y)
     
@@ -1280,11 +1272,7 @@ npregivderiv <- function(y,
 
   console <- printClear(console)
   console <- printPop(console)
-  if(is.null(x)) {
-    console <- printPush(paste("Computing optimal smoothing for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
-  } else {
-    console <- printPush(paste("Computing optimal smoothing  for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
-  }
+  console <- printPush(paste("Computing optimal smoothing for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
 
   ## For the stopping rule, we require E.phi.w
 
@@ -1325,11 +1313,9 @@ npregivderiv <- function(y,
 
   if(smooth.residuals) {
     
-    if(is.null(x)) {
-      console <- printPush(paste("Computing optimal smoothing for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
-    } else {
-      console <- printPush(paste("Computing optimal smoothing  for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
-    }
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush(paste("Computing optimal smoothing for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
 
     ## Additional smoothing on top of the stopping rule required, but
     ## we have computed the stopping rule so reuse the bandwidth
@@ -1398,19 +1384,11 @@ npregivderiv <- function(y,
     if(smooth.while.iterating) {
       console <- printClear(console)
       console <- printPop(console)
-      if(is.null(x)) {
-        console <- printPush(paste("Computing optimal smoothing  E(phi|w) for iteration ", j,"...",sep=""),console)
-      } else {
-        console <- printPush(paste("Computing optimal smoothing   E(phi|w) for iteration ", j,"...",sep=""),console)
-      }
+      console <- printPush(paste("Computing optimal smoothing for E(phi|w) for iteration ", j,"...",sep=""),console)
     } else {
       console <- printClear(console)
       console <- printPop(console)
-      if(is.null(x)) {
-        console <- printPush(paste("Computing E(phi|w) for iteration ", j,"...",sep=""),console)
-      } else {
-        console <- printPush(paste("Computing E(phi|w) for iteration ", j,"...",sep=""),console)
-      }
+      console <- printPush(paste("Computing E(phi|w) for iteration ", j,"...",sep=""),console)
     }
 
     ## NOTE - this presumes univariate z case... in general this would
@@ -1464,11 +1442,9 @@ npregivderiv <- function(y,
 
     if(smooth.residuals) {
     
-      if(is.null(x)) {
-        console <- printPush(paste("Computing optimal smoothing for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
-      } else {
-        console <- printPush(paste("Computing optimal smoothing  for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
-      }
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush(paste("Computing optimal smoothing for E(mu|w) for iteration ", j,"...",sep=""),console)
       
       ## Additional smoothing on top of the stopping rule required, but
       ## we have computed the stopping rule so reuse the bandwidth
