@@ -139,36 +139,36 @@ npregivderiv(y,
    }
 \item{iterate.max}{
   an integer indicating the maximum number of iterations permitted
-  before termination occurs for Landweber-Fridman iteration
+  before termination occurs for Landweber-Fridman iteration.
 }
 \item{iterate.tol}{
-  the search tolerance for the stopping rule for Landweber-Fridman iteration
+  the search tolerance for the stopping rule for Landweber-Fridman iteration.
 }
 \item{constant}{
-  the constant to use for Landweber-Fridman iteration
+  the constant to use for Landweber-Fridman iteration.
 }
 \item{start.phi.zero}{
   a logical value indicating whether to commence Landweber-Fridman
   assuming \eqn{\varphi_{-1}=0}{phi[-1]=0} (proper Landweber-Fridman) or
   instead begin from \eqn{E(y|z)} (defaults to \code{FALSE}, see details
-  below)
+  below).
 }
 \item{smooth.while.iterating}{
   a logical value indicating whether to re-smooth
   \eqn{E(\varphi|w)}{E(phi|w)} during Landweber-Fridman iteration
-  (defaults to \code{TRUE})
+  (defaults to \code{TRUE}).
 }
 \item{stop.on.increase}{
   a logical value (defaults to \code{TRUE}) indicating whether to halt
   iteration if the stopping criterion (see below) increases over the
   course of one iteration (i.e. it may be above the iteration tolerance
-  but increased)
+  but increased).
 }
 \item{smooth.residuals}{
   a logical value (defaults to \code{TRUE}) indicating whether to
   optimize bandidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
   on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
-  \eqn{w} during Landweber-Fridman iteration
+  \eqn{w} during Landweber-Fridman iteration.
  }
 \item{...}{ 
   additional arguments supplied to \code{\link{npksum}}.

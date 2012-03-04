@@ -182,7 +182,7 @@ npregiv(y,
   a logical value (defaults to \code{TRUE}) indicating whether to halt
   iteration if the stopping criterion (see below) increases over the
   course of one iteration (i.e. it may be above the iteration tolerance
-  but increased)
+  but increased).
 }
 \item{...}{
   additional arguments supplied to \code{\link{npksum}}.
