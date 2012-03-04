@@ -3,6 +3,8 @@
 #include <math.h>
 #include "matrix.h"
 
+#include <R.h>
+
 #ifdef RCSID
 static char rcsid[] = "$Id: matrix.c,v 1.4 2006/11/02 19:50:13 tristen Exp $";
 #endif
@@ -55,16 +57,14 @@ MATRIX  _mat_creat( int row, int col )
 
 	if ((mat = (MATBODY *)malloc( sizeof(MATHEAD) + sizeof(double *) * row)) == NULL)
 	{
-          printf("mat: malloc error: exit(EXIT_SUCCESS)\n" );
-          exit(EXIT_SUCCESS);
+          error("mat: malloc error\n" );
 	}
 
 	for (i=0; i<row; i++)
 	{
 		if ((*((double **)(&mat->matrix) + i) = (double *)malloc(sizeof(double) * col)) == NULL)
 		{
-			printf("mat: malloc error: exit(EXIT_SUCCESS)\n" );
-			exit(EXIT_SUCCESS);
+			error("mat: malloc error\n" );
 		}
 	}
 
@@ -153,7 +153,7 @@ int mat_free( MATRIX A )
 
 	if (A==NULL)
 	{
-		printf("\nAttempting to free a non-existent matrix in mat_free()\n");
+		REprintf("\nAttempting to free a non-existent matrix in mat_free()\n");
 		return (0);
 	}
 
@@ -161,7 +161,7 @@ int mat_free( MATRIX A )
 	{
 		if((A[i]==NULL))
 		{
-			printf("\nAttempting to free a non-existent matrix row in mat_free()\n");
+			REprintf("\nAttempting to free a non-existent matrix row in mat_free()\n");
 			return (0);
 		}
 		else
@@ -311,10 +311,10 @@ double mat_det( MATRIX a )
  * comen:  matrix a dumped to standard output
  *-----------------------------------------------------------------------------
  */
-MATRIX mat_dumpf(MATRIX A, char *s)
+/*MATRIX mat_dumpf(MATRIX A, char *s)
 {
 	return (mat_fdumpf(A, s, stdout));
-}
+  }*/
 
 
 MATRIX mat_fdumpf( MATRIX A, char *s, FILE *fp )
@@ -356,14 +356,13 @@ MATRIX mat_error( int errno )
 	switch( errno )
 	{
 		case MAT_MALLOC:
-			printf("mat: malloc error: exit(EXIT_SUCCESS)\n" );
-			exit(EXIT_SUCCESS);
+			error("mat: malloc error\n" );
 			break;
 		case MAT_FNOTOPEN:
-			printf("mat: fileopen error\n" );
+			error("mat: fileopen error\n" );
 			break;
 		case MAT_FNOTGETMAT:
-			printf("fgetmat: matrix read error\n");
+			error("fgetmat: matrix read error\n");
 			break;
 	}
 
@@ -410,14 +409,12 @@ MATRIX mat_inv( MATRIX a , MATRIX C)
 
 	if(MatCol(a)!=MatCol(C))
 	{
-		printf("\nUnconformable matrices in routine mat_inv(): Col(A)!=Col(B): exit(EXIT_SUCCESS)\n");
-		exit(EXIT_SUCCESS);
+		error("\nUnconformable matrices in routine mat_inv(): Col(A)!=Col(B)\n");
 	}
 
 	if(MatRow(a)!=MatRow(C))
 	{
-		printf("\nUnconformable matrices in routine mat_inv(): Row(A)!=Row(B): exit(EXIT_SUCCESS)\n");
-		exit(EXIT_SUCCESS);
+		error("\nUnconformable matrices in routine mat_inv(): Row(A)!=Row(B)\n");
 	}
 #endif
 
@@ -502,18 +499,15 @@ MATRIX mat_mul( MATRIX A, MATRIX B , MATRIX C)
 
 	if(MatCol(A)!=MatRow(B))
 	{
-		printf("\nUnconformable matrices in routine mat_mul(): Col(A)!=Row(B) (%d/%d): exit(EXIT_SUCCESS)\n", MatCol(A),MatRow(B));
-		exit(EXIT_SUCCESS);
+		error("\nUnconformable matrices in routine mat_mul(): Col(A)!=Row(B) (%d/%d)\n", MatCol(A),MatRow(B));
 	}
 	if(MatRow(A)!=MatRow(C))
 	{
-		printf("\nUnconformable matrices in routine mat_mul(): Row(A)!=Row(C) (%d/%d): exit(EXIT_SUCCESS)\n", MatRow(A), MatRow(C));
-		exit(EXIT_SUCCESS);
+		error("\nUnconformable matrices in routine mat_mul(): Row(A)!=Row(C) (%d/%d)\n", MatRow(A), MatRow(C));
 	}
 	if(MatCol(B)!=MatCol(C))
 	{
-		printf("\nUnconformable matrices in routine mat_mul(): Col(B)!=Col(C) (%d/%d): exit(EXIT_SUCCESS)\n", MatCol(B), MatCol(C));
-		exit(EXIT_SUCCESS);
+		error("\nUnconformable matrices in routine mat_mul(): Col(B)!=Col(C) (%d/%d)\n", MatCol(B), MatCol(C));
 	}
 #endif
 

@@ -2,6 +2,7 @@
 #include <math.h>
 #include <stdio.h>
 
+#include <R.h>
 #include "headers.h"
 
 #ifdef RCSID
@@ -168,7 +169,7 @@ double *fret, double (*func)(double *))
 /*        nrerror("Too many iterations in routine POWELL");*/
             if(int_VERBOSE == 1)
             {
-                printf("\n**Maximum number of iterations reached in routine POWELL\n");
+                REprintf("\n**Maximum number of iterations reached in routine POWELL\n");
             }
             pt=vector(1,n);
             ptt=vector(1,n);
@@ -227,10 +228,8 @@ double *fret, double (*func)(double *))
 
 void nrerror(char error_text[])
 {
-    printf("Numerical Recipes run-time error...\n");
-    printf("%s\n",error_text);
-    printf("...now exiting to system...\n");
-    exit(1);
+    REprintf("Numerical Recipes run-time error...\n");
+    error("%s\n",error_text);
 }
 
 
@@ -389,7 +388,7 @@ double brent(double ax, double bx, double cx, double (*f)(double), double tol, d
 /*  nrerror("Too many iterations in BRENT");*/
     if(int_VERBOSE == 1)
     {
-        printf("\n**Maximum number of iterations reached in routine BRENT\n");
+        REprintf("\n**Maximum number of iterations reached in routine BRENT\n");
     }
     *xmin=x;
     return fx;

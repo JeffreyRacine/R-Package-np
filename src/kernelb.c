@@ -8,6 +8,7 @@
 #include <float.h>
 #include <errno.h>
 
+#include <R.h>
 #include "headers.h"
 
 #ifdef MPI2
@@ -120,14 +121,13 @@ double **matrix_bandwidth_deriv)
 #ifdef MPI2
 				if(my_rank == 0) {
 #endif
-				printf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
-				printf("\n ** Program terminated abnormally!\n");
+				REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 #ifdef MPI2
 				}
 				/* Since we are exiting and this will terminate the program, clean up */
 				MPI_Finalize();
 #endif
-				exit(EXIT_SUCCESS);
+				error("\n ** Program terminated abnormally!\n");
 			}
 
 		}
@@ -142,14 +142,13 @@ double **matrix_bandwidth_deriv)
 #ifdef MPI2
 				if(my_rank == 0) {
 #endif
-				printf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
-				printf("\n ** Program terminated abnormally!\n");
+				REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 #ifdef MPI2
 				}
 				/* Since we are exiting and this will terminate the program, clean up */
 				MPI_Finalize();
 #endif
-				exit(EXIT_SUCCESS);
+				error("\n ** Program terminated abnormally!\n");
 			}
 
 		}
@@ -584,14 +583,13 @@ fact constant. */
 #ifdef MPI2
 				if(my_rank == 0) {
 #endif
-				printf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
-				printf("\n ** Program terminated abnormally!\n");
+				REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 #ifdef MPI2
 				}
 				/* Since we are exiting and this will terminate the program, clean up */
 				MPI_Finalize();
 #endif
-				exit(EXIT_SUCCESS);
+				error("\n ** Program terminated abnormally!\n");
 			}
 
 		}
@@ -606,14 +604,13 @@ fact constant. */
 #ifdef MPI2
 				if(my_rank == 0) {
 #endif
-				printf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
-				printf("\n ** Program terminated abnormally!\n");
+				REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** The variable appears to be constant!");
 #ifdef MPI2
 				}
 				/* Since we are exiting and this will terminate the program, clean up */
 				MPI_Finalize();
 #endif
-				exit(EXIT_SUCCESS);
+				error("\n ** Program terminated abnormally!\n");
 			}
 
 		}

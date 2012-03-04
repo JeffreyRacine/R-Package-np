@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+#include <R.h>
+
 #include "headers.h"
 #include "matrix.h"
 
@@ -184,8 +186,8 @@ double standerrd(int n, double *vector)
             if(my_rank == 0)
               {
 #endif
-                printf("\nFunction standerrd(): invalid interquartile range estimate (%d,%d,%lg)", fround(3.0*(double)n/4.0), fround((double)n/4.0), IQR);
-                printf("\nsum = %lg, sumsq = %lg, n = %d", (double) sum, (double) sumsq, n);
+                REprintf("\nFunction standerrd(): invalid interquartile range estimate (%d,%d,%lg)", fround(3.0*(double)n/4.0), fround((double)n/4.0), IQR);
+                REprintf("\nsum = %lg, sumsq = %lg, n = %d", (double) sum, (double) sumsq, n);
 #ifdef MPI2
               }
 #endif
@@ -218,9 +220,9 @@ double standerrd(int n, double *vector)
             if(my_rank == 0)
               {
 #endif
-                printf("\nFunction standerrd(): invalid standard error estimate (%lg)", temp1);
-                printf("\nsum = %lg, sumsq = %lg, n = %d", (double) sum, (double) sumsq, n);
-                printf("\nVar 1");
+                REprintf("\nFunction standerrd(): invalid standard error estimate (%lg)", temp1);
+                REprintf("\nsum = %lg, sumsq = %lg, n = %d", (double) sum, (double) sumsq, n);
+                REprintf("\nVar 1");
 #ifdef MPI2
               }
 #endif
@@ -285,7 +287,7 @@ int int_k_nn, double *nn_distance)
     {
 			if(int_VERBOSE == 1)
         {
-					printf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
+					REprintf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
         }
 			return(1);
     }
@@ -342,8 +344,7 @@ int int_k_nn, double *nn_distance)
         {
             if(int_VERBOSE == 1)
             {
-                    printf("\n** Error: A Kth nearest neighbor [%d] yields an invalid distance.", int_k_nn);
-                    fflush(stdout);
+                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields an invalid distance.", int_k_nn);
 
             }
             free(vector_dist);
@@ -362,7 +363,7 @@ int int_k_nn, double *nn_distance)
         {
             if(my_rank == 0)
             {
-                printf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
+                REprintf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
             }
         }
         return(1);
@@ -418,8 +419,7 @@ int int_k_nn, double *nn_distance)
         {
             if(int_VERBOSE == 1)
             {
-                    printf("\n** Error: A Kth nearest neighbor [%d] yields an invalid distance.", int_k_nn);
-                    fflush(stdout);
+                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields an invalid distance.", int_k_nn);
             }
 						/*return(1);*/
 						return_flag_MPI = 1;
@@ -482,8 +482,7 @@ double *nn_distance)
             if(my_rank == 0)
             {
 #endif
-                printf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
-                fflush(stdout);
+                REprintf("\n** Error: Invalid Kth nearest neighbor (%d).", int_k_nn);
 #ifdef MPI2
             }
 #endif
@@ -547,8 +546,7 @@ double *nn_distance)
         {
             if(int_VERBOSE == 1)
             {
-                    printf("\n** Error: A Kth nearest neighbor [%d] yields a distance of zero.", int_k_nn);
-                    fflush(stdout);
+                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields a distance of zero.", int_k_nn);
             }
             free(vector_dist);                    /* Don't forget to free... */
             free(vector_unique_dist);
@@ -611,8 +609,7 @@ double *nn_distance)
         {
             if(int_VERBOSE == 1)
             {
-                    printf("\n** Error: A Kth nearest neighbor [%d] yields a distance of zero.", int_k_nn);
-                    fflush(stdout);
+                    REprintf("\n** Error: A Kth nearest neighbor [%d] yields a distance of zero.", int_k_nn);
             }
 						return_flag_MPI = 1;
         }
@@ -737,7 +734,7 @@ double *vector_scale_factor)
                 {
                     if( (vector_scale_factor[i+1] <= 0.0) || (vector_scale_factor[i+1] > DBL_MAX))
                     {
-                        printf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+1]);
+                        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+1]);
                         if(int_large == 0)
                         {
                             vector_scale_factor[i+1] = init_continuous;
@@ -754,7 +751,7 @@ double *vector_scale_factor)
                         if( (fround(vector_scale_factor[i+1]) < 1) ||
                             (fround(vector_scale_factor[i+1]) > (int) (num_obs-1) ))
                         {
-                            printf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+1]));
+                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+1]));
                             vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
                         }
                     }
@@ -798,7 +795,7 @@ double *vector_scale_factor)
                     if( (vector_scale_factor[i+num_reg_continuous+1] <= 0.0) ||
                         (vector_scale_factor[i+num_reg_continuous+1] > DBL_MAX))
                     {
-                        printf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+1]);
+                        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+1]);
                         if(int_large == 0)
                         {
                             vector_scale_factor[i+num_reg_continuous+1] = init_continuous;
@@ -815,7 +812,7 @@ double *vector_scale_factor)
                         if( (fround(vector_scale_factor[i+num_reg_continuous+1]) < 1) ||
                             (fround(vector_scale_factor[i+num_reg_continuous+1]) > (int) (num_obs-1) ))
                         {
-                            printf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+num_reg_continuous+1]));
+                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+num_reg_continuous+1]));
                             vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
                         }
                     }
@@ -848,7 +845,7 @@ double *vector_scale_factor)
                     if( ( (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm) > (1.0 - 1.0/(double) num_categories[i])) ||
                         ((vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm) < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1], vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1], vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm);
                         vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
                     }
                 }
@@ -857,7 +854,7 @@ double *vector_scale_factor)
                     if( (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] > (1.0 - 1.0/(double) num_categories[i])) ||
                         (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]);
                         vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
                     }
                 }
@@ -889,7 +886,7 @@ double *vector_scale_factor)
                     if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm) > 1.0) ||
                         ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm) < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm);
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
                     }
                 }
@@ -898,7 +895,7 @@ double *vector_scale_factor)
                     if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] > 1.0) ||
                         (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]);
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
                     }
                 }
@@ -930,7 +927,7 @@ double *vector_scale_factor)
                     if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm) > (1.0 - 1.0/(double) num_categories[i+num_var_unordered+num_var_ordered])) ||
                         ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm) < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm);
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
                     }
                 }
@@ -939,7 +936,7 @@ double *vector_scale_factor)
                     if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] > (1.0 - 1.0/(double) num_categories[i+num_var_unordered+num_var_ordered])) ||
                         (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]);
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
                     }
                 }
@@ -971,7 +968,7 @@ double *vector_scale_factor)
                     if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm) > 1.0) ||
                         ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm) < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm);
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
                     }
                 }
@@ -980,7 +977,7 @@ double *vector_scale_factor)
                     if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] > 1.0) ||
                         (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] < 0.0))
                     {
-                        printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]);
+                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]);
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
                     }
                 }
@@ -1006,7 +1003,7 @@ double *vector_scale_factor)
                     if( (vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] <= 0.0) ||
                         (vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] > DBL_MAX))
                     {
-                        printf("\n** Warning: invalid sf for disturbance in init_nr_sf() [%g]\n", vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]);
+                        REprintf("\n** Warning: invalid sf for disturbance in init_nr_sf() [%g]\n", vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]);
                         vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = init_continuous;
                     }
                 }
@@ -1023,7 +1020,7 @@ double *vector_scale_factor)
                     if( (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
                         (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
                     {
-                        printf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
+                        REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
                         vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
                     }
                 }
@@ -1205,7 +1202,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+1]);
+                            REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+1]);
                         }
                         if(int_large == 0)
                         {
@@ -1225,7 +1222,7 @@ double *vector_scale_factor)
                         {
                             if(my_rank == 0)
                             {
-                                printf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+1]));
+                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+1]));
                             }
                             vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
                         }
@@ -1272,7 +1269,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+1]);
+                            REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+1]);
                         }
 
                         if(int_large == 0)
@@ -1293,7 +1290,7 @@ double *vector_scale_factor)
                         {
                             if(my_rank == 0)
                             {
-                                printf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+num_reg_continuous+1]));
+                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+num_reg_continuous+1]));
                             }
 
                             vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
@@ -1330,7 +1327,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_reg_continuous+1], vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_reg_continuous+1], vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm);
                         }
 
                         vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
@@ -1343,7 +1340,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]);
                         }
 
                         vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
@@ -1379,7 +1376,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm);
                         }
 
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
@@ -1392,7 +1389,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]);
                         }
 
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
@@ -1428,7 +1425,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm);
                         }
 
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
@@ -1441,7 +1438,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]);
                         }
 
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
@@ -1477,7 +1474,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm);
                         }
 
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
@@ -1490,7 +1487,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]);
+                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]);
                         }
 
                         vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
@@ -1520,7 +1517,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid sf for disturbance in init_nr_sf() [%g]\n", vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]);
+                            REprintf("\n** Warning: invalid sf for disturbance in init_nr_sf() [%g]\n", vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]);
                         }
 
                         vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = init_continuous;
@@ -1541,7 +1538,7 @@ double *vector_scale_factor)
                     {
                         if(my_rank == 0)
                         {
-                            printf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
+                            REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
                         }
 
                         vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
@@ -1913,12 +1910,11 @@ double **matrix_categorical_vals)
                 if(my_rank == 0)
                 {
 #endif
-                    printf("\n** Note: unordered variable %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+1, (int) num_categories[k], (int) num_obs);
+                    REprintf("\n** Note: unordered variable %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+1, (int) num_categories[k], (int) num_obs);
 #ifdef MPI2
                 }
 #endif
 
-                fflush(stdout);
             }
 
         }
@@ -1978,12 +1974,11 @@ double **matrix_categorical_vals)
                 if(my_rank == 0)
                 {
 #endif
-                    printf("\n** Note: ordered variable %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+num_var_ordered+1, (int) num_categories[k+num_var_unordered], (int) num_obs);
+                    REprintf("\n** Note: ordered variable %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+num_var_ordered+1, (int) num_categories[k+num_var_unordered], (int) num_obs);
 #ifdef MPI2
                 }
 #endif
 
-                fflush(stdout);
             }
 
         }
@@ -2045,12 +2040,11 @@ double **matrix_categorical_vals)
                 if(my_rank == 0)
                 {
 #endif
-                    printf("\n** Note: unordered predictor %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+1, (int) num_categories[k+num_var_unordered+num_var_ordered], (int) num_obs);
+                    REprintf("\n** Note: unordered predictor %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+1, (int) num_categories[k+num_var_unordered+num_var_ordered], (int) num_obs);
 #ifdef MPI2
                 }
 #endif
 
-                fflush(stdout);
             }
 
         }
@@ -2110,12 +2104,11 @@ double **matrix_categorical_vals)
                 if(my_rank == 0)
                 {
 #endif
-                    printf("\n** Note: ordered predictor %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+1, (int) num_categories[k+num_var_unordered+num_var_ordered+num_reg_unordered], (int) num_obs);
+                    REprintf("\n** Note: ordered predictor %d contains strictly unique values\n** [%d out of %d are unique]", (int) k+1, (int) num_categories[k+num_var_unordered+num_var_ordered+num_reg_unordered], (int) num_obs);
 #ifdef MPI2
                 }
 #endif
 
-                fflush(stdout);
             }
 
         }
@@ -2147,7 +2140,7 @@ double **matrix_categorical_vals)
         if(my_rank == 0)
         {
 #endif
-            printf("\n");
+            REprintf("\n");
 #ifdef MPI2
         }
 #endif
@@ -2517,14 +2510,13 @@ double *vector_continuous_stddev)
                 if(my_rank == 0)
                 {
 #endif
-                    printf("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i);
-                    printf("\n ** Program terminated abnormally!\n");
+                    REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i);
 #ifdef MPI2
                 }
 /* Since program terminates, clean up */
                 MPI_Finalize();
 #endif
-                exit(EXIT_SUCCESS);
+                error("\n ** Program terminated abnormally!\n");
             }
 
         }
@@ -2540,14 +2532,13 @@ double *vector_continuous_stddev)
                 if(my_rank == 0)
                 {
 #endif
-                    printf("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i+num_reg_continuous);
-                    printf("\n ** Program terminated abnormally!\n");
+                    REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i+num_reg_continuous);
 #ifdef MPI2
                 }
 /* Since program terminates, clean up */
                 MPI_Finalize();
 #endif
-                exit(EXIT_SUCCESS);
+                error("\n ** Program terminated abnormally!\n");
             }
 
         }

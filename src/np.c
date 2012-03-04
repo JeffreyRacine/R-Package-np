@@ -6,8 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
-#include <assert.h>
 
+#include <R.h>
 #include <R.h>
 
 #ifdef MPI2
@@ -309,7 +309,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   case BWM_CVLS : bwmfunc = cv_func_density_categorical_ls; break;
     //case BWM_CVML_NP : bwmfunc = cv_func_np_density_categorical_ml; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
-    exit(0); break;
+    error("np.c: invalid bandwidth selection method."); break;
   }
 
   spinner(0);
@@ -687,7 +687,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   case CBWM_NPLS : bwmfunc = np_cv_func_con_density_categorical_ls;break;
   case CBWM_CCDF : bwmfunc = cv_func_con_distribution_categorical_ccdf; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
-    exit(0); break;
+    error("np.c: invalid bandwidth selection method."); break;
   }
 
   spinner(0);
@@ -909,7 +909,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   if((train_is_eval = myopti[CD_TISEI]) && 
      (num_obs_eval_extern != num_obs_train_extern)){
     REprintf("\n(np_density_conditional): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
-    exit(0);
+    error("\n(np_density_conditional): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
   }
 
   KERNEL_reg_extern = myopti[CD_CXKRNEVI];
@@ -1764,7 +1764,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   case RBWM_CVAIC : bwmfunc = cv_func_regression_categorical_aic_c; break;
   case RBWM_CVLS : bwmfunc = cv_func_regression_categorical_ls; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
-    exit(0);break;
+    error("np.c: invalid bandwidth selection method.");break;
   }
 
   spinner(0);
@@ -1984,7 +1984,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   if(train_is_eval && (num_obs_eval_extern != num_obs_train_extern)){
     REprintf("\n(np_regression): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
-    exit(0);
+    error("\n(np_regression): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
   }
 
   KERNEL_reg_extern = myopti[REG_CKRNEVI];
@@ -2326,7 +2326,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   if(train_is_eval && (num_obs_eval_extern != num_obs_train_extern)){
     REprintf("\n(np_kernelsum): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
-    exit(0);
+    error("\n(np_kernelsum): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
   }
 
   /* allocate */
@@ -2449,8 +2449,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     num_categories_extern[j] = i;
   }
 
-  assert(!((operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8)));
-
+  if((operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8))
+    error("np.c error (operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8)");
   
   kernel_weighted_sum_np(KERNEL_reg_extern,
                          KERNEL_reg_unordered_extern,
@@ -2586,7 +2586,7 @@ void np_quantile_conditional(double * tc_con,
   if((train_is_eval = myopti[CQ_TISEI]) && 
      (num_obs_eval_extern != num_obs_train_extern)){
     REprintf("\n(np_quantile_conditional): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
-    exit(0);
+    error("\n(np_quantile_conditional): consistency check failed, train_is_eval but num_obs_train_extern != num_obs_eval_extern. bailing\n");
   }
 
   KERNEL_reg_extern = myopti[CQ_CXKRNEVI];

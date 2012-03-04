@@ -6,8 +6,8 @@
 #include <math.h>
 #include <float.h>
 #include <errno.h>
-#include <assert.h>
 
+#include <R.h>
 #include <R_ext/Utils.h>
 
 #include "headers.h"
@@ -211,19 +211,17 @@ double *kernel_sum)
 		lambda) == 1)
 	{
 #ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 #endif
 #ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+		error("\nProgram Terminated.\n");
 #endif
 	}
 
@@ -1398,7 +1396,7 @@ double *weighted_sum){
   
   if ((num_obs_train != num_obs_eval) && leave_one_out){
     
-    printf("\ntraining and evaluation data must be the same to use leave one out estimator");
+    REprintf("\ntraining and evaluation data must be the same to use leave one out estimator");
     free(lambda);
     free_tmat(matrix_bandwidth);
     free(tprod);
@@ -1635,13 +1633,16 @@ double *cv){
   i = (int)uii;
 
   sum_kerf = (double *)malloc(num_obs*sizeof(double));
-  assert(sum_kerf != NULL);
+  if(!(sum_kerf != NULL))
+    error("!(sum_kerf != NULL)");
 
   sum_ker_convolf = (double *)malloc(num_obs*sizeof(double));
-  assert(sum_ker_convolf != NULL);
+  if(!(sum_ker_convolf != NULL))
+    error("!(sum_ker_convolf != NULL)");
 
   sum_ker_marginalf = (double *)malloc(num_obs*sizeof(double));
-  assert(sum_ker_marginalf != NULL);
+  if(!(sum_ker_marginalf != NULL))
+    error("!(sum_ker_marginalf != NULL)");
 #endif
 
   lambda = alloc_vecd(num_var_unordered+num_reg_unordered+num_var_ordered+num_reg_ordered);
@@ -1674,24 +1675,31 @@ double *cv){
 
 
   blk_xi = (double *)malloc(sizeof(double)*blklen*blklen);
-  assert(blk_xi != NULL);
+  if(!(blk_xi != NULL)) 
+    error("!(blk_xi != NULL)");
 
   blk_xj = (double *)malloc(sizeof(double)*blklen*blklen);
-  assert(blk_xj != NULL);
+  if(!(blk_xj != NULL))
+    error("!(blk_xj != NULL)");
 
   blk_yij = (double *)malloc(sizeof(double)*blklen*blklen);
-  assert(blk_xj != NULL);
+  if(!(blk_xj != NULL)) 
+    error("!(blk_xj != NULL)");
 
   sum_ker = (double *)malloc(num_obs*sizeof(double));
-  assert(sum_ker != NULL);
+  if(!(sum_ker != NULL))
+    error("!(sum_ker != NULL)");
 
   sum_ker_convol = (double *)malloc(num_obs*sizeof(double));
-  assert(sum_ker_convol != NULL);
+  if(!(sum_ker_convol != NULL))
+    error("!(sum_ker_convol != NULL)");
 
   sum_ker_marginal = (double *)malloc(num_obs*sizeof(double));
-  assert(sum_ker_marginal != NULL);
+  if(!(sum_ker_marginal != NULL))
+    error("!(sum_ker_marginal != NULL)");
 
-  assert(BANDWIDTH_den == BW_FIXED);
+  if(!(BANDWIDTH_den == BW_FIXED))
+    error("!(BANDWIDTH_den == BW_FIXED)");
 
   for(int ii = 0; ii < num_obs; ii++){
     sum_ker[ii] = 0.0;

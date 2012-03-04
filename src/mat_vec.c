@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <R.h>
 #include "headers.h"
 
 #ifdef RCSID
@@ -24,13 +25,11 @@ double **alloc_tmatd(int nrows, int ncols)
 
   if(ncols*nrows != 0) {
     if((m=(double**)malloc(sizeof(double*)*ncols))==NULL){
-      printf("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
-      exit(EXIT_FAILURE);
+      error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
     if ((m[0]=(double*)malloc(sizeof(double)*nrows*ncols))==NULL){
-      printf("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
-      exit(EXIT_FAILURE);
+      error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
     f = m[0];
@@ -61,14 +60,12 @@ double **alloc_matd(int nrows, int ncols)
   if(ncols != 0) {
 
     if((m=(double**)malloc(sizeof(double*)*ncols))==NULL) {
-      printf("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
-      exit(EXIT_FAILURE);
+      error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
     }
 
     for(i=0;i<ncols;i++) {
       if((m[i]=(double*)malloc(sizeof(double)*nrows))==NULL) {
-        printf("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
-        exit(EXIT_FAILURE);
+        error("\nFATAL ERROR: Memory allocation failure (type DBL_MATRIX). Program terminated.\n");
       }
     }
 
@@ -136,8 +133,7 @@ double *alloc_vecd(int nobs)
 
   if ((a=(double *)malloc(sizeof(double)*nobs))==NULL)
   {
-    printf("\nFATAL ERROR: Memory allocation failure (type DBL_VECTOR). Program terminated.\n");
-    exit(EXIT_FAILURE);
+    error("\nFATAL ERROR: Memory allocation failure (type DBL_VECTOR). Program terminated.\n");
   }
 
   return(a);
@@ -160,8 +156,7 @@ int *alloc_vecu(int nobs)
 
   if ((a=(int *)malloc(sizeof(unsigned)*nobs))==NULL)
   {
-    printf("\nFATAL ERROR: Memory allocation failure (type INT_VECTOR). Program terminated.\n");
-    exit(EXIT_FAILURE);
+    error("\nFATAL ERROR: Memory allocation failure (type INT_VECTOR). Program terminated.\n");
   }
 
   return(a);

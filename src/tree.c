@@ -1,6 +1,6 @@
 #include <math.h>
-#include <assert.h>
 
+#include <R.h>
 #include "headers.h"
 #include "tree.h"
 
@@ -31,15 +31,18 @@ void build_kdtree(double ** p, int nump, int ndim, int nbucket, int ** ip, KDT *
   int numnode = MIN(2*nump - (nbucket-1)*nf - 1, maxnode);
 
   *kdt = (KDT *)malloc(sizeof(KDT));
-  assert(*kdt != NULL);
+  if(!(*kdt != NULL))
+    error("!(*kdt != NULL)");
 
   kdx = *kdt;
 
   kdx->kdn = (KDN *)malloc(numnode*sizeof(KDN));
-  assert(kdx->kdn != NULL);
+  if(!(kdx->kdn != NULL))
+    error("!(kdx->kdn != NULL)");
 
   kdx->bb = (double *)malloc(numnode*2*ndim*sizeof(double));
-  assert(kdx->bb != NULL);
+  if(!(kdx->bb != NULL))
+    error("!(kdx->bb != NULL)");
 
   for(int i = 0; i < numnode; i++){
     kdx->kdn[i].bb = kdx->bb+2*i*ndim;
@@ -56,7 +59,8 @@ void build_kdtree(double ** p, int nump, int ndim, int nbucket, int ** ip, KDT *
 
   // for the tree to work, points need to be put into tree order
   *ip = (int *)malloc(nump*sizeof(int));
-  assert(*ip != NULL);
+  if(!(*ip != NULL))
+    error("!(*ip != NULL)");
 
   for(int i = 0; i < nump; i++){
     (*ip)[i] = i;
@@ -64,7 +68,8 @@ void build_kdtree(double ** p, int nump, int ndim, int nbucket, int ** ip, KDT *
 
   nodecount = build_tree(p, kdx, *ip, 0, 0, nump, 0);
 
-  assert(nodecount == numnode);
+  if(!(nodecount == numnode))
+    error("!(nodecount == numnode)");
 }
 
 void kdSelect(double ** p, KDT * kdt, int * ip, int d, int k, int l, int r){
@@ -181,7 +186,8 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
 
   if(nl->n == nl->nalloc){
     nl->node = realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
-    assert(nl->node != NULL);
+    if(!(nl->node != NULL))
+      error("!(nl->node != NULL)");
     
     nl->nalloc = MAX(10, 2*nl->nalloc);
   }

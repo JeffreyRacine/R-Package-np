@@ -6,6 +6,7 @@
 #include <float.h>
 #include <errno.h>
 
+#include <R.h>
 #include <R_ext/Utils.h>
 
 #include "headers.h"
@@ -199,19 +200,17 @@ double *log_likelihood)
 		matrix_bandwidth_deriv) == 1)
 	{
 		#ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 		#endif
 		#ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+    error("\nProgram Terminated.\n");
 		#endif
 	}
 
@@ -285,8 +284,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical()");
 				}
 			}
 
@@ -347,8 +346,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical()");
 				}
 			}
 
@@ -410,8 +409,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical()");
 				}
 			}
 
@@ -482,8 +481,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical()");
 				}
 			}
 
@@ -544,8 +543,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical()");
 				}
 			}
 
@@ -607,8 +606,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical()");
 				}
 			}
 
@@ -785,8 +784,8 @@ double *cv)
 					*cv -= log_DBL_MIN;
 					if(int_VERBOSE == 1)
 					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+						REprintf("\r                                                                           ");
+						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 					}
 				}
 
@@ -840,8 +839,8 @@ double *cv)
 					*cv -= log_DBL_MIN;
 					if(int_VERBOSE == 1)
 					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+						REprintf("\r                                                                           ");
+						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 					}
 				}
 
@@ -897,8 +896,8 @@ double *cv)
 					*cv -= log_DBL_MIN;
 					if(int_VERBOSE == 1)
 					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+						REprintf("\r                                                                           ");
+						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 					}
 				}
 
@@ -965,8 +964,8 @@ double *cv)
 				*cv -= log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1029,8 +1028,8 @@ double *cv)
 				*cv -= log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1098,8 +1097,8 @@ double *cv)
 					cv_MPI -= log_DBL_MIN;
 					if((int_VERBOSE == 1)&&(my_rank == 0))
 					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+						REprintf("\r                                                                           ");
+						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 					}
 				}
 
@@ -1152,8 +1151,8 @@ double *cv)
 					cv_MPI -= log_DBL_MIN;
 					if((int_VERBOSE == 1)&&(my_rank == 0))
 					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+						REprintf("\r                                                                           ");
+						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 					}
 				}
 
@@ -1208,8 +1207,8 @@ double *cv)
 					cv_MPI -= log_DBL_MIN;
 					if((int_VERBOSE == 1)&&(my_rank == 0))
 					{
-						printf("\r                                                                           ");
-						printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+						REprintf("\r                                                                           ");
+						REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 					}
 				}
 
@@ -1275,8 +1274,8 @@ double *cv)
 				cv_MPI -= log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1338,8 +1337,8 @@ double *cv)
 				cv_MPI -= log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1542,8 +1541,8 @@ double *cv)
 				*cv -= log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1630,8 +1629,8 @@ double *cv)
 				*cv -= log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1725,8 +1724,8 @@ double *cv)
 				*cv -= log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1821,8 +1820,8 @@ double *cv)
 				cv_MPI -= log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -1909,8 +1908,8 @@ double *cv)
 				cv_MPI -= log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -2004,8 +2003,8 @@ double *cv)
 				cv_MPI -= log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_leave_one_out_cv()");
 				}
 			}
 
@@ -2115,19 +2114,17 @@ int itmax)
 		matrix_bandwidth_deriv) == 1)
 	{
 		#ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 		#endif
 		#ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+		error("\nProgram Terminated.\n");
 		#endif
 	}
 
@@ -2538,19 +2535,17 @@ double *SIGN)
 		matrix_bandwidth_deriv) == 1)
 	{
 		#ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 		#endif
 		#ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+    error("\nProgram Terminated.\n");
 		#endif
 	}
 
@@ -3024,10 +3019,9 @@ double *SIGN)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -3235,10 +3229,9 @@ double *SIGN)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -3448,10 +3441,9 @@ double *SIGN)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -3994,10 +3986,9 @@ double *SIGN)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -4205,10 +4196,9 @@ double *SIGN)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -4418,10 +4408,9 @@ double *SIGN)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical()", j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -5000,10 +4989,9 @@ double *mean)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -5173,10 +5161,9 @@ double *mean)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -5346,10 +5333,9 @@ double *mean)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -5764,10 +5750,9 @@ double *mean)
 
 					if((my_rank == 0)&&(int_DEBUG == 1))
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -5938,10 +5923,9 @@ double *mean)
 
 					if((my_rank == 0)&&(int_DEBUG == 1))
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -6111,10 +6095,9 @@ double *mean)
 
 					if((my_rank == 0)&&(int_DEBUG == 1))
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_leave_one_out()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -6787,10 +6770,9 @@ double **gradient)
 
 							if(int_DEBUG == 1)
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -6964,10 +6946,9 @@ double **gradient)
 
 							if(int_DEBUG == 1)
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 							/* Add ridge factor - epsilon goes from zero to one/n*/
 
@@ -7141,10 +7122,9 @@ double **gradient)
 
 							if(int_DEBUG == 1)
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -7544,10 +7524,9 @@ double **gradient)
 
 						if(int_DEBUG == 1)
 						{
-							printf("\r                                                                                        ");
-							printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-							printf("\n");
-							mat_dumpf( XTKX, "%g ");
+							REprintf("\r                                                                                        ");
+							REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+							REprintf("\n");
 						}
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -7910,10 +7889,10 @@ double **gradient)
 
 							if(int_DEBUG == 1)
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
+
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -8081,10 +8060,9 @@ double **gradient)
 
 							if(int_DEBUG == 1)
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -8252,10 +8230,9 @@ double **gradient)
 
 							if(int_DEBUG == 1)
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -8458,10 +8435,9 @@ double **gradient)
 
 						if(int_DEBUG == 1)
 						{
-							printf("\r                                                                                        ");
-							printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-							printf("\n");
-							mat_dumpf( XTKX, "%g ");
+							REprintf("\r                                                                                        ");
+							REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+							REprintf("\n");
 						}
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -9007,10 +8983,9 @@ double **gradient)
 
 							if((int_DEBUG == 1)&&(my_rank == 0))
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -9182,10 +9157,9 @@ double **gradient)
 
 							if((int_DEBUG == 1)&&(my_rank == 0))
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -9358,10 +9332,9 @@ double **gradient)
 
 							if((int_DEBUG == 1)&&(my_rank == 0))
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -9740,10 +9713,9 @@ double **gradient)
 
 						if((int_DEBUG == 1)&&(my_rank == 0))
 						{
-							printf("\r                                                                                        ");
-							printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-							printf("\n");
-							mat_dumpf( XTKX, "%g ");
+							REprintf("\r                                                                                        ");
+							REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+							REprintf("\n");
 						}
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -10100,10 +10072,9 @@ double **gradient)
 
 							if((int_DEBUG == 1)&&(my_rank == 0))
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -10271,10 +10242,9 @@ double **gradient)
 
 							if((int_DEBUG == 1)&&(my_rank == 0))
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -10442,10 +10412,9 @@ double **gradient)
 
 							if((int_DEBUG == 1)&&(my_rank == 0))
 							{
-								printf("\r                                                                                        ");
-								printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-								printf("\n");
-								mat_dumpf( XTKX, "%g ");
+								REprintf("\r                                                                                        ");
+								REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+								REprintf("\n");
 							}
 
 							/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -10646,10 +10615,9 @@ double **gradient)
 
 						if((int_DEBUG == 1)&&(my_rank == 0))
 						{
-							printf("\r                                                                                        ");
-							printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
-							printf("\n");
-							mat_dumpf( XTKX, "%g ");
+							REprintf("\r                                                                                        ");
+							REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_no_stderr()",j);
+							REprintf("\n");
 						}
 
 						/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -10830,19 +10798,17 @@ double *log_likelihood)
 		lambda) == 1)
 	{
 		#ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 		#endif
 		#ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+    error("\nProgram Terminated.\n");
 		#endif
 	}
 
@@ -10940,8 +10906,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -11026,8 +10992,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -11126,8 +11092,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -11222,8 +11188,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -11308,8 +11274,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -11407,8 +11373,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -11541,19 +11507,17 @@ int itmax)
 		lambda) == 1)
 	{
 		#ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 		#endif
 		#ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+    error("\nProgram Terminated.\n");
 		#endif
 	}
 
@@ -12780,9 +12744,8 @@ int itmax)
 		lambda) == 1)
 	{
 
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 	}
 
 	/* Conduct the estimation */
@@ -13123,19 +13086,17 @@ double *log_likelihood)
 		lambda) == 1)
 	{
 		#ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 		#endif
 		#ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+    error("\nProgram Terminated.\n");
 		#endif
 	}
 
@@ -13263,8 +13224,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
 				}
 			}
 
@@ -13390,8 +13351,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
 				}
 			}
 
@@ -13528,8 +13489,8 @@ double *log_likelihood)
 				*log_likelihood += log_DBL_MIN;
 				if(int_VERBOSE == 1)
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -13667,8 +13628,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
 				}
 			}
 
@@ -13795,8 +13756,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical_gradient()");
 				}
 			}
 
@@ -13933,8 +13894,8 @@ double *log_likelihood)
 				log_likelihood_MPI += log_DBL_MIN;
 				if((int_VERBOSE == 1)&&(my_rank == 0))
 				{
-					printf("\r                                                                           ");
-					printf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
+					REprintf("\r                                                                           ");
+					REprintf("\r** Trimming binding in kernel_estimate_con_density_categorical()");
 				}
 			}
 
@@ -14610,19 +14571,17 @@ int itmax)
 		lambda) == 1)
 	{
 		#ifndef MPI2
-		printf("\n** Error: invalid bandwidth.");
-		printf("\nProgram Terminated.\n");
-		exit(EXIT_FAILURE);
+		REprintf("\n** Error: invalid bandwidth.");
+		error("\nProgram Terminated.\n");
 		#endif
 		#ifdef MPI2
 		if(my_rank == 0)
 		{
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
+			REprintf("\n** Error: invalid bandwidth.");
 		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		exit(EXIT_FAILURE);
+    error("\nProgram Terminated.\n");
 		#endif
 	}
 
@@ -17595,19 +17554,17 @@ double zero)
 			lambda) == 1)
 		{
 			#ifndef MPI2
-			printf("\n** Error: invalid bandwidth.");
-			printf("\nProgram Terminated.\n");
-			exit(EXIT_FAILURE);
+			REprintf("\n** Error: invalid bandwidth.");
+			error("\nProgram Terminated.\n");
 			#endif
 			#ifdef MPI2
 			if(my_rank == 0)
 			{
-				printf("\n** Error: invalid bandwidth.");
-				printf("\nProgram Terminated.\n");
+				REprintf("\n** Error: invalid bandwidth.");
 			}
 			MPI_Barrier(comm[1]);
 			MPI_Finalize();
-			exit(EXIT_FAILURE);
+      error("\nProgram Terminated.\n");
 			#endif
 		}
 
@@ -17695,9 +17652,8 @@ double zero)
 			quantile[1] = quantile_multistart[1];
 
       if(int_MINIMIZE_IO != IO_MIN_TRUE){
-        printf("\r                                                                             ");
-        printf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-        fflush(stdout);
+        REprintf("\r                                                                             ");
+        REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
       }
 
 		}
@@ -17762,9 +17718,8 @@ double zero)
 					fret = fret_best;
 					quantile[1] = quantile_multistart[1];
           if(int_MINIMIZE_IO != IO_MIN_TRUE){
-            printf("\r                                                                             ");
-            printf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-            fflush(stdout);
+            REprintf("\r                                                                             ");
+            REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
           }
 				}
 
@@ -17819,9 +17774,8 @@ double zero)
 					fret = fret_best;
 					quantile[1] = quantile_multistart[1];
           if(int_MINIMIZE_IO != IO_MIN_TRUE){
-            printf("\r                                                                             ");
-            printf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-            fflush(stdout);
+            REprintf("\r                                                                             ");
+            REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
           }
 
 				}
@@ -17926,10 +17880,8 @@ double zero)
 
 			if((my_rank == 0) && (int_MINIMIZE_IO != IO_MIN_TRUE))
 			{
-				printf("\r                                                                             ");
-				printf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, stride, iNum_Ms, zero);
-				fflush(stdout);
-
+				REprintf("\r                                                                             ");
+				REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, stride, iNum_Ms, zero);
 			}
 
 		}
@@ -17995,9 +17947,8 @@ double zero)
           if((my_rank == 0) && (int_MINIMIZE_IO != IO_MIN_TRUE))
 					{
 
-						printf("\r                                                                             ");
-						printf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-						fflush(stdout);
+						REprintf("\r                                                                             ");
+						REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
 
 					}
 
@@ -18056,9 +18007,8 @@ double zero)
 
           if((my_rank == 0) && (int_MINIMIZE_IO != IO_MIN_TRUE))
 					{
-						printf("\r                                                                             ");
-						printf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
-						fflush(stdout);
+						REprintf("\r                                                                             ");
+						REprintf("\rWorking... (observation %d/%d required %d restarts to attain %g)", i+1, num_obs_eval, iNum_Ms, zero);
 
 					}
 
@@ -18578,10 +18528,9 @@ int *num_categories)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -18753,10 +18702,9 @@ int *num_categories)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -18928,10 +18876,9 @@ int *num_categories)
 
 					if(int_DEBUG == 1)
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -19357,10 +19304,9 @@ int *num_categories)
 
 					if((my_rank == 0)&&(int_DEBUG == 1))
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -19530,10 +19476,9 @@ int *num_categories)
 
 					if((my_rank == 0)&&(int_DEBUG == 1))
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
@@ -19703,10 +19648,9 @@ int *num_categories)
 
 					if((my_rank == 0)&&(int_DEBUG == 1))
 					{
-						printf("\r                                                                                        ");
-						printf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
-						printf("\n");
-						mat_dumpf( XTKX, "%g ");
+						REprintf("\r                                                                                        ");
+						REprintf("\r** XTKX[%d] is singular: adding ridge factor in kernel_estimate_regression_categorical_aic()",j);
+						REprintf("\n");
 					}
 
 					/* Add ridge factor - epsilon goes from zero to one/n*/
