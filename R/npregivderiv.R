@@ -1,5 +1,3 @@
-## $Id: npregivderiv.R,v 1.1 2012/02/25 12:36:29 jracine Exp jracine $
-
 ## This functions accepts the following arguments:
 
 ## y: univariate outcome
@@ -17,6 +15,9 @@
 
 ## phi: the IV estimator of phi(z) corresponding to the estimated
 ## deriviative phihat(z)
+## phi.prime: the IV derivative estimator
+## num.iterations: number of iterations taken by Landweber-Fridman
+## norm.stop: the stopping rule for each Landweber-Fridman iteration
 
 ## First, a series of functions for local polynomial kernel regression
 ## Functions for generalized local polynomial regression

@@ -1,5 +1,3 @@
-## $Id: npregiv.R,v 1.8 2011/05/30 19:17:35 jracine Exp jracine $
-
 ## This functions accepts the following arguments:
 
 ## y: univariate outcome
@@ -22,7 +20,7 @@
 
 ## This function returns a list with the following elements:
 
-## phihat: the IV estimator of phi(y)
+## phi: the IV estimator of phi(y)
 ## alpha:  the Tikhonov regularization parameter
 
 npregiv <- function(y,
@@ -1121,6 +1119,8 @@ npregiv <- function(y,
   if(NCOL(y) > 1) stop("y must be univariate")
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
   if(iterate.max < 2) stop("iterate.max must be at least 2")
+  if(iterate.tol <= 0) stop("iterate.tol must be positive")
+  if(constant <= 0 || constant >=1) stop("constant must lie in (0,1)")
   if(p < 0) stop("p must be a non-negative integer")
 
   if(!is.null(alpha) && alpha <= 0) stop("alpha must be positive")
@@ -1236,7 +1236,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing initial phi(z) estimate...", console)
-    phihat <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
+    phi <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
     
     ## KYWZ and KYWS no longer used, save memory
     
@@ -1246,7 +1246,7 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
 
-    hphiw <- glpcv(ydat=phihat,
+    hphiw <- glpcv(ydat=phi,
                    xdat=w,
                    degree=rep(p, num.w.numeric),
                    nmulti=nmulti,
@@ -1262,9 +1262,9 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
 
-    E.phihat.w <- glpreg(tydat=phihat,
+    E.phi.w <- glpreg(tydat=phi,
                          txdat=w,
-                         eydat=phihat,
+                         eydat=phi,
                          exdat=weval,
                          bws=hphiw$bw,
                          degree=rep(p, num.w.numeric),
@@ -1276,7 +1276,7 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
 
-    hphiwz <- glpcv(ydat=E.phihat.w,
+    hphiwz <- glpcv(ydat=E.phi.w,
                     xdat=z,
                     degree=rep(p, num.z.numeric),
                     nmulti=nmulti,
@@ -1311,7 +1311,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing final phi(z) estimate...", console)
-    phihat <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z))
+    phi <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z))
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1319,7 +1319,7 @@ npregiv <- function(y,
     if((alpha-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
     if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
     
-    return(list(phi=phihat, alpha=alpha))
+    return(list(phi=phi, alpha=alpha))
     
   } else {
 
@@ -1428,7 +1428,7 @@ npregiv <- function(y,
                     degree=rep(p, num.w.numeric),
                     ...)$mean
 
-    phihat <- phi.j.m.1
+    phi <- phi.j.m.1
 
     console <- printClear(console)
     console <- printPop(console)
