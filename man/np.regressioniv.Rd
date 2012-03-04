@@ -87,12 +87,12 @@ npregiv(y,
   }
   \item{p}{
     the order of the local polynomial regression (defaults to
-    \code{p=1}, i.e. local linear)
+    \code{p=1}, i.e. local linear).
   }
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
-    points. Defaults to \code{min(5,ncol(xdat))}.
+    points.
   }
 
   \item{random.seed}{
