@@ -351,7 +351,7 @@ MATRIX mat_fdumpf( MATRIX A, char *s, FILE *fp )
  *-----------------------------------------------------------------------------
  */
 
-MATRIX mat_error( int errno )
+/*MATRIX mat_error( int errno )
 {
 	switch( errno )
 	{
@@ -367,7 +367,7 @@ MATRIX mat_error( int errno )
 	}
 
 	return ((MATRIX)NULL);
-}
+  }*/
 
 
 /*

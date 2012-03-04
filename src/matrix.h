@@ -60,8 +60,7 @@ typedef double **MATRIX;
 #define ZERO_MATRIX 0
 #define UNIT_MATRIX 1
 
-
-MATRIX mat_error( int errno );
+/*MATRIX mat_error( int errno );*/
 MATRIX _mat_creat( int row, int col );
 MATRIX mat_creat( int row, int col, int type );
 MATRIX mat_fill( MATRIX A, int type );
