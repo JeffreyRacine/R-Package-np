@@ -214,7 +214,7 @@ npregiv(y,
   starts rising.  }
 
 \value{ \code{npregiv} returns a list with
-  components \code{phihat} and either \code{alpha} when
+  components \code{phi} and either \code{alpha} when
   \code{method="Tikhonov"} or \code{num.iterations} and \code{norm.stop}
   when \code{method="Landweber-Fridman"}.
 }
@@ -321,7 +321,7 @@ rm(y,z,w)
 attach(ivdata)
 
 model.iv <- npregiv(y=y,z=z,w=w)
-phihat.iv <- model.iv$phihat
+phi.iv <- model.iv$phi
 
 ## Now the non-iv local linear estimator of E(y|z)
 
@@ -343,7 +343,7 @@ curve(phi,min(z),max(z),
 
 points(z,y,type="p",cex=.25,col="grey")
 
-lines(z,phihat.iv,col="blue",lwd=2,lty=2)
+lines(z,phi.iv,col="blue",lwd=2,lty=2)
 
 lines(z,ll.mean,col="red",lwd=2,lty=4)
 

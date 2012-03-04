@@ -1319,7 +1319,7 @@ npregiv <- function(y,
     if((alpha-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
     if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
     
-    return(list(phihat=phihat, alpha=alpha))
+    return(list(phi=phihat, alpha=alpha))
     
   } else {
 
@@ -1545,7 +1545,7 @@ npregiv <- function(y,
 
     if(j == iterate.max) warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")
 
-    return(list(phihat=phi.j, num.iterations=j, norm.stop=norm.stop))
+    return(list(phi=phi.j, num.iterations=j, norm.stop=norm.stop))
 
   }
   
