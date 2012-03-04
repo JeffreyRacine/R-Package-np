@@ -1507,10 +1507,6 @@ npregiv <- function(y,
                                            degree=rep(p, num.z.numeric),
                                            ...)$mean
 
-##      print(paste("stopping rule h.E.phi.w=",h.E.phi.w$bw))
-##      print(paste("h.resid.w$bw=",h.resid.w$bw))
-##      print(paste("h.resid.fitted.z$bw=",h.resid.fitted.z$bw))
-      
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush(paste("Computing stopping rule for iteration ", j,"...",sep=""),console)

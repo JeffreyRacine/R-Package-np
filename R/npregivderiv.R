@@ -14,7 +14,7 @@
 ## This function returns a list with the following elements:
 
 ## phi: the IV estimator of phi(z) corresponding to the estimated
-## deriviative phihat(z)
+## derivative phihat(z)
 ## phi.prime: the IV derivative estimator
 ## num.iterations: number of iterations taken by Landweber-Fridman
 ## norm.stop: the stopping rule for each Landweber-Fridman iteration
@@ -1134,6 +1134,8 @@ npregivderiv <- function(y,
 
     if(p == 0) {
 
+      ## glpreg() does not provide local constant derivative
+
       phi.prime <- gradients(npreg(tydat=y,
                                    txdat=z,
                                    exdat=zeval,
@@ -1150,7 +1152,7 @@ npregivderiv <- function(y,
                             ...)$grad
 
       ## Not sure why this object switches rows and columns, but too
-      ## some time to track down (waste!).
+      ## much time to track down (waste!) hence hard-code.
 
       if(p == 1) {
         phi.prime <- grad.object[1,]
@@ -1301,9 +1303,6 @@ npregivderiv <- function(y,
 
   norm.stop[1] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
 
-#  plot(w[,1],E.y.w,col="red")
-#  points(w[,1],E.phi.w,col="red")  
-
   ## Now we compute mu.0 (a residual of sorts)
 
   mu <- y - phi
@@ -1429,9 +1428,6 @@ npregivderiv <- function(y,
                       ...)$mean
 
     norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
-
-#    plot(w[,1],E.y.w,col="red")
-#    points(w[,1],E.phi.w,col="red")  
 
     ## Now we compute mu.0 (a residual of sorts)
 
