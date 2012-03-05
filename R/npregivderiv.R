@@ -78,8 +78,6 @@ npregivderiv <- function(y,
   ## npregiv. This code is internal as the code in crs() will
   ## supersede it (i.e. npglpreg()).
 
-  require(np)
-
   Kmat.lp <- function(j.reg=0,
                       mydata.train=NULL,
                       mydata.eval=NULL,
