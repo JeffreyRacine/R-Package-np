@@ -66,7 +66,8 @@ npregivderiv <- function(y,
                          optim.maxit=500,
                          iterate.max=1000,
                          iterate.tol=1.0e-04,
-                         constant=0.5,
+                         iterate.diff.tol=1.0e-08,
+                         constant=0.95,
                          start.phi.zero=FALSE,
                          smooth.while.iterating=TRUE,
                          stop.on.increase=TRUE,
@@ -1049,6 +1050,7 @@ npregivderiv <- function(y,
   if(optim.maxit <= 0) stop("optim.maxit must be a positive integer")
   if(iterate.max < 2) stop("iterate.max must be at least 2")
   if(iterate.tol <= 0) stop("iterate.tol must be positive")
+  if(iterate.diff.tol < 0) stop("iterate.diff.tol must be non-negative")
   if(constant <= 0 || constant >= 1) stop("constant must lie in the range (0,1)")
 
   if(missing(y)) stop("You must provide y")
@@ -1499,6 +1501,7 @@ npregivderiv <- function(y,
     ## tolerance then break
 
     if(norm.stop[j] < iterate.tol) break()
+    if(norm.stop[j-1] - norm.stop[j] < iterate.diff.tol) break()
     if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
       phi <- phi.j.m.1 
       phi.prime <- phi.prime.j.m.1

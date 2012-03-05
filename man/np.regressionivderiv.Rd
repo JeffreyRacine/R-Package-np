@@ -33,7 +33,8 @@ npregivderiv(y,
              optim.maxit = 500,
              iterate.max = 1000,
              iterate.tol = 1.0e-04,
-             constant = 0.5,
+             iterate.diff.tol = 1.0e-08,
+             constant = 0.95,
              start.phi.zero = FALSE,
              smooth.while.iterating = TRUE,
              stop.on.increase = TRUE,
@@ -143,6 +144,11 @@ npregivderiv(y,
 }
 \item{iterate.tol}{
   the search tolerance for the stopping rule for Landweber-Fridman iteration.
+}
+\item{iterate.diff.tol}{
+  the search tolerance for the difference in the stopping rule from
+  iteration to iteration when using Landweber-Fridman iteration
+  (disable by setting to zero).
 }
 \item{constant}{
   the constant to use for Landweber-Fridman iteration.
