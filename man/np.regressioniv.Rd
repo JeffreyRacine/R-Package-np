@@ -44,7 +44,7 @@ npregiv(y,
         iterate.max = 1000,
         iterate.tol = 1.0e-04,
         iterate.diff.tol = 1.0e-08,
-        constant = 0.95,
+        constant = 0.5,
         method = c("Landweber-Fridman","Tikhonov"),
         stop.on.increase = TRUE,
         ...)
