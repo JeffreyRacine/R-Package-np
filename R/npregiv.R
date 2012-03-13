@@ -1154,6 +1154,11 @@ npregiv <- function(y,
     ## bandwidths, one for y on w and one for phi(z) on w (in the
     ## first step we use E(y|w) as a proxy for phi(z) and use
     ## bandwidths for y on w).
+
+    ## Convergence value returned for Landweber-Fridman but value
+    ## required
+
+    convergence <- NULL
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1528,14 +1533,22 @@ npregiv <- function(y,
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
 
-      if(norm.stop[j] < iterate.tol) break()
-      if(norm.stop[j-1] - norm.stop[j] < iterate.diff.tol) break()
+      if(norm.stop[j] < iterate.tol) {
+        convergence <- "ITERATE_TOL"
+        break()
+      }
+      if(norm.stop[j-1]-norm.stop[j] < iterate.diff.tol) {
+        convergence <- "ITERATE_DIFF_TOL"
+        break()
+      }
       if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
+        convergence <- "STOP_ON_INCREASE"
         phi.j <- phi.j.m.1 
         break()
       }
-      
+    
       phi.j.m.1 <- phi.j
+      convergence <- "ITERATE_MAX"      
 
     }
 
@@ -1544,7 +1557,7 @@ npregiv <- function(y,
 
     if(j == iterate.max) warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")
 
-    return(list(phi=phi.j, num.iterations=j, norm.stop=norm.stop))
+    return(list(phi=phi.j, num.iterations=j, norm.stop=norm.stop, convergence=convergence))
 
   }
   

@@ -219,10 +219,13 @@ npregiv(y,
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
   starts rising.  }
 
-\value{ \code{npregiv} returns a list with
-  components \code{phi} and either \code{alpha} when
-  \code{method="Tikhonov"} or \code{num.iterations} and \code{norm.stop}
-  when \code{method="Landweber-Fridman"}.
+\value{
+
+  \code{npregiv} returns a list with components \code{phi} and either
+  \code{alpha} when \code{method="Tikhonov"} or \code{num.iterations},
+  \code{norm.stop} and \code{convergence} when
+  \code{method="Landweber-Fridman"}.
+  
 }
 
 \references{

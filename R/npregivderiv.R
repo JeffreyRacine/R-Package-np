@@ -1498,13 +1498,22 @@ npregivderiv <- function(y,
     ## If stopping rule criterion increases or we are below stopping
     ## tolerance then break
 
-    if(norm.stop[j] < iterate.tol) break()
-    if(norm.stop[j-1] - norm.stop[j] < iterate.diff.tol) break()
+    if(norm.stop[j] < iterate.tol) {
+      convergence <- "ITERATE_TOL"
+      break()
+    }
+    if(norm.stop[j-1]-norm.stop[j] < iterate.diff.tol) {
+      convergence <- "ITERATE_DIFF_TOL"
+      break()
+    }
     if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
+      convergence <- "STOP_ON_INCREASE"
       phi <- phi.j.m.1 
       phi.prime <- phi.prime.j.m.1
       break()
     }
+    
+    convergence <- "ITERATE_MAX"      
 
   }
 
@@ -1513,7 +1522,7 @@ npregivderiv <- function(y,
 
   if(j == iterate.max) warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
 
-  return(list(phi=phi,phi.prime=phi.prime,num.iterations=j,norm.stop=norm.stop))
+  return(list(phi=phi,phi.prime=phi.prime,num.iterations=j,norm.stop=norm.stop,convergence=convergence))
 
 }
 

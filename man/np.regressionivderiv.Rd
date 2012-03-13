@@ -212,8 +212,12 @@ npregivderiv(y,
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
   starts rising.  }
 
-\value{ \code{npregivderiv} returns a list with components
-  \code{phi.prime}, \code{phi}, \code{num.iterations} and \code{norm.stop}.
+\value{
+
+  \code{npregivderiv} returns a list with components \code{phi.prime},
+  \code{phi}, \code{num.iterations}, \code{norm.stop} and
+  \code{convergence}.
+  
 }
 
 \references{
