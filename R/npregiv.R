@@ -1542,7 +1542,7 @@ npregiv <- function(y,
         phi.j <- phi.j.m.1 
         break()
       }
-      if(norm.stop[j-1]-norm.stop[j] < iterate.diff.tol) {
+      if(abs(norm.stop[j-1]-norm.stop[j]) < iterate.diff.tol) {
         convergence <- "ITERATE_DIFF_TOL"
         break()
       }
