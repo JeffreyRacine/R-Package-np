@@ -1502,14 +1502,14 @@ npregivderiv <- function(y,
       convergence <- "ITERATE_TOL"
       break()
     }
-    if(norm.stop[j-1]-norm.stop[j] < iterate.diff.tol) {
-      convergence <- "ITERATE_DIFF_TOL"
-      break()
-    }
     if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
       convergence <- "STOP_ON_INCREASE"
       phi <- phi.j.m.1 
       phi.prime <- phi.prime.j.m.1
+      break()
+    }
+    if(norm.stop[j-1]-norm.stop[j] < iterate.diff.tol) {
+      convergence <- "ITERATE_DIFF_TOL"
       break()
     }
     
