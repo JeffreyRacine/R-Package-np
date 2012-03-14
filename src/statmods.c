@@ -178,24 +178,6 @@ double standerrd(int n, double *vector)
 
     free(vector_temp);
 
-    /*    if(IQR < DBL_MIN)
-      {
-        if(int_VERBOSE == 1)
-          {
-#ifdef MPI2
-            if(my_rank == 0)
-              {
-#endif
-                REprintf("\nFunction standerrd(): invalid interquartile range estimate (%d,%d,%lg)", fround(3.0*(double)n/4.0), fround((double)n/4.0), IQR);
-                REprintf("\nsum = %lg, sumsq = %lg, n = %d", (double) sum, (double) sumsq, n);
-#ifdef MPI2
-              }
-#endif
-          }
-        return((double)0.0);
-      }
-    */
-
     pi = &vector[0];
     
     for(i=0; i < n; i++)
@@ -2507,16 +2489,10 @@ double *vector_continuous_stddev)
             if(vector_continuous_stddev[i] <= DBL_MIN)
             {
 #ifdef MPI2
-                if(my_rank == 0)
-                {
+              /* Since program terminates, clean up */
+              MPI_Finalize();
 #endif
-                    REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i);
-#ifdef MPI2
-                }
-/* Since program terminates, clean up */
-                MPI_Finalize();
-#endif
-                error("\n ** Program terminated abnormally!\n");
+              error("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i);
             }
 
         }
@@ -2529,18 +2505,12 @@ double *vector_continuous_stddev)
             if(vector_continuous_stddev[i+num_reg_continuous] <= DBL_MIN)
             {
 #ifdef MPI2
-                if(my_rank == 0)
-                {
+              /* Since program terminates, clean up */
+              MPI_Finalize();
 #endif
-                    REprintf("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i+num_reg_continuous);
-#ifdef MPI2
-                }
-/* Since program terminates, clean up */
-                MPI_Finalize();
-#endif
-                error("\n ** Program terminated abnormally!\n");
+              error("\r ** Fatal Error in routine kernel_bandwidth() ** variable %d appears to be constant!", i+num_reg_continuous);
             }
-
+            
         }
 
     }

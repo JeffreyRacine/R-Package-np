@@ -210,19 +210,11 @@ double *kernel_sum)
 		matrix_bandwidth,
 		lambda) == 1)
 	{
-#ifndef MPI2
-		REprintf("\n** Error: invalid bandwidth.");
-		error("\nProgram Terminated.\n");
-#endif
 #ifdef MPI2
-		if(my_rank == 0)
-		{
-			REprintf("\n** Error: invalid bandwidth.");
-		}
 		MPI_Barrier(comm[1]);
 		MPI_Finalize();
-		error("\nProgram Terminated.\n");
 #endif
+		error("\n** Error: invalid bandwidth.");
 	}
 
 #ifndef MPI2
