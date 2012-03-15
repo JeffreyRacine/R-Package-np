@@ -172,7 +172,7 @@ npregivderiv(y,
 }
 \item{smooth.residuals}{
   a logical value (defaults to \code{TRUE}) indicating whether to
-  optimize bandidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
+  optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
   on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
   \eqn{w} during Landweber-Fridman iteration.
  }
