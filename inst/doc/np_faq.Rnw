@@ -1,0 +1,1941 @@
+%% $Id: np_faq.tex,v 1.72 2012/03/15 15:07:11 jracine Exp jracine $
+
+%\VignetteIndexEntry{Frequently Asked Questions (np)}
+%\VignetteDepends{np}
+%\VignetteKeywords{nonparametric, kernel, categorical}
+%\VignettePackage{np}
+
+\documentclass[12pt]{amsart}
+
+\tolerance=5000
+
+\usepackage{setspace,srcltx,hyperref}
+
+\newcommand{\field}[1]{\mathbb{#1}} \newcommand{\R}{\field{R}}
+
+%% Change the default page sizes.
+
+\setlength{\topmargin}{-0.25in} \setlength{\textheight}{8.5in}
+\setlength{\oddsidemargin}{.0in} \setlength{\evensidemargin}{.0in}
+\setlength{\textwidth}{6.5in} \setlength{\footskip}{.5in}
+
+\title{Package {\tt np} FAQ} \date{\today} \author{Jeffrey S.~Racine}
+
+\begin{document}
+
+\maketitle
+
+\tableofcontents
+
+\onehalfspacing
+
+\section{Overview and Current Version}
+
+This set of frequently asked questions is intended to help users who
+are encountering unexpected or undesired behavior when trying to use
+the {\tt np} package.
+
+Many of the underlying C routines have been extensively tested over
+the past two decades. However, the {\tt R} `hooks' needed to call
+these routines along with processing of the data required for a
+seamless user experience may produce unexpected or undesired results
+in some settings.
+
+Kindly report any issues you encounter to me, and please include your
+code, data, version of the package and version of R used so that I can
+help track down any such issues
+(\href{mailto:racinej@mcmaster.ca}{racinej@mcmaster.ca}). And, of
+course, if you encounter an issue that you think might be of interest
+to others, kindly email me the relevant information and I will
+incorporate it into this FAQ.
+
+This FAQ refers to the most recent version, which as of this writing
+is 0.40-13. Kindly update your version should you not be using the most
+current (from within R, {\tt update.packages()} ought to do it, though
+also see \ref{update} below.). See the appendix in this file for
+cumulative changes between this and previous versions of the {\tt np}
+package.
+
+\section{Frequently Asked Questions}
+
+\subsection{How do I cite the {\tt np} package?}
+
+Once you have installed the {\tt np} package ({\tt
+  install.packages("np")}), if you load the {\tt np} package ({\tt
+  library("np")}) and type {\tt citation(\verb+"+np\verb+"+)} you will
+be presented with the following information.
+
+  \begin{singlespacing}
+\begin{verbatim}
+> citation("np")
+
+To cite np in publications use:
+
+  Tristen Hayfield and Jeffrey S. Racine (2008). Nonparametric
+  Econometrics: The np Package. Journal of Statistical Software
+  27(5). URL http://www.jstatsoft.org/v27/i05/.
+
+A BibTeX entry for LaTeX users is
+
+  @Article{,
+    title = {Nonparametric Econometrics: The np Package},
+    author = {Tristen Hayfield and Jeffrey S. Racine},
+    journal = {Journal of Statistical Software},
+    year = {2008},
+    volume = {27},
+    number = {5},
+    url = {http://www.jstatsoft.org/v27/i05/},
+  }
+\end{verbatim}
+  \end{singlespacing}
+
+\subsection{I have never used {\tt R} before. Can you direct me to some
+    introductory material that will guide me through the basics?}
+
+  There are many excellent introductions to the {\tt R} environment
+  with more on the way. First, I would recommend going directly to the
+  {\tt R} website (\url{http://www.r-project.org}) and looking under
+  Documentation/Manuals (\url{http://cran.r-project.org/manuals.html})
+  where you will discover a wealth of documentation for {\tt R} users
+  of all levels. See also the {\tt R} task views summary page
+  (\url{http://cran.nedmirror.nl/web/views/index.html}) for
+  information grouped under field of interest. A few documents that I
+  mention to my students which are tailored to econometricians include
+  \url{http://cran.r-project.org/doc/contrib/Verzani-SimpleR.pdf},
+  Cribari-Neto \& Zarkos (1999) \cite{CRIBARI_NETO_ZARKOS:1999},
+  Racine \& Hyndman (2002) \cite{RACINE_HYNDMAN:2002} and Farnsworth
+  (2006) \cite{FARNSWORTH:2006}, to name but a few.
+
+  Those looking for exemplar data sets outside of those contained in
+  the {\tt np} package are directed to the {\tt Ecdat} \cite{Ecdat}
+  and {\tt AER} \cite{AER} packages.
+
+  Often the best resource is right down the hall. Ask a colleague
+  whether they use or know anyone who uses R, then offer to buy that
+  person a coffee and along the way drop something like ``I keep
+  hearing about the {\tt R} project\dots I feel like such a
+  Luddite\dots''
+
+  \subsection{\label{update}How do I keep all {\tt R} packages on my
+    system current?}
+
+  Run the command {\tt update.packages(checkBuilt=TRUE,ask=FALSE)},
+  which will not only update all packages that are no longer current,
+  but will also update all packages built under outdated installed
+  versions of R, if appropriate.
+
+\subsection{It seems that there are a lot of packages that must be
+    installed in order to conduct econometric analysis (tseries,
+    lmtest, np, etc.). Is there a way to avoid having to individually
+    install each package individually?}
+
+  Certainly. The Comprehensive R Archive Network (CRAN) is a network
+  of ftp and web servers around the world that store identical,
+  up-to-date, versions of code and documentation for {\tt R}.  The
+  CRAN `task view' for computational econometrics might be of
+  particular interest to econometricians.  The econometric task view
+  provides an excellent summary of both parametric and nonparametric
+  econometric packages that exist for the R environment and provides
+  one-stop installation for these packages.
+
+See
+\href{http://cran.r-project.org/web/views/Econometrics.html}{cran.r-project.org/web/views/Econometrics.html} for further information.
+
+To automatically install a task view, the {\tt ctv} package first
+needs to be installed and loaded, i.e.,
+\begin{verbatim}
+install.packages("ctv")
+library("ctv")
+\end{verbatim}
+
+The econometric task view can then be installed via {\tt
+  install.views()} and updated via {\tt update.views()} (which first
+assesses which of the packages are already installed and up-to-date), i.e.,
+\begin{verbatim}
+install.views("Econometrics")
+\end{verbatim}
+or
+\begin{verbatim}
+update.views("Econometrics")
+\end{verbatim}
+
+\subsection{Is there a `gentle guide' to the {\tt np} package that
+    contains some easy to follow examples?}
+
+  Perhaps the most gentle introduction is contained in the {\tt np}
+  package itself in the form of a `vignette'. To view the vignette run
+  R, install the {\tt np} package ({\tt install.packages("np")}), then
+  type {\tt vignette("np",package="np")} to view or print the vignette
+  (this vignette is essentially the article that appeared in the
+  Journal of Statistical Software that describes the {\tt np} package
+  (Hayfield \& Racine \cite{HAYFIELD_RACINE:2008})).
+
+  See also {\tt vignette("entropy\_np",package="np")} for a vignette
+  on the entropy-based functions and procedures introduced to the {\tt
+    np} package in versions 0.30-4 through 0.30-8.
+
+  In addition, you might be interested in the nonparametric
+  econometrics primer (Racine \cite{RACINE:2008}) which is available
+  for download from my website as is the code that will generate the
+  examples contained therein.
+
+  For a listing of all routines in the {\tt np} package type: {\tt
+    library(help="np")}.
+
+\subsection{I noticed you have placed a new version of the {\tt np}
+    package on CRAN. How can I determine what has been changed,
+    modified, fixed etc?}
+
+  See the CHANGELOG on the CRAN site
+  (\url{http://cran.r-project.org/web/packages/np/ChangeLog}), or go
+  to the end of this document where the CHANGELOG is provided for your
+  convenience.
+
+\subsection{What is the difference between the {\tt np} package and the
+    previous stand-alone programs you wrote, namely, N \copyright,
+    NPREG \copyright, and NPDEN \copyright?}
+
+  The {\tt np} package is built from the same C library that underlies
+  its predecessors N \copyright, NPREG \copyright, and NPDEN
+  \copyright. In fact, {\tt R} calls the compiled C code that
+  underlies its predecessors (one of the beauties of {\tt R} is that
+  you can obtain the benefits of compiled code (i.e., speed) yet have
+  access to the rich superset of {\tt R} routines and {\tt R} packages
+  built by others). Therefore, there is no penalty in run-time when
+  using R versus the stand alone precompiled binary programs N
+  \copyright, NPREG \copyright, and NPDEN \copyright\, (unless of
+  course the compiler or compiler flags differ from those used to
+  build its predecessors).
+
+\subsection{How can I read data stored in various formats such as
+    Stata, SAS, Minitab, SPSS etc.~into the R program?}
+
+  Install the foreign library via {\tt install.packages("foreign")}
+  then do something like
+  \begin{singlespacing}
+\begin{verbatim}
+mydat <- read.dta("datafile.dta"),
+\end{verbatim}
+  \end{singlespacing}
+  where {\tt datafile.dta} is the name of your Stata data file. Note
+  that, as of version 0.8-34, the foreign package function {\tt
+    read.dta} supports reading files directly over the Internet making
+  for more portable code. For instance, one could do something like
+\begin{verbatim}
+mydat <- read.dta(file="http://www.principlesofeconometrics.com/stata/mroz.dta")
+\end{verbatim}
+as one could always do with, say, {\tt read.table()}.
+
+\subsection{I want to use so-and-so's semiparametric/nonparametric
+    method, however, the {\tt np} package does not include this
+    particular method\dots}
+
+  This is why we have included the function {\tt npksum()}, which
+  exists so that you can create your own kernel objects and take
+  advantage of underlying kernel methods implemented in the {\tt np}
+  package without having to write, say, C or Fortran code.
+
+  With the options available, you could create new nonparametric tests
+  or even new kernel estimators. For instance, the convolution kernel
+  option would allow you to replicate, say, the least squares
+  cross-validation function for kernel density estimation found in
+  {\tt npudensbw()}. The function {\tt npksum()} uses highly-optimized
+  C code that strives to minimize its memory footprint, while there is
+  low overhead involved when using repeated calls to this function.
+
+  See, by way of illustration, the example in the {\tt npksum()} help
+  file that conducts leave-one-out cross-validation for a local
+  constant regression estimator via calls to the {\tt R} function {\tt
+    nlm()}, and compares this to the {\tt npregbw()} function.
+
+  If you wish to have a method incorporated into a future version of
+  the {\tt np} package, the best way to achieve this is to
+  successfully code up the method using {\tt npksum()}, briefly
+  document it and write up an example, then send it to us. We will
+  then, at our discretion, do our best to adapt and incorporate this
+  into a future version and of course give credit where credit is due.
+
+\subsection{Cross-validation takes forever, and I can't wait that
+    long\dots}
+
+  This is the most common complaint from frustrated users coming to
+  terms with numerically demanding statistical methods.  I am fond of
+  saying `if you want the wrong answer, I can give it to you right
+  away', but this wears thin quickly.
+
+  \begin{enumerate}
+
+  \item Some background may be in order. Cross-validation methods have
+    run times that are proportional to the square of the number of
+    observations (of computational order $n^2$ hence a doubling of the
+    sample size will increase run time by a factor of four). The
+    solution I favor is to run the code in a parallel computing
+    environment. The underlying C code for {\tt np} is MPI-aware (MPI
+    denotes the `message passing interface', a popular parallel
+    programming library that is an international standard), and a
+    version of the {\tt np} package titled `{\tt npRmpi}' exists for
+    running jobs in a parallel environment that leverages the {\tt
+      Rmpi} package (\cite{Rmpi}).\footnote{We are extremely grateful
+      to Hao Yu for providing the MPI functionality contained in the
+      {\tt Rmpi} package.}
+
+    With respect to the {\tt npRmpi} package, kindly note that I
+    cannot assist with issues surrounding installation and setup due
+    to the vast heterogeneity of MPI implementations and methods for
+    executing such programs. You are instead strongly advised to seek
+    local advice from your sysadmin or others. The document {\tt
+      npRmpi.pdf} may contain some useful information for such
+    issues. You might also want to first get the {\tt Rmpi} package
+    installed and running properly as once you are at this stage it
+    ought to then be trivial to install the {\tt npRmpi} package. Also
+    note that running programs in a parallel environment requires
+    minor differences in how {\tt np} functions are called, and you
+    would be wise to examine the examples in the demo directory
+    (download and unpack the source code and look in this directory)
+    and the overview file {\tt npRmpi.pdf} in the inst/doc/ directory of
+    the {\tt npRmpi} package you downloaded and unpacked.
+    
+  \item Alternatively, you can use the method outlined in Racine
+    (1993) \cite{RACINE:1993}. The method is based on the fact that
+    the unknown constant $c_j$ (the `scale factor') in the formula
+    $c_j\sigma_j n^{-1/(2p+r)}$ is independent of the sample size, so
+    one can conduct bandwidth selection on random subsets and do this
+    for a large number of subsets then take the mean/median over these
+    subsets and feed the scale factor into the final routine for the
+    entire sample. Below you will find simple {\tt R} code that
+    replicates the method using numerical search and resampling
+    without replacement rather than the grid method outlined in
+    \cite{RACINE:1993} (both have equivalent properties but this is
+    perhaps simpler to implement using the {\tt np} package).
+
+    \begin{singlespacing}
+\begin{verbatim}
+## Regression example
+## Generate a moderately large data set
+
+set.seed(12345)
+n <- 100000
+x1 <- runif(n)
+x2 <- runif(n)
+
+y <- 1 + x1 + sin(pi*x2) + rnorm(n,sd=.1)
+
+## Set the number of resamples and the subsample size
+
+num.res <- 50
+n.sub <- 250
+
+## Create a storage matrix
+
+bw.mat <- matrix(NA,nrow=num.res,ncol=2)
+
+## Get the scale factors for resamples from the full sample of size n.sub
+
+options(np.messages=FALSE)
+
+for(i in 1:num.res)  {
+
+  cat(paste(" Replication", i, "of", num.res, "...\r"))
+
+  bw.mat[i,] <- npregbw(y~x1+x2,regtype="ll",
+                        subset=sample(n,n.sub))$sfactor$x
+
+}
+
+## A function to compute the median of the columns of a matrix
+
+colMedians <- function(data) {
+  colmed <- numeric(ncol(data))
+  for(i in 1:ncol(data)) {
+    colmed[i] <- median(data[,i])
+  }
+  return(colmed)
+}
+
+## Take the median scale factors
+
+bw <- colMedians(bw.mat)
+
+## The final model for the full dataset
+
+model.res <- npreg(y~x1+x2,bws=bw,regtype="ll",bwscaling=TRUE)
+\end{verbatim}
+    \end{singlespacing}
+
+\begin{singlespacing}
+\begin{verbatim}
+## Hat tip to Yoshi Fujiwara <yoshi.fujiwara@gmail.com> for this 
+## nice example
+
+n <- 100000
+
+library(MASS)
+rho <- 0.25
+Sigma <- matrix(c(1,rho,rho,1),2,2)
+mydat <- mvrnorm(n=n, rep(0, 2), Sigma)
+x <- mydat[,1]
+y <- mydat[,2]
+rm(mydat)
+
+num.res <- 100
+n.sub <- 100
+
+bw.mat <- matrix(NA,nrow=num.res,ncol=2)
+options(np.messages=F)
+for(i in 1:num.res) {
+  bw <- npcdensbw(y ~ x,subset=sample(n,n.sub))
+  bw.mat[i,] <- c(bw$sfactor$y,bw$sfactor$x)
+}
+
+colMedians <- function(data) {
+ colmed <- numeric(ncol(data))
+ for(i in 1:ncol(data)) {
+   colmed[i] <- median(data[,i])
+ }
+ return(colmed)
+}
+
+bw <- colMedians(bw.mat)
+bw <- npcdensbw(y ~ x, bws=bw, bwscaling=TRUE, bandwidth.compute=FALSE)
+summary(bw)
+plot(bw,xtrim=.01)
+\end{verbatim}
+\end{singlespacing}
+
+  \item Barring this, you can set the search tolerances to be a bit
+    less terse (at the expense of potential accuracy, i.e., becoming
+    trapped in local minima) by setting, say, {\tt tol=0.1} and {\tt
+      ftol=0.1} in the respective bandwidth routine (see the docs for
+    examples). Also, you can set {\tt nmulti=1} which overrides the
+    number of times the search procedure restarts from different
+    random starting values (the default is to restart $k$ times where
+    $k$ is the number of variables). Be warned, however, that this is
+    {\em definitely not recommended} and should {\em be avoided at all
+      costs} for all but the most casual examination of a
+    relationship. One ought to use multistarting for any final results
+    and never override default search tolerances {\em unless
+      increasing multistarts beyond the default}. Results based upon
+    exhaustive search {\em often differ dramatically} from that based
+    on limited search achieved by overriding default search
+    tolerances.
+
+  \item For those who like to tinker and who work on a *NIX system
+    with the gcc compiler suite, you can change the default compiler
+    switches used for building {\tt R} packages which may generate
+    some modest improvements in run time. The default compiler
+    switches are
+    \begin{singlespacing}
+\begin{verbatim}
+ -g -O2
+\end{verbatim}
+    \end{singlespacing}
+    and are set in the R-*.*.*/etc/Makeconf file (where *.*.* refers
+    to your {\tt R} version number, e.g. R-2.10.1).  You can edit this
+    file and change these defaults to
+    \begin{singlespacing}
+\begin{verbatim}
+-O3 -ffast-math -fexpensive-optimizations -fomit-frame-pointer
+\end{verbatim}
+    \end{singlespacing}
+    then reinstall the {\tt np} package and you may experience some
+    improvements in run time. Note that the -g flag turns on
+    production of debugging information which can involve some
+    overhead, so we are disabling this feature. This is not a feature
+    used by the typical applied researcher but if you envision
+    requiring this it is clearly trivial to re-enable debugging. I
+    typically experience in the neighborhood of a 0-5\% reduction in
+    run time for data-driven bandwidth selection on a variety of
+    systems depending on the method being used, though mileage will of
+    course vary.
+
+  \item Finally, I have recently been working on extending regression
+    splines (as opposed to smoothing splines\footnote{Unlike
+      regression splines, a smoothing spline places a knot at each
+      data point and penalizes the fit for lack of smoothness as
+      defined by the second derivative (typically cubic splines are
+      used). When the penalty is zero this produces a function that
+      interpolates the data points. When the penalty is infinite, this
+      delivers the linear OLS fit to the data.}) to admit categorical
+    predictors (see references for papers with Yang and Ma in the {\tt
+      crs} package). Because regression splines involve simple
+    least-squares fits, they scale much better with respect to the
+    sample size so for large sample sizes you may wish to instead
+    consider this approach (kindly see my webpage for further
+    details). You can run cross-validation with hundreds of thousands
+    of observations on a decent desktop in far less time than that
+    required for cross-validated kernel estimates.
+
+  \end{enumerate}
+
+\subsection{I estimated a parametric model using the
+  \texttt{lm()} function. How can I compare the cross-validation score
+  from the \texttt{npreg()} approach with that for the parametric
+  model?}
+
+This can be readily achieved for the parametric model as follows:
+\begin{verbatim}
+data(wage1)
+model.lm <- lm(lwage ~ married + female + nonwhite + educ +
+                       exper + tenure, data = wage1)
+cv.lm <-mean(residuals(model.lm)^2/(1-hatvalues(model.lm))^2)                                      
+cv.lm
+\end{verbatim}
+You can then compare \verb+cv.lm+ with the cross-validation score for
+the \verb+npreg+ object as follows: if your model is named \verb+foo+
+(i.e.\ you ran something like \verb^foo <- npreg(y~x1+x2)^) then
+\verb+summary(foo$bws)+ will give you a summary of the model's
+bandwidth object (the value of the objective function is the
+cross-validation score), while \verb+foo$bws$fval+ will give you the
+function value, i.e.\ the value of the cross-validation function, {\em
+  provided} that the model was estimated via least-squares
+cross-validation (default, \verb+bwmethod="cv.ls"+). If the
+cross-validation score is lower for one model, that indicates that the
+model possessing the lowest score is to be preferred.
+
+\subsection{Is
+    there a way to figure out roughly how long
+    cross-validation will take on a large sample?}
+
+  Certainly. You can run cross-validation on subsets of your data of
+  increasing size and time each run, then estimate a double-log model
+  of sample size on run time (run time can be approximated by a linear
+  log-log model) and then use this to predict approximate
+  run-time. The following example demonstrates this for a simple
+  model, but you can modify it trivially for your data. Note that the
+  larger is {\tt n.max} the more accurate it will likely be. Note that
+  we presume your data is in no particular order (if it is, you
+  perhaps ought to shuffle it first). We plot the log-log model fit
+  and prediction along with that expressed in hours.
+
+  \begin{singlespacing}
+\begin{verbatim}
+## Set the upper bound (n.max > 100) for the sub-samples on which you 
+## will run cross-validation (perhaps n.max = 1000 (or 2000) ought to 
+## suffice). For your application, n will be your sample size
+
+n <- 2000
+n.max <- 1000
+
+x <- runif(n)
+y <- 1 + x + rnorm(n)
+
+n.seq <- seq(100,n.max,by=100)
+time.seq <- numeric(length(n.seq))
+
+for(i in 1:length(n.seq)) {
+  time.seq[i] <- system.time(npregbw(y~x,subset=seq(1:n.seq[i])))[3]
+}
+
+## Now fit a double-log model and generate/plot actual values plus
+## prediction for n (i.e., approximate run time in hours)
+
+log.time <- log(time.seq)
+log.n <- log(n.seq)
+
+model <- lm(log.time~log.n)
+
+n.seq.aug <- c(n.seq,n)
+time.fcst <- exp(predict(model,newdata=data.frame(log.n=log(n.seq.aug))))
+
+par(mfrow=c(2,1))
+
+plot(log(n.seq.aug),log(time.fcst),type="b",
+     xlab="log(Sample Size)",
+     ylab="log(Run Time)",
+     main="Approximate Run Time (log seconds)")
+
+plot(n.seq.aug,time.fcst/3600,type="b",
+     xlab="Sample Size (n)",
+     ylab="Hours",
+     main="Approximate Run Time (hours)",
+     sub=paste("Predicted run time for n =", n, "observations:",
+     signif(time.fcst[length(time.fcst)]/3600, digits=2),
+     "hours"))
+\end{verbatim}
+  \end{singlespacing}
+
+\subsection{I notice your density estimator supports manual bandwidths,
+    the normal-reference rule-of-thumb, likelihood cross-validation
+    and least squares cross-validation, but not plug-in rules. How can
+    I use various plug-in rules for estimating a univariate density?}
+
+  For the univariate case this is straightforward as the default R
+  installation supports a variety of univariate plug-in bandwidths
+  (see {\tt ?bw.nrd} for details). For example, {\tt bs.SJ} computes
+  the bandwidths outlined in
+
+\begin{verbatim}
+     Sheather, S. J. and Jones, M. C. (1991) A reliable data-based
+     bandwidth selection method for kernel density estimation.
+     _Journal of the Royal Statistical Society series B_, *53*,
+     683-690.
+\end{verbatim}
+
+  Incorporating these univariate plug-in bandwidth selectors into the
+  univariate density estimation routines in {\tt np} is
+  straightforward as the following code snippet demonstrates. They
+  will certainly be faster than the likelihood and least-squares
+  cross-validation approaches. Also, you may not wish the density
+  estimate for all sample realizations, but rather for a shorter
+  grid. The following example demonstrates both and is closer in
+  spirit to the {\tt density()} function in base R.
+
+\begin{verbatim}
+x <- rnorm(10000)
+xeval <- seq(min(x),max(x),length=100)
+f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
+\end{verbatim}
+
+  You might even be tempted to use these in the multivariate case via
+  {\tt bws=c(bw.SJ(x1),bw.SJ(x2),...)} though these would be optimal
+  for univariate densities and most certainly not for a multivariate
+  density. However, for exploratory purposes these may be of interest
+  to some users.
+
+\subsection{\label{code_nowork}I wrote a program using {\tt np} and it
+    does not work as I expected\dots}
+
+  There exist a rather extensive set of examples contained in the
+  docs. You can run these examples by typing {\tt
+    example("npfunctionname")} where npfunctionname is, say, {\tt w},
+  as in {\tt example("w")}.\footnote{For a listing of all routines in
+    the np package type: {\tt library(help="np")}.} These examples
+  all pass quality control and produce the expected results, so first
+  see whether your problem fits into an existing example, and if not,
+  carefully follow the examples listed in a given function for syntax
+  issues etc.
+
+  If you are convinced that the problem lies with {\tt np} (there
+  certainly will be undiscovered `features', i.e., bugs), then kindly
+  send me your code and data so that I can replicate and help resolve
+  the issue.
+
+\subsection{Under Mac OS X, when I run a command no progress is
+    displayed\dots}
+
+  This should no longer occur for np versions 0.30-0 and up. For
+  previous versions, this reflected a peculiarity of console
+  input/output (I/O) under Mac OS X.  Note, however, that if you run {
+    \tt R} in a terminal rather than {\tt Rgui} you will get the full
+  *NIX\footnote{*NIX is often used to describe UNIX and other
+    UNIX-like platforms (i.e., UNIX, BSD, and GNU/Linux
+    distributions). I harbour strong preferences for *NIX computing
+    platforms.}  experience. 
+
+  But also note that there is a platform-independent interface that
+  does not suffer from this limitation called `RStudio' that you might
+  prefer to existing interfaces (\url{http://www.rstudio.org}).
+
+\subsection{When some routines are running under MS Windows, {\tt R}
+    appears to be `not responding.' It appears that the program is not
+    `hung', rather is simply computing. The previous stand-alone
+    program (N \copyright) always displayed useful information\dots}
+
+  This should no longer occur for np versions 0.30-0 and up. For
+  previous versions, this reflected a peculiarity of the R Windows
+  GUI, and was not specific to the {\tt np} package.
+
+  From the {\tt R} Windows FAQ\dots
+
+  ``When using Rgui the output to the console seems to be delayed.
+  This is deliberate: the console output is buffered and re-written in
+  chunks to be faster and less distracting. You can turn buffering off
+  or on from the `Misc' menu or the right-click menu: \verb+<Ctrl-W>+
+  toggles the setting.''
+
+\subsection{Some results take a while, and my MS Windows computer is
+    sluggish while {\tt R} is running\dots}
+
+  You can easily change the priority of your {\tt R} job on the fly,
+  just as you might under *NIX.  Pull up the task manager
+  (\verb+<Ctrl>-<Alt>-<Del>+), go to the process list, and find the
+  process {\tt Rgui.exe} (or {\tt R.exe} if you are running {\tt
+    Rterm}), select this process by left clicking on it, then right
+  clicking will bring up a menu, select {\tt Set priority}, then
+  change priority to {\tt low} and hit $<${\tt ok}$>$. For lengthy
+  jobs this will make your life much smoother, and you can, say, run
+  multiple jobs in low priority with no sluggishness whatsoever for
+  your other applications (useful for queuing a number of long
+  jobs). Alternatively, you could permanently change the default
+  priority of {\tt R} under MS Windows by modifying the properties of
+  your {\tt R} desktop icon.
+
+\subsection{\label{factor}A variable must be cast as, say, a factor in
+    order for {\tt np} to recognize this as an unordered factor. How
+    can I determine whether my data is already cast as a factor?}
+
+  Use the {\tt class()} function. For example, define {\tt x <-
+    factor(c("male","female"))}, then type {\tt class(x)}.
+
+\subsection{When I use {\tt plot()} {\tt (npplot())} existing graphics
+    windows are overwritten. How can I display multiple graphics plots
+    in separate graphics windows so that I can see results from
+    previous runs and compare that to my new run?}
+
+  Use the {\tt dev.new()} command in between each call to {\tt
+    plot()}. This will leave the existing graphics window open and
+  start a new one. The command {\tt dev.list()} will list all graphics
+  windows, and the command {\tt dev.set(integer.foo)} will allow you
+  to switch from one to another and overwrite existing graphics
+  windows should you so choose.
+
+  Alternately, you can use RStudio (\url{http://www.rstudio.org})
+  where the plot window is such that previous plots can be recalled on
+  the fly, resized, saved in various formats etc.
+
+\subsection{\label{plot names}Sometimes {\tt plot()} fails to use my
+    variable names\dots}
+
+  This should not occur unless you are using the data frame method and
+  not naming your variables (e.g., you are doing something like
+  data.frame(ordered(year))). To correct this, name your variables in
+  the respective data frame, as in
+
+  {\tt data <- data.frame(year=ordered(year),gdp)}
+
+  \noindent so that the ordered factor appears as `year' and not
+  `ordered.year'
+
+\subsection{Sometimes {\tt plot()} appends my variable names with
+    .ordered or .factor\dots}
+
+  See also \ref{plot names} above.
+
+\subsection{I specify a variable as {\tt factor()} or {\tt ordered()}
+    in a data frame, then call this when I conduct bandwidth
+    selection. However, when I try to plot the resulting object, it
+    complains with the following message:}
+
+    {\tt Error in eval(expr, envir, enclos) : object "variable" not
+      found\dots}
+
+  This arises because {\tt plot()} ({\tt npplot()}) tries to retrieve
+  the variable from the environment but you have changed the
+  definition when you called the bandwidth selection routine (e.g.,
+  {\tt npregbw(y\verb+~+x,data=dataframe)}).
+
+  To correct this, simply call {\tt plot()} with the argument {\tt
+    data=dataframe} where {\tt dataframe} is the name of your
+  data frame.
+
+\subsection{My {\tt np} code produces errors when I attempt to run
+    it\dots}
+
+  First, it is good practice to name all arguments (see the docs for
+  examples) as in {\tt npregbw(formula=y\verb+~+x)} (i.e., explicitly
+  call formula for functions that use named formulas). This will help
+  the code return a potentially helpful error message.
+
+  Next, follow the examples listed at the end of each function help
+  page closely (i.e., {\tt ?npreg} then scroll down to {\tt
+    Examples:}). See also \ref{code_nowork} above.
+
+\subsection{\label{0/1}I have (numeric) 0/1 dummy variable regressors
+    in my parametric model. Can I just pass them to the {\tt np}
+    functions as I would in a parametric setting?}
+
+  In general, definitely not -- you need to correctly classify each
+  variable as type {\tt factor} and treat it as one variable only. By
+  way of example, suppose in your data you have created dummy
+  variables for year, for example, dummy06 which equals 1 for 2006, 0
+  otherwise, dummy07 which equals 1 for 2007, 0 otherwise etc. We
+  create these by habit for parametric models. But, the underlying
+  variable is simply year, which equals 2006, 2007, and so forth.
+
+  In {\tt np} (and {\tt R} in general), you get to economize by just
+  telling the function that the variable `year' is ordered, as in
+  ordered(year), where year is a vector containing elements 2006, 2007
+  etc. Of course, seasoned R users would appreciate that this is in
+  fact the simple way to do it with a parametric model as well.
+
+  You would {\em never}, therefore, just pass dummy variables to an
+  {\tt np} function as you would for linear parametric models. The
+  {\em only} exception is where you have only one 0/1 dummy for one
+  variable, say `{\tt sex}', and in this case you still would have to
+  enter this as {\tt factor(sex)} so that the {\tt np} function
+  recognizes this as a factor (otherwise it would treat it as
+  continuous and use a kernel function that is inappropriate for a
+  factor).
+
+\subsection{\label{terminates}I have a categorical variable, ignored
+    the advice in items \ref{factor} and \ref{0/1}, and R terminates
+    with the following error.}
+
+\begin{verbatim}
+ ** Fatal Error in routine kernel_bandwidth() ** variable 0 appears to be constant!
+ ** Program terminated abnormally!
+\end{verbatim}
+
+  Presuming your variable is not in fact a constant (i.e., is not in
+  fact a `variable'), this can only occur in the case where a variable
+  is `pathological' in that it has {\tt IQR=0} but {\tt std>0} (see
+  the section titled `Changes from Version 0.30-1 to 0.30-2
+  [19-Apr-2009]' for further details).  This should no longer occur
+  for np versions 0.30-2 and up.
+
+\subsection{Rgui appears to crash. There must be a bug in the program.}
+
+  Try running your code using the terminal (i.e., {\tt Rterm} in
+  Windows or {\tt R} in a Mac OS X terminal) and see whether you get
+  the message in item \ref{terminates}.
+
+\subsection{Can I skip creating a bandwidth object and enter a
+    bandwidth directly?}
+
+  Certainly, though I would advise doing so for exploratory data
+  analysis only.  For example, attach a dataset via
+  \begin{singlespacing}
+\begin{verbatim}
+data(cps71)
+attach(cps71)
+\end{verbatim}
+  \end{singlespacing}
+  then enter, say,
+  \begin{singlespacing}
+\begin{verbatim}
+plot(age,logwage,main="Manual Bandwidth Example")
+lines(age,fitted(npreg(logwage~age,bws=1)),col="blue",lty=1)
+lines(age,fitted(npreg(logwage~age,bws=2)),col="red",lty=2)
+lines(age,fitted(npreg(logwage~age,bws=3)),col="green",lty=3)
+legend(20,15,
+       c("h=1","h=2","h=3"),
+       col=c("blue","red","green"),
+       lty=c(1,2,3))
+\end{verbatim}
+  \end{singlespacing}
+  to plot the local constant estimator with bandwidths of 1, 2, and 3
+  years. Note that the age variable is already sorted in this
+  dataset. If your data is not sorted you will need to do so prior to
+  plotting so that your {\tt lines} command works properly. Or see
+  \ref{partial grad q} below for a multivariate example.
+
+\subsection{\label{partial grad q}When I estimate my gradients and
+    there are two or more covariates and then extract them with the
+    {\tt gradients()} function, they are not `smooth', though if I
+    plot a model with the {\tt gradients=TRUE} option, they are. The
+    {\tt gradients()} function must be broken\dots}
+
+  The function {\tt plot()} ({\tt npplot()}) plots `partial' means and
+  gradients. In other words, it plots $x_1$ versus $\hat g(x_1,\bar
+  x_2)$ for the partial mean, where $\bar x_2$ is, say, the
+  median/modal value of $x_2$. It also plots $x_1$ versus
+  $\partial\hat g(x_1,\bar x_2)/\partial x_1$ for the gradient. Note
+  that we are controlling for the values of the other
+  covariate(s). This is in effect what people expect when they play
+  with linear parametric models of the form $y=\beta_0+\beta_1
+  x_1+\beta_2x_2+\epsilon$ since, given the additive nature of the
+  model, $\partial y/\partial x_1=\beta_1$ (i.e., does not vary with
+  $x_2$).
+
+  The example below shows how you could manually generate the partial
+  gradients (and means) for your data where the sample realizations
+  form the evaluation data for $x_1$ (unlike {\tt npplot()} which uses
+  an evenly spaced grid). Note we use the function {\tt uocquantile()}
+  to generate a vector that holds $x_2$ constant at is median/modal
+  value (i.e., the 0.5 quantile) in the evaluation data. The function
+  {\tt uocquantile()} can compute quantiles for ordered, unordered,
+  and continuous data (see {\tt ?uocquantile} for details).
+
+\begin{singlespacing}
+\begin{verbatim}
+n <- 100
+
+x1 <- runif(n)
+x2 <- runif(n)
+y <- x1^2+x2^2 + rnorm(n,sd=.1)
+
+data.train <- data.frame(x1,x2,y)
+
+bw <- npregbw(y~x1+x2,
+              data=data.train,
+              regtype="ll",
+              bwmethod="cv.aic")
+
+data.eval <-  data.frame(x1 = sort(x1),
+                    x2 = rep(uocquantile(x2,.5),n))
+
+model <- npreg(bws=bw,
+               data=data.train, 
+               newdata=data.eval,
+               gradients=TRUE)
+
+plot(data.eval[,1],model$grad[,1],xlab="X1",ylab="Gradient",type="l")
+\end{verbatim}
+\end{singlespacing}
+
+Note that this uses the sorted sample realizations for \texttt{x1}
+which is perfectly acceptable. If you want to mimic \texttt{plot()}
+exactly you will see that by default plot uses a grid of equally
+spaced values of length \texttt{neval=50} as per below. Both are
+perfectly acceptable and the point is they control for the level of
+the non-axis variables.
+\begin{singlespacing}
+\begin{verbatim} 
+data.eval <-  data.frame(x1 = seq(min(x1),max(x1),length=50),
+                         x2 = rep(uocquantile(x2,.5),50))  
+\end{verbatim}
+\end{singlespacing}
+
+\subsection{I use {\tt plot()} {\tt (npplot())} to plot, say, a density
+    and the resulting plot looks like an inverted density rather than
+    a density\dots}
+
+  This can occur when the data-driven bandwidth is dramatically
+  undersmoothed. Data-driven (i.e., automatic) bandwidth selection
+  procedures are not guaranteed always to produce good results due to
+  perhaps the presence of outliers or the rounding/discretization of
+  continuous data, among others. By default, {\tt npplot()} takes the
+  two extremes of the data (minimum, maximum i.e., actual data points)
+  then creates an equally spaced grid of evaluation data (i.e., not
+  actual data points in general) and computes the density for these
+  points. Since the bandwidth is extremely small, the density estimate
+  at these evaluation points is correctly zero, while those for the
+  sample realizations (in this case only two, the min and max) are
+  non-zero, hence we get two peaks at the edges of the plot and a flat
+  bowl equal to zero everywhere else.
+
+  This can also happen when your data is heavily discretized and you
+  treat it as continuous. In such cases, treating the data as ordered
+  may result in more sensible estimates.
+
+\subsection{Can {\tt npksum()} compute analytical derivatives with
+    respect to a continuous variable?}
+
+  As of version 0.20-0 and up, yes it can, using the {\tt operator =
+    "derivative"} argument, which is put to its paces in the following
+  code snippet (this supports multiple arguments including {\tt
+    "integral"} and {\tt "convolution"} in addition to {\tt "normal"},
+  the default).
+
+  \begin{singlespacing}
+\begin{verbatim}
+Z <- seq(-2.23,2.23,length=100)
+Zc <- seq(-4.47,4.47,length=100)
+
+par(mfrow=c(2,2))
+
+plot(Z,main="Kernel",ylab="K()",npksum(txdat=0,exdat=Z,bws=1,
+         ckertype="epanechnikov",ckerorder=2,operator="normal")$ksum,
+         col="blue",type="l")
+
+plot(Z,main="Kernel Derivative",ylab="K()",npksum(txdat=0,exdat=Z,bws=1,
+         ckertype="epanechnikov",ckerorder=2,operator="derivative")$ksum,
+         col="blue",type="l")
+
+plot(Z,main="Kernel Integral",ylab="K()",npksum(txdat=0,exdat=Z,bws=1,
+         ckertype="epanechnikov",ckerorder=2,operator="integral")$ksum,
+         col="blue",type="l")
+
+plot(Zc,main="Kernel Convolution",ylab="K()",npksum(txdat=0,exdat=Zc,bws=1,
+         ckertype="epanechnikov",ckerorder=2,operator="convolution")$ksum,
+         col="blue",type="l")
+\end{verbatim}
+  \end{singlespacing}
+
+  An alternative to computing analytical derivatives is to compute
+  them numerically using finite-differences. One simply computes the
+  kernel sum evaluating the sum with variable $j$ set at $x_j-h_j/2$
+  and calls this, say, $ksum_{j1}$, then again set at $x_j+h_j/2$ and
+  call this $ksum_{j}2$, then compute
+  $\nabla=(ksum_{j2}-ksum_{j1})/h_j$. This method has been used for
+  both theoretical and applied work and produces consistent estimates
+  of the derivatives, as of course do the analytical derivatives,
+  providing that $h\to0$ as $n\to\infty$ (which will {\em not} be the
+  case in some settings, i.e., in the presence of irrelevant
+  covariates and so forth). The following example provides a simple
+  demonstration. See \ref{partial grad q} above for multivariate
+  partial regression when using this method.
+
+  \begin{singlespacing}
+    \begin{singlespacing}
+\begin{verbatim}
+## In this example we consider the local constant estimator computed
+## using npksum, and then use npksum to compute numerical derivatives
+## using finite-difference methods, then finally compare them with the
+## analytical ones.
+
+data(cps71)
+attach(cps71)
+
+## Grab the cross-validated bandwidth
+
+bw <- npregbw(logwage~age)
+h <- bw$bw[1]
+
+## Evaluate the local constant regression at x-h/2, x+h/2...
+
+ksum.1 <- npksum(txdat=age, exdat=age-h/2,tydat=logwage,bws=bw)$ksum/
+  npksum(txdat=age,exdat=age-h/2,bws=bw)$ksum
+
+ksum.2 <- npksum(txdat=age, exdat=age+h/2,tydat=logwage,bws=bw)$ksum/
+  npksum(txdat=age,exdat=age+h/2,bws=bw)$ksum
+
+## Compute the numerical gradient...
+
+grad.numerical <- (ksum.2-ksum.1)/h
+
+## Compare with the analytical gradient...
+
+grad.analytical <- gradients(npreg(bws=bw,gradient=TRUE))
+
+## Plot the resulting estimates...
+
+plot(age,grad.numerical,type="l",col="blue",lty=1,ylab="gradient")
+lines(age,grad.analytical,type="l",col="red",lty=2)
+legend(20,-0.05,c("Numerical","Analytic"),col=c("blue","red"),lty=c(1,2))
+\end{verbatim}
+    \end{singlespacing}
+  \end{singlespacing}
+
+\subsection{Can I use the {\tt npcmstest()} function that implements
+    the consistent test for correct specification of parametric
+    regression models as described in Hsiao, Li, \& Racine (2007)
+    \cite{HSIAO_LI_RACINE:2007} to test for correct specification of
+    the semiparametric partially linear model?}
+
+  As Brennan Thompson points out, yes, you can.
+
+  To test a parametric linear specification against a semiparametric
+  partially linear alternative, i.e.,
+  \begin{align*}
+    H_0: y &= X'\beta + Z'\gamma + u\\
+    H_1: y &= X'\beta + g(Z) + u,
+  \end{align*}
+  you could use {\tt npcmstest()} as follows:
+  \begin{singlespacing}
+\begin{verbatim}
+  lmodel <- lm(y~X+Z,y=TRUE,x=TRUE)
+  uhat <- resid(lmodel)
+  npcmstest(xdat=Z,ydat=uhat,model=lmodel)
+\end{verbatim}
+  \end{singlespacing}
+
+  A slightly better way (as discussed in Li \& Wang (1998)
+  \cite{LI_WANG:1998}) would be to use a `mixed' residual, i.e., $\hat
+  u_i = y_i - X_i'\tilde \beta - Z_i'\hat \gamma$ in the test, where
+  $\tilde\beta$ is the semiparametric estimator of $\beta$ (based on
+  the semiparametric partially linear model), and $\hat \gamma$ is the
+  OLS estimator of $\gamma$ based on the linear model. This could lead
+  to potential power gains due to the improved efficiency of
+  $\hat\beta$ under the alternative.
+
+\subsection{I am using {\tt npcmstest()} on a {\tt glm()} object (the
+    document says glm() objects are supported and I am estimating a
+    Logit model) but it returns an error saying}
+\begin{verbatim}
+ Error in eval(expr, envir, enclos) : y values must be 0 <= y <= 1.
+\end{verbatim}
+
+  {\tt npcmstest()} supports conditional mean models with continuous
+  outcomes ({\tt glm()} objects are supported so that models that are
+  nonlinear in parameters can be estimated). The test is based on
+  residual bootstrapping to generate resamples for $Y$. In particular,
+  a resample for the residual vector ($\hat\epsilon^*$) is added to
+  the models' fit (i.e., $Y^*=\hat Y + \hat\epsilon^*$) to generate a
+  resample under the null. This excludes binary outcome models and the
+  like because you would have generated a resample for $Y$ that no
+  longer contains zeros and ones, hence the error message.
+
+  Note that \texttt{npcmstest} supports regression objects generated
+  by \texttt{lm} and uses features specific to objects of type
+  \texttt{lm} hence if you attempt to pass objects of a different type
+  the function cannot be expected to work.
+
+\subsection{I want to plot the kernel function itself. How can I do
+    this?}
+
+  Use the {\tt npksum()} function and switch the evaluation and
+  training roles as in the following example that plots the 2nd, 4th,
+  6th and 8th order Epanechnikov kernels.
+  \begin{singlespacing}
+\begin{verbatim}
+Z <- seq(-sqrt(5),sqrt(5),length=100)
+par(mfrow=c(2,2))
+plot(Z,ylab="kernel",npksum(txdat=0,exdat=Z,bws=1,ckertype="epanechnikov",
+ckerorder=2)$ksum,type="l",main="Epanechnikov [order = 2]")
+plot(Z,ylab="kernel",npksum(txdat=0,exdat=Z,bws=1,ckertype="epanechnikov",
+ckerorder=4)$ksum,type="l",main="Epanechnikov [order = 4]")
+plot(Z,ylab="kernel",npksum(txdat=0,exdat=Z,bws=1,ckertype="epanechnikov",
+ckerorder=6)$ksum,type="l",main="Epanechnikov [order = 6]")
+plot(Z,ylab="kernel",npksum(txdat=0,exdat=Z,bws=1,ckertype="epanechnikov",
+ckerorder=8)$ksum,type="l",main="Epanechnikov [order = 8]")
+\end{verbatim}
+  \end{singlespacing}
+
+\subsection{In version 0.20-0 and up I can `combine' steps such as
+    bandwidth selection and estimation. But when I do {\tt
+      summary(model)} I don't get the same summary that I would
+    get from, say, {\tt summary(bw)} and then {\tt
+      summary(model)}. How do I get bandwidth object summaries
+    when combining steps?}
+
+  Don't worry, the bandwidth object exists when you do the combined
+  steps and is easily accessed via {\tt summary(model\$bws)} or
+  extracted via {\tt bw <- model\$bws} where {\tt model} is
+  the name of your model.
+
+\subsection{I estimated a semiparametric index model via {\tt model <-
+      npindex(y\textasciitilde x1+x2) } but {\tt se(model)} returns NULL}.
+
+  Perhaps you want {\tt vcov(model)} instead (i.e., the asymptotic
+  variance-covariance matrix)? This is supported as of version 0.40-1
+  provided that you set {\tt gradients=TRUE} as the following snippet
+  demonstrates:
+\begin{verbatim}
+set.seed(42)
+n <- 250
+x1 <- runif(n, min=-1, max=1)
+x2 <- runif(n, min=-1, max=1)
+y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
+## Note that the first element of the vector beta is normalized to one
+## for identification purposes hence the first row and column of the
+## covariance matrix will contain zeros.
+model <- npindex(y~x1+x2, method="kleinspady", gradients=TRUE)
+vcov(model)
+Z <- coef(model)[-1]/sqrt(diag(vcov(model)))[-1]
+Z
+\end{verbatim}
+
+  Note that, alternatively, you can get robust bootstrapped standard
+  errors for the estimated model and gradients by adding the argument
+  {\tt errors=TRUE} to your call to npindex so that {\tt se(model)}
+  returns the vector of standard errors for the estimated conditional
+  mean where {\tt model} is the name of your model.  Note that {\tt
+    model\$merr } will contain the standard errors returned by {\tt
+    se(model)} while {\tt model\$gerr} will return the matrix of
+  standard errors for the gradients {\em provided} you have set {\tt
+    gradients=TRUE} (furthermore, {\tt model\$mean.grad} and {\tt
+    model\$mean.gerr} will give the average derivative and its
+  bootstrapped standard errors). See the documentation of npindex for
+  further details. The following code snippet demonstrates how one
+  could do this for a simulated dataset.
+\begin{verbatim}
+  n <- 100
+  x1 <- runif(n, min=-1, max=1)
+  x2 <- runif(n, min=-1, max=1)
+  y <- x1 - x2 + rnorm(n)
+
+  bw <- npindexbw(formula=y~x1+x2)
+  model <- npindex(bws=bw,errors=TRUE,gradients=TRUE)
+
+  se.mean <- model$merr
+  se.grad <- model$gerr
+\end{verbatim}
+
+\subsection{How do I interpret gradients from the conditional density
+    estimator?}
+
+  If you plot a conditional density $f(y|x)$ when $x$ is a scalar,
+  with gradients, by default you will get the following:
+
+  \begin{enumerate}
+
+  \item A plot of $\partial f(y = \text{median} | x)/\partial x$
+    (admittedly not the most useful plot).  (If $y$ is discrete the
+    only difference is that you get a plot of $\partial f(y =
+    \text{(unconditional) mode} | x)/\partial x$).
+
+  \item A plot of $\partial f(y | x = \text{median})/\partial x$.
+
+  \end{enumerate}
+
+  If $x$ is multivariate (for example, 2D) you get:
+
+  \begin{enumerate}
+
+  \item A plot of $\partial f(y = \text{median} | x1, x2 =
+    \text{median})/\partial x_1$
+  \item A plot of $\partial f(y = \text{median} | x1, x2 =
+    \text{median})/\partial x_2$
+
+  \item A plot of $\partial f(y = \text{median} | x1 = \text{median},
+    x2)/\partial x_1$
+  \item A plot of $\partial f(y = \text{median} | x1 = \text{median},
+    x2)/\partial x_2$
+
+  \item A plot of $\partial f(y | x1 = \text{median}, x2 =
+    \text{median})/\partial x_1$
+  \item A plot of $\partial f(y | x1 = \text{median}, x2 =
+    \text{median})/\partial x_2$
+
+  \end{enumerate}
+
+\subsection{When I run {\tt R} in batch mode via {\tt R CMD BATCH
+      filename.R} unwanted status messages (e.g., ```Multistart 1 of
+    10''') crowd out desired output. How can I turn off these unwanted
+    status messages?}
+
+  After loading the np library add the line {\tt
+    options(np.messages=FALSE)} and all such messages will be
+  disabled.
+
+\subsection{I am getting an `unable to allocate...' message after
+    repeatedly interrupting large jobs.}
+
+  Repeated interruption of large jobs can reduce available memory
+  under R. This occurs because memory is allocated dynamically, and
+  memory that has been allocated is not freed when you interrupt the
+  job (the routine will clean up after itself only if it is allowed to
+  complete all computations - when you interrupt you never reach the
+  point in the code where the memory is freed). If this becomes an
+  issue simply restart R (i.e., exit then run a fresh R session).
+
+\subsection{I have a large number of variables, and when using the
+    formula interface I get an error message stating `invoked with
+    improper formula'. I have double checked and everything looks
+    fine. Furthermore, it works fine with the data frame interface.}
+
+  The issue is that converting formulas into character strings in {\tt
+    R} appears to be limited to 500 characters. We are not aware of a
+  simple workaround so we simply advise that you use the data frame
+  interface when this occurs.
+
+\subsection{How can I estimate additive semiparametric models?}
+
+  Generalized additive semiparametric models (see Hastie and
+  Tibshirani (1990) \cite{HASTIE_TIBSHIRANI:1990}) are implemented in
+  the {\tt gam} package (though they do not support categorical
+  variables). The {\tt gam} package function {\tt gam()} (the {\tt
+    mgcv} package also contains a similar function by the same name)
+  uses iteratively reweighted least squares and either smoothing
+  splines ({\tt s($\cdot$)}) or local polynomial regression fitting
+  ({\tt `loess', lo($\cdot$)}, with default manual `span' of 0.75, the
+  parameter which controls the degree of smoothing). The following
+  code snippet demonstrates the capabilities of the {\tt gam()}
+  function via the \verb+wage1+ dataset included in the {\tt np}
+  packages using three numeric regressors.
+
+\begin{verbatim}
+library(gam)
+data(wage1)
+attach(wage1)
+model.gam <- gam(lwage~s(educ)+s(exper)+s(tenure))
+par(mfrow=c(2,2))
+plot(model.gam,se=T)
+detach(wage1)
+\end{verbatim}
+
+  The {\tt mgcv} package also has an implementation of generalized
+  additive models via the identical function name, {\tt gam()}. The
+  biggest difference is that this uses generalized cross validation to
+  select the `span' (rather than manually) hence the degree of
+  smoothing becomes part of the method (as is the case for all
+  functions in the {\tt np} package). The following code snippet
+  demonstrates the {\tt mgcv} implementation of the {\tt gam()}
+  function.
+
+\begin{verbatim}
+library(mgcv)
+data(wage1)
+attach(wage1)
+model.gam <- gam(lwage~s(educ)+s(exper)+s(tenure))
+par(mfrow=c(2,2))
+plot(model.gam,se=T)
+detach(wage1)
+\end{verbatim}
+
+  \subsection{I am using the {\tt npRmpi} package but when I launch
+    one of the demo parallel jobs I get the error {\tt Error: could
+      not find function "mpi.bcast.cmd"}}
+
+When your demo program stops at the following point in your file
+\begin{verbatim}
+> mpi.bcast.cmd(np.mpi.initialize(),
++               caller.execute=TRUE)
+Error: could not find function "mpi.bcast.cmd"
+\end{verbatim}
+this likely means that either you have failed to place the {\tt
+  .Rprofile} file in the current or root directory as directed, or the
+{\tt .Rprofile} initialization code is not being loaded as expected.
+
+\begin{enumerate}
+
+\item Make sure a copy of the initialization file {\tt Rprofile}
+  exists in your working or root directory and is named {\tt
+    .Rprofile}
+
+\item Make sure you did not run {\tt R} with either the {\tt
+    --no-init-file} or {\tt --vanilla} option (this combines a number
+  of options including {\tt --no-init-file} which will disable reading
+  of {\tt .Rprofile})
+
+\end{enumerate}
+
+\subsection{I have estimated a partially linear model and want to
+  extract the gradient/fitted values of the nonparametric component}
+
+People use partially linear models because they focus on the
+parametric component and treat the nonparametric component as a
+nuisance. In fact, the partially linear model is estimated by
+carefully getting rid of the nonparametric component $g(Z)$ prior to
+estimation, and then estimating a set of conditional moments
+nonparametrically.
+
+However, suppose after getting rid of this nonparametric nuisance
+component we then wished to construct a consistent estimator of
+$g(Z)$, the nonparametric component for a partially linear model $y =
+X\beta + g(Z) + u$. We might proceed as follows.
+
+\begin{verbatim}
+library(np)
+
+set.seed(42)
+
+n <- 250
+x1 <- rnorm(n)
+x2 <- rbinom(n, 1, .5)
+
+z1 <- rbinom(n, 1, .5)
+z2 <- rnorm(n)
+
+y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
+
+## First, construct the partially linear model using local linear 
+## regression.
+
+model <- npplreg(y~x1+factor(x2)|factor(z1)+z2,regtype="ll")
+
+## Next, subtract the fitted parametric component from y so that we
+## have y-xbetahat. Since we can have factors we need to create the
+## `model matrix' but make sure we don't keep the intercept generated
+## by model.matrix hence the [,-1]. This gives us the numeric matrix X
+## which we multiply by the coefficient vector to obtain xbetahat which
+## we can subtract from y.
+
+y.sub <- y-model.matrix(~x1+factor(x2))[,-1]%*%coef(model)
+
+## Finally, regress this on the nonparametric components Z using npreg.
+
+model.sub <- npreg(y.sub~factor(z1)+z2,regtype="ll",gradients=TRUE)
+
+## Now we can obtain derivatives etc. However, note that this is the
+## model containing the transformed y with respect to the nonparametric
+## components. We can use gradients(model.sub) etc. or plot them and
+## so forth.
+
+plot(model.sub,gradients=TRUE)
+\end{verbatim}
+
+\bibliographystyle{plain} \bibliography{np_faq}
+
+\clearpage
+
+\appendix
+
+\section*{Changes from Version 0.40-12 to 0.40-13 [05-Mar-2012]}
+
+\begin{itemize}
+
+\item Added new function \texttt{npregivderiv()} that implements the
+  IV derivative method of Florens and Racine (2012)
+
+\item Added more passable parameters to \texttt{npregiv()}
+  (multistarting, parameters passed to \texttt{optim()} for
+  cross-validation)
+
+\item Changes to code to improve compliance with R `Writing portable
+  packages' guidelines and correct partial argument matches
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-11 to 0.40-12 [24-Nov-2011]}
+
+\begin{itemize}
+
+\item Added option (user request) to hold the bandwidth fixed but
+  optimize the parameters in the single index model
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-10 to 0.40-11 [24-Oct-2011]}
+
+\begin{itemize}
+
+\item Corrected code regression in single index errors introduced
+  inadvertently in 0.40-10
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-9 to 0.40-10 [24-Oct-2011]}
+
+\begin{itemize}
+
+\item Modified Silverman's adaptive measure of spread to reflect
+  changes in \texttt{sd()} (sd on matrix deprecated)
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-8 to 0.40-9 [30-July-2011]}
+
+\begin{itemize}
+
+\item Renamed COPYING file to COPYRIGHTS
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-7 to 0.40-8 [29-July-2011]}
+
+\begin{itemize}
+
+\item Fixed issue where calling {\tt npplot} resets system seed
+
+\item Updated examples in docs so that plot is recommended throughout
+  (and not {\tt npplot} that is invoked by {\tt plot})
+
+\item Fixed regression in {\tt npindex} when {\tt gradients=TRUE} and
+  {\tt errors=TRUE}
+
+\item Function {\tt npindex/npindexbw} now accepts additional
+  arguments and implements this properly (i.e. proper implementation
+  by Tristen of Version 0.30-8/0.30-9 change for {\tt npindex})
+
+\item Function {\tt npplreg} now supports factors in the parametric
+  part just like {\tt lm()} does
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-6 to 0.40-7 [8-Jun-2011]}
+
+\begin{itemize}
+
+\item Function {\tt npregiv} now supports exogenous $X$ and multivariate
+  $Z$ and $W$.
+
+\item {\tt demo(npregiv)} provides a useful illustration.
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-5 to 0.40-6 [1-Jun-2011]}
+
+\begin{itemize}
+
+\item Added a new function {\tt npregiv} that conducts nonparametric
+  instrumental regression a la Darolles, Fan, Florens and Renault
+  (2011, forthcoming, Econometrica) and Horowitz (2011,
+  Econometrica). Note that this function currently returns the fitted
+  $\varphi(z)$ (i.e.\ lacks much functionality relative to other {\tt
+    np} functions) and is in `beta status' until further notice.
+
+\item Added a new dataset {\tt Engel95} that allows one to estimate
+  Engel curves using the new nonparametric instrumental regression
+  function {\tt npregiv}.
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-4 to 0.40-5 [26-Apr-2011]}
+
+\begin{itemize}
+
+\item Fixed issue with {\tt npindexbw} where, for certain problems,
+  starting values needed refinement otherwise convergence would fail
+  (we now use an improved normalization for the starting values)
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-3 to 0.40-4 [21-Jan-2011]}
+
+\begin{itemize}
+
+\item Fixed issue with {\tt ckertype} and {\tt ckerorder} not being
+  propagated in {\tt np.singleindex.bw.R}
+
+\item Fixed issue with negative penalties being returned by {\tt
+    bwmethod="cv.aic"} in {\tt npregbw} (ought to have been +infinity)
+
+\item Error being thrown by {\tt system(..., intern=TRUE)} when {\tt
+    mpi.quit()} is called, changed to FALSE (change to {\tt system()}
+  behaviour detailed in R CHANGELOG 2.12.0)
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-1 to 0.40-3 [23-Jul-2010]}
+
+\begin{itemize}
+
+\item Added random seed (defaults to 42) to {\tt npscoefbw} to ensure
+  consistent values for optimization for successive invocations on the
+  same data
+
+\item Fixed glitch in multistarting in {\tt npscoefbw} whereby
+  multistarting was not working (always returned last computed
+  function value and not the minimum)
+
+\item Fixed issue for {\tt npRmpi} where the {\tt C} code underlying
+  regression cross-validation (code in {\tt jksum.c}) differs between
+  np and npRmpi (both are correct with the latter being a tad slower)
+
+\item Fixed a scope issue whereby a user would write a function that
+  calls an {\tt np/npRmpi} command, however, objects passed to the
+  user's function and called by the {\tt np/npRmpi} command (i.e. such
+  as {\tt newdata}) cannot be found in the environment yet they exist
+  outside of the function
+
+\item Fixed issue with {\tt bwscaling=TRUE} and {\tt
+    bwmethod="cv.aic"} in npreg
+
+\end{itemize}
+
+\section*{Changes from Version 0.40-0 to 0.40-1 [4-Jun-2010]}
+
+\begin{itemize}
+
+\item Added asymptotic standard errors to {\tt npindex} for the Klein
+  and Spady and Ichimura parameter estimates which, when {\tt
+    gradients=TRUE}, can be extracted via {\tt vcov(foo)} where {\tt
+    foo} is a npsingleindex object (the Z-scores can be obtained via
+  {\tt Z <- coef(foo)[-1]/sqrt(diag(vcov(foo)))[-1]})
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-9 to 0.40-0 [25-May-2010]}
+
+\begin{itemize}
+
+\item Modified codebase to enable dynamic spawning for
+  interactive sessions in {\tt npRmpi}
+
+\item Interactive examples supported in {\tt npRmpi}
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-8 to 0.30-9 [17-May-2010]}
+
+\begin{itemize}
+
+\item Fixed issue where {\tt ukertype} and {\tt okertype} were being
+  ignored by {\tt npscoef}
+
+\item Fixed code regression (dating to version 0.30-4) where {\tt
+    random.seed=42} was not initialized in functions {\tt npcmstest},
+  {\tt npdeneqtest}, {\tt npindexbw}, {\tt npsdeptest}, {\tt
+    npqcmstest}, {\tt npsigtest}, {\tt npsymtest}, {\tt npunitest},
+  and {\tt npplot}
+
+\item Fixed issue with saving and restoring random seed in {\tt
+    npdeptest}
+
+\item Changes to codebase to modify method used to prevent division by
+  zero
+
+\item New vignette for the {\tt npRmpi} package
+  {\tt (vignette("npRmpi",package="npRmpi"))}
+
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-7 to 0.30-8 [20-Apr-2010]}
+
+\begin{itemize}
+
+\item Implemented moment version of metric entropy in {\tt npsymtest}
+  and {\tt npunitest} with warnings about their use documented
+  carefully and exceptions trapped and warnings issuing when detected
+ 
+\item Cleaned up print/summary output formatting of some functions
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-6 to 0.30-7 [15-Feb-2010]}
+
+\begin{itemize}
+
+\item Added function {\tt npunitest} for entropy-based testing of
+  equality of univariate densities as described in Maasoumi and Racine
+  (2002)
+
+\item Updated vignette to reflect new functions from 0.30-4 upwards
+  (Table 1: np functions)
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-5 to 0.30-6 [3-Feb-2010]}
+
+\begin{itemize}
+
+\item Added function {\tt npsdeptest} for entropy-based testing of
+  nonlinear serial dependence described in Granger, Maasoumi and
+  Racine (2004)
+
+\item Added function {\tt npdeptest} for entropy-based testing of
+  nonlinear pairwise dependence described in Maasoumi and Racine
+  (2002)
+
+\item Added more bootstrap options to {\tt npsymtest} (now both iid
+  and time-series bootstrapping are supported)
+
+\item Cleaned up summary formatting in the vignette by adding
+  \verb+\usepackage[utf8x]{inputenc}+ to the Sweave file np.Rnw
+
+\item Fixed issue with saving and restoring random seed when there was
+  none in the environment
+  
+\end{itemize}
+
+\section*{Changes from Version 0.30-4 to 0.30-5 [29-Jan-2010]}
+
+\begin{itemize}
+
+\item Added function {\tt npdeneqtest} for integrated squared
+  difference testing of equality of densities as described in
+  Maasoumi, Li, and Racine (2009), Journal of Econometrics
+
+\item Save random seed prior to setting seed in certain functions,
+  then restore seed after function completes
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-3 to 0.30-4 [27-Jan-2010]}
+
+\begin{itemize}
+
+\item Added function {\tt npsymtest} for entropy-based testing of
+  symmetry described in Maasoumi and Racine (2009), Econometric
+  Reviews
+
+\item Added function {\tt b.star} that automates block length
+  selection for the stationary and circular bootstrap
+
+\item Cleaned up docs
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-2 to 0.30-3 [28-May-2009]}
+
+\begin{itemize}
+
+\item Corrected error in Epanechnikov convolution kernels for fixed
+  and generalized bandwidth objects
+
+\item Changed default example in {\tt npscoef}
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-1 to 0.30-2 [19-Apr-2009]}
+
+\begin{itemize}
+
+\item {\tt min(std,IQR/1.348)} is the adaptive measure of spread. We
+  now test for the pathological case where {\tt IQR=0} but {\tt std>0}
+  and return {\tt std} in this instance
+
+\end{itemize}
+
+\section*{Changes from Version 0.30-0 to 0.30-1 [29-Jan-2009]}
+
+\begin{itemize}
+
+\item {\tt predict()} now supports bandwidth, density, distribution,
+  conbandwidth, condensity, and condistribution objects
+
+\item Consistently allow predictions for categorical values outside of
+  support of training data
+
+  Note that predictions based upon unconditional density objects
+  defined over categorical variables that lie outside the support of
+  the training data may no longer be true probabilities (i.e., as
+  defined over the training data and the extended/augmented support --
+  their sum may exceed one) and may therefore require renormalization
+  by the user
+
+\item Fixed a numerical issue which could hinder {\tt npregbw()}'s
+  cross validation with higher-order kernels
+
+\item Default {\tt nmulti} in {\tt npplregbw()} is now set correctly
+
+\item Fixed a bug with the ridging routine in {\tt npscoefbw()}, added
+  ridging to {\tt npscoef()}
+
+\item Fixed minor i/o issue with {\tt Multistart 1 of...} using {\tt
+    npscoefbw()}
+
+\end{itemize}
+
+\section*{Changes from Version 0.20-4 to 0.30-0 [15-Jan-2009]}
+
+\begin{itemize}
+
+\item Added basic user-interrupt checking for all underlying C code so
+  that either \verb+<Ctrl-C>+ (Rterm) or the `STOP' icon (Rgui) will
+  interrupt all running processes. This has a number of desirable side
+  effects in addition to being able to interrupt C-based processes
+  including i) R no longer showing up as `not responding' under the
+  task manager (Windows) or the activity monitor (Mac OS X) and ii)
+  buffered output now being correctly displayed when using Rgui under
+  Windows and Mac OS X
+
+  Note that repeated interruption of large jobs can reduce available
+  memory under R - if this becomes an issue (i.e., you get a `cannot
+  allocate...' error under R) simply restart R (i.e., exit then run a
+  fresh R session)
+
+\item Added a function {\tt npseed()} that allows the user to
+  set/reset the random seed for all underlying C routines
+
+\item Fixed a bug that caused {\tt npplregbw()} to ignore any
+  kernel options for the regression of $y$ on $z$
+
+\item Refined certain constants used in the normal-reference density
+  bandwidth rule for increased accuracy
+
+\item Moved from using the maximum likelihood estimate of variance
+  throughout to the degrees of freedom corrected estimate (all
+  variance estimates now change by the factor (n-1)/n)
+
+\end{itemize}
+
+\section*{Changes from Version 0.20-3 to 0.20-4 [19-Nov-2008]}
+
+\begin{itemize}
+
+\item Using an adaptive measure of spread throughout.  The scale
+  factor reported for a bandwidth can appear to be small when the
+  sample standard deviation of the associated variable is inflated due
+  to the presence of outliers.  Furthermore, supplying a scale factor
+  of, say, 1.06 for density estimation when there are outliers that
+  inflate the standard deviation may oversmooth rather dramatically in
+  the presence of outliers.  We now use the measure found in Silverman
+  (1986, equation (3.30)) which is min(standard deviation,
+  interquartile range/1.349). This robust choice produces expected
+  results for scale factors in the presence of outliers
+
+\end{itemize}
+
+\section*{Changes from Version 0.20-2 to 0.20-3[14-Nov-2008] }
+
+\begin{itemize}
+
+\item Fixed a typo which caused {\tt predict()} and {\tt plot()} to
+  abort when called on {\tt plregression} objects, and which also
+  prevented {\tt print()} and {\tt summary()} from printing
+  information about the kernels used when called on {\tt plregression}
+  objects
+
+\item Fixed a typo which caused partially linear regressions to crash
+  when out-of-sample responses were provided with evaluation data
+
+\end{itemize}
+
+\section*{Changes from Version 0.20-1 to 0.20-2 [02-Nov-2008]}
+
+\begin{itemize}
+
+\item Allow for evaluation outside of discrete support of factors in
+  {\tt npksum()} and fixed a warning in jksum
+
+\item Fixed a bug which lead to unpredictable behavior when there were
+  more categorical values for the training data than realisations
+
+\end{itemize}
+
+\section*{Changes from Version 0.20-0 to 0.20-1 [13-Aug-2008]}
+
+\begin{itemize}
+
+\item Work-around for scale-factor issues during {\tt npregbw()} cv
+  when changing the training data
+
+\end{itemize}
+
+\section*{Changes from Version 0.14-3 to 0.20-0 [28-Jul-2008]}
+
+\begin{itemize}
+
+\item {\tt npksum()} now supports an expanded set of kernels
+  (including convolution, derivative and integral), which can be
+  selected via the {\tt operator =} argument
+
+\item Automatic bandwidth searches are now performed when attempting
+  to evaluate on data without bandwidths. This allows users to combine
+  bandwidth selection and estimation in one step
+
+\item The {\tt npsigtest()} interface is brought in line with other
+  functions (S3)
+
+\item Significance tests can now be performed on {\tt npreg()}
+  outputs, so {\tt npsigtest(modelname)} is now supported
+
+\item Added a vignette and faq. To see the vignette try {\tt
+    vignette("np",package="np")}
+
+\item {\tt summary()} on {\tt npconmode()} now properly retrieves
+  names from bandwidth objects
+
+\item Fixed the 6th and 8th order epanechnikov kernels
+
+\item Fixed some quietness issues
+
+\item {\tt npplot()} now returns data upon request for conditional
+  densities
+
+\item {\tt npreg()} and {\tt npcdens()} now take the appropriate
+  limits in some pathological cases
+
+\item User supplied bandwidths now operate seamlessly with the formula
+  interface
+
+\end{itemize}
+
+\section*{Changes from Version 0.14-2 to 0.14-3 [02-May-2008]}
+
+\begin{itemize}
+
+\item Fixed a glitch that only arose when using the {\tt liracine}
+  unordered kernel in the presence of irrelevant variables. The upper
+  bound for numerical search was constrained to be (c-1)/c [that for
+  the {\tt aitchisonaitken} unordered kernel] but ought to have been
+  1. The summary output would therefore show a value of lambda hitting
+  the (smaller) upper bound (c-1)/1 when it may have hit the (larger)
+  upper bound 1
+
+\end{itemize}
+
+\section*{Changes from Version 0.14-1 to 0.14-2 [11-Jan-2008]}
+
+\begin{itemize}
+
+\item Relaxed checking tolerances slightly to prevent spurious
+  'invalid bandwidth' errors
+
+\item Empty sections were removed from help files
+
+\item {\tt example(foobar)} now works again. This was disabled in
+  0.14-1 at the request of the {\tt R} maintainers in order to shorten
+  the duration of {\tt R CMD check}. All examples remained in the help
+  files but due to the presence of `dontrun' they were not run when
+  {\tt example(foobar)} is requested. Now a limited subset is run
+  while the full set of examples remain in the documents
+
+\end{itemize}
+
+\section*{Changes from Version 0.13-1 to 0.14-1 [18-Dec-2007] }
+
+\begin{itemize}
+
+\item Now use {\tt optim()} for minimisation in single index and
+  smooth coefficient models
+
+\item Fixed bug in klein-spady objective function
+
+\item Standard errors are now available in the case of no continuous
+  variables
+
+\item Summary should look prettier, print additional information
+
+\item Tidied up lingering issues with out-of-sample data and
+  conditional modes
+
+\item Fixed error when plotting asymptotic errors with conditional
+  densities
+
+\item Fixed a bug in {\tt npplot()} with partially linear regressions
+  and {\tt plot.behavior="data"} or {\tt "plot-data"}
+
+\item Maximum default number of multistarts is 5
+
+\item Least-squares cross-validation of conditional densities uses a
+  new, much faster algorithm
+
+\item New, faster algorithm for least-squares cross-validation for
+  both local-constant and local linear regressions
+
+  Note that the estimator has changed somewhat: both cross-validation
+  and the estimator itself use a method of shrinking towards the local
+  constant estimator when singularity would otherwise lead to the
+  breakdown of the estimator. This arises in sparse data settings in
+  conjunction with small bandwidths for one or more regressor
+
+\item Optimised smooth coefficient code, added ridging
+
+\item Fixed bug in uniform CDF kernel
+
+\item Fixed bug where {\tt npindexbw()} would ignore {\tt
+    bandwidth.compute = FALSE} and compute bandwidths when supplied
+  with a preexisting bw object
+
+\item Now can handle estimation out of discrete support
+
+\item Summary would misreport the values of discrete scale factors
+  which were computed with {\tt bwscaling = TRUE}
+
+\end{itemize}
+
+\section*{Changes from Version 0.12-1 to 0.13-1  [03-May-2007]}
+
+\begin{itemize}
+
+\item Bandwidths are now checked for validity based on their variable
+  and kernel types
+
+\item np now does a better job of preserving names of some 'y' data
+
+\item Names of coefficients returned from {\tt coef()} now match
+  variable names
+
+\item Fixed some corner cases in {\tt npksum()} involving the
+  dimensionality of outputs
+
+\item Fixed deprecation warnings in {\tt R} 2.5.0 caused by use of \$
+  on atomic objects
+
+\item Various and sundry bug fixes in {\tt npscoef()}
+
+\item {\tt npscoef()} now handles discrete 'z' data
+
+\item Predict now accepts the argument 'se.fit', like predict.lm
+
+\item Fixed bug where incorrect asymptotic standard errors of
+  gradients for regression objects were being displayed in {\tt
+    npplot()}
+
+\item Fixed bug where errors of gradients of regression objects were
+  not being returned in matrix form
+
+\item {\tt vcov()} now works with partially linear regression objects
+
+\item Fixed detection of evaluation responses when using the formula
+  interface
+
+\item Pre-computed bandwidth objects are now provided for some of the
+  more computationally burdensome examples
+
+\item Added Jeffrey Wooldridge's WAGE1 dataset with qualitative
+  variables (married, female, nonwhite)
+
+\item Predictions outside of discrete support for regressions and
+  conditional densities are now allowed
+
+\item Fixed sign issue with scaling of standard errors in the single
+  index model
+
+\item Fixed error when calculating some bandwidths/scale factors for
+  display purposes
+
+\item Bug in passing certain arguments to {\tt npcdensbw()} fixed
+
+\item Added predict method for qregression objects
+
+\item Proper normalisation for liracine kernel shown in summary
+
+\item Fixed output bug ($\hat ~$H) in summary method for sigtest
+  objects
+
+\item Fixed regression with plotting of bootstrapped errors in
+  perspective plots
+
+\item {\tt npcdist()} no longer incorrectly calls {\tt npcdens()}
+
+\item Fixed spacing between var name and p-value in significance test
+  summaries
+
+\end{itemize}
+
+\section*{Version 0.12-1 [19-Nov-2006]}
+
+\begin{itemize}
+
+\item Initial release of the np package on CRAN
+
+\end{itemize}
+
+
+\end{document}
