@@ -1,3 +1,9 @@
+Changes from Version 0.40-13 to 0.40-14 [XXX]
+
+* Added reference to R2 measure (Doksum and Samarov (1995))
+
+* Startup message points to the faq, faq is now a vignette
+
 Changes from Version 0.40-12 to 0.40-13 [05-Mar-2012]
 
 * Added new function npregivderiv() that implements the IV derivative

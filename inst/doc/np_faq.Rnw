@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.72 2012/03/15 15:07:11 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.73 2012/05/22 01:53:12 jracine Exp jracine $
 
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
@@ -1314,6 +1314,28 @@ model.sub <- npreg(y.sub~factor(z1)+z2,regtype="ll",gradients=TRUE)
 ## so forth.
 
 plot(model.sub,gradients=TRUE)
+\end{verbatim}
+
+\subsection{The R function `lag()' does not work as I expect it
+  to. How can I create the $l$th lag of a numeric variable in R to be
+  fed to functions in the \texttt{np} package?}
+
+You can use the \texttt{embed} function to accomplish this task. Here
+is a simple function that might work more along the lines that you
+expect. By default we `pad' the vector with NAs but you can switch
+this to \texttt{FALSE} if you prefer. The function will return a
+vector of the same length as the original vector with NA's padded for
+the missing values.
+
+\begin{verbatim}
+lag.numeric <- function(x,l=1,pad.NA=TRUE) {
+  if(!is.numeric(x)) stop("x must be numeric")
+  if(l < 1) stop("l (lag) must be a positive integer")
+  if(pad.NA) x <- c(rep(NA,l),x)
+  return(embed(x,l+1)[,l+1])
+}
+x <- 1:10
+x.lag.1 <- lag.numeric(x,1)
 \end{verbatim}
 
 \bibliographystyle{plain} \bibliography{np_faq}

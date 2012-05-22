@@ -193,7 +193,7 @@ npscoef(bws, \dots)
     evaluation points }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
     residuals where appropriate (or possible) }
-  \item{R2}{ coefficient of determination }
+  \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}
   \item{MSE}{ mean squared error }
   \item{MAE}{ mean absolute error }
   \item{MAPE}{ mean absolute percentage error }
@@ -210,6 +210,10 @@ npscoef(bws, \dots)
   Cai Z. (2007), \dQuote{Trending time-varying coefficient time series
     models with serially correlated errors,} Journal of Econometrics,
   136, 163-188.
+
+  Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric Estimation of
+  Global Functionals and a Measure of the Explanatory Power of
+  Covariates in Regression,} The Annals of Statistics, 23 1443-1473.
 
   Hastie, T. and R. Tibshirani (1993), \dQuote{Varying-coefficient
     models,} Journal of the Royal Statistical Society, B 55, 757-796.
