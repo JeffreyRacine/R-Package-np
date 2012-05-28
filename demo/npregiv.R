@@ -31,7 +31,7 @@ rm(y,z,w)
 attach(ivdata)
 
 model.iv <- npregiv(y=y,z=z,w=w,nmulti=nmulti,method=method)
-phihat.iv <- model.iv$phihat
+phihat.iv <- model.iv$phi
 
 ## Now the non-iv local linear estimator of E(y|z)
 
