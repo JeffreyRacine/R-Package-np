@@ -244,15 +244,15 @@ npplregbw(\dots)
  Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
  discrimination by the kernel method,} Biometrika, 63, 413-420.
 
+ Gao, Q. and L. Liu and J.S. Racine (forthcoming), \dQuote{A
+ partially linear kernel estimator for categorical data,} Econometric
+ Reviews.
+
  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
  and Practice,} Princeton University Press.
 
  Li, Q. and J.S. Racine (2004), \dQuote{Cross-validated local linear
    nonparametric regression,} Statistica Sinica, 14, 485-512.
-
- Gao, Q. and L. Liu and J.S. Racine (forthcoming), \dQuote{A
- partially linear kernel estimator for categorical data,} Econometric
- Reviews.
 
  Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
  Cambridge University Press.

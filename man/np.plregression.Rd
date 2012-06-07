@@ -199,16 +199,16 @@ npplreg(bws, \dots)
  Global Functionals and a Measure of the Explanatory Power of Covariates
  in Regression,} The Annals of Statistics, 23 1443-1473.
 
+ Gao, Q. and L. Liu and J.S. Racine (forthcoming), \dQuote{A
+ partially linear kernel estimator for categorical data,} Econometric
+ Reviews.
+
  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
  and Practice,} Princeton University Press.
 
  Li, Q. and J.S. Racine (2004), \dQuote{Cross-validated local linear
    nonparametric regression,} Statistica Sinica, 14, 485-512.
  
- Gao, Q. and L. Liu and J.S. Racine (forthcoming), \dQuote{A
- partially linear kernel estimator for categorical data,} Econometric
- Reviews.
-
  Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
  Cambridge University Press.
  
