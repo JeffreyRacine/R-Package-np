@@ -250,7 +250,7 @@ npplregbw(\dots)
  Li, Q. and J.S. Racine (2004), \dQuote{Cross-validated local linear
    nonparametric regression,} Statistica Sinica, 14, 485-512.
 
- Gao, Q. and and L. Liu and J.S. Racine (forthcoming), \dQuote{A
+ Gao, Q. and L. Liu and J.S. Racine (forthcoming), \dQuote{A
  partially linear kernel estimator for categorical data,} Econometric
  Reviews.
 
