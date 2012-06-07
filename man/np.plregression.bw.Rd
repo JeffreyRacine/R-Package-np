@@ -9,14 +9,14 @@
 \title{Partially Linear Kernel Regression Bandwidth Selection with Mixed Data Types}
 
 \description{
-  \code{npplregbw} computes a bandwidth object for a partially linear kernel regression estimate of a one (1)
-  dimensional dependent variable on
-  \eqn{p+q}-variate explanatory data, using the model
-  \eqn{Y = X\beta + \Theta (Z) + \epsilon}{Y = XB + theta(Z) + epsilon}
-  given a set of estimation points, training
-  points (consisting of explanatory data and dependent data), and a
-  bandwidth specification, which can be a \code{rbandwidth} object, or a
-  bandwidth vector, bandwidth type and kernel type. 
+  \code{npplregbw} computes a bandwidth object for a partially linear
+  kernel regression estimate of a one (1) dimensional dependent variable
+  on \eqn{p+q}-variate explanatory data, using the model \eqn{Y = X\beta
+  + \Theta (Z) + \epsilon}{Y = XB + theta(Z) + epsilon} given a set of
+  estimation points, training points (consisting of explanatory data and
+  dependent data), and a bandwidth specification, which can be a
+  \code{rbandwidth} object, or a bandwidth vector, bandwidth type and
+  kernel type.
 }
 
 \usage{
@@ -250,8 +250,9 @@ npplregbw(\dots)
  Li, Q. and J.S. Racine (2004), \dQuote{Cross-validated local linear
    nonparametric regression,} Statistica Sinica, 14, 485-512.
 
- Racine, J.S. and L. Liu (2006), \dQuote{A partially linear kernel
- estimator for categorical data,} manuscript.
+ Gao, Q. and and L. Liu and J.S. Racine (forthcoming), \dQuote{A
+ partially linear kernel estimator for categorical data,} Econometric
+ Reviews.
 
  Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
  Cambridge University Press.
