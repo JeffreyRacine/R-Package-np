@@ -154,7 +154,10 @@ npregivderiv(y,
 \item{constant}{
   the constant to use for Landweber-Fridman iteration.
 }
-
+\item{penalize.iteration}{ a logical value indicating whether to
+    penalize the norm by the number of iterations or not (default
+    \code{TRUE})
+}    
 \item{starting.values}{ a value indicating whether to commence
   Landweber-Fridman assuming
   \eqn{\varphi'_{-1}=0}{phi'[-1]=starting.values} (proper
