@@ -1,5 +1,7 @@
 Changes from Version 0.40-13 to 0.40-14 [XXX]
 
+* Modified stopping rules in npregiv and npregivderiv	
+
 * Added reference to R2 measure (Doksum and Samarov (1995))
 
 * Startup message points to the faq, faq is now a vignette

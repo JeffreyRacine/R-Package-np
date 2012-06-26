@@ -16,8 +16,12 @@
 ## phi: the IV estimator of phi(z) corresponding to the estimated
 ## derivative phihat(z)
 ## phi.prime: the IV derivative estimator
+## phi.mat: the matrix with colums phi_1, phi_2 etc. over all iterations
+## phi.prime.mat: the matrix with colums phi'_1, phi'_2 etc. over all iterations
 ## num.iterations: number of iterations taken by Landweber-Fridman
 ## norm.stop: the stopping rule for each Landweber-Fridman iteration
+## norm.value: the norm not multiplied by the number of iterations
+## convergence: a character string indicating whether/why iteration terminated
 
 ## First, a series of functions for local polynomial kernel regression
 ## Functions for generalized local polynomial regression
@@ -33,9 +37,9 @@
 ## where the local polynomial estimator is ill-conditioned (sparse
 ## data, small h etc.).
 
-## This function will compute the integral using the trapezoidal rule
-## and the cumsum function as we need to compute this in a
-## computationally efficient manner.
+## This function will compute the cumulative integral at each sample
+## realization using the trapezoidal rule and the cumsum function as
+## we need to compute this in a computationally efficient manner.
 
 integrate.trapezoidal <- function(x,y) {
   n <- length(x)
@@ -68,7 +72,8 @@ npregivderiv <- function(y,
                          iterate.tol=1.0e-04,
                          iterate.diff.tol=1.0e-08,
                          constant=0.5,
-                         start.phi.zero=FALSE,
+                         penalize.iteration=TRUE,
+                         starting.values=NULL,
                          smooth.while.iterating=TRUE,
                          stop.on.increase=TRUE,
                          smooth.residuals=TRUE,
@@ -1033,7 +1038,7 @@ npregivderiv <- function(y,
 
   ## Basic error checking
 
-  if(!is.logical(start.phi.zero)) stop("start.phi.zero must be logical (TRUE/FALSE)")
+  if(!is.logical(penalize.iteration)) stop("penalize.iteration must be logical (TRUE/FALSE)")    
   if(!is.logical(smooth.while.iterating)) stop("smooth.while.iterating must be logical (TRUE/FALSE)")
   if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")  
   if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")  
@@ -1064,6 +1069,8 @@ npregivderiv <- function(y,
   if(is.null(weval)) weval <- w
   if(is.null(weval)) xeval <- x
 
+  if(!is.null(starting.values) && (NROW(starting.values) != NROW(zeval))) stop(paste("starting.values must be of length",NROW(zeval)))
+  
   ## Need to determine how many x, w, z are numeric
 
   z <- data.frame(z)
@@ -1107,10 +1114,35 @@ npregivderiv <- function(y,
   model.Sz <- npudist(tdat=z,bws=bw)
   S.z <- 1-predict(model.Sz,newdata=zeval)
 
+  console <- printClear(console)
+  console <- printPop(console)
+  console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
+  
+  ## For stopping rule...
+  
+  hyw <- glpcv(ydat=y,
+               xdat=w,
+               degree=rep(p, num.w.numeric),
+               nmulti=nmulti,
+               random.seed=random.seed,
+               optim.maxattempts=optim.maxattempts,
+               optim.method=optim.method,
+               optim.reltol=optim.reltol,
+               optim.abstol=optim.abstol,
+               optim.maxit=optim.maxit,
+               ...)
+  
+  E.y.w <- glpreg(tydat=y,
+                  txdat=w,
+                  exdat=weval,
+                  bws=hyw$bw,
+                  degree=rep(p, num.w.numeric),
+                  ...)$mean
+
   ## Potential alternative starting rule (consistent with
   ## npregiv). Here we start with E(Y|Z) rather than zero
 
-  if(!start.phi.zero) {
+  if(is.null(starting.values)) {
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1162,101 +1194,9 @@ npregivderiv <- function(y,
 
     }
 
-    ## Step 1 - begin iteration - for this we require \varphi_0. To
-    ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
-    ## term in the series), \mu_{0,i} is Y_i.
-
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
-
-    ## For stopping rule...
-    
-    hyw <- glpcv(ydat=y,
-                 xdat=w,
-                 degree=rep(p, num.w.numeric),
-                 nmulti=nmulti,
-                 random.seed=random.seed,
-                 optim.maxattempts=optim.maxattempts,
-                 optim.method=optim.method,
-                 optim.reltol=optim.reltol,
-                 optim.abstol=optim.abstol,
-                 optim.maxit=optim.maxit,
-                 ...)
-    
-    E.y.w <- glpreg(tydat=y,
-                    txdat=w,
-                    exdat=weval,
-                    bws=hyw$bw,
-                    degree=rep(p, num.w.numeric),
-                    ...)$mean
-
   } else {
-    
-    ## Step 1 - begin iteration - for this we require \varphi_0. To
-    ## compute \varphi_{0,i}, we require \mu_{0,i}. For j=0 (first
-    ## term in the series), \mu_{0,i} is Y_i.
-    
-    mu <- y
-    
-    ## We also require the mean of \miu_{0,i} shortly...
-    
-    mean.mu <- mean(mu)
-    
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
 
-    ## Next, we regress require \mu_{0,i} W (for first iteration mu is y)
-    
-    hyw <- glpcv(ydat=y,
-                 xdat=w,
-                 degree=rep(p, num.w.numeric),
-                 nmulti=nmulti,
-                 random.seed=random.seed,
-                 optim.maxattempts=optim.maxattempts,
-                 optim.method=optim.method,
-                 optim.reltol=optim.reltol,
-                 optim.abstol=optim.abstol,
-                 optim.maxit=optim.maxit,
-                 ...)
-    
-    E.y.w <- glpreg(tydat=y,
-                    txdat=w,
-                    exdat=weval,
-                    bws=hyw$bw,
-                    degree=rep(p, num.w.numeric),
-                    ...)$mean
-    
-    ## We require the mean of the fitted values
-    
-    mean.predicted.E.mu.w <- mean(E.y.w)
-    
-    ## We need the mean of the fitted values for this (we readily
-    ## compute the CDF not the survivor, so anything that is weighted
-    ## by the survivor kernel can be expressed as the mean of that
-    ## being weighted minus the weighting using the CDF kernel).
-    ## Next, we need the weighted sum of the survivor kernel where the
-    ## weights are E[\mu_{0,i}|W]. We can write this as the mean of the
-    ## \mu_{0,i} minus the weighted sum using the CDF kernel, i.e. if
-    ## K is a CDF kernel, then n^{-1}\sum_j \bar K() \mu_{0,i} =
-    ## n^{-1}\sum_j (1- K()) \mu_{0,i} = n^{-1}\sum_j\mu_{0,i}-
-    ## n^{-1}\sum_j K() \mu_{0,i}
-    
-    ## Now we compute T^* applied to E.y.w, and this is phi.prime.0 for
-    ## j=0.
-    
-    ## CDF weighted sum (but we need survivor weighted sum...)
-    
-    cdf.weighted.average <- npksum(txdat=z,
-                                   exdat=zeval,
-                                   tydat=as.matrix(E.y.w),
-                                   operator="integral",
-                                   bws=bw$bw)$ksum/length(y)
-    
-    survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
-
-    phi.prime <- (survivor.weighted.average - S.z*mean.mu)/f.z
+    phi.prime <- starting.values
 
   }  
   
@@ -1301,7 +1241,7 @@ npregivderiv <- function(y,
 
   norm.stop <- numeric()
 
-  norm.stop[1] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
+  norm.stop[1] <- sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2)
 
   ## Now we compute mu.0 (a residual of sorts)
 
@@ -1371,15 +1311,12 @@ npregivderiv <- function(y,
   ## with phi.prime.1 (i.e. overwrite phi.prime)
 
   phi.prime <- phi.prime + constant*T.star.mu
+  phi.mat <- phi
+  phi.prime.mat <- phi.prime
 
   ## This we iterate...
 
   for(j in 2:iterate.max) {
-
-    ## Save previous in case stop norm increases
-
-    phi.j.m.1 <- phi
-    phi.prime.j.m.1 <- phi.prime
 
     if(smooth.while.iterating) {
       console <- printClear(console)
@@ -1427,7 +1364,7 @@ npregivderiv <- function(y,
                       degree=rep(p, num.w.numeric),
                       ...)$mean
 
-    norm.stop[j] <- mean(((E.y.w-E.phi.w)/E.y.w)^2)
+    norm.stop[j] <- ifelse(penalize.iteration,j*sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2),sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2))
 
     ## Now we compute mu.0 (a residual of sorts)
 
@@ -1494,35 +1431,83 @@ npregivderiv <- function(y,
     ## iterate until convergence...
 
     phi.prime <- phi.prime + constant*T.star.mu
+    phi.mat <- cbind(phi.mat,phi)
+    phi.prime.mat <- cbind(phi.prime.mat,phi.prime)
 
-    ## If stopping rule criterion increases or we are below stopping
-    ## tolerance then break
-
-    if(norm.stop[j] < iterate.tol) {
-      convergence <- "ITERATE_TOL"
-      break()
-    }
-    if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
-      convergence <- "STOP_ON_INCREASE"
-      phi <- phi.j.m.1 
-      phi.prime <- phi.prime.j.m.1
-      break()
-    }
-    if(abs(norm.stop[j-1]-norm.stop[j]) < iterate.diff.tol) {
-      convergence <- "ITERATE_DIFF_TOL"
-      break()
-    }
+    ## The number of iterations in LF is asymptotically equivalent to
+    ## 1/alpha (where alpha is the regularization parameter in
+    ## Tikhonov).  Plus the criterion function we use is increasing
+    ## for very small number of iterations. So we need a threshold
+    ## after which we can pretty much confidently say that the
+    ## stopping criterion is decreasing.  In Darolles et al. (2011)
+    ## \alpha ~ O(N^(-1/(min(beta,2)+2)), where beta is the so called
+    ## qualification of your regularization method. Take the worst
+    ## case in which beta = 0 and then the number of iterations is ~
+    ## N^0.5. Note that derivative estimation seems to require more
+    ## iterations hence the heuristic 4*sqrt(N)
     
-    convergence <- "ITERATE_MAX"      
+    if(j > 4*round(nrow(z))) {
+
+      ## If stopping rule criterion increases or we are below stopping
+      ## tolerance then break
+
+      if(norm.stop[j] < iterate.tol) {
+        convergence <- "ITERATE_TOL"
+        break()
+      }
+      if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
+        convergence <- "STOP_ON_INCREASE"
+        break()
+      }
+      if(abs(norm.stop[j-1]-norm.stop[j]) < iterate.diff.tol) {
+        convergence <- "ITERATE_DIFF_TOL"
+        break()
+      }
+      
+      convergence <- "ITERATE_MAX"      
+      
+    }
 
   }
 
+  ## Extract minimum, and check for monotone increasing function and
+  ## issue warning in that case. Otherwise allow for an increasing
+  ## then decreasing (and potentially increasing thereafter) portion
+  ## of the stopping function, ignore the initial increasing portion,
+  ## and take the min from where the initial inflection point occurs
+  ## to the length of norm.stop
+
+  is.monotone.increasing <- function(x) {
+    ## Sorted and last value > first value
+    !is.unsorted(x) && x[length(x)] > x[1]
+  }
+  
+  if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
+    warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. set `starting.values' to 0.5*E(Y|z))")
+    convergence <- "FAILURE_MONOTONE_INCREASING"
+  } else {
+    ## Ignore the initial increasing portion, take the min to the
+    ## right of where the initial inflection point occurs
+    j <- 1
+    while(norm.stop[j+1] > norm.stop[j]) j <- j + 1
+    j <- j-1 + which.min(norm.stop[j:length(norm.stop)])
+    phi <- phi.mat[,j]
+    phi.prime <- phi.prime.mat[,j]    
+  }  
+    
   console <- printClear(console)
   console <- printPop(console)
 
   if(j == iterate.max) warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
 
-  return(list(phi=phi,phi.prime=phi.prime,num.iterations=j,norm.stop=norm.stop,convergence=convergence))
+  return(list(phi=phi,
+              phi.prime=phi.prime,
+              phi.mat=phi.mat,
+              phi.prime.mat=phi.prime.mat,
+              num.iterations=j,
+              norm.stop=norm.stop,
+              norm.value=norm.stop/(1:length(norm.stop)),
+              convergence=convergence))
 
 }
 

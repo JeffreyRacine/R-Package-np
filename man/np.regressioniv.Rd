@@ -46,6 +46,9 @@ npregiv(y,
         iterate.diff.tol = 1.0e-08,
         constant = 0.5,
         method = c("Landweber-Fridman","Tikhonov"),
+        penalize.iteration = TRUE,
+        smooth.residuals = TRUE,        
+        starting.values  = NULL,
         stop.on.increase = TRUE,
         ...)
 }
@@ -184,11 +187,27 @@ npregiv(y,
    Fan, Florens and Renault (2011) for details for
    \code{"Tikhonov"}).
 }
+\item{penalize.iteration}{ a logical value indicating whether to
+    penalize the norm by the number of iterations or not (default
+    \code{TRUE})
+}    
+\item{smooth.residuals}{
+  a logical value (defaults to \code{TRUE}) indicating whether to
+  optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
+  on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
+  \eqn{w} during iteration
+ }
+\item{starting.values}{ a value indicating whether to commence
+  Landweber-Fridman assuming
+  \eqn{\varphi'_{-1}=0}{phi'[-1]=starting.values} (proper
+  Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
+  \code{NULL}, see details below)
+}
 \item{stop.on.increase}{
   a logical value (defaults to \code{TRUE}) indicating whether to halt
   iteration if the stopping criterion (see below) increases over the
   course of one iteration (i.e. it may be above the iteration tolerance
-  but increased).
+  but increased)
 }
 \item{...}{
   additional arguments supplied to \code{\link{npksum}}.
@@ -215,7 +234,7 @@ npregiv(y,
   \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } from iteration to iteration is
   less than \code{iterate.tol} or we hit \code{iterate.max} or
-  \eqn{||E((y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
+  \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
   starts rising.  }
 

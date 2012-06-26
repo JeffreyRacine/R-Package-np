@@ -35,7 +35,8 @@ npregivderiv(y,
              iterate.tol = 1.0e-04,
              iterate.diff.tol = 1.0e-08,
              constant = 0.5,
-             start.phi.zero = FALSE,
+             penalize.iteration = TRUE,
+             starting.values = NULL,
              smooth.while.iterating = TRUE,
              stop.on.increase = TRUE,
              smooth.residuals = TRUE,
@@ -153,11 +154,12 @@ npregivderiv(y,
 \item{constant}{
   the constant to use for Landweber-Fridman iteration.
 }
-\item{start.phi.zero}{
-  a logical value indicating whether to commence Landweber-Fridman
-  assuming \eqn{\varphi_{-1}=0}{phi[-1]=0} (proper Landweber-Fridman) or
-  instead begin from \eqn{E(y|z)} (defaults to \code{FALSE}, see details
-  below).
+
+\item{starting.values}{ a value indicating whether to commence
+  Landweber-Fridman assuming
+  \eqn{\varphi'_{-1}=0}{phi'[-1]=starting.values} (proper
+  Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
+  \code{NULL}, see details below).
 }
 \item{smooth.while.iterating}{
   a logical value indicating whether to re-smooth
@@ -208,7 +210,7 @@ npregivderiv(y,
   \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } from iteration to iteration is
   less than \code{iterate.tol} or we hit \code{iterate.max} or
-  \eqn{||E((y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
+  \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
   starts rising.  }
 
