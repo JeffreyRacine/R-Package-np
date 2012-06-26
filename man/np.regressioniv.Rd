@@ -199,7 +199,7 @@ npregiv(y,
  }
 \item{starting.values}{ a value indicating whether to commence
   Landweber-Fridman assuming
-  \eqn{\varphi'_{-1}=0}{phi'[-1]=starting.values} (proper
+  \eqn{\varphi_{-1}=starting.values}{phi[-1]=starting.values} (proper
   Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
   \code{NULL}, see details below)
 }

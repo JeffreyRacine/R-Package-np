@@ -1445,8 +1445,8 @@ npregivderiv <- function(y,
     ## case in which beta = 0 and then the number of iterations is ~
     ## N^0.5. Note that derivative estimation seems to require more
     ## iterations hence the heuristic 4*sqrt(N)
-    
-    if(j > 4*round(nrow(z))) {
+
+    if(j > 4*round(sqrt(nrow(z)))) {
 
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
@@ -1464,10 +1464,10 @@ npregivderiv <- function(y,
         break()
       }
       
-      convergence <- "ITERATE_MAX"      
-      
     }
 
+    convergence <- "ITERATE_MAX"      
+      
   }
 
   ## Extract minimum, and check for monotone increasing function and
