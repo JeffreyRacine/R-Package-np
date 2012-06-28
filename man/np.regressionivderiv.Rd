@@ -37,7 +37,6 @@ npregivderiv(y,
              constant = 0.5,
              penalize.iteration = TRUE,
              starting.values = NULL,
-             smooth.while.iterating = TRUE,
              stop.on.increase = TRUE,
              smooth.residuals = TRUE,
              ...)
@@ -163,11 +162,6 @@ npregivderiv(y,
   \eqn{\varphi'_{-1}=starting.values}{phi'[-1]=starting.values} (proper
   Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
   \code{NULL}, see details below)
-}
-\item{smooth.while.iterating}{
-  a logical value indicating whether to re-smooth
-  \eqn{E(\varphi|w)}{E(phi|w)} during Landweber-Fridman iteration
-  (defaults to \code{TRUE}).
 }
 \item{stop.on.increase}{
   a logical value (defaults to \code{TRUE}) indicating whether to halt

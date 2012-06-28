@@ -1,3 +1,10 @@
+## Function to test for monotone increasing vector
+
+is.monotone.increasing <- function(x) {
+  ## Sorted and last value > first value
+  !is.unsorted(x) && x[length(x)] > x[1]
+}
+  
 ## what is a badord? ... an ordered factor of numeric values to treat
 ## them properly one must preserve the numeric value, ie. scale not
 ## just their sorted order Actually, the ord/badord paradigm must go,

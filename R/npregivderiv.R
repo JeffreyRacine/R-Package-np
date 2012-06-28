@@ -74,7 +74,6 @@ npregivderiv <- function(y,
                          constant=0.5,
                          penalize.iteration=TRUE,
                          starting.values=NULL,
-                         smooth.while.iterating=TRUE,
                          stop.on.increase=TRUE,
                          smooth.residuals=TRUE,
                          ...) {
@@ -1039,7 +1038,6 @@ npregivderiv <- function(y,
   ## Basic error checking
 
   if(!is.logical(penalize.iteration)) stop("penalize.iteration must be logical (TRUE/FALSE)")    
-  if(!is.logical(smooth.while.iterating)) stop("smooth.while.iterating must be logical (TRUE/FALSE)")
   if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")  
   if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")  
 
@@ -1217,31 +1215,7 @@ npregivderiv <- function(y,
   console <- printPop(console)
   console <- printPush(paste("Computing optimal smoothing for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
 
-  ## For the stopping rule, we require E.phi.w
-
-  h.E.phi.w <- glpcv(ydat=phi,
-                     xdat=w,
-                     degree=rep(p, num.w.numeric),
-                     nmulti=nmulti,
-                     random.seed=random.seed,
-                     optim.maxattempts=optim.maxattempts,
-                     optim.method=optim.method,
-                     optim.reltol=optim.reltol,
-                     optim.abstol=optim.abstol,
-                     optim.maxit=optim.maxit,
-                     ...)
-
-  E.phi.w <- glpreg(tydat=phi,
-                    txdat=w,
-                    eydat=phi,
-                    exdat=weval,
-                    bws=h.E.phi.w$bw,
-                    degree=rep(p, num.w.numeric),
-                    ...)$mean
-
   norm.stop <- numeric()
-
-  norm.stop[1] <- sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2)
 
   ## Now we compute mu.0 (a residual of sorts)
 
@@ -1286,9 +1260,31 @@ npregivderiv <- function(y,
 
   } else {
 
+      h.E.phi.w <- glpcv(ydat=phi,
+                         xdat=w,
+                         degree=rep(p, num.w.numeric),
+                         nmulti=nmulti,
+                         random.seed=random.seed,
+                         optim.maxattempts=optim.maxattempts,
+                         optim.method=optim.method,
+                         optim.reltol=optim.reltol,
+                         optim.abstol=optim.abstol,
+                         optim.maxit=optim.maxit,
+                         ...)
+        
+      E.phi.w <- glpreg(tydat=phi,
+                        txdat=w,
+                        eydat=phi,
+                        exdat=weval,
+                        bws=h.E.phi.w$bw,
+                        degree=rep(p, num.w.numeric),
+                        ...)$mean
+      
     predicted.E.mu.w <- E.y.w - E.phi.w
 
   }
+
+  norm.stop[1] <- sum(predicted.E.mu.w^2)/sum(E.y.w^2)
 
   ## We again require the mean of the fitted values
 
@@ -1318,15 +1314,9 @@ npregivderiv <- function(y,
 
   for(j in 2:iterate.max) {
 
-    if(smooth.while.iterating) {
-      console <- printClear(console)
-      console <- printPop(console)
-      console <- printPush(paste("Computing optimal smoothing for E(phi|w) for iteration ", j,"...",sep=""),console)
-    } else {
-      console <- printClear(console)
-      console <- printPop(console)
-      console <- printPush(paste("Computing E(phi|w) for iteration ", j,"...",sep=""),console)
-    }
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush(paste("Computing optimal smoothing for E(phi|w) for iteration ", j,"...",sep=""),console)
 
     ## NOTE - this presumes univariate z case... in general this would
     ## be a continuous variable's index
@@ -1337,34 +1327,6 @@ npregivderiv <- function(y,
     ## the integral with respect to z, so subtract the mean here
 
     phi <- phi - mean(phi) + mean(y)
-
-    ## For the stopping rule, we require E.phi.w
-
-    if(smooth.while.iterating) {
-
-        h.E.phi.w <- glpcv(ydat=phi,
-                           xdat=w,
-                           degree=rep(p, num.w.numeric),
-                           nmulti=nmulti,
-                           random.seed=random.seed,
-                           optim.maxattempts=optim.maxattempts,
-                           optim.method=optim.method,
-                           optim.reltol=optim.reltol,
-                           optim.abstol=optim.abstol,
-                           optim.maxit=optim.maxit,
-                           ...)
-
-    }
-
-    E.phi.w <- glpreg(tydat=phi,
-                      txdat=w,
-                      eydat=phi,
-                      exdat=weval,
-                      bws=h.E.phi.w$bw,
-                      degree=rep(p, num.w.numeric),
-                      ...)$mean
-
-    norm.stop[j] <- ifelse(penalize.iteration,j*sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2),sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2))
 
     ## Now we compute mu.0 (a residual of sorts)
 
@@ -1409,10 +1371,32 @@ npregivderiv <- function(y,
       
     } else {
       
+      h.E.phi.w <- glpcv(ydat=phi,
+                         xdat=w,
+                         degree=rep(p, num.w.numeric),
+                         nmulti=nmulti,
+                         random.seed=random.seed,
+                         optim.maxattempts=optim.maxattempts,
+                         optim.method=optim.method,
+                         optim.reltol=optim.reltol,
+                         optim.abstol=optim.abstol,
+                         optim.maxit=optim.maxit,
+                         ...)
+        
+      E.phi.w <- glpreg(tydat=phi,
+                        txdat=w,
+                        eydat=phi,
+                        exdat=weval,
+                        bws=h.E.phi.w$bw,
+                        degree=rep(p, num.w.numeric),
+                        ...)$mean
+      
       predicted.E.mu.w <- E.y.w - E.phi.w
       
     }
     
+    norm.stop[j] <- ifelse(penalize.iteration,j*sum(predicted.E.mu.w^2)/sum(E.y.w^2),sum(predicted.E.mu.w^2)/sum(E.y.w^2))
+
     mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
     ## Now we compute T^* applied to mu
@@ -1444,9 +1428,9 @@ npregivderiv <- function(y,
     ## qualification of your regularization method. Take the worst
     ## case in which beta = 0 and then the number of iterations is ~
     ## N^0.5. Note that derivative estimation seems to require more
-    ## iterations hence the heuristic 4*sqrt(N)
+    ## iterations hence the heuristic sqrt(N)
 
-    if(j > 4*round(sqrt(nrow(z)))) {
+    if(j > round(sqrt(nrow(z))) && !is.monotone.increasing(norm.stop)) {
 
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
@@ -1477,13 +1461,8 @@ npregivderiv <- function(y,
   ## and take the min from where the initial inflection point occurs
   ## to the length of norm.stop
 
-  is.monotone.increasing <- function(x) {
-    ## Sorted and last value > first value
-    !is.unsorted(x) && x[length(x)] > x[1]
-  }
-  
   if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
-    warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. set `starting.values' to 0.5*E(Y|z))")
+    warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
     convergence <- "FAILURE_MONOTONE_INCREASING"
   } else {
     ## Ignore the initial increasing portion, take the min to the

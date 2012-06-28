@@ -1457,6 +1457,8 @@ npregiv <- function(y,
       
     }
 
+    norm.stop[1] <- sum(resid.fitted^2)/sum(E.y.w^2)
+
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration 1...",sep=""),console)
@@ -1482,34 +1484,6 @@ npregiv <- function(y,
                                          ...)$mean
     
     phi.mat <- phi
-
-    ## For the stopping rule
-    
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush(paste("Computing bandwidths and E(phi(z)|w) for stopping rule...",sep=""),console)
-
-    h.E.phi.w <- glpcv(ydat=phi,
-                       xdat=w,
-                       degree=rep(p, num.w.numeric),
-                       nmulti=nmulti,
-                       random.seed=random.seed,
-                       optim.maxattempts=optim.maxattempts,
-                       optim.method=optim.method,
-                       optim.reltol=optim.reltol,
-                       optim.abstol=optim.abstol,
-                       optim.maxit=optim.maxit,
-                       ...)
-
-    E.phi.w <- glpreg(tydat=phi,
-                      txdat=w,
-                      eydat=phi,
-                      exdat=weval,
-                      bws=h.E.phi.w$bw,
-                      degree=rep(p, num.w.numeric),
-                      ...)$mean
-
-    norm.stop[1] <- sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2)
 
     for(j in 2:iterate.max) {
 
@@ -1564,6 +1538,8 @@ npregiv <- function(y,
         
       }
 
+      norm.stop[j] <- ifelse(penalize.iteration,j*sum(resid.fitted^2)/sum(E.y.w^2),sum(resid.fitted^2)/sum(E.y.w^2))
+
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j,"...",sep=""),console)
@@ -1594,18 +1570,6 @@ npregiv <- function(y,
       console <- printPop(console)
       console <- printPush(paste("Computing stopping rule for iteration ", j,"...",sep=""),console)
 
-      ## For the stopping rule (use same smoothing as original)
-
-      E.phi.w <- glpreg(tydat=phi,
-                        txdat=w,
-                        eydat=phi,
-                        exdat=weval,
-                        bws=h.E.phi.w$bw,
-                        degree=rep(p, num.w.numeric),
-                        ...)$mean
-
-      norm.stop[j] <- ifelse(penalize.iteration,j*sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2),sum((E.y.w-E.phi.w)^2)/sum(E.y.w^2))
-
       ## The number of iterations in LF is asymptotically equivalent
       ## to 1/alpha (where alpha is the regularization parameter in
       ## Tikhonov).  Plus the criterion function we use is increasing
@@ -1617,7 +1581,7 @@ npregiv <- function(y,
       ## worst case in which beta = 0 and then the number of
       ## iterations is ~ N^0.5.
 
-      if(j > round(sqrt(nrow(z)))) {
+      if(j > round(sqrt(nrow(z))) && !is.monotone.increasing(norm.stop)) {
 
         ## If stopping rule criterion increases or we are below stopping
         ## tolerance then break
@@ -1635,9 +1599,9 @@ npregiv <- function(y,
           break()
         }
         
-        convergence <- "ITERATE_MAX"
-
       }
+
+      convergence <- "ITERATE_MAX"
 
     }
 
@@ -1648,13 +1612,8 @@ npregiv <- function(y,
     ## and take the min from where the initial inflection point occurs
     ## to the length of norm.stop
 
-    is.monotone.increasing <- function(x) {
-      ## Sorted and last value > first value
-      !is.unsorted(x) && x[length(x)] > x[1]
-    }
-  
     if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
-      warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. set `starting.values' to 0.5*E(Y|z))")
+      warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
       convergence <- "FAILURE_MONOTONE_INCREASING"
     } else {
       ## Ignore the initial increasing portion, take the min to the
