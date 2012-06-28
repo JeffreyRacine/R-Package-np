@@ -69,10 +69,10 @@ npregivderiv <- function(y,
                          optim.abstol=.Machine$double.eps,
                          optim.maxit=500,
                          iterate.max=1000,
-                         iterate.tol=1.0e-04,
                          iterate.diff.tol=1.0e-08,
                          constant=0.5,
                          penalize.iteration=TRUE,
+                         start.from=c("Eyz","EEywz"),
                          starting.values=NULL,
                          stop.on.increase=TRUE,
                          smooth.residuals=TRUE,
@@ -1041,6 +1041,7 @@ npregivderiv <- function(y,
   if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")  
   if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")  
 
+  start.from <- match.arg(start.from)
   optim.method <- match.arg(optim.method)
 
   if(p < 0) stop("The order of the local polynomial must be a positive integer")
@@ -1050,7 +1051,6 @@ npregivderiv <- function(y,
   if(optim.abstol <= 0) stop("optim.abstol must be positive")
   if(optim.maxit <= 0) stop("optim.maxit must be a positive integer")
   if(iterate.max < 2) stop("iterate.max must be at least 2")
-  if(iterate.tol <= 0) stop("iterate.tol must be positive")
   if(iterate.diff.tol < 0) stop("iterate.diff.tol must be non-negative")
   if(constant <= 0 || constant >= 1) stop("constant must lie in the range (0,1)")
 
@@ -1150,7 +1150,7 @@ npregivderiv <- function(y,
       console <- printPush(paste("Computing optimal smoothing for E(y|z,x) for iteration 1...",sep=""),console)
     }
 
-    h <- glpcv(ydat=y,
+    h <- glpcv(ydat=if(start.from=="Eyz") y else E.y.w,
                xdat=z,
                degree=rep(p, num.z.numeric),
                nmulti=nmulti,
@@ -1166,7 +1166,7 @@ npregivderiv <- function(y,
 
       ## glpreg() does not provide local constant derivative
 
-      phi.prime <- gradients(npreg(tydat=y,
+      phi.prime <- gradients(npreg(tydat=if(start.from=="Eyz") y else E.y.w,
                                    txdat=z,
                                    exdat=zeval,
                                    bws=h$bw,
@@ -1174,7 +1174,7 @@ npregivderiv <- function(y,
 
     } else {
 
-      grad.object <- glpreg(tydat=y,
+      grad.object <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
                             txdat=z,
                             exdat=zeval,
                             bws=h$bw,
@@ -1435,10 +1435,6 @@ npregivderiv <- function(y,
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
 
-      if(norm.stop[j] < iterate.tol) {
-        convergence <- "ITERATE_TOL"
-        break()
-      }
       if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
         convergence <- "STOP_ON_INCREASE"
         break()

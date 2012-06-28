@@ -48,12 +48,12 @@ npregiv <- function(y,
                     alpha.max=1.0e-01,
                     alpha.tol=.Machine$double.eps^0.25,
                     iterate.max=1000,
-                    iterate.tol=1.0e-04,
                     iterate.diff.tol=1.0e-08,
                     constant=0.5,
                     method=c("Landweber-Fridman","Tikhonov"),
                     penalize.iteration=TRUE,
                     smooth.residuals=TRUE,
+                    start.from=c("Eyz","EEywz"),
                     starting.values=NULL,
                     stop.on.increase=TRUE,
                     ...) {
@@ -1130,13 +1130,13 @@ npregiv <- function(y,
   if(NCOL(y) > 1) stop("y must be univariate")
   if(NROW(y) != NROW(z) || NROW(y) != NROW(w)) stop("y, z, and w have differing numbers of rows")
   if(iterate.max < 2) stop("iterate.max must be at least 2")
-  if(iterate.tol <= 0) stop("iterate.tol must be positive")
   if(iterate.diff.tol < 0) stop("iterate.diff.tol must be non-negative")
   if(constant <= 0 || constant >=1) stop("constant must lie in (0,1)")
   if(p < 0) stop("p must be a non-negative integer")
 
   if(!is.null(alpha) && alpha <= 0) stop("alpha must be positive")
 
+  start.from <- match.arg(start.from)
   method <- match.arg(method)
   
   ## Check for evaluation data
@@ -1351,7 +1351,7 @@ npregiv <- function(y,
 
     if(is.null(starting.values)) { 
 
-      h <- glpcv(ydat=y,
+      h <- glpcv(ydat=if(start.from=="Eyz") y else E.y.w,
                  xdat=z,
                  degree=rep(p, num.z.numeric),
                  nmulti=nmulti,
@@ -1363,7 +1363,7 @@ npregiv <- function(y,
                  optim.maxit=optim.maxit,
                  ...)
 
-      phi.0 <- glpreg(tydat=y,
+      phi.0 <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
                       txdat=z,
                       exdat=zeval,
                       bws=h$bw,
@@ -1586,10 +1586,6 @@ npregiv <- function(y,
         ## If stopping rule criterion increases or we are below stopping
         ## tolerance then break
         
-        if(norm.stop[j] < iterate.tol) {
-          convergence <- "ITERATE_TOL"
-          break()
-        }
         if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
           convergence <- "STOP_ON_INCREASE"
           break()

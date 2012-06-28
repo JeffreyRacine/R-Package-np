@@ -32,10 +32,10 @@ npregivderiv(y,
              optim.abstol = .Machine$double.eps,
              optim.maxit = 500,
              iterate.max = 1000,
-             iterate.tol = 1.0e-04,
              iterate.diff.tol = 1.0e-08,
              constant = 0.5,
              penalize.iteration = TRUE,
+             start.from = c("Eyz","EEywz"),
              starting.values = NULL,
              stop.on.increase = TRUE,
              smooth.residuals = TRUE,
@@ -142,9 +142,6 @@ npregivderiv(y,
   an integer indicating the maximum number of iterations permitted
   before termination occurs for Landweber-Fridman iteration.
 }
-\item{iterate.tol}{
-  the search tolerance for the stopping rule for Landweber-Fridman iteration.
-}
 \item{iterate.diff.tol}{
   the search tolerance for the difference in the stopping rule from
   iteration to iteration when using Landweber-Fridman iteration
@@ -157,6 +154,10 @@ npregivderiv(y,
     penalize the norm by the number of iterations or not (default
     \code{TRUE})
 }    
+\item{start.from}{ a character string indicating whether to start from
+  \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
+  be overridden by providing \code{starting.values} below)
+}  
 \item{starting.values}{ a value indicating whether to commence
   Landweber-Fridman assuming
   \eqn{\varphi'_{-1}=starting.values}{phi'[-1]=starting.values} (proper
@@ -206,7 +207,7 @@ npregivderiv(y,
   Iteration will terminate when either the change in the value of
   \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } from iteration to iteration is
-  less than \code{iterate.tol} or we hit \code{iterate.max} or
+  less than \code{iterate.diff.tol} or we hit \code{iterate.max} or
   \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
   starts rising.  }
