@@ -1342,6 +1342,33 @@ npregiv <- function(y,
 
     ## Landweber-Fridman
 
+    ## For the stopping rule
+    
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush(paste("Computing bandwidths and E(y|w) for stopping rule...",sep=""),console)
+
+    norm.stop <- numeric()
+
+    h <- glpcv(ydat=y,
+               xdat=w,
+               degree=rep(p, num.w.numeric),
+               nmulti=nmulti,
+               random.seed=random.seed,
+               optim.maxattempts=optim.maxattempts,
+               optim.method=optim.method,
+               optim.reltol=optim.reltol,
+               optim.abstol=optim.abstol,
+               optim.maxit=optim.maxit,
+               ...)
+
+    E.y.w <- glpreg(tydat=y,
+                    txdat=w,
+                    exdat=weval,
+                    bws=h$bw,
+                    degree=rep(p, num.w.numeric),
+                    ...)$mean
+
     ## We begin the iteration computing phi.0 and phi.1 directly, then
     ## interate.
     
@@ -1378,33 +1405,6 @@ npregiv <- function(y,
 
     }
     
-    ## For the stopping rule
-    
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush(paste("Computing bandwidths and E(y|w) for stopping rule...",sep=""),console)
-
-    norm.stop <- numeric()
-
-    h <- glpcv(ydat=y,
-               xdat=w,
-               degree=rep(p, num.w.numeric),
-               nmulti=nmulti,
-               random.seed=random.seed,
-               optim.maxattempts=optim.maxattempts,
-               optim.method=optim.method,
-               optim.reltol=optim.reltol,
-               optim.abstol=optim.abstol,
-               optim.maxit=optim.maxit,
-               ...)
-
-    E.y.w <- glpreg(tydat=y,
-                    txdat=w,
-                    exdat=weval,
-                    bws=h$bw,
-                    degree=rep(p, num.w.numeric),
-                    ...)$mean
-
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration 1...",sep=""),console)
