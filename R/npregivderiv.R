@@ -1037,9 +1037,9 @@ npregivderiv <- function(y,
 
   ## Basic error checking
 
-  if(!is.logical(penalize.iteration)) stop("penalize.iteration must be logical (TRUE/FALSE)")    
-  if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")  
-  if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")  
+  if(!is.logical(penalize.iteration)) stop("penalize.iteration must be logical (TRUE/FALSE)")
+  if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")
+  if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")
 
   start.from <- match.arg(start.from)
   optim.method <- match.arg(optim.method)
@@ -1068,7 +1068,7 @@ npregivderiv <- function(y,
   if(is.null(weval)) xeval <- x
 
   if(!is.null(starting.values) && (NROW(starting.values) != NROW(zeval))) stop(paste("starting.values must be of length",NROW(zeval)))
-  
+
   ## Need to determine how many x, w, z are numeric
 
   z <- data.frame(z)
@@ -1115,9 +1115,9 @@ npregivderiv <- function(y,
   console <- printClear(console)
   console <- printPop(console)
   console <- printPush(paste("Computing optimal smoothing for E(y|w) (stopping rule) for iteration 1...",sep=""),console)
-  
+
   ## For stopping rule...
-  
+
   hyw <- glpcv(ydat=y,
                xdat=w,
                degree=rep(p, num.w.numeric),
@@ -1129,7 +1129,7 @@ npregivderiv <- function(y,
                optim.abstol=optim.abstol,
                optim.maxit=optim.maxit,
                ...)
-  
+
   E.y.w <- glpreg(tydat=y,
                   txdat=w,
                   exdat=weval,
@@ -1196,8 +1196,8 @@ npregivderiv <- function(y,
 
     phi.prime <- starting.values
 
-  }  
-  
+  }
+
   ## Now we can compute phi.0 by integrating phi.prime.0 up to each
   ## sample realization (here we use the trapezoidal rule)
 
@@ -1205,6 +1205,9 @@ npregivderiv <- function(y,
   ## be a continuous variable's index
 
   phi <- integrate.trapezoidal(z[,1],phi.prime)
+
+  starting.values.phi <- phi
+  starting.values.phi.prime <- phi.prime
 
   ## In the definition of phi we have the integral minus the mean of
   ## the integral with respect to z, so subtract the mean here
@@ -1226,7 +1229,7 @@ npregivderiv <- function(y,
   mean.mu <- mean(mu)
 
   if(smooth.residuals) {
-    
+
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush(paste("Computing optimal smoothing for E(mu|w) (stopping rule) for iteration 1...",sep=""),console)
@@ -1235,7 +1238,7 @@ npregivderiv <- function(y,
     ## we have computed the stopping rule so reuse the bandwidth
     ## vector to be passed below. Here we compute the bandwidth
     ## optimal for the regression of mu on w.
-    
+
     h.E.mu.w <- glpcv(ydat=mu,
                        xdat=w,
                        degree=rep(p, num.w.numeric),
@@ -1247,7 +1250,7 @@ npregivderiv <- function(y,
                        optim.abstol=optim.abstol,
                        optim.maxit=optim.maxit,
                        ...)
-    
+
     ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
 
     predicted.E.mu.w <- glpreg(tydat=mu,
@@ -1271,7 +1274,7 @@ npregivderiv <- function(y,
                          optim.abstol=optim.abstol,
                          optim.maxit=optim.maxit,
                          ...)
-        
+
       E.phi.w <- glpreg(tydat=phi,
                         txdat=w,
                         eydat=phi,
@@ -1279,7 +1282,7 @@ npregivderiv <- function(y,
                         bws=h.E.phi.w$bw,
                         degree=rep(p, num.w.numeric),
                         ...)$mean
-      
+
     predicted.E.mu.w <- E.y.w - E.phi.w
 
   }
@@ -1337,16 +1340,16 @@ npregivderiv <- function(y,
     mean.mu <- mean(mu)
 
     if(smooth.residuals) {
-    
+
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush(paste("Computing optimal smoothing for E(mu|w) for iteration ", j,"...",sep=""),console)
-      
+
       ## Additional smoothing on top of the stopping rule required, but
       ## we have computed the stopping rule so reuse the bandwidth
       ## vector to be passed below. Here we compute the bandwidth
       ## optimal for the regression of mu on w.
-      
+
       h.E.mu.w <- glpcv(ydat=mu,
                         xdat=w,
                         degree=rep(p, num.w.numeric),
@@ -1358,9 +1361,9 @@ npregivderiv <- function(y,
                         optim.abstol=optim.abstol,
                         optim.maxit=optim.maxit,
                         ...)
-      
+
       ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
-      
+
       predicted.E.mu.w <- glpreg(tydat=mu,
                                  txdat=w,
                                  eydat=mu,
@@ -1368,9 +1371,9 @@ npregivderiv <- function(y,
                                  bws=h.E.mu.w$bw,
                                  degree=rep(p, num.w.numeric),
                                  ...)$mean
-      
+
     } else {
-      
+
       h.E.phi.w <- glpcv(ydat=phi,
                          xdat=w,
                          degree=rep(p, num.w.numeric),
@@ -1382,7 +1385,7 @@ npregivderiv <- function(y,
                          optim.abstol=optim.abstol,
                          optim.maxit=optim.maxit,
                          ...)
-        
+
       E.phi.w <- glpreg(tydat=phi,
                         txdat=w,
                         eydat=phi,
@@ -1390,11 +1393,11 @@ npregivderiv <- function(y,
                         bws=h.E.phi.w$bw,
                         degree=rep(p, num.w.numeric),
                         ...)$mean
-      
+
       predicted.E.mu.w <- E.y.w - E.phi.w
-      
+
     }
-    
+
     norm.stop[j] <- ifelse(penalize.iteration,j*sum(predicted.E.mu.w^2)/sum(E.y.w^2),sum(predicted.E.mu.w^2)/sum(E.y.w^2))
 
     mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
@@ -1443,11 +1446,11 @@ npregivderiv <- function(y,
         convergence <- "ITERATE_DIFF_TOL"
         break()
       }
-      
+
     }
 
-    convergence <- "ITERATE_MAX"      
-      
+    convergence <- "ITERATE_MAX"
+
   }
 
   ## Extract minimum, and check for monotone increasing function and
@@ -1457,9 +1460,18 @@ npregivderiv <- function(y,
   ## and take the min from where the initial inflection point occurs
   ## to the length of norm.stop
 
+  norm.value <- norm.stop/(1:length(norm.stop))
+
   if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
     warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
     convergence <- "FAILURE_MONOTONE_INCREASING"
+#    phi <- starting.values.phi
+#    phi.prime <- starting.values.phi.prime
+    j <- 1
+    while(norm.value[j+1] > norm.value[j]) j <- j + 1
+    j <- j-1 + which.min(norm.value[j:length(norm.value)])
+    phi <- phi.mat[,j]
+    phi.prime <- phi.prime.mat[,j]
   } else {
     ## Ignore the initial increasing portion, take the min to the
     ## right of where the initial inflection point occurs
@@ -1467,9 +1479,9 @@ npregivderiv <- function(y,
     while(norm.stop[j+1] > norm.stop[j]) j <- j + 1
     j <- j-1 + which.min(norm.stop[j:length(norm.stop)])
     phi <- phi.mat[,j]
-    phi.prime <- phi.prime.mat[,j]    
-  }  
-    
+    phi.prime <- phi.prime.mat[,j]
+  }
+
   console <- printClear(console)
   console <- printPop(console)
 
@@ -1481,8 +1493,10 @@ npregivderiv <- function(y,
               phi.prime.mat=phi.prime.mat,
               num.iterations=j,
               norm.stop=norm.stop,
-              norm.value=norm.stop/(1:length(norm.stop)),
-              convergence=convergence))
+              norm.value=norm.value,
+              convergence=convergence,
+              starting.values.phi=starting.values.phi,
+              starting.values.phi.prime=starting.values.phi.prime))
 
 }
 

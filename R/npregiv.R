@@ -1404,6 +1404,8 @@ npregiv <- function(y,
       phi.0 <- starting.values
 
     }
+
+    starting.values.phi <- phi.0
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1608,9 +1610,16 @@ npregiv <- function(y,
     ## and take the min from where the initial inflection point occurs
     ## to the length of norm.stop
 
+    norm.value <- norm.stop/(1:length(norm.stop))
+
     if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
       warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
       convergence <- "FAILURE_MONOTONE_INCREASING"
+#      phi <- starting.values.phi
+      j <- 1
+      while(norm.value[j+1] > norm.value[j]) j <- j + 1
+      j <- j-1 + which.min(norm.value[j:length(norm.value)])
+      phi <- phi.mat[,j]
     } else {
       ## Ignore the initial increasing portion, take the min to the
       ## right of where the initial inflection point occurs
@@ -1629,8 +1638,9 @@ npregiv <- function(y,
                 phi.mat=phi.mat,
                 num.iterations=j,
                 norm.stop=norm.stop,
-                norm.value=norm.stop/(1:length(norm.stop)),
-                convergence=convergence))
+                norm.value=norm.value,
+                convergence=convergence,
+                starting.values.phi=starting.values.phi))
 
   }
   

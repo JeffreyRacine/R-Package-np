@@ -1,5 +1,4 @@
 %% $Id: np_faq.tex,v 1.73 2012/05/22 01:53:12 jracine Exp jracine $
-
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -19,7 +18,7 @@
 \setlength{\oddsidemargin}{.0in} \setlength{\evensidemargin}{.0in}
 \setlength{\textwidth}{6.5in} \setlength{\footskip}{.5in}
 
-\title{Package {\tt np} FAQ} \date{\today} \author{Jeffrey S.~Racine}
+\title{Package \texttt{np} FAQ} \date{\today} \author{Jeffrey S.~Racine}
 
 \begin{document}
 
@@ -33,7 +32,7 @@
 
 This set of frequently asked questions is intended to help users who
 are encountering unexpected or undesired behavior when trying to use
-the {\tt np} package.
+the \texttt{np} package.
 
 Many of the underlying C routines have been extensively tested over
 the past two decades. However, the {\tt R} `hooks' needed to call
@@ -53,15 +52,15 @@ This FAQ refers to the most recent version, which as of this writing
 is 0.40-13. Kindly update your version should you not be using the most
 current (from within R, {\tt update.packages()} ought to do it, though
 also see \ref{update} below.). See the appendix in this file for
-cumulative changes between this and previous versions of the {\tt np}
+cumulative changes between this and previous versions of the \texttt{np}
 package.
 
 \section{Frequently Asked Questions}
 
-\subsection{How do I cite the {\tt np} package?}
+\subsection{How do I cite the \texttt{np} package?}
 
-Once you have installed the {\tt np} package ({\tt
-  install.packages("np")}), if you load the {\tt np} package ({\tt
+Once you have installed the \texttt{np} package ({\tt
+  install.packages("np")}), if you load the \texttt{np} package ({\tt
   library("np")}) and type {\tt citation(\verb+"+np\verb+"+)} you will
 be presented with the following information.
 
@@ -107,7 +106,7 @@ A BibTeX entry for LaTeX users is
   (2006) \cite{FARNSWORTH:2006}, to name but a few.
 
   Those looking for exemplar data sets outside of those contained in
-  the {\tt np} package are directed to the {\tt Ecdat} \cite{Ecdat}
+  the \texttt{np} package are directed to the {\tt Ecdat} \cite{Ecdat}
   and {\tt AER} \cite{AER} packages.
 
   Often the best resource is right down the hall. Ask a colleague
@@ -159,15 +158,15 @@ or
 update.views("Econometrics")
 \end{verbatim}
 
-\subsection{Is there a `gentle guide' to the {\tt np} package that
+\subsection{Is there a `gentle guide' to the \texttt{np} package that
     contains some easy to follow examples?}
 
-  Perhaps the most gentle introduction is contained in the {\tt np}
+  Perhaps the most gentle introduction is contained in the \texttt{np}
   package itself in the form of a `vignette'. To view the vignette run
-  R, install the {\tt np} package ({\tt install.packages("np")}), then
+  R, install the \texttt{np} package ({\tt install.packages("np")}), then
   type {\tt vignette("np",package="np")} to view or print the vignette
   (this vignette is essentially the article that appeared in the
-  Journal of Statistical Software that describes the {\tt np} package
+  Journal of Statistical Software that describes the \texttt{np} package
   (Hayfield \& Racine \cite{HAYFIELD_RACINE:2008})).
 
   See also {\tt vignette("entropy\_np",package="np")} for a vignette
@@ -179,10 +178,10 @@ update.views("Econometrics")
   for download from my website as is the code that will generate the
   examples contained therein.
 
-  For a listing of all routines in the {\tt np} package type: {\tt
+  For a listing of all routines in the \texttt{np} package type: {\tt
     library(help="np")}.
 
-\subsection{I noticed you have placed a new version of the {\tt np}
+\subsection{I noticed you have placed a new version of the \texttt{np}
     package on CRAN. How can I determine what has been changed,
     modified, fixed etc?}
 
@@ -191,11 +190,11 @@ update.views("Econometrics")
   to the end of this document where the CHANGELOG is provided for your
   convenience.
 
-\subsection{What is the difference between the {\tt np} package and the
+\subsection{What is the difference between the \texttt{np} package and the
     previous stand-alone programs you wrote, namely, N \copyright,
     NPREG \copyright, and NPDEN \copyright?}
 
-  The {\tt np} package is built from the same C library that underlies
+  The \texttt{np} package is built from the same C library that underlies
   its predecessors N \copyright, NPREG \copyright, and NPDEN
   \copyright. In fact, {\tt R} calls the compiled C code that
   underlies its predecessors (one of the beauties of {\tt R} is that
@@ -227,12 +226,12 @@ mydat <- read.dta(file="http://www.principlesofeconometrics.com/stata/mroz.dta")
 as one could always do with, say, {\tt read.table()}.
 
 \subsection{I want to use so-and-so's semiparametric/nonparametric
-    method, however, the {\tt np} package does not include this
+    method, however, the \texttt{np} package does not include this
     particular method\dots}
 
   This is why we have included the function {\tt npksum()}, which
   exists so that you can create your own kernel objects and take
-  advantage of underlying kernel methods implemented in the {\tt np}
+  advantage of underlying kernel methods implemented in the \texttt{np}
   package without having to write, say, C or Fortran code.
 
   With the options available, you could create new nonparametric tests
@@ -249,7 +248,7 @@ as one could always do with, say, {\tt read.table()}.
     nlm()}, and compares this to the {\tt npregbw()} function.
 
   If you wish to have a method incorporated into a future version of
-  the {\tt np} package, the best way to achieve this is to
+  the \texttt{np} package, the best way to achieve this is to
   successfully code up the method using {\tt npksum()}, briefly
   document it and write up an example, then send it to us. We will
   then, at our discretion, do our best to adapt and incorporate this
@@ -270,10 +269,10 @@ as one could always do with, say, {\tt read.table()}.
     observations (of computational order $n^2$ hence a doubling of the
     sample size will increase run time by a factor of four). The
     solution I favor is to run the code in a parallel computing
-    environment. The underlying C code for {\tt np} is MPI-aware (MPI
+    environment. The underlying C code for \texttt{np} is MPI-aware (MPI
     denotes the `message passing interface', a popular parallel
     programming library that is an international standard), and a
-    version of the {\tt np} package titled `{\tt npRmpi}' exists for
+    version of the \texttt{np} package titled `{\tt npRmpi}' exists for
     running jobs in a parallel environment that leverages the {\tt
       Rmpi} package (\cite{Rmpi}).\footnote{We are extremely grateful
       to Hao Yu for providing the MPI functionality contained in the
@@ -289,7 +288,7 @@ as one could always do with, say, {\tt read.table()}.
     installed and running properly as once you are at this stage it
     ought to then be trivial to install the {\tt npRmpi} package. Also
     note that running programs in a parallel environment requires
-    minor differences in how {\tt np} functions are called, and you
+    minor differences in how \texttt{np} functions are called, and you
     would be wise to examine the examples in the demo directory
     (download and unpack the source code and look in this directory)
     and the overview file {\tt npRmpi.pdf} in the inst/doc/ directory of
@@ -306,7 +305,7 @@ as one could always do with, say, {\tt read.table()}.
     replicates the method using numerical search and resampling
     without replacement rather than the grid method outlined in
     \cite{RACINE:1993} (both have equivalent properties but this is
-    perhaps simpler to implement using the {\tt np} package).
+    perhaps simpler to implement using the \texttt{np} package).
 
     \begin{singlespacing}
 \begin{verbatim}
@@ -437,7 +436,7 @@ plot(bw,xtrim=.01)
 -O3 -ffast-math -fexpensive-optimizations -fomit-frame-pointer
 \end{verbatim}
     \end{singlespacing}
-    then reinstall the {\tt np} package and you may experience some
+    then reinstall the \texttt{np} package and you may experience some
     improvements in run time. Note that the -g flag turns on
     production of debugging information which can involve some
     overhead, so we are disabling this feature. This is not a feature
@@ -572,7 +571,7 @@ plot(n.seq.aug,time.fcst/3600,type="b",
 \end{verbatim}
 
   Incorporating these univariate plug-in bandwidth selectors into the
-  univariate density estimation routines in {\tt np} is
+  univariate density estimation routines in \texttt{np} is
   straightforward as the following code snippet demonstrates. They
   will certainly be faster than the likelihood and least-squares
   cross-validation approaches. Also, you may not wish the density
@@ -592,7 +591,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   density. However, for exploratory purposes these may be of interest
   to some users.
 
-\subsection{\label{code_nowork}I wrote a program using {\tt np} and it
+\subsection{\label{code_nowork}I wrote a program using \texttt{np} and it
     does not work as I expected\dots}
 
   There exist a rather extensive set of examples contained in the
@@ -605,7 +604,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   carefully follow the examples listed in a given function for syntax
   issues etc.
 
-  If you are convinced that the problem lies with {\tt np} (there
+  If you are convinced that the problem lies with \texttt{np} (there
   certainly will be undiscovered `features', i.e., bugs), then kindly
   send me your code and data so that I can replicate and help resolve
   the issue.
@@ -633,7 +632,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 
   This should no longer occur for np versions 0.30-0 and up. For
   previous versions, this reflected a peculiarity of the R Windows
-  GUI, and was not specific to the {\tt np} package.
+  GUI, and was not specific to the \texttt{np} package.
 
   From the {\tt R} Windows FAQ\dots
 
@@ -661,7 +660,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   your {\tt R} desktop icon.
 
 \subsection{\label{factor}A variable must be cast as, say, a factor in
-    order for {\tt np} to recognize this as an unordered factor. How
+    order for \texttt{np} to recognize this as an unordered factor. How
     can I determine whether my data is already cast as a factor?}
 
   Use the {\tt class()} function. For example, define {\tt x <-
@@ -718,7 +717,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     data=dataframe} where {\tt dataframe} is the name of your
   data frame.
 
-\subsection{My {\tt np} code produces errors when I attempt to run
+\subsection{My \texttt{np} code produces errors when I attempt to run
     it\dots}
 
   First, it is good practice to name all arguments (see the docs for
@@ -731,7 +730,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     Examples:}). See also \ref{code_nowork} above.
 
 \subsection{\label{0/1}I have (numeric) 0/1 dummy variable regressors
-    in my parametric model. Can I just pass them to the {\tt np}
+    in my parametric model. Can I just pass them to the \texttt{np}
     functions as I would in a parametric setting?}
 
   In general, definitely not -- you need to correctly classify each
@@ -742,17 +741,17 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   create these by habit for parametric models. But, the underlying
   variable is simply year, which equals 2006, 2007, and so forth.
 
-  In {\tt np} (and {\tt R} in general), you get to economize by just
+  In \texttt{np} (and {\tt R} in general), you get to economize by just
   telling the function that the variable `year' is ordered, as in
   ordered(year), where year is a vector containing elements 2006, 2007
   etc. Of course, seasoned R users would appreciate that this is in
   fact the simple way to do it with a parametric model as well.
 
   You would {\em never}, therefore, just pass dummy variables to an
-  {\tt np} function as you would for linear parametric models. The
+  \texttt{np} function as you would for linear parametric models. The
   {\em only} exception is where you have only one 0/1 dummy for one
   variable, say `{\tt sex}', and in this case you still would have to
-  enter this as {\tt factor(sex)} so that the {\tt np} function
+  enter this as {\tt factor(sex)} so that the \texttt{np} function
   recognizes this as a factor (otherwise it would treat it as
   continuous and use a kernel function that is inappropriate for a
   factor).
@@ -1202,7 +1201,7 @@ Z
   ({\tt `loess', lo($\cdot$)}, with default manual `span' of 0.75, the
   parameter which controls the degree of smoothing). The following
   code snippet demonstrates the capabilities of the {\tt gam()}
-  function via the \verb+wage1+ dataset included in the {\tt np}
+  function via the \verb+wage1+ dataset included in the \texttt{np}
   packages using three numeric regressors.
 
 \begin{verbatim}
@@ -1220,7 +1219,7 @@ detach(wage1)
   biggest difference is that this uses generalized cross validation to
   select the `span' (rather than manually) hence the degree of
   smoothing becomes part of the method (as is the case for all
-  functions in the {\tt np} package). The following code snippet
+  functions in the \texttt{np} package). The following code snippet
   demonstrates the {\tt mgcv} implementation of the {\tt gam()}
   function.
 
@@ -1337,6 +1336,20 @@ lag.numeric <- function(x,l=1,pad.NA=TRUE) {
 x <- 1:10
 x.lag.1 <- lag.numeric(x,1)
 \end{verbatim}
+
+\subsection{Can I provide sample weights to be used by functions in
+  the \texttt{np} package?}
+
+Unfortunately, at this stage the answer is `no', at least not directly
+with many of the functions as they stand. However, the function
+\texttt{npksum} underlies many of the functions in the \texttt{np}
+package and it supports passing of weights, so you may be able to use
+this function and do a bit of coding to fulfill your needs. Kindly see
+\texttt{?npksum} for illustrations.
+
+Alternatively, if reweighting of sample data is sufficient for your
+needs then you can feed the weighted sample realizations directly to
+existing functions.
 
 \bibliographystyle{plain} \bibliography{np_faq}
 

@@ -13,6 +13,7 @@ export(b.star
        ,npcdensbw
        ,npcdens
        ,npcdist
+       ,npcopula
        ,npdeptest       
        ,npsdeptest
        ,npplot
