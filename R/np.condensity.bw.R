@@ -15,7 +15,19 @@ npcdensbw.formula <-
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
-    mf <- mf[c(1,m)]                     
+    mf <- mf[c(1,m)]
+
+    if(!missing(call) && is.call(call)){
+      ## rummage about in the call for the original formula
+      for(i in 1:length(call)){
+        if(tryCatch(class(eval(call[[i]])) == "formula",
+                    error = function(e) FALSE))
+          break;
+      }
+      mf[[2]] <- call[[i]]
+      
+    }
+                     
 
     mf[[1]] <- as.name("model.frame")
 
