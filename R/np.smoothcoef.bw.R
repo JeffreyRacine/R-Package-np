@@ -25,12 +25,6 @@ npscoefbw.formula <-
           break;
       }
       mf[[2]] <- call[[i]]
-      
-      formula.args <- c("data", "subset", "na.action")
-      mc.call <- match(formula.args, names(call), nomatch = 0)
-      mc.mf <- match(formula.args, names(mf), nomatch = 0)
-      if(any(mc.mf > 0))
-        mf[mc.mf] <- call[mc.call]
     }
 
     mf[[1]] <- as.name("model.frame")
