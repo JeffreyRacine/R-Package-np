@@ -1,3 +1,9 @@
+## No Zero Denominator, used in C code for kernel estimation...
+  
+NZD <- function(a) {
+  sapply(1:NROW(a), function(i) {if(a[i] < 0) min(-.Machine$double.xmin,a[i]) else max(.Machine$double.xmin,a[i])})
+}
+
 ## Function to test for monotone increasing vector
 
 is.monotone.increasing <- function(x) {

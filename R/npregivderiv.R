@@ -349,12 +349,6 @@ npregivderiv <- function(y,
 
   }
 
-  ## No Zero Denominator, used in C code for kernel estimation...
-
-  NZD <- function(a) {
-    sapply(1:NROW(a), function(i) {if(a[i] < 0) min(-.Machine$double.xmin,a[i]) else max(.Machine$double.xmin,a[i])})
-  }
-
   mypoly <- function(X,degree) {
 
     if(missing(X)) stop(" X required")
