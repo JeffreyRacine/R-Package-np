@@ -3,7 +3,7 @@
 \title{ Kernel Copula Estimation }
 \description{
   \code{npcopula} implements the kernel copula approach 
-  of Racine (2012) for an arbitraty number of dimensions
+  of Racine (2012) for an arbitrary number of dimensions
 }
 \usage{
 npcopula <- function(bws.joint,

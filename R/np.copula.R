@@ -76,7 +76,7 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
                          okertype=bws.marginal$okertype,
                          ukertype=bws.marginal$ukertype)
 
-      copula.density <- copula.density/fitted(npudens(bws=bws.f))      
+      copula.density <- copula.density/NZD(fitted(npudens(bws=bws.f)))
     }
   } else {
     ## User wishes to compute copula for inputted u matrix. To
@@ -131,7 +131,7 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
       xeval <- data.frame(x.u[,j])
       names(xeval) <- bws.joint$xnames[j]
       ## Divide copula density by its marginals
-      copula.density <- copula.density/predict(npudens(bws=bws.f),newdata=xeval)
+      copula.density <- copula.density/NZD(predict(npudens(bws=bws.f),newdata=xeval))
     }
   }
   ## Convert to data frame and name

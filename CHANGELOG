@@ -1,5 +1,8 @@
 Changes from Version 0.40-13 to 0.40-14 [XXX]
 
+* Added function `npcopula' for d-dimensional copula estimation via
+  inversion
+
 * Modified stopping rules in npregiv and npregivderiv	
 
 * Added reference to R2 measure (Doksum and Samarov (1995))
