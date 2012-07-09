@@ -97,8 +97,10 @@ grid.dat <- cbind(grid.seq,grid.seq)
 
 copula <- npcopula(bws.joint=bw,u=grid.dat)
 contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
-persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",zlab="Copula",zlim=c(0,1))
-persp(grid.seq,grid.seq,matrix(copula$copula.density,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",zlab="Copula Density")
+persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
+      zlab="Copula",zlim=c(0,1))
+persp(grid.seq,grid.seq,matrix(copula$copula.density,n.eval,n.eval),ticktype="detailed",xlab="u1",
+      ylab="u2",zlab="Copula Density")
 copula.emp <- npcopula(bws.joint=bw)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
 }
