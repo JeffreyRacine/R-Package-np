@@ -7,8 +7,8 @@
 }
 \usage{
 npcopula(bws.joint,
-         bws.univariate=NULL,
-         u=NULL) 
+         bws.univariate = NULL,
+         u = NULL) 
 }
 
 \arguments{
