@@ -31,7 +31,9 @@ npcopula(bws.joint,
 
   \item{copula}{ the copula }
   \item{copula density}{ the copula density}
-  \item{u}{ the matrix of quantiles either input or created via \code{expand.grid}}
+  \item{u}{ the matrix of quantiles associated with the sample
+  realizations (\code{u=NULL}) or those created via \code{expand.grid}
+  when \code{u=u} is specified}
 
 }
 \references{
@@ -50,7 +52,15 @@ npcopula(bws.joint,
 \details{
 
   \code{npcopula} computes the nonparametric copula and copula density
-  using inversion (Nelsen (2006), page 51).
+  using inversion (Nelsen (2006), page 51). For the inversion approach,
+  we exploit Sklar's theorem (Corollary 2.3.7, Nelsen (2006)) to produce
+  copulas directly from the joint distribution function using
+  \eqn{C(u,v) = H(F^{-1}(u),G^{-1}(v))} rather than the typical approach
+  that instead uses \eqn{H(x,y) = C(F(x),G(y))}. Whereas the latter
+  requires kernel density estimation on a d-dimensional unit hypercube
+  which necessitates the use of boundary correction methods, the former
+  does not (unless of course the data itself is bounded requiring the
+  use of boundary corrections).
 
 }
 
