@@ -17,22 +17,6 @@ npscoefbw.formula <-
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
 
-    if(!missing(call) && is.call(call)){
-      ## rummage about in the call for the original formula
-      for(i in 1:length(call)){
-        if(tryCatch(class(eval(call[[i]])) == "formula",
-                    error = function(e) FALSE))
-          break;
-      }
-      mf[[2]] <- call[[i]]
-      
-      formula.args <- c("data", "subset", "na.action")
-      mc.call <- match(formula.args, names(call), nomatch = 0)
-      mc.mf <- match(formula.args, names(mf), nomatch = 0)
-      if(any(mc.mf > 0))
-        mf[mc.mf] <- call[mc.call]
-    }
-
     mf[[1]] <- as.name("model.frame")
 
     chromoly <- explodePipe(mf[["formula"]])
