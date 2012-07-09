@@ -6,9 +6,9 @@
   of Racine (2012) for an arbitrary number of dimensions
 }
 \usage{
-npcopula <- function(bws.joint,
-                     bws.univariate=NULL,
-                     u=NULL) 
+npcopula(bws.joint,
+         bws.univariate=NULL,
+         u=NULL) 
 }
 
 \arguments{
@@ -61,7 +61,7 @@ npcopula <- function(bws.joint,
 }
 
 \seealso{
-  \link{npudensbs},\link{npudens},\link{npudist}
+  \link{npudensbw},\link{npudens},\link{npudist}
 }
 
 \examples{
@@ -87,11 +87,8 @@ grid.dat <- cbind(grid.seq,grid.seq)
 
 copula <- npcopula(bws.joint=bw,u=grid.dat)
 contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
-Sys.sleep(5)
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",zlab="Copula",zlim=c(0,1))
-Sys.sleep(5)
 persp(grid.seq,grid.seq,matrix(copula$copula.density,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",zlab="Copula Density")
-Sys.sleep(5)
 copula.emp <- npcopula(bws.joint=bw)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
 }
