@@ -2263,6 +2263,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                   double * euno, double * eord, double * econ, 
                   double * bw,
                   double * mcv, double * padnum, 
+                  int * operator,
                   int * myopti, double * kpow, double * weighted_sum){
 
   int * ip = NULL;  // point permutation, see tree.c
@@ -2271,7 +2272,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   double * vector_scale_factor, * ksum, pad_num;
   int i,j, num_var, num_obs_eval_alloc;
-  int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw, operator;
+  int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, do_smooth_coef_weights, no_weights, sum_element_length;
 
 
@@ -2299,8 +2300,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   leave_one_out = myopti[KWS_LOOI];
   do_ipow = myopti[KWS_IPOWI];
   do_divide_bw = myopti[KWS_BDIVI];
-  operator = myopti[KWS_OPI];
-
+  
   max_lev = myopti[KWS_MLEVI];
   pad_num = *padnum;
 
@@ -2449,8 +2449,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     num_categories_extern[j] = i;
   }
 
-  if((operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8))
-    error("np.c error (operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8)");
+  //if((operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8))
+  //  error("np.c error (operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8)");
   
   kernel_weighted_sum_np(KERNEL_reg_extern,
                          KERNEL_reg_unordered_extern,

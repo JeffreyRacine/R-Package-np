@@ -901,7 +901,7 @@ void np_ukernelv(const int KERNEL,
       const int istart = kdt_extern->kdn[nl->node[m]].istart;
       const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
-	result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
+        result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
     }
   }
 }
@@ -950,7 +950,7 @@ void np_okernelv(const int KERNEL,
       const int istart = kdt_extern->kdn[nl->node[m]].istart;
       const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
-	result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+        result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
     }
   }
 }
@@ -1236,7 +1236,7 @@ const int bandwidth_divide,
 const int do_smooth_coef_weights,
 const int symmetric,
 const int gather_scatter,
-const int operator,
+int * operator,
 double * const * const matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
@@ -1264,7 +1264,15 @@ double *weighted_sum){
   int i,j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
   int do_psum; 
 
-  int np_ks_tree_use = (int_TREE == NP_TREE_TRUE) && (operator != OP_CONVOLUTION) && (BANDWIDTH_reg == BW_FIXED);
+
+  /* Trees are currently not compatible with all operations */
+  int np_ks_tree_use = (int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED);
+  int any_convolution = 0;
+  
+  for(i = 0; (i < (num_reg_unordered + num_reg_ordered + num_reg_continuous)); i++){
+    np_ks_tree_use &= (operator[i] != OP_CONVOLUTION);
+    any_convolution |= (operator[i] == OP_CONVOLUTION);
+  }
 
   NL nl = {.node = NULL, .n = 0, .nalloc = 0};
   NL * pnl=  np_ks_tree_use ? &nl : NULL;
@@ -1280,8 +1288,23 @@ double *weighted_sum){
   num_obs_eval_alloc = num_obs_eval;
 #endif
 
-  const int KERNEL_reg_np = KERNEL_reg + OP_CFUN_OFFSETS[operator];
-  const int KERNEL_unordered_reg_np = KERNEL_unordered_reg + OP_UFUN_OFFSETS[operator];
+  // we now allow one to use derivative, integral, convolution or standard kernels on a regressor by regressor basis
+  int * KERNEL_reg_np = NULL, * KERNEL_unordered_reg_np = NULL, * KERNEL_ordered_reg_np = NULL;
+
+  KERNEL_reg_np = (int *)malloc(sizeof(int)*num_reg_continuous);
+  KERNEL_unordered_reg_np = (int *)malloc(sizeof(int)*num_reg_unordered);
+  KERNEL_ordered_reg_np = (int *)malloc(sizeof(int)*num_reg_ordered);
+
+  for(l = 0; l < num_reg_continuous; l++)
+    KERNEL_reg_np[l] = KERNEL_reg + OP_CFUN_OFFSETS[operator[l]];
+
+  for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered); l++)
+    KERNEL_unordered_reg_np[l - num_reg_continuous] = KERNEL_unordered_reg + OP_UFUN_OFFSETS[operator[l]];
+
+  // todo - add (better) support for ordered integral / convolution kernels
+  for(l = (num_reg_continuous+num_reg_unordered); l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++)
+    KERNEL_ordered_reg_np[l - (num_reg_continuous + num_reg_unordered)] = KERNEL_ordered_reg;
+
   const int num_xt = (BANDWIDTH_reg == BW_ADAP_NN)?num_obs_eval:num_obs_train;
   const int ws_step = (BANDWIDTH_reg == BW_ADAP_NN)? 0 :
     (MAX(num_var_continuous_extern, 1) * MAX(num_var_ordered_extern, 1));
@@ -1353,7 +1376,7 @@ double *weighted_sum){
     return(1);
   }
 
-  if((BANDWIDTH_reg == BW_ADAP_NN) && (operator == OP_CONVOLUTION)){ // need additional bandwidths 
+  if((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution){ // need additional bandwidths 
     matrix_eval_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
 
     if(kernel_bandwidth_mean(
@@ -1460,11 +1483,11 @@ double *weighted_sum){
       double bb[kdt_extern->ndim*2];
 
       for(i = 0; i < num_reg_continuous; i++){
-	bb[2*i] = -cksup[KERNEL_reg_np][1];
-	bb[2*i+1] = -cksup[KERNEL_reg_np][0];
+        bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
+        bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
 
-	bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + m[i]*bb[2*i]);
-	bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + m[i]*bb[2*i+1]);
+        bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + m[i]*bb[2*i]);
+        bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + m[i]*bb[2*i+1]);
       }
 
       boxSearch(kdt_extern, 0, bb, pnl);
@@ -1473,35 +1496,29 @@ double *weighted_sum){
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
-    if((BANDWIDTH_reg != BW_ADAP_NN) || (operator != OP_CONVOLUTION)){
-      for(i=0; i < num_reg_continuous; i++, l++, m += mstep){
-        np_ckernelv(KERNEL_reg_np, xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl);
-        dband *= *m;
-      }
-    } else {
-      for(i=0; i < num_reg_continuous; i++, l++, m += mstep){
+    for(i=0; i < num_reg_continuous; i++, l++, m += mstep){
+      if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION))
+        np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl);
+      else
         np_convol_ckernelv(KERNEL_reg, xtc[i], num_xt, l, xc[i][j], 
                            matrix_eval_bandwidth[i], *m, tprod);
-        dband *= *m;
-      }      
+      dband *= *m;
     }
 
     /* unordered second */
 
     for(i=0; i < num_reg_unordered; i++, l++){
-      np_ukernelv(KERNEL_unordered_reg_np, xtu[i], num_xt, l, xu[i][j], 
+      np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
                   lambda[i], num_categories[i], tprod, pnl);
     }
 
     /* ordered third */
-    if(operator != OP_CONVOLUTION){
-      for(i=0; i < num_reg_ordered; i++, l++){
-        np_okernelv(KERNEL_ordered_reg, xto[i], num_xt, l,
+    for(i=0; i < num_reg_ordered; i++, l++){
+      if(operator[l] != OP_CONVOLUTION){
+        np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
                     xo[i][j], lambda[num_reg_unordered+i], 
-                    tprod, pnl);
-      }
-    } else {
-      for(i=0; i < num_reg_ordered; i++, l++){
+                    tprod, pnl);      
+      } else {
         np_convol_okernelv(KERNEL_ordered_reg, xto[i], num_xt, l,
                            xo[i][j], lambda[num_reg_unordered+i], 
                            num_categories[i+num_reg_unordered],
@@ -1540,10 +1557,13 @@ double *weighted_sum){
   if(nl.node != NULL)
     free(nl.node);
 
+  free(KERNEL_reg_np);
+  free(KERNEL_unordered_reg_np);
+  free(KERNEL_ordered_reg_np);
   free(lambda);
   free_tmat(matrix_bandwidth);
 
-  if((BANDWIDTH_reg == BW_ADAP_NN) && (operator == OP_CONVOLUTION))
+  if((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution)
     free_tmat(matrix_eval_bandwidth);
 
   free(tprod);
@@ -1932,7 +1952,14 @@ int *num_categories){
   double  * aicc;
   double traceH = 0.0;
 
+  int * operator = NULL;
+
   const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
+
+  operator = (int *)malloc(sizeof(int)*num_reg_continuous);
+
+  for(i = 0; i < num_reg_continuous; i++)
+    operator[i] = 0;
 
 #ifdef MPI2
     int stride = MAX(ceil((double) num_obs / (double) iNum_Processors),1);
@@ -2001,7 +2028,7 @@ int *num_categories){
                            0, // do_smooth_coef_weights = FALSE (not implemented)
                            0, // not symmetric
                            0, // do not gather-scatter
-                           0, // no convolution
+                           operator, // all regressors use the normal kernels (not cdf or derivative ones) 
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2054,7 +2081,7 @@ int *num_categories){
                            0, // do_smooth_coef_weights = FALSE (not implemented)
                            0, // not symmetric
                            0, // do not gather-scatter
-                           0, // no convolution
+                           operator, // no special operators being used
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2231,7 +2258,7 @@ int *num_categories){
                                  0, // do_smooth_coef_weights = FALSE (not implemented)
                                  1, // symmetric
                                  1, // gather-scatter sum
-                                 0, // no convolution
+                                 operator, // no convolution
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -2323,7 +2350,7 @@ int *num_categories){
                                0, // do_smooth_coef_weights = FALSE (not implemented)
                                1, // symmetric
                                1, // gather-scatter sum
-                               0, // no convolution
+                               operator, // no convolution
                                PXU, // TRAIN
                                PXO, 
                                PXC,
@@ -2409,6 +2436,7 @@ int *num_categories){
     free(sgn);
   }
 
+  free(operator);
   free(aicc);
   free(lambda);
   free_mat(matrix_bandwidth,num_reg_continuous);

@@ -742,6 +742,8 @@ OP_CONVOLUTION = 1
 OP_DERIVATIVE  = 2
 OP_INTEGRAL    = 3
 
+ALL_OPERATORS = c(OP_NORMAL, OP_CONVOLUTION, OP_DERIVATIVE, OP_INTEGRAL)
+names(ALL_OPERATORS) <- c("normal","convolution", "derivative", "integral")
 
 ## useful numerical constants of kernel integrals
 int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.62396943688265038571, 0.74785078617543927990,

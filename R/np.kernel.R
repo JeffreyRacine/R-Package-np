@@ -89,7 +89,12 @@ npksum.default <-
     miss.ex <- missing(exdat)
     miss.weights <- missing(weights)
 
-    operator <- match.arg(operator)
+    uo.operators <- c("normal","convolution","integral")
+
+    if(missing(operator))
+      operator <- match.arg(operator)
+    else
+      operator <- match.arg(operator, several.ok = TRUE)
     
     txdat = toFrame(txdat)
 
@@ -108,6 +113,17 @@ npksum.default <-
     if (length(bws$bw) != length(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
+    if(length(operator) == 1)
+      operator = rep(operator, length(txdat))
+    
+    if(length(operator) != length(txdat))
+      stop("operator not specified for all variables")
+
+    if(!all(operator[c(bws$iuno,bws$iord)] %in% uo.operators))
+      stop("unordered and ordered variables may only make use of 'normal', 'convolution' and 'integral' operator types")
+    
+    operator.num <- ALL_OPERATORS[operator]
+    
     ccon = unlist(lapply(txdat[,bws$icon,drop=FALSE],class))
     if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
         (any(bws$iord) && !all(unlist(lapply(txdat[,bws$iord, drop=FALSE],class)) ==
@@ -212,7 +228,6 @@ npksum.default <-
       eord = data.frame()
       econ = data.frame()
     }
-
     
     myopti = list(
       num_obs_train = tnrow,
@@ -240,11 +255,6 @@ npksum.default <-
       leave.one.out = leave.one.out, 
       ipow = integer.pow,
       bandwidth.divide = bandwidth.divide,
-      operator = switch(operator,
-        normal = OP_NORMAL,
-        convolution = OP_CONVOLUTION,
-        derivative = OP_DERIVATIVE,
-        integral = OP_INTEGRAL),
       mcv.numRow = attr(bws$xmcv, "num.row"),
       smooth.coefficient = smooth.coefficient,
       wncol = dim.in[1],
@@ -259,6 +269,7 @@ npksum.default <-
          as.double(euno),  as.double(eord),  as.double(econ), 
          as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+         as.integer(operator.num[c(bws$icon,bws$iuno,bws$iord)]),
          as.integer(myopti), as.double(kernel.pow),
          ksum = double(length.out),
          PACKAGE="np" )[["ksum"]]
