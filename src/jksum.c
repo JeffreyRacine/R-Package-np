@@ -1956,9 +1956,9 @@ int *num_categories){
 
   const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
 
-  operator = (int *)malloc(sizeof(int)*num_reg_continuous);
+  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
 
-  for(i = 0; i < num_reg_continuous; i++)
+  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
     operator[i] = 0;
 
 #ifdef MPI2
