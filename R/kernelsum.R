@@ -1,5 +1,5 @@
 npkernelsum = 
-  function(bws, eval, ksum,
+  function(bws, eval, ksum, kw,
            ntrain, trainiseval = FALSE){
 
     if (missing(bws) | missing(eval) | missing(ksum) | missing(ntrain))
@@ -20,6 +20,7 @@ npkernelsum =
       pokertype = bws$pokertype,
       eval = eval,
       ksum = ksum,
+      kw = kw,
       ntrain = ntrain,
       trainiseval = trainiseval
       )
@@ -42,6 +43,9 @@ print.npkernelsum <- function(x, digits=NULL, ...){
       "\nBandwidth Type:",x$ptype,
       "\n\nKernel sum in component 'ksum'")
 
+  if (!is.null(weights))
+    cat("\nKernel weights available in component 'kw'")
+  
   if (x$ncon > 0)
     cat("\n\nContinuous Kernel Type:",x$pckertype,
         "\nNo. Continuous Vars.:",x$ncon)

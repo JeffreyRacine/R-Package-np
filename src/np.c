@@ -2264,16 +2264,17 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                   double * bw,
                   double * mcv, double * padnum, 
                   int * operator,
-                  int * myopti, double * kpow, double * weighted_sum){
+                  int * myopti, double * kpow, double * weighted_sum,
+                  double * kernel_weights){
 
   int * ip = NULL;  // point permutation, see tree.c
       
   /* the ys are the weights */
 
-  double * vector_scale_factor, * ksum, pad_num;
+  double * vector_scale_factor, * ksum, pad_num, ** kw = NULL;
   int i,j, num_var, num_obs_eval_alloc;
   int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw;
-  int max_lev, do_smooth_coef_weights, no_weights, sum_element_length;
+  int max_lev, do_smooth_coef_weights, no_weights, sum_element_length, return_kernel_weights;
 
 
   /* match integer options with their globals */
@@ -2312,6 +2313,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   num_var_ordered_extern = myopti[KWS_WNCOLI];
 
   int_TREE = myopti[KWS_DOTREEI];
+  return_kernel_weights = myopti[KWS_RKWI];
 
   no_y = (num_var_continuous_extern == 0);
   no_weights = (num_var_ordered_extern == 0);
@@ -2449,6 +2451,9 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     num_categories_extern[j] = i;
   }
 
+  if(return_kernel_weights){
+    kw = alloc_matd(num_obs_train_extern, num_obs_eval_extern);
+  }
   //if((operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8))
   //  error("np.c error (operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8)");
   
@@ -2482,7 +2487,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          &vector_scale_factor[1],
                          num_categories_extern,
                          matrix_categorical_vals_extern,
-                         ksum);
+                         ksum,
+                         kw);
   /*
     kernel_convolution_weighted_sum(KERNEL_reg_extern,
                                     KERNEL_reg_unordered_extern,
@@ -2509,10 +2515,17 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   if(train_is_eval && (int_TREE == NP_TREE_TRUE)){
     for(j = 0; j < num_obs_eval_extern; j++)
       for(i = 0; i < sum_element_length; i++)
-	weighted_sum[ip[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
+        weighted_sum[ip[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
   } else {
     for(i = 0; i < sum_element_length * num_obs_eval_extern; i++)
       weighted_sum[i] = ksum[i];
+  }
+
+  if(return_kernel_weights){
+    for(j = 0; j < num_obs_eval_extern; j++)
+      for(i = 0; i < num_obs_train_extern; i++)
+        kernel_weights[j*num_obs_train_extern + i] = kw[j][i];
+    free_mat(kw, num_obs_eval_extern);
   }
 
   /* clean up */

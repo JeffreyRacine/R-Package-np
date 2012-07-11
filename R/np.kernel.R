@@ -48,7 +48,7 @@ npksum.numeric <-
            exdat,
            weights,
            leave.one.out, kernel.pow, bandwidth.divide,
-           operator, smooth.coefficient,
+           operator, smooth.coefficient, return.kernel.weights,
            ...){
 
     txdat <- toFrame(txdat)
@@ -61,7 +61,7 @@ npksum.numeric <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("tydat", "exdat", "weights", "leave.one.out", "kernel.pow", "bandwidth.divide",
-               "operator", "smooth.coefficient")
+               "operator", "smooth.coefficient", "return.kernel.weights")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
@@ -83,6 +83,7 @@ npksum.default <-
            bandwidth.divide = FALSE,
            operator = c("normal","convolution","derivative","integral"),
            smooth.coefficient = FALSE,
+           return.kernel.weights = FALSE,
            ...){
 
     miss.ty <- missing(tydat)
@@ -228,7 +229,11 @@ npksum.default <-
       eord = data.frame()
       econ = data.frame()
     }
-    
+
+    nkw <- ifelse(return.kernel.weights, tnrow*enrow, 0)
+
+    return.names <- c("ksum","kernel.weights")
+      
     myopti = list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
@@ -259,10 +264,12 @@ npksum.default <-
       smooth.coefficient = smooth.coefficient,
       wncol = dim.in[1],
       yncol = dim.in[2],
-      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
+      return.kernel.weights = return.kernel.weights)
     
 
-    myout=
+
+    myout <- 
       .C("np_kernelsum",
          as.double(tuno), as.double(tord), as.double(tcon),
          as.double(tydat), as.double(weights),
@@ -272,21 +279,29 @@ npksum.default <-
          as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
          as.integer(myopti), as.double(kernel.pow),
          ksum = double(length.out),
-         PACKAGE="np" )[["ksum"]]
+         kernel.weights = double(nkw),
+         PACKAGE="np" )[return.names]
 
     if (dim.out[1] > 1){
-      dim(myout) <- dim.out
+      dim(myout[["ksum"]]) <- dim.out
       if (dim.out[2] < 2)
-        dim(myout) <- dim(myout)[-2]
+        dim(myout[["ksum"]]) <- dim(myout[["ksum"]])[-2]
     } else if (max(dim.out) > 1) {
-      dim(myout) <- dim.out[dim.out > 1]
+      dim(myout[["ksum"]]) <- dim.out[dim.out > 1]
       if (miss.weights)
-        myout <- aperm(myout)
+        myout[["ksum"]] <- aperm(myout[["ksum"]])
     }
-        
+
+    if(return.kernel.weights){
+      kw <- matrix(data = myout[["kernel.weights"]], nrow = tnrow, ncol = enrow)
+    } else {
+      kw <- NULL
+    }
+    
     return( npkernelsum(bws = bws,
                         eval = teval,
-                        ksum = myout,
+                        ksum = myout[["ksum"]],
+                        kw = kw,
                         ntrain = tnrow, trainiseval = miss.ex) )
 
   }
