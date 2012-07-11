@@ -123,7 +123,12 @@ npksum(\dots)
   \item{operator}{
     a string specifying whether the \code{normal}, \code{convolution},
     \code{derivative}, or \code{integral} kernels are to be
-    used. Defaults to \code{normal}.
+    used. Defaults to \code{normal} and applies to all elements in a
+    multivariate object. However, one can mix and match these strings
+    provided they match the dimension of the data e.g. for a
+    two-dimensional data frame \code{operator=c("normal","derivative")}
+    will use the normal (i.e. PDF) kernel for variable one and the
+    derivative of the PDF kernel for variable two.
   }
 
   \item{smooth.coefficient}{
