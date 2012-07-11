@@ -269,7 +269,7 @@ npksum.default <-
          as.double(euno),  as.double(eord),  as.double(econ), 
          as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-         as.integer(operator.num[c(bws$icon,bws$iuno,bws$iord)]),
+         as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
          as.integer(myopti), as.double(kernel.pow),
          ksum = double(length.out),
          PACKAGE="np" )[["ksum"]]
