@@ -226,10 +226,11 @@ npksum(\dots)
   kernel weights ignoring all other objects and options that may be
   provided to \code{npksum} (e.g. \code{bandwidth.divide=TRUE} will be
   ignored, etc.). Summing the columns of the weight matrix and dividing
-  by \sQuote{number of training observations}
-  (i.e. \code{\link{colMeans}(foo$kw)/prod(h)}) would produce the kernel
-  estimator of a (multivariate) density (\code{operator="normal"}) or
-  multivariate cumulative distribution (\code{operator="integral"}).
+  by \sQuote{number of training observations} times the product of the
+  bandwidths (i.e. \code{\link{colMeans}(foo$kw)/prod(h)}) would produce
+  the kernel estimator of a (multivariate) density
+  (\code{operator="normal"}) or multivariate cumulative distribution
+  (\code{operator="integral"}).
 
 }
 \value{
