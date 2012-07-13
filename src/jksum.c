@@ -1250,7 +1250,7 @@ double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
 double *weighted_sum,
-double ** kw){
+double * kw){
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -1541,14 +1541,10 @@ double ** kw){
                           bandwidth_divide, dband,
                           ws, pnl);
 
-    if(kw != NULL){
-      if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-        for(i = 0; i < num_obs_train; i++)
-          kw[j][i] = tprod[i];
-      } else {
-        for(i = 0; i < num_obs_eval; i++)
-          kw[i][j] = tprod[i];
-      }
+    if(kw != NULL){ 
+      // if using adaptive bandwidths, kw is returned transposed
+      for(i = 0; i < num_xt; i++)
+        kw[j*num_xt + i] = tprod[i];
     }
     
   }
@@ -1561,6 +1557,10 @@ double ** kw){
       MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
     } else if(BANDWIDTH_reg == BW_ADAP_NN){
       MPI_Allreduce(MPI_IN_PLACE, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
+    }
+
+    if(kw != NULL){
+      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw, stride * num_xt, MPI_DOUBLE, comm[1]);    
     }
 #endif
   }

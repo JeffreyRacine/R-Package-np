@@ -2271,7 +2271,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       
   /* the ys are the weights */
 
-  double * vector_scale_factor, * ksum, pad_num, ** kw = NULL;
+  double * vector_scale_factor, * ksum, pad_num, * kw = NULL;
   int i,j, num_var, num_obs_eval_alloc;
   int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, do_smooth_coef_weights, no_weights, sum_element_length, return_kernel_weights;
@@ -2452,7 +2452,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(return_kernel_weights){
-    kw = alloc_matd(num_obs_train_extern, num_obs_eval_extern);
+    kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
   }
   //if((operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8))
   //  error("np.c error (operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8)");
@@ -2522,10 +2522,16 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(return_kernel_weights){
-    for(j = 0; j < num_obs_eval_extern; j++)
-      for(i = 0; i < num_obs_train_extern; i++)
-        kernel_weights[j*num_obs_train_extern + i] = kw[j][i];
-    free_mat(kw, num_obs_eval_extern);
+    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+      for(j = 0; j < num_obs_eval_extern; j++)
+        for(i = 0; i < num_obs_train_extern; i++)
+          kernel_weights[j*num_obs_train_extern + i] = kw[j*num_obs_train_extern + i];
+    } else {
+      for(j = 0; j < num_obs_train_extern; j++)
+        for(i = 0; i < num_obs_eval_extern; i++)
+          kernel_weights[i*num_obs_train_extern + j] = kw[j*num_obs_eval_extern + i];      
+    }
+    safe_free(kw);
   }
 
   /* clean up */
