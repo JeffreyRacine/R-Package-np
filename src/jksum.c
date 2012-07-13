@@ -1543,24 +1543,14 @@ double ** kw){
 
     if(kw != NULL){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-        if(kernel_pow == 1){
-          for(i = 0; i < num_obs_train; i++)
-            kw[j][i] = tprod[i];
-        } else {
-          for(i = 0; i < num_obs_train; i++)
-            kw[j][i] = ipow(tprod[i], kernel_pow);
-        }
+        for(i = 0; i < num_obs_train; i++)
+          kw[j][i] = tprod[i];
       } else {
-        if(kernel_pow == 1){
-          for(i = 0; i < num_obs_eval; i++)
-            kw[i][j] = tprod[i];
-        } else {
-          for(i = 0; i < num_obs_eval; i++)
-            kw[i][j] = ipow(tprod[i], kernel_pow);
-        }
+        for(i = 0; i < num_obs_eval; i++)
+          kw[i][j] = tprod[i];
       }
     }
-
+    
   }
 
   if(!gather_scatter){ 
