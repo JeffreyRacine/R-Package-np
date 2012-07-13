@@ -3,18 +3,20 @@ Changes from Version 0.40-13 to 0.40-14 [XXX]
 * npksum functionality extended
 
 - npksum can now return the matrix of kernel weights (which can be
-  useful for constrained estimation)
+  useful for constrained estimation, by way of illustration, or
+  constructing novel kernel-based procedures without the need to write
+  extensive code)
 
 - npksum can now accept different operators on a product kernel, for
   example,
 
   npksum(txdat=data.frame(x1,x2),operator=c("derivative","normal"),bws=c(1,1))
 
-  will use the derivative kernel for variable one (i.e. the derivative
-  of the gaussian kernel) and the default kernel for variable 2
-  (i.e. a standard kernel such as the gaussian) thereby allowing the
-  user to program a number of estimators such as conditional CDFs
-  etc. that were previously not available via npksum
+  will use the derivative kernel for x1 (i.e. the derivative of the
+  gaussian kernel) and the default kernel for x2 (i.e. a standard
+  kernel such as the gaussian) thereby allowing the user to program a
+  number of estimators such as conditional CDFs etc. that were
+  previously not available via npksum
 
 * Fixed glitch with variable scope where certain objects could not be
   found in the environment

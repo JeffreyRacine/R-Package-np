@@ -26,6 +26,7 @@ npksum(\dots)
        bandwidth.divide = FALSE,
        operator = c("normal","convolution","derivative","integral"),
        smooth.coefficient = FALSE,
+       return.kernel.weights = FALSE,
        \dots)
 
 \method{npksum}{numeric}(bws,
@@ -38,6 +39,7 @@ npksum(\dots)
        bandwidth.divide,
        operator,
        smooth.coefficient,
+       return.kernel.weights,
        \dots)
 }
 
@@ -137,6 +139,12 @@ npksum(\dots)
     nothing. Defaults to \code{FALSE}.
   }
 
+  \item{return.kernel.weights}{
+    a logical specifying whether or not to return the matrix of
+    generalized product kernel weights. Defaults to \code{FALSE}. See
+    details below.
+    }
+
 }
 \details{
   \code{npksum}
@@ -147,36 +155,34 @@ npksum(\dots)
   say, the least squares cross-validation function for kernel density
   estimation.
   
-  \code{npksum} uses highly-optimized C code that strives
-  to minimize its \sQuote{memory footprint}, while there is low overhead
-  involved when using repeated calls to this function (see, by way of
+  \code{npksum} uses highly-optimized C code that strives to minimize
+  its \sQuote{memory footprint}, while there is low overhead involved
+  when using repeated calls to this function (see, by way of
   illustration, the example below that conducts leave-one-out
   cross-validation for a local constant regression estimator via calls
   to the \code{R} function \code{\link{nlm}}, and compares this to the
   \code{\link{npregbw}} function).
 
-  \code{npksum} implements a variety
-  of methods for computing
-  multivariate kernel sums (\eqn{p}-variate) defined over a set of possibly
-  continuous and/or discrete (unordered, ordered) data. The approach is
-  based on Li and Racine (2003) who employ \sQuote{generalized product kernels}
-  that admit a mix of continuous and discrete data types.
+  \code{npksum} implements a variety of methods for computing
+  multivariate kernel sums (\eqn{p}-variate) defined over a set of
+  possibly continuous and/or discrete (unordered, ordered) data. The
+  approach is based on Li and Racine (2003) who employ
+  \sQuote{generalized product kernels} that admit a mix of continuous
+  and discrete data types.
 
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
-  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating the
-  kernel sum at the point \eqn{x}. Generalized nearest-neighbor bandwidths change
-  with the point at which the sum is computed, \eqn{x}. Fixed bandwidths
-  are constant over the support of \eqn{x}.
+  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating
+  the kernel sum at the point \eqn{x}. Generalized nearest-neighbor
+  bandwidths change with the point at which the sum is computed,
+  \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
-  \code{npksum} computes
-  \eqn{\sum_{j=1}^{n}{W_j^\prime Y_j K(X_j)}}{sum(t(W[j]) \%*\% Y[j] *
-  K(X[j]))}, where \eqn{A_j}{A[j]} represents a row vector extracted
-  from \eqn{A}.
-  That is, it computes the kernel 
-  weighted sum of the outer product of the rows of \eqn{W} and \eqn{Y}. In the
-  examples, the uses of such sums are illustrated.
+  \code{npksum} computes \eqn{\sum_{j=1}^{n}{W_j^\prime Y_j
+  K(X_j)}}{sum(t(W[j]) \%*\% Y[j] * K(X[j]))}, where \eqn{A_j}{A[j]}
+  represents a row vector extracted from \eqn{A}.  That is, it computes
+  the kernel weighted sum of the outer product of the rows of \eqn{W}
+  and \eqn{Y}. In the examples, the uses of such sums are illustrated.
 
   \code{npksum} may be invoked \emph{either} with a formula-like
   symbolic 
@@ -187,27 +193,37 @@ npksum(\dots)
 
   Data contained in the data frame \code{txdat} (and also \code{exdat})
   may be a mix of continuous (default), unordered discrete (to be
-  specified in the data frame \code{txdat} using the \code{\link{factor}} command),
-  and ordered discrete (to be specified in the data frame \code{txdat}
-  using the \code{\link{ordered}} command). Data can be entered in an arbitrary
-  order and data types will be detected automatically by the routine
-  (see \code{\link{np}} for details).
+  specified in the data frame \code{txdat} using the
+  \code{\link{factor}} command), and ordered discrete (to be specified
+  in the data frame \code{txdat} using the \code{\link{ordered}}
+  command). Data can be entered in an arbitrary order and data types
+  will be detected automatically by the routine (see \code{\link{np}}
+  for details).
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data
-  ~ explanatory data},
-  where \code{dependent data} and \code{explanatory data} are both
-  series of variables specified by name, separated by 
-  the separation character '+'. For example, \code{ y1 ~ x1 + x2 }
-  specifies that \code{y1} is to be kernel-weighted by \code{x1} and 
-  \code{x2} throughout the sum. See below for further examples. 
+  ~ explanatory data}, where \code{dependent data} and \code{explanatory
+  data} are both series of variables specified by name, separated by the
+  separation character '+'. For example, \code{ y1 ~ x1 + x2 } specifies
+  that \code{y1} is to be kernel-weighted by \code{x1} and \code{x2}
+  throughout the sum. See below for further examples.
 
   A variety of kernels may be specified by the user. Kernels implemented
-  for continuous data types include the second, fourth, sixth, and eighth
-  order Gaussian and Epanechnikov kernels, and the uniform
+  for continuous data types include the second, fourth, sixth, and
+  eighth order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Unordered discrete data types use a variation on Aitchison and
-  Aitken's (1976) kernel, while ordered data types use a variation of the
-  Wang and van Ryzin (1981) kernel (see \code{\link{np}} for details).
+  Aitken's (1976) kernel, while ordered data types use a variation of
+  the Wang and van Ryzin (1981) kernel (see \code{\link{np}} for
+  details).
+
+  The option \code{return.kernel.weights=TRUE} returns a matrix of
+  dimension \sQuote{number of training observations} by \sQuote{number
+  of evaluation observations} and contains only the generalized product
+  kernel weights ignoring other objects that may be provided to
+  \code{npksum}. Summing the columns and dividing by \sQuote{number of
+  training observations} would produce the kernel estimator of a
+  (multivariate) density (\code{operator="normal"}) or multivariate
+  cumulative distribution (\code{operator="integral"}).
 
 }
 \value{
@@ -216,6 +232,8 @@ npksum(\dots)
 
   \item{eval}{ the evaluation points }
   \item{ksum}{ the sum at the evaluation points }
+  \item{kw}{ the kernel weights (when \code{return.kernel.weights=TRUE}
+  is specified)}
 }
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{ Multivariate binary
