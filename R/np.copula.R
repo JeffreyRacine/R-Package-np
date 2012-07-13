@@ -15,10 +15,6 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
   
   bws.marginal <- bws.joint  
 
-  F.quantile <- function(x.eval,tau.x,j) {
-    (eval(parse(text=paste("fitted(npudist(tdat=",bws.joint$xnames[j],",edat=x.eval,bws=bws.marginal$bw[j],bwmethod=bws.marginal$method,bwtype=bws.marginal$type,ckerorder=bws.marginal$ckerorder,ckertype=bws.marginal$ckertype,okertype=bws.marginal$okertype,ukertype=bws.marginal$ukertype))",sep="")))-tau.x)^2
-  }
-
   ## Basic error checking
 
   if(missing(bws.joint)) stop("You must provide a joint distribution bandwidth object")
@@ -83,25 +79,13 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
     ## economize on computation we obtain the quantiles from the
     ## marginals then expand to compute the copula
     x.u <- matrix(NA,nrow(u),num.var)
-    ii <- 0
     for(j in 1:num.var) {
       for(i in 1:nrow(u)) {
-        console <- printPop(console)
-        ii <- ii + 1
-        console <- printPush(msg = paste("Numerically inverting marginal distribution of ",
-                               bws.joint$xnames[j],
-                               " (tau=",formatC(u[i,j],digits=2,format="f"),
-                               ", ",
-                               ii,
-                               " of ",
-                               nrow(u)*ncol(u),
-                               ")",
-                               sep=""), console)
-        ## We invert the marginal CDF at u to compute the uth quantile
-        ## for each variable in the joint distribution. For starting
-        ## values use the empirical quantile
-        quantile.x.u.j <- eval(parse(text=paste("quantile(", bws.joint$xnames[j],",",u[i,j], ")",sep="")))
-        x.u[i,j] <- nlm(f=F.quantile,p=quantile.x.u.j,tau.x=u[i,j],j=j)$estimate
+        ## Quasi inverse
+        er <- eval(parse(text=paste("extendrange(", bws.joint$xnames[j],",f=0.5)",sep="")))
+        x.eval <- seq(er[1],er[2],length=1000)
+        F <- eval(parse(text=paste("fitted(npudist(tdat=",bws.joint$xnames[j],",edat=x.eval,bws=bws.marginal$bw[j],bwmethod=bws.marginal$method,bwtype=bws.marginal$type,ckerorder=bws.marginal$ckerorder,ckertype=bws.marginal$ckertype,okertype=bws.marginal$okertype,ukertype=bws.marginal$ukertype))",sep="")))
+        x.u[i,j] <- ifelse(u[i,j]>=0.5, max(x.eval[F<=u[i,j]]), min(x.eval[F>=u[i,j]]))
       }
     }
     ## Convert to evaluation data frame and name so that we can use
