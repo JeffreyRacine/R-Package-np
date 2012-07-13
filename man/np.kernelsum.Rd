@@ -126,11 +126,7 @@ npksum(\dots)
     a string specifying whether the \code{normal}, \code{convolution},
     \code{derivative}, or \code{integral} kernels are to be
     used. Defaults to \code{normal} and applies to all elements in a
-    multivariate object. However, one can mix and match these strings
-    provided they match the dimension of the data e.g. for a
-    two-dimensional data frame \code{operator=c("normal","derivative")}
-    will use the normal (i.e. PDF) kernel for variable one and the
-    derivative of the PDF kernel for variable two.
+    multivariate object. See details.
   }
 
   \item{smooth.coefficient}{
@@ -142,7 +138,7 @@ npksum(\dots)
   \item{return.kernel.weights}{
     a logical specifying whether or not to return the matrix of
     generalized product kernel weights. Defaults to \code{FALSE}. See
-    details below.
+    details.
     }
 
 }
@@ -216,14 +212,24 @@ npksum(\dots)
   the Wang and van Ryzin (1981) kernel (see \code{\link{np}} for
   details).
 
+  The option \code{operator=} can be used to \sQuote{mix and match}
+  operator strings to create a \sQuote{hybrid} kernel provided they
+  match the dimension of the data. For example, for a two-dimensional
+  data frame of \link{numeric} datatypes,
+  \code{operator=c("normal","derivative")} will use the normal
+  (i.e. PDF) kernel for variable one and the derivative of the PDF
+  kernel for variable two
+
   The option \code{return.kernel.weights=TRUE} returns a matrix of
   dimension \sQuote{number of training observations} by \sQuote{number
   of evaluation observations} and contains only the generalized product
   kernel weights ignoring other objects that may be provided to
-  \code{npksum}. Summing the columns and dividing by \sQuote{number of
-  training observations} would produce the kernel estimator of a
-  (multivariate) density (\code{operator="normal"}) or multivariate
-  cumulative distribution (\code{operator="integral"}).
+  \code{npksum}. Summing the columns of the weight matrix and dividing
+  by \sQuote{number of training observations}
+  (i.e. \code{\link{colMeans}(foo$kw)/prod(h)}) would produce the kernel
+  estimator of a (multivariate) density
+  (\code{operator="normal"}) or
+  multivariate cumulative distribution (\code{operator="integral"}).
 
 }
 \value{
