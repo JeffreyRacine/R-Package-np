@@ -223,12 +223,12 @@ npksum(\dots)
   The option \code{return.kernel.weights=TRUE} returns a matrix of
   dimension \sQuote{number of training observations} by \sQuote{number
   of evaluation observations} and contains only the generalized product
-  kernel weights ignoring other objects that may be provided to
-  \code{npksum}. Summing the columns of the weight matrix and dividing
+  kernel weights ignoring all other objects and options that may be
+  provided to \code{npksum} (e.g. \code{bandwidth.divide=TRUE} will be
+  ignored, etc.). Summing the columns of the weight matrix and dividing
   by \sQuote{number of training observations}
   (i.e. \code{\link{colMeans}(foo$kw)/prod(h)}) would produce the kernel
-  estimator of a (multivariate) density
-  (\code{operator="normal"}) or
+  estimator of a (multivariate) density (\code{operator="normal"}) or
   multivariate cumulative distribution (\code{operator="integral"}).
 
 }
