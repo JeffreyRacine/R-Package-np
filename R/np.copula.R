@@ -81,9 +81,23 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
     x.u <- matrix(NA,nrow(u),num.var)
     for(j in 1:num.var) {
       for(i in 1:nrow(u)) {
-        ## Quasi inverse
-        er <- eval(parse(text=paste("extendrange(", bws.joint$xnames[j],",f=0.5)",sep="")))
-        x.eval <- seq(er[1],er[2],length=1000)
+        ## Compute the quasi inverse (Definition 2.3.6, Nelson (2006)).
+        ## Here we take pains to span a sufficiently rich set of
+        ## evaluation points to cover a range of possibilities. In
+        ## particular, we extend the range of the variable by a
+        ## fraction 1 on min/max and create an equally spaced grid on
+        ## this range to try to cover long-tailed distributions but
+        ## provide a sufficiently fine grid on this extended range
+        ## (uniform spacing, add and subtract the range of the data
+        ## to/from max/min). We also use a sequence of equi-quantile
+        ## spaced points from the quantiles of the raw data again to
+        ## provide a sufficiently fine grid. Finally, we use the
+        ## datapoints themselves. We then concatenate and sort the
+        ## equally space extended grid, the equi-quantile grid, and
+        ## the data points themselves.
+        x.er <- eval(parse(text=paste("extendrange(", bws.joint$xnames[j],",f=1)",sep="")))
+        x.q <- eval(parse(text=paste("quantile(", bws.joint$xnames[j],",seq(0,1,length=500))",sep="")))
+        x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q,eval(parse(text=bws.joint$xnames[j]))))
         F <- eval(parse(text=paste("fitted(npudist(tdat=",bws.joint$xnames[j],",edat=x.eval,bws=bws.marginal$bw[j],bwmethod=bws.marginal$method,bwtype=bws.marginal$type,ckerorder=bws.marginal$ckerorder,ckertype=bws.marginal$ckertype,okertype=bws.marginal$okertype,ukertype=bws.marginal$ukertype))",sep="")))
         x.u[i,j] <- ifelse(u[i,j]>=0.5, max(x.eval[F<=u[i,j]]), min(x.eval[F>=u[i,j]]))
       }
