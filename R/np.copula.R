@@ -82,29 +82,29 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     ## User wishes to compute copula for inputted u matrix. To
     ## economize on computation we obtain the quantiles from the
     ## marginals then expand to compute the copula
-    x.u <- matrix(NA,nrow(u),num.var)
+    n.u <- nrow(u)
+    x.u <- matrix(NA,n.u,num.var)
     for(j in 1:num.var) {
+      for(i in 1:n.u) {
       console <- printPop(console)
-      console <- printPush(msg = paste("Computing the pseudo-inverses for variable ",j,"...",sep=""), console)
-      for(i in 1:nrow(u)) {
-        ## Compute the quasi inverse (Definition 2.3.6, Nelson (2006)).
-        ## Here we take pains to span a sufficiently rich set of
-        ## evaluation points to cover a range of possibilities. In
-        ## particular, we extend the range of the variable by a
-        ## fraction 1 on min/max and create an equally spaced grid on
-        ## this range to try to cover long-tailed distributions but
-        ## provide a sufficiently fine grid on this extended range
-        ## (uniform spacing, add and subtract the range of the data
-        ## to/from max/min). We also use a sequence of equi-quantile
-        ## spaced points from the quantiles of the raw data again to
-        ## provide a sufficiently fine grid. Finally, we use the
-        ## datapoints themselves. We then concatenate and sort the
-        ## equally space extended grid, the equi-quantile grid, and
-        ## the data points themselves.
+      console <- printPush(msg = paste("Computing the pseudo-inverse for variable ",j,", grid point ", i,"/",n.u,"...",sep=""), console)
+        ## Compute the quasi inverse (Definition 2.3.6, Nelson
+        ## (2006)).  Here we take pains to span a sufficiently rich
+        ## set of evaluation points to cover a range of
+        ## possibilities. In particular, we extend the range of the
+        ## variable by a fraction 1 on min/max and create an equally
+        ## spaced grid on this range to try to cover long-tailed
+        ## distributions but provide a sufficiently fine grid on this
+        ## extended range (uniform spacing, add and subtract the range
+        ## of the data to/from max/min). We also use a sequence of
+        ## equi-quantile spaced points from the quantiles of the raw
+        ## data again to provide a sufficiently fine grid.  We then
+        ## concatenate and sort the equally space extended grid and
+        ## the equi-quantile grid.
         x.marginal <- eval(parse(text=paste("data$",bws.joint$xnames[j],sep="")))
         x.er <- extendrange(x.marginal,f=1)
         x.q <- quantile(x.marginal,seq(0,1,length=500))
-        x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q,x.marginal))
+        x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q))
         F <- fitted(npudist(tdat=x.marginal,
                             edat=x.eval,
                             bws=bws.marginal$bw[j],
