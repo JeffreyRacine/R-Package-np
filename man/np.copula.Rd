@@ -35,8 +35,7 @@ npcopula(bws,
   \code{npcopula} returns an object of type \code{dataframe} with the
   following components
 
-  \item{copula}{ the copula }
-  \item{copula.density}{ the copula density}
+  \item{copula}{ the copula (default) or copula density (\code{density=TRUE}) }
   \item{u}{ the matrix of quantiles associated with the sample
   realizations (\code{u=NULL}) or those created via \code{expand.grid}
   when \code{u=u} is specified}
