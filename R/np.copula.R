@@ -49,6 +49,8 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     ## F(x_i)) and divide copula density by its marginals
     u <- matrix(NA,bws.joint$nobs,num.var)
     for(j in 1:num.var) {
+      console <- printPop(console)
+      console <- printPush(msg = paste("Computing the marginal of ",bws.joint$xnames[j]," at the sample realizations...",sep=""), console)
       bws.F <- npudensbw(formula(paste("~",bws.joint$xnames[j])),
                          bws=bws.marginal$bw[j],
                          bandwidth.compute=FALSE,
@@ -125,7 +127,12 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     console <- printPush(msg = "Expanding the u matrix and computing the copula and copula density...", console)
     x.u <- expand.grid(data.frame(x.u))
     names(x.u) <- bws.joint$xnames
+    console <- printPop(console)
+    console <- printPush(msg = "Computing the copula...", console)
     copula <- predict(npudist(bws=bws.joint),data=data,newdata=x.u)
+    console <- printPop(console)
+    console <- printPop(console)
+    console <- printPush(msg = "Computing the copula density...", console)
     copula.density <- predict(npudens(bws=bws.joint),data=data,newdata=x.u)
     ## For the copula density require marginal densities. Desirable to
     ## have the same bws in numerator and denominator, so use those
