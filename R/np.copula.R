@@ -87,7 +87,7 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     for(j in 1:num.var) {
       for(i in 1:n.u) {
       console <- printPop(console)
-      console <- printPush(msg = paste("Computing the pseudo-inverse for variable ",j,", grid point ", i,"/",n.u,"...",sep=""), console)
+      console <- printPush(msg = paste("Computing the pseudo-inverse for ",bws.joint$xnames[j],", grid point ", i,"/",n.u,"...",sep=""), console)
         ## Compute the quasi inverse (Definition 2.3.6, Nelson
         ## (2006)).  Here we take pains to span a sufficiently rich
         ## set of evaluation points to cover a range of
