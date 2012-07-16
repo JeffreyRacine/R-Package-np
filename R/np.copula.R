@@ -43,7 +43,11 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
   if(is.null(u)) {
     ## Compute the copula distribution and density for the sample
     ## realizations (joint CDF)
+    console <- printPop(console)
+    console <- printPush(msg = "Computing the copula...", console)
     copula <- fitted(npudist(bws=bws.joint,data=data))
+    console <- printPop(console)
+    console <- printPush(msg = "Computing the copula density...", console)
     copula.density <- fitted(npudens(bws=bws.joint,data=data))    
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
     ## F(x_i)) and divide copula density by its marginals
