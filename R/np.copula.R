@@ -87,7 +87,7 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     for(j in 1:num.var) {
       for(i in 1:n.u) {
       console <- printPop(console)
-      console <- printPush(msg = paste("Computing the pseudo-inverse for ",bws.joint$xnames[j],", grid point ", i,"/",n.u,"...",sep=""), console)
+      console <- printPush(msg = paste("Computing the pseudo-inverse for the marginal of ",bws.joint$xnames[j]," at grid point ", i,"/",n.u,"...",sep=""), console)
         ## Compute the quasi inverse (Definition 2.3.6, Nelson
         ## (2006)).  Here we take pains to span a sufficiently rich
         ## set of evaluation points to cover a range of
@@ -132,6 +132,8 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     ## from the joint (mirror regression, conditional density
     ## estimation etc.)
     for(j in 1:num.var) {
+      console <- printPop(console)
+      console <- printPush(msg = paste("Computing the marginal of ",bws.joint$xnames[j]," at the sample realizations...",sep=""), console)
       bws.f <- npudensbw(formula(paste("~",bws.joint$xnames[j])),
                          bws=bws.joint$bw[j],
                          bandwidth.compute=FALSE,
