@@ -44,10 +44,10 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     ## Compute the copula distribution and density for the sample
     ## realizations (joint CDF)
     console <- printPop(console)
-    console <- printPush(msg = "Computing the copula...", console)
+    console <- printPush(msg = "Computing the copula at the sample realizations...", console)
     copula <- fitted(npudist(bws=bws.joint,data=data))
     console <- printPop(console)
-    console <- printPush(msg = "Computing the copula density...", console)
+    console <- printPush(msg = "Computing the copula density at the sample realizations...", console)
     copula.density <- fitted(npudens(bws=bws.joint,data=data))    
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
     ## F(x_i)) and divide copula density by its marginals
@@ -65,7 +65,7 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
                          okertype=bws.marginal$okertype,
                          ukertype=bws.marginal$ukertype,
                          data=data)
-      
+
       u[,j] <- fitted(npudist(bws=bws.F,data=data))
       ## For copula density we require marginal densities. Desirable
       ## to have the same bws in numerator and denominator, so use
@@ -81,7 +81,6 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
                          okertype=bws.marginal$okertype,
                          ukertype=bws.marginal$ukertype,
                          data=data)
-
       copula.density <- copula.density/NZD(fitted(npudens(bws=bws.f,data=data)))
     }
   } else {
@@ -91,35 +90,38 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     n.u <- nrow(u)
     x.u <- matrix(NA,n.u,num.var)
     for(j in 1:num.var) {
-      for(i in 1:n.u) {
       console <- printPop(console)
-      console <- printPush(msg = paste("Computing the pseudo-inverse for the marginal of ",bws.joint$xnames[j]," at grid point ", i,"/",n.u,"...",sep=""), console)
-        ## Compute the quasi inverse (Definition 2.3.6, Nelson
-        ## (2006)).  Here we take pains to span a sufficiently rich
-        ## set of evaluation points to cover a range of
-        ## possibilities. In particular, we extend the range of the
-        ## variable by a fraction 1 on min/max and create an equally
-        ## spaced grid on this range to try to cover long-tailed
-        ## distributions but provide a sufficiently fine grid on this
-        ## extended range (uniform spacing, add and subtract the range
-        ## of the data to/from max/min). We also use a sequence of
-        ## equi-quantile spaced points from the quantiles of the raw
-        ## data again to provide a sufficiently fine grid.  We then
-        ## concatenate and sort the equally space extended grid and
-        ## the equi-quantile grid.
-        x.marginal <- eval(parse(text=paste("data$",bws.joint$xnames[j],sep="")))
-        x.er <- extendrange(x.marginal,f=1)
-        x.q <- quantile(x.marginal,seq(0,1,length=500))
-        x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q))
-        F <- fitted(npudist(tdat=x.marginal,
-                            edat=x.eval,
-                            bws=bws.marginal$bw[j],
-                            bwmethod=bws.marginal$method,
-                            bwtype=bws.marginal$type,
-                            ckerorder=bws.marginal$ckerorder,
-                            ckertype=bws.marginal$ckertype,
-                            okertype=bws.marginal$okertype,
-                            ukertype=bws.marginal$ukertype,data=data))
+      console <- printPush(msg = paste("Computing the pseudo-inverse for the marginal of ",bws.joint$xnames[j],"...",sep=""), console)
+      ## Compute the quasi inverse (Definition 2.3.6, Nelson
+      ## (2006)).  Here we take pains to span a sufficiently rich
+      ## set of evaluation points to cover a range of
+      ## possibilities. In particular, we extend the range of the
+      ## variable by a fraction 1 on min/max and create an equally
+      ## spaced grid on this range to try to cover long-tailed
+      ## distributions but provide a sufficiently fine grid on this
+      ## extended range (uniform spacing, add and subtract the range
+      ## of the data to/from max/min). We also use a sequence of
+      ## equi-quantile spaced points from the quantiles of the raw
+      ## data again to provide a sufficiently fine grid.  We then
+      ## concatenate and sort the equally space extended grid and
+      ## the equi-quantile grid.
+      x.marginal <- eval(parse(text=paste("data$",bws.joint$xnames[j],sep="")))
+      x.er <- extendrange(x.marginal,f=1)
+      x.q <- quantile(x.marginal,seq(0,1,length=500))
+      x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q))
+      ## Compute the CDF at this set of evaluation points
+      F <- fitted(npudist(tdat=x.marginal,
+                          edat=x.eval,
+                          bws=bws.marginal$bw[j],
+                          bwmethod=bws.marginal$method,
+                          bwtype=bws.marginal$type,
+                          ckerorder=bws.marginal$ckerorder,
+                          ckertype=bws.marginal$ckertype,
+                          okertype=bws.marginal$okertype,
+                          ukertype=bws.marginal$ukertype,data=data))
+      ## Now compute the psuedo inverse from the estimated F for the
+      ## evaluation points
+      for(i in 1:n.u) {
         x.u[i,j] <- ifelse(u[i,j]>=0.5, max(x.eval[F<=u[i,j]]), min(x.eval[F>=u[i,j]]))
       }
     }
@@ -132,10 +134,10 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     x.u <- expand.grid(data.frame(x.u))
     names(x.u) <- bws.joint$xnames
     console <- printPop(console)
-    console <- printPush(msg = "Computing the copula...", console)
+    console <- printPush(msg = "Computing the copula at the expanded grid...", console)
     copula <- predict(npudist(bws=bws.joint),data=data,newdata=x.u)
     console <- printPop(console)
-    console <- printPush(msg = "Computing the copula density...", console)
+    console <- printPush(msg = "Computing the copula density at the expanded grid...", console)
     copula.density <- predict(npudens(bws=bws.joint),data=data,newdata=x.u)
     ## For the copula density require marginal densities. Desirable to
     ## have the same bws in numerator and denominator, so use those
@@ -143,7 +145,7 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     ## estimation etc.)
     for(j in 1:num.var) {
       console <- printPop(console)
-      console <- printPush(msg = paste("Computing the marginal of ",bws.joint$xnames[j]," at the sample realizations...",sep=""), console)
+      console <- printPush(msg = paste("Computing the marginal of ",bws.joint$xnames[j]," at the expanded grid...",sep=""), console)
       bws.f <- npudensbw(formula(paste("~",bws.joint$xnames[j])),
                          bws=bws.joint$bw[j],
                          bandwidth.compute=FALSE,
