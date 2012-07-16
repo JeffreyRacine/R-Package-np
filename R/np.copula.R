@@ -84,6 +84,8 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     ## marginals then expand to compute the copula
     x.u <- matrix(NA,nrow(u),num.var)
     for(j in 1:num.var) {
+      console <- printPop(console)
+      console <- printPush(msg = paste("Computing the pseudo-inverses for variable ",j,"...",sep=""), console)
       for(i in 1:nrow(u)) {
         ## Compute the quasi inverse (Definition 2.3.6, Nelson (2006)).
         ## Here we take pains to span a sufficiently rich set of
@@ -120,7 +122,7 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     ## of marginal quantiles so that every combination of the columns
     ## of u is constructed
     console <- printPop(console)
-    console <- printPush(msg = "Expanding the u matrix and computing the copula and copula density", console)
+    console <- printPush(msg = "Expanding the u matrix and computing the copula and copula density...", console)
     x.u <- expand.grid(data.frame(x.u))
     names(x.u) <- bws.joint$xnames
     copula <- predict(npudist(bws=bws.joint),data=data,newdata=x.u)

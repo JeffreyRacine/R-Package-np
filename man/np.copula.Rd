@@ -17,7 +17,7 @@ npcopula(bws.joint,
     an unconditional joint bandwidth object
   }
   \item{data}{
-    a dataframe containing variables used to construct bws.joint (and
+    a dataframe containing variables used to construct \code{bws.joint} (and
     optionally bws.univariate)
     }
   \item{bws.univariate}{
@@ -35,7 +35,7 @@ npcopula(bws.joint,
   following components
 
   \item{copula}{ the copula }
-  \item{copula density}{ the copula density}
+  \item{copula.density}{ the copula density}
   \item{u}{ the matrix of quantiles associated with the sample
   realizations (\code{u=NULL}) or those created via \code{expand.grid}
   when \code{u=u} is specified}
@@ -89,8 +89,8 @@ n.eval <- 25
 rho <- 0.95
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
-data <- mvrnorm(n=n, mu, Sigma)
-mydat <- data.frame(x=data[,2],y=data[,1])
+mydat <- mvrnorm(n=n, mu, Sigma)
+mydat <- data.frame(x=mydat[,1],y=mydat[,2])
 bw <- npudensbw(~x+y,data=mydat)
 
 q.min <- 0.0
