@@ -6,18 +6,15 @@
   of Racine (2012) for an arbitrary number of dimensions
 }
 \usage{
-npcopula(bws.copula,
-         bws.copula.density,
+npcopula(bws,
          data,
-         u = NULL) 
+         u = NULL,
+         density = FALSE) 
 }
 
 \arguments{
-  \item{bws.copula}{
-    an unconditional joint distribution bandwidth object
-  }
-  \item{bws.copula.density}{
-    an unconditional joint density bandwidth object
+  \item{bws}{
+    an unconditional joint distribution/density bandwidth object
   }
   \item{data}{
     a dataframe containing variables used to construct \code{bws.joint} (and
@@ -27,6 +24,10 @@ npcopula(bws.copula,
     a matrix of real numbers lying in [0,1], each column of which
     corresponds to the vector of uth quantile values desired (otherwise
     the u values returned are those corresponding to the sample realizations)
+  }
+  \item{density}{
+    a logical value indicating whether to compute and return the copula
+    or copula density (default is \code{FALSE})
   }
 }
 
@@ -101,13 +102,14 @@ grid.dat <- cbind(grid.seq,grid.seq)
 ## Here we use the same bandwidths for the copula and copula density
 ## (temporary awaiting CDF bandwidth selector)
 
-copula <- npcopula(bws.copula=bw,bws.copula.density=bw,data=mydat,u=grid.dat)
+copula <- npcopula(bws=bw,data=mydat,u=grid.dat)
 contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
       zlab="Copula",zlim=c(0,1))
-persp(grid.seq,grid.seq,matrix(copula$copula.density,n.eval,n.eval),ticktype="detailed",xlab="u1",
+copula <- npcopula(bws=bw,data=mydat,u=grid.dat,density=TRUE)
+persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",
       ylab="u2",zlab="Copula Density")
-copula.emp <- npcopula(bws.copula=bw,bws.copula.density=bw,data=mydat)
+copula.emp <- npcopula(bws=bw,data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
 }
 
