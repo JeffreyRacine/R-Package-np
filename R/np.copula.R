@@ -135,7 +135,6 @@ npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
     console <- printPush(msg = "Computing the copula...", console)
     copula <- predict(npudist(bws=bws.joint),data=data,newdata=x.u)
     console <- printPop(console)
-    console <- printPop(console)
     console <- printPush(msg = "Computing the copula density...", console)
     copula.density <- predict(npudens(bws=bws.joint),data=data,newdata=x.u)
     ## For the copula density require marginal densities. Desirable to
