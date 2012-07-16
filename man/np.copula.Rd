@@ -7,6 +7,7 @@
 }
 \usage{
 npcopula(bws.joint,
+         data,
          bws.univariate = NULL,
          u = NULL) 
 }
@@ -15,6 +16,10 @@ npcopula(bws.joint,
   \item{bws.joint}{
     an unconditional joint bandwidth object
   }
+  \item{data}{
+    a dataframe containing variables used to construct bws.joint (and
+    optionally bws.univariate)
+    }
   \item{bws.univariate}{
     an optional list of unconditional univariate bandwidth objects
   }
@@ -86,22 +91,20 @@ mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
 data <- mvrnorm(n=n, mu, Sigma)
 mydat <- data.frame(x=data[,2],y=data[,1])
-attach(mydat)
-
-bw <- npudensbw(~x+y,nmulti=1,tol=.1,ftol=.1)
+bw <- npudensbw(~x+y,data=mydat)
 
 q.min <- 0.0
 q.max <- 1.0
 grid.seq <- seq(q.min,q.max,length=n.eval)
 grid.dat <- cbind(grid.seq,grid.seq)
 
-copula <- npcopula(bws.joint=bw,u=grid.dat)
+copula <- npcopula(bws.joint=bw,data=mydat,u=grid.dat)
 contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
       zlab="Copula",zlim=c(0,1))
 persp(grid.seq,grid.seq,matrix(copula$copula.density,n.eval,n.eval),ticktype="detailed",xlab="u1",
       ylab="u2",zlab="Copula Density")
-copula.emp <- npcopula(bws.joint=bw)
+copula.emp <- npcopula(bws.joint=bw,data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
 }
 

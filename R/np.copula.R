@@ -5,7 +5,7 @@
 ## the copula `copula', the copula density `copula density' and u
 ## (columns for the grid constructed from the columns of the u matrix)
 
-npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
+npcopula <- function(bws.joint,data,bws.univariate=NULL,u=NULL) {
 
   ## We make a copy of the joint bandwidth object then copy marginal
   ## bandwidths into each position if supplied. All attributes of the
@@ -17,6 +17,8 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
 
   ## Basic error checking
 
+  if(missing(data)) stop("You must provide a data frame")
+  if(!is.data.frame(data)) stop("Object `data' must be a data frame")
   if(missing(bws.joint)) stop("You must provide a joint distribution bandwidth object")
   if(!is.null(u)) if(any(u>1) || any(u<0)) stop("u must lie in [0,1]")
   num.var <- length(bws.joint$xnames)
@@ -41,8 +43,8 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
   if(is.null(u)) {
     ## Compute the copula distribution and density for the sample
     ## realizations (joint CDF)
-    copula <- fitted(npudist(bws=bws.joint))
-    copula.density <- fitted(npudens(bws=bws.joint))    
+    copula <- fitted(npudist(bws=bws.joint,data=data))
+    copula.density <- fitted(npudens(bws=bws.joint,data=data))    
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
     ## F(x_i)) and divide copula density by its marginals
     u <- matrix(NA,bws.joint$nobs,num.var)
@@ -55,9 +57,10 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
                          ckerorder=bws.marginal$ckerorder,
                          ckertype=bws.marginal$ckertype,
                          okertype=bws.marginal$okertype,
-                         ukertype=bws.marginal$ukertype)
+                         ukertype=bws.marginal$ukertype,
+                         data=data)
       
-      u[,j] <- fitted(npudist(bws=bws.F))
+      u[,j] <- fitted(npudist(bws=bws.F,data=data))
       ## For copula density we require marginal densities. Desirable
       ## to have the same bws in numerator and denominator, so use
       ## those from the joint (mirror regression, conditional density
@@ -70,9 +73,10 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
                          ckerorder=bws.marginal$ckerorder,
                          ckertype=bws.marginal$ckertype,
                          okertype=bws.marginal$okertype,
-                         ukertype=bws.marginal$ukertype)
+                         ukertype=bws.marginal$ukertype,
+                         data=data)
 
-      copula.density <- copula.density/NZD(fitted(npudens(bws=bws.f)))
+      copula.density <- copula.density/NZD(fitted(npudens(bws=bws.f,data=data)))
     }
   } else {
     ## User wishes to compute copula for inputted u matrix. To
@@ -95,10 +99,19 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
         ## datapoints themselves. We then concatenate and sort the
         ## equally space extended grid, the equi-quantile grid, and
         ## the data points themselves.
-        x.er <- eval(parse(text=paste("extendrange(", bws.joint$xnames[j],",f=1)",sep="")))
-        x.q <- eval(parse(text=paste("quantile(", bws.joint$xnames[j],",seq(0,1,length=500))",sep="")))
-        x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q,eval(parse(text=bws.joint$xnames[j]))))
-        F <- eval(parse(text=paste("fitted(npudist(tdat=",bws.joint$xnames[j],",edat=x.eval,bws=bws.marginal$bw[j],bwmethod=bws.marginal$method,bwtype=bws.marginal$type,ckerorder=bws.marginal$ckerorder,ckertype=bws.marginal$ckertype,okertype=bws.marginal$okertype,ukertype=bws.marginal$ukertype))",sep="")))
+        x.marginal <- eval(parse(text=paste("data$",bws.joint$xnames[j],sep="")))
+        x.er <- extendrange(x.marginal,f=1)
+        x.q <- quantile(x.marginal,seq(0,1,length=500))
+        x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q,x.marginal))
+        F <- fitted(npudist(tdat=x.marginal,
+                            edat=x.eval,
+                            bws=bws.marginal$bw[j],
+                            bwmethod=bws.marginal$method,
+                            bwtype=bws.marginal$type,
+                            ckerorder=bws.marginal$ckerorder,
+                            ckertype=bws.marginal$ckertype,
+                            okertype=bws.marginal$okertype,
+                            ukertype=bws.marginal$ukertype,data=data))
         x.u[i,j] <- ifelse(u[i,j]>=0.5, max(x.eval[F<=u[i,j]]), min(x.eval[F>=u[i,j]]))
       }
     }
@@ -110,8 +123,8 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
     console <- printPush(msg = "Expanding the u matrix and computing the copula and copula density", console)
     x.u <- expand.grid(data.frame(x.u))
     names(x.u) <- bws.joint$xnames
-    copula <- predict(npudist(bws=bws.joint),newdata=x.u)
-    copula.density <- predict(npudens(bws=bws.joint),newdata=x.u)
+    copula <- predict(npudist(bws=bws.joint),data=data,newdata=x.u)
+    copula.density <- predict(npudens(bws=bws.joint),data=data,newdata=x.u)
     ## For the copula density require marginal densities. Desirable to
     ## have the same bws in numerator and denominator, so use those
     ## from the joint (mirror regression, conditional density
@@ -125,11 +138,12 @@ npcopula <- function(bws.joint,bws.univariate=NULL,u=NULL) {
                          ckerorder=bws.marginal$ckerorder,
                          ckertype=bws.marginal$ckertype,
                          okertype=bws.marginal$okertype,
-                         ukertype=bws.marginal$ukertype)
+                         ukertype=bws.marginal$ukertype,
+                         data=data)
       xeval <- data.frame(x.u[,j])
       names(xeval) <- bws.joint$xnames[j]
       ## Divide copula density by its marginals
-      copula.density <- copula.density/NZD(predict(npudens(bws=bws.f),newdata=xeval))
+      copula.density <- copula.density/NZD(predict(npudens(bws=bws.f,data=data),newdata=xeval))
     }
   }
   ## Convert to data frame and name
