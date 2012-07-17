@@ -29,10 +29,10 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
     ## realizations (joint CDF)
     console <- printPop(console)
     if(!density) {
-      console <- printPush(msg = "Computing the copula at the sample realizations...", console)
+      console <- printPush(msg = "Computing the copula for the sample realizations...", console)
       copula <- fitted(npudist(bws=bws,data=data))
     } else {
-      console <- printPush(msg = "Computing the copula density at the sample realizations...", console)
+      console <- printPush(msg = "Computing the copula density for the sample realizations...", console)
       copula <- fitted(npudens(bws=bws,data=data))
     }
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
@@ -40,7 +40,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
     u <- matrix(NA,bws$nobs,num.var)
     for(j in 1:num.var) {
       console <- printPop(console)
-      console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," at the sample realizations...",sep=""), console)
+      console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the sample realizations...",sep=""), console)
       bws.F <- npudensbw(formula(paste("~",bws$xnames[j])),
                          bws=bws$bw[j],
                          bandwidth.compute=FALSE,
@@ -123,10 +123,10 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
     names(x.u) <- bws$xnames
     console <- printPop(console)
     if(!density) {
-      console <- printPush(msg = "Computing the copula at the expanded grid...", console)
+      console <- printPush(msg = "Computing the copula for the expanded grid...", console)
       copula <- predict(npudist(bws=bws),data=data,newdata=x.u)
     } else {
-      console <- printPush(msg = "Computing the copula density at the expanded grid...", console)
+      console <- printPush(msg = "Computing the copula density for the expanded grid...", console)
       copula <- predict(npudens(bws=bws),data=data,newdata=x.u)
       ## For the copula density require marginal densities. Desirable to
       ## have the same bws in numerator and denominator, so use those
@@ -134,7 +134,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
       ## estimation etc.)
       for(j in 1:num.var) {
         console <- printPop(console)
-        console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," at the expanded grid...",sep=""), console)
+        console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the expanded grid...",sep=""), console)
         bws.f <- npudensbw(formula(paste("~",bws$xnames[j])),
                            bws=bws$bw[j],
                            bandwidth.compute=FALSE,

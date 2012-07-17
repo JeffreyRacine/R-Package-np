@@ -17,8 +17,7 @@ npcopula(bws,
     an unconditional joint distribution/density bandwidth object
   }
   \item{data}{
-    a dataframe containing variables used to construct \code{bws.joint} (and
-    optionally bws.univariate)
+    a dataframe containing variables used to construct \code{bws}
   }
   \item{u}{
     a matrix of real numbers lying in [0,1], each column of which
@@ -56,7 +55,7 @@ npcopula(bws,
 
 \details{
 
-  \code{npcopula} computes the nonparametric copula and copula density
+  \code{npcopula} computes the nonparametric copula or copula density
   using inversion (Nelsen (2006), page 51). For the inversion approach,
   we exploit Sklar's theorem (Corollary 2.3.7, Nelsen (2006)) to produce
   copulas directly from the joint distribution function using
