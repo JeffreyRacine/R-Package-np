@@ -9,7 +9,8 @@
 npcopula(bws,
          data,
          u = NULL,
-         density = FALSE) 
+         density = FALSE,
+         n.pseudo.inv = 500) 
 }
 
 \arguments{
@@ -27,6 +28,12 @@ npcopula(bws,
   \item{density}{
     a logical value indicating whether to compute and return the copula
     or copula density (default is \code{FALSE})
+  }
+  \item{n.pseudo.inv}{
+    a value used to contruct a grid of length \eqn{2\times
+    n.pseudo.inv}{2 x n.pseudo.inv} that is used to compute the
+    quantiles given \code{u} via pseudo-inverse of the marginal
+    distributions
   }
 }
 
@@ -82,6 +89,12 @@ npcopula(bws,
   only. Even here, however, providing a grid of length 100 will expand
   into a matrix of dimension 10000 by 2 which, though not memory
   intensive, may be computationally burdensome.
+
+  Note that copula are only defined for data of type
+  \code{\link{numeric}} or \code{\link{ordered}}.
+
+  The pseudo-inverse (\sQuote{quasi-inverse}) is computed via Definition
+  2.3.6 from Nelson (2006).
 
 }
 

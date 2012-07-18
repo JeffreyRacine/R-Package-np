@@ -5,7 +5,7 @@
 ## the copula `copula', the copula density `copula density' and u
 ## (columns for the grid constructed from the columns of the u matrix)
 
-npcopula <- function(bws,data,u=NULL,density=FALSE) {
+npcopula <- function(bws,data,u=NULL,density=FALSE,n.pseudo.inv=500) {
 
   ## Basic error checking
 
@@ -16,6 +16,10 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
   if(!is.null(u)) if(any(u>1) || any(u<0)) stop("u must lie in [0,1]")
   num.var <- length(bws$xnames)
   if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
+
+  ## Check for unordered factors
+
+  if(bw$nuno>0) stop("unordered factors not suitable for copula estimation")
 
   u.provided <- ifelse(is.null(u),FALSE,TRUE)
   
@@ -28,8 +32,8 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
   console <- newLineConsole()
 
   if(is.null(u)) {
-    ## Compute the copula distribution and density for the sample
-    ## realizations (joint CDF)
+    ## Compute the copula distribution or copula density for the
+    ## sample realizations (joint CDF)
     console <- printClear(console)
     if(!density) {
       console <- printPush(msg = "Computing the copula for the sample realizations...", console)
@@ -39,7 +43,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
       copula <- fitted(npudens(bws=bws,data=data))
     }
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
-    ## F(x_i)) and divide copula density by its marginals
+    ## F(x_i))
     u <- matrix(NA,bws$nobs,num.var)
     for(j in 1:num.var) {
       console <- printClear(console)
@@ -56,10 +60,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
                          data=data)
 
       u[,j] <- fitted(npudist(bws=bws.F,data=data))
-      ## For copula density we require marginal densities. Desirable
-      ## to have the same bws in numerator and denominator, so use
-      ## those from the joint (mirror regression, conditional density
-      ## estimation etc.)
+      ## For the copula density we require marginal densities.
       if(density) {
         bws.f <- npudensbw(formula(paste("~",bws$xnames[j])),
                            bws=bws$bw[j],
@@ -71,15 +72,17 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
                            okertype=bws$okertype,
                            ukertype=bws$ukertype,
                            data=data)
+        ## Divide the copula density by its marginals
         copula <- copula/NZD(fitted(npudens(bws=bws.f,data=data)))
       }
     }
   } else {
-    ## User wishes to compute copula for inputted u matrix. To
-    ## economize on computation we obtain the quantiles from the
-    ## marginals then expand to compute the copula
+    ## Here the user wishes to compute copula for the input u
+    ## matrix. To economize on computation we obtain the quantiles
+    ## from the marginals then call expand.grid to compute the copula
     n.u <- nrow(u)
-    x.u <- matrix(NA,n.u,num.var)
+    x.u <- data.frame(matrix(NA,n.u,num.var))
+    names(x.u) <- bws$xnames
     for(j in 1:num.var) {
       console <- printClear(console)
       console <- printPush(msg = paste("Computing the pseudo-inverse for the marginal of ",bws$xnames[j],"...",sep=""), console)
@@ -97,10 +100,17 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
       ## concatenate and sort the equally space extended grid and
       ## the equi-quantile grid.
       x.marginal <- eval(parse(text=paste("data$",bws$xnames[j],sep="")))
-      x.er <- extendrange(x.marginal,f=1)
-      x.q <- quantile(x.marginal,seq(0,1,length=500))
-      x.eval <- sort(c(seq(x.er[1],x.er[2],length=500),x.q))
-      ## Compute the CDF at this set of evaluation points
+      quantile.seq <- seq(0,1,length=n.pseudo.inv)
+      if(is.numeric(x.marginal)) {
+        x.er <- extendrange(x.marginal,f=1)
+        x.q <- quantile(x.marginal,quantile.seq)
+        x.eval <- sort(c(seq(x.er[1],x.er[2],length=n.pseudo.inv),x.q))
+      } else {
+        x.u[,j] <- ordered(x.u[,j],levels=levels(x.marginal))
+        x.q <- sapply(1:n.pseudo.inv,function(i){uocquantile(x.marginal,quantile.seq[i])})
+        x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
+      }
+      ## Compute the CDF at this set of evaluation points.
       F <- fitted(npudist(tdat=x.marginal,
                           edat=x.eval,
                           bws=bws$bw[j],
@@ -110,20 +120,24 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
                           ckertype=bws$ckertype,
                           okertype=bws$okertype,
                           ukertype=bws$ukertype,data=data))
-      ## Now compute the psuedo inverse from the estimated F for the
-      ## evaluation points
+      ## Now compute the pseudo inverse from the estimated F for the
+      ## evaluation points.
       for(i in 1:n.u) {
-        x.u[i,j] <- ifelse(u[i,j]>=0.5, max(x.eval[F<=u[i,j]]), min(x.eval[F>=u[i,j]]))
+        if(u[i,j]>=0.5) {
+          x.u[i,j] <- max(x.eval[F<=u[i,j]])
+        } else {
+          x.u[i,j] <-  min(x.eval[F>=u[i,j]])
+        }
       }
     }
-    ## Convert to evaluation data frame and name so that we can use
-    ## predict(,newdata=...). To compute the copula we expand the grid
-    ## of marginal quantiles so that every combination of the columns
-    ## of u is constructed
+    ## To compute the copula we expand the grid of marginal quantiles
+    ## so that every combination of the columns of u is constructed.
     console <- printClear(console)
     console <- printPush(msg = "Expanding the u matrix...", console)
     x.u <- expand.grid(data.frame(x.u))
-    names(x.u) <- bws$xnames
+    for(k in 1:ncol(x.u)) {
+      if(is.ordered(data[,k])) x.u[,k] <- ordered(x.u[,k],levels=levels(data[,k]))
+    }
     console <- printClear(console)
     if(!density) {
       console <- printPush(msg = "Computing the copula for the expanded grid...", console)
@@ -155,13 +169,16 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
       }
     }
   }
-  ## Convert to data frame and name
+
   console <- printClear(console)
+
   if(!u.provided) {
     u <- data.frame(u)
     names(u) <- paste("u",1:num.var,sep="")
     return(data.frame(copula,u))
   } else {
+    ## If u was provided we expand its grid as was done for the
+    ## marginals
     u <- expand.grid(data.frame(u))
     names(u) <- paste("u",1:num.var,sep="")
     return(data.frame(copula,u,x.u))
