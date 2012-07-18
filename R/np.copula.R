@@ -27,7 +27,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
   if(is.null(u)) {
     ## Compute the copula distribution and density for the sample
     ## realizations (joint CDF)
-    console <- printPop(console)
+    console <- printClear(console)
     if(!density) {
       console <- printPush(msg = "Computing the copula for the sample realizations...", console)
       copula <- fitted(npudist(bws=bws,data=data))
@@ -39,7 +39,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
     ## F(x_i)) and divide copula density by its marginals
     u <- matrix(NA,bws$nobs,num.var)
     for(j in 1:num.var) {
-      console <- printPop(console)
+      console <- printClear(console)
       console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the sample realizations...",sep=""), console)
       bws.F <- npudensbw(formula(paste("~",bws$xnames[j])),
                          bws=bws$bw[j],
@@ -78,7 +78,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
     n.u <- nrow(u)
     x.u <- matrix(NA,n.u,num.var)
     for(j in 1:num.var) {
-      console <- printPop(console)
+      console <- printClear(console)
       console <- printPush(msg = paste("Computing the pseudo-inverse for the marginal of ",bws$xnames[j],"...",sep=""), console)
       ## Compute the quasi inverse (Definition 2.3.6, Nelson
       ## (2006)).  Here we take pains to span a sufficiently rich
@@ -117,11 +117,11 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
     ## predict(,newdata=...). To compute the copula we expand the grid
     ## of marginal quantiles so that every combination of the columns
     ## of u is constructed
-    console <- printPop(console)
+    console <- printClear(console)
     console <- printPush(msg = "Expanding the u matrix...", console)
     x.u <- expand.grid(data.frame(x.u))
     names(x.u) <- bws$xnames
-    console <- printPop(console)
+    console <- printClear(console)
     if(!density) {
       console <- printPush(msg = "Computing the copula for the expanded grid...", console)
       copula <- predict(npudist(bws=bws),data=data,newdata=x.u)
@@ -133,7 +133,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
       ## from the joint (mirror regression, conditional density
       ## estimation etc.)
       for(j in 1:num.var) {
-        console <- printPop(console)
+        console <- printClear(console)
         console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the expanded grid...",sep=""), console)
         bws.f <- npudensbw(formula(paste("~",bws$xnames[j])),
                            bws=bws$bw[j],
@@ -153,7 +153,6 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
     }
   }
   ## Convert to data frame and name
-  console <- printPop(console)
   console <- printClear(console)
   u <- data.frame(u)
   names(u) <- paste("u",1:num.var,sep="")

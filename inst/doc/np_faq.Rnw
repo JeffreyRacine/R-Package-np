@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.73 2012/05/22 01:53:12 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.76 2012/07/17 19:43:31 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -1351,7 +1351,148 @@ Alternatively, if reweighting of sample data is sufficient for your
 needs then you can feed the weighted sample realizations directly to
 existing functions.
 
-\bibliographystyle{plain} \bibliography{np_faq}
+\subsection{Quantile regression is slow, particularly for very
+  small/large values of tau. Can this be sped up?}
+
+Yes, indeed this can be the case for extreme values of tau (and not so
+extreme values as well). The reason for this is because numerical
+methods are used to invert the CDF. This must be done for each
+predictor observation requiring the solution to $n$ (or $neval$)
+optimization problems. An alternative is to compute the
+`pseudo-inverse' via a `lookup method'. In essence, one computes the
+conditional CDF for a range of $y$ values, and then computes the
+pseudo-inverse which is defined as
+\begin{align*}
+  q_{\tau}(x) &= \inf \{ y: \, F(y|x) \geq \tau \}\\
+  & = \sup \{ y: \, F(y|x) \le \tau \}
+\end{align*}
+
+The following code demonstrates this approach for the example used in
+the help file for \texttt{npqreg} (see \texttt{?npqreg}).
+
+\begin{verbatim}
+data("Italy")
+attach(Italy)
+     
+bw <- npcdensbw(gdp~year)
+
+## Set a grid of values for which the conditional CDF will be computed
+## with a range that extends well beyond the range of the data
+
+n.eval <- 1000
+gdp.er <- extendrange(gdp,f=2)
+gdp.q <- quantile(gdp,seq(0,1,length=n.eval))
+gdp.eval <- sort(c(seq(gdp.er[1],gdp.er[2],length=n.eval),gdp.q))
+n.q <- length(gdp.eval)
+
+## We only need to compute the conditional quantiles for each unique
+## value of year
+
+year.unique <- unique(year)
+
+## Consider a range of values for tau
+
+tau.seq <- c(0.01,0.05,0.25,0.5,0.75,0.95,0.99)
+gdp.tau <- matrix(NA,length(year.unique),length(tau.seq))
+
+for(j in 1:length(tau.seq)) {
+  cat("\r",j,"of",length(tau.seq))
+  tau <- tau.seq[j]
+  for(i in 1:length(year.unique)) {
+    F <- fitted(npcdist(bws=c(bw$xbw,bw$ybw),
+                        txdat = year,
+                        tydat = gdp,
+                        exdat = rep(year.unique[i],n.q),
+                        eydat = gdp.eval))
+    ## For each realization of the predictor, compute the 
+    ## the pseudo-inverse
+    gdp.tau[i,j] <- ifelse(tau>=0.5, max(gdp.eval[F<=tau]), 
+                                     min(gdp.eval[F>=tau]))
+  }
+}
+
+## Plot the results
+
+plot(year,gdp,ylim=c(min(gdp.tau,gdp),max(gdp.tau,gdp)))     
+for(j in 1:length(tau.seq)) {
+  lines(year.unique,gdp.tau[,j],col=j+1,lty=j,lwd=2)
+}
+
+legend(min(year),max(gdp.tau,gdp),
+       paste("tau=",tau.seq),
+       col=1:length(tau.seq)+1,
+       lty=1:length(tau.seq),
+       lwd=2)
+\end{verbatim}
+
+\subsection{How can I generate nonparametric resamples from the
+  unknown distribution of a set of data?}
+
+This can be accomplished using the standard method of generating
+random deviates based on inverting a CDF at random draws from the
+uniform distribution (the distribution of a CDF is uniform). The
+following code demonstrates this approach.
+
+\begin{verbatim}
+## Simulate data `x' drawn from a mixture of normals. Suppose you wish
+## to resample from the distribution of x but in a nonparametric
+## manner (i.e. do not make use of knowledge of the underlying
+## distribution).
+
+x <- c(rnorm(100,mean=-2,sd=1),rnorm(100,mean=3,sd=0.5))
+
+## We first estimate the CDF of x nonparametrically using an ad-hoc
+## normal reference rule that is optimal for kernel estimation of
+## CDFs.  In practice you would first compute the CDF-optimal
+## bandwidth using e.g. npudistbw().
+
+bw <- npudensbw(~x,bws=1.587*sd(x)*length(x)^{-1/3},cv="none")
+
+## Let nobs be the number of observations you wish for your resample.
+
+nobs <- 1000
+
+## Now create a set of points used to construct the pseudo-inverse
+## given a draw from the uniform (we invert these draws from the
+## uniform using the pseudo-inverse).
+
+n.eval <- 2*nobs
+x.er <- extendrange(x,f=2)
+x.eval <- data.frame(x=sort(c(seq(x.er[1],x.er[2],length=n.eval),
+                       quantile(x,seq(0,1,length=n.eval)))))
+
+## Compute F for this set of points.
+
+F <- predict(npudist(bws=bw),newdata=x.eval)
+
+## Take a draw from the uniform of length nobs
+
+u <- runif(nobs)
+x.resample <- numeric(nobs)
+
+## Compute the pseudo-inverse of F, and add some `jitter' as x.eval is
+## unchanging (only needed if repeated resamples are needed)
+
+for(i in 1:nobs) {
+  x.resample[i] <- jitter(ifelse(u[i]>=0.5, max(x.eval$x[F<=u[i]]),
+                                            min(x.eval$x[F>=u[i]])))
+}
+
+## Now plot the histogram of the resample along with the true DGP
+## (i.e. the true mixture of normals)
+
+hist(x.resample,prob=TRUE,br=50,ylim=c(0,.5),
+     main="Resample Histogram & True DGP",
+     xlab="X")
+rug(x.resample)
+x.resample <- sort(x.resample)
+lines(x.resample,0.5*dnorm(x.resample,mean=-2,sd=1))
+lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
+\end{verbatim}
+
+\bibliographystyle{plain} 
+
+\bibliography{np_faq}
 
 \clearpage
 
