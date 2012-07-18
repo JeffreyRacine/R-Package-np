@@ -43,7 +43,8 @@ npcopula(bws,
   \code{\link{expand.grid}} when \code{u} is provided}
 
   \item{data}{ the matrix of marginal quantiles constructed when
-  \code{u} is provided (same names as data)}
+  \code{u} is provided (\code{data} returned has the same names as
+  \code{data} inputted)}
 
 }
 \references{
