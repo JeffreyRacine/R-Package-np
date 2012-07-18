@@ -94,7 +94,7 @@ npcopula(bws,
   \code{\link{numeric}} or \code{\link{ordered}}.
 
   The pseudo-inverse (\sQuote{quasi-inverse}) is computed via Definition
-  2.3.6 from Nelson (2006).
+  2.3.6 from Nelsen (2006).
 
 }
 
