@@ -19,7 +19,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE,n.pseudo.inv=500) {
 
   ## Check for unordered factors
 
-  if(bw$nuno>0) stop("unordered factors not suitable for copula estimation")
+  if(bws$nuno>0) stop("unordered factors not suitable for copula estimation")
 
   u.provided <- ifelse(is.null(u),FALSE,TRUE)
   
