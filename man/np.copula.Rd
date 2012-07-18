@@ -31,13 +31,19 @@ npcopula(bws,
 }
 
 \value{
+
   \code{npcopula} returns an object of type \code{dataframe} with the
   following components
 
-  \item{copula}{ the copula (default) or copula density (\code{density=TRUE}) }
-  \item{u}{ the matrix of quantiles associated with the sample
-  realizations (\code{u=NULL}) or those created via \code{expand.grid}
-  when \code{u=u} is specified}
+  \item{copula}{ the copula (default) or copula density
+  (\code{density=TRUE}) }
+
+  \item{u}{ the matrix of marginal u values associated with the sample
+  realizations (\code{u=NULL}) or those created via
+  \code{\link{expand.grid}} when \code{u} is provided}
+
+  \item{data}{ the matrix of marginal quantiles constructed when
+  \code{u} is provided (same names as data)}
 
 }
 \references{
@@ -65,6 +71,16 @@ npcopula(bws,
   which necessitates the use of boundary correction methods, the former
   does not (unless of course the data itself is bounded requiring the
   use of boundary corrections).
+
+  Note that if \code{u} is provided then \code{\link{expand.grid}} is
+  called on \code{u}. As the dimension increases this can become
+  unwieldy and potentially consume an enormous amount of memory unless
+  the number of grid points is kept very small. As the reason for
+  computing the copula on a grid is typically for graphical purposes,
+  then providing \code{u} is typically done for two dimension problems
+  only. Even here, however, providing a grid of length 100 will expand
+  into a matrix of dimension 10000 by 2 which, though not memory
+  intensive, may be computationally burdensome.
 
 }
 

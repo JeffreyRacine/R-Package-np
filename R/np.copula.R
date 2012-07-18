@@ -15,6 +15,9 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
   if(density&&missing(bws)) stop("You must provide a joint density bandwidth object")
   if(!is.null(u)) if(any(u>1) || any(u<0)) stop("u must lie in [0,1]")
   num.var <- length(bws$xnames)
+  if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
+
+  u.provided <- ifelse(is.null(u),FALSE,TRUE)
   
   ## Test for compatible quantile vector/matrix if provided
   if(!is.null(u)) {
@@ -154,9 +157,15 @@ npcopula <- function(bws,data,u=NULL,density=FALSE) {
   }
   ## Convert to data frame and name
   console <- printClear(console)
-  u <- data.frame(u)
-  names(u) <- paste("u",1:num.var,sep="")
-  return(data.frame(copula,u))
+  if(!u.provided) {
+    u <- data.frame(u)
+    names(u) <- paste("u",1:num.var,sep="")
+    return(data.frame(copula,u))
+  } else {
+    u <- expand.grid(data.frame(u))
+    names(u) <- paste("u",1:num.var,sep="")
+    return(data.frame(copula,u,x.u))
+  }
 
 }
 
