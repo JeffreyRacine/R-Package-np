@@ -34,11 +34,17 @@ npcopula(bws,
     or copula density (default is \code{FALSE} [copula])
   }
   \item{n.quasi.inv}{
-    number passed to \code{\link{extendrange}} specifying the fraction
-    by which the range should be extended when constructing a grid of
-    length \eqn{2\times n.quasi.inv}{2 x n.quasi.inv} that is used to
-    compute the quantiles given \code{u} via quasi-inverse of the
-    marginal distributions (see details)
+    number used to construct a grid of length \eqn{2\times
+    n.quasi.inv}{2 x n.quasi.inv} when \code{u} is provided in order to
+    compute the quasi-inverse of each marginal distribution (see
+    details)
+  }
+  \item{er.quasi.inv}{
+    number passed to \code{\link{extendrange}} when \code{u} is provided
+    specifying the fraction by which the range should be extended when
+    constructing a grid of length \eqn{2\times n.quasi.inv}{2 x
+    n.quasi.inv} that is used to compute the quantiles given \code{u}
+    via quasi-inverse of the marginal distributions (see details)
   }
 }
 
