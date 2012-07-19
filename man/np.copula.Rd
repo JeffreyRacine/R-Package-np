@@ -1,16 +1,19 @@
 \name{npcopula}
 \alias{npcopula}
-\title{ Kernel Copula Estimation }
+\title{ Kernel Copula Estimation with Mixed Data Types }
+
 \description{
-  \code{npcopula} implements the kernel copula approach 
-  of Racine (2012) for an arbitrary number of dimensions
+  \code{npcopula} implements the nonparametric mixed data kernel copula
+  approach of Racine (2012) for an arbitrary number of dimensions
 }
+
 \usage{
 npcopula(bws,
          data,
          u = NULL,
          density = FALSE,
-         n.pseudo.inv = 500) 
+         n.quasi.inv = 500,
+         er.quasi.inv = 1) 
 }
 
 \arguments{
@@ -18,29 +21,31 @@ npcopula(bws,
     an unconditional joint distribution/density bandwidth object
   }
   \item{data}{
-    a dataframe containing variables used to construct \code{bws}
+    a data frame containing variables used to construct \code{bws}
   }
   \item{u}{
-    a matrix of real numbers lying in [0,1], each column of which
-    corresponds to the vector of uth quantile values desired (otherwise
-    the u values returned are those corresponding to the sample realizations)
+    an optional matrix of real numbers lying in [0,1], each column of
+    which corresponds to the vector of uth quantile values desired for
+    each variable in the copula (otherwise the u values returned are
+    those corresponding to the sample realizations)
   }
   \item{density}{
     a logical value indicating whether to compute and return the copula
-    or copula density (default is \code{FALSE})
+    or copula density (default is \code{FALSE} [copula])
   }
-  \item{n.pseudo.inv}{
-    a value used to contruct a grid of length \eqn{2\times
-    n.pseudo.inv}{2 x n.pseudo.inv} that is used to compute the
-    quantiles given \code{u} via pseudo-inverse of the marginal
-    distributions
+  \item{n.quasi.inv}{
+    number passed to \code{\link{extendrange}} specifying the fraction
+    by which the range should be extended when constructing a grid of
+    length \eqn{2\times n.quasi.inv}{2 x n.quasi.inv} that is used to
+    compute the quantiles given \code{u} via quasi-inverse of the
+    marginal distributions (see details)
   }
 }
 
 \value{
 
-  \code{npcopula} returns an object of type \code{dataframe} with the
-  following components
+  \code{npcopula} returns an object of type \code{\link{data.frame}}
+  with the following components
 
   \item{copula}{ the copula (default) or copula density
   (\code{density=TRUE}) }
@@ -77,15 +82,14 @@ npcopula(bws,
   that instead uses \eqn{H(x,y) = C(F(x),G(y))}. Whereas the latter
   requires kernel density estimation on a d-dimensional unit hypercube
   which necessitates the use of boundary correction methods, the former
-  does not (unless of course the data itself is bounded requiring the
-  use of boundary corrections).
+  does not.
 
   Note that if \code{u} is provided then \code{\link{expand.grid}} is
   called on \code{u}. As the dimension increases this can become
   unwieldy and potentially consume an enormous amount of memory unless
   the number of grid points is kept very small. As the reason for
   computing the copula on a grid is typically for graphical purposes,
-  then providing \code{u} is typically done for two dimension problems
+  then providing \code{u} is typically done for two-dimensional problems
   only. Even here, however, providing a grid of length 100 will expand
   into a matrix of dimension 10000 by 2 which, though not memory
   intensive, may be computationally burdensome.
@@ -93,8 +97,15 @@ npcopula(bws,
   Note that copula are only defined for data of type
   \code{\link{numeric}} or \code{\link{ordered}}.
 
-  The pseudo-inverse (\sQuote{quasi-inverse}) is computed via Definition
-  2.3.6 from Nelsen (2006).
+  The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
+  Nelsen (2006). We compute an equi-quantile grid on the range of the
+  data of length \code{n.quasi.inv}. We then extend the range of the
+  data by the factor \code{er.quasi.inv} and compute an equi-spaced grid
+  of points (e.g. using the default \code{er.quasi.inv=1} we go from
+  the minimum data value minus \eqn{1\times}{1x} the range to the
+  maximum data value plus \eqn{1\times}{1x} the range for each
+  marginal). We then take these two grids, concatenate and sort, and
+  these form the final grid for the quasi-inverse.
 
 }
 

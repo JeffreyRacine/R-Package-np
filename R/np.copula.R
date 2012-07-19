@@ -5,7 +5,12 @@
 ## the copula `copula', the copula density `copula density' and u
 ## (columns for the grid constructed from the columns of the u matrix)
 
-npcopula <- function(bws,data,u=NULL,density=FALSE,n.pseudo.inv=500) {
+npcopula <- function(bws,
+                     data,
+                     u=NULL,
+                     density=FALSE,
+                     n.quasi.inv=500,
+                     er.quasi.inv=1) {
 
   ## Basic error checking
 
@@ -13,9 +18,11 @@ npcopula <- function(bws,data,u=NULL,density=FALSE,n.pseudo.inv=500) {
   if(!is.data.frame(data)) stop("Object `data' must be a data frame")
   if(!density&&missing(bws)) stop("You must provide a joint distribution bandwidth object")
   if(density&&missing(bws)) stop("You must provide a joint density bandwidth object")
+  if(class(bws)!="bandwidth") stop("bws must be an np bandwidth object")
   if(!is.null(u)) if(any(u>1) || any(u<0)) stop("u must lie in [0,1]")
   num.var <- length(bws$xnames)
   if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
+  if(n.quasi.inv < 1) stop("n.quasi.inv must be a positive integer")
 
   ## Check for unordered factors
 
@@ -85,8 +92,8 @@ npcopula <- function(bws,data,u=NULL,density=FALSE,n.pseudo.inv=500) {
     names(x.u) <- bws$xnames
     for(j in 1:num.var) {
       console <- printClear(console)
-      console <- printPush(msg = paste("Computing the pseudo-inverse for the marginal of ",bws$xnames[j],"...",sep=""), console)
-      ## Compute the quasi inverse (Definition 2.3.6, Nelson
+      console <- printPush(msg = paste("Computing the quasi-inverse for the marginal of ",bws$xnames[j],"...",sep=""), console)
+      ## Compute the quasi-inverse (Definition 2.3.6, Nelson
       ## (2006)).  Here we take pains to span a sufficiently rich
       ## set of evaluation points to cover a range of
       ## possibilities. In particular, we extend the range of the
@@ -100,14 +107,14 @@ npcopula <- function(bws,data,u=NULL,density=FALSE,n.pseudo.inv=500) {
       ## concatenate and sort the equally space extended grid and
       ## the equi-quantile grid.
       x.marginal <- eval(parse(text=paste("data$",bws$xnames[j],sep="")))
-      quantile.seq <- seq(0,1,length=n.pseudo.inv)
+      quantile.seq <- seq(0,1,length=n.quasi.inv)
       if(is.numeric(x.marginal)) {
-        x.er <- extendrange(x.marginal,f=1)
+        x.er <- extendrange(x.marginal,f=er.quasi.inv)
         x.q <- quantile(x.marginal,quantile.seq)
-        x.eval <- sort(c(seq(x.er[1],x.er[2],length=n.pseudo.inv),x.q))
+        x.eval <- sort(c(seq(x.er[1],x.er[2],length=n.quasi.inv),x.q))
       } else {
         x.u[,j] <- ordered(x.u[,j],levels=levels(x.marginal))
-        x.q <- sapply(1:n.pseudo.inv,function(i){uocquantile(x.marginal,quantile.seq[i])})
+        x.q <- sapply(1:n.quasi.inv,function(i){uocquantile(x.marginal,quantile.seq[i])})
         x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
       }
       ## Compute the CDF at this set of evaluation points.
@@ -120,7 +127,7 @@ npcopula <- function(bws,data,u=NULL,density=FALSE,n.pseudo.inv=500) {
                           ckertype=bws$ckertype,
                           okertype=bws$okertype,
                           ukertype=bws$ukertype,data=data))
-      ## Now compute the pseudo inverse from the estimated F for the
+      ## Now compute the quasi-inverse from the estimated F for the
       ## evaluation points.
       for(i in 1:n.u) {
         if(u[i,j]>=0.5) {
