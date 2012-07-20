@@ -592,6 +592,7 @@ compute.bootstrap.errors.sibandwidth =
 
 
 uocquantile <- function(x, prob) {
+  if(prob < 0 || prob > 1) stop("Error in uocquantile(x, prob = prob) : 'prob' outside [0,1]")
   if (is.ordered(x)){
     tq = unclass(table(x))
     tq = tq / sum(tq)

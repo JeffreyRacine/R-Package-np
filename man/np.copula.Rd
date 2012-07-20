@@ -34,7 +34,7 @@ npcopula(bws,
     or copula density (default is \code{FALSE} [copula])
   }
   \item{n.quasi.inv}{
-    number used to construct a grid when \code{u} is provided in order to
+    number of grid points generated when \code{u} is provided in order to
     compute the quasi-inverse of each marginal distribution (see
     details)
   }
