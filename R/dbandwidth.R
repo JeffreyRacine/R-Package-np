@@ -1,6 +1,6 @@
-bandwidth <-
-  function(bw = stop("bandwidth: argument 'bw' missing"),
-           bwmethod = c("cv.ml","cv.ls","normal-reference"),
+dbandwidth <-
+  function(bw = stop("dbandwidth: argument 'bw' missing"),
+           bwmethod = c("cv.cdf","normal-reference"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
            ckertype = c("gaussian", "epanechnikov","uniform"), 
@@ -10,7 +10,7 @@ bandwidth <-
            fval = NA,
            ifval = NA,
            nobs = NA,
-           xdati = stop("bandwidth:argument 'xdati' missing"),
+           xdati = stop("dbandwidth:argument 'xdati' missing"),
            xnames = character(length(bw)),
            sfactor = NA, bandwidth = NA,
            rows.omit = NA, bandwidth.compute = TRUE, ...){
@@ -63,8 +63,7 @@ bandwidth <-
       bw=bw,
       method = bwmethod,
       pmethod = switch( bwmethod,
-        cv.ml = "Maximum Likelihood Cross-Validation",
-        cv.ls = "Least Squares Cross-Validation",
+        cv.cdf = "Least Squares Cross-Validation",
         "normal-reference" = "Normal Reference"),
       fval = fval,
       ifval = ifval,
@@ -121,18 +120,18 @@ bandwidth <-
       mybw$pmethod <- "Manual"
     
 
-    class(mybw) = "bandwidth"
+    class(mybw) = "dbandwidth"
     if(!any(is.na(mybw$bandwidth)))
     validateBandwidth(mybw)
     mybw
     
   }
 
-as.double.bandwidth <- function(x, ...){
+as.double.dbandwidth <- function(x, ...){
   x$bw
 }
 
-print.bandwidth <- function(x, digits=NULL, ...){
+print.dbandwidth <- function(x, digits=NULL, ...){
   cat("\nData (",x$nobs," observations, ",x$ndim," variable(s)):\n\n",sep="")
   print(matrix(x$bw,ncol=x$ndim,dimnames=list(paste(x$pscaling,":",sep=""),x$xnames)))
 
@@ -146,7 +145,7 @@ print.bandwidth <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-summary.bandwidth <- function(object, ...) {
+summary.dbandwidth <- function(object, ...) {
   cat("\nData (",object$nobs," observations, ",object$ndim," variable(s)):\n",sep="")
 
   cat(genOmitStr(object))
@@ -161,6 +160,6 @@ summary.bandwidth <- function(object, ...) {
   cat("\n\n")
 }
 
-plot.bandwidth <- function(...) { npplot(...)  }
+plot.dbandwidth <- function(...) { npplot(...)  }
 
-predict.bandwidth <- function(...) { eval(npudens(...), envir =parent.frame()) }
+predict.dbandwidth <- function(...) { eval(npudist(...), envir =parent.frame()) }

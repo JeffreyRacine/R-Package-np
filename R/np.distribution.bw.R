@@ -1,14 +1,14 @@
-npudensbw <- function(...){
+npudistbw <- function(...){
   args = list(...)
   if (is(args[[1]],"formula"))
-    UseMethod("npudensbw",args[[1]])
+    UseMethod("npudistbw",args[[1]])
   else if (!is.null(args$formula))
-    UseMethod("npudensbw",args$formula)
+    UseMethod("npudistbw",args$formula)
   else
-    UseMethod("npudensbw",args[[which(names(args)=="bws")[1]]])
+    UseMethod("npudistbw",args[[which(names(args)=="bws")[1]]])
 }
 
-npudensbw.formula <-
+npudistbw.formula <-
   function(formula, data, subset, na.action, call, ...){
     
     mf <- match.call(expand.dots = FALSE)
@@ -20,11 +20,11 @@ npudensbw.formula <-
     mf <- eval(mf, envir = parent.frame())
 
     if (attr(attr(mf, "terms"), "response") != 0)
-      stop("invalid density formula")
+      stop("invalid distribution formula")
     
     dat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
     
-    tbw <- npudensbw(dat = dat, ...)
+    tbw <- npudistbw(dat = dat, ...)
     tbw$call <- match.call(expand.dots = FALSE)
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
@@ -35,7 +35,7 @@ npudensbw.formula <-
   }
 
 
-npudensbw.NULL <-
+npudistbw.NULL <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, ...){
 
@@ -50,7 +50,7 @@ npudensbw.NULL <-
 
     bws = double(dim(dat)[2])
 
-    tbw <- npudensbw.default(dat = dat, bws = bws, ...)
+    tbw <- npudistbw.default(dat = dat, bws = bws, ...)
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -60,7 +60,7 @@ npudensbw.NULL <-
     tbw
   }
 
-npudensbw.bandwidth <- 
+npudistbw.dbandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
            ftol=1.19209e-07, tol=1.49012e-08, small=2.22045e-16, ...){
@@ -113,8 +113,7 @@ npudensbw.bandwidth <-
         itmax=itmax, int_RESTART_FROM_MIN=ifelse(remin,RE_MIN_TRUE,RE_MIN_FALSE), 
         int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE), 
         bwmethod = switch(bws$method,
-          cv.ml = BWM_CVML,
-          cv.ls = BWM_CVLS),
+          cv.cdf = DBWM_CVLS),
         kerneval = switch(bws$ckertype,
           gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
@@ -127,7 +126,7 @@ npudensbw.bandwidth <-
 
       if (bws$method != "normal-reference"){
         myout=
-          .C("np_density_bw", as.double(duno), as.double(dord), as.double(dcon),
+          .C("np_distribution_bw", as.double(duno), as.double(dord), as.double(dcon),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
              fval = double(2),
@@ -136,9 +135,9 @@ npudensbw.bandwidth <-
         nbw = double(ncol)
         gbw = sum(bws$icon)
         if (gbw > 0){
-          nbw[1:gbw] = (4/3)^0.2
+          nbw[1:gbw] = 1.587
           if(!bws$scaling)
-            nbw[1:gbw]=nbw[1:gbw]*EssDee(dcon)*nrow^(-1.0/(2.0*bws$ckerorder+gbw))
+            nbw[1:gbw]=nbw[1:gbw]*EssDee(dcon)*nrow^(-1.0/3.0)
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
       }
@@ -183,7 +182,7 @@ npudensbw.bandwidth <-
       }
     }
 
-    tbw <- bandwidth(bw = tbw$bw,
+    tbw <- dbandwidth(bw = tbw$bw,
                      bwmethod = tbw$method,
                      bwscaling = tbw$scaling,
                      bwtype = tbw$type,
@@ -204,10 +203,10 @@ npudensbw.bandwidth <-
     tbw
   }
 
-npudensbw.default <-
+npudistbw.default <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, bandwidth.compute = TRUE,
-           ## dummy arguments for later passing into npudensbw.bandwidth
+           ## dummy arguments for later passing into npudistbw.bandwidth
            nmulti, remin, itmax, ftol, tol, small,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
@@ -234,7 +233,7 @@ npudensbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("bandwidth(bws",
+    tbw <- eval(parse(text=paste("dbandwidth(bws",
                         ifelse(any.m, ",",""),
                         paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
                         ", nobs = dim(dat)[1], xdati = untangle(dat),",
@@ -250,7 +249,7 @@ npudensbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("npudensbw.bandwidth(dat=dat, bws=tbw",
+    tbw <- eval(parse(text=paste("npudistbw.dbandwidth(dat=dat, bws=tbw",
                         ifelse(any.m, ",",""),
                         paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
                         ")")))
