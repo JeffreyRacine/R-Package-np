@@ -1399,7 +1399,7 @@ for(j in 1:length(tau.seq)) {
   cat("\r",j,"of",length(tau.seq))
   tau <- tau.seq[j]
   for(i in 1:length(year.unique)) {
-    F <- fitted(npcdist(bws=c(bw$xbw,bw$ybw),
+    F <- fitted(npcdist(bws=c(bw$ybw,bw$xbw),
                         txdat = year,
                         tydat = gdp,
                         exdat = rep(year.unique[i],n.q),
