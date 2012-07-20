@@ -48,6 +48,8 @@ double cv_func_con_density_categorical_ls(double *vector_scale_factor);
 double cv_func_con_density_categorical_ml(double *vector_scale_factor);
 double cv_func_density_categorical_ls(double *vector_scale_factor);
 double cv_func_density_categorical_ml(double *vector_scale_factor);
+
+double cv_func_distribution_categorical_ls(double *vector_scale_factor);
 /* double cv_func_np_density_categorical_ml(double *vector_scale_factor); */
 double cv_func_regression_categorical_ls(double *vector_scale_factor);
 
@@ -224,6 +226,8 @@ double np_cv_func_con_density_categorical_ls(double *vector_scale_factor);
 #define BWM_CVLS 1
 #define BWM_CVML_NP 2
 
+#define DBWM_CVLS 0
+
 #define NP_DO_DENS 1
 #define NP_DO_DIST 0
 
@@ -288,6 +292,27 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define BW_FTOLD  0
 #define BW_TOLD   1
 #define BW_SMALLD 2
+
+// distribution defines
+#define DBW_NOBSI   0
+#define DBW_IMULTII 1
+#define DBW_NMULTII 2
+#define DBW_USTARTI 3
+#define DBW_LSFI    4
+#define DBW_DENI  5
+#define DBW_ITMAXI  6
+#define DBW_REMINI  7
+#define DBW_MINIOI  8
+#define DBW_MI    9
+#define DBW_CKRNEVI 10
+#define DBW_CDFONTRAIN 11
+#define DBW_NUNOI 12
+#define DBW_NORDI 13
+#define DBW_NCONI 14
+
+#define DBW_FTOLD  0
+#define DBW_TOLD   1
+#define DBW_SMALLD 2
 
 #define CBW_NOBSI   0
 #define CBW_IMULTII 1

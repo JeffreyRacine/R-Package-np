@@ -580,6 +580,58 @@ double cv_func_density_categorical_ls(double *vector_scale_factor)
 
 }
 
+double cv_func_distribution_categorical_ls(double *vector_scale_factor)
+{
+
+/* Numerical recipes wrapper function for likelihood density
+                    cross-validation */
+
+/* Declarations */
+
+    double cv = 0.0;
+
+    if(check_valid_scale_factor_cv(
+        KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        0,
+        0,
+        0,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor) == 1) return(DBL_MAX);
+
+/* Compute the cross-validation function */
+
+    if(np_kernel_estimate_distribution_ls_cv(KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
+        KERNEL_den_ordered_extern,
+        BANDWIDTH_den_extern,
+        num_obs_train_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_reg_continuous_extern,
+        matrix_X_unordered_train_extern,
+        matrix_X_ordered_train_extern,
+        matrix_X_continuous_train_extern,
+        &vector_scale_factor[1],
+        num_categories_extern,
+        matrix_categorical_vals_extern,
+        &cv)==1)
+    {
+        return(DBL_MAX);
+    }
+
+
+    return(cv);
+
+}
+
 
 double func_con_density_quantile(double *quantile)
 {

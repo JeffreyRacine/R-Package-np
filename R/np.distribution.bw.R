@@ -100,6 +100,12 @@ npudistbw.dbandwidth <-
 
     tbw <- bws
 
+    ## these are the points where we evaluate the CDF
+    ## for now we default to the training points (hence cdf_on_train = TRUE below)
+    euno = data.frame()
+    eord = data.frame()
+    econ = data.frame()
+
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(dat)[1], 
         iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
@@ -118,6 +124,7 @@ npudistbw.dbandwidth <-
           gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
           uniform = CKER_UNI),
+        cdf_on_train = TRUE,
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
         ncon = dim(dcon)[2])
@@ -127,6 +134,7 @@ npudistbw.dbandwidth <-
       if (bws$method != "normal-reference"){
         myout=
           .C("np_distribution_bw", as.double(duno), as.double(dord), as.double(dcon),
+             as.double(euno), as.double(eord), as.double(econ),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
              fval = double(2),

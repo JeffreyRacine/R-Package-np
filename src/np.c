@@ -484,6 +484,326 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   
 }
 
+ 
+// For distributions the bandwidth selection involves evaluating the CDF at a number of points.
+// We allow one to specify those points, passed in by mye{uno,ord,con}.
+
+void np_distribution_bw(double * myuno, double * myord, double * mycon, 
+                        double * myeuno, double * myeord, double * myecon, 
+                        int * myopti, double * myoptd, double * myans, double * fval){
+  /* Likelihood bandwidth selection for density estimation */
+
+  double **matrix_y;
+
+  double *vector_continuous_stddev;
+  double *vector_scale_factor, *vector_scale_factor_multistart;
+
+  double fret, fret_best;
+  double ftol, tol;
+  double (* bwmfunc)(double *);
+
+  double small;
+  
+  int i,j;
+  int num_var;
+  int iMultistart, iMs_counter, iNum_Multistart, iImproved;
+  int itmax, iter;
+  int int_use_starting_values;
+
+  num_reg_unordered_extern = myopti[BW_NUNOI];
+  num_reg_ordered_extern = myopti[BW_NORDI];
+  num_reg_continuous_extern = myopti[BW_NCONI];
+
+  num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
+
+  num_obs_train_extern = myopti[BW_NOBSI];
+  iMultistart = myopti[BW_IMULTII];
+  iNum_Multistart = myopti[BW_NMULTII];
+
+  KERNEL_den_extern = myopti[BW_CKRNEVI];
+  KERNEL_den_unordered_extern = 0;
+  KERNEL_den_ordered_extern = 0;
+
+  int_use_starting_values= myopti[BW_USTARTI];
+  int_LARGE_SF=myopti[BW_LSFI];
+  BANDWIDTH_den_extern=myopti[BW_DENI];
+  int_RESTART_FROM_MIN = myopti[BW_REMINI];
+  int_MINIMIZE_IO = myopti[BW_MINIOI];
+
+  itmax=myopti[BW_ITMAXI];
+
+  ftol=myoptd[BW_FTOLD];
+  tol=myoptd[BW_TOLD];
+  small=myoptd[BW_SMALLD];
+
+/* Allocate memory for objects */
+
+  matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
+  matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
+  matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+
+
+  num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
+  matrix_y = alloc_matd(num_var + 1, num_var +1);
+  vector_scale_factor = alloc_vecd(num_var + 1);
+  matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+
+  if (int_use_starting_values)
+    for( i=0;i<num_var; i++ )
+      vector_scale_factor[i+1] = myans[i];
+
+/* Parse data */
+
+  for( j=0;j<num_reg_unordered_extern;j++)
+    for( i=0;i<num_obs_train_extern;i++ )
+      matrix_X_unordered_train_extern[j][i]=myuno[j*num_obs_train_extern+i];
+    
+
+  for( j=0;j<num_reg_ordered_extern;j++)
+    for( i=0;i<num_obs_train_extern;i++ )
+      matrix_X_ordered_train_extern[j][i]=myord[j*num_obs_train_extern+i];
+
+  for( j=0;j<num_reg_continuous_extern;j++)
+    for( i=0;i<num_obs_train_extern;i++ )
+      matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+i];
+
+
+  determine_categorical_vals(
+                             num_obs_train_extern,
+                             0,
+                             0,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             matrix_Y_unordered_train_extern,
+                             matrix_Y_ordered_train_extern,
+                             matrix_X_unordered_train_extern,
+                             matrix_X_ordered_train_extern,
+                             num_categories_extern,
+                             matrix_categorical_vals_extern);
+
+  vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
+
+  compute_continuous_stddev(
+                            int_LARGE_SF,
+                            num_obs_train_extern,
+                            0,
+                            num_reg_continuous_extern,
+                            matrix_Y_continuous_train_extern,
+                            matrix_X_continuous_train_extern,
+                            vector_continuous_stddev);
+
+  /* Initialize scale factors and Hessian for NR modules */
+
+  initialize_nr_vector_scale_factor(
+                                    BANDWIDTH_den_extern,
+                                    BANDWIDTH_den_extern,
+                                    0,                /* Not Random (0) Random (1) */
+                                    int_RANDOM_SEED,
+                                    0,                /* regression (0) regression ml (1) */
+                                    int_LARGE_SF,
+                                    num_obs_train_extern,
+                                    0,
+                                    0,
+                                    0,
+                                    num_reg_continuous_extern,
+                                    num_reg_unordered_extern,
+                                    num_reg_ordered_extern,
+                                    matrix_Y_continuous_train_extern,
+                                    matrix_X_continuous_train_extern,
+                                    int_use_starting_values,
+                                    pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    num_categories_extern,
+                                    vector_continuous_stddev,
+                                    vector_scale_factor);
+
+  initialize_nr_hessian(num_var, matrix_y);
+
+  /* When multistarting, set counter */
+
+  imsnum = iMs_counter = 0;
+  imstot = iNum_Multistart;
+  
+  /* Conduct direction set search */
+
+  /* assign the function to be optimized */
+  switch(myopti[BW_MI]){
+  case DBWM_CVLS : bwmfunc = cv_func_distribution_categorical_ls; break;
+  default : REprintf("np.c: invalid bandwidth selection method.");
+    error("np.c: invalid bandwidth selection method."); break;
+  }
+
+  spinner(0);
+
+  fret_best = bwmfunc(vector_scale_factor);
+  iImproved = 0;
+
+  powell(0,
+         0,
+         vector_scale_factor,
+         vector_scale_factor,
+         matrix_y,
+         num_var,
+         ftol,
+         tol,
+         small,
+         itmax,
+         &iter,
+         &fret,
+         bwmfunc);
+
+  /* int_RESTART_FROM_MIN needs to be set */
+
+  if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+
+    initialize_nr_hessian(num_var, matrix_y);
+
+    powell(0,
+           0,
+           vector_scale_factor,
+           vector_scale_factor,
+           matrix_y,
+           num_var,
+           ftol,
+           tol,
+           small,
+           itmax,
+           &iter,
+           &fret,
+           bwmfunc);
+  }
+
+  iImproved = (fret < fret_best);
+
+  /* When multistarting save initial minimum of objective function and scale factors */
+
+  if(iMultistart == IMULTI_TRUE){
+    fret_best = fret;
+    vector_scale_factor_multistart = alloc_vecd(num_var + 1);
+    for(i = 1; i <= num_var; i++)
+      vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+    		
+    /* Conduct search from new random values of the search parameters */
+       	
+    for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
+
+      /* Initialize scale factors and hessian for NR modules */
+
+      initialize_nr_vector_scale_factor(
+                                        BANDWIDTH_den_extern,
+                                        BANDWIDTH_den_extern,
+                                        1,        /* Not Random (0) Random (1) */
+                                        int_RANDOM_SEED,
+                                        0,        /* regression (0) regression ml (1) */
+                                        int_LARGE_SF,
+                                        num_obs_train_extern,
+                                        0,
+                                        0,
+                                        0,
+                                        num_reg_continuous_extern,
+                                        num_reg_unordered_extern,
+                                        num_reg_ordered_extern,
+                                        matrix_Y_continuous_train_extern,
+                                        matrix_X_continuous_train_extern,
+                                        int_use_starting_values,
+                                        pow((double)4.0/(double)3.0,0.2),     /* Init for continuous vars */
+                                        num_categories_extern,
+                                        vector_continuous_stddev,
+                                        vector_scale_factor);
+
+      initialize_nr_hessian(num_var, matrix_y);
+
+      /* Conduct direction set search */
+
+      powell(0,
+             0,
+             vector_scale_factor,
+             vector_scale_factor,
+             matrix_y,
+             num_var,
+             ftol,
+             tol,
+             small,
+             itmax,
+             &iter,
+             &fret,
+             bwmfunc);
+
+      if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+
+        initialize_nr_hessian(num_var, matrix_y);
+
+        powell(0,
+               0,
+               vector_scale_factor,
+               vector_scale_factor,
+               matrix_y,
+               num_var,
+               ftol,
+               tol,
+               small,
+               itmax,
+               &iter,
+               &fret,
+               bwmfunc);
+      }
+       			
+      /* If this run resulted in an improved minimum save information */
+       		
+      if(fret < fret_best){
+        fret_best = fret;
+        iImproved = iMs_counter;
+       
+        for(i = 1; i <= num_var; i++)	
+          vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
+      }
+
+    }
+
+    /* Save best for estimation */
+
+    fret = fret_best;
+
+    for(i = 1; i <= num_var; i++)
+      vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
+
+    free(vector_scale_factor_multistart);
+
+  }
+
+  /* return data to R */
+  if (BANDWIDTH_den_extern == BW_GEN_NN || 
+      BANDWIDTH_den_extern == BW_ADAP_NN){
+    for( i=0; i<num_reg_continuous_extern; i++ )
+      vector_scale_factor[i+1]=fround(vector_scale_factor[i+1]);
+  }
+
+  for( i=0; i<num_var; i++ )
+    myans[i]=vector_scale_factor[i+1];
+
+  fval[0] = fret;
+  fval[1] = iImproved;
+  /* end return data */
+
+  /* Free data objects */
+
+  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  free_mat(matrix_y, num_var + 1);
+  free(vector_scale_factor);
+  free(num_categories_extern);
+
+  free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
+
+  free(vector_continuous_stddev);
+
+  if(int_MINIMIZE_IO != IO_MIN_TRUE)
+    Rprintf("\r                   \r");
+
+  return ;
+  
+}
+
 
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                double * u_uno, double * u_ord, double * u_con,
