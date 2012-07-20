@@ -153,7 +153,7 @@ npudistbw.dbandwidth <-
     
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
     
-    nfactor <- nrow^(-2.0/(2.0*tbw$ckerorder+tbw$ncon))
+    nfactor <- nrow^(-2.0/(1.0 + tbw$ckerorder))
 
     if (tbw$nuno > 0){
       if(tbw$scaling){ 
@@ -173,7 +173,7 @@ npudistbw.dbandwidth <-
 
 
     if (tbw$ncon > 0){
-      dfactor <- EssDee(dcon)*nrow^(-1.0/(2.0*tbw$ckerorder+tbw$ncon))
+      dfactor <- EssDee(dcon)*nrow^(-1.0/(1.0+tbw$ckerorder))
 
       if (tbw$scaling) {
         tbw$bandwidth[tbw$xdati$icon] <- tbw$bandwidth[tbw$xdati$icon]*dfactor

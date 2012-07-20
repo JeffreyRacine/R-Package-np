@@ -430,6 +430,80 @@ compute.bootstrap.errors.bandwidth =
     list(boot.err = boot.err, bxp = all.bp)
   }
 
+compute.bootstrap.errors.dbandwidth <- 
+  function(xdat, 
+           exdat,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.quantiles,
+           bws){
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strt = ifelse(is.inid, "tdat = xdat[indices,],",
+      "tdat = tsb,")
+
+    
+    boofun = eval(parse(text=paste(strf, "npudist(",
+                          strt, "edat = exdat, bws = bws)$dist}", sep="")))
+
+    if (is.inid) {
+      boot.out = boot(data = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+
+    all.bp <- list()
+
+    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+      boot.frame <- as.data.frame(boot.out$t)
+      u.lev <- bws$xdati$all.ulev[[slice.index]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+      all.bp$names <- bws$xdati$all.lev[[slice.index]]
+      rm(boot.frame)
+    }
+
+    if (plot.errors.type == "standard") {
+      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type == "quantiles") {
+      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
+                function (y) {
+                  quantile(y,probs = plot.errors.quantiles)
+                }))
+      boot.err[,1] = boot.out$t0 - boot.err[,1]
+      boot.err[,2] = boot.err[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp)
+  }
+
 compute.bootstrap.errors.conbandwidth =
   function(xdat, ydat,
            exdat, eydat,
@@ -2892,6 +2966,467 @@ npplot.bandwidth <-
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
                       cdf = cdf,
+                      slice.index = i,
+                      plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+                      plot.errors.boot.num = plot.errors.boot.num,
+                      plot.errors.center = plot.errors.center,
+                      plot.errors.type = plot.errors.type,
+                      plot.errors.quantiles = plot.errors.quantiles,
+                      bws = bws)
+            temp.err[1:xi.neval,] = temp.boot[["boot.err"]]
+            temp.boot <- temp.boot[["bxp"]]
+            if (!plot.bxp.out){
+              temp.boot$out <- numeric()
+              temp.boot$group <- integer()
+            }
+          }
+        }
+        
+        if (common.scale){
+          allei[,i] = ei
+          data.eval[,i] = temp.dens
+          if (plot.errors){
+            all.bxp[i] = NA
+            all.bxp[[i]] = temp.boot
+
+            data.err[,c(3*i-2,3*i-1,3*i)] = temp.err
+          }
+        } else if (plot.behavior != "data") {
+          ## plot evaluation
+          eval(parse(text = paste(eval(pfunE), "(", eval(pxE), eval(pyE),
+                       eval(pylimE), eval(pxlabE), eval(pylabE), eval(prestE),
+                       eval(pmainE), ")")))
+
+          ## error plotting evaluation
+          if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+            if (!xi.factor && !plotOnEstimate)
+              lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+
+            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                         eval(eehyE), eval(erestE), ")")))
+          }
+        }
+
+        if (plot.behavior != "plot") {
+          plot.out[i] = NA
+          plot.out[[i]] = eval(doutE)
+          plot.out[[i]]$bias = na.omit(temp.dens - temp.err[,3])
+          plot.out[[i]]$bxp = temp.boot
+        }
+      }
+      
+      if (common.scale & (plot.behavior != "data")){
+        jj = 1:bws$ndim*3
+
+        if (plot.errors.center == "estimate" | !plot.errors) {
+          y.max = max(na.omit(as.double(data.eval)) +
+            if (plot.errors) na.omit(as.double(data.err[,jj-1]))
+            else 0
+            )
+          y.min = min(na.omit(as.double(data.eval)) -
+            if (plot.errors) na.omit(as.double(data.err[,jj-2]))
+            else 0
+            )
+        } else if (plot.errors.center == "bias-corrected") {
+          y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+          y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+        }
+
+        if(!is.null(ylim)){
+          y.min = ylim[1]
+          y.max = ylim[2]
+        }
+        
+        for (i in 1:bws$ndim){
+          xi.factor = is.factor(xdat[,i])
+
+          ## plot evaluation
+          eval(parse(text = paste(eval(pfunE), "(", eval(pxE), eval(pyE),
+                       eval(pylimE), eval(pxlabE), eval(pylabE), eval(prestE),
+                       eval(pmainE), ")")))
+
+          ## error plotting evaluation
+          if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+            if (!xi.factor && !plotOnEstimate)
+              lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+
+            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                         eval(eehyE), eval(erestE), ")")))
+          }
+        }
+      }
+
+      if (plot.behavior != "data")
+        par(mfrow=c(1,1))
+
+      if (plot.behavior != "plot"){
+        names(plot.out) = paste("d",1:bws$ndim,sep="")
+        return (plot.out)
+      }
+    }
+  }
+
+npplot.dbandwidth <-
+  function(bws,
+           xdat,
+           data = NULL,
+           xq = 0.5, xtrim = 0.0, neval = 50,
+           common.scale = TRUE, perspective = TRUE,
+           main = "",
+           theta = 0.0, phi = 10.0,
+           view = c("rotate","fixed"), type = "l",
+           ylim = NULL,
+           plot.behavior = c("plot","plot-data","data"),
+           plot.errors.method = c("none","bootstrap","asymptotic"),
+           plot.errors.boot.method = c("inid", "fixed", "geom"),
+           plot.errors.boot.blocklen = NULL,
+           plot.errors.boot.num = 399,
+           plot.errors.center = c("estimate","bias-corrected"),
+           plot.errors.type = c("standard","quantiles"),
+           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.style = c("bar","band"),
+           plot.errors.bar = c("|","I"),
+           plot.errors.bar.num = min(neval,25),
+           plot.bxp = FALSE,
+           plot.bxp.out = TRUE,
+           ...,
+           random.seed){
+
+    miss.x <- missing(xdat)
+
+    if(miss.x && !is.null(bws$formula)){
+      tt <- terms(bws)
+    m <- match(c("formula", "data", "subset", "na.action"),
+               names(bws$call), nomatch = 0)
+    tmf <- bws$call[c(1,m)]
+    tmf[[1]] <- as.name("model.frame")
+    tmf[["formula"]] <- tt
+    umf <- tmf <- eval(tmf, envir = environment(tt))
+
+      xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+    } else {
+      if(miss.x && !is.null(bws$call)){
+        xdat <- data.frame(eval(bws$call[["dat"]], environment(bws$call)))
+      }
+      xdat = toFrame(xdat)
+      xdat = na.omit(xdat)
+    }
+
+    xq = double(bws$ndim)+xq
+    xtrim = double(bws$ndim)+xtrim
+
+    if (missing(plot.errors.method) &
+        any(!missing(plot.errors.boot.num), !missing(plot.errors.boot.method),
+            !missing(plot.errors.boot.blocklen))){
+      warning(paste("plot.errors.method must be set to 'bootstrap' to use bootstrapping.",
+                    "\nProceeding without bootstrapping."))
+    }
+
+    plot.behavior = match.arg(plot.behavior)
+    plot.errors.method = match.arg(plot.errors.method)
+    plot.errors.boot.method = match.arg(plot.errors.boot.method)
+    plot.errors.center = match.arg(plot.errors.center)
+    plot.errors.type = match.arg(plot.errors.type)
+    plot.errors.style = match.arg(plot.errors.style)
+    plot.errors.bar = match.arg(plot.errors.bar)
+
+    common.scale = common.scale | (!is.null(ylim))
+
+    if (plot.errors.method == "asymptotic") {
+      if (plot.errors.type == "quantiles"){
+        warning("quantiles cannot be calculated with asymptotics, calculating standard errors")
+        plot.errors.type = "standard"
+      }
+
+      if (plot.errors.center == "bias-corrected") {
+        warning("no bias corrections can be calculated with asymptotics, centering on estimate")
+        plot.errors.center = "estimate"
+      }
+    }
+
+    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
+        is.null(plot.errors.boot.blocklen))
+      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
+
+
+    plot.errors = (plot.errors.method != "none")
+
+    if ((bws$ncon + bws$nord == 2) & (bws$nuno == 0) & perspective &
+        !any(xor(bws$xdati$iord, bws$xdati$inumord))){
+      view = match.arg(view)
+      rotate = (view == "rotate")
+
+      
+      if (is.ordered(xdat[,1])){
+        x1.eval = bws$xdati$all.ulev[[1]]
+        x1.neval = length(x1.eval)
+      } else {
+        x1.neval = neval
+        qi = trim.quantiles(xdat[,1], xtrim[1])
+        x1.eval = seq(qi[1], qi[2], length.out = x1.neval)
+      }
+
+      if (is.ordered(xdat[,2])){
+        x2.eval = bws$xdati$all.ulev[[2]]
+        x2.neval = length(x2.eval)
+      } else {
+        x2.neval = neval
+        qi = trim.quantiles(xdat[,2], xtrim[2])
+        x2.eval = seq(qi[1], qi[2], length.out = x2.neval)
+      }
+
+      x.eval <- expand.grid(x1.eval, x2.eval)
+
+      ##x.eval = as.data.frame(matrix(data = NA, ncol = 2, nrow = x1.neval*x2.neval))
+      ##x.eval[,1] = rep(x1.eval, times = x2.neval)
+      ##x.eval[,2] = rep(x2.eval, each = x1.neval)
+
+      if (is.ordered(xdat[,1]))
+        x1.eval <- (bws$xdati$all.dlev[[1]])[as.integer(x1.eval)]
+
+      if (is.ordered(xdat[,2]))
+        x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
+
+      tobj =  npudist(tdat = xdat, edat = x.eval, bws = bws)
+
+      tdens = matrix(data = tobj$dist,
+        nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+      terr = matrix(data = tobj$derr, nrow = nrow(x.eval), ncol = 3)
+      terr[,3] = NA
+      
+      if (plot.errors.method == "bootstrap"){
+        terr <- compute.bootstrap.errors(xdat = xdat, 
+          exdat = x.eval,
+          slice.index = 0,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          plot.errors.center = plot.errors.center,
+          plot.errors.type = plot.errors.type,
+          plot.errors.quantiles = plot.errors.quantiles,
+          bws = bws)[["boot.err"]]
+
+        pc = (plot.errors.center == "bias-corrected")
+
+        lerr = matrix(data = if(pc) {terr[,3]} else {tobj$dist}
+          -terr[,1],
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        herr = matrix(data = if(pc) {terr[,3]} else {tobj$dist}
+          +terr[,2],
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+      } else if (plot.errors.method == "asymptotic") {
+        lerr = matrix(data = tobj$dist - 2.0*tobj$derr,
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        herr = matrix(data = tobj$dist + 2.0*tobj$derr,
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+      }
+
+      zlim =
+        if (plot.errors)
+          c(min(lerr),max(herr))
+        else
+          c(min(tobj$dist),max(tobj$dist))
+
+
+      if (plot.behavior != "plot"){
+        d1 <- npdistribution(bws = bws, eval = x.eval,
+                             dist = tobj$dist, derr = terr[,1:2], ntrain = nrow(xdat))
+        d1$bias = NA
+
+        if (plot.errors.center == "bias-corrected")
+          d1$bias = terr[,3] - tobj$dist
+        
+        if (plot.behavior == "data")
+          return ( list(d1 = d1) )
+      }
+      
+      # rows = constant x2
+      # cols = constant x1
+
+      dtheta = 5.0
+      dphi = 10.0
+
+      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      
+##      for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
+        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+          if (plot.errors){
+            persp(x1.eval,
+                  x2.eval,
+                  lerr,
+                  zlim = zlim,
+                  col = persp.col,
+                  border = "grey",
+                  ticktype = "detailed",
+                  xlab = "",
+                  ylab = "",
+                  zlab = "",
+                  theta = i,
+                  phi = phi)
+            par(new = TRUE)
+          }
+          
+          persp(x1.eval,
+                x2.eval,
+                tdens,
+                zlim = zlim,
+                col= persp.col,
+                border = "black",
+                ticktype="detailed",
+                xlab=gen.label(names(xdat)[1], "X1"),
+                ylab=gen.label(names(xdat)[2], "X2"),
+                zlab="Joint Distribution",
+                theta = i,
+                phi = phi,
+                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+
+          if (plot.errors){
+            par(new = TRUE)
+            persp(x1.eval,
+                  x2.eval,
+                  herr,
+                  zlim = zlim,
+                  col = persp.col,
+                  border = "grey",
+                  ticktype = "detailed",
+                  xlab = "",
+                  ylab = "",
+                  zlab = "",
+                  theta = i,
+                  phi = phi)
+          }
+
+          Sys.sleep(0.5)
+        }
+      ##}
+
+      if (plot.behavior == "plot-data")
+        return ( list(d1 = d1) )        
+
+    } else {
+
+      if (plot.behavior != "data")
+        par(mfrow=dim.plot(bws$ndim))
+
+      ev = xdat[1,,drop = FALSE]
+
+      for (i in 1:bws$ndim)
+        ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
+
+      maxneval = max(c(sapply(xdat,nlevels),neval))
+
+      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$ndim))
+
+      for (i in 1:bws$ndim)
+        exdat[,i] = ev[1,i]
+      
+      if (common.scale){
+        data.eval = matrix(data = NA, nrow = maxneval, ncol = bws$ndim)
+        data.err = matrix(data = NA, nrow = maxneval, ncol = 3*bws$ndim)
+        allei = as.data.frame(matrix(data = NA, nrow = maxneval, ncol = bws$ndim))
+        all.bxp = list()
+      }
+
+      plot.out = list()
+
+      temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
+      temp.dens = replicate(maxneval, NA)
+
+      ## plotting expressions
+      
+      plot.bootstrap = plot.errors.method == "bootstrap"
+
+      pfunE = expression(ifelse(xi.factor,
+          ifelse(plot.bootstrap & plot.bxp,"bxp","plotFactor"), "plot"))
+
+      pxE = expression(ifelse(common.scale,
+          ifelse(xi.factor,
+                 ifelse(plot.bootstrap & plot.bxp, "z = all.bxp[[i]],", "f = allei[,i],"),
+                 "x = allei[,i],"),
+          ifelse(xi.factor,
+                 ifelse(plot.bootstrap & plot.bxp, "z = temp.boot,", "f = ei,"), "x = ei,")))
+
+      pyE = expression(ifelse(xi.factor & plot.bootstrap & plot.bxp, "",
+          ifelse(common.scale,"y = data.eval[,i],", "y = temp.dens,")))
+
+      pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
+        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))),
+              max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+
+      pxlabE = "xlab = gen.label(bws$xnames[i], paste('X', i, sep = '')),"
+
+      pylabE = "ylab = 'Distribution',"
+
+      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
+      pmainE = "main = main"
+
+      ## error plotting expressions
+      plotOnEstimate = (plot.errors.center == "estimate")
+
+      efunE = "draw.errors"
+      eexE = ifelse(common.scale, "ex = as.numeric(na.omit(allei[,i])),",
+          "ex = as.numeric(na.omit(ei)),")
+      eelyE = ifelse(common.scale,
+        ifelse(plotOnEstimate, "ely = na.omit(data.eval[,i] - data.err[,3*i-2]),",
+               "ely = na.omit(data.err[,3*i] - data.err[,3*i-2]),"),
+        ifelse(plotOnEstimate, "ely = na.omit(temp.dens - temp.err[,1]),",
+               "ely = na.omit(temp.err[,3] - temp.err[,1]),"))
+      eehyE = ifelse(common.scale,
+        ifelse(plotOnEstimate, "ehy = na.omit(data.eval[,i] + data.err[,3*i-1]),",
+               "ehy = na.omit(data.err[,3*i] + data.err[,3*i-1]),"),
+        ifelse(plotOnEstimate, "ehy = na.omit(temp.dens + temp.err[,2]),",
+               "ehy = na.omit(temp.err[,3] + temp.err[,2]),"))
+
+      erestE = "plot.errors.style = ifelse(xi.factor,'bar',plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor,'I',plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = ifelse(xi.factor,1,2)"
+
+      ## density / distribution expressions
+
+      devalE = parse(text="npudist(tdat = xdat, edat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws)")
+      
+      dcompE = parse(text="tobj$dist")
+
+      doutE = parse(text="npdistribution(bws = bws, eval = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], dist = na.omit(temp.dens), derr = na.omit(cbind(-temp.err[,1], temp.err[,2])), ntrain = bws$nobs)")
+
+      for (i in 1:bws$ndim){
+        temp.err[,] = NA
+        temp.dens[] =  NA
+        temp.boot = list()
+
+        xi.factor = is.factor(xdat[,i])
+
+        if (xi.factor){
+          ei = bws$xdati$all.ulev[[i]]
+          xi.neval = length(ei)
+        } else {
+          xi.neval = neval
+          qi = trim.quantiles(xdat[,i], xtrim[i])
+          ei = seq(qi[1], qi[2], length.out = neval)
+        }
+
+        if (xi.neval < maxneval){
+          ei[(xi.neval+1):maxneval] = NA
+        }
+
+        tobj = eval(devalE)
+
+        temp.dens[1:xi.neval] = eval(dcompE)
+
+        if (plot.errors){
+          if (plot.errors.method == "asymptotic")
+            temp.err[1:xi.neval,1:2] = replicate(2,2.0*tobj$derr)
+          else if (plot.errors.method == "bootstrap"){
+            temp.boot <- compute.bootstrap.errors(
+                      xdat = xdat,
+                      exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,

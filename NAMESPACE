@@ -235,6 +235,7 @@ S3method(npcdist, conbandwidth)
 
 S3method(npplot, rbandwidth)
 S3method(npplot, bandwidth)
+S3method(npplot, dbandwidth)
 S3method(npplot, plbandwidth)
 S3method(npplot, conbandwidth)
 S3method(npplot, sibandwidth)
@@ -242,6 +243,7 @@ S3method(npplot, scbandwidth)
 
 S3method(compute.bootstrap.errors, rbandwidth)
 S3method(compute.bootstrap.errors, bandwidth)
+S3method(compute.bootstrap.errors, dbandwidth)
 S3method(compute.bootstrap.errors, conbandwidth)
 
 S3method(npksum, integer)
