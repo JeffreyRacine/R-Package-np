@@ -724,6 +724,8 @@ BWM_CVML = 0
 BWM_CVLS = 1
 BWM_CVML_NP= 2
 
+##distribution
+DBWM_CVLS = 0
 ##regression
 BWM_CVAIC = 0
 

@@ -2,6 +2,7 @@ useDynLib(np)
 import(stats)
 export(b.star
        ,npudensbw
+       ,npudistbw
        ,npudens
        ,npudist
        ,npregbw
@@ -37,6 +38,7 @@ export(b.star
        )
 
 S3method(print,bandwidth)
+S3method(print,dbandwidth)
 S3method(print,npdensity)
 S3method(print,npdistribution)
 S3method(print,rbandwidth)
@@ -64,6 +66,7 @@ S3method(print,unitest)
 
 
 S3method(plot, bandwidth)
+S3method(plot, dbandwidth)
 S3method(plot, rbandwidth)
 S3method(plot, conbandwidth)
 S3method(plot, plbandwidth)
@@ -106,6 +109,7 @@ S3method(vcov, singleindex)
 
 S3method(predict, npregression)
 S3method(predict, bandwidth)
+S3method(predict, dbandwidth)
 S3method(predict, conbandwidth)
 S3method(predict, condensity)
 S3method(predict, condistribution)
@@ -121,6 +125,7 @@ S3method(predict, singleindex)
 S3method(predict, smoothcoefficient)
 
 S3method(summary, bandwidth)
+S3method(summary, dbandwidth)
 S3method(summary, conbandwidth)
 S3method(summary, rbandwidth)
 S3method(summary, plbandwidth)
@@ -175,6 +180,13 @@ S3method(npudens, formula)
 S3method(npudens, call)
 S3method(npudens, default)
 S3method(npudens, bandwidth)
+
+S3method(npudistbw, NULL)
+S3method(npudistbw, formula)
+S3method(npudistbw, default)
+S3method(npudistbw, dbandwidth)
+
+S3method(as.double, dbandwidth)
 
 S3method(npudist, formula)
 S3method(npudist, call)
