@@ -67,7 +67,7 @@ npcopula(bws,
   Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
   Edition, Springer-Verlag.
 
-  Racine, J.S. (2012), \dQuote{Mixed Data Kernel Copulas: An Inversion Approach,}
+  Racine, J.S. (2012), \dQuote{Mixed Data Kernel Copulas,}
   manuscript.
 
 }
