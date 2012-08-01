@@ -1,9 +1,6 @@
 # np
 
-This is the R package `np' (Nonparametric Kernel Methods for Mixed
-Datatypes) written and maintained by Jeffrey S. Racine
-(racinej@mcmaster.ca) and co-authored by Tristen Hayfield
-<hayfield@mpia.de>
+This is the R package `np' (Nonparametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield <hayfield@mpia.de>
 
 ## Installation
 
@@ -13,7 +10,7 @@ You can install the stable version on [CRAN](http://cran.r-project.org/package=n
 install.packages('np', dependencies = TRUE)
 ```
 
-Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-np/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-np/tarball/master), decompress and run `R CMD INSTALL` on it, or use the **devtools** package to install the development version:
+Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-np/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-np/tarball/master), decompress and run `R CMD INSTALL` on it, or install then use the **devtools** package to install the development version:
 
 ```r
 ## this package depends on R >= 2.14.1
