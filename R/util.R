@@ -384,7 +384,7 @@ genOmitStr <- function(x){
 ## Estimation-related rgf's
 genGofStr <- function(x){
   paste(ifelse(is.na(x$MSE),"",paste("\nResidual standard error:",
-                                     format(x$MSE))),
+                                     format(sqrt(x$MSE)))),
         ifelse(is.na(x$R2),"",paste("\nR-squared:",
                                     format(x$R2))), sep="")
 }
