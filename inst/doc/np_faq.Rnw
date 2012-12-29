@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.77 2012/07/17 20:35:57 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.78 2012/11/13 06:17:21 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -490,6 +490,20 @@ function value, i.e.\ the value of the cross-validation function, {\em
 cross-validation (default, \verb+bwmethod="cv.ls"+). If the
 cross-validation score is lower for one model, that indicates that the
 model possessing the lowest score is to be preferred.
+
+\subsection{Where can I get some examples of R code for the np
+  package in addition to the examples in the help files?}
+
+Start \texttt{R} then type \verb+demo(package="np")+ and you will be
+presented with a list of demos for constrained estimation, inference,
+and so forth. To run one of these demos type, for example,
+\verb+demo(npregiv)+ (note that you must first install the {\tt
+  rgl} package to run this particular demo).
+
+To find the location of a demo type
+\verb+system.file("demo","npregiv.R",package="np")+ for example,
+then you can take the source code for this demo and modify it for your
+particular application.
 
 \subsection{Is
     there a way to figure out roughly how long
