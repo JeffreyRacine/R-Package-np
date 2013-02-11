@@ -8,6 +8,6 @@
     options(np.tree = FALSE)
 
 }
-.Last.lib <- function (lpath){
+.onUnload <- function (lpath){
   library.dynam.unload("np", libpath=lpath) 
 }

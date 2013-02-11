@@ -1220,8 +1220,6 @@ npregivderiv <- function(y,
 
   ## Now we repeat this entire process using mu = y = phi.0 rather than y
 
-  mean.mu <- mean(mu)
-
   if(smooth.residuals) {
 
     console <- printClear(console)
@@ -1297,7 +1295,7 @@ npregivderiv <- function(y,
 
   survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
-  T.star.mu <- (survivor.weighted.average-S.z*mean.mu)/f.z
+  T.star.mu <- (survivor.weighted.average-S.z*mean.predicted.E.mu.w)/f.z
 
   ## Now we update phi.prime.0, this provides phi.prime.1, and now
   ## we can iterate until convergence... note we replace phi.prime.0

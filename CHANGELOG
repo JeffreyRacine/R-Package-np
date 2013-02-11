@@ -1,5 +1,10 @@
 Changes from Version 0.40-13 to 0.40-14 [XXX]
 
+* using .onUnload rather than .Last.lib in zzz.R
+
+* Fixed glitch in npreg summary where `Residual standard error' was
+  reporting residual variance
+
 * npksum functionality extended
 
 - npksum can now return the matrix of kernel weights (which can be

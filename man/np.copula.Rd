@@ -12,7 +12,7 @@ npcopula(bws,
          data,
          u = NULL,
          density = FALSE,
-         n.quasi.inv = 500,
+         n.quasi.inv = 1000,
          er.quasi.inv = 1) 
 }
 
@@ -34,17 +34,14 @@ npcopula(bws,
     or copula density (default is \code{FALSE} [copula])
   }
   \item{n.quasi.inv}{
-    number used to construct a grid of length \eqn{2\times
-    n.quasi.inv}{2 x n.quasi.inv} when \code{u} is provided in order to
+    number of grid points generated when \code{u} is provided in order to
     compute the quasi-inverse of each marginal distribution (see
     details)
   }
   \item{er.quasi.inv}{
     number passed to \code{\link{extendrange}} when \code{u} is provided
-    specifying the fraction by which the range should be extended when
-    constructing a grid of length \eqn{2\times n.quasi.inv}{2 x
-    n.quasi.inv} that is used to compute the quantiles given \code{u}
-    via quasi-inverse of the marginal distributions (see details)
+    specifying the fraction by which the data range should be extended when
+    constructing the grid used to compute the quasi-inverse (see details)
   }
 }
 
@@ -70,7 +67,7 @@ npcopula(bws,
   Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
   Edition, Springer-Verlag.
 
-  Racine, J.S. (2012), \dQuote{Kernel Copula Estimation Via Inversion,}
+  Racine, J.S. (2012), \dQuote{Mixed Data Kernel Copulas,}
   manuscript.
 
 }
@@ -100,21 +97,21 @@ npcopula(bws,
   into a matrix of dimension 10000 by 2 which, though not memory
   intensive, may be computationally burdensome.
 
+  The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
+  Nelsen (2006). We compute an equi-quantile grid on the range of the
+  data of length \code{n.quasi.inv/2}. We then extend the range of the
+  data by the factor \code{er.quasi.inv} and compute an equi-spaced grid
+  of points of length \code{n.quasi.inv/2} (e.g. using the default
+  \code{er.quasi.inv=1} we go from the minimum data value minus
+  \eqn{1\times}{1x} the range to the maximum data value plus
+  \eqn{1\times}{1x} the range for each marginal). We then take these two
+  grids, concatenate and sort, and these form the final grid of length
+  \code{n.quasi.inv} for computing the quasi-inverse.
+
   Note that copula are only defined for data of type
   \code{\link{numeric}} or \code{\link{ordered}}.
 
-  The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
-  Nelsen (2006). We compute an equi-quantile grid on the range of the
-  data of length \code{n.quasi.inv}. We then extend the range of the
-  data by the factor \code{er.quasi.inv} and compute an equi-spaced grid
-  of points (e.g. using the default \code{er.quasi.inv=1} we go from
-  the minimum data value minus \eqn{1\times}{1x} the range to the
-  maximum data value plus \eqn{1\times}{1x} the range for each
-  marginal). We then take these two grids, concatenate and sort, and
-  these form the final grid for the quasi-inverse.
-
 }
-
 \section{Usage Issues}{
 
   See the example below for proper usage.
