@@ -9,7 +9,7 @@ npcopula <- function(bws,
                      data,
                      u=NULL,
                      density=FALSE,
-                     n.quasi.inv=500,
+                     n.quasi.inv=1000,
                      er.quasi.inv=1) {
 
   ## Basic error checking
@@ -23,6 +23,7 @@ npcopula <- function(bws,
   num.var <- length(bws$xnames)
   if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
   if(n.quasi.inv < 1) stop("n.quasi.inv must be a positive integer")
+  if(any(is.na(data))) stop("NA values present in data - recompute bw object with na.omit on data")
 
   ## Check for unordered factors
 
@@ -107,14 +108,14 @@ npcopula <- function(bws,
       ## concatenate and sort the equally space extended grid and
       ## the equi-quantile grid.
       x.marginal <- eval(parse(text=paste("data$",bws$xnames[j],sep="")))
-      quantile.seq <- seq(0,1,length=n.quasi.inv)
+      quantile.seq <- seq(0,1,length=round(n.quasi.inv/2))
       if(is.numeric(x.marginal)) {
         x.er <- extendrange(x.marginal,f=er.quasi.inv)
         x.q <- quantile(x.marginal,quantile.seq)
-        x.eval <- sort(c(seq(x.er[1],x.er[2],length=n.quasi.inv),x.q))
+        x.eval <- sort(c(seq(x.er[1],x.er[2],length=round(n.quasi.inv/2)),x.q))
       } else {
         x.u[,j] <- ordered(x.u[,j],levels=levels(x.marginal))
-        x.q <- sapply(1:n.quasi.inv,function(i){uocquantile(x.marginal,quantile.seq[i])})
+        x.q <- sapply(1:round(n.quasi.inv/2),function(i){uocquantile(x.marginal,quantile.seq[i])})
         x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
       }
       ## Compute the CDF at this set of evaluation points.
