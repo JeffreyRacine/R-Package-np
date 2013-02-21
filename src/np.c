@@ -508,33 +508,38 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int itmax, iter;
-  int int_use_starting_values;
+  int int_use_starting_values, cdfontrain;
 
-  num_reg_unordered_extern = myopti[BW_NUNOI];
-  num_reg_ordered_extern = myopti[BW_NORDI];
-  num_reg_continuous_extern = myopti[BW_NCONI];
+  cdfontrain =  myopti[DBW_CDFONTRAIN];
+
+  num_reg_unordered_extern = myopti[DBW_NUNOI];
+  num_reg_ordered_extern = myopti[DBW_NORDI];
+  num_reg_continuous_extern = myopti[DBW_NCONI];
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
-  num_obs_train_extern = myopti[BW_NOBSI];
-  iMultistart = myopti[BW_IMULTII];
-  iNum_Multistart = myopti[BW_NMULTII];
+  num_obs_train_extern = myopti[DBW_NOBSI];
+  
+  num_obs_eval_extern = cdfontrain ? num_obs_train_extern : myopti[DBW_NEVALI];
 
-  KERNEL_den_extern = myopti[BW_CKRNEVI];
+  iMultistart = myopti[DBW_IMULTII];
+  iNum_Multistart = myopti[DBW_NMULTII];
+
+  KERNEL_den_extern = myopti[DBW_CKRNEVI];
   KERNEL_den_unordered_extern = 0;
   KERNEL_den_ordered_extern = 0;
 
-  int_use_starting_values= myopti[BW_USTARTI];
-  int_LARGE_SF=myopti[BW_LSFI];
-  BANDWIDTH_den_extern=myopti[BW_DENI];
-  int_RESTART_FROM_MIN = myopti[BW_REMINI];
-  int_MINIMIZE_IO = myopti[BW_MINIOI];
+  int_use_starting_values= myopti[DBW_USTARTI];
+  int_LARGE_SF=myopti[DBW_LSFI];
+  BANDWIDTH_den_extern=myopti[DBW_DENI];
+  int_RESTART_FROM_MIN = myopti[DBW_REMINI];
+  int_MINIMIZE_IO = myopti[DBW_MINIOI];
 
-  itmax=myopti[BW_ITMAXI];
+  itmax=myopti[DBW_ITMAXI];
 
-  ftol=myoptd[BW_FTOLD];
-  tol=myoptd[BW_TOLD];
-  small=myoptd[BW_SMALLD];
+  ftol=myoptd[DBW_FTOLD];
+  tol=myoptd[DBW_TOLD];
+  small=myoptd[DBW_SMALLD];
 
 /* Allocate memory for objects */
 
@@ -542,11 +547,24 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
   matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
 
+  if(cdfontrain){
+    matrix_X_unordered_eval_extern = matrix_X_unordered_train_extern;
+    matrix_X_ordered_eval_extern = matrix_X_ordered_train_extern;
+    matrix_X_continuous_eval_extern = matrix_X_continuous_train_extern;
+  } else {
+    matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
+    matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
+    matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
+  }
 
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_var + 1, num_var +1);
   vector_scale_factor = alloc_vecd(num_var + 1);
+  // nb check vals
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+
+  if(num_reg_unordered_extern > 0)
+    error("np.c: distribution bw selection only works on ordered and continuous data."); 
 
   if (int_use_starting_values)
     for( i=0;i<num_var; i++ )
@@ -567,6 +585,21 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     for( i=0;i<num_obs_train_extern;i++ )
       matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+i];
 
+
+  // points for evaluating the cdf
+  if(!cdfontrain){
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_eval_extern;i++ )
+        matrix_X_unordered_eval_extern[j][i]=myeuno[j*num_obs_eval_extern+i];
+
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_eval_extern;i++ )
+        matrix_X_ordered_eval_extern[j][i]=myeord[j*num_obs_eval_extern+i];
+
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_eval_extern;i++ )
+        matrix_X_continuous_eval_extern[j][i]=myecon[j*num_obs_eval_extern+i];
+  }
 
   determine_categorical_vals(
                              num_obs_train_extern,
@@ -626,7 +659,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   /* Conduct direction set search */
 
   /* assign the function to be optimized */
-  switch(myopti[BW_MI]){
+  switch(myopti[DBW_MI]){
   case DBWM_CVLS : bwmfunc = cv_func_distribution_categorical_ls; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
     error("np.c: invalid bandwidth selection method."); break;
@@ -789,6 +822,13 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
   free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
   free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+
+  if(!cdfontrain){
+    free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
+    free_mat(matrix_X_ordered_eval_extern, num_reg_ordered_extern);
+    free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
+  }
+
   free_mat(matrix_y, num_var + 1);
   free(vector_scale_factor);
   free(num_categories_extern);
@@ -2792,6 +2832,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          do_smooth_coef_weights,
                          0, //not symmetric
                          0, //disable 'twisting'
+                         0, // do not drop train
+                         0, // do not drop train
                          operator,
                          matrix_X_unordered_train_extern,
                          matrix_X_ordered_train_extern,

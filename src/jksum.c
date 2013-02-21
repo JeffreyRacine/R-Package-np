@@ -1236,6 +1236,8 @@ const int bandwidth_divide,
 const int do_smooth_coef_weights,
 const int symmetric,
 const int gather_scatter,
+const int drop_one_train,
+const int drop_which_train,
 int * operator,
 double * const * const matrix_X_unordered_train,
 double **matrix_X_ordered_train,
@@ -1269,6 +1271,8 @@ double * kw){
   /* Trees are currently not compatible with all operations */
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED);
   int any_convolution = 0;
+
+  int lod;
   
   for(i = 0; (i < (num_reg_unordered + num_reg_ordered + num_reg_continuous)); i++){
     np_ks_tree_use &= (operator[i] != OP_CONVOLUTION);
@@ -1410,6 +1414,15 @@ double * kw){
 
   }
   
+  if (leave_one_out && drop_one_train) {
+    REprintf("\n error, leave one out estimator and drop-one estimator can't be enabled simultaneously");
+    free(lambda);
+    free_tmat(matrix_bandwidth);
+    free(tprod);
+    return(1);
+
+  }
+
   if ((num_obs_train != num_obs_eval) && leave_one_out){
     
     REprintf("\ntraining and evaluation data must be the same to use leave one out estimator");
@@ -1459,12 +1472,24 @@ double * kw){
     ws = weighted_sum;
 #endif
   }
-  
+
+  const int leave_or_drop = leave_one_out || (drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN));
+  if(drop_one_train) lod = drop_which_train;
+
     /* do sums */
   for(j=js; j <= je; j++, ws += ws_step){
     R_CheckUserInterrupt();
 
     dband = 1.0;
+
+    // if we are consistently dropping one obs from training data, and we are doing a parallel sum, then that means
+    // we need to skip here
+
+    if (drop_one_train && do_psum && (j == drop_which_train)){
+      continue;
+    }
+
+    if(leave_one_out) lod = j;
 
     if (num_reg_continuous > 0){
       m = matrix_bandwidth[0];
@@ -1533,7 +1558,7 @@ double * kw){
     np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
                           matrix_Y, num_var_continuous_extern,
                           tprod, num_xt,
-                          leave_one_out, j,
+                          leave_or_drop, lod,
                           kernel_pow,
                           do_psum,
                           symmetric,
@@ -2039,6 +2064,8 @@ int *num_categories){
                            0, // do_smooth_coef_weights = FALSE (not implemented)
                            0, // not symmetric
                            0, // do not gather-scatter
+                           0, // do not drop train
+                           0, // do not drop train
                            operator, // all regressors use the normal kernels (not cdf or derivative ones) 
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
@@ -2093,6 +2120,8 @@ int *num_categories){
                            0, // do_smooth_coef_weights = FALSE (not implemented)
                            0, // not symmetric
                            0, // do not gather-scatter
+                           0, // do not drop train
+                           0, // do not drop train
                            operator, // no special operators being used
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
@@ -2271,6 +2300,8 @@ int *num_categories){
                                  0, // do_smooth_coef_weights = FALSE (not implemented)
                                  1, // symmetric
                                  1, // gather-scatter sum
+                                 0, // do not drop train
+                                 0, // do not drop train
                                  operator, // no convolution
                                  PXU, // TRAIN
                                  PXO, 
@@ -2364,6 +2395,8 @@ int *num_categories){
                                0, // do_smooth_coef_weights = FALSE (not implemented)
                                1, // symmetric
                                1, // gather-scatter sum
+                               0, // do not drop train
+                               0, // do not drop train
                                operator, // no convolution
                                PXU, // TRAIN
                                PXO, 
@@ -2469,4 +2502,86 @@ int *num_categories){
   return(cv);
 }
 
-//np_kernel_estimate_distribution_ls_cv
+double np_kernel_estimate_distribution_ls_cv( 
+int KERNEL_den,
+int KERNEL_den_unordered,
+int KERNEL_den_ordered,
+int BANDWIDTH_den,
+int num_obs_train,
+int num_obs_eval,
+int num_reg_unordered,
+int num_reg_ordered,
+int num_reg_continuous,
+double ** matrix_X_unordered_train,
+double ** matrix_X_ordered_train,
+double ** matrix_X_continuous_train,
+double ** matrix_X_unordered_eval,
+double ** matrix_X_ordered_eval,
+double ** matrix_X_continuous_eval,
+double * vsf,
+int * num_categories,
+double ** matrix_categorical_vals,
+double * cv){
+  int i,j,l, indy;
+
+  int * operator = NULL;
+
+  double * mean = (double *)malloc(num_obs_eval*sizeof(double));
+  double ofac = num_obs_train - 1.0;
+
+  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+
+  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
+    operator[i] = OP_INTEGRAL;
+  
+  *cv = 0;
+  for(i = 0; i < num_obs_train; i++){
+    kernel_weighted_sum_np(KERNEL_den,
+                           KERNEL_den_unordered,
+                           KERNEL_den_ordered,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           num_obs_eval,
+                           num_reg_unordered,
+                           num_reg_ordered,
+                           num_reg_continuous,
+                           0,
+                           1,
+                           0,
+                           0,
+                           0,
+                           0,
+                           1,
+                           i,
+                           operator,
+                           matrix_X_unordered_train,
+                           matrix_X_ordered_train,
+                           matrix_X_continuous_train,
+                           matrix_X_unordered_eval,
+                           matrix_X_ordered_eval,
+                           matrix_X_continuous_eval,
+                           NULL,
+                           NULL,
+                           NULL,
+                           vsf,
+                           num_categories,
+                           matrix_categorical_vals,
+                           mean,
+                           NULL);
+    for(j = 0; j < num_obs_eval; j++){
+      indy = 1;
+      for(l = 0; l < num_reg_ordered; l++){
+        indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+      }
+      for(l = 0; l < num_reg_continuous; l++){
+        indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
+      }
+      *cv += (indy - mean[j]/ofac)*(indy - mean[j]/ofac);
+    }
+  }
+  *cv /= (double) num_obs_train*num_obs_eval;
+  free(operator);
+  free(mean);
+  return(0);
+}
+

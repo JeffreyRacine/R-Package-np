@@ -107,7 +107,8 @@ npudistbw.dbandwidth <-
     econ = data.frame()
 
     if (bandwidth.compute){
-      myopti = list(num_obs_train = dim(dat)[1], 
+      myopti = list(num_obs_train = dim(dat)[1],
+        num_obs_eval = 0,
         iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
         iNum_Multistart = nmulti,
         int_use_starting_values = ifelse(all(bws$bw==0),USE_START_NO, USE_START_YES),

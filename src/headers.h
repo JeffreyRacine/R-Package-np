@@ -177,7 +177,7 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor);
 int unique(int num_obs, double *x);
 void spinner(int num);
 
-int kernel_weighted_sum_np(const int KERNEL_reg, const int KERNEL_unordered_reg, const int KERNEL_ordered_reg, const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const int leave_one_out, const int kernel_pow, const int bandwidth_divide, const int do_smooth_coef_weights, const int symmetric, const int gather_scatter, int * operator, double * const * const matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double ** matrix_Y, double ** matrix_W, double * sgn, double *vector_scale_factor,int *num_categories,double ** matrix_categorical_vals, double *weighted_sum, double * kw);
+int kernel_weighted_sum_np(const int KERNEL_reg, const int KERNEL_unordered_reg, const int KERNEL_ordered_reg, const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const int leave_one_out, const int kernel_pow, const int bandwidth_divide, const int do_smooth_coef_weights, const int symmetric, const int gather_scatter, const int drop_one_train, const int drop_which_train, int * operator, double * const * const matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double ** matrix_Y, double ** matrix_W, double * sgn, double *vector_scale_factor,int *num_categories,double ** matrix_categorical_vals, double *weighted_sum, double * kw);
 
 int kernel_convolution_weighted_sum(int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *kernel_sum);
 
@@ -196,6 +196,8 @@ int np_cuokernelv_loo_mlcv(int KERNEL, int uKERNEL, int oKERNEL,
 
 int np_kernel_estimate_con_density_categorical_convolution_cv(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_Y_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_scale_factor, int *num_categories, double ** matrix_categorical_vals, double *cv);
 double np_cv_func_con_density_categorical_ls(double *vector_scale_factor);
+
+double np_kernel_estimate_distribution_ls_cv(int KERNEL_den,int KERNEL_den_unordered,int KERNEL_den_ordered,int BANDWIDTH_den,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double ** matrix_X_unordered_train,double ** matrix_X_ordered_train,double ** matrix_X_continuous_train,double ** matrix_X_unordered_eval,double ** matrix_X_ordered_eval,double ** matrix_X_continuous_eval,double * vsf,int * num_categories,double ** matrix_categorical_vals,double * cv);
 
 // some general np and R-c interface related defines
 #define safe_free(x) if((x) != NULL) free((x))
@@ -295,20 +297,21 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 
 // distribution defines
 #define DBW_NOBSI   0
-#define DBW_IMULTII 1
-#define DBW_NMULTII 2
-#define DBW_USTARTI 3
-#define DBW_LSFI    4
-#define DBW_DENI  5
-#define DBW_ITMAXI  6
-#define DBW_REMINI  7
-#define DBW_MINIOI  8
-#define DBW_MI    9
-#define DBW_CKRNEVI 10
-#define DBW_CDFONTRAIN 11
-#define DBW_NUNOI 12
-#define DBW_NORDI 13
-#define DBW_NCONI 14
+#define DBW_NEVALI  1
+#define DBW_IMULTII 2
+#define DBW_NMULTII 3
+#define DBW_USTARTI 4
+#define DBW_LSFI    5
+#define DBW_DENI  6
+#define DBW_ITMAXI  7
+#define DBW_REMINI  8
+#define DBW_MINIOI  9
+#define DBW_MI    10
+#define DBW_CKRNEVI 11
+#define DBW_CDFONTRAIN 12
+#define DBW_NUNOI 13
+#define DBW_NORDI 14
+#define DBW_NCONI 15
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1
