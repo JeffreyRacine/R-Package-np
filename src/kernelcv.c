@@ -98,6 +98,8 @@ extern double *vector_scale_factor_extern;
 extern double y_min_extern;
 extern double y_max_extern;
 
+// cdf extern
+extern int int_fast_dls_extern;
 #ifdef RCSID
 static char rcsid[] = "$Id: kernelcv.c,v 1.9 2006/11/02 16:56:49 tristen Exp $";
 #endif
@@ -617,6 +619,7 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor)
         num_reg_unordered_extern,
         num_reg_ordered_extern,
         num_reg_continuous_extern,
+        int_fast_dls_extern,
         matrix_X_unordered_train_extern,
         matrix_X_ordered_train_extern,
         matrix_X_continuous_train_extern,

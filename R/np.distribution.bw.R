@@ -9,7 +9,7 @@ npudistbw <- function(...){
 }
 
 npudistbw.formula <-
-  function(formula, data, subset, na.action, call, ...){
+  function(formula, data, subset, na.action, call, gdata = NULL, ...){
     
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -23,8 +23,22 @@ npudistbw.formula <-
       stop("invalid distribution formula")
     
     dat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
-    
-    tbw <- npudistbw(dat = dat, ...)
+
+    if ((has.gval <- !is.null(gdata))) {
+      gmf <- match.call(expand.dots = FALSE)
+      gm <- match(c("formula", "gdata"), names(gmf), nomatch = 0)
+      gmf <- gmf[c(1,gm)]
+                     
+      gmf[[1]] <- as.name("model.frame")
+      gmf <- eval(gmf, envir = parent.frame())
+
+      gdat <- gmf[, attr(attr(gmf, "terms"),"term.labels"), drop = FALSE]
+
+    }
+
+    tbw <- eval(parse(text=paste("npudistbw(dat = dat,",
+                        ifelse(has.gval,"gdat = gdat",""),
+                        "...)")))
     tbw$call <- match.call(expand.dots = FALSE)
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
@@ -62,7 +76,8 @@ npudistbw.NULL <-
 
 npudistbw.dbandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
-           bws, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
+           bws, gdat = NULL, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
+           fast.cdf = TRUE,
            ftol=1.19209e-07, tol=1.49012e-08, small=2.22045e-16, ...){
 
     dat = toFrame(dat)
@@ -102,13 +117,29 @@ npudistbw.dbandwidth <-
 
     ## these are the points where we evaluate the CDF
     ## for now we default to the training points (hence cdf_on_train = TRUE below)
-    euno = data.frame()
-    eord = data.frame()
-    econ = data.frame()
+    if(!is.null(gdat)){
+      gdat <- toFrame(gdat)
+      if(any(is.na(gdat)))
+        stop("na's not allowed to be present in cdf gdata")
+      gdat <- toMatrix(gdat)
+
+      guno = gdat[, bws$iuno, drop = FALSE]
+      gord = gdat[, bws$iord, drop = FALSE]
+      gcon = gdat[, bws$icon, drop = FALSE]
+      cdf_on_train = FALSE
+      noe = nrow(gdat)
+      
+    } else {
+      cdf_on_train = TRUE
+      noe = 0
+      guno = data.frame()
+      gord = data.frame()
+      gcon = data.frame()
+    }
 
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(dat)[1],
-        num_obs_eval = 0,
+        num_obs_eval = noe,
         iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
         iNum_Multistart = nmulti,
         int_use_starting_values = ifelse(all(bws$bw==0),USE_START_NO, USE_START_YES),
@@ -125,17 +156,18 @@ npudistbw.dbandwidth <-
           gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
           uniform = CKER_UNI),
-        cdf_on_train = TRUE,
+        cdf_on_train = cdf_on_train,
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
-        ncon = dim(dcon)[2])
+        ncon = dim(dcon)[2],
+        fast.cdf = fast.cdf)
       
       myoptd = list(ftol=ftol, tol=tol, small=small)
 
       if (bws$method != "normal-reference"){
         myout=
           .C("np_distribution_bw", as.double(duno), as.double(dord), as.double(dcon),
-             as.double(euno), as.double(eord), as.double(econ),
+             as.double(guno), as.double(gord), as.double(gcon),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
              fval = double(2),
@@ -214,9 +246,9 @@ npudistbw.dbandwidth <-
 
 npudistbw.default <-
   function(dat = stop("invoked without input data 'dat'"),
-           bws, bandwidth.compute = TRUE,
+           bws, gdat, bandwidth.compute = TRUE,
            ## dummy arguments for later passing into npudistbw.bandwidth
-           nmulti, remin, itmax, ftol, tol, small,
+           nmulti, remin, itmax, fast.cdf, ftol, tol, small,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ukertype, okertype,
@@ -253,7 +285,7 @@ npudistbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
+    margs <- c("gdat","bandwidth.compute", "nmulti", "remin", "itmax", "fast.cdf", "ftol", "tol",
                "small")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

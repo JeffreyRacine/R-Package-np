@@ -1485,10 +1485,6 @@ double * kw){
     // if we are consistently dropping one obs from training data, and we are doing a parallel sum, then that means
     // we need to skip here
 
-    if (drop_one_train && do_psum && (j == drop_which_train)){
-      continue;
-    }
-
     if(leave_one_out) lod = j;
 
     if (num_reg_continuous > 0){
@@ -1555,16 +1551,18 @@ double * kw){
 
     /* expand matrix outer product, multiply by kernel weights, etc, do sum */
 
-    np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
-                          matrix_Y, num_var_continuous_extern,
-                          tprod, num_xt,
-                          leave_or_drop, lod,
-                          kernel_pow,
-                          do_psum,
-                          symmetric,
-                          gather_scatter,
-                          bandwidth_divide, dband,
-                          ws, pnl);
+    if (!(drop_one_train && do_psum && (j == drop_which_train))){
+        np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
+                              matrix_Y, num_var_continuous_extern,
+                              tprod, num_xt,
+                              leave_or_drop, lod,
+                              kernel_pow,
+                              do_psum,
+                              symmetric,
+                              gather_scatter,
+                              bandwidth_divide, dband,
+                              ws, pnl);
+    }
 
     if(kw != NULL){ 
       // if using adaptive bandwidths, kw is returned transposed
@@ -2512,6 +2510,7 @@ int num_obs_eval,
 int num_reg_unordered,
 int num_reg_ordered,
 int num_reg_continuous,
+int fast,
 double ** matrix_X_unordered_train,
 double ** matrix_X_ordered_train,
 double ** matrix_X_continuous_train,
@@ -2527,15 +2526,29 @@ double * cv){
   int * operator = NULL;
 
   double * mean = (double *)malloc(num_obs_eval*sizeof(double));
+  
+  if(mean == NULL)
+    error("failed to allocate mean");
+
+
   double ofac = num_obs_train - 1.0;
 
   operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+
+  if(operator == NULL)
+    error("failed to allocate operator");
 
   for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
     operator[i] = OP_INTEGRAL;
   
   *cv = 0;
-  for(i = 0; i < num_obs_train; i++){
+
+  if(fast){
+    double * kw = (double *)malloc(num_obs_train*num_obs_eval*sizeof(double));
+
+    if(kw == NULL)
+      error("failed to allocate kw, try reducing num_obs_eval");
+
     kernel_weighted_sum_np(KERNEL_den,
                            KERNEL_den_unordered,
                            KERNEL_den_ordered,
@@ -2551,8 +2564,8 @@ double * cv){
                            0,
                            0,
                            0,
-                           1,
-                           i,
+                           0,
+                           0,
                            operator,
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
@@ -2567,19 +2580,72 @@ double * cv){
                            num_categories,
                            matrix_categorical_vals,
                            mean,
-                           NULL);
-    for(j = 0; j < num_obs_eval; j++){
-      indy = 1;
-      for(l = 0; l < num_reg_ordered; l++){
-        indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+                           kw);
+
+    for(i = 0; i < num_obs_train; i++){
+      for(j = 0; j < num_obs_eval; j++){
+        indy = 1;
+        for(l = 0; l < num_reg_ordered; l++){
+          indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+        }
+        for(l = 0; l < num_reg_continuous; l++){
+          indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
+        }
+        const double tvd = (indy - mean[j]/ofac + kw[j*num_obs_train + i]/ofac);
+        *cv += tvd*tvd;
       }
-      for(l = 0; l < num_reg_continuous; l++){
-        indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
-      }
-      *cv += (indy - mean[j]/ofac)*(indy - mean[j]/ofac);
     }
+    *cv /= (double) num_obs_train*num_obs_eval;
+
+    free(kw);
+  } else {
+    for(i = 0; i < num_obs_train; i++){
+      kernel_weighted_sum_np(KERNEL_den,
+                             KERNEL_den_unordered,
+                             KERNEL_den_ordered,
+                             BANDWIDTH_den,
+                             num_obs_train,
+                             num_obs_eval,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             num_reg_continuous,
+                             0,
+                             1,
+                             0,
+                             0,
+                             0,
+                             0,
+                             1,
+                             i,
+                             operator,
+                             matrix_X_unordered_train,
+                             matrix_X_ordered_train,
+                             matrix_X_continuous_train,
+                             matrix_X_unordered_eval,
+                             matrix_X_ordered_eval,
+                             matrix_X_continuous_eval,
+                             NULL,
+                             NULL,
+                             NULL,
+                             vsf,
+                             num_categories,
+                             matrix_categorical_vals,
+                             mean,
+                             NULL);
+      for(j = 0; j < num_obs_eval; j++){
+        indy = 1;
+        for(l = 0; l < num_reg_ordered; l++){
+          indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+        }
+        for(l = 0; l < num_reg_continuous; l++){
+          indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
+        }
+        *cv += (indy - mean[j]/ofac)*(indy - mean[j]/ofac);
+      }
+    }
+    *cv /= (double) num_obs_train*num_obs_eval;
   }
-  *cv /= (double) num_obs_train*num_obs_eval;
+
   free(operator);
   free(mean);
   return(0);

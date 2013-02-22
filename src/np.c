@@ -116,6 +116,9 @@ int KERNEL_den_ordered_extern=0;
 int BANDWIDTH_reg_extern;
 int BANDWIDTH_den_extern;
 
+// cdf algorithm extern
+int int_fast_dls_extern = 1;
+
 /* Statics for dependence metric */
 
 int num_lag_extern;
@@ -536,6 +539,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int_MINIMIZE_IO = myopti[DBW_MINIOI];
 
   itmax=myopti[DBW_ITMAXI];
+
+  int_fast_dls_extern = myopti[DBW_FASTI];
 
   ftol=myoptd[DBW_FTOLD];
   tol=myoptd[DBW_TOLD];
