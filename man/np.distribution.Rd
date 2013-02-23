@@ -1,7 +1,7 @@
 % $Id: np.density.Rd,v 1.75 2006/11/03 21:19:03 tristen Exp $
 \name{npudist}
 \alias{npudist}
-\alias{npudist.bandwidth}
+\alias{npudist.dbandwidth}
 \alias{npudist.call}
 \alias{npudist.default}
 \alias{npudist.formula}

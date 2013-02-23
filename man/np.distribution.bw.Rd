@@ -4,7 +4,7 @@
 \alias{npudistbw.formula}
 \alias{npudistbw.NULL}
 \alias{npudistbw.default}
-\alias{npudistbw.bandwidth}
+\alias{npudistbw.dbandwidth}
 \title{Kernel Distribution Bandwidth Selection with Mixed Data Types}
 
 \description{
@@ -21,7 +21,7 @@
 
 npudistbw(\dots)
 
-\method{npudistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL\dots)
+\method{npudistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL,\dots)
 
 \method{npudistbw}{NULL}(dat = stop("invoked without input data 'dat'"),
           bws,
@@ -95,6 +95,12 @@ npudistbw(\dots)
     another function. It is not recommended that the user set this.
   }
     
+  \item{gdata}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles).
+  }
+
   \item{dat}{
     a \eqn{p}-variate data frame on which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
