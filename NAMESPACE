@@ -191,7 +191,7 @@ S3method(as.double, dbandwidth)
 S3method(npudist, formula)
 S3method(npudist, call)
 S3method(npudist, default)
-S3method(npudist, bandwidth)
+S3method(npudist, dbandwidth)
 
 S3method(npregbw, NULL)
 S3method(npregbw, formula)
