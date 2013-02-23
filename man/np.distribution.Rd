@@ -11,7 +11,7 @@
 
   \code{npudist} computes kernel unconditional cumulative distribution
   estimates on evaluation data, given a set of training data and a
-  bandwidth specification (a \code{bandwidth} object or a bandwidth
+  bandwidth specification (a \code{dbandwidth} object or a bandwidth
   vector, bandwidth type, and kernel type) using the method of Li and
   Racine (2003).  Similarly \code{\link{npudens}} computes kernel
   unconditional density estimates.
@@ -22,7 +22,7 @@ npudist(bws, \dots)
 
 \method{npudist}{formula}(bws, data = NULL, newdata = NULL, \dots)
 
-\method{npudist}{bandwidth}(bws,
+\method{npudist}{dbandwidth}(bws,
         tdat = stop("invoked without training data 'tdat'"),
         edat,
         \dots)
@@ -34,7 +34,7 @@ npudist(bws, \dots)
 
 \arguments{
   \item{bws}{
-    a bandwidth specification. This can be set as a \code{bandwidth}
+    a dbandwidth specification. This can be set as a \code{dbandwidth}
     object returned from an invocation of \code{\link{npudistbw}}, or as a
     \eqn{p}-vector of bandwidths, with an element for each variable in the
     training data. If specified as a vector, then additional arguments
@@ -48,7 +48,7 @@ npudist(bws, \dots)
     data, the
     bandwidth type, kernel types, and so on.
     This is necessary if you specify bws as a \eqn{p}-vector and not
-    a \code{bandwidth} object, and you do not desire the default
+    a \code{dbandwidth} object, and you do not desire the default
     behaviours. To do this, you may specify any of \code{bwscaling},
     \code{bwtype}, \code{ckertype}, \code{ckerorder}, \code{ukertype},
     \code{okertype}, as described in \code{\link{npudistbw}}.

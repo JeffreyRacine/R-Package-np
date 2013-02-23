@@ -21,18 +21,20 @@
 
 npudistbw(\dots)
 
-\method{npudistbw}{formula}(formula, data, subset, na.action, call, \dots)
+\method{npudistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL\dots)
 
 \method{npudistbw}{NULL}(dat = stop("invoked without input data 'dat'"),
           bws,
           \dots)
 
-\method{npudistbw}{bandwidth}(dat = stop("invoked without input data 'dat'"),
+\method{npudistbw}{dbandwidth}(dat = stop("invoked without input data 'dat'"),
           bws,
+          gdat = NULL,
           bandwidth.compute = TRUE,
           nmulti,
           remin = TRUE,
           itmax = 10000,
+          fast.cdf = TRUE,
           ftol = 1.19209e-07,
           tol = 1.49012e-08,
           small = 2.22045e-16,
@@ -40,10 +42,12 @@ npudistbw(\dots)
 
 \method{npudistbw}{default}(dat = stop("invoked without input data 'dat'"),
           bws,
+          gdat,
           bandwidth.compute = TRUE,
           nmulti,
           remin,
           itmax,
+          fast.cdf,
           ftol,
           tol,
           small,
@@ -106,6 +110,12 @@ npudistbw(\dots)
     bandwidths. If specified as a vector, then additional arguments will
     need to be supplied as necessary to specify the bandwidth type,
     kernel types, selection methods, and so on. This can be left unset.
+  }
+
+  \item{gdat} {
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles).
   }
 
   \item{\dots}{
@@ -201,6 +211,11 @@ npudistbw(\dots)
   \item{itmax}{
     integer number of iterations before failure in the numerical
     optimization routine. Defaults to \code{10000}.
+  }
+
+  \item{fast.cdf}{
+    a logical value which when set as \code{TRUE} uses a computationally
+    efficient but potentially memory intensive computational algorithm.
   }
 
   \item{ftol}{
