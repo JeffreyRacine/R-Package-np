@@ -112,7 +112,7 @@ npudistbw(\dots)
     kernel types, selection methods, and so on. This can be left unset.
   }
 
-  \item{gdat} {
+  \item{gdat}{
     a grid of data on which the indicator function for
     least-squares cross-validation is to be computed (can be the sample
     or a grid of quantiles).
