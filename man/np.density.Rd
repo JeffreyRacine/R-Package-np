@@ -13,8 +13,7 @@
   evaluation data, given a set of training data and a bandwidth
   specification (a \code{bandwidth} object or a bandwidth vector,
   bandwidth type, and kernel type) using the method of Li and Racine
-  (2003).  Similarly \code{\link{npudist}} computes  kernel
-  unconditional cumulative distribution estimates.
+  (2003).
 
 }
 \usage{
@@ -104,12 +103,12 @@ npudens(bws, \dots)
     fhat <- npudens(tdat = y, ckertype="epanechnikov", ckerorder=4)
   }
 
-  \code{npudens} and \code{\link{npudist}} implement a variety of
-  methods for estimating multivariate density and distribution functions
-  (\eqn{p}-variate) defined over a set of possibly continuous and/or
-  discrete (unordered, ordered) data. The approach is based on Li and
-  Racine (2003) who employ \sQuote{generalized product kernels} that
-  admit a mix of continuous and discrete data types.
+  \code{npudens} implements a variety of methods for estimating
+  multivariate density functions (\eqn{p}-variate) defined over a set of
+  possibly continuous and/or discrete (unordered, ordered) data. The
+  approach is based on Li and Racine (2003) who employ
+  \sQuote{generalized product kernels} that admit a mix of continuous
+  and discrete data types.
 
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
