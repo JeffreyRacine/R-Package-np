@@ -109,6 +109,10 @@ A BibTeX entry for LaTeX users is
   the \texttt{np} package are directed to the {\tt Ecdat} \cite{Ecdat}
   and {\tt AER} \cite{AER} packages.
 
+  I maintain a `Gallery' to provide a forum for users to share code
+  and discover examples and illustrations which can be found at
+  \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
+
   Often the best resource is right down the hall. Ask a colleague
   whether they use or know anyone who uses R, then offer to buy that
   person a coffee and along the way drop something like ``I keep

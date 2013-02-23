@@ -1,6 +1,6 @@
 # np
 
-This is the R package `np' (Nonparametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield <hayfield@mpia.de>
+This is the R package `np' (Nonparametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield (hayfield@mpia.de)
 
 ## Installation
 

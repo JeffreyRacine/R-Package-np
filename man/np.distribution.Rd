@@ -1,41 +1,41 @@
 % $Id: np.density.Rd,v 1.75 2006/11/03 21:19:03 tristen Exp $
-\name{npudens}
-\alias{npudens}
-\alias{npudens.bandwidth}
-\alias{npudens.call}
-\alias{npudens.default}
-\alias{npudens.formula}
+\name{npudist}
+\alias{npudist}
+\alias{npudist.bandwidth}
+\alias{npudist.call}
+\alias{npudist.default}
+\alias{npudist.formula}
 
-\title{ Kernel Density Estimation with Mixed Data Types }
+\title{ Kernel Distribution Estimation with Mixed Data Types }
 \description{
 
-  \code{npudens} computes  kernel unconditional density estimates on
-  evaluation data, given a set of training data and a bandwidth
-  specification (a \code{bandwidth} object or a bandwidth vector,
-  bandwidth type, and kernel type) using the method of Li and Racine
-  (2003).  Similarly \code{\link{npudist}} computes  kernel
-  unconditional cumulative distribution estimates.
+  \code{npudist} computes kernel unconditional cumulative distribution
+  estimates on evaluation data, given a set of training data and a
+  bandwidth specification (a \code{bandwidth} object or a bandwidth
+  vector, bandwidth type, and kernel type) using the method of Li and
+  Racine (2003).  Similarly \code{\link{npudens}} computes kernel
+  unconditional density estimates.
 
 }
 \usage{
-npudens(bws, \dots)
+npudist(bws, \dots)
 
-\method{npudens}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npudist}{formula}(bws, data = NULL, newdata = NULL, \dots)
 
-\method{npudens}{bandwidth}(bws,
+\method{npudist}{bandwidth}(bws,
         tdat = stop("invoked without training data 'tdat'"),
         edat,
         \dots)
 
-\method{npudens}{call}(bws, \dots)
+\method{npudist}{call}(bws, \dots)
 
-\method{npudens}{default}(bws, tdat, \dots)
+\method{npudist}{default}(bws, tdat, \dots)
 }
 
 \arguments{
   \item{bws}{
     a bandwidth specification. This can be set as a \code{bandwidth}
-    object returned from an invocation of \code{\link{npudensbw}}, or as a
+    object returned from an invocation of \code{\link{npudistbw}}, or as a
     \eqn{p}-vector of bandwidths, with an element for each variable in the
     training data. If specified as a vector, then additional arguments
     will need to be supplied as necessary to change them from the
@@ -51,7 +51,7 @@ npudens(bws, \dots)
     a \code{bandwidth} object, and you do not desire the default
     behaviours. To do this, you may specify any of \code{bwscaling},
     \code{bwtype}, \code{ckertype}, \code{ckerorder}, \code{ukertype},
-    \code{okertype}, as described in \code{\link{npudensbw}}.
+    \code{okertype}, as described in \code{\link{npudistbw}}.
   }
 
   \item{tdat}{
@@ -69,7 +69,7 @@ npudens(bws, \dots)
     coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
     in the model. If not found in data, the variables are taken from
     \code{environment(bws)}, typically the environment from which
-    \code{\link{npudensbw}} was called.
+    \code{\link{npudistbw}} was called.
   }
 
   \item{newdata}{
@@ -84,32 +84,32 @@ npudens(bws, \dots)
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
   \preformatted{
-    Usage 1: first compute the bandwidth object via npudensbw and then
+    Usage 1: first compute the bandwidth object via npudistbw and then
     compute the density:
     
-    bw <- npudensbw(~y)
-    fhat <- npudens(bw)
+    bw <- npudistbw(~y)
+    Fhat <- npudist(bw)
     
     Usage 2: alternatively, compute the bandwidth object indirectly:
     
-    fhat <- npudens(~y)
+    Fhat <- npudist(~y)
     
     Usage 3: modify the default kernel and order:
     
-    fhat <- npudens(~y, ckertype="epanechnikov", ckerorder=4)
+    Fhat <- npudist(~y, ckertype="epanechnikov", ckerorder=4)
 
     Usage 4: use the data frame interface rather than the formula
     interface:
 
-    fhat <- npudens(tdat = y, ckertype="epanechnikov", ckerorder=4)
+    Fhat <- npudist(tdat = y, ckertype="epanechnikov", ckerorder=4)
   }
 
-  \code{npudens} and \code{\link{npudist}} implement a variety of
-  methods for estimating multivariate density and distribution functions
-  (\eqn{p}-variate) defined over a set of possibly continuous and/or
-  discrete (unordered, ordered) data. The approach is based on Li and
-  Racine (2003) who employ \sQuote{generalized product kernels} that
-  admit a mix of continuous and discrete data types.
+  \code{npudist} and \code{\link{npudens}} implement a variety
+  of methods for estimating multivariate distributions (\eqn{p}-variate)
+  defined over a set of possibly continuous and/or discrete (unordered,
+  ordered) data. The approach is based on Li and Racine (2003) who
+  employ \sQuote{generalized product kernels} that admit a mix of
+  continuous and discrete data types.
 
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
@@ -137,9 +137,9 @@ npudens(bws, \dots)
 }
 \value{
   
-  \code{npudens} returns a \code{npdensity} object. The generic accessor
-  functions \code{\link{fitted}}, and \code{\link{se}}, extract
-  estimated values and asymptotic standard errors on estimates,
+  \code{\link{npudist}} returns a \code{npdistribution} object. The
+  generic accessor functions \code{\link{fitted}}, and \code{\link{se}},
+  extract estimated values and asymptotic standard errors on estimates,
   respectively, from the returned object. Furthermore, the functions
   \code{\link{predict}}, \code{\link{summary}} and \code{\link{plot}}
   support objects of both classes. The returned objects have the
@@ -193,7 +193,7 @@ npudens(bws, \dots)
   type.
 }
 
-\seealso{ \code{\link{npudensbw}} , \code{\link{density}} }
+\seealso{ \code{\link{npudistbw}} , \code{\link{density}} }
 
 \examples{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
@@ -208,17 +208,17 @@ attach(Italy)
 
 # Compute bandwidths using likelihood cross-validation (default).
 
-bw <- npudensbw(formula=~ordered(year)+gdp)
+bw <- npudistbw(formula=~ordered(year)+gdp)
 
-# At this stage you could use npudens() to do a variety of
-# things. Here we compute the npudens() object and place it in fhat.
+# At this stage you could use npudist() to do a variety of
+# things. Here we compute the npudist() object and place it in Fhat.
 
-fhat <- npudens(bws=bw)
+Fhat <- npudist(bws=bw)
 
 # Note that simply typing the name of the object returns some useful
 # information. For more info, one can call summary: 
 
-summary(fhat)
+summary(Fhat)
 
 \dontrun{
 
@@ -233,11 +233,11 @@ data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
 
 # Generate the estimated density computed for the evaluation data
 
-fhat <- fitted(npudens(bws=bw, newdata=data.eval))
+Fhat <- fitted(npudist(bws=bw, newdata=data.eval))
 
 # Coerce the data into a matrix for plotting with persp()
 
-f <- matrix(fhat, length(unique(year)), 50)
+f <- matrix(Fhat, length(unique(year)), 50)
 
 # Next, create a 3D perspective plot of the PDF f, and a 2D
 # contour plot.
@@ -284,17 +284,17 @@ data <- data.frame(year=ordered(year), gdp)
 
 # Compute bandwidths using likelihood cross-validation (default).
 
-bw <- npudensbw(dat=data)
+bw <- npudistbw(dat=data)
 
-# At this stage you could use npudens() to do a variety of
-# things. Here we compute the npudens() object and place it in fhat.
+# At this stage you could use npudist() to do a variety of
+# things. Here we compute the npudist() object and place it in Fhat.
 
-fhat <- npudens(bws=bw)
+Fhat <- npudist(bws=bw)
 
 # Note that simply typing the name of the object returns some useful
 # information. For more info, one can call summary: 
 
-summary(fhat)
+summary(Fhat)
 
 # Next, we illustrate how to create a grid of `evaluation data' and feed
 # it to the perspective plotting routines in R, among others.
@@ -307,11 +307,11 @@ data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
 
 # Generate the estimated density computed for the evaluation data
 
-fhat <- fitted(npudens(edat = data.eval, bws=bw))
+Fhat <- fitted(npudist(edat = data.eval, bws=bw))
 
 # Coerce the data into a matrix for plotting with persp()
 
-f <- matrix(fhat, length(unique(year)), 50)
+f <- matrix(Fhat, length(unique(year)), 50)
 
 # Next, create a 3D perspective plot of the PDF f, and a 2D
 # contour plot.
@@ -355,7 +355,7 @@ attach(faithful)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npudensbw(formula=~eruptions+waiting)
+bw <- npudistbw(formula=~eruptions+waiting)
 
 summary(bw)
 
@@ -365,6 +365,10 @@ summary(bw)
 # the tails of the estimate to meet the horizontal axis).
 
 plot(bw, xtrim=-0.2)
+
+# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt)
+
+plot(bw, cdf=TRUE)
 
 detach(faithful)
 
@@ -379,7 +383,7 @@ attach(faithful)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npudensbw(dat=faithful)
+bw <- npudistbw(dat=faithful)
 
 summary(bw)
 
@@ -389,6 +393,10 @@ summary(bw)
 # the tails of the estimate to meet the horizontal axis).
 
 plot(bw, xtrim=-0.2)
+
+# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt)
+
+plot(bw, cdf=TRUE)
 
 detach(faithful)
 } % enddontrun

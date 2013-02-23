@@ -1,16 +1,16 @@
 % $Id: np.density.bw.Rd,v 1.63 2006/11/03 21:17:20 tristen Exp $
-\name{npudensbw}
-\alias{npudensbw}
-\alias{npudensbw.formula}
-\alias{npudensbw.NULL}
-\alias{npudensbw.default}
-\alias{npudensbw.bandwidth}
-\title{Kernel Density Bandwidth Selection with Mixed Data Types}
+\name{npudistbw}
+\alias{npudistbw}
+\alias{npudistbw.formula}
+\alias{npudistbw.NULL}
+\alias{npudistbw.default}
+\alias{npudistbw.bandwidth}
+\title{Kernel Distribution Bandwidth Selection with Mixed Data Types}
 
 \description{
 
-  \code{npudensbw} computes a bandwidth object for a \eqn{p}-variate
-  kernel unconditional density estimator defined over mixed continuous
+  \code{npudistbw} computes a bandwidth object for a \eqn{p}-variate
+  kernel cumulative distribution estimator defined over mixed continuous
   and discrete (unordered, ordered) data using either the normal
   reference rule-of-thumb, likelihood cross-validation, or least-squares
   cross validation using the method of Li and Racine (2003).
@@ -19,15 +19,15 @@
 
 \usage{
 
-npudensbw(\dots)
+npudistbw(\dots)
 
-\method{npudensbw}{formula}(formula, data, subset, na.action, call, \dots)
+\method{npudistbw}{formula}(formula, data, subset, na.action, call, \dots)
 
-\method{npudensbw}{NULL}(dat = stop("invoked without input data 'dat'"),
+\method{npudistbw}{NULL}(dat = stop("invoked without input data 'dat'"),
           bws,
           \dots)
 
-\method{npudensbw}{bandwidth}(dat = stop("invoked without input data 'dat'"),
+\method{npudistbw}{bandwidth}(dat = stop("invoked without input data 'dat'"),
           bws,
           bandwidth.compute = TRUE,
           nmulti,
@@ -38,7 +38,7 @@ npudensbw(\dots)
           small = 2.22045e-16,
           \dots)
 
-\method{npudensbw}{default}(dat = stop("invoked without input data 'dat'"),
+\method{npudistbw}{default}(dat = stop("invoked without input data 'dat'"),
           bws,
           bandwidth.compute = TRUE,
           nmulti,
@@ -66,11 +66,11 @@ npudensbw(\dots)
   }
 
   \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
+    an optional data frame, list or environment (or object coercible to
+    a data frame by \code{\link{as.data.frame}}) containing the
+    variables in the model. If not found in data, the variables are
+    taken from \code{environment(formula)}, typically the environment
+    from which the function is called.
   }
 
   \item{subset}{
@@ -113,19 +113,20 @@ npudensbw(\dots)
     kernel types, selection methods, and so on, detailed below.
   }
   
-  \item{bwmethod}{ a character string specifying the bandwidth selection
-    method. \code{cv.ml} specifies likelihood cross-validation,
+  \item{bwmethod}{
+    a character string specifying the bandwidth selection method.
     \code{cv.ls} specifies least-squares cross-validation, and
     \code{normal-reference} just computes the \sQuote{rule-of-thumb}
-    bandwidth \eqn{h_j}{h[j]} using the standard formula \eqn{h_j = 1.06
-    \sigma_j n^{-1/(2P+l)}}{h[j] = 1.06*sigma[j]*n^(-1.0/(2.0*P+l))},
+    bandwidth \eqn{h_j}{h[j]} using the standard formula \eqn{h_j =
+    1.587 \sigma_j n^{-1/(P+l)}}{h[j] = 1.587*sigma[j]*n^(-1.0/(P+l))},
     where \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
     the \eqn{j}th continuous variable defined as min(standard deviation,
     interquartile range/1.349), \eqn{n} the number of observations,
     \eqn{P} the order of the kernel, and \eqn{l} the number of
     continuous variables. Note that when there exist factors and the
     normal-reference rule is used, there is zero smoothing of the
-    factors. Defaults to \code{cv.ml}.  }
+    factors. Defaults to \code{cv.ls}.
+  }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
     supplied bandwidths are interpreted as `scale factors'
@@ -133,15 +134,15 @@ npudensbw(\dots)
     interpreted as `raw bandwidths' (\eqn{h_j}{h[j]} for continuous data
     types, \eqn{\lambda_j}{lambda[j]} for discrete data types). For
     continuous data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are
-    related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
-    c[j]*sigma[j]*n^(-1/(2*P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
+    related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(P+l)}}{h[j] =
+    c[j]*sigma[j]*n^(-1/(P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
     adaptive measure of spread of the \eqn{j}th continuous variable
     defined as min(standard deviation, interquartile range/1.349),
     \eqn{n} the number of observations, \eqn{P}{P} the order of the
     kernel, and \eqn{l}{l} the number of continuous variables. For
     discrete data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related
-    by the formula \eqn{h_j = c_jn^{-2/(2P+l)}}{h[j] =
-    c[j]*n^(-2/(2*P+l))}, where here \eqn{j}{[j]} denotes discrete
+    by the formula \eqn{h_j = c_jn^{-2/(P+l)}}{h[j] =
+    c[j]*n^(-2/(P+l))}, where here \eqn{j}{[j]} denotes discrete
     variable \eqn{j}{j}.  Defaults to \code{FALSE}.  }
 
   \item{bwtype}{
@@ -229,17 +230,17 @@ npudensbw(\dots)
     
     Usage 1: compute a bandwidth object using the formula interface:
     
-    bw <- npudensbw(~y)
+    bw <- npudistbw(~y)
     
     Usage 2: compute a bandwidth object using the data frame interface
     and change the default kernel and order:
 
-    fhat <- npudensbw(tdat = y, ckertype="epanechnikov", ckerorder=4)
+    Fhat <- npudistbw(tdat = y, ckertype="epanechnikov", ckerorder=4)
     
   }
 
   
-  \code{npudensbw} implements a variety of methods for choosing
+  \code{npudistbw} implements a variety of methods for choosing
   bandwidths for multivariate (\eqn{p}-variate) distributions defined over
   a set of possibly continuous and/or discrete (unordered, ordered)
   data. The approach is based on Li and Racine (2003) who employ
@@ -260,7 +261,7 @@ npudensbw(\dots)
   with the point at which the density is estimated, \eqn{x}. Fixed bandwidths
   are constant over the support of \eqn{x}.
 
-  \code{npudensbw} may be invoked \emph{either} with a formula-like
+  \code{npudistbw} may be invoked \emph{either} with a formula-like
   symbolic description of variables on which bandwidth selection is to
   be performed \emph{or} through a simpler interface whereby data is
   passed directly to the function via the \code{dat} parameter. Use of
@@ -290,7 +291,7 @@ npudensbw(\dots)
 
 }
 \value{
-  \code{npudensbw} returns a \code{bandwidth} object, with the
+  \code{npudistbw} returns a \code{bandwidth} object, with the
   following components:
 
   \item{bw}{ bandwidth(s), scale factor(s) or nearest neighbours for the
@@ -378,7 +379,7 @@ npudensbw(\dots)
 
 \seealso{
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}},  \code{\link{hist}},
-  \code{\link{npudens}}, \code{\link{npudist}} }
+  \code{\link{npudist}}, \code{\link{npudist}} }
 \examples{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
@@ -394,9 +395,9 @@ data <- data.frame(ordered(year), gdp)
 # order Gaussian kernel, fixed bandwidths). Note that the bandwidth
 # object you compute inherits all properties of the estimator (kernel
 # type, kernel order, estimation method) and can be fed directly into
-# the plotting utility plot() or into the npudens() function.
+# the plotting utility plot() or into the npudist() function.
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bwmethod="normal-reference")
+bw <- npudistbw(formula=~ordered(year)+gdp, bwmethod="normal-reference")
 
 summary(bw)
 
@@ -409,7 +410,7 @@ Sys.sleep(5)
 # Next, specify a value for the bandwidths manually (0.5 for the first
 # variable, 1.0 for the second)...
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bws=c(0.5, 1.0),
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0.5, 1.0),
                 bandwidth.compute=FALSE)
 
 summary(bw)
@@ -426,7 +427,7 @@ Sys.sleep(5)
 # factors' rather than the `bandwidth' as reported in some of the
 # previous examples.
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bws=c(0, 1.06),
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0, 1.06),
                 bwscaling=TRUE, 
                 bandwidth.compute=FALSE)
 
@@ -440,7 +441,7 @@ Sys.sleep(5)
 # continuous variables and specify your own bandwidths, you could do
 # that as follows.
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bws=c(0.5, 1.0),
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0.5, 1.0),
                 bandwidth.compute=FALSE, 
                 ckertype="epanechnikov",
                 ckerorder=8)
@@ -455,7 +456,7 @@ Sys.sleep(5)
 # kernel estimator for the continuous variable, you would use the
 # bwtype="generalized_nn" argument.
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bwtype = "generalized_nn")
+bw <- npudistbw(formula=~ordered(year)+gdp, bwtype = "generalized_nn")
 
 summary(bw)
 
@@ -468,7 +469,7 @@ Sys.sleep(5)
 # variable (default).  Note - this may take a few minutes depending on
 # the speed of your computer.
 
-bw <- npudensbw(formula=~ordered(year)+gdp)
+bw <- npudistbw(formula=~ordered(year)+gdp)
 
 summary(bw)
 
@@ -480,7 +481,7 @@ Sys.sleep(5)
 # can either provide a vector of bandwidths as in bws=c(...) or a
 # bandwidth object from a previous run, as in
 
-bw <- npudensbw(formula=~ordered(year)+gdp, bws=c(1, 1))
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(1, 1))
 
 summary(bw)
 
@@ -500,9 +501,9 @@ data <- data.frame(ordered(year), gdp)
 # order Gaussian kernel, fixed bandwidths). Note that the bandwidth
 # object you compute inherits all properties of the estimator (kernel
 # type, kernel order, estimation method) and can be fed directly into
-# the plotting utility plot() or into the npudens() function.
+# the plotting utility plot() or into the npudist() function.
 
-bw <- npudensbw(dat=data, bwmethod="normal-reference")
+bw <- npudistbw(dat=data, bwmethod="normal-reference")
 
 summary(bw)
 
@@ -513,7 +514,7 @@ Sys.sleep(5)
 # Next, specify a value for the bandwidths manually (0.5 for the first
 # variable, 1.0 for the second)...
 
-bw <- npudensbw(dat=data, bws=c(0.5, 1.0), bandwidth.compute=FALSE)
+bw <- npudistbw(dat=data, bws=c(0.5, 1.0), bandwidth.compute=FALSE)
 
 summary(bw)
 
@@ -529,7 +530,7 @@ Sys.sleep(5)
 # factors' rather than the `bandwidth' as reported in some of the
 # previous examples.
 
-bw <- npudensbw(dat=data, bws=c(0, 1.06),
+bw <- npudistbw(dat=data, bws=c(0, 1.06),
                 bwscaling=TRUE, 
                 bandwidth.compute=FALSE)
 
@@ -543,7 +544,7 @@ Sys.sleep(5)
 # continuous variables and specify your own bandwidths, you could do
 # that as follows.
 
-bw <- npudensbw(dat=data, bws=c(0.5, 1.0),
+bw <- npudistbw(dat=data, bws=c(0.5, 1.0),
                 bandwidth.compute=FALSE, 
                 ckertype="epanechnikov",
                 ckerorder=8)
@@ -558,7 +559,7 @@ Sys.sleep(5)
 # kernel estimator for the continuous variable, you would use the
 # bwtype="generalized_nn" argument.
 
-bw <- npudensbw(dat=data, bwtype = "generalized_nn")
+bw <- npudistbw(dat=data, bwtype = "generalized_nn")
 
 summary(bw)
 
@@ -571,7 +572,7 @@ Sys.sleep(5)
 # variable (default).  Note - this may take a few minutes depending on
 # the speed of your computer.
 
-bw <- npudensbw(dat=data)
+bw <- npudistbw(dat=data)
 
 summary(bw)
 
@@ -583,7 +584,7 @@ Sys.sleep(5)
 # can either provide a vector of bandwidths as in bws=c(...) or a
 # bandwidth object from a previous run, as in
 
-bw <- npudensbw(dat=data, bws=c(1, 1))
+bw <- npudistbw(dat=data, bws=c(1, 1))
 
 summary(bw)
 
