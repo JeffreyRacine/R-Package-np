@@ -53,7 +53,7 @@ npudist.call <-
           bws = bws, ...)
   }
 
-npudist.bandwidth <-
+npudist.dbandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
            edat, ...){
