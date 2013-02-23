@@ -30,6 +30,7 @@ npudistbw.formula <-
       gmf <- gmf[c(1,gm)]
                      
       gmf[[1]] <- as.name("model.frame")
+      names(gmf)[3] <- "data"
       gmf <- eval(gmf, envir = parent.frame())
 
       gdat <- gmf[, attr(attr(gmf, "terms"),"term.labels"), drop = FALSE]
@@ -37,7 +38,7 @@ npudistbw.formula <-
     }
 
     tbw <- eval(parse(text=paste("npudistbw(dat = dat,",
-                        ifelse(has.gval,"gdat = gdat",""),
+                        ifelse(has.gval,"gdat = gdat,",""),
                         "...)")))
     tbw$call <- match.call(expand.dots = FALSE)
     environment(tbw$call) <- parent.frame()
