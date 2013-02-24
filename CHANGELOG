@@ -1,5 +1,14 @@
 Changes from Version 0.40-13 to 0.40-14 [XXX]
 
+* The functions npudist and npudistbw now uncoupled from npudens
+  and npudensbw (previously they relied on unconditional PDF bandwidth
+  due to a lack of a multivariate mixed-data method for selecting bandwidths
+  for CDFs - now with Li & Racine (2013) we have a robust method hence the
+  split)
+
+* The use of cdf=TRUE is deprecated for npudens and npudensbw objects due
+  to the uncoupling described above
+
 * using .onUnload rather than .Last.lib in zzz.R
 
 * Fixed glitch in npreg summary where `Residual standard error' was
