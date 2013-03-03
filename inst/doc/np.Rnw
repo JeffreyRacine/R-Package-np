@@ -1120,23 +1120,24 @@ time that has elapsed since the previous eruption. Modeling the joint
 distribution is, however, of interest in its own right, and the
 underlying bimodal nature of the joint PDF and CDF is readily revealed
 by the kernel estimator.  For this example, we load the old faithful
-geyser data and compute the density and distribution functions. To
-plot the conditional distribution we use \code{cdf = TRUE} in
-\code{plot}. Results are presented in Figure~\ref{faithful plot}. Note
+geyser data and compute the density and distribution
+functions. Results are presented in Figure~\ref{faithful plot}. Note
 that in this example we conduct bandwidth selection and estimation in
 one step.
 
 <<eval=TRUE,keep.source=TRUE>>=
 data("faithful", package = "datasets")
 f.faithful <- npudens(~ eruptions + waiting, data = faithful)
+F.faithful <- npudist(~ eruptions + waiting, data = faithful)
 summary(f.faithful)
+summary(F.faithful)
 @
 
 The following code will generate Figure~\ref{faithful plot}.
 
 <<eval=FALSE, keep.source=TRUE>>=
 plot(f.faithful, xtrim = -0.2, view = "fixed", main = "")
-plot(f.faithful, cdf = TRUE, xtrim = -0.2, view = "fixed", main = "")
+plot(F.faithful, xtrim = -0.2, view = "fixed", main = "")
 @
 
 \begin{figure}[!ht]
@@ -1150,12 +1151,12 @@ plot.x1 <- unique(plot.output$d1$eval[,1])
 plot.x2 <- unique(plot.output$d1$eval[,2])
 persp(plot.x1,plot.x2,f,xlab="eruptions",ylab="waiting",zlab="Joint Density",col="lightblue", ticktype="detailed")
 
-plot.output <- plot(f.faithful, cdf = TRUE, xtrim = -0.2, view = "fixed", main="",plot.behavior="data")
+plot.output <- plot(F.faithful, xtrim = -0.2, view = "fixed", main="",plot.behavior="data")
 # Retrieve data from plot() to create multiple figures
-f <- matrix(plot.output$d1$dist, 50, 50)
+F <- matrix(plot.output$d1$dist, 50, 50)
 plot.x1 <- unique(plot.output$d1$eval[,1])
 plot.x2 <- unique(plot.output$d1$eval[,2])
-persp(plot.x1,plot.x2,f,xlab="eruptions",ylab="waiting",zlab="Joint Distribution",col="lightblue", ticktype="detailed")
+persp(plot.x1,plot.x2,F,xlab="eruptions",ylab="waiting",zlab="Joint Distribution",col="lightblue", ticktype="detailed")
 
 @
 \caption{\label{faithful plot}Nonparametric multivariate PDF and CDF
@@ -1179,8 +1180,7 @@ are $n=1,008$ observations in total, and two variables, \code{gdp} and
 take a minute or two depending on the speed of your computer. We
 override the default tolerances for the search method as the objective
 function is well-behaved (do not of course do this in general), then
-we compute the \code{npcdens} object.  To plot the conditional
-distribution we use \code{cdf = TRUE} in \code{plot}.  Note that in this
+we compute the \code{npcdens} object. Note that in this
 example we conduct bandwidth selection and estimation in one step.
 
 <<eval=TRUE,keep.source=TRUE>>=
