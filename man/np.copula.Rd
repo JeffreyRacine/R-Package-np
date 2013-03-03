@@ -148,6 +148,9 @@ grid.dat <- cbind(grid.seq,grid.seq)
 
 bw <- npudistbw(~x+y,data=mydat)
 copula <- npcopula(bws=bw,data=mydat,u=grid.dat)
+
+## Plot the copula
+
 contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
       zlab="Copula",zlim=c(0,1))
@@ -156,6 +159,8 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",
 
 bw.pdf <- npudensbw(~x+y,data=mydat)
 copula <- npcopula(bws=bw,bws.pdf=bw.pdf,data=mydat,u=grid.dat,density=TRUE)
+
+## Plot the copula density
 
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",
       ylab="u2",zlab="Copula Density")
