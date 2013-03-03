@@ -2602,7 +2602,6 @@ npplot.bandwidth <-
            theta = 0.0, phi = 10.0,
            view = c("rotate","fixed"), type = "l",
            ylim = NULL,
-           cdf = FALSE,
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -2714,11 +2713,9 @@ npplot.bandwidth <-
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      tobj = 
-        if (cdf) npudist(tdat = xdat, edat = x.eval, bws = bws)
-        else npudens(tdat = xdat, edat = x.eval, bws = bws)
+      tobj =  npudens(tdat = xdat, edat = x.eval, bws = bws)
 
-      tcomp = parse(text=paste("tobj$", ifelse(cdf,"dist","dens"), sep=""))
+      tcomp = parse(text="tobj$dens")
 
       tdens = matrix(data = eval(tcomp),
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
@@ -2729,7 +2726,7 @@ npplot.bandwidth <-
       if (plot.errors.method == "bootstrap"){
         terr <- compute.bootstrap.errors(xdat = xdat, 
           exdat = x.eval,
-          cdf = cdf,
+          cdf = FALSE,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -2765,9 +2762,9 @@ npplot.bandwidth <-
           c(min(eval(tcomp)),max(eval(tcomp)))
 
       tret = parse(text=paste(
-                     ifelse(cdf,"npdistribution", "npdensity"),
+                     "npdensity",
                      "(bws = bws, eval = x.eval,",
-                     ifelse(cdf,"dist","dens"),
+                     "dens",
                      " = eval(tcomp), derr = terr[,1:2], ntrain = nrow(xdat))", sep=""))
 
       if (plot.behavior != "plot"){
@@ -2816,7 +2813,7 @@ npplot.bandwidth <-
                 ticktype="detailed",
                 xlab=gen.label(names(xdat)[1], "X1"),
                 ylab=gen.label(names(xdat)[2], "X2"),
-                zlab=paste("Joint", ifelse(cdf,"Distribution", "Density")),
+                zlab=paste("Joint", "Density"),
                 theta = i,
                 phi = phi,
                 main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
@@ -2896,7 +2893,7 @@ npplot.bandwidth <-
 
       pxlabE = "xlab = gen.label(bws$xnames[i], paste('X', i, sep = '')),"
 
-      pylabE = paste("ylab = ", ifelse(cdf,"'Distribution'", "'Density'"), ",")
+      pylabE = paste("ylab = ", "'Density'", ",")
 
       prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
       pmainE = "main = main"
@@ -2925,16 +2922,16 @@ npplot.bandwidth <-
 
       ## density / distribution expressions
 
-      devalE = parse(text=paste(ifelse(cdf,"npudist","npudens"),
+      devalE = parse(text=paste("npudens",
                        "(tdat = xdat, edat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws)",
                        sep=""))
       
-      dcompE = parse(text=paste("tobj$",ifelse(cdf,"dist","dens"),
-                       sep=""))
+      dcompE = parse(text="tobj$dens")
 
-      doutE = parse(text=paste(ifelse(cdf,"npdistribution","npdensity"),
+
+      doutE = parse(text=paste("npdensity",
                       "(bws = bws, eval = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],",
-                      ifelse(cdf,"dist","dens"),
+                      "dens",
                       "= na.omit(temp.dens), derr = na.omit(cbind(-temp.err[,1], temp.err[,2])), ntrain = bws$nobs)",
                       sep=""))
 
@@ -2969,7 +2966,7 @@ npplot.bandwidth <-
             temp.boot <- compute.bootstrap.errors(
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-                      cdf = cdf,
+                      cdf = FALSE,
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
