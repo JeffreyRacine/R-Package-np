@@ -35,6 +35,8 @@ npudistbw(\dots)
           remin = TRUE,
           itmax = 10000,
           fast.cdf = TRUE,
+          do.full.integral = FALSE,
+          ngrid = 100,
           ftol = 1.19209e-07,
           tol = 1.49012e-08,
           small = 2.22045e-16,
@@ -48,6 +50,8 @@ npudistbw(\dots)
           remin,
           itmax,
           fast.cdf,
+          do.full.integral,
+          ngrid,
           ftol,
           tol,
           small,
@@ -222,6 +226,16 @@ npudistbw(\dots)
   \item{fast.cdf}{
     a logical value which when set as \code{TRUE} uses a computationally
     efficient but potentially memory intensive computational algorithm.
+  }
+
+  \item{do.full.integral}{
+    a logical value which when set as \code{TRUE} evaluates the
+    moment-based integral on the entire sample.
+  }
+
+  \item{ngrid}{
+    integer number of grid points to use when computing the moment-based
+    integral. Defaults to \code{100}.
   }
 
   \item{ftol}{
