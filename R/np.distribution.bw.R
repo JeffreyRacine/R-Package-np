@@ -114,9 +114,6 @@ npudistbw.dbandwidth <-
     ## at this stage, data to be sent to the c routines must be converted to
     ## numeric type.
 
-    if((!nogi) && (ngrid > nrow))
-      stop("number of grid points specified is greater than the number of data points")
-
     odat <- dat
     dat = toMatrix(dat)
 
@@ -141,7 +138,7 @@ npudistbw.dbandwidth <-
       noe = nrow(gdat)
       
     } else {
-      if(((nrow(dat) <= ngrid) && (nofi)) || do.full.integral) {
+      if(do.full.integral) {
         cdf_on_train = TRUE
         noe = 0
         guno = data.frame()
