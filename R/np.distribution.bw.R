@@ -78,11 +78,14 @@ npudistbw.NULL <-
 npudistbw.dbandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws, gdat = NULL, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
-           fast.cdf = TRUE,
+           fast.cdf = TRUE, do.full.integral = FALSE, ngrid = 100,
            ftol=1.19209e-07, tol=1.49012e-08, small=2.22045e-16, ...){
 
     dat = toFrame(dat)
 
+    nofi <- missing(do.full.integral)
+    nogi <- missing(ngrid)
+    
     if (missing(nmulti)){
       nmulti <- min(5,dim(dat)[2])
     }
@@ -99,6 +102,9 @@ npudistbw.dbandwidth <-
                                class(factor(0)))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
 
+    if(any(bws$iuno))
+      stop("distribution bandwidth selection does not support unordered data types")
+
     dat <- na.omit(dat)
     rows.omit <- unclass(na.action(dat))
 
@@ -108,6 +114,10 @@ npudistbw.dbandwidth <-
     ## at this stage, data to be sent to the c routines must be converted to
     ## numeric type.
 
+    if((!nogi) && (ngrid > nrow))
+      stop("number of grid points specified is greater than the number of data points")
+
+    odat <- dat
     dat = toMatrix(dat)
 
     duno = dat[, bws$iuno, drop = FALSE]
@@ -131,11 +141,27 @@ npudistbw.dbandwidth <-
       noe = nrow(gdat)
       
     } else {
-      cdf_on_train = TRUE
-      noe = 0
-      guno = data.frame()
-      gord = data.frame()
-      gcon = data.frame()
+      if(((nrow(dat) <= ngrid) && (nofi)) || do.full.integral) {
+        cdf_on_train = TRUE
+        noe = 0
+        guno = data.frame()
+        gord = data.frame()
+        gcon = data.frame()
+      } else {
+        cdf_on_train = FALSE
+        noe = ngrid
+        probs <- seq(0,1,length.out = noe)
+        ev <- odat[1:noe,,drop = FALSE]
+        for(i in 1:ncol(ev)){
+          ev[,i] <- uocquantile(odat[,i], probs)
+        }
+
+        ev <- toMatrix(ev)
+        
+        guno = ev[, bws$iuno, drop = FALSE]
+        gord = ev[, bws$iord, drop = FALSE]
+        gcon = ev[, bws$icon, drop = FALSE]
+      }
     }
 
     if (bandwidth.compute){
@@ -249,7 +275,7 @@ npudistbw.default <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, gdat, bandwidth.compute = TRUE,
            ## dummy arguments for later passing into npudistbw.bandwidth
-           nmulti, remin, itmax, fast.cdf, ftol, tol, small,
+           nmulti, remin, itmax, fast.cdf, do.full.integral, ngrid, ftol, tol, small,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ukertype, okertype,
@@ -286,7 +312,7 @@ npudistbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("gdat","bandwidth.compute", "nmulti", "remin", "itmax", "fast.cdf", "ftol", "tol",
+    margs <- c("gdat","bandwidth.compute", "nmulti", "remin", "itmax", "fast.cdf", "do.full.integral", "ngrid", "ftol", "tol",
                "small")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
