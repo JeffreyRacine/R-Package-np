@@ -814,7 +814,8 @@ void np_ckernelv(const int KERNEL,
                  const int do_xw,
                  const double x, const double h, 
                  double * const result,
-		 const NL * const nl){
+                 const NL * const nl,
+                 const int swap_xxt){
 
   /* 
      this should be read as:
@@ -825,6 +826,7 @@ void np_ckernelv(const int KERNEL,
   int i,j; 
   const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
+  const double sgn = swap_xxt ? -1.0 : 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
   double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, //ordinary kernels
@@ -841,13 +843,13 @@ void np_ckernelv(const int KERNEL,
 
   if(nl == NULL)
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
-      result[i] = xw[j]*k[KERNEL]((x-xt[i])/h);
+      result[i] = xw[j]*k[KERNEL]((x-xt[i])*sgn/h);
   else{
     for (int m = 0; m < nl->n; m++){
       const int istart = kdt_extern->kdn[nl->node[m]].istart;
       const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
-	result[i] = xw[j]*k[KERNEL]((x-xt[i])/h);
+        result[i] = xw[j]*k[KERNEL]((x-xt[i])*sgn/h);
     }
   }
 
@@ -859,16 +861,25 @@ void np_convol_ckernelv(const int KERNEL,
                         const double x, 
                         double * xt_h, 
                         const double h, 
-                        double * const result){
+                        double * const result,
+                        const int swap_xxt){
 
   int i,j; 
   const int bin_do_xw = do_xw > 0;
+
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
-    result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
-                                    (x-xt[i])/xt_h[i], xt_h[i], h);
+  if(!swap_xxt){
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+      result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
+                                      (x-xt[i])/xt_h[i], xt_h[i], h);
+  } else {
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+      result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
+                                      (xt[i]-x)/xt_h[i], h, xt_h[i]);
+
+  }
 
 }
 
@@ -911,15 +922,21 @@ void np_convol_okernelv(const int KERNEL,
                         const int do_xw,
                         const double x, const double lambda,
                         int ncat, double * cat,
-                        double * const result){
+                        double * const result,
+                        const int swap_xxt){
 
   int i; 
   int j, bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
-    result[i] = xw[j]*kernel_ordered_convolution(KERNEL, xt[i], x, lambda, ncat, cat);
+  if(!swap_xxt)
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+      result[i] = xw[j]*kernel_ordered_convolution(KERNEL, xt[i], x, lambda, ncat, cat);
+  else
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+      result[i] = xw[j]*kernel_ordered_convolution(KERNEL, x, xt[i], lambda, ncat, cat);
+
 }
 
 void np_okernelv(const int KERNEL, 
@@ -927,7 +944,8 @@ void np_okernelv(const int KERNEL,
                  const int do_xw,
                  const double x, const double lambda,
                  double * const result,
-		 const NL * const nl){
+                 const NL * const nl,
+                 const int swap_xxt){
   
   /* 
      this should be read as:
@@ -942,15 +960,29 @@ void np_okernelv(const int KERNEL,
 
   double (* const k[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine };
 
-  if(nl == NULL)
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
-      result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
-  else{
-    for (int m = 0; m < nl->n; m++){
-      const int istart = kdt_extern->kdn[nl->node[m]].istart;
-      const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
-      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
+  if(!swap_xxt){
+    if(nl == NULL)
+      for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
         result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+    else{
+      for (int m = 0; m < nl->n; m++){
+        const int istart = kdt_extern->kdn[nl->node[m]].istart;
+        const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+        for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
+          result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+      }
+    }
+  } else {
+    if(nl == NULL)
+      for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)
+        result[i] = xw[j]*k[KERNEL](x, xt[i], lambda);
+    else{
+      for (int m = 0; m < nl->n; m++){
+        const int istart = kdt_extern->kdn[nl->node[m]].istart;
+        const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+        for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw)
+          result[i] = xw[j]*k[KERNEL](x, xt[i], lambda);
+      }
     }
   }
 }
@@ -1265,7 +1297,7 @@ double * kw){
   /* Declarations */
 
   int i,j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
-  int do_psum; 
+  int do_psum, swap_xxt; 
 
 
   /* Trees are currently not compatible with all operations */
@@ -1336,6 +1368,7 @@ double * kw){
   }
 
   do_psum = BANDWIDTH_reg == BW_ADAP_NN;
+  swap_xxt = BANDWIDTH_reg == BW_ADAP_NN;
   /* Allocate memory for objects */
 
   mstep = (BANDWIDTH_reg==BW_GEN_NN)?num_obs_eval:
@@ -1520,10 +1553,10 @@ double * kw){
     /* for the rest, the accumulated products are the weights */
     for(i=0; i < num_reg_continuous; i++, l++, m += mstep){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION))
-        np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl);
+        np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl, swap_xxt);
       else
         np_convol_ckernelv(KERNEL_reg, xtc[i], num_xt, l, xc[i][j], 
-                           matrix_eval_bandwidth[i], *m, tprod);
+                           matrix_eval_bandwidth[i], *m, tprod, swap_xxt);
       dband *= *m;
     }
 
@@ -1539,13 +1572,13 @@ double * kw){
       if(operator[l] != OP_CONVOLUTION){
         np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
                     xo[i][j], lambda[num_reg_unordered+i], 
-                    tprod, pnl);      
+                    tprod, pnl, swap_xxt);      
       } else {
         np_convol_okernelv(KERNEL_ordered_reg, xto[i], num_xt, l,
                            xo[i][j], lambda[num_reg_unordered+i], 
                            num_categories[i+num_reg_unordered],
                            matrix_categorical_vals[i+num_reg_unordered],
-                           tprod);
+                           tprod, swap_xxt);
       }
     }
 
