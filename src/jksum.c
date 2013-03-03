@@ -2591,8 +2591,14 @@ double * cv){
         for(l = 0; l < num_reg_continuous; l++){
           indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
         }
-        const double tvd = (indy - mean[j]/ofac + kw[j*num_obs_train + i]/ofac);
-        *cv += tvd*tvd;
+        if(BANDWIDTH_den != BW_ADAP_NN){
+          const double tvd = (indy - mean[j]/ofac + kw[j*num_obs_train + i]/ofac);
+          *cv += tvd*tvd;
+        } else {
+          const double tvd = (indy - mean[j]/ofac + kw[i*num_obs_train + j]/ofac);
+          *cv += tvd*tvd;
+        }
+
       }
     }
     *cv /= (double) num_obs_train*num_obs_eval;
