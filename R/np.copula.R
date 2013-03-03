@@ -6,6 +6,7 @@
 ## (columns for the grid constructed from the columns of the u matrix)
 
 npcopula <- function(bws,
+                     bws.pdf=NULL,
                      data,
                      u=NULL,
                      density=FALSE,
@@ -17,8 +18,9 @@ npcopula <- function(bws,
   if(missing(data)) stop("You must provide a data frame")
   if(!is.data.frame(data)) stop("Object `data' must be a data frame")
   if(!density&&missing(bws)) stop("You must provide a joint distribution bandwidth object")
-  if(density&&missing(bws)) stop("You must provide a joint density bandwidth object")
-  if(class(bws)!="bandwidth") stop("bws must be an np bandwidth object")
+  if(density&&missing(bws.pdf)) stop("You must provide a joint density bandwidth object")
+  if(density&&class(bws.pdf)!="bandwidth") stop("density bws must be an np density bandwidth object")
+  if(!density&&class(bws)!="dbandwidth") stop("distribution bws must be an np distribution bandwidth object")  
   if(!is.null(u)) if(any(u>1) || any(u<0)) stop("u must lie in [0,1]")
   num.var <- length(bws$xnames)
   if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
@@ -48,7 +50,7 @@ npcopula <- function(bws,
       copula <- fitted(npudist(bws=bws,data=data))
     } else {
       console <- printPush(msg = "Computing the copula density for the sample realizations...", console)
-      copula <- fitted(npudens(bws=bws,data=data))
+      copula <- fitted(npudens(bws=bws.pdf,data=data))
     }
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
     ## F(x_i))
@@ -56,7 +58,7 @@ npcopula <- function(bws,
     for(j in 1:num.var) {
       console <- printClear(console)
       console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the sample realizations...",sep=""), console)
-      bws.F <- npudensbw(formula(paste("~",bws$xnames[j])),
+      bws.F <- npudistbw(formula(paste("~",bws$xnames[j])),
                          bws=bws$bw[j],
                          bandwidth.compute=FALSE,
                          bwmethod=bws$method,
@@ -64,21 +66,20 @@ npcopula <- function(bws,
                          ckerorder=bws$ckerorder,
                          ckertype=bws$ckertype,
                          okertype=bws$okertype,
-                         ukertype=bws$ukertype,
                          data=data)
 
       u[,j] <- fitted(npudist(bws=bws.F,data=data))
       ## For the copula density we require marginal densities.
       if(density) {
-        bws.f <- npudensbw(formula(paste("~",bws$xnames[j])),
-                           bws=bws$bw[j],
+        bws.f <- npudensbw(formula(paste("~",bws.pdf$xnames[j])),
+                           bws=bws.pdf$bw[j],
                            bandwidth.compute=FALSE,
-                           bwmethod=bws$method,
-                           bwtype=bws$type,
-                           ckerorder=bws$ckerorder,
-                           ckertype=bws$ckertype,
-                           okertype=bws$okertype,
-                           ukertype=bws$ukertype,
+                           bwmethod=bws.pdf$method,
+                           bwtype=bws.pdf$type,
+                           ckerorder=bws.pdf$ckerorder,
+                           ckertype=bws.pdf$ckertype,
+                           okertype=bws.pdf$okertype,
+                           ukertype=bws.pdf$ukertype,
                            data=data)
         ## Divide the copula density by its marginals
         copula <- copula/NZD(fitted(npudens(bws=bws.f,data=data)))
@@ -152,7 +153,7 @@ npcopula <- function(bws,
       copula <- predict(npudist(bws=bws),data=data,newdata=x.u)
     } else {
       console <- printPush(msg = "Computing the copula density for the expanded grid...", console)
-      copula <- predict(npudens(bws=bws),data=data,newdata=x.u)
+      copula <- predict(npudens(bws=bws.pdf),data=data,newdata=x.u)
       ## For the copula density require marginal densities. Desirable to
       ## have the same bws in numerator and denominator, so use those
       ## from the joint (mirror regression, conditional density
@@ -160,18 +161,18 @@ npcopula <- function(bws,
       for(j in 1:num.var) {
         console <- printClear(console)
         console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the expanded grid...",sep=""), console)
-        bws.f <- npudensbw(formula(paste("~",bws$xnames[j])),
-                           bws=bws$bw[j],
+        bws.f <- npudensbw(formula(paste("~",bws.pdf$xnames[j])),
+                           bws=bws.pdf$bw[j],
                            bandwidth.compute=FALSE,
-                           bwmethod=bws$method,
-                           bwtype=bws$type,
-                           ckerorder=bws$ckerorder,
-                           ckertype=bws$ckertype,
-                           okertype=bws$okertype,
-                           ukertype=bws$ukertype,
+                           bwmethod=bws.pdf$method,
+                           bwtype=bws.pdf$type,
+                           ckerorder=bws.pdf$ckerorder,
+                           ckertype=bws.pdf$ckertype,
+                           okertype=bws.pdf$okertype,
+                           ukertype=bws.pdf$ukertype,
                            data=data)
         xeval <- data.frame(x.u[,j])
-        names(xeval) <- bws$xnames[j]
+        names(xeval) <- bws.pdf$xnames[j]
         ## Divide copula density by its marginals
         copula <- copula/NZD(predict(npudens(bws=bws.f,data=data),newdata=xeval))
       }

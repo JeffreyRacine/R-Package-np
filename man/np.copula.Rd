@@ -9,6 +9,7 @@
 
 \usage{
 npcopula(bws,
+         bws.pdf,
          data,
          u = NULL,
          density = FALSE,
@@ -18,7 +19,10 @@ npcopula(bws,
 
 \arguments{
   \item{bws}{
-    an unconditional joint distribution/density bandwidth object
+    an unconditional joint distribution bandwidth object
+  }
+  \item{bws.pdf}{
+    an unconditional joint density bandwidth object (only needed when \code{density=TRUE})
   }
   \item{data}{
     a data frame containing variables used to construct \code{bws}
@@ -134,23 +138,30 @@ mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
 mydat <- mvrnorm(n=n, mu, Sigma)
 mydat <- data.frame(x=mydat[,1],y=mydat[,2])
-bw <- npudensbw(~x+y,data=mydat)
 
 q.min <- 0.0
 q.max <- 1.0
 grid.seq <- seq(q.min,q.max,length=n.eval)
 grid.dat <- cbind(grid.seq,grid.seq)
 
-## Here we use the same bandwidths for the copula and copula density
-## (temporary awaiting CDF bandwidth selector)
+## Estimate the copula
 
+bw <- npudistbw(~x+y,data=mydat)
 copula <- npcopula(bws=bw,data=mydat,u=grid.dat)
 contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
       zlab="Copula",zlim=c(0,1))
-copula <- npcopula(bws=bw,data=mydat,u=grid.dat,density=TRUE)
+
+## Estimate the copula density
+
+bw.pdf <- npudensbw(~x+y,data=mydat)
+copula <- npcopula(bws=bw,bws.pdf=bw.pdf,data=mydat,u=grid.dat,density=TRUE)
+
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",
       ylab="u2",zlab="Copula Density")
+
+## Plot the empirical copula
+
 copula.emp <- npcopula(bws=bw,data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
 }
