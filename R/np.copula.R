@@ -17,10 +17,10 @@ npcopula <- function(bws,
 
   if(missing(data)) stop("You must provide a data frame")
   if(!is.data.frame(data)) stop("Object `data' must be a data frame")
-  if(!density&&missing(bws)) stop("You must provide a joint distribution bandwidth object")
-  if(density&&missing(bws.pdf)) stop("You must provide a joint density bandwidth object")
+  if(missing(bws)) stop("You must provide a joint distribution bandwidth object")
+  if(class(bws)!="dbandwidth") stop("distribution bws must be an np distribution bandwidth object")  
+  if(density&&missing(bws.pdf)) stop("You must provide a joint density bandwidth object when density=TRUE")
   if(density&&class(bws.pdf)!="bandwidth") stop("density bws must be an np density bandwidth object")
-  if(!density&&class(bws)!="dbandwidth") stop("distribution bws must be an np distribution bandwidth object")  
   if(!is.null(u)) if(any(u>1) || any(u<0)) stop("u must lie in [0,1]")
   num.var <- length(bws$xnames)
   if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
