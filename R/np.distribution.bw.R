@@ -135,20 +135,20 @@ npudistbw.dbandwidth <-
       gord = gdat[, bws$iord, drop = FALSE]
       gcon = gdat[, bws$icon, drop = FALSE]
       cdf_on_train = FALSE
-      noe = nrow(gdat)
+      nog = nrow(gdat)
       
     } else {
       if(do.full.integral) {
         cdf_on_train = TRUE
-        noe = 0
+        nog = 0
         guno = data.frame()
         gord = data.frame()
         gcon = data.frame()
       } else {
         cdf_on_train = FALSE
-        noe = ngrid
-        probs <- seq(0,1,length.out = noe)
-        ev <- odat[1:noe,,drop = FALSE]
+        nog = ngrid
+        probs <- seq(0,1,length.out = nog)
+        ev <- odat[1:nog,,drop = FALSE]
         for(i in 1:ncol(ev)){
           ev[,i] <- uocquantile(odat[,i], probs)
         }
@@ -163,7 +163,7 @@ npudistbw.dbandwidth <-
 
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(dat)[1],
-        num_obs_eval = noe,
+        num_obs_eval = nog,
         iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
         iNum_Multistart = nmulti,
         int_use_starting_values = ifelse(all(bws$bw==0),USE_START_NO, USE_START_YES),

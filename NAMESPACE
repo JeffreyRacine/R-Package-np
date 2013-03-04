@@ -14,6 +14,7 @@ export(b.star
        ,npcdensbw
        ,npcdens
        ,npcdist
+       ,npcdistbw
        ,npcopula
        ,npdeptest       
        ,npsdeptest
@@ -46,6 +47,7 @@ S3method(print,npregression)
 S3method(print,plbandwidth)
 S3method(print,plregression)
 S3method(print,conbandwidth)
+S3method(print,condbandwidth)
 S3method(print,condensity)
 S3method(print,condistribution)
 S3method(print,npkernelsum)
@@ -111,6 +113,7 @@ S3method(predict, npregression)
 S3method(predict, bandwidth)
 S3method(predict, dbandwidth)
 S3method(predict, conbandwidth)
+S3method(predict, condbandwidth)
 S3method(predict, condensity)
 S3method(predict, condistribution)
 S3method(predict, npdensity)
@@ -127,6 +130,7 @@ S3method(predict, smoothcoefficient)
 S3method(summary, bandwidth)
 S3method(summary, dbandwidth)
 S3method(summary, conbandwidth)
+S3method(summary, condbandwidth)
 S3method(summary, rbandwidth)
 S3method(summary, plbandwidth)
 S3method(summary, sibandwidth)
@@ -232,6 +236,11 @@ S3method(npcdens, conbandwidth)
 S3method(npcdist, formula)
 S3method(npcdist, default)
 S3method(npcdist, conbandwidth)
+
+S3method(npcdistbw, NULL)
+S3method(npcdistbw, formula)
+S3method(npcdistbw, default)
+S3method(npcdistbw, condbandwidth)
 
 S3method(npplot, rbandwidth)
 S3method(npplot, bandwidth)

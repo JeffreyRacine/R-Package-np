@@ -2628,7 +2628,7 @@ double * cv){
           const double tvd = (indy - mean[j]/ofac + kw[j*num_obs_train + i]/ofac);
           *cv += tvd*tvd;
         } else {
-          const double tvd = (indy - mean[j]/ofac + kw[i*num_obs_train + j]/ofac);
+          const double tvd = (indy - mean[j]/ofac + kw[i*num_obs_eval + j]/ofac);
           *cv += tvd*tvd;
         }
 
@@ -2690,3 +2690,215 @@ double * cv){
   return(0);
 }
 
+int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(
+int KERNEL_den,
+int KERNEL_unordered_den,
+int KERNEL_ordered_den,
+int KERNEL_reg,
+int KERNEL_unordered_reg,
+int KERNEL_ordered_reg,
+int BANDWIDTH_den,
+int num_obs_train,
+int num_obs_eval,
+int num_var_unordered,
+int num_var_ordered,
+int num_var_continuous,
+int num_reg_unordered,
+int num_reg_ordered,
+int num_reg_continuous,
+int fast,
+double **matrix_Y_unordered_train,
+double **matrix_Y_ordered_train,
+double **matrix_Y_continuous_train,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_Y_unordered_eval,
+double **matrix_Y_ordered_eval,
+double **matrix_Y_continuous_eval,
+double *vector_scale_factor,
+int *num_categories,
+double **matrix_categorical_vals,
+double *cv){
+  int i,j,l, indy;
+
+  // unfortunately kernel_weighted_sum_np uses num_var_ordered_extern and num_var_continuous extern for other purposes
+  // this is bad and should be changed. until then:
+  num_var_unordered_extern = 0;
+  num_var_ordered_extern = 0;
+  num_var_continuous_extern = 0;
+ 
+  const int num_reg_tot = num_reg_continuous+num_reg_unordered+num_reg_ordered;
+  const int num_var_tot = num_var_continuous+num_var_unordered+num_var_ordered;
+
+  int * x_operator = NULL, * y_operator = NULL;
+
+  double vsfx[num_reg_tot];
+  double vsfy[num_var_tot];
+  double xyj, xmi;
+
+  double * mean = (double *)malloc(MAX(num_obs_eval,num_obs_train)*sizeof(double));
+  
+  if(mean == NULL)
+    error("failed to allocate mean");
+
+  double ofac = num_obs_train - 1.0;
+
+  for(i = 0; i < num_reg_continuous; i++)
+    vsfx[i] = vector_scale_factor[i];
+
+  for(l = num_reg_continuous, i = num_reg_continuous + num_var_tot; i < (num_reg_tot + num_var_tot); i++, l++)
+    vsfx[l] = vector_scale_factor[i];
+
+  for(l = 0, i = num_reg_continuous; i < (num_reg_continuous + num_var_tot); l++, i++)
+    vsfy[l] = vector_scale_factor[i];
+  
+
+  x_operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+
+  if(x_operator == NULL)
+    error("failed to allocate x_operator");
+
+  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
+    x_operator[i] = OP_INTEGRAL;
+
+  y_operator = (int *)malloc(sizeof(int)*(num_var_continuous+num_var_unordered+num_var_ordered));
+
+  if(y_operator == NULL)
+    error("failed to allocate y_operator");
+
+  for(i = 0; i < (num_var_continuous+num_var_unordered+num_var_ordered); i++)
+    y_operator[i] = OP_INTEGRAL;
+  
+  *cv = 0;
+
+  if(fast){
+    double * kwx = (double *)malloc(num_obs_train*num_obs_train*sizeof(double));
+
+    if(kwx == NULL)
+      error("failed to allocate kwx, try setting fast.cdf = false");
+
+    double * kwy = (double *)malloc(num_obs_train*num_obs_eval*sizeof(double));
+
+    if(kwy == NULL)
+      error("failed to allocate kwy, try reducing num_obs_eval");
+
+    // compute y weights first
+    kernel_weighted_sum_np(KERNEL_den,
+                           KERNEL_unordered_den,
+                           KERNEL_ordered_den,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           num_obs_eval,
+                           num_var_unordered,
+                           num_var_ordered,
+                           num_var_continuous,
+                           0,
+                           1,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           y_operator,
+                           matrix_Y_unordered_train,
+                           matrix_Y_ordered_train,
+                           matrix_Y_continuous_train,
+                           matrix_Y_unordered_eval,
+                           matrix_Y_ordered_eval,
+                           matrix_Y_continuous_eval,
+                           NULL,
+                           NULL,
+                           NULL,
+                           vsfy,
+                           num_categories,
+                           NULL,
+                           mean,
+                           kwy);
+
+    kernel_weighted_sum_np(KERNEL_reg,
+                           KERNEL_unordered_reg,
+                           KERNEL_ordered_reg,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           num_obs_train,
+                           num_reg_unordered,
+                           num_reg_ordered,
+                           num_reg_continuous,
+                           1, // compute the leave-one-out marginals
+                           1,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           x_operator,
+                           matrix_X_unordered_train,
+                           matrix_X_ordered_train,
+                           matrix_X_continuous_train,
+                           matrix_X_unordered_train,
+                           matrix_X_ordered_train,
+                           matrix_X_continuous_train,
+                           NULL,
+                           NULL,
+                           NULL,
+                           vsfx,
+                           num_categories + (num_var_unordered + num_var_ordered),
+                           NULL,
+                           mean,
+                           kwx);
+
+    for(i = 0; i < num_obs_train; i++){     
+      for(j = 0; j < num_obs_eval; j++){
+        indy = 1;
+        for(l = 0; l < num_var_ordered; l++){
+          indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
+        }
+        for(l = 0; l < num_var_continuous; l++){
+          indy *= (matrix_Y_continuous_train[l][i] <= matrix_Y_continuous_eval[l][j]);
+        }
+        if(BANDWIDTH_den != BW_ADAP_NN){
+          // leave-one-out joint density
+
+          xyj = 0.0;
+          for(l = 0; l < num_obs_train; l++)
+            xyj += kwy[j*num_obs_train+l]*kwx[i*num_obs_train+l];
+          xyj -= kwy[j*num_obs_train+i]*kwx[i*num_obs_train+i];
+
+          const double tvd = (indy - xyj/mean[i]);
+          *cv += tvd*tvd;
+        } else {
+          // leave-one-out joint density
+
+          xyj = 0.0;
+          for(l = 0; l < num_obs_train; l++)
+            xyj += kwy[l*num_obs_eval+j]*kwx[l*num_obs_train+i];
+          xyj -= kwy[i*num_obs_eval+j]*kwx[i*num_obs_train+i];
+
+          const double tvd = (indy - xyj/mean[i]);
+          *cv += tvd*tvd;
+        }
+
+      }
+    }
+    *cv /= (double) num_obs_train*num_obs_eval;
+
+    free(kwx);
+    free(kwy);
+  } else {
+    error("slow ccdf cv not yet implemented!");
+  }
+
+  free(x_operator);
+  free(y_operator);
+  free(mean);
+
+  num_var_unordered_extern = num_var_unordered;
+  num_var_ordered_extern = num_var_ordered;
+  num_var_continuous_extern = num_var_continuous;
+
+  return(0);
+
+}
