@@ -2722,6 +2722,12 @@ double **matrix_categorical_vals,
 double *cv){
   int i,j,l, indy;
 
+  // unfortunately kernel_weighted_sum_np uses num_var_ordered_extern and num_var_continuous extern for other purposes
+  // this is bad and should be changed. until then:
+  num_var_unordered_extern = 0;
+  num_var_ordered_extern = 0;
+  num_var_continuous_extern = 0;
+ 
   const int num_reg_tot = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int num_var_tot = num_var_continuous+num_var_unordered+num_var_ordered;
 
@@ -2847,10 +2853,10 @@ double *cv){
     for(i = 0; i < num_obs_train; i++){     
       for(j = 0; j < num_obs_eval; j++){
         indy = 1;
-        for(l = 0; l < num_reg_ordered; l++){
+        for(l = 0; l < num_var_ordered; l++){
           indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
         }
-        for(l = 0; l < num_reg_continuous; l++){
+        for(l = 0; l < num_var_continuous; l++){
           indy *= (matrix_Y_continuous_train[l][i] <= matrix_Y_continuous_eval[l][j]);
         }
         if(BANDWIDTH_den != BW_ADAP_NN){
@@ -2888,6 +2894,11 @@ double *cv){
   free(x_operator);
   free(y_operator);
   free(mean);
+
+  num_var_unordered_extern = num_var_unordered;
+  num_var_ordered_extern = num_var_ordered;
+  num_var_continuous_extern = num_var_continuous;
+
   return(0);
 
 }
