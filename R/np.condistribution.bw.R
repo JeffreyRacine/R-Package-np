@@ -46,7 +46,6 @@ npcdistbw.formula <-
                                         varsPlus[[2]]),
                                   env = environment(formula))
     gmf[["formula"]] <- mf[["formula"]]
-    names(gmf)[3] <- "data"
     
     mf <- eval(mf, parent.frame())
     
@@ -54,6 +53,7 @@ npcdistbw.formula <-
     xdat <- mf[, variableNames[[2]], drop = FALSE]
 
     if (has.gval) {
+      names(gmf)[3] <- "data"
       gmf <- eval(gmf, parent.frame())
       gydat <- gmf[, variableNames[[1]], drop = FALSE]
     }
@@ -143,7 +143,6 @@ npcdistbw.condbandwidth <-
     ycon = ydat[, bws$iycon, drop = FALSE]
     yord = ydat[, bws$iyord, drop = FALSE]
 
-    oxdat <- oxdat
     xdat = toMatrix(xdat)
 
     xuno = xdat[, bws$ixuno, drop = FALSE]
@@ -208,7 +207,7 @@ npcdistbw.condbandwidth <-
         itmax=itmax, int_RESTART_FROM_MIN=ifelse(remin,RE_MIN_TRUE,RE_MIN_FALSE), 
         int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE), 
         bwmethod = switch(bws$method,
-          cv.ls = CBWM_CVLS),
+          cv.ls = CDBWM_CVLS),
         xkerneval = switch(bws$cxkertype,
           gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,

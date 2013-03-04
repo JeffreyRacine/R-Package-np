@@ -14,6 +14,7 @@ export(b.star
        ,npcdensbw
        ,npcdens
        ,npcdist
+       ,npcdistbw
        ,npcopula
        ,npdeptest       
        ,npsdeptest
@@ -232,6 +233,11 @@ S3method(npcdens, conbandwidth)
 S3method(npcdist, formula)
 S3method(npcdist, default)
 S3method(npcdist, conbandwidth)
+
+S3method(npcdistbw, NULL)
+S3method(npcdistbw, formula)
+S3method(npcdistbw, default)
+S3method(npcdistbw, condbandwidth)
 
 S3method(npplot, rbandwidth)
 S3method(npplot, bandwidth)
