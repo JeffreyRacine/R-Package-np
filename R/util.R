@@ -739,6 +739,9 @@ CBWM_CVLS = 1
 CBWM_NPLS = 2
 CBWM_CCDF = 3 # Added 7/2/2010 jracine
 
+##conditional distribution
+CDBWM_CVLS = 0
+
 ##integral operators on kernels
 OP_NORMAL      = 0
 OP_CONVOLUTION = 1

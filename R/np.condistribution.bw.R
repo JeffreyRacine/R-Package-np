@@ -1,0 +1,451 @@
+npcdistbw <-
+  function(...){
+    args = list(...)
+    if (is(args[[1]],"formula"))
+      UseMethod("npcdistbw",args[[1]])
+    else if (!is.null(args$formula))
+      UseMethod("npcdistbw",args$formula)
+    else
+      UseMethod("npcdistbw",args[[which(names(args)=="bws")[1]]])
+  }
+
+npcdistbw.formula <-
+  function(formula, data, subset, na.action, call, gdata = NULL, ...){
+
+    has.gval <- !is.null(gdata)
+    
+    gmf <- mf <- match.call(expand.dots = FALSE)
+    m <- match(c("formula", "data", "subset", "na.action"),
+               names(mf), nomatch = 0)
+    gm <- match(c("formula", "gdata"),
+               names(gmf), nomatch = 0)
+
+    mf <- mf[c(1,m)]
+    gmf <- gmf[c(1,gm)]
+
+    if(!missing(call) && is.call(call)){
+      ## rummage about in the call for the original formula
+      for(i in 1:length(call)){
+        if(tryCatch(class(eval(call[[i]])) == "formula",
+                    error = function(e) FALSE))
+          break;
+      }
+      mf[[2]] <- call[[i]]
+      gmf[[2]] <- call[[i]]
+    }
+                     
+
+    mf[[1]] <- as.name("model.frame")
+    gmf[[1]] <- as.name("model.frame")
+
+    variableNames <- explodeFormula(mf[["formula"]])
+    
+    ## make formula evaluable, then eval
+    varsPlus <- lapply(variableNames, paste, collapse=" + ")
+    mf[["formula"]] <- as.formula(paste(" ~ ", varsPlus[[1]]," + ",
+                                        varsPlus[[2]]),
+                                  env = environment(formula))
+    gmf[["formula"]] <- mf[["formula"]]
+    names(gmf)[3] <- "data"
+    
+    mf <- eval(mf, parent.frame())
+    
+    ydat <- mf[, variableNames[[1]], drop = FALSE]
+    xdat <- mf[, variableNames[[2]], drop = FALSE]
+
+    if (has.gval) {
+      gmf <- eval(gmf, parent.frame())
+      gydat <- gmf[, variableNames[[1]], drop = FALSE]
+    }
+    
+    tbw = eval(parse(text=paste("npcdistbw(xdat = xdat, ydat = ydat,",
+                       ifelse(has.gval, "gydat = gydat",""), "...)")))
+
+    ## clean up (possible) inconsistencies due to recursion ...
+    tbw$call <- match.call(expand.dots = FALSE)
+    environment(tbw$call) <- parent.frame()
+    tbw$formula <- formula
+    tbw$rows.omit <- as.vector(attr(mf,"na.action"))
+    tbw$nobs.omit <- length(tbw$rows.omit)
+    tbw$terms <- attr(mf,"terms")
+    tbw$variableNames <- variableNames
+
+    tbw
+  }
+
+npcdistbw.condbandwidth <- 
+  function(xdat = stop("data 'xdat' missing"),
+           ydat = stop("data 'ydat' missing"),
+           gydat = NULL,
+           bws, bandwidth.compute = TRUE,
+           fast = FALSE, auto = TRUE,
+           nmulti, remin = TRUE, itmax = 10000,
+           fast.cdf = TRUE, do.full.integral = FALSE, ngrid = 100,
+           ftol=1.19209e-07, tol=1.49012e-08, small=2.22045e-16,
+           ...){
+
+    ydat = toFrame(ydat)
+    xdat = toFrame(xdat)
+
+    if (missing(nmulti)){
+      nmulti <- min(5,(dim(ydat)[2]+dim(xdat)[2]))
+    }
+
+    if (length(bws$ybw) != dim(ydat)[2])
+      stop(paste("length of bandwidth vector does not match number of columns of", "'ydat'"))
+
+    if (length(bws$xbw) != dim(xdat)[2])
+      stop(paste("length of bandwidth vector does not match number of columns of", "'xdat'"))
+
+    if (dim(ydat)[1] != dim(xdat)[1])
+      stop(paste("number of rows of", "'ydat'", "does not match", "'xdat'"))
+
+    yccon = unlist(lapply(as.data.frame(ydat[,bws$iycon]),class))
+    if ((any(bws$iycon) && !all((yccon == class(integer(0))) | (yccon == class(numeric(0))))) ||
+        (any(bws$iyord) && !all(unlist(lapply(as.data.frame(ydat[,bws$iyord]),class)) ==
+                               class(ordered(0)))) ||
+        (any(bws$iyuno) && !all(unlist(lapply(as.data.frame(ydat[,bws$iyuno]),class)) ==
+                               class(factor(0)))))
+      stop(paste("supplied bandwidths do not match", "'ydat'", "in type"))
+
+    xccon = unlist(lapply(as.data.frame(xdat[,bws$ixcon]),class))
+    if ((any(bws$ixcon) && !all((xccon == class(integer(0))) | (xccon == class(numeric(0))))) ||
+        (any(bws$ixord) && !all(unlist(lapply(as.data.frame(xdat[,bws$ixord]),class)) ==
+                               class(ordered(0)))) ||
+        (any(bws$ixuno) && !all(unlist(lapply(as.data.frame(xdat[,bws$ixuno]),class)) ==
+                               class(factor(0)))))
+      stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
+
+    ## catch and destroy NA's
+    goodrows <- 1:dim(xdat)[1]
+    rows.omit <- unclass(na.action(na.omit(data.frame(xdat,ydat))))
+    goodrows[rows.omit] <- 0
+
+    if (all(goodrows==0))
+      stop("Data has no rows without NAs")
+
+    xdat = xdat[goodrows,,drop = FALSE]
+    ydat = ydat[goodrows,,drop = FALSE]
+
+    
+    nrow = nrow(ydat)
+    yncol = ncol(ydat)
+    xncol = ncol(xdat)
+
+    ## at this stage, data to be sent to the c routines must be converted to
+    ## numeric type.
+
+    oydat <- ydat
+    
+    ydat = toMatrix(ydat)
+
+    yuno = ydat[, bws$iyuno, drop = FALSE]
+    ycon = ydat[, bws$iycon, drop = FALSE]
+    yord = ydat[, bws$iyord, drop = FALSE]
+
+    oxdat <- oxdat
+    xdat = toMatrix(xdat)
+
+    xuno = xdat[, bws$ixuno, drop = FALSE]
+    xcon = xdat[, bws$ixcon, drop = FALSE]
+    xord = xdat[, bws$ixord, drop = FALSE]
+
+    tbw <- bws
+
+    if(!is.null(gydat)){
+      gydat <- toFrame(gydat)
+      if(any(is.na(gydat)))
+        stop("na's not allowed to be present in cdf gdata")
+
+      gydat <- toMatrix(gydat)
+
+      gyuno = gydat[, bws$iyuno, drop = FALSE]
+      gyord = gydat[, bws$iyord, drop = FALSE]
+      gycon = gydat[, bws$iycon, drop = FALSE]
+      cdf_on_train = FALSE
+      nog = nrow(gydat)
+
+    } else {
+      if(do.full.integral) {
+        cdf_on_train = TRUE
+        nog = 0
+
+        gyuno = data.frame()
+        gyord = data.frame()
+        gycon = data.frame()
+
+      } else {
+        cdf_on_train = FALSE
+        nog = ngrid
+        probs <- seq(0,1,length.out = nog)
+
+        evy <- oydat[1:nog,,drop = FALSE]
+        for(i in 1:ncol(evy)){
+          evy[,i] <- uocquantile(oydat[,i], probs)
+        }
+
+        evy <- toMatrix(evy)
+
+        gyuno = evy[, bws$iyuno, drop = FALSE]
+        gyord = evy[, bws$iyord, drop = FALSE]
+        gycon = evy[, bws$iycon, drop = FALSE]
+
+      }
+
+    }
+    if (bandwidth.compute){
+      myopti = list(num_obs_train = nrow,
+        num_obs_grid = nog,
+        iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
+        iNum_Multistart = nmulti,
+        int_use_starting_values = ifelse(all(bws$ybw==0) && all(bws$xbw==0),
+          USE_START_NO, USE_START_YES),
+        int_LARGE_SF = ifelse(bws$scaling, SF_NORMAL, SF_ARB),
+        BANDWIDTH_den_extern = switch(bws$type,
+          fixed = BW_FIXED,
+          generalized_nn = BW_GEN_NN,
+          adaptive_nn = BW_ADAP_NN),
+        itmax=itmax, int_RESTART_FROM_MIN=ifelse(remin,RE_MIN_TRUE,RE_MIN_FALSE), 
+        int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE), 
+        bwmethod = switch(bws$method,
+          cv.ls = CBWM_CVLS),
+        xkerneval = switch(bws$cxkertype,
+          gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
+          epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
+          uniform = CKER_UNI),
+        ykerneval = switch(bws$cykertype,
+          gaussian = CKER_GAUSS + bws$cykerorder/2 - 1,
+          epanechnikov = CKER_EPAN + bws$cykerorder/2 - 1,
+          uniform = CKER_UNI),
+        uxkerneval = switch(bws$uxkertype,
+          aitchisonaitken = UKER_AIT,
+          liracine = UKER_LR),
+        uykerneval = switch(bws$uykertype,
+          aitchisonaitken = UKER_AIT,
+          liracine = UKER_LR),
+        oxkerneval = switch(bws$oxkertype,
+          wangvanryzin = OKER_WANG,
+          liracine = OKER_LR),
+        oykerneval = switch(bws$oykertype,
+          wangvanryzin = OKER_WANG,
+          liracine = OKER_LR),
+        ynuno = dim(yuno)[2],
+        ynord = dim(yord)[2],
+        yncon = dim(ycon)[2],
+        xnuno = dim(xuno)[2],
+        xnord = dim(xord)[2],
+        xncon = dim(xcon)[2],
+        auto = auto,
+        fast.cdf = fast.cdf,
+        cdf_on_train = cdf_on_train)
+      
+      myoptd = list(ftol=ftol, tol=tol, small=small)
+
+      if (bws$method != "normal-reference"){
+        myout=
+          .C("np_distribution_conditional_bw", as.double(yuno), as.double(yord), as.double(ycon),
+             as.double(xuno), as.double(xord), as.double(xcon),
+             as.double(gyuno), as.double(gyord), as.double(gycon),
+             as.integer(myopti), as.double(myoptd), 
+             bw = c(bws$xbw[bws$ixcon],bws$ybw[bws$iycon],
+               bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
+               bws$xbw[bws$ixuno],bws$xbw[bws$ixord]),
+             fval = double(2),
+             PACKAGE="np" )[c("bw","fval")]
+      } else {
+        nbw = double(yncol+xncol)
+        gbw = bws$yncon+bws$xncon
+        if (gbw > 0){
+          nbw[1:gbw] = (4/3)^0.2
+          if(!bws$scaling)
+            nbw[1:gbw]=nbw[1:gbw]*EssDee(data.frame(xcon,ycon))*nrow^(-1.0/(2.0*bws$cxkerorder+gbw))
+        }
+        myout= list( bw = nbw, fval = c(NA,NA) )
+      }
+
+      yr = 1:yncol
+      xr = 1:xncol
+      rorder = numeric(yncol + xncol)
+
+      ## bandwidths are passed back from the C routine in an unusual order
+      ## xc, y[cuo], x[uo]
+      
+      rxcon = xr[bws$ixcon]
+      rxuno = xr[bws$ixuno] 
+      rxord = xr[bws$ixord] 
+
+      rycon = yr[bws$iycon] 
+      ryuno = yr[bws$iyuno] 
+      ryord = yr[bws$iyord] 
+
+
+      ## rorder[c(rxcon,rycon,ryuno,ryord,rxuno,rxord)]=1:(yncol+xncol)
+
+      tbw <- bws
+      tbw$ybw[c(rycon,ryuno,ryord)] <- myout$bw[yr+bws$xncon]
+      tbw$xbw[c(rxcon,rxuno,rxord)] <- myout$bw[setdiff(1:(yncol+xncol),yr+bws$xncon)]
+
+      tbw$fval = myout$fval[1]
+      tbw$ifval = myout$fval[2]
+    }
+    
+    ## bandwidth metadata
+    tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
+
+    bwf <- function(i){
+      tbw$bandwidth[[i]][tl[[i]]] <<- (tbw$bandwidth[[i]])[tl[[i]]]*dfactor[[i]]
+    }
+
+    sff <- function(i){
+      tbw$sfactor[[i]][tl[[i]]] <<- (tbw$sfactor[[i]])[tl[[i]]]/dfactor[[i]]
+    }
+
+    myf <- if(tbw$scaling) bwf else sff
+    
+    if ((tbw$xnuno+tbw$ynuno) > 0){
+      dfactor <- nrow^(-2.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- list(x = dfactor, y = dfactor)
+
+      tl <- list(x = tbw$xdati$iuno, y = tbw$ydati$iuno)
+
+      lapply(1:length(tl), myf)
+    }
+
+    if ((tbw$xnord+tbw$ynord) > 0){
+      dfactor <- nrow^(-2.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- list(x = dfactor, y = dfactor)
+
+      tl <- list(x = tbw$xdati$iord, y = tbw$ydati$iord)
+
+      lapply(1:length(tl), myf)
+    }
+
+      
+    if (tbw$ncon > 0){
+      dfactor <- nrow^(-1.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- list(x = EssDee(xcon)*dfactor, y = EssDee(ycon)*dfactor)
+
+      tl <- list(x = tbw$xdati$icon, y = tbw$ydati$icon)
+
+      lapply(1:length(tl), myf)
+    }
+  
+    tbw <- condbandwidth(xbw = tbw$xbw,
+                        ybw = tbw$ybw,
+                        bwmethod = tbw$method,
+                        bwscaling = tbw$scaling,
+                        bwtype = tbw$type,
+                        cxkertype = tbw$cxkertype,
+                        cxkerorder = tbw$cxkerorder,
+                        uxkertype = tbw$uxkertype,
+                        oxkertype = tbw$oxkertype,
+                        cykertype = tbw$cykertype,
+                        cykerorder = tbw$cykerorder,
+                        uykertype = tbw$uykertype,
+                        oykertype = tbw$oykertype,
+                        fval = tbw$fval,
+                        ifval = tbw$ifval,
+                        nobs = tbw$nobs,
+                        xdati = tbw$xdati,
+                        ydati = tbw$ydati,      
+                        xnames = tbw$xnames,
+                        ynames = tbw$ynames,
+                        sfactor = tbw$sfactor,
+                        bandwidth = tbw$bandwidth,
+                        rows.omit = rows.omit,
+                        bandwidth.compute = bandwidth.compute)
+           
+    tbw
+  }
+
+npcdistbw.NULL <-
+  function(xdat = stop("data 'xdat' missing"),
+           ydat = stop("data 'ydat' missing"),
+           bws, ...){
+
+    ## maintain x names and 'toFrame'
+    xdat <- toFrame(xdat)
+
+    ## maintain y names and 'toFrame'
+    ydat <- toFrame(ydat)
+
+    ## do bandwidths
+    
+    bws = double(ncol(ydat)+ncol(xdat))
+
+    tbw <- npcdistbw.default(xdat = xdat, ydat = ydat, bws = bws, ...)
+
+    ## clean up (possible) inconsistencies due to recursion ...
+    mc <- match.call(expand.dots = FALSE)
+    environment(mc) <- parent.frame()
+    tbw$call <- mc
+
+    tbw
+  }
+
+npcdistbw.default <-
+  function(xdat = stop("data 'xdat' missing"),
+           ydat = stop("data 'ydat' missing"),
+           gydat,
+           bws, 
+           bandwidth.compute = TRUE,
+           fast, auto, nmulti, remin, itmax,
+           fast.cdf, do.full.integral, ngrid,
+           ftol, tol, small,
+           ## dummy arguments for condbandwidth() function call
+           bwmethod, bwscaling, bwtype,
+           cxkertype, cxkerorder,
+           cykertype, cykerorder,
+           uxkertype, uykertype,
+           oxkertype, oykertype,
+           ...){
+
+    ## maintain x names and 'toFrame'
+    xdat <- toFrame(xdat)
+
+    ## maintain y names and 'toFrame'
+    ydat <- toFrame(ydat)
+
+    ## first grab dummy args for bandwidth() and perform 'bootstrap'
+    ## bandwidth() call
+
+    mc.names <- names(match.call(expand.dots = FALSE))
+    margs <- c("bwmethod", "bwscaling", "bwtype", "cxkertype", "cxkerorder",
+               "cykertype", "cykerorder", "uxkertype", "uykertype", "oxkertype",
+               "oykertype")
+
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
+
+    tbw <- eval(parse(text=paste("condbandwidth(",
+                        "xbw = bws[length(ydat)+1:length(xdat)],",
+                        "ybw = bws[1:length(ydat)],",
+                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
+                        ifelse(any.m, ",",""),
+                        "nobs = nrow(xdat),",
+                        "xdati = untangle(xdat),",
+                        "ydati = untangle(ydat),",
+                        "xnames = names(xdat),",
+                        "ynames = names(ydat),",
+                        "bandwidth.compute = bandwidth.compute)")))
+                        
+    ## next grab dummies for actual bandwidth selection and perform call
+
+    mc.names <- names(match.call(expand.dots = FALSE))
+    margs <- c("gydat", "bandwidth.compute", "fast", "auto", "nmulti", "remin", "itmax", "fast.cdf", "do.full.integral", "ngrid", "ftol",
+               "tol", "small")
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
+
+    tbw <- eval(parse(text=paste("npcdistbw.condbandwidth(xdat=xdat, ydat=ydat, bws=tbw",
+                        ifelse(any.m, ",",""),
+                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
+                        ")")))
+
+    mc <- match.call(expand.dots = FALSE)
+    environment(mc) <- parent.frame()
+    tbw$call <- mc
+
+    return(tbw)
+  }
+

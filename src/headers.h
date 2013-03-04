@@ -49,6 +49,8 @@ double cv_func_con_density_categorical_ml(double *vector_scale_factor);
 double cv_func_density_categorical_ls(double *vector_scale_factor);
 double cv_func_density_categorical_ml(double *vector_scale_factor);
 
+double cv_func_con_distribution_categorical_ls(double *vector_scale_factor);
+
 double cv_func_distribution_categorical_ls(double *vector_scale_factor);
 /* double cv_func_np_density_categorical_ml(double *vector_scale_factor); */
 double cv_func_regression_categorical_ls(double *vector_scale_factor);
@@ -198,6 +200,8 @@ int np_kernel_estimate_con_density_categorical_convolution_cv(int KERNEL_den, in
 double np_cv_func_con_density_categorical_ls(double *vector_scale_factor);
 
 double np_kernel_estimate_distribution_ls_cv(int KERNEL_den,int KERNEL_den_unordered,int KERNEL_den_ordered,int BANDWIDTH_den,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous, int fast,double ** matrix_X_unordered_train,double ** matrix_X_ordered_train,double ** matrix_X_continuous_train,double ** matrix_X_unordered_eval,double ** matrix_X_ordered_eval,double ** matrix_X_continuous_eval,double * vsf,int * num_categories,double ** matrix_categorical_vals,double * cv);
+
+int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERNEL_den,int KERNEL_unordered_den,int KERNEL_ordered_den,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_den,int num_obs,int num_obs_eval,int num_var_unordered,int num_var_ordered,int num_var_continuous,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,int fast,double **matrix_Y_unordered_train,double **matrix_Y_ordered_train,double **matrix_Y_continuous_train,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_Y_unordered_eval,double **matrix_Y_ordered_eval,double **matrix_Y_continuous_eval,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *cv);
 
 // some general np and R-c interface related defines
 #define safe_free(x) if((x) != NULL) free((x))
@@ -354,6 +358,41 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 
 #define CBW_MINOBS 1024
 
+// ccdf defines
+#define CDBW_NOBSI   0
+#define CDBW_NEVALI  1
+#define CDBW_IMULTII 2
+#define CDBW_NMULTII 3
+#define CDBW_USTARTI 4
+#define CDBW_LSFI    5
+#define CDBW_DENI  6
+#define CDBW_ITMAXI  7
+#define CDBW_REMINI  8
+#define CDBW_MINIOI  9
+#define CDBW_MI    10
+#define CDBW_CXKRNEVI 11
+#define CDBW_CYKRNEVI 12
+#define CDBW_UXKRNEVI 13
+#define CDBW_UYKRNEVI 14
+#define CDBW_OXKRNEVI 15
+#define CDBW_OYKRNEVI 16
+#define CDBW_CNUNOI 17
+#define CDBW_CNORDI 18
+#define CDBW_CNCONI 19
+#define CDBW_UNUNOI 20
+#define CDBW_UNORDI 21
+#define CDBW_UNCONI 22
+#define CDBW_AUTOI 23
+#define CDBW_FASTI 24
+#define CDBW_CDFONTRAIN 25
+
+#define CDBW_FTOLD  0
+#define CDBW_TOLD   1
+#define CDBW_SMALLD 2
+
+#define CDBWM_CVLS 0
+
+//
 #define CD_TNOBSI 0
 #define CD_ENOBSI   1
 #define CD_LSFI    2
