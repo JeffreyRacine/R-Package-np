@@ -14,7 +14,8 @@ Data Types}
   distribution estimator defined over mixed continuous and discrete
   (unordered, ordered) data using either the normal-reference
   rule-of-thumb, likelihood cross-validation, or least-squares cross
-  validation using the method of Li, Lin and Racine (2013).
+  validation using the method of Li and Racine (2008) and Li, Lin and
+  Racine (2013).
 }
 
 \usage{
@@ -364,6 +365,11 @@ npcdistbw(\dots)
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
   and Practice,} Princeton University Press.
 
+  Li, Q. and J.S. Racine (2008), \dQuote{Nonparametric estimation of
+  conditional CDF and quantile functions with mixed categorical and
+  continuous data,} Journal of Business and Economic Statistics, 26,
+  423-434.
+  
   Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
   Selection for Nonparametric Conditional Distribution and Quantile
   Functions}, Journal of Business and Economic Statistics, 31, 57-65.

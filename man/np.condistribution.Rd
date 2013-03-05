@@ -9,14 +9,14 @@
 \title{Kernel Conditional Distribution Estimation with Mixed Data Types}
 
 \description{
-
   \code{npcdist} computes kernel cumulative conditional distribution
   estimates on \eqn{p+q}-variate evaluation data, given a set of
   training data (both explanatory and dependent) and a bandwidth
   specification (a \code{condbandwidth} object or a bandwidth vector,
-  bandwidth type, and kernel type) using the method of Li, Lin, and
-  Racine (2013).  The data may be continuous, discrete (unordered and
-  ordered factors), or some combination thereof.  }
+  bandwidth type, and kernel type) using the method of Li and Racine
+  (2008) and Li, Lin, and Racine (2013).  The data may be continuous,
+  discrete (unordered and ordered factors), or some combination thereof.
+  }
 
 \usage{
 npcdist(bws, \dots)
@@ -179,6 +179,11 @@ npcdist(bws, \dots)
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
     and Practice,} Princeton University Press.
 
+  Li, Q. and J.S. Racine (2008), \dQuote{Nonparametric estimation of
+  conditional CDF and quantile functions with mixed categorical and
+  continuous data,} Journal of Business and Economic Statistics, 26,
+  423-434.
+  
   Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
   Selection for Nonparametric Conditional Distribution and Quantile
   Functions}, Journal of Business and Economic Statistics, 31, 57-65.

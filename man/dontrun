@@ -9,11 +9,15 @@ sed -i bak -f sed_dontrun.scr gradients.Rd
 sed -i bak -f sed_dontrun.scr np-package.Rd
 sed -i bak -f sed_dontrun.scr np.cmstest.Rd
 sed -i bak -f sed_dontrun.scr np.condensity.Rd
+sed -i bak -f sed_dontrun.scr np.condistribution.Rd
 sed -i bak -f sed_dontrun.scr np.condensity.bw.Rd
+sed -i bak -f sed_dontrun.scr np.condistribution.bw.Rd
 sed -i bak -f sed_dontrun.scr np.conmode.Rd
 sed -i bak -f sed_dontrun.scr np.deneqtest.Rd
 sed -i bak -f sed_dontrun.scr np.density.Rd
+sed -i bak -f sed_dontrun.scr np.distribution.Rd
 sed -i bak -f sed_dontrun.scr np.density.bw.Rd
+sed -i bak -f sed_dontrun.scr np.distribution.bw.Rd
 sed -i bak -f sed_dontrun.scr np.deptest.Rd
 sed -i bak -f sed_dontrun.scr np.kernelsum.Rd
 sed -i bak -f sed_dontrun.scr np.plot.Rd
