@@ -1,33 +1,31 @@
-% $Id: np.condensity.Rd,v 1.67 2006/11/03 21:19:03 tristen Exp $
-\name{npcdens}
-\alias{npcdens}
-\alias{npcdens.call}
-\alias{npcdens.conbandwidth}
-\alias{npcdens.default}
-\alias{npcdens.formula}
+% $Id: np.condistity.Rd,v 1.67 2006/11/03 21:19:03 tristen Exp $
+\name{npcdist}
 \alias{npcdist}
-\title{Kernel Conditional Density and Distribution Estimates with Mixed Data Types}
+\alias{npcdist.call}
+\alias{npcdist.conbandwidth}
+\alias{npcdist.default}
+\alias{npcdist.formula}
+
+\title{Kernel Conditional Distribution Estimation with Mixed Data Types}
 
 \description{
-  \code{npcdens} computes kernel conditional density estimates on
-  \eqn{p+q}-variate evaluation data, given a set of training data (both
-  explanatory and dependent) and a bandwidth specification (a
-  \code{conbandwidth} object or a bandwidth vector, bandwidth type, and
-  kernel type) using the method of Hall, Racine, and Li (2004).
-  Similarly \code{npcdist} computes kernel
-  conditional cumulative distribution estimates.
-  The data may be continuous, discrete (unordered and ordered
-  factors), or some combination thereof. 
-}
+
+  \code{npcdist} computes kernel cumulative conditional distribution
+  estimates on \eqn{p+q}-variate evaluation data, given a set of
+  training data (both explanatory and dependent) and a bandwidth
+  specification (a \code{conbandwidth} object or a bandwidth vector,
+  bandwidth type, and kernel type) using the method of Li, Lin, and
+  Racine (2013).  The data may be continuous, discrete (unordered and
+  ordered factors), or some combination thereof.  }
 
 \usage{
-npcdens(bws, \dots)
+npcdist(bws, \dots)
 
-\method{npcdens}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npcdist}{formula}(bws, data = NULL, newdata = NULL, \dots)
 
-\method{npcdens}{call}(bws, \dots)
+\method{npcdist}{call}(bws, \dots)
 
-\method{npcdens}{conbandwidth}(bws,
+\method{npcdist}{conbandwidth}(bws,
         txdat = stop("invoked without training data 'txdat'"),
         tydat = stop("invoked without training data 'tydat'"),
         exdat,
@@ -35,14 +33,14 @@ npcdens(bws, \dots)
         gradients = FALSE,
         \dots)
 
-\method{npcdens}{default}(bws, txdat, tydat, \dots)
+\method{npcdist}{default}(bws, txdat, tydat, \dots)
 
 }
 
 \arguments{
   \item{bws}{
     a bandwidth specification. This can be set as a \code{conbandwidth}
-    object returned from a previous invocation of \code{\link{npcdensbw}}, or
+    object returned from a previous invocation of \code{\link{npcdistbw}}, or
     as a \eqn{p+q}-vector 
     of bandwidths, with each element \eqn{i} up to \eqn{i=p}
     corresponding to the bandwidth for column \eqn{i} in \code{txdat}, 
@@ -68,7 +66,7 @@ npcdens(bws, \dots)
     \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
     \code{cykertype}, \code{cykerorder}, \code{uxkertype},
     \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
-    in \code{\link{npcdensbw}}. 
+    in \code{\link{npcdistbw}}. 
 
   }
   
@@ -77,7 +75,7 @@ npcdens(bws, \dots)
     coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
     in the model. If not found in data, the variables are taken from
     \code{environment(bws)}, typically the environment from which
-   \code{\link{npcdensbw}} was called.
+   \code{\link{npcdistbw}} was called.
   }
 
   \item{newdata}{
@@ -112,12 +110,12 @@ npcdens(bws, \dots)
 
 }
 \details{
-  \code{npcdens} and \code{\link{npcdist}} implement a
-  variety of methods for estimating multivariate conditional
-  distributions (\eqn{p+q}-variate) defined over a set of possibly
-  continuous and/or discrete (unordered, ordered) data. The approach is
-  based on Li and Racine (2004) who employ \sQuote{generalized product
-    kernels} that admit a mix of continuous and discrete data types.
+  \code{npcdist} implements a variety of methods for estimating
+  multivariate conditional cumulative distributions (\eqn{p+q}-variate)
+  defined over a set of possibly continuous and/or discrete (unordered,
+  ordered) data. The approach is based on Li and Racine (2004) who
+  employ \sQuote{generalized product kernels} that admit a mix of
+  continuous and discrete data types.
 
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
@@ -143,8 +141,7 @@ npcdens(bws, \dots)
 
 }
 \value{
-  \code{npcdens} returns a \code{condensity} object, similarly
-  \code{\link{npcdist}} returns a \code{condistribution} object. The generic
+  \code{npcdist} returns a \code{condistribution} object. The generic
   accessor functions \code{\link{fitted}}, \code{\link{se}}, and
   \code{\link{gradients}}, extract estimated values, asymptotic standard
   errors on estimates, and gradients, respectively, from
@@ -159,8 +156,8 @@ npcdens(bws, \dots)
     dependent data, \code{tydat} }
   \item{xeval}{ the evaluation points of the explanatory data }
   \item{yeval}{ the evaluation points of the dependent data }
-  \item{condens or condist}{ estimates of the conditional density (cumulative
-    distribution) at the evaluation points }
+  \item{condist}{ estimates of the conditional cumulative
+    distribution at the evaluation points }
   \item{conderr}{ standard errors of the conditional density (cumulative distribution)
     estimates }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
@@ -181,7 +178,11 @@ npcdens(bws, \dots)
   American Statistical Association, 99, 1015-1026.
 
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
-  and Practice,} Princeton University Press.
+    and Practice,} Princeton University Press.
+
+  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
+  Selection for Nonparametric Conditional Distribution and Quantile
+  Functions}, Journal of Business and Economic Statistics, 31, 57-65.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
   University Press. 
@@ -225,14 +226,14 @@ attach(Italy)
 # First, compute the bandwidths... note that this may take a minute or
 # two depending on the speed of your computer. 
 
-bw <- npcdensbw(formula=gdp~ordered(year))
+bw <- npcdistbw(formula=gdp~ordered(year))
 
-# Next, compute the condensity object...
+# Next, compute the condistity object...
 
-fhat <- npcdens(bws=bw)
+fhat <- npcdist(bws=bw)
 
 # The object fhat now contains results such as the estimated conditional
-# density function (fhat$condens) and so on...
+# density function (fhat$condist) and so on...
 
 summary(fhat)
 
@@ -243,12 +244,6 @@ summary(fhat)
 # systems).
 
 plot(bw)
-
-# To plot the conditional distribution we use cdf=TRUE in plot
-# (<ctrl>-C will interrupt on *NIX systems, <esc> will interrupt on MS
-# Windows systems)
-
-plot(bw, cdf=TRUE)
 
 detach(Italy)
 
@@ -272,14 +267,14 @@ attach(Italy)
 X <- data.frame(year=ordered(year))
 y <- data.frame(gdp)
 
-bw <- npcdensbw(xdat=X, ydat=y)
+bw <- npcdistbw(xdat=X, ydat=y)
 
-# Next, compute the condensity object...
+# Next, compute the condistity object...
 
-fhat <- npcdens(bws=bw)
+fhat <- npcdist(bws=bw)
 
 # The object fhat now contains results such as the estimated conditional
-# density function (fhat$condens) and so on...
+# density function (fhat$condist) and so on...
 
 summary(fhat)
 
@@ -287,12 +282,6 @@ summary(fhat)
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows systems).
 
 plot(bw)
-
-# To plot the conditional distribution we use cdf=TRUE in plot
-# (<ctrl>-C will interrupt on *NIX systems, <esc> will interrupt on MS
-# Windows systems)
-
-plot(bw, cdf=TRUE)
 
 detach(Italy)
 
@@ -307,7 +296,7 @@ attach(faithful)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npcdensbw(formula=eruptions~waiting)
+bw <- npcdistbw(formula=eruptions~waiting)
 
 summary(bw)
 
@@ -315,11 +304,6 @@ summary(bw)
 # <esc> will interrupt on MS Windows systems).
 
 plot(bw)
-
-# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt on
-# *NIX systems, <esc> will interrupt on MS Windows systems)
-
-plot(bw, cdf=TRUE)
 
 detach(faithful)
 
@@ -342,7 +326,7 @@ attach(faithful)
 X <- data.frame(waiting)
 y <- data.frame(eruptions)
 
-bw <- npcdensbw(xdat=X, ydat=y)
+bw <- npcdistbw(xdat=X, ydat=y)
 
 summary(bw)
 
@@ -350,11 +334,6 @@ summary(bw)
 # <esc> will interrupt on MS Windows systems)
 
 plot(bw)
-
-# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt on
-# *NIX systems, <esc> will interrupt on MS Windows systems)
-
-plot(bw, cdf=TRUE)
 
 detach(faithful)
 
@@ -384,7 +363,7 @@ y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
 # Generate data-driven bandwidths (likelihood cross-validation). Note -
 # this may take a few minutes depending on the speed of your computer...
 
-bw <- npcdensbw(formula=factor(y)~x1+x2)
+bw <- npcdistbw(formula=factor(y)~x1+x2)
 
 # Next, create the evaluation data in order to generate a perspective
 # plot
@@ -398,7 +377,7 @@ data.eval <- data.frame(y=factor(rep(1, nrow(X.eval))),x1=X.eval[,1],x2=X.eval[,
 # Now evaluate the conditional probability for y=1 and for the
 # evaluation Xs
 
-fit <- fitted(npcdens(bws=bw,newdata=data.eval))
+fit <- fitted(npcdist(bws=bw,newdata=data.eval))
 
 # Finally, coerce the data into a matrix for plotting with persp()
 
@@ -449,7 +428,7 @@ X <- cbind(x1, x2)
 # Generate data-driven bandwidths (likelihood cross-validation). Note -
 # this may take a few minutes depending on the speed of your computer...
 
-bw <- npcdensbw(xdat=X, ydat=factor(y))
+bw <- npcdistbw(xdat=X, ydat=factor(y))
 
 # Next, create the evaluation data in order to generate a perspective
 # plot
@@ -461,7 +440,7 @@ X.eval <- expand.grid(x1=x1.seq,x2=x2.seq)
 # Now evaluate the conditional probability for y=1 and for the
 # evaluation Xs
 
-fit <- fitted(npcdens(exdat=X.eval, 
+fit <- fitted(npcdist(exdat=X.eval, 
                eydat=factor(rep(1, nrow(X.eval))), 
                bws=bw))
 

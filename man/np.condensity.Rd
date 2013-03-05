@@ -5,8 +5,7 @@
 \alias{npcdens.conbandwidth}
 \alias{npcdens.default}
 \alias{npcdens.formula}
-\alias{npcdist}
-\title{Kernel Conditional Density and Distribution Estimates with Mixed Data Types}
+\title{Kernel Conditional Density Estimation with Mixed Data Types}
 
 \description{
   \code{npcdens} computes kernel conditional density estimates on
@@ -14,8 +13,6 @@
   explanatory and dependent) and a bandwidth specification (a
   \code{conbandwidth} object or a bandwidth vector, bandwidth type, and
   kernel type) using the method of Hall, Racine, and Li (2004).
-  Similarly \code{npcdist} computes kernel
-  conditional cumulative distribution estimates.
   The data may be continuous, discrete (unordered and ordered
   factors), or some combination thereof. 
 }
@@ -112,12 +109,12 @@ npcdens(bws, \dots)
 
 }
 \details{
-  \code{npcdens} and \code{\link{npcdist}} implement a
-  variety of methods for estimating multivariate conditional
-  distributions (\eqn{p+q}-variate) defined over a set of possibly
-  continuous and/or discrete (unordered, ordered) data. The approach is
-  based on Li and Racine (2004) who employ \sQuote{generalized product
-    kernels} that admit a mix of continuous and discrete data types.
+  \code{npcdens} implements a variety of methods for estimating
+  multivariate conditional distributions (\eqn{p+q}-variate) defined
+  over a set of possibly continuous and/or discrete (unordered, ordered)
+  data. The approach is based on Li and Racine (2004) who employ
+  \sQuote{generalized product kernels} that admit a mix of continuous
+  and discrete data types.
 
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
@@ -143,15 +140,14 @@ npcdens(bws, \dots)
 
 }
 \value{
-  \code{npcdens} returns a \code{condensity} object, similarly
-  \code{\link{npcdist}} returns a \code{condistribution} object. The generic
+
+  \code{npcdens} returns a \code{condensity} object. The generic
   accessor functions \code{\link{fitted}}, \code{\link{se}}, and
   \code{\link{gradients}}, extract estimated values, asymptotic standard
-  errors on estimates, and gradients, respectively, from
-  the returned object. Furthermore, the functions \code{\link{predict}},
-  \code{\link{summary}}
-  and \code{\link{plot}} support objects of both classes. The returned objects
-  have the following components:
+  errors on estimates, and gradients, respectively, from the returned
+  object. Furthermore, the functions \code{\link{predict}},
+  \code{\link{summary}} and \code{\link{plot}} support objects of both
+  classes. The returned objects have the following components:
 
   \item{xbw}{ bandwidth(s), scale factor(s) or nearest neighbours for the
     explanatory data, \code{txdat} }
@@ -159,9 +155,9 @@ npcdens(bws, \dots)
     dependent data, \code{tydat} }
   \item{xeval}{ the evaluation points of the explanatory data }
   \item{yeval}{ the evaluation points of the dependent data }
-  \item{condens or condist}{ estimates of the conditional density (cumulative
-    distribution) at the evaluation points }
-  \item{conderr}{ standard errors of the conditional density (cumulative distribution)
+  \item{condens}{ estimates of the conditional density at the evaluation
+    points }
+  \item{conderr}{ standard errors of the conditional density
     estimates }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
     the gradients at the evaluation points }
@@ -244,12 +240,6 @@ summary(fhat)
 
 plot(bw)
 
-# To plot the conditional distribution we use cdf=TRUE in plot
-# (<ctrl>-C will interrupt on *NIX systems, <esc> will interrupt on MS
-# Windows systems)
-
-plot(bw, cdf=TRUE)
-
 detach(Italy)
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
@@ -288,17 +278,11 @@ summary(fhat)
 
 plot(bw)
 
-# To plot the conditional distribution we use cdf=TRUE in plot
-# (<ctrl>-C will interrupt on *NIX systems, <esc> will interrupt on MS
-# Windows systems)
-
-plot(bw, cdf=TRUE)
-
 detach(Italy)
 
 # EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
-# conditional density and conditional distribution functions.
+# conditional density function.
 
 library("datasets")
 data("faithful")
@@ -316,16 +300,11 @@ summary(bw)
 
 plot(bw)
 
-# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt on
-# *NIX systems, <esc> will interrupt on MS Windows systems)
-
-plot(bw, cdf=TRUE)
-
 detach(faithful)
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
-# conditional density and conditional distribution functions.
+# conditional density function.
 
 library("datasets")
 data("faithful")
@@ -350,11 +329,6 @@ summary(bw)
 # <esc> will interrupt on MS Windows systems)
 
 plot(bw)
-
-# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt on
-# *NIX systems, <esc> will interrupt on MS Windows systems)
-
-plot(bw, cdf=TRUE)
 
 detach(faithful)
 
