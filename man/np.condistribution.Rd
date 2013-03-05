@@ -2,7 +2,7 @@
 \name{npcdist}
 \alias{npcdist}
 \alias{npcdist.call}
-\alias{npcdist.conbandwidth}
+\alias{npcdist.condbandwidth}
 \alias{npcdist.default}
 \alias{npcdist.formula}
 
@@ -13,7 +13,7 @@
   \code{npcdist} computes kernel cumulative conditional distribution
   estimates on \eqn{p+q}-variate evaluation data, given a set of
   training data (both explanatory and dependent) and a bandwidth
-  specification (a \code{conbandwidth} object or a bandwidth vector,
+  specification (a \code{condbandwidth} object or a bandwidth vector,
   bandwidth type, and kernel type) using the method of Li, Lin, and
   Racine (2013).  The data may be continuous, discrete (unordered and
   ordered factors), or some combination thereof.  }
@@ -25,7 +25,7 @@ npcdist(bws, \dots)
 
 \method{npcdist}{call}(bws, \dots)
 
-\method{npcdist}{conbandwidth}(bws,
+\method{npcdist}{condbandwidth}(bws,
         txdat = stop("invoked without training data 'txdat'"),
         tydat = stop("invoked without training data 'tydat'"),
         exdat,
@@ -39,17 +39,16 @@ npcdist(bws, \dots)
 
 \arguments{
   \item{bws}{
-    a bandwidth specification. This can be set as a \code{conbandwidth}
-    object returned from a previous invocation of \code{\link{npcdistbw}}, or
-    as a \eqn{p+q}-vector 
-    of bandwidths, with each element \eqn{i} up to \eqn{i=p}
-    corresponding to the bandwidth for column \eqn{i} in \code{txdat}, 
-    and each element \eqn{i} from \eqn{i=p+1} to \eqn{i=p+q}
-    corresponding to the bandwidth for column \eqn{i-p} in
-    \code{tydat}. If specified as a vector, then
-    additional arguments will need to be supplied as necessary to
-    specify the bandwidth type, kernel types, training data, and so
-    on. 
+    a bandwidth specification. This can be set as a \code{condbandwidth}
+    object returned from a previous invocation of
+    \code{\link{npcdistbw}}, or as a \eqn{p+q}-vector of bandwidths,
+    with each element \eqn{i} up to \eqn{i=p} corresponding to the
+    bandwidth for column \eqn{i} in \code{txdat}, and each element
+    \eqn{i} from \eqn{i=p+1} to \eqn{i=p+q} corresponding to the
+    bandwidth for column \eqn{i-p} in \code{tydat}. If specified as a
+    vector, then additional arguments will need to be supplied as
+    necessary to specify the bandwidth type, kernel types, training
+    data, and so on.
   }
 
   \item{gradients}{
@@ -60,7 +59,7 @@ npcdist(bws, \dots)
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, and so on.  This is necessary if you
-    specify bws as a \eqn{p+q}-vector and not a \code{conbandwidth}
+    specify bws as a \eqn{p+q}-vector and not a \code{condbandwidth}
     object, and you do not desire the default behaviours. To do this,
     you may specify any of \code{bwmethod}, \code{bwscaling},
     \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
@@ -71,12 +70,12 @@ npcdist(bws, \dots)
   }
   
   \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(bws)}, typically the environment from which
-   \code{\link{npcdistbw}} was called.
-  }
+    an optional data frame, list or environment (or object coercible to
+    a data frame by \code{\link{as.data.frame}}) containing the
+    variables in the model. If not found in data, the variables are
+    taken from \code{environment(bws)}, typically the environment from
+    which \code{\link{npcdistbw}} was called.
+ }
 
   \item{newdata}{
     An optional data frame in which to look for evaluation data. If

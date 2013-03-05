@@ -2,7 +2,7 @@
 \name{npqreg}
 \alias{npqreg}
 \alias{npqreg.call}
-\alias{npqreg.conbandwidth}
+\alias{npqreg.condbandwidth}
 \alias{npqreg.default}
 \alias{npqreg.formula}
 \title{Kernel Quantile Regression with Mixed Data Types}
@@ -12,9 +12,9 @@
   (1) dimensional dependent variable on \eqn{p}-variate explanatory
   data, given a set of evaluation points, training points (consisting of
   explanatory data and dependent data), and a bandwidth specification
-  using the method of Li and Racine (2008). A bandwidth specification
-  can be a \code{conbandwidth} object, or a bandwidth vector, bandwidth
-  type and kernel type.
+  using the methods of Li and Racine (2008) and Li, Lin and Racine
+  (2013). A bandwidth specification can be a \code{condbandwidth} object,
+  or a bandwidth vector, bandwidth type and kernel type.
 }
 
 \usage{
@@ -24,7 +24,7 @@ npqreg(bws, \dots)
 
 \method{npqreg}{call}(bws, \dots)
 
-\method{npqreg}{conbandwidth}(bws,
+\method{npqreg}{condbandwidth}(bws,
        txdat = stop("training data 'txdat' missing"),
        tydat = stop("training data 'tydat' missing"),
        exdat,
@@ -42,8 +42,8 @@ npqreg(bws, \dots)
 
 \arguments{
   \item{bws}{
-    a bandwidth specification. This can be set as a \code{conbandwidth}
-    object returned from an invocation of \code{\link{npcdensbw}}, or
+    a bandwidth specification. This can be set as a \code{condbandwidth}
+    object returned from an invocation of \code{\link{npcdistbw}}, or
     as a vector of bandwidths, with each element \eqn{i} corresponding
     to the bandwidth for column \eqn{i} in \code{txdat}. If specified as
     a vector, then additional arguments will need to be supplied as
@@ -63,7 +63,7 @@ npqreg(bws, \dots)
     \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
     \code{cykertype}, \code{cykerorder}, \code{uxkertype},
     \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
-    in \code{\link{npcdensbw}}. 
+    in \code{\link{npcdistbw}}. 
   }
 
   \item{data}{
@@ -71,7 +71,7 @@ npqreg(bws, \dots)
     coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
     in the model. If not found in data, the variables are taken from
     \code{environment(bws)}, typically the environment from which
-    \code{\link{npcdensbw}} was called.
+    \code{\link{npcdistbw}} was called.
   }
 
   \item{newdata}{
@@ -152,9 +152,9 @@ npqreg(bws, \dots)
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
 
-  Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation and the
-    estimation of conditional probability densities,} Journal of the
-  American Statistical Association, 99, 1015-1026.
+  Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation
+    and the estimation of conditional probability densities,} Journal of
+    the American Statistical Association, 99, 1015-1026.
 
   Koenker, R. W. and G.W. Bassett (1978), \dQuote{Regression
   quantiles,} Econometrica, 46, 33-50.
@@ -170,6 +170,10 @@ npqreg(bws, \dots)
   continuous data,} Journal of Business and Economic Statistics, 26,
   423-434.
   
+  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
+  Selection for Nonparametric Conditional Distribution and Quantile
+  Functions}, Journal of Business and Economic Statistics, 31, 57-65.
+
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
     estimators for discrete distributions,} Biometrika, 68, 301-309.
 }
@@ -200,7 +204,7 @@ attach(Italy)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npcdensbw(formula=gdp~ordered(year))
+bw <- npcdistbw(formula=gdp~ordered(year))
 
 # Note - numerical search for computing the quantiles will take a
 # minute or so...
@@ -239,7 +243,7 @@ data <- data.frame(ordered(year), gdp)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npcdensbw(xdat=ordered(year), ydat=gdp)
+bw <- npcdistbw(xdat=ordered(year), ydat=gdp)
 
 # Note - numerical search for computing the quantiles will take a
 # minute or so...
