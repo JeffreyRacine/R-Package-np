@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.78 2012/11/13 06:17:21 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.79 2013/03/06 18:36:31 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -49,7 +49,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.40-13. Kindly update your version should you not be using the most
+is 0.50-1. Kindly update your version should you not be using the most
 current (from within R, {\tt update.packages()} ought to do it, though
 also see \ref{update} below.). See the appendix in this file for
 cumulative changes between this and previous versions of the \texttt{np}
@@ -1516,6 +1516,73 @@ lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
 
 \appendix
 
+\section*{Changes from Version 0.40-13 to 0.50-1 [06-Mar-2013]}
+
+\begin{itemize}
+
+\item The functions \texttt{npudist()} and \texttt{npudistbw()} now
+  uncoupled from \texttt{npudens()} and \texttt{npudensbw()}
+  (previously they relied on unconditional PDF bandwidths due to the
+  lack of a multivariate mixed-data method for selecting bandwidths
+  for CDFs - now with Li \& Racine (2013) we have a robust method
+  hence the split)
+
+\item The use of \texttt{cdf=TRUE} is deprecated for
+  \texttt{npudens()} and \texttt{npudensbw()} objects due to the
+  uncoupling described above
+
+\item Fixed glitch in gradient standard errors in npindex where
+  identical standard errors were output in \texttt{model\$gerr}
+
+\item Fixed glitch in npksum where use of
+  \texttt{bwtype="adaptive\_nn"} and \texttt{operator="integral"}
+  produced the survivor function rather than the cumulative
+  distribution function
+
+\item Cleaned up internals for \texttt{npcmstest()}
+
+\item Using .onUnload rather than .Last.lib in zzz.R
+
+\item Fixed glitch in \texttt{npreg()} summary where `Residual
+  standard error' was reporting residual variance
+
+\item \texttt{npksum()} functionality extended
+
+\begin{itemize}
+
+\item \texttt{npksum()} can now return the matrix of kernel weights
+  (which can be useful for constrained estimation, by way of
+  illustration, or constructing novel kernel-based procedures without
+  the need to write extensive code)
+
+\item \texttt{npksum()} can now accept different operators on a
+  product kernel, for example,
+\begin{verbatim}
+  npksum(txdat=data.frame(x1,x2),operator=c("derivative","normal"),bws=c(1,1))
+\end{verbatim}
+  will use the derivative kernel for x1 (i.e. the derivative of the
+  gaussian kernel) and the default kernel for x2 (i.e. a standard
+  kernel such as the gaussian) thereby allowing the user to program a
+  number of estimators such as conditional CDFs etc. that were
+  previously not available via \texttt{npksum()}
+
+\end{itemize}
+
+\item Fixed glitch with variable scope where certain objects could not be
+  found in the environment
+
+\item Added function \texttt{npcopula()} for d-dimensional copula
+  estimation via inversion
+
+\item Modified stopping rules in \texttt{npregiv()} and
+  \texttt{npregivderiv()}
+
+\item Added reference to R2 measure (Doksum and Samarov (1995))
+
+\item Startup message points to the faq, faq is now a vignette
+
+\end{itemize}
+
 \section*{Changes from Version 0.40-12 to 0.40-13 [05-Mar-2012]}
 
 \begin{itemize}
@@ -1605,10 +1672,10 @@ lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
 
 \item Added a new function {\tt npregiv} that conducts nonparametric
   instrumental regression a la Darolles, Fan, Florens and Renault
-  (2011, forthcoming, Econometrica) and Horowitz (2011,
-  Econometrica). Note that this function currently returns the fitted
-  $\varphi(z)$ (i.e.\ lacks much functionality relative to other {\tt
-    np} functions) and is in `beta status' until further notice.
+  (2011, Econometrica) and Horowitz (2011, Econometrica). Note that
+  this function currently returns the fitted $\varphi(z)$ (i.e.\ lacks
+  much functionality relative to other {\tt np} functions) and is in
+  `beta status' until further notice.
 
 \item Added a new dataset {\tt Engel95} that allows one to estimate
   Engel curves using the new nonparametric instrumental regression

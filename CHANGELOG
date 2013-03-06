@@ -1,11 +1,4 @@
-Changes from Version 0.40-13 to 0.40-14 [XXX]
-
-* Fixed glitch in gradient standard errors in npindex where identical
-  standard errors were output in model$gerr 
-
-* Fixed glitch in npksum where use of bwtype="adaptive_nn" and
-  operator="integral" produced the survivor function rather than
-  the cumulative distribution function
+Changes from Version 0.40-13 to 0.50-1 [XXX]
 
 * The functions npudist and npudistbw now uncoupled from npudens
   and npudensbw (previously they relied on unconditional PDF bandwidths
@@ -13,8 +6,15 @@ Changes from Version 0.40-13 to 0.40-14 [XXX]
   for CDFs - now with Li & Racine (2013) we have a robust method hence the
   split)
 
-* The use of cdf=TRUE is deprecated for npudens and npudensbw objects due
-  to the uncoupling described above
+* The use of cdf=TRUE is deprecated for npudens and
+  npudensbw objects due to the uncoupling described above
+
+* Fixed glitch in gradient standard errors in npindex where identical
+  standard errors were output in model$gerr
+
+* Fixed glitch in npksum where use of bwtype="adaptive_nn" and
+  operator="integral" produced the survivor function rather than
+  the cumulative distribution function
 
 * Cleaned up internals for npcmstest
 
