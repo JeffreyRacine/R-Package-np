@@ -95,7 +95,7 @@ npconmode(bws, \dots)
   \item{conmode}{ a vector of type \code{factor} (or \code{ordered
       factor}) containing the conditional mode at each evaluation
     point}
-  \item{condens}{ a vector of numeric type containing the density
+  \item{condens}{ a vector of numeric type containing the modal density
     estimates at each evaluation point}
   \item{xeval}{ a data frame of evaluation points }
   \item{yeval}{ a vector of type \code{factor} (or \code{ordered
