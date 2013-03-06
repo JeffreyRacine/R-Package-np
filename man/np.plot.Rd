@@ -60,7 +60,6 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        xtrim = 0.0,
        ytrim = 0.0,
        neval = 50,
-       quantreg = FALSE,
        gradients = FALSE,
        common.scale = TRUE,
        perspective = TRUE,
@@ -307,12 +306,6 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   \item{perspective}{
     a logical value specifying whether a perspective plot should be
     displayed (if possible). Defaults to \code{TRUE}.
-  }
-
-  \item{quantreg}{
-    a logical value specifying whether a quantile regression should be
-    plotted (\code{conbandwidth} objects only). See related parameter
-    'tau'. Defaults to \code{FALSE}.
   }
 
   \item{gradients}{

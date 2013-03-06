@@ -1,5 +1,9 @@
 Changes from Version 0.40-13 to 0.40-14 [XXX]
 
+* Fixed glitch in gradient standard errors in npindex where identical
+  standard errors were output in model$gerr and the covariance matrix was
+  not square/symmetric
+
 * Fixed glitch in npksum where use of bwtype="adaptive_nn" and
   operator="integral" produced the survivor function rather than
   the cumulative distribution function

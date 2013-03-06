@@ -29,6 +29,7 @@ npcdistbw(\dots)
 
 \method{npcdistbw}{condbandwidth}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),
+          gydat = NULL,
           bws,
           bandwidth.compute = TRUE,
           fast = FALSE,
@@ -36,6 +37,9 @@ npcdistbw(\dots)
           nmulti,
           remin = TRUE,
           itmax = 10000,
+          fast.cdf = TRUE,
+          do.full.integral = FALSE,
+          ngrid = 100,
           ftol = 1.19209e-07,
           tol = 1.49012e-08,
           small = 2.22045e-16,
@@ -43,6 +47,7 @@ npcdistbw(\dots)
 
 \method{npcdistbw}{default}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),
+          gydat,
           bws,
           bandwidth.compute = TRUE,
           fast,
@@ -50,6 +55,9 @@ npcdistbw(\dots)
           nmulti,
           remin,
           itmax,
+          fast.cdf,
+          do.full.integral,
+          ngrid,
           ftol,
           tol,
           small,
@@ -116,6 +124,12 @@ npcdistbw(\dots)
     a \eqn{q}-variate data frame of dependent data which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
     and ordered factors), or some combination thereof.
+  }
+
+  \item{gydat}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles for \code{ydat}).
   }
 
   \item{bws}{
@@ -261,6 +275,21 @@ npcdistbw(\dots)
   \item{itmax}{
     integer number of iterations before failure in the numerical
     optimization routine. Defaults to \code{10000}.
+  }
+
+  \item{fast.cdf}{
+    a logical value which when set as \code{TRUE} uses a computationally
+    efficient but potentially memory intensive computational algorithm.
+  }
+
+  \item{do.full.integral}{
+    a logical value which when set as \code{TRUE} evaluates the
+    moment-based integral on the entire sample.
+  }
+
+  \item{ngrid}{
+    integer number of grid points to use when computing the moment-based
+    integral. Defaults to \code{100}.
   }
 
   \item{ftol}{
