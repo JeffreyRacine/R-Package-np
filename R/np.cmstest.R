@@ -13,7 +13,7 @@ npcmstest <- function(formula,
                       ...) {
   
   pcall = paste(deparse(model$call),collapse="")
-  if(length(grep("x = TRUE", pcall)) == 0 | length(grep("y = TRUE", pcall)) == 0)
+  if(length(grep("x = (T|TRUE)[ ,)]", pcall)) == 0 | length(grep("y = (T|TRUE)[ ,)]", pcall)) == 0)
     stop(paste(sQuote("model")," is missing components ", sQuote("x"), " and ",
                sQuote("y"), ".\nTo fix this please invoke ", sQuote("lm"),
                " or ", sQuote("glm"),
