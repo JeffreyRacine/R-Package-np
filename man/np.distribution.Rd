@@ -195,8 +195,8 @@ npudist(bws, \dots)
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous,
 # compute bandwidths using likelihood cross-validation, then create a
-# grid of data on which the density will be evaluated for plotting
-# purposes.
+# grid of data on which the cumulative distribution will be evaluated
+# for plotting purposes.
 
 data("Italy")
 attach(Italy)
@@ -205,13 +205,13 @@ attach(Italy)
 
 bw <- npudistbw(formula=~ordered(year)+gdp)
 
-# At this stage you could use npudist() to do a variety of
-# things. Here we compute the npudist() object and place it in Fhat.
+# At this stage you could use npudist() to do a variety of things. Here
+# we compute the npudist() object and place it in Fhat.
 
 Fhat <- npudist(bws=bw)
 
 # Note that simply typing the name of the object returns some useful
-# information. For more info, one can call summary: 
+# information. For more info, one can call summary:
 
 summary(Fhat)
 
@@ -226,7 +226,8 @@ year.seq <- sort(unique(year))
 gdp.seq <- seq(1,36,length=50)
 data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
 
-# Generate the estimated density computed for the evaluation data
+# Generate the estimated cumulative distribution computed for the
+# evaluation data
 
 Fhat <- fitted(npudist(bws=bw, newdata=data.eval))
 
@@ -250,7 +251,7 @@ contour(as.integer(levels(year.seq)),
         f, 
         xlab="Year", 
         ylab="GDP", 
-        main = "Density Contour Plot", 
+        main = "Cumulative Distribution Contour Plot", 
         col=topo.colors(100))
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -269,8 +270,8 @@ detach(Italy)
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous,
 # compute bandwidths using likelihood cross-validation, then create a
-# grid of data on which the density will be evaluated for plotting
-# purposes.
+# grid of data on which the cumulative distribution will be evaluated
+# for plotting purposes.
 
 data("Italy")
 attach(Italy)
@@ -287,7 +288,7 @@ bw <- npudistbw(dat=data)
 Fhat <- npudist(bws=bw)
 
 # Note that simply typing the name of the object returns some useful
-# information. For more info, one can call summary: 
+# information. For more info, one can call summary:
 
 summary(Fhat)
 
@@ -300,7 +301,8 @@ year.seq <- sort(unique(year))
 gdp.seq <- seq(1,36,length=50)
 data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
 
-# Generate the estimated density computed for the evaluation data
+# Generate the estimated cumulative distribution computed for the
+# evaluation data
 
 Fhat <- fitted(npudist(edat = data.eval, bws=bw))
 
@@ -312,7 +314,8 @@ f <- matrix(Fhat, length(unique(year)), 50)
 # contour plot.
 
 persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
-      ticktype="detailed", ylab="GDP", xlab="Year", zlab="Density",
+      ticktype="detailed", ylab="GDP", xlab="Year",
+      zlab="Cumulative Distribution",
       theta=300, phi=50)
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -324,7 +327,7 @@ contour(as.integer(levels(year.seq)),
         f, 
         xlab="Year", 
         ylab="GDP", 
-        main = "Density Contour Plot", 
+        main = "Cumulative Distribution Contour Plot", 
         col=topo.colors(100))
 
 # Sleep for 5 seconds so that we can examine the output...
@@ -340,8 +343,7 @@ plot(bw)
 detach(Italy)
 
 # EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
-# faithful geyser data and compute the density and distribution
-# functions.
+# faithful geyser data and compute the cumulative distribution function.
 
 library("datasets")
 data("faithful")
@@ -354,22 +356,17 @@ bw <- npudistbw(formula=~eruptions+waiting)
 
 summary(bw)
 
-# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
-# <esc> will interrupt on MS Windows systems). Note that we use xtrim =
-# -0.2 to extend the plot outside the support of the data (i.e., extend
-# the tails of the estimate to meet the horizontal axis).
+# Plot the cumulative distribution function (<ctrl>-C will interrupt on
+# *NIX systems, <esc> will interrupt on MS Windows systems). Note that
+# we use xtrim = -0.2 to extend the plot outside the support of the data
+# (i.e., extend the tails of the estimate to meet the horizontal axis).
 
 plot(bw, xtrim=-0.2)
-
-# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt)
-
-plot(bw, cdf=TRUE)
 
 detach(faithful)
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
-# faithful geyser data and compute the density and distribution
-# functions.
+# faithful geyser data and compute the cumulative distribution function.
 
 library("datasets")
 data("faithful")
@@ -382,16 +379,12 @@ bw <- npudistbw(dat=faithful)
 
 summary(bw)
 
-# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
-# <esc> will interrupt on MS Windows systems). Note that we use xtrim =
-# -0.2 to extend the plot outside the support of the data (i.e., extend
-# the tails of the estimate to meet the horizontal axis).
+# Plot the cumulative distribution function (<ctrl>-C will interrupt on
+# *NIX systems, <esc> will interrupt on MS Windows systems). Note that
+# we use xtrim = -0.2 to extend the plot outside the support of the data
+# (i.e., extend the tails of the estimate to meet the horizontal axis).
 
 plot(bw, xtrim=-0.2)
-
-# Plot the distribution function (cdf=TRUE) (<ctrl>-C will interrupt)
-
-plot(bw, cdf=TRUE)
 
 detach(faithful)
 } % enddontrun

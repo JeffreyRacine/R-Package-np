@@ -10,18 +10,17 @@ Data Types}
 
 \description{
   \code{npcdistbw} computes a \code{condbandwidth} object for estimating
-  the conditional cumulative distribution of a \eqn{p+q}-variate kernel
-  distribution estimator defined over mixed continuous and discrete
-  (unordered, ordered) data using either the normal-reference
-  rule-of-thumb, likelihood cross-validation, or least-squares cross
-  validation using the method of Li and Racine (2008) and Li, Lin and
-  Racine (2013).
+  a \eqn{p+q}-variate kernel conditional cumulative distribution
+  estimator defined over mixed continuous and discrete (unordered,
+  ordered) data using either the normal-reference rule-of-thumb or
+  least-squares cross validation using the method of Li and Racine
+  (2008) and Li, Lin and Racine (2013).
 }
 
 \usage{
 npcdistbw(\dots)
 
-\method{npcdistbw}{formula}(formula, data, subset, na.action, call, \dots)
+\method{npcdistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL,\dots)
 
 \method{npcdistbw}{NULL}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),
@@ -29,6 +28,7 @@ npcdistbw(\dots)
 
 \method{npcdistbw}{condbandwidth}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),
+          gydat = NULL,
           bws,
           bandwidth.compute = TRUE,
           fast = FALSE,
@@ -36,6 +36,9 @@ npcdistbw(\dots)
           nmulti,
           remin = TRUE,
           itmax = 10000,
+          fast.cdf = TRUE,
+          do.full.integral = FALSE,
+          ngrid = 100,
           ftol = 1.19209e-07,
           tol = 1.49012e-08,
           small = 2.22045e-16,
@@ -43,6 +46,7 @@ npcdistbw(\dots)
 
 \method{npcdistbw}{default}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),
+          gydat,
           bws,
           bandwidth.compute = TRUE,
           fast,
@@ -50,6 +54,9 @@ npcdistbw(\dots)
           nmulti,
           remin,
           itmax,
+          fast.cdf,
+          do.full.integral,
+          ngrid,
           ftol,
           tol,
           small,
@@ -100,6 +107,11 @@ npcdistbw(\dots)
     another function. It is not recommended that the user set this.
   }
 
+  \item{gdata}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles).
+  }
 
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data on which bandwidth selection will
@@ -111,6 +123,12 @@ npcdistbw(\dots)
     a \eqn{q}-variate data frame of dependent data which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
     and ordered factors), or some combination thereof.
+  }
+
+  \item{gydat}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles for \code{ydat}).
   }
 
   \item{bws}{
@@ -256,6 +274,21 @@ npcdistbw(\dots)
   \item{itmax}{
     integer number of iterations before failure in the numerical
     optimization routine. Defaults to \code{10000}.
+  }
+
+  \item{fast.cdf}{
+    a logical value which when set as \code{TRUE} uses a computationally
+    efficient but potentially memory intensive computational algorithm.
+  }
+
+  \item{do.full.integral}{
+    a logical value which when set as \code{TRUE} evaluates the
+    moment-based integral on the entire sample.
+  }
+
+  \item{ngrid}{
+    integer number of grid points to use when computing the moment-based
+    integral. Defaults to \code{100}.
   }
 
   \item{ftol}{

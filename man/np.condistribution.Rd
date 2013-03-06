@@ -16,7 +16,7 @@
   bandwidth type, and kernel type) using the method of Li and Racine
   (2008) and Li, Lin, and Racine (2013).  The data may be continuous,
   discrete (unordered and ordered factors), or some combination thereof.
-  }
+}
 
 \usage{
 npcdist(bws, \dots)

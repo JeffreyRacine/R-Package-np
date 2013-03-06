@@ -1190,6 +1190,11 @@ fhat <- npcdens(gdp ~ year,
                 ftol = 0.1,
                 data = Italy)
 summary(fhat)
+Fhat <- npcdist(gdp ~ year,
+                tol = 0.1,
+                ftol = 0.1,
+                data = Italy)
+summary(Fhat)
 @ 
 
 Figure~\ref{italy conditional plot} plots the resulting conditional
@@ -1198,7 +1203,7 @@ generate Figure~\ref{italy conditional plot}.
 
 <<eval=FALSE, keep.source=TRUE>>=
 plot(fhat, view = "fixed", main = "", theta = 300, phi = 50)
-plot(fhat, cdf = TRUE, view = "fixed", main = "", theta = 300, phi = 50)
+plot(Fhat, view = "fixed", main = "", theta = 300, phi = 50)
 @
 
 \begin{figure}[!ht]
@@ -1212,12 +1217,12 @@ plot.y1 <- unique(plot.output$cd1$yeval)
 plot.x1 <- unique(plot.output$cd1$xeval)
 persp(as.integer(levels(plot.x1)),plot.y1,f,xlab="year",ylab="gdp",zlab="Conditional Density",col="lightblue", ticktype="detailed",theta=300,phi=50)
 
-plot.output <- plot(fhat, cdf = TRUE, view="fixed", main="",plot.behavior="data")
+plot.output <- plot(Fhat, view="fixed", main="",plot.behavior="data")
 # Retrieve data from plot() to create multiple figures
-f <- matrix(plot.output$cd1$condist, 48, 50)
+F <- matrix(plot.output$cd1$condist, 48, 50)
 plot.y1 <- unique(plot.output$cd1$yeval)
 plot.x1 <- unique(plot.output$cd1$xeval)
-persp(as.numeric(plot.x1)+1951,plot.y1,f,xlab="year",ylab="gdp",zlab="Conditional Distribution",col="lightblue", ticktype="detailed",theta=300,phi=50)
+persp(as.numeric(plot.x1)+1951,plot.y1,F,xlab="year",ylab="gdp",zlab="Conditional Distribution",col="lightblue", ticktype="detailed",theta=300,phi=50)
 
 @
 \caption{\label{italy conditional plot}Nonparametric conditional PDF
@@ -1245,11 +1250,11 @@ general). Then we compute the resulting conditional quantile estimates
 using the method of \citet{LI_RACINE:2008}. By way of example, we
 compute the 25th, 50th, and 75th conditional quantiles. Note that this
 may take a minute or two depending on the speed of your computer.
-Note that for this example we first call \code{npcdensbw} to avoid
+Note that for this example we first call \code{npcdistbw} to avoid
 unnecessary re-computation of the bandwidth object.
 
 <<eval=TRUE,keep.source=TRUE>>=
-bw <- npcdensbw(formula = gdp ~ year,
+bw <- npcdistbw(formula = gdp ~ year,
                 tol = 0.1,
                 ftol = 0.1,
                 data = Italy)
