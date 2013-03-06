@@ -7,13 +7,11 @@
 \title{Kernel Distribution Bandwidth Selection with Mixed Data Types}
 
 \description{
-
   \code{npudistbw} computes a bandwidth object for a \eqn{p}-variate
   kernel cumulative distribution estimator defined over mixed continuous
   and discrete (unordered, ordered) data using either the normal
   reference rule-of-thumb, likelihood cross-validation, or least-squares
   cross validation using the method of Li and Racine (2003).
-
 }
 
 \usage{

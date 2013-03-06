@@ -10,12 +10,11 @@ Data Types}
 
 \description{
   \code{npcdistbw} computes a \code{condbandwidth} object for estimating
-  the conditional cumulative distribution of a \eqn{p+q}-variate kernel
-  distribution estimator defined over mixed continuous and discrete
-  (unordered, ordered) data using either the normal-reference
-  rule-of-thumb, likelihood cross-validation, or least-squares cross
-  validation using the method of Li and Racine (2008) and Li, Lin and
-  Racine (2013).
+  a \eqn{p+q}-variate kernel conditional cumulative distribution
+  estimator defined over mixed continuous and discrete (unordered,
+  ordered) data using either the normal-reference rule-of-thumb or
+  least-squares cross validation using the method of Li and Racine
+  (2008) and Li, Lin and Racine (2013).
 }
 
 \usage{
