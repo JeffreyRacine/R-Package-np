@@ -255,7 +255,8 @@ npcdistbw.condbandwidth <-
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
         if (gbw > 0){
-          nbw[1:gbw] = (4/3)^0.2
+          nbw[1:bws$xncon] <- 1.06
+          nbw[(bws$xncon+1):gbw] <- 1.587
           if(!bws$scaling)
             nbw[1:gbw]=nbw[1:gbw]*EssDee(data.frame(xcon,ycon))*nrow^(-1.0/(2.0*bws$cxkerorder+gbw))
         }
