@@ -1,7 +1,7 @@
 conbandwidth <-
   function(xbw,
            ybw,
-           bwmethod = c("cv.ml","cv.ls","normal-reference", "cv.ls.np", "cv.ccdf", "manual"),
+           bwmethod = c("cv.ml","cv.ls","normal-reference", "cv.ls.np", "manual"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
            cxkertype = c("gaussian", "epanechnikov","uniform"), 
@@ -115,7 +115,6 @@ conbandwidth <-
       cv.ml = "Maximum Likelihood Cross-Validation",
       cv.ls = "Least Squares Cross-Validation",
       cv.ls.np = "Least Squares Cross-Validation (block algorithm)",
-      cv.ccdf = "Conditional Distribution Cross-Validation",      
       "normal-reference" = "Normal Reference"),
     fval = fval,
     ifval = ifval,

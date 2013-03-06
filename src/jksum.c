@@ -2760,7 +2760,7 @@ double *cv){
     error("failed to allocate x_operator");
 
   for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
-    x_operator[i] = OP_INTEGRAL;
+    x_operator[i] = OP_NORMAL;
 
   y_operator = (int *)malloc(sizeof(int)*(num_var_continuous+num_var_unordered+num_var_ordered));
 

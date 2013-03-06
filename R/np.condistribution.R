@@ -56,7 +56,7 @@ npcdist.call <-
   }
 
 
-npcdist.conbandwidth <-
+npcdist.condbandwidth <-
   function(bws,
            txdat = stop("invoked without training data 'txdat'"),
            tydat = stop("invoked without training data 'tydat'"),
@@ -303,7 +303,7 @@ npcdist.default <- function(bws, txdat, tydat, ...){
   ty.str <- ifelse(tydat.named, "ydat = tydat,",
                    ifelse(no.tydat, "", "tydat,"))
   
-  tbw <- eval(parse(text = paste("npcdensbw(",
+  tbw <- eval(parse(text = paste("npcdistbw(",
                       ifelse(bws.named,                             
                              paste(tx.str, ty.str,
                                    "bws = bws, bandwidth.compute = FALSE,"),
