@@ -171,12 +171,12 @@ quantile), significance tests (\citeauthor{RACINE:1997}
 \citeyear{RACINE:1997}, \citeauthor{RACINE_HART_LI:2006}
 \citeyear{RACINE_HART_LI:2006}), semiparametric regression (partially
 linear \citeauthor{ROBINSON:1988} \citeyear{ROBINSON:1988},
-\citeauthor{RACINE_LIU:2007} \citeyear{RACINE_LIU:2007}, index models
+\citeauthor{GAO_LIU_RACINE:2012} \citeyear{GAO_LIU_RACINE:2012}, index models
 \citeauthor{KLEIN_SPADY:1993} \citeyear{KLEIN_SPADY:1993},
 \citeauthor{ICHIMURA:1993} \citeyear{ICHIMURA:1993}, average
 derivative estimation, varying/smooth coefficient models
-\citeauthor{LI_RACINE:2007b} \citeyear{LI_RACINE:2007b},
-\citeauthor{RACINE_OUYANG_LI:2007} \citeyear{RACINE_OUYANG_LI:2007}),
+\citeauthor{LI_RACINE:2010} \citeyear{LI_RACINE:2010},
+\citeauthor{LI_OUYANG_RACINE:2012} \citeyear{LI_OUYANG_RACINE:2012}),
 among others. The various functions in the \pkg{np} package are
 described in Table~\ref{np function table}.
 
@@ -202,15 +202,15 @@ described in Table~\ref{np function table}.
 \code{npksum} &  Nonparametric Kernel Sums & \\
 \code{npplot} & General Purpose Plotting of Nonparametric Objects& \\
 \code{npplreg} & Semiparametric Partially Linear  Regression &
-\citet{ROBINSON:1988}, \citet{RACINE_LIU:2007} \\
-\code{npplregbw} & Semiparametric Partially Linear  Regression Bandwidth Selection & \citet{ROBINSON:1988}, \citet{RACINE_LIU:2007} \\
+\citet{ROBINSON:1988}, \citet{GAO_LIU_RACINE:2012} \\
+\code{npplregbw} & Semiparametric Partially Linear  Regression Bandwidth Selection & \citet{ROBINSON:1988}, \citet{GAO_LIU_RACINE:2012} \\
 \code{npqcmstest} &  Parametric Quantile Regression Model Specification Test
 & \citet{ZHENG:1998}, \citet{RACINE:2006}\\
 \code{npqreg} & Nonparametric Quantile Regression & \citet{LI_RACINE:2008} \\
 \code{npreg} &  Nonparametric Regression & \citet{RACINE_LI:2004}, \citet{LI_RACINE:2004}\\
 \code{npregbw} &  Nonparametric Regression Bandwidth Selection & \citet{HURVICH_SIMONOFF_TSAI:1998}, \citet{RACINE_LI:2004}, \citet{LI_RACINE:2004} \\
-\code{npscoef} & Semiparametric Smooth Coefficient  Regression& \citet{LI_RACINE:2007b}\\
-\code{npscoefbw} & Semiparametric Smooth Coefficient  Regression Bandwidth Selection& \citet{LI_RACINE:2007b}\\
+\code{npscoef} & Semiparametric Smooth Coefficient  Regression& \citet{LI_RACINE:2010}\\
+\code{npscoefbw} & Semiparametric Smooth Coefficient  Regression Bandwidth Selection& \citet{LI_RACINE:2010}\\
 \code{npsdeptest} & Nonparametric Entropy Test for Serial Nonlinear Dependence& \citet{GRANGER_MAASOUMI_RACINE:2004}\\
 \code{npsigtest} &  Nonparametric Regression Significance Test & \citet{RACINE:1997}, \citet{RACINE_HART_LI:2006}\\
 \code{npsymtest} & Nonparametric Entropy Test for Asymmetry& \citet{MAASOUMI_RACINE:2009}\\
@@ -1317,7 +1317,7 @@ is unwilling to presume the nature of the relationship between
 nonparametric part of a semiparametric partially linear model.  The
 partially linear model was proposed by \citet{ROBINSON:1988} and
 extended to handle the presence of categorical covariates by
-\citet{RACINE_LIU:2007}.
+\citet{GAO_LIU_RACINE:2012}.
 
 Before proceeding, we ought to clarify a common misunderstanding about
 partially linear models. Many believe that, as the model is apparently
@@ -1418,8 +1418,8 @@ We revisit the \code{wage1} dataset found in
 \citet[p.~222]{WOOLDRIDGE:2003}, but assume that the researcher
 believes that the model's parameters may differ depending on one's
 sex. In this case, one might adopt a varying coefficient approach such
-as that found in \citet{LI_RACINE:2007b} and
-\citet{RACINE_OUYANG_LI:2007}. We compare a simple linear model with
+as that found in \citet{LI_RACINE:2010} and
+\citet{LI_OUYANG_RACINE:2012}. We compare a simple linear model with
 the semiparametric varying coefficient model.  Note that the $X$ data
 in the varying coefficient model must be of type \code{numeric}, so we
 create a 0/1 dummy variable from the qualitative variable for $X$, but
