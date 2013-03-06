@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.79 2013/03/06 18:36:31 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.80 2013/03/06 18:46:58 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -1520,8 +1520,8 @@ lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
 
 \begin{itemize}
 
-\item The functions \texttt{npudist()} and \texttt{npudistbw()} now
-  uncoupled from \texttt{npudens()} and \texttt{npudensbw()}
+\item The functions \texttt{npudist()} and \texttt{npudistbw()} are
+  now uncoupled from \texttt{npudens()} and \texttt{npudensbw()}
   (previously they relied on unconditional PDF bandwidths due to the
   lack of a multivariate mixed-data method for selecting bandwidths
   for CDFs - now with Li \& Racine (2013) we have a robust method
@@ -1561,7 +1561,7 @@ lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
   npksum(txdat=data.frame(x1,x2),operator=c("derivative","normal"),bws=c(1,1))
 \end{verbatim}
   will use the derivative kernel for x1 (i.e. the derivative of the
-  gaussian kernel) and the default kernel for x2 (i.e. a standard
+  Gaussian kernel) and the default kernel for x2 (i.e. a standard
   kernel such as the gaussian) thereby allowing the user to program a
   number of estimators such as conditional CDFs etc. that were
   previously not available via \texttt{npksum()}
