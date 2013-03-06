@@ -513,6 +513,7 @@ npindex.sibandwidth <-
       }
     }
 
+    
     if (errors){
 
       boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = boot.num))
@@ -524,7 +525,7 @@ npindex.sibandwidth <-
         index.gerr = matrix(data = 0, ncol = ncol(txdat), nrow = length(index.eval))
         index.gerr[,] = sqrt(diag(cov(boot.out$t[,(length(index.eval)+1):(2*length(index.eval))])))
 
-        for (i in ncol(txdat))
+        for (i in 1:ncol(txdat))
           index.gerr[,i] = abs(bws$beta[i])*index.gerr[,i]
 
         index.mgerr = sd(boot.out$t[,2*length(index.eval)+1])
