@@ -1,4 +1,3 @@
-% $Id: np.density.bw.Rd,v 1.63 2006/11/03 21:17:20 tristen Exp $
 \name{npudistbw}
 \alias{npudistbw}
 \alias{npudistbw.formula}
@@ -292,8 +291,8 @@ npudistbw(\dots)
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
   each sample realization in the set, \eqn{x_i}{x[i]}, when estimating the
-  density at the point \eqn{x}. Generalized nearest-neighbor bandwidths change
-  with the point at which the density is estimated, \eqn{x}. Fixed bandwidths
+  cumulative distribution at the point \eqn{x}. Generalized nearest-neighbor bandwidths change
+  with the point at which the cumulative distribution is estimated, \eqn{x}. Fixed bandwidths
   are constant over the support of \eqn{x}.
 
   \code{npudistbw} may be invoked \emph{either} with a formula-like
@@ -366,10 +365,10 @@ npudistbw(\dots)
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
 
-  Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
+  Scott, D.W. (1992), \emph{Multivariate Cumulative Distribution Estimation. Theory,
   Practice and Visualization,} New York: Wiley.
 
-  Silverman, B.W. (1986), \emph{Density Estimation,} London: Chapman and
+  Silverman, B.W. (1986), \emph{Cumulative Distribution Estimation,} London: Chapman and
   Hall.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators
@@ -425,7 +424,7 @@ attach(Italy)
 
 data <- data.frame(ordered(year), gdp)
 
-# We compute bandwidths for the kernel density estimator using the
+# We compute bandwidths for the kernel cumulative distribution estimator using the
 # normal-reference rule-of-thumb, otherwise, we use the defaults (second
 # order Gaussian kernel, fixed bandwidths). Note that the bandwidth
 # object you compute inherits all properties of the estimator (kernel
@@ -531,12 +530,13 @@ attach(Italy)
 
 data <- data.frame(ordered(year), gdp)
 
-# We compute bandwidths for the kernel density estimator using the
-# normal-reference rule-of-thumb, otherwise, we use the defaults (second
-# order Gaussian kernel, fixed bandwidths). Note that the bandwidth
-# object you compute inherits all properties of the estimator (kernel
-# type, kernel order, estimation method) and can be fed directly into
-# the plotting utility plot() or into the npudist() function.
+# We compute bandwidths for the kernel cumulative distribution estimator
+# using the normal-reference rule-of-thumb, otherwise, we use the
+# defaults (second order Gaussian kernel, fixed bandwidths). Note that
+# the bandwidth object you compute inherits all properties of the
+# estimator (kernel type, kernel order, estimation method) and can be
+# fed directly into the plotting utility plot() or into the npudist()
+# function.
 
 bw <- npudistbw(dat=data, bwmethod="normal-reference")
 

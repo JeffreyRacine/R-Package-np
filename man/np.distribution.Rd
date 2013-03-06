@@ -1,4 +1,3 @@
-% $Id: np.density.Rd,v 1.75 2006/11/03 21:19:03 tristen Exp $
 \name{npudist}
 \alias{npudist}
 \alias{npudist.dbandwidth}
@@ -55,11 +54,11 @@ npudist(bws, \dots)
 
   \item{tdat}{
     a \eqn{p}-variate data frame of sample realizations (training data)
-    used to estimate the density. Defaults to the training data used to
+    used to estimate the cumulative distribution. Defaults to the training data used to
     compute the bandwidth object.
   }
   \item{edat}{
-    a \eqn{p}-variate data frame of density evaluation points. By default,
+    a \eqn{p}-variate data frame of cumulative distribution evaluation points. By default,
     evaluation takes place on the data provided by \code{tdat}.
   }
 
@@ -84,7 +83,7 @@ npudist(bws, \dots)
   the examples at the end of this help file)
   \preformatted{
     Usage 1: first compute the bandwidth object via npudistbw and then
-    compute the density:
+    compute the cumulative distribution:
     
     bw <- npudistbw(~y)
     Fhat <- npudist(bw)
@@ -114,8 +113,8 @@ npudist(bws, \dots)
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
   each sample realization in the set, \eqn{x_i}{x[i]}, when estimating
-  the density at the point \eqn{x}. Generalized nearest-neighbor
-  bandwidths change with the point at which the density is estimated,
+  the cumulative distribution at the point \eqn{x}. Generalized nearest-neighbor
+  bandwidths change with the point at which the cumulative distribution is estimated,
   \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
   Data contained in the data frame \code{tdat} (and also \code{edat})
@@ -145,11 +144,8 @@ npudist(bws, \dots)
   following components:
 
   \item{eval}{ the evaluation points. }
-  \item{dens or dist}{ estimation of the density (cumulative
-   distribution) at the evaluation points }
-  \item{derr}{ standard errors of the density (cumulative distribution)
-   estimates }
-  \item{log_likelihood}{ log likelihood of the density estimates }
+  \item{dens or dist}{ estimation of the cumulative distribution at the evaluation points }
+  \item{derr}{ standard errors of the cumulative distribution estimates }
   
 }
 \references{
