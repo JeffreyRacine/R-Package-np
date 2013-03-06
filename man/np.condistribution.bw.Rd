@@ -21,7 +21,7 @@ Data Types}
 \usage{
 npcdistbw(\dots)
 
-\method{npcdistbw}{formula}(formula, data, subset, na.action, call, \dots)
+\method{npcdistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL,\dots)
 
 \method{npcdistbw}{NULL}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),
@@ -100,6 +100,11 @@ npcdistbw(\dots)
     another function. It is not recommended that the user set this.
   }
 
+  \item{gdata}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles).
+  }
 
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data on which bandwidth selection will
