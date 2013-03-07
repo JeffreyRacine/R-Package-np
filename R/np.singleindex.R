@@ -439,15 +439,15 @@ npindex.sibandwidth <-
       ## g^{(1)}=dg/d\beta, first beta normalized to one so this
       ## simplifies computation (beta's drop out)
 
-      dg.db.sq <- (W*index.tgrad[,1])^2
+      dg.db <- W*index.tgrad[,1]
 
-      dg.db.sq.xmex <- sapply(1:length(tydat),function(i){dg.db.sq[i,]*xmex[,i]})      
+      dg.db.xmex <- sapply(1:length(tydat),function(i){dg.db[i,]*xmex[,i]})      
 
       uhat <- tydat - index.tmean ## Training y and training mean
 
-      Vinv <- solve(dg.db.sq.xmex%*%t(xmex))
+      Vinv <- solve(dg.db.xmex%*%t(dg.db.xmex))
 
-      Sigma <- ((uhat^2)*dg.db.sq.xmex)%*%t(xmex)
+      Sigma <- (uhat*dg.db.xmex)%*%t(uhat*dg.db.xmex)
 
       Bvcov[-1,-1] <- Vinv %*% Sigma %*% Vinv
     
