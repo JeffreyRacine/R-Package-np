@@ -236,6 +236,7 @@ S3method(npcdens, conbandwidth)
 
 S3method(npcdist, formula)
 S3method(npcdist, default)
+S3method(npcdist, call)
 S3method(npcdist, condbandwidth)
 
 S3method(npcdistbw, NULL)
