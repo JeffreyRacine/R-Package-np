@@ -991,7 +991,7 @@ and \Sexpr{formatC(pse.np,format="f",digits=3)} for the nonparametric
 estimator that uses the full sample but smooths both the qualitative
 and quantitative data. The nonparametric model that smooths both the
 quantitative and qualitative data is more than
-\Sexpr{formatC(((pse.ols-pse.np)/pse.ols)*100,format="f",digits=3)}\%
+\Sexpr{formatC(((pse.ols-pse.np)/pse.ols)*100,format="f",digits=1)}\%
 more efficient in terms of out-of-sample predictive ability than the
 parametric or frequency nonparametric model, and therefore appears to
 provide a better description of the underlying data generating process
