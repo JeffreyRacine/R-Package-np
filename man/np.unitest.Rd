@@ -169,7 +169,6 @@ t.test(x,y)
 ## critical values
 F <- var(x)/var(y)
 qf(c(0.025,0.975),df1=n-1,df2=n-1)
-} % enddontrun
 
 ## Plot the nonparametric density estimates on the same axes
 
@@ -217,6 +216,7 @@ x <- factor(rbinom(n,2,.5))
 y <- factor(rbinom(n,2,.1))
 
 npunitest(x,y,boot.num=99)
+} % enddontrun
 }
 \keyword{ univar }
 \keyword{ nonparametric }
