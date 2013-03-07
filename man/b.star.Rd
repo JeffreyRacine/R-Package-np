@@ -88,7 +88,6 @@ b.star(yt,round=TRUE)
 
 yt <- ar.series(0.9,rnorm(10000))
 b.star(yt,round=TRUE)
-
 }
 
 \keyword{univar}

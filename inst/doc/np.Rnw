@@ -841,6 +841,7 @@ X <- data.frame(wage1$female,
 output <- npcmstest(model = model.ols, 
                     xdat = X, 
                     ydat = wage1$lwage, 
+                    nmulti = 1,
                     tol = 0.1, 
                     ftol = 0.1)
 summary(output)
@@ -982,13 +983,14 @@ pse.np
 pse.np.freq
 @
 
-The predicted square error on the hold-out data was $0.147$ for the
-parametric linear model, $0.145$ for the traditional nonparametric
-estimator that splits the data into subsets, and $0.134$ for the
-nonparametric estimator that uses the full sample but smooths both the
-qualitative and quantitative data. The nonparametric model that
-smooths both the quantitative and qualitative data is more than 8\%
-more efficient in terms of out-of-sample predictive ability than the
+The predicted square error on the hold-out data was \Sexpr{pse.ols}
+for the parametric linear model, \Sexpr{pse.np.freq} for the traditional
+nonparametric estimator that splits the data into subsets, and
+\Sexpr{pse.np} for the nonparametric estimator that uses the full
+sample but smooths both the qualitative and quantitative data. The
+nonparametric model that smooths both the quantitative and qualitative
+data is more than \Sexpr{(1-round(pse.np/pse.ols))*100}\% more
+efficient in terms of out-of-sample predictive ability than the
 parametric or frequency nonparametric model, and therefore appears to
 provide a better description of the underlying data generating process
 than either.
@@ -1157,7 +1159,6 @@ F <- matrix(plot.output$d1$dist, 50, 50)
 plot.x1 <- unique(plot.output$d1$eval[,1])
 plot.x2 <- unique(plot.output$d1$eval[,2])
 persp(plot.x1,plot.x2,F,xlab="eruptions",ylab="waiting",zlab="Joint Distribution",col="lightblue", ticktype="detailed")
-
 @
 \caption{\label{faithful plot}Nonparametric multivariate PDF and CDF
   estimates for the Old Faithful data.}

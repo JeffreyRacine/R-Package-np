@@ -12,7 +12,7 @@
   estimates on evaluation data, given a set of training data and a
   bandwidth specification (a \code{dbandwidth} object or a bandwidth
   vector, bandwidth type, and kernel type) using the method of Li and
-  Racine (2003).
+  Racine (2013).
 
 }
 \usage{
@@ -32,7 +32,7 @@ npudist(bws, \dots)
 
 \arguments{
   \item{bws}{
-    a dbandwidth specification. This can be set as a \code{dbandwidth}
+    a \code{dbandwidth} specification. This can be set as a \code{dbandwidth}
     object returned from an invocation of \code{\link{npudistbw}}, or as a
     \eqn{p}-vector of bandwidths, with an element for each variable in the
     training data. If specified as a vector, then additional arguments
@@ -159,6 +159,10 @@ npudist(bws, \dots)
     distributions with categorical and continuous data,} Journal
   of Multivariate Analysis, 86, 266-292.
 
+  Li, H. and J.S. Racine (2013), \dQuote{Cross-validated estimation of
+  cumulative distribution functions with categorical and continuous
+  data,} manuscript.
+
   Ouyang, D. and Q. Li and J.S. Racine (2006), \dQuote{Cross-validation
     and the estimation of probability distributions with categorical
     data,} Journal of Nonparametric Statistics, 18, 69-100.
@@ -191,6 +195,7 @@ npudist(bws, \dots)
 \seealso{ \code{\link{npudistbw}} , \code{\link{density}} }
 
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous,
@@ -214,8 +219,6 @@ Fhat <- npudist(bws=bw)
 # information. For more info, one can call summary:
 
 summary(Fhat)
-
-\dontrun{
 
 # Next, we illustrate how to create a grid of `evaluation data' and feed
 # it to the perspective plotting routines in R, among others.

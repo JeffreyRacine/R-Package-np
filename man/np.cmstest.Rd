@@ -176,6 +176,7 @@ npcmstest(formula,
 }
 
 \examples{
+\dontrun{
 # EXAMPLE 1: For this example, we conduct a consistent model
 # specification test for a parametric wage regression model that is
 # quadratic in age. The work of Murphy and Welch (1990) would suggest
@@ -193,8 +194,6 @@ lines(age, fitted(model))
 # computer...
 
 npcmstest(model = model, xdat = age, ydat = logwage)
-
-\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 

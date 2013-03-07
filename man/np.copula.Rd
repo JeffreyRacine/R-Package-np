@@ -127,6 +127,7 @@ npcopula(bws,
 }
 
 \examples{
+\dontrun{
 require(MASS)
 
 set.seed(42)
@@ -169,6 +170,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",
 
 copula.emp <- npcopula(bws=bw,data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
+} % enddontrun
 }
 
 \keyword{ nonparametric }

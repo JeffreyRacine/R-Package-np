@@ -209,6 +209,7 @@ npcdens(bws, \dots)
   \code{\link{npudens}}
 }
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
 # likelihood cross-validated bandwidths (default) using a second-order
@@ -231,8 +232,6 @@ fhat <- npcdens(bws=bw)
 # density function (fhat$condens) and so on...
 
 summary(fhat)
-
-\dontrun{
 
 # Call the plot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows

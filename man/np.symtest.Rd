@@ -130,6 +130,7 @@ npsymtest(data = NULL,
 }
 
 \examples{
+\dontrun{
 set.seed(1234)
 
 n <- 100
@@ -159,8 +160,6 @@ Sys.sleep(5)
 
 y <- rnorm(n)
 npsymtest(y,boot.num=99)
-
-\dontrun{
 
 ## Time-series bootstrap
 

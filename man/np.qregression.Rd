@@ -193,6 +193,7 @@ npqreg(bws, \dots)
 \seealso{ \pkg{quantreg} }
 
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
 # bivariate nonparametric quantile regression estimate for Giovanni
 # Baiocchi's Italian income panel (see Italy for details)
@@ -228,8 +229,6 @@ legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"),
        lty=c(2, 3, 2), col=c("red", "blue", "red"))
 
 detach(Italy)
-
-\dontrun{
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
 # bivariate nonparametric quantile regression estimate for Giovanni

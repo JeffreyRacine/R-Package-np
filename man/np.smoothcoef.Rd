@@ -258,6 +258,7 @@ npscoef(bws, \dots)
   \code{\link{npudensbw}}, \code{\link{npscoefbw}} }
 
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): 
 
 n <- 250
@@ -268,7 +269,6 @@ bw <- npscoefbw(y~x|z)
 model <- npscoef(bw)
 plot(model)
 
-\dontrun{
 # EXAMPLE 1 (INTERFACE=DATA FRAME): 
 
 n <- 250

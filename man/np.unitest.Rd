@@ -130,6 +130,7 @@ npunitest(data.x = NULL,
 }
 
 \examples{
+\dontrun{
 set.seed(1234)
 n <- 1000
 
@@ -162,7 +163,6 @@ npunitest(x,y,boot.num=99)
 
 Sys.sleep(5)
 
-\dontrun{
 ## Two sample t-test for equality of means
 t.test(x,y)
 ## F test for equality of variances and asymptotic

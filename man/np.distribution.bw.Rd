@@ -11,7 +11,7 @@
   kernel cumulative distribution estimator defined over mixed continuous
   and discrete (unordered, ordered) data using either the normal
   reference rule-of-thumb, likelihood cross-validation, or least-squares
-  cross validation using the method of Li and Racine (2003).
+  cross validation using the method of Li and Racine (2013).
 }
 
 \usage{
@@ -356,6 +356,10 @@ npudistbw(\dots)
    distributions with categorical and continuous data,} Journal
   of Multivariate Analysis, 86, 266-292.
 
+  Li, H. and J.S. Racine (2013), \dQuote{Cross-validated estimation of
+  cumulative distribution functions with categorical and continuous
+  data,} manuscript.
+
   Ouyang, D. and Q. Li and J.S. Racine (2006), \dQuote{Cross-validation
     and the estimation of probability distributions with categorical
     data,} Journal of Nonparametric Statistics, 18, 69-100.
@@ -413,6 +417,7 @@ npudistbw(\dots)
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}},  \code{\link{hist}},
   \code{\link{npudist}}, \code{\link{npudist}} }
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous.
@@ -432,8 +437,6 @@ data <- data.frame(ordered(year), gdp)
 bw <- npudistbw(formula=~ordered(year)+gdp, bwmethod="normal-reference")
 
 summary(bw)
-
-\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 

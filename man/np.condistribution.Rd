@@ -1,4 +1,3 @@
-% $Id: np.condistity.Rd,v 1.67 2006/11/03 21:19:03 tristen Exp $
 \name{npcdist}
 \alias{npcdist}
 \alias{npcdist.call}
@@ -218,6 +217,7 @@ npcdist(bws, \dots)
   \code{\link{npudens}}
 }
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
 # likelihood cross-validated bandwidths (default) using a second-order
@@ -232,16 +232,14 @@ attach(Italy)
 
 bw <- npcdistbw(formula=gdp~ordered(year))
 
-# Next, compute the condistity object...
+# Next, compute the condistribution object...
 
-fhat <- npcdist(bws=bw)
+Fhat <- npcdist(bws=bw)
 
-# The object fhat now contains results such as the estimated conditional
-# density function (fhat$condist) and so on...
+# The object Fhat now contains results such as the estimated conditional
+# density function (Fhat$condist) and so on...
 
-summary(fhat)
-
-\dontrun{
+summary(Fhat)
 
 # Call the plot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
@@ -273,14 +271,14 @@ y <- data.frame(gdp)
 
 bw <- npcdistbw(xdat=X, ydat=y)
 
-# Next, compute the condistity object...
+# Next, compute the condistribution object...
 
-fhat <- npcdist(bws=bw)
+Fhat <- npcdist(bws=bw)
 
-# The object fhat now contains results such as the estimated conditional
-# density function (fhat$condist) and so on...
+# The object Fhat now contains results such as the estimated conditional
+# density function (Fhat$condist) and so on...
 
-summary(fhat)
+summary(Fhat)
 
 # Call the plot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows systems).

@@ -239,6 +239,7 @@ npplreg(bws, \dots)
 \seealso{
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we simulate an
 # example for a partially linear model, and compare the coefficient
 # estimates from the partially linear model with those from a correctly
@@ -267,8 +268,6 @@ pl <- npplreg(bws=bw)
 # Print a summary of the model...
 
 summary(pl)
-
-\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 

@@ -380,6 +380,7 @@ npudensbw(\dots)
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}},  \code{\link{hist}},
   \code{\link{npudens}}, \code{\link{npudist}} }
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous.
@@ -399,8 +400,6 @@ data <- data.frame(ordered(year), gdp)
 bw <- npudensbw(formula=~ordered(year)+gdp, bwmethod="normal-reference")
 
 summary(bw)
-
-\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 

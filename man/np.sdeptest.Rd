@@ -127,6 +127,7 @@ npsdeptest(data = NULL,
 }
 
 \examples{
+\dontrun{
 set.seed(1234)
 
 ## A function to create a time series
@@ -154,8 +155,6 @@ Sys.sleep(5)
 
 yt <- ar.series(0.0,rnorm(n))
 npsdeptest(yt,lag.num=2,boot.num=99,method="summation")
-
-\dontrun{
 
 ## Stationary persistent time-series
 

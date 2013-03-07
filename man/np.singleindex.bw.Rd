@@ -317,6 +317,7 @@ npindexbw(\dots)
   large datasets.  }
 
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): Generate a simple linear model then
 # compute coefficients and the bandwidth using Ichimura's nonlinear
 # least squares approach.
@@ -338,8 +339,6 @@ y <- x1 - x2 + rnorm(n)
 bw <- npindexbw(formula=y~x1+x2, method="ichimura")
 
 summary(bw)
-
-\dontrun{
 
 # Sleep for 5 seconds so that we can examine the output...
 

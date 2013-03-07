@@ -159,6 +159,7 @@ npconmode(bws, \dots)
 }
 
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we use the
 # birthweight data taken from the MASS library, and compute a parametric
 # logit model and a nonparametric conditional mode model. We then
@@ -220,8 +221,6 @@ ccr
 summary(model.np)
 
 detach(birthwt)
-
-\dontrun{
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we use the
 # birthweight data taken from the MASS library, and compute a parametric

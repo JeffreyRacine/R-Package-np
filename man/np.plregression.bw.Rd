@@ -306,6 +306,7 @@ npplregbw(\dots)
 \seealso{
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we simulate an
 # example for a partially linear model and perform bandwidth selection
 
@@ -329,8 +330,6 @@ Z <- data.frame(factor(z1), z2)
 bw <- npplregbw(formula=y~x1+factor(x2)|factor(z1)+z2)
 
 summary(bw)
-
-\dontrun{
 
 # Note - the default is to use the local constant estimator. If you wish
 # to use instead a local linear estimator, this is accomplished via

@@ -134,6 +134,7 @@ npdeptest(data.x = NULL,
 }
 
 \examples{
+\dontrun{
 set.seed(1234)
 
 ## Test/measure lack of fit between y and its fitted value from a
@@ -160,7 +161,6 @@ y.fit <- fitted(model)
 
 npdeptest(x,y,boot.num=99,method="summation")
 
-\dontrun{
 ## Test/measure lack of fit between y and its fitted value from a
 ## regression model when x is relevant using the `integration'
 ## version (default, slower than summation version).

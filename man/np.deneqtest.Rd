@@ -97,6 +97,7 @@ npdeneqtest(x = NULL,
 }
 
 \examples{
+\dontrun{
 set.seed(1234)
 
 ## Distributions are equal
@@ -117,7 +118,6 @@ sample.B <- data.frame(x=rchisq(n,df=5))
 
 npdeneqtest(sample.A,sample.B,boot.num=99)
 
-\dontrun{
 ## Mixed datatypes, distributions are equal
 
 sample.A <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))

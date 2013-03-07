@@ -13,6 +13,7 @@ sed -i bak -f sed_dontrun.scr np.condistribution.Rd
 sed -i bak -f sed_dontrun.scr np.condensity.bw.Rd
 sed -i bak -f sed_dontrun.scr np.condistribution.bw.Rd
 sed -i bak -f sed_dontrun.scr np.conmode.Rd
+sed -i bak -f sed_dontrun.scr np.copula.Rd
 sed -i bak -f sed_dontrun.scr np.deneqtest.Rd
 sed -i bak -f sed_dontrun.scr np.density.Rd
 sed -i bak -f sed_dontrun.scr np.distribution.Rd
