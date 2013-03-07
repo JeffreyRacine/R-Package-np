@@ -431,17 +431,20 @@ npindex.sibandwidth <-
 
       xmex <- sapply(1:length(tydat),function(i){W[i,]-tyindex[,i]/tindex[i]})
 
-      ## Need to trap case where k-1=1..., sapply will return a
-      ## vector, need a 1 x n matrix
-
-      if(is.vector(xmex)) xmex <- matrix(xmex,nrow=1,ncol=length(xmex))
-
       ## g^{(1)}=dg/d\beta, first beta normalized to one so this
       ## simplifies computation (beta's drop out)
 
       dg.db <- W*index.tgrad[,1]
 
-      dg.db.xmex <- sapply(1:length(tydat),function(i){dg.db[i,]*xmex[,i]})      
+      ## Need to trap case where k-1=1..., sapply will return a
+      ## vector, need a 1 x n matrix
+
+      if(is.vector(xmex)) {
+        xmex <- matrix(xmex,nrow=1,ncol=length(xmex))
+        dg.db.xmex <- matrix(xmex,sapply(1:length(tydat),function(i){dg.db[i,]*xmex[,i]}),nrow=1,ncol=length(xmex))
+      } else {
+        dg.db.xmex <- sapply(1:length(tydat),function(i){dg.db[i,]*xmex[,i]})
+      }
 
       uhat <- tydat - index.tmean ## Training y and training mean
 

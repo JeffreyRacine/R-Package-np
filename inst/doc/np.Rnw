@@ -559,11 +559,12 @@ summary(model.par)
 @ 
 
 If we first consider the model's goodness of fit, the model has an
-unadjusted $R^2$ of 23.1\%.  Next, we consider the local linear
-nonparametric method proposed by \citet{LI_RACINE:2004} employing
-cross-validated bandwidth selection using the method of
-\citet{HURVICH_SIMONOFF_TSAI:1998}. Note that in this example we
-conduct bandwidth selection and estimation in one step.
+unadjusted $R^2$ of \Sexpr{summary(model.par)$r.squared}\%.  Next, we
+consider the local linear nonparametric method proposed by
+\citet{LI_RACINE:2004} employing cross-validated bandwidth selection
+using the method of \citet{HURVICH_SIMONOFF_TSAI:1998}. Note that in
+this example we conduct bandwidth selection and estimation in one
+step.
 
 
 <<eval=TRUE,keep.source=TRUE>>=
@@ -578,8 +579,8 @@ summary(model.np)
 Using the measure of goodness of fit introduced in the next section,
 we see that this method produces a better in-sample model, at least as
 measured by the $R^2$ criterion, having an $R^2$ of
-32.5\%.\footnote{See Section~\ref{r-squared section} for details on
-  computation of the nonparametric $R^2$ measure.}
+\Sexpr{model.np$R2}\%.\footnote{See Section~\ref{r-squared section}
+  for details on computation of the nonparametric $R^2$ measure.}
 
 So far we have summarized the model's goodness-of-fit. However,
 econometricians also routinely report the results from tests of
@@ -1108,8 +1109,10 @@ summary(model.np)
 
 For this example the nonparametric model is better able to predict low
 birthweight infants than its parametric counterpart, correctly
-predicting 161/189 birthweights compared with 144/189 for the
-parametric model.
+predicting
+\Sexpr{sum(diag(model.np$confusion.matrix))}/\Sexpr{sum(model.np$confusion.matrix)}
+birthweights compared with \Sexpr{sum(diag(cm))}/\Sexpr{sum(cm)} for
+the parametric model.
 
 \section{Nonparametric unconditional PDF and CDF estimation}\label{pdf
   and cdf section}
