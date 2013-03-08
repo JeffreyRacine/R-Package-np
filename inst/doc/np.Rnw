@@ -979,9 +979,6 @@ fit.np.freq <- predict(model.np.freq,
                        data = wage1.train,
                        newdata = wage1.eval)
 pse.np.freq <- mean((wage1.eval$lwage - fit.np.freq)^2)
-pse.ols
-pse.np
-pse.np.freq
 @
 
 The predicted square error on the hold-out data was
