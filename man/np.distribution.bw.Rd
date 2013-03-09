@@ -132,7 +132,8 @@ npudistbw(\dots)
   
   \item{bwmethod}{
     a character string specifying the bandwidth selection method.
-    \code{cv.ls} specifies least-squares cross-validation, and
+    \code{cv.cdf} specifies least-squares cross-validation for
+    cumulative distribution functions (Li and Racine (2013)), and
     \code{normal-reference} just computes the \sQuote{rule-of-thumb}
     bandwidth \eqn{h_j}{h[j]} using the standard formula \eqn{h_j =
     1.587 \sigma_j n^{-1/(P+l)}}{h[j] = 1.587*sigma[j]*n^(-1.0/(P+l))},
@@ -142,7 +143,7 @@ npudistbw(\dots)
     \eqn{P} the order of the kernel, and \eqn{l} the number of
     continuous variables. Note that when there exist factors and the
     normal-reference rule is used, there is zero smoothing of the
-    factors. Defaults to \code{cv.ls}.
+    factors. Defaults to \code{cv.cdf}.
   }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
