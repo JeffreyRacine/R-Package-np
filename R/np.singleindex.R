@@ -348,11 +348,9 @@ npindex.sibandwidth <-
 
       index.mean <- model$mean
 
-      ## index.grad is a matrix, one column for each variable, each
-      ## equal to its coefficient beta_i times the first derivative of
-      ## the local-constant model
+      ## index.grad is a 1-column matrix
 
-      index.grad <- model$grad
+      index.grad <- as.numeric(model$grad)
 
       if(!no.ex & (no.ey | residuals)){
 
@@ -371,7 +369,7 @@ npindex.sibandwidth <-
 
         index.tmean <- model$mean
 
-        index.tgrad <- model$grad
+        index.tgrad <- as.numeric(model$grad)
 
       }
 
@@ -434,7 +432,7 @@ npindex.sibandwidth <-
       if(is.vector(xmex)) {
         dg.db.xmex <- matrix(index.tgrad*xmex,nrow=1,ncol=length(xmex))
       } else {
-        dg.db.xmex <- index.tgrad * xmex
+        dg.db.xmex <- index.tgrad*xmex
       }
 
       uhat <- tydat - index.tmean ## Training y and training mean
@@ -570,7 +568,7 @@ npindex.sibandwidth <-
     eval(parse(text=paste(
                  "singleindex(bws = bws, index = index.eval, mean = index.mean,",
                  ifelse(errors,"merr = index.merr,",""),
-                 ifelse(gradients,"grad = index.grad, mean.grad = colMeans(index.grad), betavcov = Bvcov,",""),
+                 ifelse(gradients,"grad = index.grad, mean.grad = mean(index.grad), betavcov = Bvcov,",""),
                  ifelse(errors & gradients,"gerr = index.gerr, mean.gerr = index.mgerr,",""),
                  strres,
                  "ntrain = nrow(txdat),", strgof,
