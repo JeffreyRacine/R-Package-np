@@ -199,14 +199,14 @@ npudist(bws, \dots)
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous,
-# compute bandwidths using likelihood cross-validation, then create a
-# grid of data on which the cumulative distribution will be evaluated
-# for plotting purposes.
+# compute bandwidths using cross-validation, then create a grid of data
+# on which the cumulative distribution will be evaluated for plotting
+# purposes.
 
 data("Italy")
 attach(Italy)
 
-# Compute bandwidths using likelihood cross-validation (default).
+# Compute bandwidths using cross-validation (default).
 
 bw <- npudistbw(formula=~ordered(year)+gdp)
 
@@ -272,16 +272,16 @@ detach(Italy)
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous,
-# compute bandwidths using likelihood cross-validation, then create a
-# grid of data on which the cumulative distribution will be evaluated
-# for plotting purposes.
+# compute bandwidths using cross-validation, then create a grid of data
+# on which the cumulative distribution will be evaluated for plotting
+# purposes.
 
 data("Italy")
 attach(Italy)
 
 data <- data.frame(year=ordered(year), gdp)
 
-# Compute bandwidths using likelihood cross-validation (default).
+# Compute bandwidths using cross-validation (default).
 
 bw <- npudistbw(dat=data)
 

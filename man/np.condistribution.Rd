@@ -222,9 +222,9 @@ npcdist(bws, \dots)
 \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
-# likelihood cross-validated bandwidths (default) using a second-order
-# Gaussian kernel (default). Note - this may take a minute or two
-# depending on the speed of your computer.
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
 
 data("Italy")
 attach(Italy)
@@ -253,9 +253,9 @@ detach(Italy)
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
-# likelihood cross-validated bandwidths (default) using a second-order
-# Gaussian kernel (default). Note - this may take a minute or two
-# depending on the speed of your computer.
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
 
 data("Italy")
 attach(Italy)

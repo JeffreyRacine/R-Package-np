@@ -465,9 +465,9 @@ npcdistbw(\dots)
 \examples{
 \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
-# likelihood cross-validated bandwidths (default) using a second-order
-# Gaussian kernel (default). Note - this may take a minute or two
-# depending on the speed of your computer.
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
 
 data("Italy")
 attach(Italy)
@@ -487,9 +487,9 @@ summary(bw)
 detach(Italy)
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute the
-# likelihood cross-validated bandwidths (default) using a second-order
-# Gaussian kernel (default). Note - this may take a minute or two
-# depending on the speed of your computer.
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
 
 data("Italy")
 attach(Italy)

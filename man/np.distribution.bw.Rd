@@ -10,8 +10,8 @@
   \code{npudistbw} computes a bandwidth object for a \eqn{p}-variate
   kernel cumulative distribution estimator defined over mixed continuous
   and discrete (unordered, ordered) data using either the normal
-  reference rule-of-thumb, likelihood cross-validation, or least-squares
-  cross validation using the method of Li and Racine (2013).
+  reference rule-of-thumb or least-squares cross validation using the
+  method of Li and Racine (2013).
 }
 
 \usage{
@@ -500,10 +500,10 @@ summary(bw)
 
 Sys.sleep(5)
 
-# Next, compute bandwidths using likelihood cross-validation, fixed
-# bandwidths, and a second order Gaussian kernel for the continuous
-# variable (default).  Note - this may take a few minutes depending on
-# the speed of your computer.
+# Next, compute bandwidths using cross-validation, fixed bandwidths, and
+# a second order Gaussian kernel for the continuous variable (default).
+# Note - this may take a few minutes depending on the speed of your
+# computer.
 
 bw <- npudistbw(formula=~ordered(year)+gdp)
 
@@ -604,10 +604,10 @@ summary(bw)
 
 Sys.sleep(5)
 
-# Next, compute bandwidths using likelihood cross-validation, fixed
-# bandwidths, and a second order Gaussian kernel for the continuous
-# variable (default).  Note - this may take a few minutes depending on
-# the speed of your computer.
+# Next, compute bandwidths using cross-validation, fixed bandwidths, and
+# a second order Gaussian kernel for the continuous variable (default).
+# Note - this may take a few minutes depending on the speed of your
+# computer.
 
 bw <- npudistbw(dat=data)
 
