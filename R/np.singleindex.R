@@ -304,32 +304,35 @@ npindex.sibandwidth <-
 
     if(gradients==FALSE) {
 
-      index.mean <- npksum(txdat=index,
-                           tydat=tydat,
-                           exdat=index.eval,
-                           bws=bws$bw,
-                           ckertype = bws$ckertype,
-                           ckerorder = bws$ckerorder)$ksum/
-                             npksum(txdat=index,
-                                    exdat=index.eval,
-                                    bws=bws$bw,
-                                    ckertype = bws$ckertype,
-                                    ckerorder = bws$ckerorder)$ksum
+      tww <- npksum(txdat=as.matrix(txdat) %*% c(1,bws$beta),
+                    tydat=as.matrix(data.frame(tydat,1)),
+                    weights=as.matrix(data.frame(tydat,1)),
+                    exdat=as.matrix(exdat) %*% c(1,bws$beta),
+                    bws=bws$bw,
+                    ckertype = bws$ckertype,
+                    ckerorder = bws$ckerorder)$ksum
+
+      denom <- tww[2,2,]
+      denom[which(denom == 0.0)] <- sqrt(.Machine$double.eps)
+      index.mean <- tww[1,2,]/denom
 
       if(!no.ex & (no.ey | residuals)){
+
         ## want to evaluate on training data for in sample errors even
         ## if evaluation x's are different from training but no y's
         ## are specified
 
-        index.tmean <- npksum(txdat=index,
-                              tydat=tydat,
-                              bws=bws$bw,
-                              ckertype = bws$ckertype,
-                              ckerorder = bws$ckerorder)$ksum/
-                                npksum(txdat=index,
-                                       bws=bws$bw,
-                                       ckertype = bws$ckertype,
-                                       ckerorder = bws$ckerorder)$ksum
+        tww <- npksum(txdat=as.matrix(txdat) %*% c(1,bws$beta),
+                      tydat=as.matrix(data.frame(tydat,1)),
+                      weights=as.matrix(data.frame(tydat,1)),
+                      bws=bws$bw,
+                      ckertype = bws$ckertype,
+                      ckerorder = bws$ckerorder)$ksum
+
+        denom <- tww[2,2,]
+        denom[which(denom == 0.0)] <- sqrt(.Machine$double.eps)
+        index.tmean <- tww[1,2,]/denom
+
       }
 
     } else if(gradients==TRUE) {
@@ -349,7 +352,7 @@ npindex.sibandwidth <-
       ## equal to its coefficient beta_i times the first derivative of
       ## the local-constant model
 
-      index.grad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))
+      index.grad <- model$grad
 
       if(!no.ex & (no.ey | residuals)){
 
@@ -368,7 +371,7 @@ npindex.sibandwidth <-
 
         index.tmean <- model$mean
 
-        index.tgrad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))
+        index.tgrad <- model$grad
 
       }
 
@@ -425,19 +428,13 @@ npindex.sibandwidth <-
 
       xmex <- sapply(1:length(tydat),function(i){W[i,]-tyindex[,i]/tindex[i]})
 
-      ## g^{(1)}=dg/d\beta, first beta normalized to one so this
-      ## simplifies computation (beta's drop out)
-
-      dg.db <- W*index.tgrad[,1]
-
       ## Need to trap case where k-1=1..., sapply will return a
       ## vector, need a 1 x n matrix
 
       if(is.vector(xmex)) {
-        xmex <- matrix(xmex,nrow=1,ncol=length(xmex))
-        dg.db.xmex <- matrix(xmex,sapply(1:length(tydat),function(i){dg.db[i,]*xmex[,i]}),nrow=1,ncol=length(xmex))
+        dg.db.xmex <- matrix(index.tgrad*xmex,nrow=1,ncol=length(xmex))
       } else {
-        dg.db.xmex <- sapply(1:length(tydat),function(i){dg.db[i,]*xmex[,i]})
+        dg.db.xmex <- index.tgrad * xmex
       }
 
       uhat <- tydat - index.tmean ## Training y and training mean
@@ -457,7 +454,7 @@ npindex.sibandwidth <-
       ## We divide by P(1-P) so test for P=0 or 1...
 
       keep <- which(index.tmean < 1 & index.tmean > 0)
-      dg.db <- txdat[,-1,drop=FALSE]*index.tgrad[,1]
+      dg.db <- txdat[,-1,drop=FALSE]*index.tgrad
 
       ## First row & column of covariance matrix are zero due to
       ## identification condition that beta_1=0. Note the n^{-1} in
