@@ -2566,6 +2566,16 @@ double * cv){
   if(mean == NULL)
     error("failed to allocate mean");
 
+  int is,ie;
+#ifdef MPI2
+  int stride = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
+  is = stride * my_rank;
+  ie = MIN(num_obs_train - 1, is + stride - 1);
+#else
+  is = 0;
+  ie = num_obs_train - 1;
+#endif
+
 
   double ofac = num_obs_train - 1.0;
 
@@ -2618,7 +2628,7 @@ double * cv){
                            mean,
                            kw);
 
-    for(i = 0; i < num_obs_train; i++){
+    for(i = is; i <= ie; i++){
       for(j = 0; j < num_obs_eval; j++){
         indy = 1;
         for(l = 0; l < num_reg_ordered; l++){
@@ -2637,11 +2647,15 @@ double * cv){
 
       }
     }
+#ifdef MPI2
+    MPI_Allgather(MPI_IN_PLACE, 1, MPI_DOUBLE, cv, 1, MPI_DOUBLE, comm[1]);    
+#endif
+
     *cv /= (double) num_obs_train*num_obs_eval;
 
     free(kw);
   } else {
-    for(i = 0; i < num_obs_train; i++){
+    for(i = is; i <= ie; i++){
       kernel_weighted_sum_np(KERNEL_den,
                              KERNEL_den_unordered,
                              KERNEL_den_ordered,
@@ -2685,6 +2699,10 @@ double * cv){
         *cv += (indy - mean[j]/ofac)*(indy - mean[j]/ofac);
       }
     }
+#ifdef MPI2
+    MPI_Allgather(MPI_IN_PLACE, 1, MPI_DOUBLE, cv, 1, MPI_DOUBLE, comm[1]);    
+#endif
+
     *cv /= (double) num_obs_train*num_obs_eval;
   }
 
@@ -2741,6 +2759,16 @@ double *cv){
   double xyj, xmi;
 
   double * mean = (double *)malloc(MAX(num_obs_eval,num_obs_train)*sizeof(double));
+
+  int is,ie;
+#ifdef MPI2
+  int stride = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
+  is = stride * my_rank;
+  ie = MIN(num_obs_train - 1, is + stride - 1);
+#else
+  is = 0;
+  ie = num_obs_train - 1;
+#endif
   
   if(mean == NULL)
     error("failed to allocate mean");
@@ -2853,7 +2881,7 @@ double *cv){
                            mean,
                            kwx);
 
-    for(i = 0; i < num_obs_train; i++){     
+    for(i = is; i <= ie; i++){     
       for(j = 0; j < num_obs_eval; j++){
         indy = 1;
         for(l = 0; l < num_var_ordered; l++){
@@ -2886,6 +2914,10 @@ double *cv){
 
       }
     }
+
+#ifdef MPI2
+    MPI_Allgather(MPI_IN_PLACE, 1, MPI_DOUBLE, cv, 1, MPI_DOUBLE, comm[1]);    
+#endif
     *cv /= (double) num_obs_train*num_obs_eval;
 
     free(kwx);
