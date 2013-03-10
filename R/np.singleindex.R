@@ -304,10 +304,10 @@ npindex.sibandwidth <-
 
     if(gradients==FALSE) {
 
-      tww <- npksum(txdat=as.matrix(txdat) %*% c(1,bws$beta),
+      tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
                     tydat=as.matrix(data.frame(tydat,1)),
                     weights=as.matrix(data.frame(tydat,1)),
-                    exdat=as.matrix(exdat) %*% c(1,bws$beta),
+                    exdat=as.matrix(exdat) %*% as.matrix(bws$beta),
                     bws=bws$bw,
                     ckertype = bws$ckertype,
                     ckerorder = bws$ckerorder)$ksum
@@ -322,7 +322,7 @@ npindex.sibandwidth <-
         ## if evaluation x's are different from training but no y's
         ## are specified
 
-        tww <- npksum(txdat=as.matrix(txdat) %*% c(1,bws$beta),
+        tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
                       tydat=as.matrix(data.frame(tydat,1)),
                       weights=as.matrix(data.frame(tydat,1)),
                       bws=bws$bw,
@@ -350,7 +350,7 @@ npindex.sibandwidth <-
 
       ## index.grad is a 1-column matrix
 
-      index.grad <- as.numeric(model$grad)
+      index.grad <- model$grad
 
       if(!no.ex & (no.ey | residuals)){
 
@@ -369,7 +369,7 @@ npindex.sibandwidth <-
 
         index.tmean <- model$mean
 
-        index.tgrad <- as.numeric(model$grad)
+        index.tgrad <- model$grad
 
       }
 
@@ -430,9 +430,9 @@ npindex.sibandwidth <-
       ## vector, need a 1 x n matrix
 
       if(is.vector(xmex)) {
-        dg.db.xmex <- matrix(index.tgrad*xmex,nrow=1,ncol=length(xmex))
+        dg.db.xmex <- matrix(index.tgrad[,1]*xmex,nrow=1,ncol=length(xmex))
       } else {
-        dg.db.xmex <- index.tgrad*xmex
+        dg.db.xmex <- index.tgrad[,1]*xmex
       }
 
       uhat <- tydat - index.tmean ## Training y and training mean
@@ -452,7 +452,7 @@ npindex.sibandwidth <-
       ## We divide by P(1-P) so test for P=0 or 1...
 
       keep <- which(index.tmean < 1 & index.tmean > 0)
-      dg.db <- txdat[,-1,drop=FALSE]*index.tgrad
+      dg.db <- txdat[,-1,drop=FALSE]*index.tgrad[,1]
 
       ## First row & column of covariance matrix are zero due to
       ## identification condition that beta_1=0. Note the n^{-1} in
