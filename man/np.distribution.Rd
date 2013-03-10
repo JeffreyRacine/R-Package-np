@@ -236,12 +236,12 @@ Fhat <- fitted(npudist(bws=bw, newdata=data.eval))
 
 # Coerce the data into a matrix for plotting with persp()
 
-f <- matrix(Fhat, length(unique(year)), 50)
+F <- matrix(Fhat, length(unique(year)), 50)
 
-# Next, create a 3D perspective plot of the PDF f, and a 2D
+# Next, create a 3D perspective plot of the CDF F, and a 2D
 # contour plot.
 
-persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
+persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
       ticktype="detailed", ylab="GDP", xlab="Year", zlab="Density",
       theta=300, phi=50)
 
@@ -311,9 +311,9 @@ Fhat <- fitted(npudist(edat = data.eval, bws=bw))
 
 # Coerce the data into a matrix for plotting with persp()
 
-f <- matrix(Fhat, length(unique(year)), 50)
+F <- matrix(Fhat, length(unique(year)), 50)
 
-# Next, create a 3D perspective plot of the PDF f, and a 2D
+# Next, create a 3D perspective plot of the CDF F, and a 2D
 # contour plot.
 
 persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",

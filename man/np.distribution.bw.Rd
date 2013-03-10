@@ -455,15 +455,15 @@ summary(bw)
 
 Sys.sleep(5)
 
-# Next, if you wanted to use the 1.06 sigma n^{-1/(2p+q)} rule-of-thumb
+# Next, if you wanted to use the 1.587 sigma n^{-1/(2p+q)} rule-of-thumb
 # for the bandwidth for the continuous variable and, say, no smoothing
 # for the discrete variable, you would use the bwscaling=TRUE argument
-# and feed in the values 0 for the first variable (year) and 1.06 for
+# and feed in the values 0 for the first variable (year) and 1.587 for
 # the second (gdp). Note that in the printout it reports the `scale
 # factors' rather than the `bandwidth' as reported in some of the
 # previous examples.
 
-bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0, 1.06),
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0, 1.587),
                 bwscaling=TRUE, 
                 bandwidth.compute=FALSE)
 
@@ -559,15 +559,15 @@ summary(bw)
 
 Sys.sleep(5)
 
-# Next, if you wanted to use the 1.06 sigma n^{-1/(2p+q)} rule-of-thumb
+# Next, if you wanted to use the 1.587 sigma n^{-1/(2p+q)} rule-of-thumb
 # for the bandwidth for the continuous variable and, say, no smoothing
 # for the discrete variable, you would use the bwscaling=TRUE argument
-# and feed in the values 0 for the first variable (year) and 1.06 for
+# and feed in the values 0 for the first variable (year) and 1.587 for
 # the second (gdp). Note that in the printout it reports the `scale
 # factors' rather than the `bandwidth' as reported in some of the
 # previous examples.
 
-bw <- npudistbw(dat=data, bws=c(0, 1.06),
+bw <- npudistbw(dat=data, bws=c(0, 1.587),
                 bwscaling=TRUE, 
                 bandwidth.compute=FALSE)
 
