@@ -12,7 +12,7 @@ npindexbw <-
 
 npindexbw.formula <-
   function(formula, data, subset, na.action, call, ...){
-    
+
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
@@ -20,10 +20,10 @@ npindexbw.formula <-
 
     mf[[1]] <- as.name("model.frame")
     mf <- eval(mf, parent.frame())
-    
+
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
-    
+
     tbw <- npindexbw(xdat = xdat, ydat = ydat, ...)
 
     ## clean up (possible) inconsistencies due to recursion ...
@@ -42,7 +42,6 @@ npindexbw.formula <-
 
     tbw
   }
-
 
 npindexbw.NULL <-
   function(xdat = stop("training data xdat missing"),
@@ -68,7 +67,6 @@ npindexbw.NULL <-
 
     tbw
   }
-  
 
 npindexbw.default <-
   function(xdat = stop("training data xdat missing"),
@@ -85,7 +83,7 @@ npindexbw.default <-
     if (ncol(xdat) < 2) {
       if (coarseclass(xdat[,1]) != "numeric")
         stop("xdat must contain at least one continuous variable")
-      
+
       warning(paste("xdat has one dimension. Using a single index model to reduce",
                     "dimensionality is unnecessary."))
     }
@@ -104,17 +102,16 @@ npindexbw.default <-
                        bandwidth = bws[ncol(xdat)+1],
                        bandwidth.compute = bandwidth.compute)
 
-
-    if (tbw$method == "kleinspady" & !setequal(ydat,c(0,1))) 
+    if (tbw$method == "kleinspady" & !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("nmulti","random.seed", "optim.method", "optim.maxattempts",
                "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta")
-    
+
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
-    
+
     if (bandwidth.compute)
       tbw <- eval(parse(text=paste("npindexbw.sibandwidth(xdat=xdat, ydat=ydat, bws=tbw",
                           ifelse(any.m, ",",""),
@@ -128,7 +125,6 @@ npindexbw.default <-
     return(tbw)
   }
 
-  
 npindexbw.sibandwidth <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
@@ -157,20 +153,20 @@ npindexbw.sibandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,ncol(xdat))
     }
-    
-    if (bws$method == "kleinspady" & !setequal(ydat,c(0,1))) 
+
+    if (bws$method == "kleinspady" & !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     if (ncol(xdat) < 2) {
       if (coarseclass(xdat[,1]) != "numeric")
         stop("xdat must contain at least one continuous variable")
-      
+
       warning(paste("xdat has one dimension. Using a single index model to reduce",
                     "dimensionality is unnecessary."))
     }
 
     optim.method <- match.arg(optim.method)
-    
+
     ## catch and destroy NA's
     goodrows = 1:dim(xdat)[1]
     rows.omit = attr(na.omit(data.frame(xdat,ydat)), "na.action")
@@ -181,17 +177,17 @@ npindexbw.sibandwidth <-
 
     xdat = xdat[goodrows,,drop = FALSE]
     ydat = ydat[goodrows]
-    
+
     ## convert to numeric
     if (is.factor(ydat))
       ydat <- dlev(ydat)[as.integer(ydat)]
     else
       ydat <- as.double(ydat)
-    
+
     xdat = toMatrix(xdat)
 
     if(bandwidth.compute){
-      
+
       ## Note - there are two methods currently implemented, Ichimura's
       ## least squares approach and Klein and Spady's likelihood approach.
 
@@ -203,7 +199,7 @@ npindexbw.sibandwidth <-
 
       ichimuraMaxPenalty <- 10*mean(ydat^2)
       ichimuraFloor <- sqrt(.Machine$double.eps)
-      
+
       ichimura <- function(param) {
 
         ##Define the leave-one-out objective function, sum (y - \hat
@@ -211,9 +207,9 @@ npindexbw.sibandwidth <-
         ## parameters in `param') and then let h denote the kth column.
         if (ncol(xdat) == 1)
           beta = numeric(0)
-        else 
+        else
           beta <- param[1:(ncol(xdat)-1)]
-        
+
         h <- param[ncol(xdat)]
 
         ## Next we define the sum of squared leave-one-out residuals
@@ -221,7 +217,7 @@ npindexbw.sibandwidth <-
         sum.squares.leave.one.out <- function(xdat,ydat,beta,h) {
 
           ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
-          
+
           index <- as.matrix(xdat) %*% c(1,beta)
 
           ## One call to npksum to avoid repeated computation of the
@@ -233,8 +229,10 @@ npindexbw.sibandwidth <-
                         tydat=W,
                         weights=W,
                         leave.one.out=TRUE,
-                        bandwidth.divide=TRUE,bws=c(h),
-                        ckertype = bws$ckertype, ckerorder = bws$ckerorder)$ksum
+                        bandwidth.divide=TRUE,
+                        bws=c(h),
+                        ckertype = bws$ckertype,
+                        ckerorder = bws$ckerorder)$ksum
 
           denom <- tww[2,2,]
           denom[which(denom == 0.0)] <- ichimuraFloor
@@ -273,7 +271,7 @@ npindexbw.sibandwidth <-
         ## parameters in `param') and then let h denote the kth column.
         if (ncol(xdat) == 1)
           beta = numeric(0)
-        else 
+        else
           beta <- param[1:(ncol(xdat)-1)]
 
         h <- param[ncol(xdat)]
@@ -283,7 +281,7 @@ npindexbw.sibandwidth <-
         sum.log.leave.one.out <- function(xdat,ydat,beta,h) {
 
           ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
-          
+
           index <- as.matrix(xdat) %*% c(1,beta)
 
           ## One call to npksum to avoid repeated computation of the
@@ -295,8 +293,10 @@ npindexbw.sibandwidth <-
                         tydat=W,
                         weights=W,
                         leave.one.out=TRUE,
-                        bandwidth.divide=TRUE,bws=c(h),
-                        ckertype = bws$ckertype, ckerorder = bws$ckerorder)$ksum
+                        bandwidth.divide=TRUE,
+                        bws=c(h),
+                        ckertype = bws$ckertype,
+                        ckerorder = bws$ckerorder)$ksum
 
           denom <- tww[2,2,]
           denom[which(denom == 0.0)] <- kleinspadyFloor
@@ -349,7 +349,7 @@ npindexbw.sibandwidth <-
 
         console <- printPush(paste(sep="", "Multistart ", i, " of ", nmulti, "..."), console)
         ##cv.console <- newLineConsole(console)
-        
+
         n <- nrow(xdat)
 
         ## We use the nlm command to minimize the objective function using
@@ -362,14 +362,14 @@ npindexbw.sibandwidth <-
           ## multistart 1
           ols.fit <- lm(ydat~xdat,x=TRUE)
           fit <- fitted(ols.fit)
-          
+
           if (ncol(xdat) != 1){
             if (setequal(bws$beta[2:ncol(xdat)],c(0)))
               beta <- coef(ols.fit)[3:ncol(ols.fit$x)]
             else
               beta = bws$beta[2:ncol(xdat)]
           } else { beta = numeric(0) }
-          
+
           if (bws$bw == 0)
             if(IQR(fit) > 0) {
               h <- (4/3)^0.2*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
@@ -394,7 +394,7 @@ npindexbw.sibandwidth <-
 
         optim.parm <- if(only.optimize.beta) beta else c(beta,h)
 
-        topt <- parse(text=paste("optim(optim.parm,fn=optim.fn,gr=NULL,method=optim.method,control=optim.control", ifelse(only.optimize.beta, ',h)',')')))        
+        topt <- parse(text=paste("optim(optim.parm,fn=optim.fn,gr=NULL,method=optim.method,control=optim.control", ifelse(only.optimize.beta, ',h)',')')))
         suppressWarnings(optim.return <- eval(topt))
         attempts <- 0
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
@@ -411,20 +411,18 @@ npindexbw.sibandwidth <-
           optim.control <- lapply(optim.control,'*',10.0)
           suppressWarnings(optim.return <- eval(topt))
         }
-        
 
         if(optim.return$convergence != 0)
           stop(paste("optim failed to converge after optim.maxattempts = ", optim.maxattempts, " iterations."))
 
-        fval.value[i] <- optim.return$value       
-        if(optim.return$value < fval.min) {        
+        fval.value[i] <- optim.return$value
+        if(optim.return$value < fval.min) {
           param <- if(only.optimize.beta) c(optim.return$par,h) else optim.return$par
           fval.min <- optim.return$value
           numimp <- numimp + 1
           best <- i
         }
 
-        
         if(i != nmulti)
           console <- printPop(console)
       }
@@ -451,7 +449,7 @@ npindexbw.sibandwidth <-
     ## Restore seed
 
     if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
-    
+
     bws <- sibandwidth(beta = bws$beta,
                        h = bws$bw,
                        method = bws$method,
@@ -471,7 +469,6 @@ npindexbw.sibandwidth <-
                        bandwidth.compute = bandwidth.compute,
                        optim.method = optim.method,
                        only.optimize.beta = only.optimize.beta)
-
 
     bws
 

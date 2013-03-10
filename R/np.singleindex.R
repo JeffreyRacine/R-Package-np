@@ -69,12 +69,12 @@ npindex.formula <-
     if ((has.eval <- !is.null(newdata))) {
       if (!(has.ey <- succeedWithResponse(tt, newdata)))
         tt <- delete.response(tt)
-      
+
       umf <- emf <- model.frame(tt, data = newdata)
 
       if (has.ey)
         eydat <- model.response(emf)
-      
+
       exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
     }
 
@@ -110,7 +110,7 @@ npindex.default <- function(bws, txdat, tydat, ...){
   no.tydat <- missing(tydat)
 
   ## if bws was passed in explicitly, do not compute bandwidths
-    
+
   if(txdat.named)
     txdat <- toFrame(txdat)
 
@@ -120,9 +120,9 @@ npindex.default <- function(bws, txdat, tydat, ...){
                    ifelse(no.txdat, "", "txdat,"))
   ty.str <- ifelse(tydat.named, "ydat = tydat,",
                    ifelse(no.tydat, "", "tydat,"))
-  
+
   tbw <- eval(parse(text = paste("npindexbw(",
-                      ifelse(bws.named,                             
+                      ifelse(bws.named,
                              paste(tx.str, ty.str,
                                    "bws = bws, bandwidth.compute = FALSE,"),
                              paste(ifelse(no.bws, "", "bws,"), tx.str, ty.str)),
@@ -133,7 +133,7 @@ npindex.default <- function(bws, txdat, tydat, ...){
   ##                            bws = tbw)
 
   repair.args <- c("data", "subset", "na.action")
-  
+
   m.par <- match(repair.args, names(mc), nomatch = 0)
   m.child <- match(repair.args, names(tbw$call), nomatch = 0)
 
@@ -145,7 +145,7 @@ npindex.default <- function(bws, txdat, tydat, ...){
   m.bws.par <- match(c("bws","txdat","tydat"), names(mc), nomatch = 0)
   m.bws.child <- match(c("bws","txdat","tydat"), as.character(tbw$call), nomatch = 0)
   m.bws.union <- (m.bws.par > 0) & (m.bws.child > 0)
-  
+
   tbw$call[m.bws.child[m.bws.union]] <- mc[m.bws.par[m.bws.union]]
 
   environment(tbw$call) <- parent.frame()
@@ -156,13 +156,13 @@ npindex.default <- function(bws, txdat, tydat, ...){
     ty.str <- ",tydat = tydat"
   } else {
     tx.str <- ifelse(txdat.named, ",txdat = txdat","")
-    ty.str <- ifelse(tydat.named, ",tydat = tydat","")    
+    ty.str <- ifelse(tydat.named, ",tydat = tydat","")
     if((!bws.named) && (!txdat.named)){
       ty.str <- ifelse(tydat.named, ",tydat = tydat",
                        ifelse(no.tydat,"",",tydat"))
     }
   }
-  
+
   eval(parse(text=paste("npindex(bws = tbw", tx.str, ty.str, ",...)")))
 }
 
@@ -177,17 +177,15 @@ npindex.sibandwidth <-
            errors = FALSE,
            boot.num = 399, ...) {
 
-  
     no.ex = missing(exdat)
     no.ey = missing(eydat)
-    
 
     ## if no.ex then if !no.ey then ey and tx must match, to get
     ## oos errors alternatively if no.ey you get is errors if
     ## !no.ex then if !no.ey then ey and ex must match, to get
     ## oos errors alternatively if no.ey you get NO errors since we
     ## don't evaluate on the training data
-    
+
     txdat = toFrame(txdat)
 
     if (!(is.vector(tydat) | is.factor(tydat)))
@@ -201,15 +199,15 @@ npindex.sibandwidth <-
 
     if (!no.ex){
       exdat = toFrame(exdat)
-      
+
       if (! txdat %~% exdat )
         stop("'txdat' and 'exdat' are not similar data frames!")
-      
+
       if (!no.ey){
         if (dim(exdat)[1] != length(eydat))
           stop("number of evaluation data 'exdat' and dependent data 'eydat' do not match")
       }
-      
+
     } else if(!no.ey) {
       if (dim(txdat)[1] != length(eydat))
         stop("number of training data 'txdat' and dependent data 'eydat' do not match")
@@ -225,7 +223,6 @@ npindex.sibandwidth <-
 
     txdat = txdat[goodrows,,drop = FALSE]
     tydat = tydat[goodrows]
-
 
     if (!no.ex){
       goodrows = 1:dim(exdat)[1]
@@ -252,7 +249,6 @@ npindex.sibandwidth <-
     else
       tydat <- as.double(tydat)
 
-
     if (no.ey)
       eydat <- double()
     else {
@@ -266,9 +262,9 @@ npindex.sibandwidth <-
 
     ## re-assign levels in training and evaluation data to ensure correct
     ## conversion to numeric type.
-    
+
     txdat <- adjustLevels(txdat, bws$xdati)
-      
+
     if (!no.ex)
       exdat <- adjustLevels(exdat, bws$xdati)
 
@@ -280,13 +276,12 @@ npindex.sibandwidth <-
 
     ## put the unordered, ordered, and continuous data in their own objects
     ## data that is not a factor is continuous.
-    
+
     txdat = toMatrix(txdat)
 
     if (!no.ex){
       exdat = toMatrix(exdat)
     }
-
 
     ## from this point on txdat and exdat have been recast as matrices
 
@@ -298,7 +293,7 @@ npindex.sibandwidth <-
     index <- txdat %*% bws$beta
 
     if(no.ex) {
-      index.eval <- index 
+      index.eval <- index
       exdat <- txdat
       eydat <- tydat
     } else {
@@ -317,7 +312,7 @@ npindex.sibandwidth <-
                            ckerorder = bws$ckerorder)$ksum/
                              npksum(txdat=index,
                                     exdat=index.eval,
-                                    bws=bws$bw,                                    
+                                    bws=bws$bw,
                                     ckertype = bws$ckertype,
                                     ckerorder = bws$ckerorder)$ksum
 
@@ -325,14 +320,14 @@ npindex.sibandwidth <-
         ## want to evaluate on training data for in sample errors even
         ## if evaluation x's are different from training but no y's
         ## are specified
-        
+
         index.tmean <- npksum(txdat=index,
                               tydat=tydat,
-                              bws=bws$bw,                              
+                              bws=bws$bw,
                               ckertype = bws$ckertype,
                               ckerorder = bws$ckerorder)$ksum/
                                 npksum(txdat=index,
-                                       bws=bws$bw,                                       
+                                       bws=bws$bw,
                                        ckertype = bws$ckertype,
                                        ckerorder = bws$ckerorder)$ksum
       }
@@ -342,18 +337,18 @@ npindex.sibandwidth <-
       model <- npreg(txdat=index,
                      tydat=tydat,
                      exdat=index.eval,
-                     bws=bws$bw,                     
+                     bws=bws$bw,
                      ckertype = bws$ckertype,
                      ckerorder = bws$ckerorder,
                      regtype="lc",
                      gradients=TRUE)
 
       index.mean <- model$mean
-      
+
       ## index.grad is a matrix, one column for each variable, each
       ## equal to its coefficient beta_i times the first derivative of
       ## the local-constant model
-      
+
       index.grad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))
 
       if(!no.ex & (no.ey | residuals)){
@@ -373,10 +368,9 @@ npindex.sibandwidth <-
 
         index.tmean <- model$mean
 
-        index.tgrad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))        
+        index.tgrad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))
 
       }
-
 
     }
 
@@ -414,11 +408,11 @@ npindex.sibandwidth <-
       tyindex <- npksum(txdat = index,
                         tydat = rep(1,length(tydat)),
                         weights = W,
-                        bws = bws$bw,                        
+                        bws = bws$bw,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
-      tindex <- npksum(txdat = index, bws = bws$bw,                       
+      tindex <- npksum(txdat = index, bws = bws$bw,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder)$ksum
 
@@ -453,15 +447,15 @@ npindex.sibandwidth <-
       Sigma <- (uhat*dg.db.xmex)%*%t(uhat*dg.db.xmex)
 
       Bvcov[-1,-1] <- Vinv %*% Sigma %*% Vinv
-    
-      dimnames(Bvcov) <- list(bws$xnames,bws$xnames)      
+
+      dimnames(Bvcov) <- list(bws$xnames,bws$xnames)
 
       ## Now export this in an S3 method...
 
     } else if(bws$method == "kleinspady" & gradients == TRUE) {
 
       ## We divide by P(1-P) so test for P=0 or 1...
-      
+
       keep <- which(index.tmean < 1 & index.tmean > 0)
       dg.db <- txdat[,-1,drop=FALSE]*index.tgrad[,1]
 
@@ -475,7 +469,7 @@ npindex.sibandwidth <-
       Bvcov[-1,-1] <- solve(t(dg.db[keep,])%*%(dg.db[keep,]/(index.tmean[keep]*
         (1-index.tmean[keep]))))
 
-      dimnames(Bvcov) <- list(bws$xnames,bws$xnames)      
+      dimnames(Bvcov) <- list(bws$xnames,bws$xnames)
 
       ## Now export this in an S3 method...
 
@@ -510,13 +504,12 @@ npindex.sibandwidth <-
                bws = bws$bw,
                ckertype = bws$ckertype,
                ckerorder = bws$ckerorder)$ksum/
-                 npksum(txdat = rindex, exdat = index.eval, bws=bws$bw,                        
+                 npksum(txdat = rindex, exdat = index.eval, bws=bws$bw,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
       }
     }
 
-    
     if (errors){
 
       boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = boot.num))
@@ -559,26 +552,23 @@ npindex.sibandwidth <-
       index.pred =
         if (!no.ey) round(index.mean)
         else round(index.tmean)
-      
+
       confusion.matrix =
         table(if (!no.ey) eydat else tydat,
               index.pred, dnn=c("Actual", "Predicted"))
-      
+
       CCR.overall <- sum(diag(confusion.matrix))/sum(confusion.matrix)
       CCR.byoutcome <- diag(confusion.matrix)/rowSums(confusion.matrix)
 
-
       fit.mcfadden <- confusion.matrix/sum(confusion.matrix)
-      
+
       fit.mcfadden <- sum(diag(fit.mcfadden)) -
         (sum(fit.mcfadden^2)-sum(diag(fit.mcfadden)^2))
-
 
       strgof = "confusion.matrix = confusion.matrix, CCR.overall = CCR.overall,
            CCR.byoutcome =  CCR.byoutcome, fit.mcfadden = fit.mcfadden,"
       strres = ""
     }
-
 
     eval(parse(text=paste(
                  "singleindex(bws = bws, index = index.eval, mean = index.mean,",
@@ -588,5 +578,5 @@ npindex.sibandwidth <-
                  strres,
                  "ntrain = nrow(txdat),", strgof,
                  "trainiseval = no.ex, residuals = residuals, gradients = gradients)")))
-  
+
   }
