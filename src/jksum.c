@@ -1318,6 +1318,7 @@ double * kw){
   // switch parallelisation strategies based on biggest stride
  
   int stride = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int stride_mpi;
 
   num_obs_eval_alloc = stride*iNum_Processors;
 
@@ -1475,6 +1476,7 @@ double * kw){
     if(!gather_scatter){
       js = stride * my_rank;
       je = MIN(num_obs_eval - 1, js + stride - 1);
+      stride_mpi = je - js + 1;
       ws = weighted_sum + js*sum_element_length;
     } else {
       js = 0;
@@ -1493,6 +1495,7 @@ double * kw){
     if(!gather_scatter){
       js = stride * my_rank;
       je = MIN(num_obs_train - 1, js + stride - 1);
+      stride_mpi = je - js + 1;
       ws = weighted_sum;
     } else {
       js = 0;
@@ -1610,13 +1613,13 @@ double * kw){
     // note: ll cv + adaptive_nn does not work in parallel
 #ifdef MPI2
     if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-      MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
+      MPI_Allgather(MPI_IN_PLACE, stride_mpi * sum_element_length, MPI_DOUBLE, weighted_sum, stride_mpi * sum_element_length, MPI_DOUBLE, comm[1]);
     } else if(BANDWIDTH_reg == BW_ADAP_NN){
       MPI_Allreduce(MPI_IN_PLACE, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
     }
 
     if(kw != NULL){
-      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw, stride * num_xt, MPI_DOUBLE, comm[1]);    
+      MPI_Allgather(MPI_IN_PLACE, stride_mpi * num_xt, MPI_DOUBLE, kw, stride_mpi * num_xt, MPI_DOUBLE, comm[1]);    
     }
 #endif
   }
