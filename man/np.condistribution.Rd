@@ -95,14 +95,15 @@ npcdist(bws, \dots)
   }
 
   \item{exdat}{
-    a \eqn{p}-variate data frame of explanatory data on which
-    conditional densities will be evaluated. By default,
-    evaluation takes place on the data provided by \code{txdat}.
+    a \eqn{p}-variate data frame of explanatory data on
+    which cumulative conditional distributions will be evaluated. By
+    default, evaluation takes place on the data provided by
+    \code{txdat}.
   }
 
   \item{eydat}{
-    a \eqn{q}-variate data frame of dependent data on which conditional
-    densities will be evaluated. By default,
+    a \eqn{q}-variate data frame of dependent data on which
+    cumulative conditional distributions will be evaluated. By default,
     evaluation takes place on the data provided by \code{tydat}.
   }
 
@@ -119,8 +120,9 @@ npcdist(bws, \dots)
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
   each sample realization in the set, \eqn{x_i}{x[i]}, when estimating
-  the density at the point \eqn{x}. Generalized nearest-neighbor
-  bandwidths change with the point at which the density is estimated,
+  the cumulative conditional distribution at the point
+  \eqn{x}. Generalized nearest-neighbor bandwidths change with the point
+  at which the cumulative conditional distribution is estimated,
   \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
   Training and evaluation input data  may be a
@@ -156,13 +158,13 @@ npcdist(bws, \dots)
   \item{yeval}{ the evaluation points of the dependent data }
   \item{condist}{ estimates of the conditional cumulative
     distribution at the evaluation points }
-  \item{conderr}{ standard errors of the conditional density (cumulative distribution)
+  \item{conderr}{ standard errors of the cumulative conditional distribution
     estimates }
   \item{congrad}{ if invoked with \code{gradients = TRUE}, estimates of
     the gradients at the evaluation points }
   \item{congerr}{ if invoked with \code{gradients = TRUE}, standard
     errors of the gradients at the evaluation points }
-  \item{log_likelihood}{ log likelihood of the conditional density estimate }
+  \item{log_likelihood}{ log likelihood of the cumulative conditional distribution estimate }
 
 }
 
@@ -236,8 +238,8 @@ bw <- npcdistbw(formula=gdp~ordered(year))
 
 Fhat <- npcdist(bws=bw)
 
-# The object Fhat now contains results such as the estimated conditional
-# density function (Fhat$condist) and so on...
+# The object Fhat now contains results such as the estimated cumulative
+# conditional distribution function (Fhat$condist) and so on...
 
 summary(Fhat)
 
@@ -275,8 +277,8 @@ bw <- npcdistbw(xdat=X, ydat=y)
 
 Fhat <- npcdist(bws=bw)
 
-# The object Fhat now contains results such as the estimated conditional
-# density function (Fhat$condist) and so on...
+# The object Fhat now contains results such as the estimated cumulative
+# conditional distribution function (Fhat$condist) and so on...
 
 summary(Fhat)
 
@@ -289,7 +291,7 @@ detach(Italy)
 
 # EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
-# conditional density and conditional distribution functions.
+# conditional distribution function.
 
 library("datasets")
 data("faithful")
@@ -302,8 +304,9 @@ bw <- npcdistbw(formula=eruptions~waiting)
 
 summary(bw)
 
-# Plot the density function (<ctrl>-C will interrupt on *NIX systems,
-# <esc> will interrupt on MS Windows systems).
+# Plot the conditional cumulative distribution function (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows
+# systems).
 
 plot(bw)
 
@@ -311,7 +314,7 @@ detach(faithful)
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
 # faithful geyser data from the R `datasets' library and compute the
-# conditional density and conditional distribution functions.
+# cumulative conditional distribution function.
 
 library("datasets")
 data("faithful")
@@ -332,8 +335,8 @@ bw <- npcdistbw(xdat=X, ydat=y)
 
 summary(bw)
 
-# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
-# <esc> will interrupt on MS Windows systems)
+# Plot the conditional cumulative distribution function (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows systems)
 
 plot(bw)
 

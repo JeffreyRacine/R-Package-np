@@ -1,4 +1,4 @@
-% $Id: np.condensity.bw.Rd,v 1.52 2006/11/03 21:17:20 tristen Exp $
+
 \name{npcdistbw}
 \alias{npcdistbw}
 \alias{npcdistbw.NULL}
