@@ -253,7 +253,6 @@ npudistbw.dbandwidth <-
                      bwtype = tbw$type,
                      ckertype = tbw$ckertype,
                      ckerorder = tbw$ckerorder,
-                     ukertype = tbw$ukertype,
                      okertype = tbw$okertype,
                      fval = tbw$fval,
                      ifval = tbw$ifval,
@@ -275,7 +274,7 @@ npudistbw.default <-
            nmulti, remin, itmax, fast.cdf, do.full.integral, ngrid, ftol, tol, small,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
-           ckertype, ckerorder, ukertype, okertype,
+           ckertype, ckerorder, okertype,
            ...){
 
     t.names <- NULL
@@ -292,7 +291,7 @@ npudistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
-               "ukertype", "okertype")
+               "okertype")
 
 
     m <- match(margs, mc.names, nomatch = 0)
