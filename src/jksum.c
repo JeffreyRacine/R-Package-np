@@ -1252,6 +1252,11 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 
 
 
+//Warning: the MPI operations used by this function assume that the
+//receiving buffers, i.e. weighted_sum have enough space allocated such that a write
+//consisting of nproc*stride will not segfault. It is up to the caller
+//to ensure that this is the case.
+
 int kernel_weighted_sum_np(
 const int KERNEL_reg,
 const int KERNEL_unordered_reg,
@@ -1318,8 +1323,6 @@ double * kw){
   // switch parallelisation strategies based on biggest stride
  
   int stride = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
-  int stride_mpi;
-
   num_obs_eval_alloc = stride*iNum_Processors;
 
 #else
@@ -1476,7 +1479,6 @@ double * kw){
     if(!gather_scatter){
       js = stride * my_rank;
       je = MIN(num_obs_eval - 1, js + stride - 1);
-      stride_mpi = je - js + 1;
       ws = weighted_sum + js*sum_element_length;
     } else {
       js = 0;
@@ -1495,7 +1497,6 @@ double * kw){
     if(!gather_scatter){
       js = stride * my_rank;
       je = MIN(num_obs_train - 1, js + stride - 1);
-      stride_mpi = je - js + 1;
       ws = weighted_sum;
     } else {
       js = 0;
@@ -1613,13 +1614,13 @@ double * kw){
     // note: ll cv + adaptive_nn does not work in parallel
 #ifdef MPI2
     if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-      MPI_Allgather(MPI_IN_PLACE, stride_mpi * sum_element_length, MPI_DOUBLE, weighted_sum, stride_mpi * sum_element_length, MPI_DOUBLE, comm[1]);
+      MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
     } else if(BANDWIDTH_reg == BW_ADAP_NN){
       MPI_Allreduce(MPI_IN_PLACE, weighted_sum, num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
     }
 
     if(kw != NULL){
-      MPI_Allgather(MPI_IN_PLACE, stride_mpi * num_xt, MPI_DOUBLE, kw, stride_mpi * num_xt, MPI_DOUBLE, comm[1]);    
+      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw, stride * num_xt, MPI_DOUBLE, comm[1]);    
     }
 #endif
   }
@@ -2561,21 +2562,31 @@ double * cv){
 
   int * operator = NULL;
 
-  double * mean = (double *)malloc(num_obs_eval*sizeof(double));
-  
-  if(mean == NULL)
-    error("failed to allocate mean");
-
   int is,ie;
+
+  int num_obs_eval_alloc, num_obs_train_alloc;
+
 #ifdef MPI2
-  int stride = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
-  is = stride * my_rank;
-  ie = MIN(num_obs_train - 1, is + stride - 1);
+  int stride_t = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
+  is = stride_t * my_rank;
+  ie = MIN(num_obs_train - 1, is + stride_t - 1);
+  int stride_e = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  
+  num_obs_train_alloc = stride_t*iNum_Processors;
+  num_obs_eval_alloc = stride_e*iNum_Processors;
 #else
   is = 0;
   ie = num_obs_train - 1;
+
+  num_obs_train_alloc = num_obs_train;
+  num_obs_eval_alloc = num_obs_eval;
 #endif
 
+
+  double * mean = (double *)malloc(num_obs_eval_alloc*sizeof(double));
+  
+  if(mean == NULL)
+    error("failed to allocate mean");
 
   double ofac = num_obs_train - 1.0;
 
@@ -2590,7 +2601,7 @@ double * cv){
   *cv = 0;
 
   if(fast){
-    double * kw = (double *)malloc(num_obs_train*num_obs_eval*sizeof(double));
+    double * kw = (double *)malloc(num_obs_train_alloc*num_obs_eval_alloc*sizeof(double));
 
     if(kw == NULL)
       error("failed to allocate kw, try reducing num_obs_eval");
@@ -2648,7 +2659,7 @@ double * cv){
       }
     }
 #ifdef MPI2
-    MPI_Allgather(MPI_IN_PLACE, 1, MPI_DOUBLE, cv, 1, MPI_DOUBLE, comm[1]);    
+    MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
 
     *cv /= (double) num_obs_train*num_obs_eval;
@@ -2700,7 +2711,7 @@ double * cv){
       }
     }
 #ifdef MPI2
-    MPI_Allgather(MPI_IN_PLACE, 1, MPI_DOUBLE, cv, 1, MPI_DOUBLE, comm[1]);    
+    MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
 
     *cv /= (double) num_obs_train*num_obs_eval;
@@ -2758,17 +2769,29 @@ double *cv){
   double vsfy[num_var_tot];
   double xyj, xmi;
 
-  double * mean = (double *)malloc(MAX(num_obs_eval,num_obs_train)*sizeof(double));
-
   int is,ie;
+  int num_obs_eval_alloc, num_obs_train_alloc;
+
 #ifdef MPI2
-  int stride = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
-  is = stride * my_rank;
-  ie = MIN(num_obs_train - 1, is + stride - 1);
+  int stride_t = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
+  is = stride_t * my_rank;
+  ie = MIN(num_obs_train - 1, is + stride_t - 1);
+  int stride_e = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  
+  num_obs_train_alloc = stride_t*iNum_Processors;
+  num_obs_eval_alloc = stride_e*iNum_Processors;
 #else
   is = 0;
   ie = num_obs_train - 1;
+
+  num_obs_train_alloc = num_obs_train;
+  num_obs_eval_alloc = num_obs_eval;
 #endif
+
+
+  double * mean = (double *)malloc(MAX(num_obs_eval_alloc,num_obs_train_alloc)*sizeof(double));
+
+
   
   if(mean == NULL)
     error("failed to allocate mean");
@@ -2804,12 +2827,12 @@ double *cv){
   *cv = 0;
 
   if(fast){
-    double * kwx = (double *)malloc(num_obs_train*num_obs_train*sizeof(double));
+    double * kwx = (double *)malloc(num_obs_train_alloc*num_obs_train_alloc*sizeof(double));
 
     if(kwx == NULL)
       error("failed to allocate kwx, try setting fast.cdf = false");
 
-    double * kwy = (double *)malloc(num_obs_train*num_obs_eval*sizeof(double));
+    double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_eval_alloc*sizeof(double));
 
     if(kwy == NULL)
       error("failed to allocate kwy, try reducing num_obs_eval");
@@ -2916,7 +2939,7 @@ double *cv){
     }
 
 #ifdef MPI2
-    MPI_Allgather(MPI_IN_PLACE, 1, MPI_DOUBLE, cv, 1, MPI_DOUBLE, comm[1]);    
+    MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
     *cv /= (double) num_obs_train*num_obs_eval;
 
