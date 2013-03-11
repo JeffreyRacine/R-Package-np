@@ -251,7 +251,7 @@ Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)), 
         gdp.seq, 
-        f, 
+        F, 
         xlab="Year", 
         ylab="GDP", 
         main = "Cumulative Distribution Contour Plot", 
@@ -316,7 +316,7 @@ F <- matrix(Fhat, length(unique(year)), 50)
 # Next, create a 3D perspective plot of the CDF F, and a 2D
 # contour plot.
 
-persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
+persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
       ticktype="detailed", ylab="GDP", xlab="Year",
       zlab="Cumulative Distribution",
       theta=300, phi=50)
@@ -327,7 +327,7 @@ Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)),
         gdp.seq, 
-        f, 
+        F, 
         xlab="Year", 
         ylab="GDP", 
         main = "Cumulative Distribution Contour Plot", 
