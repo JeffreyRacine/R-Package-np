@@ -78,7 +78,7 @@ npcdistbw.condbandwidth <-
            ydat = stop("data 'ydat' missing"),
            gydat = NULL,
            bws, bandwidth.compute = TRUE,
-           fast = FALSE, auto = TRUE,
+           auto = TRUE,
            nmulti, remin = TRUE, itmax = 10000,
            fast.cdf = TRUE, do.full.integral = FALSE, ngrid = 100,
            ftol=1.19209e-07, tol=1.49012e-08, small=2.22045e-16,
@@ -389,7 +389,7 @@ npcdistbw.default <-
            gydat,
            bws, 
            bandwidth.compute = TRUE,
-           fast, auto, nmulti, remin, itmax,
+           auto, nmulti, remin, itmax,
            fast.cdf, do.full.integral, ngrid,
            ftol, tol, small,
            ## dummy arguments for condbandwidth() function call
@@ -432,7 +432,7 @@ npcdistbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("gydat", "bandwidth.compute", "fast", "auto", "nmulti", "remin", "itmax", "fast.cdf", "do.full.integral", "ngrid", "ftol",
+    margs <- c("gydat", "bandwidth.compute", "auto", "nmulti", "remin", "itmax", "fast.cdf", "do.full.integral", "ngrid", "ftol",
                "tol", "small")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
