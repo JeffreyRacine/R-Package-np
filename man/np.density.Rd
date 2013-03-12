@@ -145,7 +145,7 @@ npudens(bws, \dots)
   following components:
 
   \item{eval}{ the evaluation points. }
-  \item{dens or dist}{ estimation of the density at the evaluation points }
+  \item{dens}{ estimation of the density at the evaluation points }
   \item{derr}{ standard errors of the density estimates }
   \item{log_likelihood}{ log likelihood of the density estimates }
   

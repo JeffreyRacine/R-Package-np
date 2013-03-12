@@ -144,7 +144,7 @@ npudist(bws, \dots)
   following components:
 
   \item{eval}{ the evaluation points. }
-  \item{dens or dist}{ estimation of the cumulative distribution at the evaluation points }
+  \item{dist}{ estimation of the cumulative distribution at the evaluation points }
   \item{derr}{ standard errors of the cumulative distribution estimates }
   
 }
