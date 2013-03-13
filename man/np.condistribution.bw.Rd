@@ -31,7 +31,6 @@ npcdistbw(\dots)
           gydat = NULL,
           bws,
           bandwidth.compute = TRUE,
-          fast = FALSE,
           auto = TRUE,
           nmulti,
           remin = TRUE,
@@ -49,7 +48,6 @@ npcdistbw(\dots)
           gydat,
           bws,
           bandwidth.compute = TRUE,
-          fast,
           auto,
           nmulti,
           remin,
@@ -148,16 +146,6 @@ npcdistbw(\dots)
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
-  }
-
-  \item{fast}{
-    a logical value specifying whether a significantly faster, memory
-    intensive procedure should be used when doing least-squares
-    cross-validation. Recommended for datasets of moderate
-    size. Use of this on datasets of size larger than ~1000 observations
-    will result in decreased performance. For more information see the
-    the \code{auto} argument.
-    Defaults to \code{FALSE}.
   }
 
   \item{auto}{
