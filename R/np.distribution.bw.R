@@ -248,21 +248,22 @@ npudistbw.dbandwidth <-
     }
 
     tbw <- dbandwidth(bw = tbw$bw,
-                     bwmethod = tbw$method,
-                     bwscaling = tbw$scaling,
-                     bwtype = tbw$type,
-                     ckertype = tbw$ckertype,
-                     ckerorder = tbw$ckerorder,
-                     okertype = tbw$okertype,
-                     fval = tbw$fval,
-                     ifval = tbw$ifval,
-                     nobs = tbw$nobs,
-                     xdati = tbw$xdati,
-                     xnames = tbw$xnames,
-                     sfactor = tbw$sfactor,
-                     bandwidth = tbw$bandwidth,
-                     rows.omit = rows.omit,
-                     bandwidth.compute)
+                      bwmethod = tbw$method,
+                      bwscaling = tbw$scaling,
+                      bwtype = tbw$type,
+                      ckertype = tbw$ckertype,
+                      ckerorder = tbw$ckerorder,
+                      ukertype = c("aitchisonaitken"),
+                      okertype = tbw$okertype,
+                      fval = tbw$fval,
+                      ifval = tbw$ifval,
+                      nobs = tbw$nobs,
+                      xdati = tbw$xdati,
+                      xnames = tbw$xnames,
+                      sfactor = tbw$sfactor,
+                      bandwidth = tbw$bandwidth,
+                      rows.omit = rows.omit,
+                      bandwidth.compute)
     
     tbw
   }
