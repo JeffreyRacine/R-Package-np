@@ -56,16 +56,14 @@ npcdist(bws, \dots)
   }
 
   \item{\dots}{
-    additional arguments supplied to specify the bandwidth type,
-    kernel types, and so on.  This is necessary if you
-    specify bws as a \eqn{p+q}-vector and not a \code{condbandwidth}
-    object, and you do not desire the default behaviours. To do this,
-    you may specify any of \code{bwmethod}, \code{bwscaling},
-    \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
-    \code{cykertype}, \code{cykerorder}, \code{uxkertype},
-    \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
-    in \code{\link{npcdistbw}}. 
-
+    additional arguments supplied to specify the bandwidth type, kernel
+    types, and so on.  This is necessary if you specify bws as a
+    \eqn{p+q}-vector and not a \code{condbandwidth} object, and you do
+    not desire the default behaviours. To do this, you may specify any
+    of \code{bwmethod}, \code{bwscaling}, \code{bwtype},
+    \code{cxkertype}, \code{cxkerorder}, \code{cykertype},
+    \code{cykerorder}, \code{uxkertype}, \code{oxkertype},
+    \code{oykertype}, as described in \code{\link{npcdistbw}}.
   }
   
   \item{data}{
