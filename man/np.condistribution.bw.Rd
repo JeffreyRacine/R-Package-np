@@ -66,7 +66,6 @@ npcdistbw(\dots)
           cykertype,
           cykerorder,
           uxkertype,
-          uykertype,
           oxkertype,
           oykertype,
           \dots)
@@ -234,10 +233,6 @@ npcdistbw(\dots)
     character string used to specify the unordered categorical
     kernel type. Can be set as \code{aitchisonaitken} or
     \code{liracine}. Defaults to \code{aitchisonaitken}.
-  }
-  \item{uykertype}{
-    character string used to specify the unordered categorical
-    kernel type. Can be set as \code{aitchisonaitken}.
   }
   \item{oxkertype}{
     character string used to specify the ordered categorical
