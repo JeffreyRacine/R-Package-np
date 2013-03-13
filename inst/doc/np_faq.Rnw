@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.80 2013/03/06 18:46:58 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.81 2013/03/12 21:40:48 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -8,7 +8,7 @@
 
 \tolerance=5000
 
-\usepackage{setspace,srcltx,hyperref}
+\usepackage{setspace,hyperref}
 
 \newcommand{\field}[1]{\mathbb{#1}} \newcommand{\R}{\field{R}}
 
@@ -1516,7 +1516,7 @@ lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
 
 \appendix
 
-\section*{Changes from Version 0.40-13 to 0.50-1 [12-Mar-2013]}
+\section*{Changes from Version 0.40-13 to 0.50-1 [13-Mar-2013]}
 
 \begin{itemize}
 
