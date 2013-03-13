@@ -1516,7 +1516,7 @@ lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
 
 \appendix
 
-\section*{Changes from Version 0.40-13 to 0.50-1 [08-Mar-2013]}
+\section*{Changes from Version 0.40-13 to 0.50-1 [12-Mar-2013]}
 
 \begin{itemize}
 

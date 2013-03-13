@@ -112,6 +112,28 @@ npcopula(bws,
   grids, concatenate and sort, and these form the final grid of length
   \code{n.quasi.inv} for computing the quasi-inverse.
 
+  Note that \code{npcopula}, when called with the option
+  \code{density=TRUE}, allows for two levels of smoothing if desired,
+  one for the distribution, \eqn{F(x,y)}, and one for the density,
+  \eqn{f(x,y)}. These can be different or the same, for instance, that
+  for the density only (we include this flexibility for extensibility
+  purposes). If the user wishes to use the same bandwidths throughout
+  then simply copy the bandwidths from, e.g. the \code{npudensbw}
+  bandwidth object, \code{bw.pdf}, into those from, e.g the
+  \code{npudistbw} bandwidth object, \code{bw.cdf}, as follows:
+
+  \preformatted{
+
+    bw.cdf$bws$bandwidth$x <- bw.pdf$bws$bandwidth$x
+    bw.cdf$bw <- bw.pdf$bw
+
+  }
+
+  When these two bandwidth objects are passed to \code{npcopula} the
+  same bandwidths will be used everywhere (i.e when inverting
+  \eqn{F(x,y)} and when computing
+  \eqn{f(F_x^{-1}(u_x),F_y^{-1}(u_y))/(f_x(F_x^{-1}(u_x))f_x(F_y^{-1}(u_y)))}).
+
   Note that copula are only defined for data of type
   \code{\link{numeric}} or \code{\link{ordered}}.
 
