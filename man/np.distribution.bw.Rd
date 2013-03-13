@@ -57,7 +57,6 @@ npudistbw(\dots)
           bwtype,
           ckertype,
           ckerorder,
-          ukertype,
           okertype,
           \dots) 
 
@@ -193,11 +192,6 @@ npudistbw(\dots)
     \code{(2,4,6,8)}). Kernel order specified along with a
   \code{uniform} continuous kernel type will be ignored. Defaults to
   \code{2}.
-  }
-
-  \item{ukertype}{
-    character string used to specify the unordered categorical kernel type.
-    Can be set as \code{aitchisonaitken}.
   }
 
   \item{okertype}{
