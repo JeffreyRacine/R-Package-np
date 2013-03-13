@@ -396,7 +396,7 @@ npcdistbw.default <-
            bwmethod, bwscaling, bwtype,
            cxkertype, cxkerorder,
            cykertype, cykerorder,
-           uxkertype, uykertype,
+           uxkertype, 
            oxkertype, oykertype,
            ...){
 
@@ -411,7 +411,7 @@ npcdistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "cxkertype", "cxkerorder",
-               "cykertype", "cykerorder", "uxkertype", "uykertype", "oxkertype",
+               "cykertype", "cykerorder", "uxkertype", "oxkertype",
                "oykertype")
 
     m <- match(margs, mc.names, nomatch = 0)
@@ -422,6 +422,7 @@ npcdistbw.default <-
                         "ybw = bws[1:length(ydat)],",
                         paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
                         ifelse(any.m, ",",""),
+                        "uykertype = 'aitchisonaitken',",
                         "nobs = nrow(xdat),",
                         "xdati = untangle(xdat),",
                         "ydati = untangle(ydat),",
