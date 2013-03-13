@@ -42,14 +42,13 @@ npudist(bws, \dots)
   }
 
   \item{\dots}{
-    additional arguments supplied to specify, the training
-    data, the
-    bandwidth type, kernel types, and so on.
-    This is necessary if you specify bws as a \eqn{p}-vector and not
-    a \code{dbandwidth} object, and you do not desire the default
-    behaviours. To do this, you may specify any of \code{bwscaling},
-    \code{bwtype}, \code{ckertype}, \code{ckerorder}, \code{ukertype},
-    \code{okertype}, as described in \code{\link{npudistbw}}.
+    additional arguments supplied to specify, the training data, the
+    bandwidth type, kernel types, and so on.  This is necessary if you
+    specify bws as a \eqn{p}-vector and not a \code{dbandwidth} object,
+    and you do not desire the default behaviours. To do this, you may
+    specify any of \code{bwscaling}, \code{bwtype}, \code{ckertype},
+    \code{ckerorder}, \code{okertype}, as described in
+    \code{\link{npudistbw}}.
   }
 
   \item{tdat}{
