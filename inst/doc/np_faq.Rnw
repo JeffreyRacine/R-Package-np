@@ -1531,8 +1531,9 @@ lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
   \texttt{npudens()} and \texttt{npudensbw()} objects due to the
   uncoupling described above
 
-\item Fixed glitch in gradient standard errors in npindex where
-  identical standard errors were output in \texttt{model\$gerr}
+\item Fixed glitch in \texttt{gradient} standard errors in
+  \texttt{npindex()} where identical standard errors were output in
+  \texttt{model\$gerr}
 
 \item Fixed glitch in covariance matrix in \texttt{npindex()}
   (\texttt{"ichimura"}) where covariance matrix was not symmetric
