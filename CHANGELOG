@@ -1,3 +1,9 @@
+Changes from Version 0.50-1 to 0.50-2 [XXX]
+
+* Reworked the interface for npcopula() to avoid two bandwidths and
+  density=TRUE but exploiting passing of either npudistbw (copula) or
+  npudensbw (copula density)
+
 Changes from Version 0.40-13 to 0.50-1 [13-Mar-2013]
 
 * The functions npudist() and npudistbw() are now uncoupled from npudens
