@@ -153,14 +153,14 @@ copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat)
 
 ## Plot the copula
 
-contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
+contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2",main="Copula Contour")
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
       zlab="Copula",zlim=c(0,1))
 
 ## Plot the empirical copula
 
 copula.emp <- npcopula(bws=bw.cdf,data=mydat)
-plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
+plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
@@ -173,6 +173,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",
       ylab="u2",zlab="Copula Density")
 
 ## Example 2: Bivariate Continuous Data
+
 require(MASS)
 
 set.seed(42)
@@ -199,14 +200,14 @@ copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat)
 
 ## Plot the copula
 
-contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
+contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2",main="Copula Contour")
 persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
       zlab="Copula",zlim=c(0,1))
 
 ## Plot the empirical copula
 
 copula.emp <- npcopula(bws=bw.cdf,data=mydat)
-plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
+plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
