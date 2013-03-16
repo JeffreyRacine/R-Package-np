@@ -125,6 +125,8 @@ npcopula(bws,
 
 \examples{
 \dontrun{
+## Example 1: Bivariate Mixed Data
+
 require(MASS)
 
 set.seed(42)
@@ -132,8 +134,54 @@ set.seed(42)
 ## Simulate correlated Gaussian data (rho(x,y)=0.95)
 
 n <- 1000
-n.eval <- 50
-rho <- 0.95
+n.eval <- 100
+rho <- 0.99
+mu <- c(0,0)
+Sigma <- matrix(c(1,rho,rho,1),2,2)
+mydat <- mvrnorm(n=n, mu, Sigma)
+mydat <- data.frame(x=mydat[,1],y=ordered(as.integer(cut(mydat[,2],c(-Inf,quantile(mydat[,2],seq(0,1,length=10+1)),Inf)))-1))
+
+q.min <- 0.0
+q.max <- 1.0
+grid.seq <- seq(q.min,q.max,length=n.eval)
+grid.dat <- cbind(grid.seq,grid.seq)
+
+## Estimate the copula (bw object obtained from npudistbw())
+
+bw.cdf <- npudistbw(~x+y,data=mydat)
+copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat)
+
+## Plot the copula
+
+contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2")
+persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
+      zlab="Copula",zlim=c(0,1))
+
+## Plot the empirical copula
+
+copula.emp <- npcopula(bws=bw.cdf,data=mydat)
+plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25)
+
+## Estimate the copula density (bw object obtained from npudensbw())
+
+bw.pdf <- npudensbw(~x+y,data=mydat)
+copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat)
+
+## Plot the copula density
+
+persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",
+      ylab="u2",zlab="Copula Density")
+
+## Example 2: Bivariate Continuous Data
+require(MASS)
+
+set.seed(42)
+
+## Simulate correlated Gaussian data (rho(x,y)=0.95)
+
+n <- 1000
+n.eval <- 100
+rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
 mydat <- mvrnorm(n=n, mu, Sigma)
