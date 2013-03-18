@@ -225,9 +225,6 @@ npscoefbw.scbandwidth <-
         
         bws$bw <- param
         
-        ##tyw <- npksum(txdat = zdat, tydat = ydat, weights = W, bws = bws,
-        ##              leave.one.out = TRUE)$ksum
-        
         tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = bws,
                       leave.one.out = TRUE)$ksum
 

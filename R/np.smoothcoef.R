@@ -71,7 +71,6 @@ npscoef.call <-
                  'bws = bws, ...)')))
   }
 
-
 npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   sc.names <- names(sys.call())
 
@@ -117,12 +116,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
                                    tx.str, ty.str, tz.str)),
                       "call = mc, ...",")",sep="")))
 
-  ## tbw <-
-  ##  updateBwNameMetadata(nameList = list(ynames = deparse(substitute(tydat))),
-  ##                       bws = tbw)
-
-  ## need to do some surgery on the call to
-  ## allow it to work with the formula interface
+  ## need to do some surgery on the call to allow it to work with the
+  ## formula interface
 
   repair.args <- c("data", "subset", "na.action")
   
@@ -143,12 +138,10 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   environment(tbw$call) <- parent.frame()
 
   ## because of some ambiguities in how the function might be called
-  ## we only drop up to two unnamed arguments, when sometimes dropping three
-  ## would be appropriate. 
-  ## also, for simplicity, we don't allow for inconsistent
-  ## mixes of named/unnamed arguments
-  ## so bws is named or unnamed, and t[xyz]dat collectively either
-  ## named or unnamed
+  ## we only drop up to two unnamed arguments, when sometimes dropping
+  ## three would be appropriate.  also, for simplicity, we don't allow
+  ## for inconsistent mixes of named/unnamed arguments so bws is named
+  ## or unnamed, and t[xyz]dat collectively either named or unnamed
 
   tz.str <- ifelse(tzdat.named, ",tzdat = tzdat",
                    ifelse(no.tzdat, "", "tzdat"))
@@ -186,15 +179,15 @@ npscoef.scbandwidth <-
            betas = FALSE, ...){
     
     miss.z <- missing(tzdat)
-    
+
     miss.ex = missing(exdat)
     miss.ey = missing(eydat)
     
 
     ## if miss.ex then if !miss.ey then ey and tx must match, to get
     ## oos errors alternatively if miss.ey you get is errors if
-    ## !miss.ex then if !miss.ey then ey and ex must match, to get
-    ## oos errors alternatively if miss.ey you get NO errors since we
+    ## !miss.ex then if !miss.ey then ey and ex must match, to get oos
+    ## errors alternatively if miss.ey you get NO errors since we
     ## don't evaluate on the training data
     
     txdat <- toFrame(txdat)
@@ -204,7 +197,6 @@ npscoef.scbandwidth <-
 
     if (!miss.z)
       tzdat <- toFrame(tzdat)
-
 
     if (!miss.ex){
       exdat <- toFrame(exdat)
@@ -246,7 +238,6 @@ npscoef.scbandwidth <-
     if (!miss.z)
       tzdat <- tzdat[goodrows,, drop = FALSE]
 
-
     if (!miss.ex){
       goodrows = 1:dim(exdat)[1]
       rows.omit = eval(parse(text=paste('attr(na.omit(data.frame(exdat',
@@ -262,7 +253,6 @@ npscoef.scbandwidth <-
       if (!miss.z)
         ezdat <- ezdat[goodrows,, drop = FALSE]
 
-
       if (all(goodrows==0))
         stop("Evaluation data has no rows without NAs")
     }
@@ -276,7 +266,6 @@ npscoef.scbandwidth <-
     }
     else
       tydat <- as.double(tydat)
-
 
     if (miss.ey)
       eydat <- double()
@@ -313,7 +302,6 @@ npscoef.scbandwidth <-
         teval <- list(exdat = exdat, ezdat = ezdat)
     }
 
-
     ## put the unordered, ordered, and continuous data in their own objects
     ## data that is not a factor is continuous.
     
@@ -324,8 +312,8 @@ npscoef.scbandwidth <-
     }
 
     ## from this point on txdat and exdat have been recast as matrices
-
     ## construct 'W' matrix
+
     W.train <- W <- as.matrix(data.frame(1,txdat))
     yW <- as.matrix(data.frame(tydat,1,txdat))
 
@@ -335,26 +323,12 @@ npscoef.scbandwidth <-
         ezdat <- exdat
     }
       
-    ## need to conserve + propagate desired bandwidth properties
-
-    tyw <- eval(parse(text=paste("npksum(txdat = tzdat, tydat = tydat, weights = W,",
+    tww <- eval(parse(text=paste("npksum(txdat = tzdat, tydat = yW, weights = yW,",
                     ifelse(miss.ex, "", "exdat = ezdat,"),
                     "bws = bws)$ksum")))
 
-    tww <- eval(parse(text=paste("npksum(txdat = tzdat, tydat = W, weights = W,",
-                    ifelse(miss.ex, "", "exdat = ezdat,"),
-                    "bws = bws)$ksum")))
-
-# jracine - this ought to work but barfs on evaluation data. Reverting to old code.
-#    
-#    tww <- eval(parse(text=paste("npksum(txdat = tzdat, tydat = yW, weights = yW,",
-#                    ifelse(miss.ex, "", "exdat = ezdat,"),
-#                    "bws = bws)$ksum")))
-
-#    tyw <- tww[-1,1,]
-#    tww <- tww[-1,-1,]
-
-#    stop(cat("dim tww = ", dim(tww),"dim tyw = ", dim(tyw)))
+    tyw <- tww[-1,1,]
+    tww <- tww[-1,-1,]
 
     tnrow <- nrow(txdat)
     enrow <- ifelse(miss.ex, nrow(txdat), nrow(exdat))
@@ -362,7 +336,7 @@ npscoef.scbandwidth <-
     if (!miss.ex)
       W <- as.matrix(data.frame(1,exdat))
 
-## ridging jracine Jan 28 2009
+    ## ridging jracine Jan 28 2009
 
     maxPenalty <- sqrt(.Machine$double.xmax)
     coef.mat <- matrix(maxPenalty,ncol(W),enrow)
@@ -390,8 +364,6 @@ npscoef.scbandwidth <-
       iloo <- (1:enrow)[doridge]
       coef.mat[,iloo] <- sapply(iloo, ridger)
     }
-
-##    coef.mat <- sapply(1:enrow, function(i) { solve(tww[,,i], tyw[,i]) })
 
     if (do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex)){
       resid <- tydat - sapply(1:enrow, function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
@@ -450,6 +422,7 @@ npscoef.scbandwidth <-
     }
       
     if(errors | (residuals & miss.ex)){
+      
       tyw <- npksum(txdat = tzdat, tydat = tydat, weights = W.train, bws = bws)$ksum
       tm <- npksum(txdat = tzdat, tydat = W.train, weights = W.train, bws = bws)$ksum
 
@@ -489,7 +462,6 @@ npscoef.scbandwidth <-
                               uniform = CKER_UNI)+1])^length(bws$bw)
       
 
-
       u2.W <- sapply(1:tnrow, function(i) { W.train[i,, drop=FALSE]*u2.W[i] })
       u2.W <- t(u2.W)
 
@@ -514,6 +486,6 @@ npscoef.scbandwidth <-
                  "ntrain = nrow(txdat), trainiseval = miss.ex,",
                  ifelse(miss.ey && !miss.ex, "",
                         "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN)"),")")))
-
+    
   }
 
