@@ -8,13 +8,14 @@
 \title{Kernel Conditional Distribution Bandwidth Selection with Mixed
 Data Types}
 
-\description{
+\description{ 
   \code{npcdistbw} computes a \code{condbandwidth} object for estimating
   a \eqn{p+q}-variate kernel conditional cumulative distribution
-  estimator defined over mixed continuous and discrete (unordered,
-  ordered) data using either the normal-reference rule-of-thumb or
-  least-squares cross validation using the method of Li and Racine
-  (2008) and Li, Lin and Racine (2013).
+  estimator defined over mixed continuous and discrete (unordered
+  \code{xdat}, ordered \code{xdat} and \code{ydat}) data using either
+  the normal-reference rule-of-thumb or least-squares cross validation
+  using the method of Li and Racine (2008) and Li, Lin and Racine
+  (2013).
 }
 
 \usage{
@@ -117,9 +118,9 @@ npcdistbw(\dots)
   }
 
   \item{ydat}{
-    a \eqn{q}-variate data frame of dependent data which bandwidth selection will
-    be performed. The data types may be continuous, discrete (unordered
-    and ordered factors), or some combination thereof.
+    a \eqn{q}-variate data frame of dependent data which bandwidth
+    selection will be performed. The data types may be continuous,
+    discrete (ordered factors), or some combination thereof.
   }
 
   \item{gydat}{
@@ -297,10 +298,11 @@ npcdistbw(\dots)
 \details{
   \code{npcdistbw} implements a variety of methods for choosing
   bandwidths for multivariate distributions (\eqn{p+q}-variate) defined
-  over a set of possibly continuous and/or discrete (unordered, ordered)
-  data. The approach is based on Li and Racine (2004) who employ
-  \sQuote{generalized product kernels} that admit a mix of continuous
-  and discrete data types.
+  over a set of possibly continuous and/or discrete (unordered
+  \code{xdat}, ordered \code{xdat} and \code{ydat}) data. The approach
+  is based on Li and Racine (2004) who employ \sQuote{generalized
+  product kernels} that admit a mix of continuous and discrete data
+  types.
 
   The cross-validation methods employ multivariate numerical search
   algorithms (direction set (Powell's) methods in multidimensions).
@@ -323,12 +325,15 @@ npcdistbw(\dots)
   directly to the function via the \code{xdat} and \code{ydat}
   parameters. Use of these two interfaces is \bold{mutually exclusive}.
 
-  Data contained in the data frames \code{xdat} and \code{ydat} may be a
-  mix of continuous (default), unordered discrete (to be specified in
-  the data frames using \code{\link{factor}}), and ordered discrete (to be
-  specified in the data frames using \code{\link{ordered}}). Data can be
-  entered in an arbitrary order and data types will be detected
-  automatically by the routine (see \code{\link{np}} for details).
+  Data contained in the data frame \code{xdat} may be a mix of
+  continuous (default), unordered discrete (to be specified in the data
+  frames using \code{\link{factor}}), and ordered discrete (to be
+  specified in the data frames using \code{\link{ordered}}).  Data
+  contained in the data frame \code{ydat} may be a mix of continuous
+  (default) and ordered discrete (to be specified in the data frames
+  using \code{\link{ordered}}). Data can be entered in an arbitrary
+  order and data types will be detected automatically by the routine
+  (see \code{\link{np}} for details).
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data

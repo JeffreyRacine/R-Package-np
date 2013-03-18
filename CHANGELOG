@@ -6,8 +6,8 @@ Changes from Version 0.50-1 to 0.50-2 [XXX]
 
 Changes from Version 0.40-13 to 0.50-1 [13-Mar-2013]
 
-* The functions npudist() and npudistbw() are now uncoupled from npudens
-  and npudensbw (previously they relied on unconditional PDF bandwidths
+* The functions npudist() and npudistbw() are now uncoupled from npudens()
+  and npudensbw() (previously they relied on unconditional PDF bandwidths
   due to the lack of a multivariate mixed-data method for selecting bandwidths
   for CDFs - now with Li & Racine (2013) we have a robust method hence the
   split)

@@ -9,7 +9,7 @@
 \description{
   \code{npudistbw} computes a bandwidth object for a \eqn{p}-variate
   kernel cumulative distribution estimator defined over mixed continuous
-  and discrete (unordered, ordered) data using either the normal
+  and discrete (ordered) data using either the normal
   reference rule-of-thumb or least-squares cross validation using the
   method of Li and Racine (2013).
 }
@@ -102,9 +102,9 @@ npudistbw(\dots)
   }
 
   \item{dat}{
-    a \eqn{p}-variate data frame on which bandwidth selection will
-    be performed. The data types may be continuous, discrete (unordered
-    and ordered factors), or some combination thereof.
+    a \eqn{p}-variate data frame on which bandwidth selection will be
+    performed. The data types may be continuous, discrete (ordered
+    factors), or some combination thereof.
   }
 
   \item{bws}{
@@ -268,9 +268,9 @@ npudistbw(\dots)
 
   
   \code{npudistbw} implements a variety of methods for choosing
-  bandwidths for multivariate (\eqn{p}-variate) distributions defined over
-  a set of possibly continuous and/or discrete (unordered, ordered)
-  data. The approach is based on Li and Racine (2003) who employ
+  bandwidths for multivariate (\eqn{p}-variate) distributions defined
+  over a set of possibly continuous and/or discrete (ordered) data. The
+  approach is based on Li and Racine (2003) who employ
   \sQuote{generalized product kernels} that admit a mix of continuous
   and discrete data types.
 
@@ -295,12 +295,10 @@ npudistbw(\dots)
   these two interfaces is \bold{mutually exclusive}.
 
   Data contained in the data frame \code{dat} may be a mix of continuous
-  (default), unordered discrete (to be specified in the data frame
-  \code{dat} using \code{\link{factor}}), and ordered discrete (to be
-  specified in the data frame \code{dat} using
-  \code{\link{ordered}}). Data can be entered in an arbitrary order and
-  data types will be detected automatically by the routine (see
-  \code{\link{np}} for details).
+  (default) and ordered discrete (to be specified in the data frame
+  \code{dat} using \code{\link{ordered}}). Data can be entered in an
+  arbitrary order and data types will be detected automatically by the
+  routine (see \code{\link{np}} for details).
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{~ data}, where
@@ -312,9 +310,8 @@ npudistbw(\dots)
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and
   eighth order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. Unordered discrete data types use a variation on Aitchison and
-  Aitken's (1976) kernel, while ordered data types use a variation of
-  the Wang and van Ryzin (1981) kernel.
+  kernel. Ordered data types use a variation of the Wang and van Ryzin
+  (1981) kernel.
 
 }
 \value{

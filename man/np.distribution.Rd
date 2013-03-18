@@ -103,8 +103,8 @@ npudist(bws, \dots)
 
   \code{npudist} implements a variety of methods for estimating
   multivariate cumulative distributions (\eqn{p}-variate) defined over a
-  set of possibly continuous and/or discrete (unordered, ordered)
-  data. The approach is based on Li and Racine (2003) who employ
+  set of possibly continuous and/or discrete (ordered) data. The
+  approach is based on Li and Racine (2003) who employ
   \sQuote{generalized product kernels} that admit a mix of continuous
   and discrete data types.
 
@@ -117,19 +117,17 @@ npudist(bws, \dots)
   \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
   Data contained in the data frame \code{tdat} (and also \code{edat})
-  may be a mix of continuous (default), unordered discrete (to be
-  specified in the data frame \code{tdat} using the \code{\link{factor}}
-  command), and ordered discrete (to be specified in the data frame
-  \code{tdat} using the \code{\link{ordered}} command). Data can be
-  entered in an arbitrary order and data types will be detected
-  automatically by the routine (see \code{\link{np}} for details).
+  may be a mix of continuous (default) and ordered discrete (to be
+  specified in the data frame \code{tdat} using the
+  \code{\link{ordered}} command). Data can be entered in an arbitrary
+  order and data types will be detected automatically by the routine
+  (see \code{\link{np}} for details).
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and
   eighth order Gaussian and Epanechnikov kernels, and the uniform
-  kernel. Unordered discrete data types use a variation on Aitchison and
-  Aitken's (1976) kernel, while ordered data types use a variation of
-  the Wang and van Ryzin (1981) kernel.
+  kernel. Ordered data types use a variation of the Wang and van Ryzin
+  (1981) kernel.
 
 }
 \value{
