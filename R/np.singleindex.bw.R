@@ -437,10 +437,6 @@ npindexbw.sibandwidth <-
     ## value of the objective function, the restart that resulted in the
     ## smallest value, and the vector of objective function values.
 
-    ## TRISTEN XXX - kindly make sure I have named return vals consistent
-    ## with other functions, e.g., ifval, fval etc? Also, kindly return a
-    ## `pretty print' type of object
-
     ## Restore seed
 
     if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)

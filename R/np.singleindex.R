@@ -4,18 +4,6 @@
 # dimensionality to a one-dimensional nonparametric estimator, though
 # at the potential cost of misspecification.
 
-# Note - klein and spady's estimator requires a binary y with 0/1
-# values only - TRISTEN XXX kindly check that if someone selects this
-# approach their y is 0/1 and if not return an informative message.
-
-# Note - X must have at least two columns (otherwise foolish to reduce
-# dimensionality) XXX - TRISTEN... kindly check that X has at least
-# two columns.
-
-# Note also that identification requires that X contain at least one
-# continuous variable. XXX - TRISTEN - kindly ensure that this check
-# is made and an appropriate error message is passed back.
-
 # Note also that we will use the so-called scale normalization, i.e.,
 # that beta_1=1 (no need to estimate) which reduces search by 1
 # parameter (this is obviously restricted search subject to beta_1=1).
@@ -24,11 +12,6 @@
 # estimator of y on a linear index X\beta where beta_1 is presumed to
 # be 1 by restriction though, at this stage, the user may feed in any
 # value they so desire.
-
-# TRISTEN: I would like this function to accept arguments that
-# npksum will automatically grab... also a pretty print function
-# similar to regression would rock stating `mean in mean, beta in
-# beta' goodness of fit and so forth...
 
 npindex <-
   function(bws, ...){
@@ -285,9 +268,6 @@ npindex.sibandwidth <-
 
     ## from this point on txdat and exdat have been recast as matrices
 
-    ## TRISTEN - how do we cast txdat here so that matrix multiplication
-    ## is permitted? I currently use cbind() but data.frame barfs out...
-
     ## First, create the scalar index (n \times 1 vector)
 
     index <- txdat %*% bws$beta
@@ -468,14 +448,6 @@ npindex.sibandwidth <-
       ## Now export this in an S3 method...
 
     }
-
-    ## TRISTEN XXX - for continuous y we want to return the fitted model
-    ## along with the measures of goodness of fit RSQ, MSE, and other
-    ## measures of goodness of fit. For discrete y (0/1), npconmode()
-    ## type measures. But, I don't want to implement asymptotic standard
-    ## errors however, these can be readily bootstrapped, so perhaps we
-    ## can add a simple bootstrap section that bootstraps beta and the
-    ## mean (and gradients and avgderiv)?
 
     if (gradients){
       boofun = function(data, indices){

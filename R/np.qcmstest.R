@@ -129,10 +129,6 @@ npqcmstest <- function(formula,
     n <- length(model.resid)
 
     ## Compute In (equation 2.10, Hsiao/Li/racine 2005)
-
-    ## Tristen - need bandwidth.divide (for continuous vars) to be set to
-    ## TRUE for both of these npksums
-
     ## Residuals in cms test replaced with varepsilon
     
     varepsilon <- ifelse(model.resid<=0,1-tau,-tau)
@@ -146,10 +142,6 @@ npqcmstest <- function(formula,
 
   Omega.hat <- function(xdat, model.resid, bw) {
   
-    ## TRISTEN - I only want the product of the continuous
-    ## variable bandwidths... this will do all which I _don't_ want (see
-    ## equation 2.11, page 7)... something like test for is.factor() etc.
-
     ## Variance of In (equation 2.11, Hsiao/Li/racine 2005)
     n <- length(model.resid)
 

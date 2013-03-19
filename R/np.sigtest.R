@@ -1,24 +1,13 @@
 # This function implements a test of significance for both discrete
 # and continuous variables. It accepts a data frame for explanatory
 # data (mixed datatypes allowed), a vector for y for a regression
-# model, an npregbw object, and a set of indices for the
-# columns of X for which the test is to be run (default = all).
+# model, an npregbw object, and a set of indices for the columns of X
+# for which the test is to be run (default = all).
 
 # Note - this conducts _individual_ tests of significance only. It
 # uses a wild bootstrap to handle potential heteroskedasticity (though
 # it perhaps could be readily changed to resample (y.star, X) pairs
 # and perhaps this is desirable).
-
-# Tristen XXX - this one is trivial to clean up - no plotting etc. All
-# that is needed is a simple pretty print method like that for
-# npcmstest. The difference here is that by default it conducts one
-# test for each column of xdat and therefore returns a vector of In
-# test statistics and a vector of P values (along with the actual
-# indices used).
-
-# Tristen XXX - we need to pass args for things like bandwidth options
-# etc. for bootstrap method II, and for the npreg stuff as
-# well...
 
 npsigtest <-
   function(bws, ...){
@@ -306,10 +295,6 @@ npsigtest.rbandwidth <- function(bws,
   }
 
   ## Return a list containing the statistic and its P-value
-  ##cat("\n")
-  
-  ## Tristen XXX - I would also like, if/when you implement a pretty
-  ## print method, to pass back a matrix each column containing the
   ## bootstrapped In.vec for each variable...
 
   ## Restore seed
