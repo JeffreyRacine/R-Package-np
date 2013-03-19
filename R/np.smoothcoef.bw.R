@@ -237,8 +237,7 @@ npscoefbw.scbandwidth <-
 
         ridger <- function(i) {
           doridge[i] <<- FALSE
-          ridge.val <- ridge[i]*tww[-1,1,i][1]/
-            (ifelse(tww[-1,-1,i][1,1]>=0, 1, -1)*max(.Machine$double.eps,abs(tww[-1,-1,i][1,1])))
+          ridge.val <- ridge[i]*tww[-1,1,i][1]/NZD(tww[-1,-1,i][1,1])
           W[i,, drop = FALSE] %*% tryCatch(solve(tww[-1,-1,i]+diag(rep(ridge[i],nc)),
                   tww[-1,1,i]+c(ridge.val,rep(0,nc-1))),
                   error = function(e){
