@@ -312,9 +312,7 @@ npindex.sibandwidth <-
                     ckertype = bws$ckertype,
                     ckerorder = bws$ckerorder)$ksum
 
-      denom <- tww[2,2,]
-      denom[which(denom == 0.0)] <- sqrt(.Machine$double.eps)
-      index.mean <- tww[1,2,]/denom
+      index.mean <- tww[1,2,]/NZD(tww[2,2,])
 
       if(!no.ex & (no.ey | residuals)){
 
@@ -329,9 +327,7 @@ npindex.sibandwidth <-
                       ckertype = bws$ckertype,
                       ckerorder = bws$ckerorder)$ksum
 
-        denom <- tww[2,2,]
-        denom[which(denom == 0.0)] <- sqrt(.Machine$double.eps)
-        index.tmean <- tww[1,2,]/denom
+        index.tmean <- tww[1,2,]/NZD(tww[2,2,])
 
       }
 
@@ -348,9 +344,11 @@ npindex.sibandwidth <-
 
       index.mean <- model$mean
 
-      ## index.grad is a 1-column matrix
+      ## index.grad is a matrix, one column for each variable, each
+      ## equal to its coefficient beta_i times the first derivative of
+      ## the local-constant model
 
-      index.grad <- model$grad
+      index.grad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))
 
       if(!no.ex & (no.ey | residuals)){
 
@@ -413,7 +411,8 @@ npindex.sibandwidth <-
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
-      tindex <- npksum(txdat = index, bws = bws$bw,
+      tindex <- npksum(txdat = index,
+                       bws = bws$bw,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder)$ksum
 
@@ -480,28 +479,32 @@ npindex.sibandwidth <-
 
     if (gradients){
       boofun = function(data, indices){
-        rindex = txdat[indices,] %*% bws$beta
-        model = npreg(regtype = 'lc', gradients = TRUE,
-          txdat = rindex,
-          tydat = tydat[indices],
-          exdat = index.eval,
-          bws = bws$bw,
-          ckertype = bws$ckertype,
-          ckerorder = bws$ckerorder)[c('mean','grad')]
-
+        rindex <- txdat[indices,] %*% bws$beta
+        model <- npreg(regtype = 'lc',
+                       gradients = TRUE,
+                       txdat = rindex,
+                       tydat = tydat[indices],
+                       exdat = index.eval,
+                       bws = bws$bw,
+                       ckertype = bws$ckertype,
+                       ckerorder = bws$ckerorder)[c('mean','grad')]
+        
         c(model$mean, model$grad, mean(model$grad))
       }
 
     } else {
       boofun = function(data, indices){
         rindex = txdat[indices,] %*% bws$beta
-        npksum(txdat = rindex, tydat = tydat[indices], exdat = index.eval,
-               bws = bws$bw,
-               ckertype = bws$ckertype,
-               ckerorder = bws$ckerorder)$ksum/
-                 npksum(txdat = rindex, exdat = index.eval, bws=bws$bw,
-                        ckertype = bws$ckertype,
-                        ckerorder = bws$ckerorder)$ksum
+        tww <- npksum(txdat = rindex,
+                      tydat = cbind(tydat[indices],1),
+                      weights = cbind(tydat[indices],1),
+                      exdat = index.eval,
+                      bws = bws$bw,
+                      ckertype = bws$ckertype,
+                      ckerorder = bws$ckerorder)$ksum
+
+        tww[1,2,]/NZD(tww[2,2,])
+        
       }
     }
 
@@ -568,7 +571,7 @@ npindex.sibandwidth <-
     eval(parse(text=paste(
                  "singleindex(bws = bws, index = index.eval, mean = index.mean,",
                  ifelse(errors,"merr = index.merr,",""),
-                 ifelse(gradients,"grad = index.grad, mean.grad = mean(index.grad), betavcov = Bvcov,",""),
+                 ifelse(gradients,"grad = index.grad, mean.grad = colMeans(index.grad), betavcov = Bvcov,",""),
                  ifelse(errors & gradients,"gerr = index.gerr, mean.gerr = index.mgerr,",""),
                  strres,
                  "ntrain = nrow(txdat),", strgof,

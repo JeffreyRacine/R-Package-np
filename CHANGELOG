@@ -1,5 +1,10 @@
 Changes from Version 0.50-1 to 0.50-2 [XXX]
 
+* Fixed regression in npindex with bootstrapped standard errors
+
+* Code making use on one call to npksum in npindex and npscoef where
+  possible rather than two separate calls
+
 * Reworked the interface for npcopula() to avoid two bandwidths and
   density=TRUE but exploiting passing of either npudistbw (copula) or
   npudensbw (copula density)

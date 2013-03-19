@@ -286,15 +286,15 @@ npscoefbw.scbandwidth <-
           partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
         } else {
           bws$bw <- param
-          partial.loo <- W[,partial.index]*
-            npksum(txdat = zdat,
-                   tydat = partial.orig * W[,partial.index],
-                   bws = bws,
-                   leave.one.out = TRUE)$ksum/
-                     npksum(txdat = zdat,
-                            tydat = W[,partial.index]^2,
-                            bws = bws,
-                            leave.one.out = TRUE)$ksum
+
+          tww <- npksum(txdat=zdat,
+                        tydat=cbind(partial.orig * W[,partial.index],W[,partial.index]^2),
+                        weights=cbind(partial.orig * W[,partial.index],1),
+                        bws=bws,
+                        leave.one.out=TRUE)$ksum
+
+          partial.loo <- W[,partial.index]*tww[1,2,]/NZD(tww[2,2,])
+          
         }
         
 
@@ -434,13 +434,14 @@ npscoefbw.scbandwidth <-
             } else {
               bws$bw <- bws$bw.fitted[,j]
               ## estimate new beta.hats
-              scoef$beta[,j] <-
-                npksum(txdat = zdat,
-                       tydat = partial.orig * W[,j],
-                       bws = bws)$ksum/
-                         npksum(txdat = zdat,
-                                tydat = W[,j]^2,
-                                bws = bws)$ksum
+
+              tww <- npksum(txdat=zdat,
+                            tydat=cbind(partial.orig * W[,j],W[,j]^2),
+                            weights=cbind(partial.orig * W[,j],1),
+                            bws=bws)$ksum
+              
+              scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
+              
               bws$bw <- param.overall
               ## estimate new full residuals 
               resid.full <- partial.orig - W[,j] * scoef$beta[,j]

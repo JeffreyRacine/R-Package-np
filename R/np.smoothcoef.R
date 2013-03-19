@@ -345,7 +345,6 @@ npscoef.scbandwidth <-
     doridge <- !logical(enrow)
 
     nc <- ncol(tww[,,1])
-
     
     ridger <- function(i) {
       doridge[i] <<- FALSE
@@ -382,15 +381,14 @@ npscoef.scbandwidth <-
           
           ## use to calculate new beta implicitly
 
-          ksum1 <- npksum(txdat = tzdat,
-                          tydat = partial * W[,j],
-                          bws = bws, leave.one.out = leave.one.out)$ksum
-          ksum2 <- npksum(txdat = tzdat,
-                          tydat = W[,j]^2,
-                          bws = bws, leave.one.out = leave.one.out)$ksum
-
-          coef.mat[j,] <- ksum1/
-            (ifelse(ksum2>=0, 1, -1)*max(.Machine$double.eps,abs(ksum2)))
+          twww <- npksum(txdat=tzdat,
+                         tydat=cbind(partial * W[,j],W[,j]^2),
+                         weights=cbind(partial * W[,j],1),
+                         bws=bws,
+                         leave.one.out=leave.one.out)$ksum
+          
+          coef.mat[j,] <- twww[1,2,]/
+            (ifelse(twww[2,2,]>=0, 1, -1)*max(.Machine$double.eps,abs(twww[2,2,])))
 
           ## estimate new full residuals 
           resid <- partial - W[,j] * coef.mat[j,]
@@ -422,17 +420,52 @@ npscoef.scbandwidth <-
     }
       
     if(errors | (residuals & miss.ex)){
-      
+
       tyw <- npksum(txdat = tzdat, tydat = tydat, weights = W.train, bws = bws)$ksum
       tm <- npksum(txdat = tzdat, tydat = W.train, weights = W.train, bws = bws)$ksum
 
+# jracine March 19, need to revisit to get one call to npksum functional      
+#      tyw <- npksum(txdat = tzdat,
+#                    tydat = cbind(tydat,W.train),
+#                    weights = cbind(tydat*W.train,W.train),
+#                    bws = bws)$ksum
+#
+#      tm <- tyw[-1,-1,]
+#      tyw <- tyw[-1,1,]
+#      
+#      tnrow <- nrow(txdat)
+#      mean.fit <- rep(maxPenalty,tnrow)
+#      epsilon <- 1.0/tnrow
+#      ridge.tm <- double(tnrow)
+#      doridge <- !logical(tnrow)
+#      
+#      nc <- ncol(tm[,,1])
+#    
+#      ridger <- function(i) {
+#        doridge[i] <<- FALSE
+#        ridge.val <- ridge.tm[i]*tyw[,i][1]/
+#          (ifelse(tm[,,i][1,1]>=0, 1, -1)*max(.Machine$double.eps,abs(tm[,,i][1,1])))
+#        tryCatch(solve(tm[,,i]+diag(rep(ridge.tm[i],nc)),
+#                       tyw[,i]+c(ridge.val,rep(0,nc-1))),
+#                 error = function(e){
+#                   ridge.tm[i] <<- ridge.tm[i]+epsilon
+#                   doridge[i] <<- TRUE
+#                   return(rep(maxPenalty,nc))
+#                 })
+#      }
+#      
+#      while(any(doridge)){
+#        ii <- (1:tnrow)[doridge]
+#        mean.fit[ii] <- sapply(ii, ridger)
+#      }
+      
       mean.fit <- rep(maxPenalty,nrow(txdat))
       epsilon <- 1.0/nrow(txdat)
       ridge.tm <- double(nrow(txdat))
       doridge <- !logical(nrow(txdat))
-
+      
       nc <- ncol(tm[,,1])
-
+      
       ridger <- function(i) {
         doridge[i] <<- FALSE
         ridge.val <- ridge.tm[i]*tyw[,i][1]/
@@ -445,12 +478,12 @@ npscoef.scbandwidth <-
                         return(rep(maxPenalty,nc))
                       })
       }
-
+      
       while(any(doridge)){
         ii <- (1:nrow(txdat))[doridge]
         mean.fit[ii] <- sapply(ii, ridger)
       }
-
+      
       u2.W <- (resid <- tydat - mean.fit)^2
     }
 

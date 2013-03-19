@@ -198,7 +198,6 @@ npindexbw.sibandwidth <-
       ##c(1,beta) which can be used in the index.model function above.
 
       ichimuraMaxPenalty <- 10*mean(ydat^2)
-      ichimuraFloor <- sqrt(.Machine$double.eps)
 
       ichimura <- function(param) {
 
@@ -234,9 +233,7 @@ npindexbw.sibandwidth <-
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
-          denom <- tww[2,2,]
-          denom[which(denom == 0.0)] <- ichimuraFloor
-          fit.loo <- tww[1,2,]/denom
+          fit.loo <- tww[1,2,]/NZD(tww[2,2,])
 
           t.ret <- mean((ydat-fit.loo)^2)
           return(t.ret)
@@ -298,9 +295,7 @@ npindexbw.sibandwidth <-
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
-          denom <- tww[2,2,]
-          denom[which(denom == 0.0)] <- kleinspadyFloor
-          ks.loo <- tww[1,2,]/denom
+          ks.loo <- tww[1,2,]/NZD(tww[2,2,])
 
           ## Avoid taking log of zero (ks.loo = 0 or 1 since we take
           ## the log of ks.loo and the log of 1-ks.loo)
