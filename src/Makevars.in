@@ -1,0 +1,5 @@
+# -*- Makefile -*-  vim : ft = make
+
+PKG_CPPFLAGS = @DEFS@ @PKG_CPPFLAGS@
+PKG_CFLAGS   = $(ARCHCFLAGS)
+PKG_LIBS     = @PKG_LIBS@ $(ARCHLIB)

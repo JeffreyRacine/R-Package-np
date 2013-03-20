@@ -195,7 +195,7 @@ npudistbw.dbandwidth <-
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
              fval = double(2),
-             PACKAGE="np" )[c("bw","fval")]
+             PACKAGE="npRmpi" )[c("bw","fval")]
       } else {
         nbw = double(ncol)
         gbw = sum(bws$icon)

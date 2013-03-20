@@ -1,0 +1,43 @@
+#!/bin/sh
+
+mkdir serial
+cd serial
+cp ../Rprofile .Rprofile
+make -f ../makefile.serial.sharcnet
+cd ../
+
+mkdir n_2
+cd n_2
+cp ../Rprofile .Rprofile
+make -f ../makefile.sharcnet n=2
+cd ../
+
+mkdir n_3
+cd n_3
+cp ../Rprofile .Rprofile
+make -f ../makefile.sharcnet n=3
+cd ../
+
+mkdir n_4
+cd n_4
+cp ../Rprofile .Rprofile
+make -f ../makefile.sharcnet n=4
+cd ../
+
+mkdir n_6
+cd n_6
+cp ../Rprofile .Rprofile
+make -f ../makefile.sharcnet n=6
+cd ../
+
+mkdir n_8
+cd n_8
+cp ../Rprofile .Rprofile
+make -f ../makefile.sharcnet n=8
+cd ../
+
+mkdir n_10
+cd n_10
+cp ../Rprofile .Rprofile
+make -f ../makefile.sharcnet n=10
+cd ../

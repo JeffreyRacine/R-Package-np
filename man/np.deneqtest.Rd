@@ -98,42 +98,45 @@ npdeneqtest(x = NULL,
 
 \examples{
 \dontrun{
-set.seed(1234)
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-## Distributions are equal
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-n <- 250
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
+n <- 100
 
 sample.A <- data.frame(x=rnorm(n))
 sample.B <- data.frame(x=rnorm(n))
 
-npdeneqtest(sample.A,sample.B,boot.num=99)
+mpi.bcast.Robj2slave(sample.A)
+mpi.bcast.Robj2slave(sample.B)
 
-Sys.sleep(5)
+mpi.bcast.cmd(output <- npdeneqtest(sample.A,sample.B,boot.num=99),
+              caller.execute=TRUE)
 
-## Distributions are unequal
+output
 
-sample.A <- data.frame(x=rnorm(n))
-sample.B <- data.frame(x=rchisq(n,df=5))
 
-npdeneqtest(sample.A,sample.B,boot.num=99)
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-## Mixed datatypes, distributions are equal
+mpi.close.Rslaves()
 
-sample.A <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
-sample.B <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-npdeneqtest(sample.A,sample.B,boot.num=99)
-
-Sys.sleep(5)
-
-## Mixed datatypes, distributions are unequal
-
-sample.A <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
-sample.B <- data.frame(a=rnorm(n,sd=10),b=factor(rbinom(n,2,.25)))
-
-npdeneqtest(sample.A,sample.B,boot.num=99)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 
 \keyword{ nonparametric }

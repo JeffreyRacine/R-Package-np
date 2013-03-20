@@ -1,19 +1,19 @@
-# np
+# npRmpi
 
-This is the R package `np' (Nonparametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield (hayfield@mpia.de)
+This is the R package `npRmpi' (NonpRmpiarametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield <hayfield@mpia.de>
 
 ## Installation
 
-You can install the stable version on [CRAN](http://cran.r-project.org/package=np):
+Presuming that a working implementation of MPI exists on the target machine, you can install the stable version on [CRAN](http://cran.r-project.org/package=npRmpi):
 
 ```r
-install.packages('np', dependencies = TRUE)
+install.packages('npRmpi', dependencies = TRUE)
 ```
 
-Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-np/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-np/tarball/master), decompress and run `R CMD INSTALL` on it, or install then use the **devtools** package to install the development version:
+Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-npRmpi/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-npRmpi/tarball/master), decompress and run `R CMD INSTALL` on it, or install then use the **devtools** package to install the development version:
 
 ```r
-library(devtools); install_github('R-Package-np', 'JeffreyRacine')
+library(devtools); install_github('R-Package-npRmpi', 'JeffreyRacine')
 ```
 
 Note Windows users have to first install [Rtools](http://www.murdoch-sutherland.com/Rtools/).

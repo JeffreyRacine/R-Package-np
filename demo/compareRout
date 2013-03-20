@@ -1,0 +1,26 @@
+#!/bin/sh
+
+grep Objective serial/npcdensls_serial.Rout n_4/npcdensls_npRmpi.Rout
+grep Objective serial/npcdensml_serial.Rout n_4/npcdensml_npRmpi.Rout
+grep Objective serial/npcdistls_serial.Rout n_4/npcdistls_npRmpi.Rout
+grep Objective serial/npcmstest_serial.Rout n_4/npcmstest_npRmpi.Rout
+grep Objective serial/npconmode_serial.Rout n_4/npconmode_npRmpi.Rout
+grep Objective serial/npcopula_serial.Rout n_4/npcopula_npRmpi.Rout
+grep Objective serial/npdeneqtest_serial.Rout n_4/npdeneqtest_npRmpi.Rout
+grep Objective serial/npdeptest_serial.Rout n_4/npdeptest_npRmpi.Rout
+grep Objective serial/npindexich_serial.Rout n_4/npindexich_npRmpi.Rout
+grep Objective serial/npindexks_serial.Rout n_4/npindexks_npRmpi.Rout
+grep "R-squared" serial/npplreg_serial.Rout n_4/npplreg_npRmpi.Rout
+grep Objective serial/npqreg_serial.Rout n_4/npqreg_npRmpi.Rout
+grep Objective serial/npreglcaic_serial.Rout n_4/npreglcaic_npRmpi.Rout
+grep Objective serial/npreglcls_serial.Rout n_4/npreglcls_npRmpi.Rout
+grep Objective serial/npregllaic_serial.Rout n_4/npregllaic_npRmpi.Rout
+grep Objective serial/npregllls_serial.Rout n_4/npregllls_npRmpi.Rout
+grep Objective serial/npscoef_serial.Rout n_4/npscoef_npRmpi.Rout
+grep Objective serial/npsdeptest_serial.Rout n_4/npsdeptest_npRmpi.Rout
+grep Objective serial/npsigtest_serial.Rout n_4/npsigtest_npRmpi.Rout
+grep Objective serial/npsymtest_serial.Rout n_4/npsymtest_npRmpi.Rout
+grep Objective serial/npudensls_serial.Rout n_4/npudensls_npRmpi.Rout
+grep Objective serial/npudensml_serial.Rout n_4/npudensml_npRmpi.Rout
+grep Objective serial/npudistcdf_serial.Rout n_4/npudistcdf_npRmpi.Rout
+grep Objective serial/npunitest_serial.Rout n_4/npunitest_npRmpi.Rout

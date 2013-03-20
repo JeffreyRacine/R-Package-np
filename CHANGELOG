@@ -2,12 +2,18 @@ Changes from Version 0.50-1 to 0.50-2 [XXX]
 
 * Fixed regression in npindex with bootstrapped standard errors
 
-* Code making use on one call to npksum in npindex and npscoef where
+* Code making use of one call to npksum in npindex and npscoef where
   possible rather than two separate calls
 
 * Reworked the interface for npcopula() to avoid two bandwidths and
   density=TRUE but exploiting passing of either npudistbw (copula) or
   npudensbw (copula density)
+
+* Changed default behaviour of generating log files to FALSE
+  (mpi.spawn.Rslaves(...,needlog=FALSE))
+
+* Increased sample sizes for demos to better assess how well algorithms
+  scale with respect to the number of processors
 
 Changes from Version 0.40-13 to 0.50-1 [13-Mar-2013]
 
@@ -32,10 +38,14 @@ Changes from Version 0.40-13 to 0.50-1 [13-Mar-2013]
 
 * Cleaned up internals for npcmstest()
 
-* Using .onUnload rather than .Last.lib in zzz.R
+* Using .onLoad rather than .Last.lib in zzz.R
 
-* Fixed glitch in npreg() summary where `Residual standard error' was
+* Fixed glitch in npreg summary where `Residual standard error' was
   reporting residual variance
+
+* Added reference to R2 measure (Doksum and Samarov (1995))
+
+* Startup message points to the faq, faq is now a vignette
 
 * npksum() functionality extended
 
@@ -62,10 +72,6 @@ Changes from Version 0.40-13 to 0.50-1 [13-Mar-2013]
   inversion
 
 * Modified stopping rules in npregiv and npregivderiv
-
-* Added reference to R2 measure (Doksum and Samarov (1995))
-
-* Startup message points to the faq, faq is now a vignette
 
 Changes from Version 0.40-12 to 0.40-13 [05-Mar-2012]
 
@@ -112,14 +118,13 @@ Changes from Version 0.40-7 to 0.40-8 [29-July-2011]
 * Function npplreg now supports factors in the parametric part just
   like lm() does
 
-* Fixed glitch in jksum.c where the use of weights and adaptive bws
-  could segfault.
+* Minor modifications to Rmpi.c and Rmpi.h and Makevars.win (thanks to
+  David Jacho-Chavez) for building under recent version of Windows
+  (Windows 7).
 
 Changes from Version 0.40-6 to 0.40-7 [8-Jun-2011]
 
 * Function npregiv now supports exogenous X and multivariate Z and W.
-
-* demo(npregiv) provides a useful illustration.
 
 Changes from Version 0.40-5 to 0.40-6 [1-Jun-2011]
 
@@ -185,7 +190,7 @@ Changes from Version 0.30-9 to 0.40-0 [25-May-2010]
 
 Changes from Version 0.30-8 to 0.30-9 [17-May-2010]
 
-* Fixed issue where ukertype and okertype were being ignored by npindex
+* Fixed issue where ukertype and okertype were being ignored by npscoef
 
 * Fixed regression (dating to version 0.30-4) where random.seed=42 was
   not initialized in functions npcmstest, npdeneqtest, npindexbw,

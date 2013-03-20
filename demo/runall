@@ -1,0 +1,26 @@
+#!/bin/bash
+
+mkdir serial
+cd serial
+make -f ../makefile.serial
+cd ../
+
+mkdir n_2
+cd n_2
+cp ../../inst/Rprofile .Rprofile
+make -f ../makefile.openmpi np=2
+cd ../
+
+mkdir n_3
+cd n_3
+cp ../../inst/Rprofile .Rprofile
+make -f ../makefile.openmpi np=3
+cd ../
+
+mkdir n_4
+cd n_4
+cp ../../inst/Rprofile .Rprofile
+make -f ../makefile.openmpi np=4
+cd ../
+
+./timing

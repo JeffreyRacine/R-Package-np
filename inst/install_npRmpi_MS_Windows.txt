@@ -1,0 +1,73 @@
+Title: Installing the npRmpi binary package for MS Windows 7 (32-bit/64-bit)
+
+Date: 07/14/2011
+Author: David T. Jacho-Chavez (djachocha@emory.edu)
+
+These are based on those given in http://www.stats.uwo.ca/faculty/yu/Rmpi/
+
+INSTALLATION:
+
+1) Download and install MPICH2 for Windows (32-bit) from
+   http://www-unix.mcs.anl.gov/mpi/mpich2 Version 1.3rc1.
+
+   Before installing MPICH2, you may need Microsoft .Net 2.0 .NET
+   Framework Version 2.0 Redistributable Package and Visual C++ 2010
+   Redistributable Package (x86).
+
+2) After installation, add the MPICH2 bin directory to your PATH
+   environment variables. This is very important. Otherwise npRmpi
+   will not run properly.
+
+   Right click "My Computer" and choose "Properties". Click "Advanced
+   system settings" to get a new window.
+
+   Click "Environment Variables..." to get a new window. Locate the
+   variable "PATH" (it is version dependent. Either User or System
+   variables will be fine). Click Edit to get a new window.
+
+   At end of Variable value, add ";C:\Program Files (x86)\MPICH2\bin" for
+   32bit windows. (Remove the double quotations).
+
+3) Next launch wmpiconfig.exe from the Start menu. First it will ask
+   you for your account name and password. Enter your account name and
+   password. Click "Register" and then "OK". After that MPICH2
+   Configurable Settings will show up. Click "Get Settings" on the
+   right upper corner. If your machine name gets a green color on the
+   left hosts panel, then MPICH2 is running properly. Otherwise open
+   "Command Prompt" as the administrator. At the prompt, type
+
+    smpd -install -phrase mypassword
+
+   (change `mypassword' to your actual password). click "Get Settings"
+   again to see if your host gets green color.
+
+4) Download the npRmpi binary zip file for windows. Launch R as the
+   administrator to install npRmpi.
+
+TESTING:
+
+   The way to run code in parallel on a windows machine is described
+   in steps 1 to 4 below.
+
+   Note that the provided ".Rprofile" file has to be located where
+   'test.R' is for the above command to run properly. In this example,
+   both 'test.R' and '.Rprofile' are located on my 'C Drive'
+
+  (i) Download the files 'test.R' and '.Rprofile' and save them
+      locally on your C:\ drive.
+
+ (ii) Open "Command Prompt" as the administrator. At the prompt, type
+
+  cd C:\
+
+(iii) Now type
+
+     mpiexec -n 2 R --no-save -q < test.R > test_out.txt
+
+     (Change 2 for 3 or 4 if you got a quad-core desktop)
+
+(iv) After execution, type
+
+    test_out.txt
+
+    and notepad will open and display the generated output.

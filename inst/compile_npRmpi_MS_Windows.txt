@@ -1,0 +1,108 @@
+Title: Compiling npRmpi from source code under MS Windows 7 (32-bit/64-bit)
+
+Date: 03/13/2013
+
+Author: David T. Jacho-Chavez (djachocha@emory.edu)
+
+These are based on those given in
+
+http://www.stats.uwo.ca/faculty/yu/Rmpi/
+
+1. Download the following files:
+
+   a. Rtools30.exe: http://cran.r-project.org/bin/windows/Rtools/Rtools30.exe
+
+   b. mpich2-1.4.1p1-win-ia32.msi:
+
+http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-ia32.msi
+
+   c. mpich2-1.4.1p1-win-x86-64.msi:
+
+http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-x86-64.msi
+
+   d. R-2.15.3-win.exe: http://cran.r-project.org/mirrors.html
+
+   e. npRmpi_0.50-1.tar.gz: http://cran.r-project.org/web/packages/npRmpi/
+
+2. Run and install the following programs:
+
+   a. Install (a) in the previous step, and make sure your system Path
+   starts with: “c:\Rtools\bin;c:\Rtools\MinGW\bin;C:\Program
+   Files\R\R- 2.15.3\bin\i386;...”
+
+   b. Run and install (b). Do not change the Passphrase (i.e. behappy)
+   and use the default directory: “C:\Program Files (x86)\MPICH2\”
+
+       i. Go to “Start” -> “All Programs” -> “MPICH2” -> “wmpiregister.exe”
+          and enter your PC username and password (the one you use to log in).
+
+      ii. Open "Command Prompt" with administrator. At prompt,
+
+      typesmpd -install -phrase behappy
+
+      change behappy to whatever the pass phrase you choose).
+
+      Run smpd -status
+
+      If it returns "smpd running on your_host_name", then smpd is
+      setup properly.
+
+   c. Run and install (c). Do not change the Passphrase (i.e. behappy)
+   and use the default directory: “C:\Program Files\MPICH2\”
+
+       i. Go to “Start” -> “All Programs” -> “MPICH2” ->
+       “wmpiregister” and enter your PC username and password (the one
+       you use to log in).
+
+       ii. Open "Command Prompt" with administrator. At prompt,
+
+       typesmpd -install -phrase behappy
+
+       change behappy to whatever the pass phrase you choose).
+
+       Run smpd -status
+
+       If it returns "smpd running on your_host_name", then smpd is
+       setup properly.
+
+   d. Install (d) in the previous step, and make sure the installation
+   directory is: “C:\Program Files\R\R-2.15.3\”
+
+       i. Go to “Start” -> “run” and type “cmd”. Then type
+       “R”. ii. From inside R, run
+
+       Install.packages(“cubature”)
+
+       Select your mirror and let it run. Close the window. 
+
+3. Add MPICH2 bin directory to PATH environment variables as follows:
+
+   a. Right click "My Computer" and choose "Properties". Click
+   "Advanced system settings" to get a new window.  ￼￼￼￼￼￼￼￼￼
+
+   b. Click "Environment Variables..." to get a new window. Locate
+   variable "PATH" (it is version dependent. Either User or System
+   variables will be fine). Click Edit to get a new window.
+
+   c. At end of Variable value, add: ";C:\Program
+   Files\MPICH2\bin;C:\Program Files (x86)\MPICH2\bin" (Remove the
+   double quotations).
+
+4. npRmpi Installation:
+
+Go to “Start” -> “run” and type “cmd”. Navigate where item (e) in step
+1 is located in your directory, e.g. “cd
+C:\Users\yourusername\Downloads” and write
+
+R CMD INSTALL –preclean npRmpi_0.50-1.tar.gz
+
+5. Testing:
+
+From inside your DOS command shell, now navigate where your test R
+code (called it “mytest.R”) is located (along with the .Rprofile
+file). At the command prompt, write
+
+mpiexec –n 2 R –no-save –q < mytest.R > mytest_OUT.txt
+
+Open “mytest_OUT.txt” using notepad or any other text editor and check
+it ran correctly.

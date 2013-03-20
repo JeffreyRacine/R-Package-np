@@ -1,2 +1,13 @@
-# -*- Makefile -*-
+# -*- Makefile -*-  vim : ft = make
+
+ifeq "$(WIN)" "64" 
+PKG_CFLAGS   = -Ic:/progra~1/mpich2/include -DMPI2 -DWin32
+PKG_LIBS     = -Lc:/progra~1/mpich2/lib -lmpi
+else
+PKG_CFLAGS   = -Ic:/progra~2/mpich2/include -DMPI2 -DWin32
+PKG_LIBS     = -Lc:/progra~2/mpich2/lib -lmpi
+endif
+
+#PKG_CFLAGS   = -Ic:/progra~2/DeinoMPI/include -DMPI2 -DWin32
+#PKG_LIBS     = -Lc:/progra~2/DeinoMPI/lib -lmpi
 

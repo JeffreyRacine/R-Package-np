@@ -1,8 +1,8 @@
-%% $Id: np_faq.tex,v 1.83 2013/03/16 02:04:19 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.82 2013/03/15 12:44:07 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
-%\VignetteDepends{np}
+%\VignetteDepends{npRmpi}
 %\VignetteKeywords{nonparametric, kernel, categorical}
-%\VignettePackage{np}
+%\VignettePackage{npRmpi}
 
 \documentclass[12pt]{amsart}
 

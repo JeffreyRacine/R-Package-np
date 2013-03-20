@@ -179,8 +179,6 @@ npindex(bws, \dots)
     or \code{NA} if outcomes are not available }
 }
 
-
-
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
@@ -212,7 +210,7 @@ npindex(bws, \dots)
     
 
 \author{
-  Tristen Hayfield \email{hayfield@phys.ethz.ch}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
+  Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
 \section{Usage Issues}{
@@ -227,287 +225,54 @@ npindex(bws, \dots)
 
 \examples{
 \dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): Generate a simple linear model then
-# estimate it using a semiparametric single index specification and
-# Ichimura's nonlinear least squares coefficients and bandwidth
-# (default). Also compute the matrix of gradients and average derivative
-# estimates.
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-set.seed(12345)
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-n <- 100
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
+n <- 500
 
 x1 <- runif(n, min=-1, max=1)
 x2 <- runif(n, min=-1, max=1)
-
 y <- x1 - x2 + rnorm(n)
+mydat <- data.frame(x1,x2,y)
+rm(y,x1,x2)
 
-# Note - this may take a minute or two depending on the speed of your
-# computer. Note also that the first element of the vector beta is
-# normalized to one for identification purposes, and that X must contain
-# at least one continuous variable.
+mpi.bcast.Robj2slave(mydat)
 
-bw <- npindexbw(formula=y~x1+x2)
+## Ichimura, continuous y
 
-summary(bw)
-
-model <- npindex(bws=bw, gradients=TRUE)
-
-summary(model)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Or you can visualize the input with plot.
-
-plot(bw)
-
-Sys.sleep(5)
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): Generate a simple linear model then
-# estimate it using a semiparametric single index specification and
-# Ichimura's nonlinear least squares coefficients and bandwidth
-# (default). Also compute the matrix of gradients and average derivative
-# estimates.
-
-set.seed(12345)
-
-n <- 100
-
-x1 <- runif(n, min=-1, max=1)
-x2 <- runif(n, min=-1, max=1)
-
-y <- x1 - x2 + rnorm(n)
-
-X <- cbind(x1, x2)
-
-# Note - this may take a minute or two depending on the speed of your
-# computer. Note also that the first element of the vector beta is
-# normalized to one for identification purposes, and that X must contain
-# at least one continuous variable.
-
-bw <- npindexbw(xdat=X, ydat=y)
+mpi.bcast.cmd(bw <- npindexbw(formula=y~x1+x2,
+                              data=mydat),
+              caller.execute=TRUE)
 
 summary(bw)
 
-model <- npindex(bws=bw, gradients=TRUE)
+mpi.bcast.cmd(model <- npindex(bws=bw,
+                               gradients=TRUE),
+              caller.execute=TRUE)
 
 summary(model)
 
-# Sleep for 5 seconds so that we can examine the output...
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-Sys.sleep(5)
+mpi.close.Rslaves()
 
-# Or you can visualize the input with plot.
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-plot(bw)
-
-Sys.sleep(5)
-
-# EXAMPLE 2 (INTERFACE=FORMULA): Generate a simple binary outcome linear
-# model then estimate it using a semiparametric single index
-# specification and Klein and Spady's likelihood-based coefficients and
-# bandwidth (default). Also compute the matrix of gradients and average
-# derivative estimates.
-
-n <- 100
-
-x1 <- runif(n, min=-1, max=1)
-x2 <- runif(n, min=-1, max=1)
-
-y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
-
-# Note that the first element of the vector beta is normalized to one
-# for identification purposes, and that X must contain at least one
-# continuous variable.
-
-bw <- npindexbw(formula=y~x1+x2, method="kleinspady")
-
-summary(bw)
-
-model <- npindex(bws=bw, gradients=TRUE)
-
-# Note that, since the outcome is binary, we can assess model
-# performance using methods appropriate for binary outcomes. We look at
-# the confusion matrix, various classification ratios, and McFadden et
-# al's measure of predictive performance.
-
-summary(model)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# EXAMPLE 2 (INTERFACE=DATA FRAME): Generate a simple binary outcome
-# linear model then estimate it using a semiparametric single index
-# specification and Klein and Spady's likelihood-based coefficients and
-# bandwidth (default). Also compute the matrix of gradients and average
-# derivative estimates.
-
-n <- 100
-
-x1 <- runif(n, min=-1, max=1)
-x2 <- runif(n, min=-1, max=1)
-
-y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
-
-X <- cbind(x1, x2)
-
-# Note that the first element of the vector beta is normalized to one
-# for identification purposes, and that X must contain at least one
-# continuous variable.
-
-bw <- npindexbw(xdat=X, ydat=y, method="kleinspady")
-
-summary(bw)
-
-model <- npindex(bws=bw, gradients=TRUE)
-
-# Note that, since the outcome is binary, we can assess model
-# performance using methods appropriate for binary outcomes. We look at
-# the confusion matrix, various classification ratios, and McFadden et
-# al's measure of predictive performance.
-
-summary(model)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# EXAMPLE 3 (INTERFACE=FORMULA): Replicate the DGP of Klein & Spady
-# (1993) (see their description on page 405, pay careful attention to
-# footnote 6 on page 405).
-
-set.seed(123)
-
-n <- 1000
-
-# x1 is chi-squared having 3 df truncated at 6 standardized by
-# subtracting 2.348 and dividing by 1.511
-
-x <- rchisq(n, df=3)
-x1 <- (ifelse(x < 6, x, 6) - 2.348)/1.511
-
-# x2 is normal (0, 1) truncated at +- 2 divided by 0.8796
-
-x <- rnorm(n)
-x2 <- ifelse(abs(x) < 2 , x, 2) / 0.8796
-
-# y is 1 if y* > 0, 0 otherwise.
-
-y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
-
-# Compute the parameter vector and bandwidth. Note that the first
-# element of the vector beta is normalized to one for identification
-# purposes, and that X must contain at least one continuous variable.
-
-
-bw <- npindexbw(formula=y~x1+x2, method="kleinspady")
-
-# Next, create the evaluation data in order to generate a perspective
-# plot
-
-# Create an evaluation data matrix
-
-x1.seq <- seq(min(x1), max(x1), length=50)
-x2.seq <- seq(min(x2), max(x2), length=50)
-X.eval <- expand.grid(x1=x1.seq, x2=x2.seq)
-
-# Now evaluate the single index model on the evaluation data
-
-fit <- fitted(npindex(exdat=X.eval, 
-               eydat=rep(1, nrow(X.eval)), 
-               bws=bw))
-
-# Finally, coerce the fitted model into a matrix suitable for 3D
-# plotting via persp()
-
-fit.mat <- matrix(fit, 50, 50)
-
-# Generate a perspective plot similar to Figure 2 b of Klein and Spady
-# (1993)
-
-persp(x1.seq, 
-      x2.seq, 
-      fit.mat, 
-      col="white", 
-      ticktype="detailed", 
-      expand=0.5, 
-      axes=FALSE, 
-      box=FALSE, 
-      main="Estimated Semiparametric Probability Perspective", 
-      theta=310, 
-      phi=25)
-
-# EXAMPLE 3 (INTERFACE=DATA FRAME): Replicate the DGP of Klein & Spady
-# (1993) (see their description on page 405, pay careful attention to
-# footnote 6 on page 405).
-
-set.seed(123)
-
-n <- 1000
-
-# x1 is chi-squared having 3 df truncated at 6 standardized by
-# subtracting 2.348 and dividing by 1.511
-
-x <- rchisq(n, df=3)
-x1 <- (ifelse(x < 6, x, 6) - 2.348)/1.511
-
-# x2 is normal (0, 1) truncated at +- 2 divided by 0.8796
-
-x <- rnorm(n)
-x2 <- ifelse(abs(x) < 2 , x, 2) / 0.8796
-
-# y is 1 if y* > 0, 0 otherwise.
-
-y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
-
-# Create the X matrix
-
-X <- cbind(x1, x2)
-
-# Compute the parameter vector and bandwidth. Note that the first
-# element of the vector beta is normalized to one for identification
-# purposes, and that X must contain at least one continuous variable.
-
-
-bw <- npindexbw(xdat=X, ydat=y, method="kleinspady")
-
-# Next, create the evaluation data in order to generate a perspective
-# plot
-
-# Create an evaluation data matrix
-
-x1.seq <- seq(min(x1), max(x1), length=50)
-x2.seq <- seq(min(x2), max(x2), length=50)
-X.eval <- expand.grid(x1=x1.seq, x2=x2.seq)
-
-# Now evaluate the single index model on the evaluation data
-
-fit <- fitted(npindex(exdat=X.eval, 
-               eydat=rep(1, nrow(X.eval)), 
-               bws=bw))
-
-# Finally, coerce the fitted model into a matrix suitable for 3D
-# plotting via persp()
-
-fit.mat <- matrix(fit, 50, 50)
-
-# Generate a perspective plot similar to Figure 2 b of Klein and Spady
-# (1993)
-
-persp(x1.seq, 
-      x2.seq, 
-      fit.mat, 
-      col="white", 
-      ticktype="detailed", 
-      expand=0.5, 
-      axes=FALSE, 
-      box=FALSE, 
-      main="Estimated Semiparametric Probability Perspective", 
-      theta=310, 
-      phi=25)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 \keyword{nonparametric}

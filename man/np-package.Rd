@@ -11,7 +11,7 @@
 	variables respectively). A vignette containing many of the examples
 	found in the help files accompanying the \pkg{np} package that is
 	intended to serve as a gentle introduction to this package can be
-	accessed via \code{vignette("np", package="np")}.
+	accessed via \code{vignette("npRmpi", package="npRmpi")}.
 
   For a listing of all routines in the \pkg{np} package type:
   \sQuote{library(help="np")}.  

@@ -24,7 +24,7 @@ matrix.sd <- function(x, na.rm=FALSE) {
 }
 
 npseed <- function(seed){
-  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "np")
+  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "npRmpi")
   invisible()
 }
 

@@ -550,214 +550,36 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
 \examples{
 \dontrun{
-# EXAMPLE 1: For this example, we load Giovanni Baiocchi's Italian GDP
-# panel (see Italy for details), then create a data frame in which year
-# is an ordered factor, GDP is continuous, compute bandwidths using
-# likelihood cross-validation, then create a grid of data on which the
-# density will be evaluated for plotting purposes
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-data("Italy")
-attach(Italy)
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-data <- data.frame(ordered(year), gdp)
+x <- rnorm(100)
+mpi.bcast.Robj2slave(x)
+mpi.bcast.cmd(fhat <- npudens(~x),
+              caller.execute=TRUE)
 
-# Compute bandwidths using likelihood cross-validation (default). Note
-# that this may take a minute or two depending on the speed of your
-# computer...
+mpi.bcast.cmd(plot(fhat),
+              caller.execute=TRUE)
 
-bw <- npudensbw(dat=data)
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-# You can always do things manually, as the following example demonstrates
+mpi.close.Rslaves()
 
-# Create an evaluation data matrix
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-year.seq <- sort(unique(year))
-gdp.seq <- seq(1,36,length=50)
-data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
-
-# Generate the estimated density computed for the evaluation data
-
-fhat <- fitted(npudens(tdat = data, edat = data.eval, bws=bw))
-
-# Coerce the data into a matrix for plotting with persp()
-
-f <- matrix(fhat, length(unique(year)), 50)
-
-# Next, create a 3D perspective plot of the PDF f
-
-persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
-      ticktype="detailed", ylab="GDP", xlab="Year", zlab="Density",
-      theta=300, phi=50)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# However, npplot simply streamlines this process and aids in the
-# visualization process (<ctrl>-C will interrupt on *NIX systems, <esc>
-# will interrupt on MS Windows systems).
-
-plot(bw)
-
-# npplot also streamlines construction of variability bounds (<ctrl>-C
-# will interrupt on *NIX systems, <esc> will interrupt on MS Windows
-# systems)
-
-plot(bw, plot.errors.method = "asymptotic")
-
-# EXAMPLE 2: For this example, we simulate multivariate data, and plot the
-# partial regression surfaces for a locally linear estimator and its
-# derivatives.
-
-set.seed(123)
-
-n <- 100
-
-x1 <- runif(n)
-x2 <- runif(n)
-x3 <- runif(n)
-x4 <- rbinom(n, 2, .3)
-
-y <- 1 + x1 + x2 + x3 + x4 + rnorm(n)
-
-X <- data.frame(x1, x2, x3, ordered(x4))
-
-bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic")
-
-plot(bw)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Now plot the gradients...
-
-plot(bw, gradients=TRUE)
-
-# Plot the partial regression surfaces with bias-corrected bootstrapped
-# nonparametric confidence intervals... this may take a minute or two
-# depending on the speed of your computer as the bootstrapping must be
-# completed prior to results being displayed...
-
-plot(bw,
-     plot.errors.method="bootstrap", 
-     plot.errors.center="bias-corrected",
-     plot.errors.type="quantiles")
-
-# Note - if you wished to create, say, a postscript graph for inclusion
-# in, say, a latex document, use R's `postscript' command to switch to
-# the postscript device (turn off the device once completed). The
-# following will create a disk file `graph.ps' that can be pulled into,
-# say, a latex document via \includegraphics[width=5in, height=5in,
-# angle=270]{graph.ps}
-
-# Note - make sure to include the graphicx package in your latex
-# document via adding \usepackage{graphicx} in your latex file. Also, 
-# you might was to use larger fonts, which can be achieved by adding the
-# pointsize= argument, e.g., postscript(file="graph.ps", pointsize=20)
-
-postscript(file="graph.ps")
-plot(bw)
-dev.off()
-
-# The following latex file compiled in the same directory as graph.ps
-# ought to work (remove the #s and place in a file names, e.g., 
-# test.tex).
-# \documentclass[]{article}
-# \usepackage{graphicx}
-# \begin{document}
-# \begin{figure}[!ht]
-# \includegraphics[width=5in, height=5in, angle=270]{graph.ps}
-# \caption{Local linear partial regression surfaces.}
-# \end{figure}
-# \end{document}
-
-
-# EXAMPLE 3: This example demonstrates how to retrieve plotting data from
-# npplot(). When npplot() is called with the arguments
-# `plot.behavior="plot-data"' (or "data"), it returns plotting objects
-# named r1, r2, and so on (rg1, rg2, and so on when `gradients=TRUE' is
-# set).  Each plotting object's index (1,2,...) corresponds to the index
-# of the explanatory data data frame xdat (and zdat if appropriate). 
-
-# Take the cps71 data by way of example. In this case, there is only one
-# object returned by default, `r1', since xdat is univariate.
-
-data("cps71")
-attach(cps71)
-
-# Compute bandwidths for local linear regression using cv.aic...
-
-bw <- npregbw(xdat=age,ydat=logwage,regtype="ll",bwmethod="cv.aic")
-
-# Generate the plot and return plotting data, and store output in
-# `plot.out' (NOTE: the call to `plot.behavior' is necessary).
-
-plot.out <- plot(bw,
-                 perspective=FALSE,
-                 plot.errors.method="bootstrap",
-                 plot.errors.boot.num=25,
-                 plot.behavior="plot-data")
-
-# Now grab the r1 object that npplot plotted on the screen, and take
-# what you need. First, take the output, lower error bound and upper
-# error bound...
-
-logwage.eval <- fitted(plot.out$r1)
-logwage.se <- se(plot.out$r1)
-logwage.lower.ci <- logwage.eval + logwage.se[,1]
-logwage.upper.ci <- logwage.eval + logwage.se[,2]
-
-# Next grab the x data evaluation data. xdat is a data.frame(), so we
-# need to coerce it into a vector (take the `first column' of data frame
-# even though there is only one column)
-
-age.eval <- plot.out$r1$eval[,1]
-
-# Now we could plot this if we wished, or direct it to whatever end use
-# we envisioned. We plot the results using R's plot() routines...
-
-plot(age,logwage,cex=0.2,xlab="Age",ylab="log(Wage)")
-lines(age.eval,logwage.eval)
-lines(age.eval,logwage.lower.ci,lty=3)
-lines(age.eval,logwage.upper.ci,lty=3)
-
-# If you wanted npplot() data for gradients, you would use the argument
-# `gradients=TRUE' in the call to npplot() as the following
-# demonstrates...
-
-plot.out <- plot(bw,
-                 perspective=FALSE,
-                 plot.errors.method="bootstrap",
-                 plot.errors.boot.num=25,
-                 plot.behavior="plot-data",
-                 gradients=TRUE)
-
-# Now grab object that npplot() plotted on the screen. First, take the
-# output, lower error bound and upper error bound... note that gradients
-# are stored in objects rg1, rg2 etc.
-
-grad.eval <- gradients(plot.out$rg1)
-grad.se <- gradients(plot.out$rg1, errors = TRUE)
-grad.lower.ci <- grad.eval + grad.se[,1]
-grad.upper.ci <- grad.eval + grad.se[,2]
-
-# Next grab the x evaluation data. xdat is a data.frame(), so we need to
-# coerce it into a vector (take `first column' of data frame even though
-# there is only one column)
-
-age.eval <- plot.out$rg1$eval[,1]
-
-# We plot the results using R's plot() routines...
-
-plot(age.eval,grad.eval,cex=0.2,
-     ylim=c(min(grad.lower.ci),max(grad.upper.ci)),
-     xlab="Age",ylab="d log(Wage)/d Age",type="l")
-lines(age.eval,grad.lower.ci,lty=3)
-lines(age.eval,grad.upper.ci,lty=3)
-
-detach(cps71)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 
 \keyword{nonparametric}

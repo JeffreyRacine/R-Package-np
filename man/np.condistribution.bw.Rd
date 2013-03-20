@@ -452,50 +452,37 @@ npcdistbw(\dots)
 
 \examples{
 \dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
-# cross-validated bandwidths (default) using a second-order Gaussian
-# kernel (default). Note - this may take a minute or two depending on
-# the speed of your computer.
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
 data("Italy")
-attach(Italy)
 
-bw <- npcdistbw(formula=gdp~ordered(year))
+mpi.bcast.Robj2slave(Italy)
 
-# The object bw can be used for further estimation using
-# npcdist(), plotting using plot() etc. Entering the name of
-# the object provides useful summary information, and names() will also
-# provide useful information.
+mpi.bcast.cmd(bw <- npcdistbw(formula=gdp~ordered(year),
+                              data=Italy),
+              caller.execute=TRUE)
 
 summary(bw)
 
-# Note - see the example for npudensbw() for multiple illustrations
-# of how to change the kernel function, kernel order, and so forth.
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-detach(Italy)
+mpi.close.Rslaves()
 
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute the
-# cross-validated bandwidths (default) using a second-order Gaussian
-# kernel (default). Note - this may take a minute or two depending on
-# the speed of your computer.
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-data("Italy")
-attach(Italy)
-
-bw <- npcdistbw(xdat=ordered(year), ydat=gdp)
-
-# The object bw can be used for further estimation using npcdist(),
-# plotting using plot() etc. Entering the name of the object provides
-# useful summary information, and names() will also provide useful
-# information.
-
-summary(bw)
-
-# Note - see the example for npudensbw() for multiple illustrations
-# of how to change the kernel function, kernel order, and so forth.
-
-detach(Italy)
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
 } % enddontrun
 }
 \keyword{nonparametric}
-

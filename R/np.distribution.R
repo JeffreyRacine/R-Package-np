@@ -156,7 +156,7 @@ npudist.dbandwidth <-
          dist = double(enrow),
          derr = double(enrow),
          log_likelihood = double(1),
-         PACKAGE="np" )[c("dist","derr", "log_likelihood")]
+         PACKAGE="npRmpi" )[c("dist","derr", "log_likelihood")]
 
     ev <- npdistribution(bws=bws, eval=teval, dist = myout$dist,
                          derr = myout$derr, ntrain = tnrow, trainiseval = no.e,

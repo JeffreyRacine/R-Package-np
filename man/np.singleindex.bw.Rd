@@ -318,99 +318,48 @@ npindexbw(\dots)
 
 \examples{
 \dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): Generate a simple linear model then
-# compute coefficients and the bandwidth using Ichimura's nonlinear
-# least squares approach.
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-set.seed(12345)
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-n <- 100
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
+n <- 500
 
 x1 <- runif(n, min=-1, max=1)
 x2 <- runif(n, min=-1, max=1)
-
 y <- x1 - x2 + rnorm(n)
+mydat <- data.frame(x1,x2,y)
+rm(y,x1,x2)
 
-# Note - this may take a minute or two depending on the speed of your
-# computer. Note also that the first element of the vector beta is
-# normalized to one for identification purposes, and that X must contain
-# at least one continuous variable.
+mpi.bcast.Robj2slave(mydat)
 
-bw <- npindexbw(formula=y~x1+x2, method="ichimura")
+## Ichimura, continuous y
 
-summary(bw)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): Generate a simple linear model then
-# compute coefficients and the bandwidth using Ichimura's nonlinear
-# least squares approach.
-
-set.seed(12345)
-
-n <- 100
-
-x1 <- runif(n, min=-1, max=1)
-x2 <- runif(n, min=-1, max=1)
-
-y <- x1 - x2 + rnorm(n)
-
-X <- cbind(x1, x2)
-
-# Note - this may take a minute or two depending on the speed of your
-# computer. Note also that the first element of the vector beta is
-# normalized to one for identification purposes, and that X must contain
-# at least one continuous variable.
-
-bw <- npindexbw(xdat=X, ydat=y, method="ichimura")
+mpi.bcast.cmd(bw <- npindexbw(formula=y~x1+x2,
+                              data=mydat),
+              caller.execute=TRUE)
 
 summary(bw)
 
-# Sleep for 5 seconds so that we can examine the output...
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-Sys.sleep(5)
+mpi.close.Rslaves()
 
-# EXAMPLE 2 (INTERFACE=DATA FRAME): Generate a simple binary outcome
-# model then compute coefficients and the bandwidth using Klein and
-# Spady's likelihood-based approach.
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-n <- 100
-
-x1 <- runif(n, min=-1, max=1)
-x2 <- runif(n, min=-1, max=1)
-
-y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
-
-# Note that the first element of the vector beta is normalized to one
-# for identification purposes, and that X must contain at least one
-# continuous variable.
-
-bw <- npindexbw(formula=y~x1+x2, method="kleinspady")
-
-summary(bw)
-
-# EXAMPLE 2 (INTERFACE=DATA FRAME): Generate a simple binary outcome
-# model then compute coefficients and the bandwidth using Klein and
-# Spady's likelihood-based approach.
-
-n <- 100
-
-x1 <- runif(n, min=-1, max=1)
-x2 <- runif(n, min=-1, max=1)
-
-y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
-
-X <- cbind(x1, x2)
-
-# Note that the first element of the vector beta is normalized to one
-# for identification purposes, and that X must contain at least one
-# continuous variable.
-
-bw <- npindexbw(xdat=X, ydat=y, method="kleinspady")
-
-summary(bw)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 \keyword{nonparametric}

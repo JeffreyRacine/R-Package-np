@@ -280,7 +280,7 @@ npksum.default <-
          as.integer(myopti), as.double(kernel.pow),
          ksum = double(length.out),
          kernel.weights = double(nkw),
-         PACKAGE="np" )[return.names]
+         PACKAGE="npRmpi" )[return.names]
 
     if (dim.out[1] > 1){
       dim(myout[["ksum"]]) <- dim.out

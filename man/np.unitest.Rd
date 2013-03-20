@@ -131,92 +131,47 @@ npunitest(data.x = NULL,
 
 \examples{
 \dontrun{
-set.seed(1234)
-n <- 1000
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-## Compute the statistic only for data drawn from same distribution
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
+n <- 250
 
 x <- rnorm(n)
 y <- rnorm(n)
 
-npunitest(x,y,bootstrap=FALSE)
+mpi.bcast.Robj2slave(x)
+mpi.bcast.Robj2slave(y)
 
-Sys.sleep(5)
+mpi.bcast.cmd(output <- npunitest(x,y,
+                                  method="summation",
+                                  bootstrap=TRUE,
+                                  boot.num=99),
+              caller.execute=TRUE)
 
-## Conduct the test for this data
+summary(output)
 
-npunitest(x,y,boot.num=99)
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-Sys.sleep(5)
+mpi.close.Rslaves()
 
-## Conduct the test for data drawn from different distributions having
-## the same mean and variance
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-x <- rchisq(n,df=5)
-y <- rnorm(n,mean=5,sd=sqrt(10))
-mean(x)
-mean(y)
-sd(x)
-sd(y)
-
-npunitest(x,y,boot.num=99)
-
-Sys.sleep(5)
-
-## Two sample t-test for equality of means
-t.test(x,y)
-## F test for equality of variances and asymptotic
-## critical values
-F <- var(x)/var(y)
-qf(c(0.025,0.975),df1=n-1,df2=n-1)
-
-## Plot the nonparametric density estimates on the same axes
-
-fx <- density(x)
-fy <- density(y)
-xlim <- c(min(fx$x,fy$x),max(fx$x,fy$x))
-ylim <- c(min(fx$y,fy$y),max(fx$y,fy$y))
-plot(fx,xlim=xlim,ylim=ylim,xlab="Data",main="f(x), f(y)")
-lines(fy$x,fy$y,col="red")
-
-Sys.sleep(5)
-
-## Test for equality of log(wage) distributions
-
-data(wage1)
-attach(wage1)
-lwage.male <- lwage[female=="Male"]
-lwage.female <- lwage[female=="Female"]
-
-npunitest(lwage.male,lwage.female,boot.num=99)
-
-Sys.sleep(5)
-
-## Plot the nonparametric density estimates on the same axes
-
-f.m <- density(lwage.male)
-f.f <- density(lwage.female)
-xlim <- c(min(f.m$x,f.f$x),max(f.m$x,f.f$x))
-ylim <- c(min(f.m$y,f.f$y),max(f.m$y,f.f$y))
-plot(f.m,xlim=xlim,ylim=ylim,
-     xlab="log(wage)",
-     main="Male/Female log(wage) Distributions")
-lines(f.f$x,f.f$y,col="red",lty=2)
-rug(lwage.male)
-legend(-1,1.2,c("Male","Female"),lty=c(1,2),col=c("black","red"))
-
-detach(wage1)
-
-Sys.sleep(5)
-
-## Conduct the test for data drawn from different discrete probability
-## distributions
-
-x <- factor(rbinom(n,2,.5))
-y <- factor(rbinom(n,2,.1))
-
-npunitest(x,y,boot.num=99)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 \keyword{ univar }
 \keyword{ nonparametric }

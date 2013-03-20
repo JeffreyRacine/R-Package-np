@@ -212,8 +212,8 @@ npscoef(bws, \dots)
   136, 163-188.
 
   Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric Estimation of
-  Global Functionals and a Measure of the Explanatory Power of
-  Covariates in Regression,} The Annals of Statistics, 23 1443-1473.
+    Global Functionals and a Measure of the Explanatory Power of
+    Covariates in Regression,} The Annals of Statistics, 23 1443-1473.
 
   Hastie, T. and R. Tibshirani (1993), \dQuote{Varying-coefficient
     models,} Journal of the Royal Statistical Society, B 55, 757-796.
@@ -223,7 +223,7 @@ npscoef(bws, \dots)
 
   Li, Q. and J.S. Racine (2010), \dQuote{Smooth varying-coefficient
     estimation and inference for qualitative and quantitative data,}
-    Econometric Theory, 26, 1-31.
+    Econometric Theory, 26, 1607-1637
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
@@ -259,26 +259,53 @@ npscoef(bws, \dots)
 
 \examples{
 \dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): 
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-n <- 250
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
+n <- 500
+
 x <- runif(n)
 z <- runif(n, min=-2, max=2)
 y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
-bw <- npscoefbw(y~x|z)
-model <- npscoef(bw)
-plot(model)
+mydat <- data.frame(x,y,z)
+rm(x,y,z)
 
-# EXAMPLE 1 (INTERFACE=DATA FRAME): 
+mpi.bcast.Robj2slave(mydat)
 
-n <- 250
-x <- runif(n)
-z <- runif(n, min=-2, max=2)
-y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
-bw <- npscoefbw(xdat=x, ydat=y, zdat=z)
-model <- npscoef(bw)
-plot(model)
-} % enddontrun
+## A smooth coefficient model example
+
+mpi.bcast.cmd(bw <- npscoefbw(y~x|z,data=mydat),
+              caller.execute=TRUE)
+
+summary(bw)
+
+mpi.bcast.cmd(model <- npscoef(bws=bw, gradients=TRUE),
+              caller.execute=TRUE)
+
+summary(model)
+
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+mpi.close.Rslaves()
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 \keyword{nonparametric}
 

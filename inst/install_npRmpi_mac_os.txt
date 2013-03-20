@@ -1,0 +1,63 @@
+Thanks to Steven F. Koch for these helpful notes (steve.koch@up.ac.za)
+
+Installing npRmpi on OSX 10.8 (Mtn Lion)
+
+We basically need to install `Xcode' and its command line tools which
+delivers compilers etc. then install MacPorts (www.macports.org) which
+allows you to install R and openmpi, then set system wide environment
+variables. Or you can install R directly from the R website if you
+prefer.
+
+1. Within App Store, install Xcode. It is free, but takes time to
+install, depending on your connection.
+
+2. Launch Xcode. Open Xcode Preferences. Under the Downloads tab,
+install Command Line Tools.
+
+3. It is now possible to install MacPorts. Follow the instructions
+on http://www.macports.org/install.php. I downloaded the ".pkg"
+version, and installed the same way as many other applications in Mac.
+
+4. Install openmpi (and optionally R if you prefer to do this rather
+than downloading the OS X binary from r-project.org) using MacPorts:
+using Terminal (from Applications): type "sudo port install openmpi
+R-framework" (without the quotes, and drop R-framework if you already
+have R installed). For related information, take a look at
+https://trac.macports.org/wiki/UsingMacPortsQuickStart
+
+5. Next, we need to set system wide environment variables so that
+these values will be recognized for both command line and GUI
+applications such as RStudio.
+
+Create or append these to your existing ~/.bashrc file from the
+Terminal via `sudo emacs ~./bashrc' (without the quotes `') to set
+environment variables for command line apps run from Terminal
+
+export LD_LIBRARY_PATH=/opt/local/lib
+export RMPI_LIB_PATH=/opt/local/lib
+export RMPI_TYPE OPENMPI
+export RMPI_INCLUDE=/opt/local/include/openmpi
+
+launchctl setenv LD_LIBRARY_PATH $LD_LIBRARY_PATH
+launchctl setenv RMPI_LIB_PATH $RMPI_LIB_PATH
+launchctl setenv RMPI_TYPE $RMPI_TYPE
+launchctl setenv RMPI_INCLUDE $RMPI_INCLUDE
+
+If you use R-framework, you may wish to also set R_LIBS_USER to a
+local directory. To do this create a directory as in `mkdir
+~/Library/R' then also add the following to your ~/.bashrc
+
+export R_LIBS_USER=$HOME/Library/R
+
+and
+
+launchctl setenv R_LIBS_USER $R_LIBS_USER
+
+Then from the Terminal run `source ~/.bashrc' or log out and log in
+again.
+
+6. Test things out. From within R, type `install.packages("npRmpi")'
+(without the single quotes) and if your install of openmpi and
+R-framework went well and you set the environment variables listed
+above, you can test out the install via `library(npRmpi)' (without the
+single quotes) from within R.

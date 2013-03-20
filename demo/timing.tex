@@ -1,0 +1,68 @@
+%% $Id$
+
+\documentclass[]{amsart}
+
+\usepackage{setspace,graphicx,srcltx,enumitem}
+\usepackage[agsm]{harvard}
+
+\newcommand{\field}[1]{\mathbb{#1}}
+\newcommand{\R}{\field{R}}
+
+%% Change the default page sizes.
+
+\setlength{\topmargin}{-0.25in}
+\setlength{\textheight}{8.5in}
+\setlength{\oddsidemargin}{.0in}
+\setlength{\evensidemargin}{.0in}
+\setlength{\textwidth}{6.5in}
+\setlength{\footskip}{.5in}
+
+\date{\today} 
+
+\title{np/npRmpi Relative Performance}
+
+\begin{document}
+
+\maketitle
+
+\section*{Timing Results, number of cores $1,\dots,4$}
+
+Due to small sample sizes some demos may not show appreciable gains
+with respect to increasing the number of cores. Where possible we have
+bumped up sample sizes in the hopes that the larger sample sizes will
+show expected scaling benefits.  
+
+\begin{enumerate}
+
+\item Note that the functions npconmode, npcmstest, and npqreg use
+  actual datasets so these are restricted unless we wish to go with
+  fully simulated data (an entry of $n=0$ indicates the example uses a
+  dataset)
+
+\item Note that currently the function npregiv is serial only hence no
+  speedup (in fact overhead from message passing will slow it down as
+  the number of cores increases)
+
+\item Note that currently the function npscoef and npglpreg are not
+  fully MPI aware as the ridging occurs outside of a call to npksum()
+  hence is processed serially and not in parallel
+
+\end{enumerate}
+
+The table below presents Seconds with respect to the number of cores
+followed by the ratio (Secs(1) versus Secs(2) for instance). Note that
+an entry of $n=0$ indicates the example uses a dataset hence the
+number of observations cannot be modified.
+
+\begin{table}[!ht]
+\scriptsize
+\input timing_n_2
+\input timing_n_3
+\end{table}
+
+\begin{table}[!ht]
+\scriptsize
+\input timing_n_4
+\end{table}
+
+\end{document}

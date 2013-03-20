@@ -190,7 +190,7 @@ npcdensbw.conbandwidth <-
                bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
                bws$xbw[bws$ixuno],bws$xbw[bws$ixord]),
              fval = double(2),
-             PACKAGE="np" )[c("bw","fval")]
+             PACKAGE="npRmpi" )[c("bw","fval")]
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon

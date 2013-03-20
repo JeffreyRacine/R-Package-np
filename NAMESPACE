@@ -1,6 +1,125 @@
-useDynLib(np)
+useDynLib(npRmpi)
 import(stats)
 export(b.star
+       ,.docall
+       ,.force.type
+       ,.mpi.undefined
+       ,.simplify
+       ,.splitIndices
+       ,.typeindex
+       ,lamhosts
+       ,.mpi.worker.exec
+       ,.mpi.worker.apply
+       ,.mpi.worker.sim
+       ,.mpi.worker.applyLB
+       ,mpi.abort
+       ,mpi.allgather
+       ,mpi.allgather.Robj
+       ,mpi.allgatherv
+       ,mpi.allreduce
+       ,mpi.any.source
+       ,mpi.any.tag
+       ,mpi.apply
+       ,mpi.applyLB
+       ,mpi.barrier
+       ,mpi.bcast
+       ,mpi.bcast.Robj
+       ,mpi.bcast.Robj2slave
+       ,mpi.bcast.cmd
+       ,mpi.cancel
+       ,mpi.cart.coords
+       ,mpi.cart.create
+       ,mpi.cart.get
+       ,mpi.cart.rank
+       ,mpi.cart.shift
+       ,mpi.cartdim.get
+       ,mpi.close.Rslaves
+       ,mpi.comm.c2f
+       ,mpi.comm.disconnect
+       ,mpi.comm.dup
+       ,mpi.comm.free
+       ,mpi.comm.get.parent
+       ,mpi.comm.is.null
+       ,mpi.comm.maxsize
+       ,mpi.comm.rank
+       ,mpi.comm.remote.size
+       ,mpi.comm.set.errhandler
+       ,mpi.comm.size
+       ,mpi.comm.spawn
+       ,mpi.comm.test.inter
+       ,mpi.dims.create
+       ,mpi.exit
+       ,mpi.finalize
+       ,mpi.gather
+       ,mpi.gather.Robj
+       ,mpi.gatherv
+       ,mpi.get.count
+       ,mpi.get.processor.name
+       ,mpi.get.sourcetag
+       ,mpi.hostinfo
+       ,mpi.iapply
+       ,mpi.iapplyLB
+       ,mpi.info.create
+       ,mpi.info.free
+       ,mpi.info.get
+       ,mpi.info.set
+       ,mpi.intercomm.merge
+       ,mpi.iparApply
+       ,mpi.iparCapply
+       ,mpi.iparLapply
+       ,mpi.iparMM
+       ,mpi.iparRapply
+       ,mpi.iparReplicate
+       ,mpi.iparSapply
+       ,mpi.iprobe
+       ,mpi.irecv
+       ,mpi.is.master
+       ,mpi.isend
+       ,mpi.isend.Robj
+       ,mpi.parApply
+       ,mpi.parCapply
+       ,mpi.parLapply
+       ,mpi.parMM
+       ,mpi.parRapply
+       ,mpi.parReplicate
+       ,mpi.parSapply
+       ,mpi.parSim
+       ,mpi.probe
+       ,mpi.proc.null
+       ,mpi.quit
+       ,mpi.realloc.comm
+       ,mpi.realloc.request
+       ,mpi.realloc.status
+       ,mpi.recv
+       ,mpi.recv.Robj
+       ,mpi.reduce
+       ,mpi.remote.exec
+       ,mpi.request.maxsize
+       ,mpi.scatter
+       ,mpi.scatter.Robj
+       ,mpi.scatterv
+       ,mpi.send
+       ,mpi.send.Robj
+       ,mpi.sendrecv
+       ,mpi.sendrecv.replace
+       ,mpi.setup.rngstream
+       ,mpi.spawn.Rslaves
+       ,mpi.status.maxsize
+       ,mpi.test
+       ,mpi.test.cancelled
+       ,mpi.testall
+       ,mpi.testany
+       ,mpi.testsome
+       ,mpi.universe.size
+       ,mpi.wait
+       ,mpi.waitall
+       ,mpi.waitany
+       ,mpi.waitsome
+       ,mpichhosts
+       ,slave.hostinfo
+       ,string
+       ,tailslave.log
+       ,np.mpi.initialize
        ,npudensbw
        ,npudistbw
        ,npudens
@@ -8,7 +127,7 @@ export(b.star
        ,npregbw
        ,npreg
        ,npregiv
-       ,npregivderiv              
+       ,npregivderiv       
        ,npplreg
        ,npplregbw
        ,npcdensbw

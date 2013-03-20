@@ -158,7 +158,7 @@ npudens.bandwidth <-
        dens = double(enrow),
        derr = double(enrow),
        log_likelihood = double(1),
-       PACKAGE="np" )[c("dens","derr", "log_likelihood")]
+       PACKAGE="npRmpi" )[c("dens","derr", "log_likelihood")]
 
   ev <- npdensity(bws=bws, eval=teval, dens = myout$dens,
                   derr = myout$derr, ll = myout$log_likelihood,

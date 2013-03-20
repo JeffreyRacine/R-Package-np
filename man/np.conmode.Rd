@@ -160,136 +160,58 @@ npconmode(bws, \dots)
 
 \examples{
 \dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we use the
-# birthweight data taken from the MASS library, and compute a parametric
-# logit model and a nonparametric conditional mode model. We then
-# compare their confusion matrices and summary measures of
-# classification ability.
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-library("MASS")
-data("birthwt")
-attach(birthwt)
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-# Fit a parametric logit model with low (0/1) as the dependent
-# variable and age, lwt, and smoke (0/1) as the covariates
+mpi.bcast.cmd(library(MASS),caller.execute=TRUE)
+mpi.bcast.cmd(data(birthwt),caller.execute=TRUE)
 
-# From ?birthwt
-# 'low' indicator of birth weight less than 2.5kg
-# 'smoke' smoking status during pregnancy
-# 'race' mother's race ('1' = white, '2' = black, '3' = other)
-# 'ht' history of hypertension
-# 'ui' presence of uterine irritability
-# 'ftv' number of physician visits during the first trimester
-# 'age' mother's age in years
-# 'lwt' mother's weight in pounds at last menstrual period
+birthwt$low <- factor(birthwt$low)
+birthwt$smoke <- factor(birthwt$smoke)
+birthwt$race <- factor(birthwt$race)
+birthwt$ht <- factor(birthwt$ht)
+birthwt$ui <- factor(birthwt$ui)
+birthwt$ftv <- ordered(birthwt$ftv)
 
-model.logit <- glm(low~factor(smoke)+
-                   factor(race)+
-                   factor(ht)+
-                   factor(ui)+
-                   ordered(ftv)+
-                   age+
-                   lwt, 
-                   family=binomial(link=logit))
+mpi.bcast.Robj2slave(birthwt)
 
-# Generate the confusion matrix and correct classification ratio
+mpi.bcast.cmd(bw <- npcdensbw(low~
+                              smoke+ 
+                              race+ 
+                              ht+ 
+                              ui+    
+                              ftv+  
+                              age+           
+                              lwt,
+                              data=birthwt),
+              caller.execute=TRUE)
 
-cm <- table(low, ifelse(fitted(model.logit)>0.5, 1, 0))
-ccr <- sum(diag(cm))/sum(cm)
+summary(bw)
 
-# Now do the same with a nonparametric model.  Note - this may take a
-# few minutes depending on the speed of your computer... 
+mpi.bcast.cmd(model <- npconmode(bws=bw),
+              caller.execute=TRUE)
 
-bw <- npcdensbw(formula=factor(low)~factor(smoke)+
-                factor(race)+
-                factor(ht)+
-                factor(ui)+
-                ordered(ftv)+
-                age+
-                lwt)
+summary(model)
 
-model.np <- npconmode(bws=bw)
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-# Compare confusion matrices from the logit and nonparametric model
+mpi.close.Rslaves()
 
-# Logit
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-cm
-ccr
-
-# Nonparametric
-summary(model.np)
-
-detach(birthwt)
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we use the
-# birthweight data taken from the MASS library, and compute a parametric
-# logit model and a nonparametric conditional mode model. We then
-# compare their confusion matrices and summary measures of
-# classification ability.
-
-library("MASS")
-data("birthwt")
-attach(birthwt)
-
-# Fit a parametric logit model with low (0/1) as the dependent
-# variable and age, lwt, and smoke (0/1) as the covariates
-
-# From ?birthwt
-# 'low' indicator of birth weight less than 2.5kg
-# 'smoke' smoking status during pregnancy
-# 'race' mother's race ('1' = white, '2' = black, '3' = other)
-# 'ht' history of hypertension
-# 'ui' presence of uterine irritability
-# 'ftv' number of physician visits during the first trimester
-# 'age' mother's age in years
-# 'lwt' mother's weight in pounds at last menstrual period
-
-model.logit <- glm(low~factor(smoke)+
-                   factor(race)+
-                   factor(ht)+
-                   factor(ui)+
-                   ordered(ftv)+
-                   age+
-                   lwt, 
-                   family=binomial(link=logit))
-
-# Generate the confusion matrix and correct classification ratio
-
-cm <- table(low, ifelse(fitted(model.logit)>0.5, 1, 0))
-ccr <- sum(diag(cm))/sum(cm)
-
-# Now do the same with a nonparametric model...
-
-X <- data.frame(factor(smoke), 
-                factor(race), 
-                factor(ht), 
-                factor(ui), 
-                ordered(ftv), 
-                age, 
-                lwt)
-
-y <- factor(low)
-
-# Note - this may take a few minutes depending on the speed of your
-# computer... 
-
-bw <- npcdensbw(xdat=X, ydat=y)
-
-model.np <- npconmode(bws=bw)
-
-# Compare confusion matrices from the logit and nonparametric model
-
-# Logit
-
-cm
-ccr
-
-# Nonparametric
-summary(model.np)
-
-detach(birthwt)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
 
