@@ -167,11 +167,13 @@ double *kernel_sum)
 	double *lambda;
 	double **matrix_bandwidth = NULL;
 
-	double *psum;
+#ifndef MPI2
+  double * psum;
+#endif
 	double *py;
 
 #ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 #endif
 
@@ -218,7 +220,6 @@ double *kernel_sum)
 	}
 
 #ifndef MPI2
-
 	if(BANDWIDTH_reg == 0)
 	{
 
@@ -1322,7 +1323,7 @@ double * kw){
 #ifdef MPI2
   // switch parallelisation strategies based on biggest stride
  
-  int stride = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int stride = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   num_obs_eval_alloc = stride*iNum_Processors;
 
 #else
@@ -1703,7 +1704,7 @@ double *cv){
   const uint64_t Q = (Nb*Nb*Nb)/Np;
   const uint64_t Nr = (Nb*Nb*Nb)%Np;
 
-  const uint64_t Wi = P*Q + (P > Nr)?Nr:P;
+  const uint64_t Wi = P*Q + ((P > Nr)?Nr:P);
   const uint64_t Wf = Wi + Q + (P < Nr);
   const uint64_t uki = Wi/(Nb*Nb);
   const uint64_t uji = (Wi%(Nb*Nb))/Nb;
@@ -2033,7 +2034,7 @@ int *num_categories){
     operator[i] = 0;
 
 #ifdef MPI2
-    int stride = MAX(ceil((double) num_obs / (double) iNum_Processors),1);
+    int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
     num_obs_eval_alloc = stride*iNum_Processors;
     aicc = (double *)malloc(stride*sizeof(double));
 #else
@@ -2567,10 +2568,10 @@ double * cv){
   int num_obs_eval_alloc, num_obs_train_alloc;
 
 #ifdef MPI2
-  int stride_t = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
+  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
   is = stride_t * my_rank;
   ie = MIN(num_obs_train - 1, is + stride_t - 1);
-  int stride_e = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   
   num_obs_train_alloc = stride_t*iNum_Processors;
   num_obs_eval_alloc = stride_e*iNum_Processors;
@@ -2773,10 +2774,10 @@ double *cv){
   int num_obs_eval_alloc, num_obs_train_alloc;
 
 #ifdef MPI2
-  int stride_t = MAX(ceil((double) num_obs_train / (double) iNum_Processors),1);
+  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
   is = stride_t * my_rank;
   ie = MIN(num_obs_train - 1, is + stride_t - 1);
-  int stride_e = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   
   num_obs_train_alloc = stride_t*iNum_Processors;
   num_obs_eval_alloc = stride_e*iNum_Processors;

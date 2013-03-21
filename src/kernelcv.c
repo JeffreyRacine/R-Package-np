@@ -187,7 +187,7 @@ double cv_func_regression_categorical_ls_nn(double *vector_scale_factor)
 
 #ifdef MPI2
 
-    stride = ceil((double) num_obs_train_extern / (double) iNum_Processors);
+    stride = (int)ceil((double) num_obs_train_extern / (double) iNum_Processors);
     if(stride < 1) stride = 1;
     mean = alloc_vecd(stride*iNum_Processors);
 #endif

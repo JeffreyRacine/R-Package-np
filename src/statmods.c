@@ -254,7 +254,7 @@ int int_k_nn, double *nn_distance)
     double *pointer_nndi;
 
 #ifdef MPI2
-    int stride = ceil((double) num_obs / (double) iNum_Processors);
+    int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
 		int return_flag = 0;
 		int return_flag_MPI = 0;
     if(stride < 1) stride = 1;
@@ -450,7 +450,7 @@ double *nn_distance)
     double *pointer_nndi;
 
 #ifdef MPI2
-    int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+    int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 		int return_flag = 0;
 		int return_flag_MPI = 0;
     if(stride < 1) stride = 1;

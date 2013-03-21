@@ -872,10 +872,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int itmax, iter;
   int int_use_starting_values, autoSelectCVLS, ibwmfunc;
 
-#ifdef MPI2
-  int work_np;
-#endif // MPI
-
   num_var_unordered_extern = myopti[CBW_CNUNOI];
   num_var_ordered_extern = myopti[CBW_CNORDI];
   num_var_continuous_extern = myopti[CBW_CNCONI];
@@ -1252,10 +1248,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int itmax, iter;
   int int_use_starting_values, autoSelectCVLS, ibwmfunc;
   int cdfontrain;
-
-#ifdef MPI2
-  int work_np;
-#endif // MPI
 
   cdfontrain =  myopti[CDBW_CDFONTRAIN];
 
