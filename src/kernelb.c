@@ -163,14 +163,14 @@ double **matrix_bandwidth_deriv)
 
 	if(BANDWIDTH == 1)
 	{
-		stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+		stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 		if(stride < 1) stride = 1;
 		nn_distance = alloc_vecd(stride*iNum_Processors);
 	}
 
 	if(BANDWIDTH == 2)
 	{
-		stride = ceil((double) num_obs_train / (double) iNum_Processors);
+		stride = (int)ceil((double) num_obs_train / (double) iNum_Processors);
 		if(stride < 1) stride = 1;
 		nn_distance = alloc_vecd(stride*iNum_Processors);
 	}
@@ -615,14 +615,14 @@ fact constant. */
 
 	if(BANDWIDTH == 1)
 	{
-		stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+		stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 		if(stride < 1) stride = 1;
 		nn_distance = alloc_vecd(stride*iNum_Processors);
 	}
 
 	if(BANDWIDTH == 2)
 	{
-		stride = ceil((double) num_obs_train / (double) iNum_Processors);
+		stride = (int)ceil((double) num_obs_train / (double) iNum_Processors);
 		if(stride < 1) stride = 1;
 		nn_distance = alloc_vecd(stride*iNum_Processors);
 	}

@@ -157,7 +157,7 @@ double *log_likelihood)
 
 	#ifdef MPI2
 	double log_likelihood_MPI;
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -675,7 +675,7 @@ double *cv)
 
 	#ifdef MPI2
 	double cv_MPI;
-	int stride = ceil((double) num_obs / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -1410,7 +1410,7 @@ double *cv)
 
 	#ifdef MPI2
 	double cv_MPI;
-	int stride = ceil((double) num_obs / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -2063,7 +2063,7 @@ int itmax)
 	double **matrix_bandwidth_deriv = NULL;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -2433,7 +2433,9 @@ double *SIGN)
 	double temp_var;
 	double temp_mean_y;
 	double *pointer_yi;
+#ifndef MPI2
 	double *pointer_m;
+#endif
 	double temp;
 	double temp1 = DBL_MAX;
 
@@ -2452,7 +2454,7 @@ double *SIGN)
 	int num_reg_cat_cont;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -3686,7 +3688,7 @@ double *SIGN)
 
 				mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 
-				temp_var = (sum_y_sq_ker/sum_ker) - ipow(*pointer_m++, 2);
+				temp_var = (sum_y_sq_ker/sum_ker) - ipow(mean[j-my_rank*stride], 2);
 
 				/* With no continuous variables, need to drop K_INT_KERNEL_P */
 
@@ -4568,12 +4570,14 @@ double *mean)
 	MATRIX  DELTA;
 
 	double *pointer_yi;
-	double *pointer_m;
 
+#ifndef MPI2
+	double *pointer_m;
+#endif
 	int num_reg_cat_cont;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -6203,7 +6207,9 @@ double **gradient)
 	double temp1 = DBL_MAX;
 
 	double *pointer_yi;
+#ifndef MPI2
 	double *pointer_m;
+#endif
 
 	double *pointer_matrix_weights_K;
 	double *pointer_matrix_weights_K_deriv;
@@ -6219,7 +6225,7 @@ double **gradient)
 	int num_reg_cat_cont;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -10734,7 +10740,7 @@ double *log_likelihood)
 
 	#ifdef MPI2
 	double log_likelihood_MPI;
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -11433,7 +11439,7 @@ int itmax)
 	double **matrix_bandwidth_reg = NULL;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -11959,7 +11965,7 @@ int itmax)
 	double **matrix_bandwidth_reg = NULL;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -12487,7 +12493,7 @@ int itmax)
 	double **matrix_Y_continuous_eval;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_train / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_train / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -13002,7 +13008,7 @@ double *log_likelihood)
 
 	#ifdef MPI2
 	double log_likelihood_MPI;
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -13955,12 +13961,14 @@ double **pdf_deriv_stderr)
 	double **matrix_X_unordered_temp;
 	double **matrix_X_ordered_temp;
 
+#ifndef MPI2
 	double *pointer_m;
 	double *pointer_me;
 	double *pointer_g;
+#endif
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -14479,7 +14487,7 @@ int itmax)
 	double DIFF_KER_PPM;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -15272,12 +15280,14 @@ int itmax)
 	double **matrix_X_unordered_temp;
 	double **matrix_X_ordered_temp;
 
+#ifndef MPI2
 	double *pointer_m;
 	double *pointer_me;
 	double *pointer_g;
+#endif
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -15773,7 +15783,7 @@ double *cv)
 
 	#ifdef MPI2
 	double cv_MPI;
-	int stride = ceil((double) num_obs / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -16303,7 +16313,7 @@ double *cv)
 
 	#ifdef MPI2
 	double cv_MPI;
-	int stride = ceil((double) num_obs / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -17457,7 +17467,7 @@ double zero)
 	double **matrix_bandwidth_reg = NULL;
 
 	#ifdef MPI2
-	int stride = ceil((double) num_obs_eval / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	#endif
 
@@ -18050,7 +18060,9 @@ int *num_categories)
 	MATRIX  DELTA;
 
 	double *pointer_yi;
+#ifndef MPI2
 	double *pointer_m;
+#endif
 
 	int num_reg_cat_cont;
 
@@ -18062,7 +18074,7 @@ int *num_categories)
 
 	#ifdef MPI2
 	double trace_H_MPI = 0.0;
-	int stride = ceil((double) num_obs / (double) iNum_Processors);
+	int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
 	if(stride < 1) stride = 1;
 	mean = alloc_vecd(stride*iNum_Processors);
 	#endif
@@ -19742,7 +19754,7 @@ double **gradient_categorical)
 	double *iord;
 
 	#ifdef MPI2
-	num_obs_eval_alloc = MAX(ceil((double) num_obs_eval / (double) iNum_Processors),1)*iNum_Processors;
+	num_obs_eval_alloc = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1)*iNum_Processors;
 	#else
 	num_obs_eval_alloc = num_obs_eval;
 	#endif
