@@ -2767,7 +2767,7 @@ double *cv){
 
   double vsfx[num_reg_tot];
   double vsfy[num_var_tot];
-  double xyj, xmi;
+  double xyj;
 
   int is,ie;
   int num_obs_eval_alloc, num_obs_train_alloc;
@@ -2795,8 +2795,6 @@ double *cv){
   
   if(mean == NULL)
     error("failed to allocate mean");
-
-  double ofac = num_obs_train - 1.0;
 
   for(i = 0; i < num_reg_continuous; i++)
     vsfx[i] = vector_scale_factor[i];

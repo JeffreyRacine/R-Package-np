@@ -159,7 +159,7 @@ int mat_free( MATRIX A )
 
 	for (i=0; i<MatRow(A); i++)
 	{
-		if((A[i]==NULL))
+		if(A[i]==NULL)
 		{
 			REprintf("\nAttempting to free a non-existent matrix row in mat_free()\n");
 			return (0);

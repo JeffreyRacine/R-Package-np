@@ -145,7 +145,7 @@ void cv_func_binary_choice_gradient(double *vector_scale_factor, double *vector_
 void free_mat(double **x, int n);
 void free_tmat(double **x);
 
-void free_vector(double *v, int nl, int nh);
+void free_vector(double *v, int nl);
 
 void linmin(int RESTRICT, int INTEGER, double *p_restrict, double *p, double *xi, int n, double tol, double small, int itmax, double *fret, double (*func)(double *));
 void mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double small, double (*func)(double));
@@ -489,6 +489,7 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define CQ_GRADI 18
 #define CQ_ITMAXI 19
 #define CQ_MLEVI 20
+#define CQ_NMULTII 21
 
 #define CQ_FTOLD  0
 #define CQ_TOLD   1

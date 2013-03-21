@@ -32,7 +32,7 @@ immense;
 typedef struct GREAT {unsigned short l,c,r;}
 great;
 
-#define FREEALL free_vector(xi,1,n);free_vector(h,1,n);free_vector(g,1,n);
+#define FREEALL free_vector(xi,1);free_vector(h,1);free_vector(g,1);
 
 #define GOLD 1.618034
 #define GLIMIT 100.0
@@ -159,9 +159,9 @@ double *fret, double (*func)(double *))
 /* Begin checking... */
         if (2.0*fabs(fp-(*fret)) <= ftol*(fabs(fp)+fabs(*fret)))
         {
-            free_vector(xit,1,n);
-            free_vector(ptt,1,n);
-            free_vector(pt,1,n);
+            free_vector(xit,1);
+            free_vector(ptt,1);
+            free_vector(pt,1);
             return;
         }
         if (*iter == itmax)
@@ -243,9 +243,8 @@ double *vector(int nl,int nh)
 }
 
 
-void free_vector(double *v, int nl, int nh)
+void free_vector(double *v, int nl)
 {
-    nh = nh;                                      /* Simply to avoid warning about unused variable */
     free((char*) (v+nl));
 }
 
@@ -311,8 +310,8 @@ void  linmin(int RESTRICT, int INTEGER, double *p_restrict, double *p, double *x
         xi[j] *= xmin;
         p[j] += xi[j];
     }
-    free_vector(xicom,1,n);
-    free_vector(pcom,1,n);
+    free_vector(xicom,1);
+    free_vector(pcom,1);
 }
 
 
@@ -474,7 +473,7 @@ double f1dim(double x)
     xt=vector(1,ncom);
     for (j=1;j<=ncom;j++) xt[j]=pcom[j]+x*xicom[j];
     f=(*nrfunc)(xt);
-    free_vector(xt,1,ncom);
+    free_vector(xt,1);
     return f;
 }
 /* This is an approximation to the error function good to 1.2e-07.

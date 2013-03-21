@@ -181,7 +181,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   double fret, fret_best;
   double ftol, tol;
-  double (* bwmfunc)(double *);
+  double (* bwmfunc)(double *) = NULL;
 
   double small;
   
@@ -503,7 +503,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   double fret, fret_best;
   double ftol, tol;
-  double (* bwmfunc)(double *);
+  double (* bwmfunc)(double *) = NULL;
 
   double small;
   
@@ -862,7 +862,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   double fret, fret_best;
   double ftol, tol;
-  double (* bwmfunc)(double *);
+  double (* bwmfunc)(double *) = NULL;
 
   double small;
   
@@ -1242,7 +1242,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   double fret, fret_best;
   double ftol, tol;
-  double (* bwmfunc)(double *);
+  double (* bwmfunc)(double *) = NULL;
 
   double small;
   
@@ -2355,7 +2355,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   double fret, fret_best;
   double ftol, tol, small;
-  double (* bwmfunc)(double *);
+  double (* bwmfunc)(double *) = NULL;
 
   int i,j;
   int num_var;
@@ -3342,15 +3342,19 @@ void np_quantile_conditional(double * tc_con,
   /* Likelihood bandwidth selection for density estimation */
 
   double **g = NULL, * eq, * eqerr;
-  double ftol, small, tol, itmax;
+  double ftol, small, tol;
   double pad_num;
 
   int i,j, max_lev;
   int num_var, num_obs_eval_alloc;
   int num_all_var, num_var_var, train_is_eval, do_gradients;
+  int itmax;
 
+  int iNum_Multistart;
+
+  iNum_Multistart = myopti[CQ_NMULTII];
   imsnum = 0;
-  imstot = myopti[BW_NMULTII]; /* iNum_Multistart */
+  imstot = myopti[CQ_NMULTII]; /* iNum_Multistart */
 
   num_var_unordered_extern = 0;
   num_var_ordered_extern = 0;
@@ -3535,7 +3539,7 @@ void np_quantile_conditional(double * tc_con,
                            tol,
                            small,
                            itmax,
-                           itmax,            /* Maximum number of multistarts */
+                           iNum_Multistart,            /* Maximum number of multistarts */
                            1.0e-10);         /* Zero for all intents and purposes */
 
 

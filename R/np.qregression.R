@@ -192,7 +192,8 @@ npqreg.condbandwidth <-
       no.ex = no.ex,
       gradients = gradients,
       itmax = itmax,
-      xmcv.numRow = attr(bws$xmcv, "num.row")
+      xmcv.numRow = attr(bws$xmcv, "num.row"),
+      nmulti = itmax
       )
 
     myoptd = list(
