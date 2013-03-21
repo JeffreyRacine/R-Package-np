@@ -3788,7 +3788,7 @@ double *SIGN)
 
 				mean[j-my_rank*stride] = sum_y_ker/sum_ker;
 
-				temp_var = (sum_y_sq_ker/sum_ker) - ipow(*pointer_m++, 2);
+				temp_var = (sum_y_sq_ker/sum_ker) - ipow(mean[j-my_rank*stride], 2);
 
 				/* With no continuous variables, need to drop K_INT_KERNEL_P */
 
