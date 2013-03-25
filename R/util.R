@@ -28,6 +28,10 @@ npseed <- function(seed){
   invisible()
 }
 
+nptgauss <- function(b, alpha, c0, a0, a1, a2){
+  .C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2)), PACKAGE = "np")
+}
+
 numNotIn <- function(x){
   while(is.element(num <- rnorm(1),x)){}
   num

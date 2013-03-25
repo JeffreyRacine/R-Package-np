@@ -14,8 +14,6 @@
 
 #include "mpi.h"
 
-#include <R.h>
-
 extern  int my_rank;
 extern  int source;
 extern  int dest;
@@ -24,6 +22,8 @@ extern  int iNum_Processors;
 extern  int iSeed_my_rank;
 extern  MPI_Status status;
 #endif
+
+#include <R.h>
 
 #ifdef RCSID
 static char rcsid[] = "$Id: kernel.c,v 1.3 2006/11/02 16:56:49 tristen Exp $";
