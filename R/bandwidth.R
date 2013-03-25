@@ -3,7 +3,7 @@ bandwidth <-
            bwmethod = c("cv.ml","cv.ls","normal-reference"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("gaussian", "epanechnikov","uniform"), 
+           ckertype = c("gaussian", "epanechnikov","uniform", "truncated gaussian"), 
            ckerorder = c(2,4,6,8),
            ukertype = c("aitchisonaitken"),
            okertype = c("wangvanryzin"),
@@ -29,6 +29,9 @@ bandwidth <-
       if (!any(kord == ckerorder))
         stop("ckerorder must be one of ", paste(kord,collapse=" "))
     }
+
+    if (ckertype == "truncated gaussian" && ckerorder != 2)
+      warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
     if (bwmethod == "normal-reference" && (ckertype != "gaussian" || bwtype != "fixed")){    
       warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
@@ -80,7 +83,8 @@ bandwidth <-
       pckertype = switch(ckertype,
         gaussian = paste(porder,"Gaussian"),
         epanechnikov =  paste(porder,"Epanechnikov"),
-        uniform = "Uniform"),
+        uniform = "Uniform",
+        "truncated gaussian" = "Truncated Gaussian"),
       ukertype = ukertype,
       pukertype = switch( ukertype,
         aitchisonaitken = "Aitchison and Aitken"),

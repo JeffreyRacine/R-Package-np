@@ -14,6 +14,8 @@
 
 #include "mpi.h"
 
+#include <R.h>
+
 extern  int my_rank;
 extern  int source;
 extern  int dest;
@@ -26,6 +28,10 @@ extern  MPI_Status status;
 #ifdef RCSID
 static char rcsid[] = "$Id: kernel.c,v 1.3 2006/11/02 16:56:49 tristen Exp $";
 #endif
+
+extern double np_tgauss2_b, np_tgauss2_alpha, np_tgauss2_c0;
+// convolution kernel constants
+extern double np_tgauss2_a0, np_tgauss2_a1, np_tgauss2_a2;
 
 /*
 
@@ -161,7 +167,11 @@ double kernel(int KERNEL, double z)
 
 			break;
 
+  case 9:
+    return_value = (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z) - np_tgauss2_c0;
+    break;
 	}
+
 
 	return(return_value);
 
@@ -321,6 +331,9 @@ double cdf_kernel(int KERNEL, double z)
 
 			break;
 
+  case 9:
+    return_value = (z < -np_tgauss2_b) ? 0.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5);
+    break;
 	}
 
 	return(return_value);
@@ -447,6 +460,9 @@ double kernel_deriv(int KERNEL, double z)
 
 			break;
 
+  case 9:
+    return_value = (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*(-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
+    break;
 	}
 
 	return(return_value);
@@ -585,6 +601,20 @@ double kernel_convol(int KERNEL, int BANDWIDTH, double z, double h1, double h2)
 				}
 
 				break;
+
+    case 9:
+      if(fabs(z) > 2*np_tgauss2_b)
+        return_value = 0.0;
+      else {
+        if(z < 0)
+          return_value = (np_tgauss2_a0*erfun(0.5*z + np_tgauss2_b)*exp(-0.25*z*z) + np_tgauss2_a1*z + 
+                          np_tgauss2_a2*erfun(0.7071067810*(z + np_tgauss2_b)) - np_tgauss2_c0);
+        else
+          return_value = (-np_tgauss2_a0*erfun(0.5*z - np_tgauss2_b)*exp(-0.25*z*z) - np_tgauss2_a1*z -
+                          np_tgauss2_a2*erfun(0.7071067810*(z - np_tgauss2_b)) - np_tgauss2_c0);
+        
+      }
+      break;
 
 		}
 
@@ -840,7 +870,9 @@ double kernel_convol(int KERNEL, int BANDWIDTH, double z, double h1, double h2)
 				}
 
 				break;
-
+    case 9:
+      error("adaptive bandwidths not supported with truncation gaussian."); break;
+      
 		}
 
 	}

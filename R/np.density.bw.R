@@ -118,7 +118,8 @@ npudensbw.bandwidth <-
         kerneval = switch(bws$ckertype,
           gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-          uniform = CKER_UNI),
+          uniform = CKER_UNI,
+          "truncated gaussian" = CKER_TGAUSS),
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
         ncon = dim(dcon)[2])

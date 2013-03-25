@@ -106,6 +106,9 @@ extern double *vector_scale_factor_dep_met_univar_lag_extern;
 extern double y_min_extern;
 extern double y_max_extern;
 
+// so that quantile stuff gives a more sensible multistart message
+extern int imstot;
+
 int kernel_estimate_density_categorical(
 int KERNEL_den,
 int KERNEL_unordered_den,
@@ -17571,6 +17574,7 @@ double zero)
 			quantile_multistart[1] = quantile[1];
 
       Rprintf("iMax_Num_Multistart: %d\n", iMax_Num_Multistart);
+      imstot = iMax_Num_Multistart;
 			for(iMs_counter = 1, iNum_Ms = 1; iMs_counter < iMax_Num_Multistart; iMs_counter++, iNum_Ms++)
 			{
 
