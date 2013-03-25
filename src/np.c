@@ -8,7 +8,6 @@
 #include <time.h>
 
 #include <R.h>
-#include <R.h>
 
 #ifdef MPI2
 #include "mpi.h"
@@ -143,6 +142,36 @@ int imstot = 0;
 KDT * kdt_extern = NULL;
 
 extern int iff;
+
+double np_tgauss2_b = 3.0, np_tgauss2_alpha = 1.030174731161562;
+double np_tgauss2_c0 = .004565578246317041;
+
+double np_tgauss2_a0 = 0.2993759121518507, np_tgauss2_a1 = 2.0844504723243343E-5;
+double np_tgauss2_a2 = -2.0*0.002351671671248367;
+
+extern double cksup[OP_NCFUN][2];
+
+void np_set_tgauss2(double * coefficients){
+  np_tgauss2_b = coefficients[TG2_B];
+  np_tgauss2_alpha = coefficients[TG2_ALPHA];
+  np_tgauss2_c0 = coefficients[TG2_C0];
+
+  np_tgauss2_a0 = coefficients[TG2_A0];
+  np_tgauss2_a1 = coefficients[TG2_A1];
+  np_tgauss2_a2 = coefficients[TG2_A2];
+
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_NORMAL]][0] = -np_tgauss2_b;
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_NORMAL]][1] = np_tgauss2_b;
+
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_CONVOLUTION]][0] = -2.0*np_tgauss2_b;
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_CONVOLUTION]][1] = 2.0*np_tgauss2_b;
+
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_DERIVATIVE]][0] = -np_tgauss2_b;
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_DERIVATIVE]][1] = np_tgauss2_b;
+
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_INTEGRAL]][0] = -np_tgauss2_b;
+  cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_INTEGRAL]][1] = DBL_MAX;
+}
 
 void spinner(int num) {
   if(int_MINIMIZE_IO == IO_MIN_FALSE){

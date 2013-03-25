@@ -549,6 +549,15 @@ double *kernel_sum)
 
 }
 
+extern double np_tgauss2_b, np_tgauss2_alpha, np_tgauss2_c0;
+// convolution kernel constants
+extern double np_tgauss2_a0, np_tgauss2_a1, np_tgauss2_a2;
+
+
+double np_tgauss2(const double z){
+  return (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z) - np_tgauss2_c0;
+}
+
 double np_gauss2(const double z){
   return ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z);
 }
@@ -605,6 +614,30 @@ double np_owang_van_ryzin(const double x, const double y, const double lambda){
 double np_oli_racine(const double x, const double y, const double lambda){
   return (x == y)?1.0:ipow(lambda, (int)fabs(x-y));
 
+}
+
+// not so simple truncated gaussian convolution kernels
+//   In general for our truncated Gaussian kernel the convolution kernel will be a polynomial of the form:
+// z < 0: 
+// a0*erf*(z/2 + b)*exp(-z^2/4) + a1*z +a2*erf(z/sqrt(2) + b/sqrt(2)) + a3
+// z > 0
+// -a0*erf*(z/2 - b)*exp(-z^2/4) - a1*z - a2*erf(z/sqrt(2) - b/sqrt(2)) + a3
+double np_econvol_rect(const double z){
+  return ((fabs(z) < 2.0) ? 0.25 : 0.0);
+}
+
+double np_econvol_tgauss2(const double z){
+  if(fabs(z) > 2*np_tgauss2_b)
+    return 0.0;
+  else {
+    if(z < 0)
+      return(np_tgauss2_a0*erfun(0.5*z + np_tgauss2_b)*exp(-0.25*z*z) + np_tgauss2_a1*z + 
+             np_tgauss2_a2*erfun(0.7071067810*(z + np_tgauss2_b)) - np_tgauss2_c0);
+    else
+      return(-np_tgauss2_a0*erfun(0.5*z - np_tgauss2_b)*exp(-0.25*z*z) - np_tgauss2_a1*z -
+             np_tgauss2_a2*erfun(0.7071067810*(z - np_tgauss2_b)) - np_tgauss2_c0);
+
+  }
 }
 
 // the simple convolution kernels
@@ -680,6 +713,12 @@ double np_econvol_uli_racine(const int same_cat, const double lambda, const int 
 
 // derivative kernels
 
+
+double np_deriv_tgauss2(const double z){
+  return (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*(-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
+}
+
+
 double np_deriv_gauss2(const double z){
   return (-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
 }
@@ -723,6 +762,11 @@ double np_deriv_rect(const double z){
 }
 
 // cdf kernels
+
+double np_cdf_tgauss2(const double z){
+  return (z < -np_tgauss2_b) ? 0.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5);
+}
+
 
 double np_cdf_gauss2(const double z){
   return (0.5*erfun(0.7071067810*z)+0.5);
@@ -790,17 +834,20 @@ double (* const alluk[])(int, double, int) = { np_uaa, np_uli_racine };
 #define SQRT5 2.23606797749979
 #define SQRT20 4.47213595499958
 
-double cksup[][2] = { {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
-		      {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
-		      {-1.0, 1.0},
-		      {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
-		      {-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},
-		      {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
-		      {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
-		      {-0.0, 0.0}, // PLEASE DON'T EVER USE THIS
-		      {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
-		      {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, 
-		      {-1.0, DBL_MAX} };
+double cksup[OP_NCFUN][2] = { {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
+                              {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
+                              {-1.0, 1.0}, {-3.0, 3.0},
+                              {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
+                              {-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},{-SQRT20, SQRT20},
+                              {-2.0, 2.0}, {-6.0, 6.0},
+                              {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX},
+                              {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5}, {-SQRT5, SQRT5},
+                              {-0.0, 0.0}, // PLEASE DON'T EVER USE THIS
+                              {-3.0, 3.0},
+                              {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, 
+                              {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, {-SQRT5, DBL_MAX}, 
+                              {-1.0, DBL_MAX},
+                              {-3.0, DBL_MAX} };
 
 /* 
    np_kernelv does weighted products of vectors - this is useful for 
@@ -832,15 +879,16 @@ void np_ckernelv(const int KERNEL,
 
   double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, //ordinary kernels
                                    np_epan2, np_epan4, np_epan6, np_epan8, 
-                                   np_rect, 
+                                   np_rect, np_tgauss2, 
                                    np_econvol_gauss2, np_econvol_gauss4, np_econvol_gauss6, np_econvol_gauss8, // convolution kernels
                                    np_econvol_epan2, np_econvol_epan4, np_econvol_epan6, np_econvol_epan8,
+                                   np_econvol_rect, np_econvol_tgauss2,
                                    np_deriv_gauss2, np_deriv_gauss4, np_deriv_gauss6, np_deriv_gauss8, // derivative kernels
                                    np_deriv_epan2, np_deriv_epan4, np_deriv_epan6, np_deriv_epan8, 
-                                   np_deriv_rect,
+                                   np_deriv_rect, np_deriv_tgauss2,
                                    np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8, // cdfative kernels
                                    np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8, 
-                                   np_cdf_rect };
+                                   np_cdf_rect, np_cdf_tgauss2 };
 
   if(nl == NULL)
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw)

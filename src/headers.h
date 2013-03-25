@@ -245,8 +245,22 @@ int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERN
 #define NP_TREE_FALSE 0
 #define NP_TREE_TRUE  1
 
-static const int OP_CFUN_OFFSETS[4] = { 0, 9, 17, 26 };
+static const int OP_CFUN_OFFSETS[4] = { 0, 10, 20, 30 };
+#define OP_NCFUN 40
 static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
+
+// these defines are to facilitate accessing the continuous kernels in their various arrays
+
+#define CK_GAUSS2 0
+#define CK_GAUSS4 1
+#define CK_GAUSS6 2
+#define CK_GAUSS8 3
+#define CK_EPAN2 4
+#define CK_EPAN4 5
+#define CK_EPAN6 6
+#define CK_EPAN8 7
+#define CK_UNIF 8
+#define CK_TGAUSS2 9
 
 #define ONE_OVER_SQRT_TWO_PI 0.39894228040143267794
 #define SQRT_5 2.236067978
@@ -495,4 +509,11 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define CQ_TOLD   1
 #define CQ_SMALLD 2
 
-#endif // _NP_
+#define TG2_B 0
+#define TG2_ALPHA 1
+#define TG2_C0 2
+#define TG2_A0 3
+#define TG2_A1 4
+#define TG2_A2 5
+
+#endif // _NP__

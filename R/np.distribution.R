@@ -142,7 +142,8 @@ npudist.dbandwidth <-
       kerneval = switch(bws$ckertype,
         gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
         epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-        uniform = CKER_UNI),
+        uniform = CKER_UNI,
+        "truncated gaussian" = CKER_TGAUSS),
       no.e = no.e,
       mcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DIST)

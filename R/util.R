@@ -28,6 +28,10 @@ npseed <- function(seed){
   invisible()
 }
 
+nptgauss <- function(b, alpha, c0, a0, a1, a2){
+  .C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2)), PACKAGE = "np")
+}
+
 numNotIn <- function(x){
   while(is.element(num <- rnorm(1),x)){}
   num
@@ -712,6 +716,7 @@ DO_TREE_YES = 1
 CKER_GAUSS = 0
 CKER_EPAN  = 4
 CKER_UNI   = 8
+CKER_TGAUSS = 9
 
 UKER_AIT = 0
 UKER_LR = 1

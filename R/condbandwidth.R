@@ -4,11 +4,11 @@ condbandwidth <-
            bwmethod = c("cv.ls","normal-reference", "manual"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           cxkertype = c("gaussian", "epanechnikov","uniform"), 
+           cxkertype = c("gaussian", "epanechnikov","uniform", "truncated gaussian"), 
            cxkerorder = c(2,4,6,8),
            uxkertype = c("aitchisonaitken","liracine"),
            oxkertype = c("wangvanryzin","liracine"),
-           cykertype = c("gaussian", "epanechnikov","uniform"), 
+           cykertype = c("gaussian", "epanechnikov","uniform", "truncated gaussian"), 
            cykerorder = c(2,4,6,8),
            uykertype = c("aitchisonaitken"),
            oykertype = c("wangvanryzin"),
@@ -43,6 +43,9 @@ condbandwidth <-
       stop("cxkerorder must be one of ", paste(kord,collapse=" "))
   }
 
+  if (cxkertype == "truncated gaussian" && cxkerorder != 2)
+    warning("using truncated gaussian of order 2, higher orders not yet implemented")
+
   if (bwmethod == "normal-reference" && (cxkertype != "gaussian" || bwtype != "fixed")){    
     warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
     bwtype = "fixed"
@@ -58,6 +61,9 @@ condbandwidth <-
     if (!any(kord == cykerorder))
       stop("cykerorder must be one of ", paste(kord,collapse=" "))
   }
+
+  if (cykertype == "truncated gaussian" && cykerorder != 2)
+    warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
   if (bwmethod == "normal-reference" && (cykertype != "gaussian" || bwtype != "fixed")){    
     warning("normal-reference bandwidth selection assumes gaussian kernel with fixed bandwidth")
@@ -130,11 +136,13 @@ condbandwidth <-
     pcxkertype = switch(cxkertype,
       gaussian = paste(pxorder,"Gaussian"),
       epanechnikov =  paste(pxorder,"Epanechnikov"),
-      uniform = "Uniform"),
+      uniform = "Uniform",
+      "truncated gaussian" = "Truncated Gaussian"),
     pcykertype = switch(cykertype,
       gaussian = paste(pyorder,"Gaussian"),
       epanechnikov =  paste(pyorder,"Epanechnikov"),
-      uniform = "Uniform"),
+      uniform = "Uniform",
+      "truncated gaussian" = "Truncated Gaussian"),
     uxkertype = uxkertype,
     uykertype = uykertype,
     puxkertype = switch( uxkertype,

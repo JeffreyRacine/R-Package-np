@@ -2,7 +2,7 @@ sibandwidth <-
   function(beta, h,
            method=c("ichimura","kleinspady"),
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("gaussian", "epanechnikov","uniform"), 
+           ckertype = c("gaussian", "epanechnikov","uniform", "truncated gaussian"), 
            ckerorder = c(2,4,6,8),
            fval = NA,
            ifval = NA,
@@ -33,6 +33,9 @@ sibandwidth <-
     if (!any(kord == ckerorder))
       stop("ckerorder must be one of ", paste(kord,collapse=" "))
   }
+
+  if (ckertype == "truncated gaussian" && ckerorder != 2)
+    warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
 
@@ -73,7 +76,8 @@ sibandwidth <-
     pckertype = switch(ckertype,
       gaussian = paste(porder,"Gaussian"),
       epanechnikov =  paste(porder,"Epanechnikov"),
-      uniform = "Uniform"),
+      uniform = "Uniform",
+      "truncated gaussian" = "Truncated Gaussian"),
     nobs = nobs,
     ndim = ndim,
     ncon = sum(xdati$icon),
