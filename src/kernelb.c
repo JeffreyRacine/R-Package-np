@@ -265,6 +265,15 @@ double **matrix_bandwidth_deriv)
 
 			break;
 
+		case 9:
+
+/* Gaussian Kernel */
+
+			temp_pow1 = 1.0/pow((double)num_obs_train, (1.0/(4.0 + (double) num_reg_cont + num_var_cont)));
+			temp_pow2 = 1.0/pow((double)num_obs_train, (1.0/(6.0 + (double) num_reg_cont + num_var_cont)));
+
+			break;
+
 	}
 
 	if(BANDWIDTH == 0)
@@ -707,6 +716,15 @@ fact constant. */
 			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(4.0 + (double) num_reg_cont + num_var_cont)));
 
 			break;
+
+		case 9:
+
+/* COPIED FROM Gaussian Kernel */
+
+			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(4.0 + (double) num_reg_cont + num_var_cont)));
+
+			break;
+
 
 	}
 

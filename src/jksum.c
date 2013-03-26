@@ -555,7 +555,7 @@ extern double np_tgauss2_a0, np_tgauss2_a1, np_tgauss2_a2;
 
 
 double np_tgauss2(const double z){
-  return (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z) - np_tgauss2_c0;
+  return (fabs(z) >= np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z) - np_tgauss2_c0;
 }
 
 double np_gauss2(const double z){
@@ -627,7 +627,7 @@ double np_econvol_rect(const double z){
 }
 
 double np_econvol_tgauss2(const double z){
-  if(fabs(z) > 2*np_tgauss2_b)
+  if(fabs(z) >= 2*np_tgauss2_b)
     return 0.0;
   else {
     if(z < 0)
@@ -715,7 +715,7 @@ double np_econvol_uli_racine(const int same_cat, const double lambda, const int 
 
 
 double np_deriv_tgauss2(const double z){
-  return (fabs(z) > np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*(-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
+  return (fabs(z) >= np_tgauss2_b) ? 0.0 : np_tgauss2_alpha*(-z*ONE_OVER_SQRT_TWO_PI*exp(-0.5*z*z));
 }
 
 
@@ -764,7 +764,7 @@ double np_deriv_rect(const double z){
 // cdf kernels
 
 double np_cdf_tgauss2(const double z){
-  return (z < -np_tgauss2_b) ? 0.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5);
+  return (z <= -np_tgauss2_b) ? 0.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5);
 }
 
 
