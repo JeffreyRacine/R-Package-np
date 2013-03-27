@@ -44,7 +44,7 @@ nptgauss <- function(b){
   a2 <- (c0 + integrate(f = function(z) { tgauss(z)^2 }, -b, b)$value - a0*erf(b))/erf(b/sqrt(2))
   a1 <- -(a2*erf(b/sqrt(2)) + c0)/(2*b)
 
-  .C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2)), PACKAGE = "np")
+  .C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2)), PACKAGE = "npRmpi")
 }
 
 numNotIn <- function(x){
