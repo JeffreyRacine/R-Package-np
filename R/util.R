@@ -28,7 +28,22 @@ npseed <- function(seed){
   invisible()
 }
 
-nptgauss <- function(b, alpha, c0, a0, a1, a2){
+nptgauss <- function(b){
+  require(gsl)
+  rel.tol <- sqrt(.Machine$double.eps)
+  alpha <- 1.0
+  tgauss <- function(z){
+    ifelse(abs(z) >= b, 0.0, alpha/sqrt(2*pi)*(exp(-0.5*z^2) - exp(-0.5*b^2)))
+  }
+  
+  alpha <- 1.0/integrate(tgauss, -b, b, rel.tol = rel.tol)$value
+
+  c0 <- alpha/sqrt(2*pi)*exp(-0.5*b^2)
+
+  a0 <- (0.5 + 2*b*c0)/integrate(f = function(z){ erf(z/2 + b)*exp(-0.25*z^2) }, -2*b, 0)$value
+  a2 <- (c0 + integrate(f = function(z) { tgauss(z)^2 }, -b, b)$value - a0*erf(b))/erf(b/sqrt(2))
+  a1 <- -(a2*erf(b/sqrt(2)) + c0)/(2*b)
+
   .C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2)), PACKAGE = "np")
 }
 

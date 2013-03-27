@@ -2,43 +2,23 @@
 \alias{nptgauss}
 \title{Truncated Second-order Gaussian Kernels}
 \description{
-  \code{nptgauss} provides an interface for setting the parameters
-  describing the truncated second-order Gaussian kernel used
+  \code{nptgauss} provides an interface for setting the truncation
+  radius of the truncated second-order Gaussian kernel used
   by \pkg{np}.
 }
 \usage{
-nptgauss(b, alpha, c0, a0, a1, a2)
+nptgauss(b)
 }
 
 \arguments{
   \item{b}{
     Truncation radius of the kernel.
   }
-
-  \item{alpha}{
-    The overall normalization of the kernel multiplied by \eqn{\sqrt{2\pi}}{sqrt(2*pi)}.
-  }
-
-  \item{c0}{
-    A constant containing the value of
-    \deqn{\frac{\alpha}{\sqrt{2\pi}}e^{-b^2/2}}{alpha/sqrt(2*pi)*exp(-b^2/2)}.
-  }
-
-  \item{a0}{
-    A coefficient of the function describing the convolution kernel, see details.
-  }
-
-  \item{a1}{
-    A coefficient of the function describing the convolution kernel, see details.
-  }
-  
-  \item{a2}{
-    A coefficient of the function describing the convolution kernel, see details.
-  }
-
 }
 
 \details{
+  \code{nptgauss} allows one to set the truncation radius of the truncated Gaussian kernel used by \pkg{np}, which defaults to 3. It automatically computes the constants describing the truncated gaussian kernel for the user.
+  
 We define the truncated gaussion kernel on the interval \eqn{[-b,b]} as:
 \deqn{K = \frac{\alpha}{\sqrt{2\pi}}\left(e^{-z^2/2} - e^{-b^2/2}\right)}{K = alpha/sqrt(2*pi)*exp(-b^2/2)*(exp(-z^2/2) - exp(-b^2/2))}
 
@@ -57,24 +37,17 @@ The convolution kernel on \eqn{[-2b,0]} has the general form:
 and on \eqn{[0,2b]} it is:
 \deqn{H_+ = -a_0\,\mathrm{erf}(z/2 - b) e^{-z^2/4} - a_1z - a_2\,\mathrm{erf}((z-b)/\sqrt{2}) - c_0}{-a0*erf(z/2 - b)*exp(-0.25*z^2) - a1*z - a2*erf((z-b)/sqrt(2)) - c0}
 
+where \eqn{a_0}{a0} is determined by the normalisation condition on H,
+\eqn{a_2}{a2} is determined by considering the value of the kernel at
+\eqn{z = 0} and \eqn{a_1}{a1} is determined by the requirement that \eqn{H = 0} at \eqn{[-2b,2b]}.
 }
 \author{
     Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine
     \email{racinej@mcmaster.ca}
 }
 
-\section{Usage Issues}{
-  All of the constants for a given truncation radius must be precomputed
-  by the user, using a program such as maxima and passed to \code{nptgauss}.
-}
-
 \examples{
 ## The default kernel, a gaussian truncated at +- 3
-nptgauss(b = 3.0,
-         alpha = 1.030174731161562,
-         c0 = 0.004565578246317041,
-         a0 = 0.2993759121518507,
-         a1 = 2.0844504723243343E-5,
-         a2 = -0.004703343342496734)
+nptgauss(b = 3.0)
 
 }
