@@ -2668,7 +2668,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
       }
 
       /* If this run resulted in an improved minimum save information */
-      
+
       if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;

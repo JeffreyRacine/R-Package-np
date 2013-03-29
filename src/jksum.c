@@ -2090,6 +2090,7 @@ int *num_categories){
     aicc = (double *)malloc(sizeof(double));
 #endif
 
+    int ks_tree_use = (int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED);
 
   // Allocate memory for objects 
 
@@ -2287,7 +2288,7 @@ int *num_categories){
     for(l = 0; l < num_reg_ordered; l++)
       PXO[l] = matrix_X_ordered[l];
 
-    double * kwm = (double *)malloc(nrcc22*num_obs*sizeof(double));
+    double * kwm = (double *)malloc(nrcc22*num_obs_eval_alloc*sizeof(double));
 
     for(int ii = 0; ii < nrcc22*num_obs; ii++)
       kwm[ii] = 0.0;
@@ -2333,39 +2334,251 @@ int *num_categories){
       }
 
 #ifdef MPI2
-      if((j % iNum_Processors) == 0){
+      if(ks_tree_use){
+        if((j % iNum_Processors) == 0){
+          if((j+my_rank) < (num_obs)){
+            for(l = 0; l < num_reg_continuous; l++){
+          
+              for(i = 0; i < num_obs; i++){
+                XTKX[l+2][i] = matrix_X_continuous[l][i]-matrix_X_continuous[l][j+my_rank];
+              }
+              TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
+            }
 
-        // some guys have to sit out the last calculation, but
-        // they still sync up afterwards
-        if((j+my_rank) < (num_obs-1)){
+
+            for(l = 0; l < num_reg_unordered; l++)
+              TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
+
+            for(l = 0; l < num_reg_ordered; l++)
+              TORD[l][0] = matrix_X_ordered[l][j+my_rank];
+
+            num_var_continuous_extern = nrc2; // rows in the y_mat
+            num_var_ordered_extern = nrc2; // rows in weights
+
+            kernel_weighted_sum_np(KERNEL_reg,
+                                   KERNEL_unordered_reg,
+                                   KERNEL_ordered_reg,
+                                   BANDWIDTH_reg,
+                                   num_obs,
+                                   1,
+                                   num_reg_unordered,
+                                   num_reg_ordered,
+                                   num_reg_continuous,
+                                   0, 
+                                   1, // kernel_pow = 1
+                                   (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
+                                   0, // do_smooth_coef_weights = FALSE (not implemented)
+                                   1, // symmetric
+                                   0, // NO gather-scatter sum
+                                   1, // drop train
+                                   j+my_rank, // drop this training datum
+                                   operator, // no convolution
+                                   PXU, // TRAIN
+                                   PXO, 
+                                   PXC,
+                                   TUNO, // EVAL
+                                   TORD,
+                                   TCON,
+                                   XTKX,
+                                   XTKX,
+                                   NULL,
+                                   vsf,
+                                   num_categories,
+                                   NULL,
+                                   kwm+(j+my_rank)*nrcc22,  // weighted sum
+                                   NULL); // do not return kernel weights
+
+            num_var_continuous_extern = 0; // set back to number of regressors
+            num_var_ordered_extern = 0; // always zero
+          }
+          // synchro step
+          MPI_Allgather(MPI_IN_PLACE, nrcc22*iNum_Processors, MPI_DOUBLE, kwm+j*nrcc22, nrcc22*iNum_Processors, MPI_DOUBLE, comm[1]);    
+        }
+      } else {
+        if((j % iNum_Processors) == 0){
+
+          // some guys have to sit out the last calculation, but
+          // they still sync up afterwards
+          if((j+my_rank) < (num_obs-1)){
+
+            for(l = 0; l < (nrc2); l++){
+              XTKX[l] = PXTKX[l] + j + my_rank + 1;
+            }
+
+            for(l = 0; l < num_reg_continuous; l++)
+              PXC[l] = matrix_X_continuous[l] + j + my_rank + 1;
+
+            for(l = 0; l < num_reg_unordered; l++)
+              PXU[l] = matrix_X_unordered[l] + j + my_rank + 1;
+
+            for(l = 0; l < num_reg_ordered; l++)
+              PXO[l] = matrix_X_ordered[l] + j + my_rank + 1;
+        
+            for(l = 0; l < num_reg_continuous; l++){
+        
+              for(i = 0; i < (num_obs-j-1-my_rank); i++){
+                XTKX[l+2][i] = matrix_X_continuous[l][i+j+1+my_rank]-matrix_X_continuous[l][j+my_rank];
+              }
+              TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
+            }
+
+            for(l = 0; l < num_reg_unordered; l++)
+              TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
+
+            for(l = 0; l < num_reg_ordered; l++)
+              TORD[l][0] = matrix_X_ordered[l][j+my_rank];
+
+            num_var_continuous_extern = nrc2; // rows in the y_mat
+            num_var_ordered_extern = nrc2; // rows in weights
+
+            kernel_weighted_sum_np(KERNEL_reg,
+                                   KERNEL_unordered_reg,
+                                   KERNEL_ordered_reg,
+                                   BANDWIDTH_reg,
+                                   num_obs-j-my_rank-1,
+                                   1,
+                                   num_reg_unordered,
+                                   num_reg_ordered,
+                                   num_reg_continuous,
+                                   0, // we leave one out via the weight matrix
+                                   1, // kernel_pow = 1
+                                   (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
+                                   0, // do_smooth_coef_weights = FALSE (not implemented)
+                                   1, // symmetric
+                                   1, // gather-scatter sum
+                                   0, // do not drop train
+                                   0, // do not drop train
+                                   operator, // no convolution
+                                   PXU, // TRAIN
+                                   PXO, 
+                                   PXC,
+                                   TUNO, // EVAL
+                                   TORD,
+                                   TCON,
+                                   XTKX,
+                                   XTKX,
+                                   sgn,
+                                   vsf,
+                                   num_categories,
+                                   NULL,
+                                   kwm+(j+my_rank)*nrcc22,  // weighted sum
+                                   NULL); // do not return kernel weights
+
+            num_var_continuous_extern = 0; // set back to number of regressors
+            num_var_ordered_extern = 0; // always zero
+
+            // need to use reference weight to fix weight sum
+            for(int jj = j+my_rank+1; jj < num_obs; jj++){
+              const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-my_rank-1]);
+              for(int ii = 1; ii < nrc2; ii++){
+                kwm[jj*nrcc22+ii*nrc2] += RW*XTKX[ii][jj-j-my_rank-1]*sgn[ii];
+              }
+            }
+          }
+          // reduce all work arrays
+          const int nrem = num_obs % iNum_Processors;
+          const int nred = ((j+iNum_Processors) > num_obs) ? nrem : iNum_Processors;
+
+          MPI_Allreduce(MPI_IN_PLACE, kwm+j*nrcc22, nred*nrcc22, MPI_DOUBLE, MPI_SUM, comm[1]);
+        }
+
+        // due to a quirk of the algorithm in parallel, always need to re-symmetrise array
+        
+        double * const tpk = kwm+j*nrcc22;
+        for (int jj = 0; jj < (nrc2); jj++){
+          for (int ii = (nrc1); ii > jj; ii--){
+            tpk[jj*(nrc2)+ii] = tpk[ii*(nrc2)+jj];
+          }
+        }
+      }
+
+#else
+      if(ks_tree_use){
+
+        for(l = 0; l < num_reg_continuous; l++){
+          
+          for(i = 0; i < num_obs; i++){
+            XTKX[l+2][i] = matrix_X_continuous[l][i]-matrix_X_continuous[l][j];
+          }
+          TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
+        }
+
+
+        for(l = 0; l < num_reg_unordered; l++)
+          TUNO[l][0] = matrix_X_unordered[l][j];
+
+        for(l = 0; l < num_reg_ordered; l++)
+          TORD[l][0] = matrix_X_ordered[l][j];
+
+        num_var_continuous_extern = nrc2; // rows in the y_mat
+        num_var_ordered_extern = nrc2; // rows in weights
+
+        kernel_weighted_sum_np(KERNEL_reg,
+                               KERNEL_unordered_reg,
+                               KERNEL_ordered_reg,
+                               BANDWIDTH_reg,
+                               num_obs,
+                               1,
+                               num_reg_unordered,
+                               num_reg_ordered,
+                               num_reg_continuous,
+                               0, // we leave one out via the weight matrix
+                               1, // kernel_pow = 1
+                               (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
+                               0, // do_smooth_coef_weights = FALSE (not implemented)
+                               1, // symmetric
+                               0, // gather-scatter sum
+                               1, // do not drop train
+                               j, // do not drop train
+                               operator, // no convolution
+                               PXU, // TRAIN
+                               PXO, 
+                               PXC,
+                               TUNO, // EVAL
+                               TORD,
+                               TCON,
+                               XTKX,
+                               XTKX,
+                               NULL,
+                               vsf,
+                               num_categories,
+                               NULL,
+                               kwm+j*nrcc22,  // weighted sum
+                               NULL); // do not return kernel weights
+
+        num_var_continuous_extern = 0; // set back to number of regressors
+        num_var_ordered_extern = 0; // always zero
+      } else {
+        if(j < (num_obs-1)){
 
           for(l = 0; l < (nrc2); l++){
-            XTKX[l] = PXTKX[l] + j + my_rank + 1;
+            XTKX[l]++;
           }
 
           for(l = 0; l < num_reg_continuous; l++)
-            PXC[l] = matrix_X_continuous[l] + j + my_rank + 1;
+            PXC[l]++;
 
           for(l = 0; l < num_reg_unordered; l++)
-            PXU[l] = matrix_X_unordered[l] + j + my_rank + 1;
+            PXU[l]++;
 
           for(l = 0; l < num_reg_ordered; l++)
-            PXO[l] = matrix_X_ordered[l] + j + my_rank + 1;
-        
+            PXO[l]++;
+
           for(l = 0; l < num_reg_continuous; l++){
-        
-            for(i = 0; i < (num_obs-j-1-my_rank); i++){
-              XTKX[l+2][i] = matrix_X_continuous[l][i+j+1+my_rank]-matrix_X_continuous[l][j+my_rank];
+          
+            for(i = 0; i < (num_obs-j-1); i++){
+              XTKX[l+2][i] = matrix_X_continuous[l][i+j+1]-matrix_X_continuous[l][j];
             }
-            TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
+            TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
           }
 
+      
           for(l = 0; l < num_reg_unordered; l++)
-            TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
+            TUNO[l][0] = matrix_X_unordered[l][j];
 
           for(l = 0; l < num_reg_ordered; l++)
-            TORD[l][0] = matrix_X_ordered[l][j+my_rank];
-
+            TORD[l][0] = matrix_X_ordered[l][j];
+      
           num_var_continuous_extern = nrc2; // rows in the y_mat
           num_var_ordered_extern = nrc2; // rows in weights
 
@@ -2373,7 +2586,7 @@ int *num_categories){
                                  KERNEL_unordered_reg,
                                  KERNEL_ordered_reg,
                                  BANDWIDTH_reg,
-                                 num_obs-j-my_rank-1,
+                                 num_obs-j-1,
                                  1,
                                  num_reg_unordered,
                                  num_reg_ordered,
@@ -2399,119 +2612,25 @@ int *num_categories){
                                  vsf,
                                  num_categories,
                                  NULL,
-                                 kwm+(j+my_rank)*nrcc22,  // weighted sum
-                                 NULL); // do not return kernel weights
+                                 kwm+j*nrcc22, // weighted sum
+                                 NULL);  // no kernel weights
 
           num_var_continuous_extern = 0; // set back to number of regressors
           num_var_ordered_extern = 0; // always zero
 
           // need to use reference weight to fix weight sum
-          for(int jj = j+my_rank+1; jj < num_obs; jj++){
-            const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-my_rank-1]);
+          for(int jj = j+1; jj < num_obs; jj++){
+            const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-1]);
             for(int ii = 1; ii < nrc2; ii++){
-              kwm[jj*nrcc22+ii*nrc2] += RW*XTKX[ii][jj-j-my_rank-1]*sgn[ii];
+              kwm[jj*nrcc22+ii*nrc2] += RW*XTKX[ii][jj-j-1]*sgn[ii];
             }
           }
-        }
-        // reduce all work arrays
-        const int nrem = num_obs % iNum_Processors;
-        const int nred = ((j+iNum_Processors) > num_obs) ? nrem : iNum_Processors;
-
-        MPI_Allreduce(MPI_IN_PLACE, kwm+j*nrcc22, nred*nrcc22, MPI_DOUBLE, MPI_SUM, comm[1]);
-      }
-
-      // due to a quirk of the algorithm in parallel, always need to re-symmetrise array
-
-      double * const tpk = kwm+j*nrcc22;
-      for (int jj = 0; jj < (nrc2); jj++){
-        for (int ii = (nrc1); ii > jj; ii--){
-          tpk[jj*(nrc2)+ii] = tpk[ii*(nrc2)+jj];
-        }
-      }
-
-#else
-
-      if(j < (num_obs-1)){
-
-        for(l = 0; l < (nrc2); l++){
-          XTKX[l]++;
-        }
-
-        for(l = 0; l < num_reg_continuous; l++)
-          PXC[l]++;
-
-        for(l = 0; l < num_reg_unordered; l++)
-          PXU[l]++;
-
-        for(l = 0; l < num_reg_ordered; l++)
-          PXO[l]++;
-
-        for(l = 0; l < num_reg_continuous; l++){
-          
-          for(i = 0; i < (num_obs-j-1); i++){
-            XTKX[l+2][i] = matrix_X_continuous[l][i+j+1]-matrix_X_continuous[l][j];
-          }
-          TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
-        }
-
-      
-        for(l = 0; l < num_reg_unordered; l++)
-          TUNO[l][0] = matrix_X_unordered[l][j];
-
-        for(l = 0; l < num_reg_ordered; l++)
-          TORD[l][0] = matrix_X_ordered[l][j];
-      
-        num_var_continuous_extern = nrc2; // rows in the y_mat
-        num_var_ordered_extern = nrc2; // rows in weights
-
-        kernel_weighted_sum_np(KERNEL_reg,
-                               KERNEL_unordered_reg,
-                               KERNEL_ordered_reg,
-                               BANDWIDTH_reg,
-                               num_obs-j-1,
-                               1,
-                               num_reg_unordered,
-                               num_reg_ordered,
-                               num_reg_continuous,
-                               0, // we leave one out via the weight matrix
-                               1, // kernel_pow = 1
-                               (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                               0, // do_smooth_coef_weights = FALSE (not implemented)
-                               1, // symmetric
-                               1, // gather-scatter sum
-                               0, // do not drop train
-                               0, // do not drop train
-                               operator, // no convolution
-                               PXU, // TRAIN
-                               PXO, 
-                               PXC,
-                               TUNO, // EVAL
-                               TORD,
-                               TCON,
-                               XTKX,
-                               XTKX,
-                               sgn,
-                               vsf,
-                               num_categories,
-                               NULL,
-                               kwm+j*nrcc22, // weighted sum
-                               NULL);  // no kernel weights
-
-        num_var_continuous_extern = 0; // set back to number of regressors
-        num_var_ordered_extern = 0; // always zero
-
-        // need to use reference weight to fix weight sum
-        for(int jj = j+1; jj < num_obs; jj++){
-          const double RW = kwm[jj*nrcc22+nrc1]*(XTKX[0][-1]-XTKX[0][jj-j-1]);
-          for(int ii = 1; ii < nrc2; ii++){
-            kwm[jj*nrcc22+ii*nrc2] += RW*XTKX[ii][jj-j-1]*sgn[ii];
-          }
-        }
-      } else { // because we skip the last call to npksum, we need to copy L to U for last observation
-        double * const tpk = kwm+j*nrcc22;
-        for (int jj = 0; jj < (nrc2); jj++){
-          for (int ii = (nrc1); ii > jj; ii--){
-            tpk[jj*(nrc2)+ii] = tpk[ii*(nrc2)+jj];
+        } else { // because we skip the last call to npksum, we need to copy L to U for last observation
+          double * const tpk = kwm+j*nrcc22;
+          for (int jj = 0; jj < (nrc2); jj++){
+            for (int ii = (nrc1); ii > jj; ii--){
+              tpk[jj*(nrc2)+ii] = tpk[ii*(nrc2)+jj];
+            }
           }
         }
       }
@@ -2539,7 +2658,7 @@ int *num_categories){
       const double dy = vector_Y[j]-DELTA[0][0];
       cv += dy*dy; 
     }
-
+    
     for(int ii = 0; ii < (nrc1); ii++){
       KWM[ii] = PKWM[ii];
       XTKY[ii] = PXTKY[ii];
@@ -2583,6 +2702,7 @@ int *num_categories){
       cv = log(cv) + (1.0+traceH/((double)num_obs))/(1.0-(traceH+2.0)/((double)num_obs));
     }
   }
+
   return(cv);
 }
 
