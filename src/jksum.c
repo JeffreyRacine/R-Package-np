@@ -1085,19 +1085,24 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     if(!gather_scatter){
       if(!symmetric){
         if(kpow == 1){
-          for (k = 0; k < num_weights; k++, l+=linc)
+          for (k = 0; k < num_weights; k++, l+=linc){
+            if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++)
               for (i = 0; i < max_B; i++)
                 result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+          }
         } else { // kpow != 1
-          for (k = 0; k < num_weights; k++, l+=linc)
+          for (k = 0; k < num_weights; k++, l+=linc){
+            if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++)
               for (i = 0; i < max_B; i++)
                 result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+          }
         }
       } else { // symmetric
         if(kpow == 1){
           for (k = 0; k < num_weights; k++, l+=linc){
+            if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++){
               for (i = 0; i <= j; i++){
                 result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
@@ -1106,6 +1111,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
           }
         } else { // kpow != 1
           for (k = 0; k < num_weights; k++, l+=linc){
+            if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++){
               for (i = 0; i <= j; i++){
                 result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
@@ -1124,26 +1130,32 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     } else { // gather_scatter
       if(!symmetric){
         if(kpow == 1){
-          for (k = 0; k < num_weights; k++, l+=linc)
+          for (k = 0; k < num_weights; k++, l+=linc){
+            if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++)
               for (i = 0; i < max_B; i++)
                 result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+          }
         } else { // kpow != 1
-          for (k = 0; k < num_weights; k++, l+=linc)
+          for (k = 0; k < num_weights; k++, l+=linc){
+            if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++)
               for (i = 0; i < max_B; i++)
                 result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+          }
         }
       } else { // symmetric
         if(kpow == 1){
           for (k = 0; k < num_weights; k++){
-            for (j = 0; j < max_A; j++){
-              for (i = 0; i <= j; i++){
-                const double tp = pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*weights[k]/db;
-                const double sgnp = tp*p_sgn[j*have_sgn]*p_sgn[i*have_sgn];
-                result[k*kstride+j*max_B+i] += tp;
-                result[(k+1)*max_AB+j*max_B+i] += sgnp;
-                //fprintf(stderr,"\nmax ab %d\tsgnp %e\tres %e",max_AB,sgnp,result[(k+1)*max_AB+j*max_B+i]);
+            if(weights[k] != 0.0){
+              for (j = 0; j < max_A; j++){
+                for (i = 0; i <= j; i++){
+                  const double tp = pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*weights[k]/db;
+                  const double sgnp = tp*p_sgn[j*have_sgn]*p_sgn[i*have_sgn];
+                  result[k*kstride+j*max_B+i] += tp;
+                  result[(k+1)*max_AB+j*max_B+i] += sgnp;
+                  //fprintf(stderr,"\nmax ab %d\tsgnp %e\tres %e",max_AB,sgnp,result[(k+1)*max_AB+j*max_B+i]);
+                }
               }
             }
             // insert reference weight in top right corner
@@ -1151,6 +1163,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
           }
         } else { // kpow != 1
           for (k = 0; k < num_weights; k++){
+            if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++){
               for (i = 0; i <= j; i++){
                 result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*ipow(weights[k]/db, kpow);
@@ -1175,20 +1188,24 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             const int istart = kdt_extern->kdn[nl->node[m]].istart;
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
-            for (k = istart; k < istart+nlev; k++, l+=linc)
+            for (k = istart; k < istart+nlev; k++, l+=linc){
+              if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++)
                 for (i = 0; i < max_B; i++)
                   result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+            }
           }
         } else { // kpow != 1
           for (int m = 0; m < nl->n; m++){
             const int istart = kdt_extern->kdn[nl->node[m]].istart;
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
-            for (k = istart; k < istart+nlev; k++, l+=linc)
+            for (k = istart; k < istart+nlev; k++, l+=linc){
+              if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++)
                 for (i = 0; i < max_B; i++)
                   result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+            }
           }
         }
       } else { // symmetric
@@ -1198,6 +1215,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
+              if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++){
                 for (i = 0; i <= j; i++){
                   result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
@@ -1211,6 +1229,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
+              if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++){
                 for (i = 0; i <= j; i++){
                   result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
@@ -1234,20 +1253,24 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             const int istart = kdt_extern->kdn[nl->node[m]].istart;
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
-            for (k = istart; k < istart+nlev; k++, l+=linc)
+            for (k = istart; k < istart+nlev; k++, l+=linc){
+              if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++)
                 for (i = 0; i < max_B; i++)
                   result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*weights[k]/db;
+            }
           }
         } else { // kpow != 1
           for (int m = 0; m < nl->n; m++){
             const int istart = kdt_extern->kdn[nl->node[m]].istart;
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
-            for (k = istart; k < istart+nlev; k++, l+=linc)
+            for (k = istart; k < istart+nlev; k++, l+=linc){
+              if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++)
                 for (i = 0; i < max_B; i++)
                   result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+            }
           }
         }
       } else { // symmetric
@@ -1257,13 +1280,15 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++){
-              for (j = 0; j < max_A; j++){
-                for (i = 0; i <= j; i++){
-                  const double tp = pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*weights[k]/db;
-                  const double sgnp = tp*p_sgn[j*have_sgn]*p_sgn[i*have_sgn];
-                  result[k*kstride+j*max_B+i] += tp;
-                  result[(k+1)*max_AB+j*max_B+i] += sgnp;
-                  //fprintf(stderr,"\nmax ab %d\tsgnp %e\tres %e",max_AB,sgnp,result[(k+1)*max_AB+j*max_B+i]);
+              if(weights[k] != 0.0){
+                for (j = 0; j < max_A; j++){
+                  for (i = 0; i <= j; i++){
+                    const double tp = pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*weights[k]/db;
+                    const double sgnp = tp*p_sgn[j*have_sgn]*p_sgn[i*have_sgn];
+                    result[k*kstride+j*max_B+i] += tp;
+                    result[(k+1)*max_AB+j*max_B+i] += sgnp;
+                    //fprintf(stderr,"\nmax ab %d\tsgnp %e\tres %e",max_AB,sgnp,result[(k+1)*max_AB+j*max_B+i]);
+                  }
                 }
               }
               // insert reference weight in top right corner
@@ -1276,6 +1301,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++){
+              if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++){
                 for (i = 0; i <= j; i++){
                   result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*ipow(weights[k]/db, kpow);
