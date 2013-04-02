@@ -2745,13 +2745,14 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * cm, double * cmerr, double * g, double *gerr, 
                    double * xtra){
 
-  double * vector_scale_factor, * ecm, * ecmerr, ** eg, **egerr;
+  double * vector_scale_factor, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
   double * lambda, ** matrix_bandwidth;
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
 
   int i,j, num_var;
   int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev;
 
+  int * ip = NULL;  // point permutation, see tree.c
   /* match integer options with their globals */
 
   num_reg_continuous_extern = myopti[REG_NCONI];
@@ -2785,8 +2786,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   max_lev = myopti[REG_MLEVI];
   pad_num = *padnum;
 
+  int_TREE = myopti[REG_DOTREEI];
+
 #ifdef MPI2
-  num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
+  num_obs_eval_alloc = MAX((int)ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
 #else
   num_obs_eval_alloc = num_obs_eval_extern;
 #endif
@@ -2825,9 +2828,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   ecm = alloc_vecd(num_obs_eval_alloc);
   ecmerr = alloc_vecd(num_obs_eval_alloc);
   
+
   eg = alloc_matd(num_obs_eval_alloc, num_var);
   egerr = alloc_matd(num_obs_eval_alloc, num_var);
-
+  
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   vector_scale_factor = alloc_vecd(num_var + 1);
   matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
@@ -2887,6 +2891,33 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     num_categories_extern[j] = i;
   }
 
+  // attempt tree build, if enabled 
+  int_TREE = int_TREE && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
+
+  if(int_TREE == NP_TREE_TRUE){
+    build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
+                 4*num_reg_continuous_extern, &ip, &kdt_extern);
+
+    //put training data into tree-order using the index array
+
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ip[i]];
+    
+    
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ip[i]];
+
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ip[i]];
+
+    /* response variable */
+    for( i=0;i<num_obs_train_extern;i++ )
+      vector_Y_extern[i] = ty[ip[i]];
+  }
+
 
   /* Conduct estimation */
 	
@@ -2895,110 +2926,174 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
      - they have only one kernel type each at the moment 
   */
 
-  kernel_estimate_regression_categorical(int_ll_extern,
-                                         KERNEL_reg_extern,
-                                         KERNEL_reg_unordered_extern,
-                                         KERNEL_reg_ordered_extern,
-                                         BANDWIDTH_reg_extern,
-                                         num_obs_train_extern,
-                                         num_obs_eval_extern,
-                                         num_reg_unordered_extern,
-                                         num_reg_ordered_extern,
-                                         num_reg_continuous_extern,
-                                         /* Train */
-                                         matrix_X_unordered_train_extern,
-                                         matrix_X_ordered_train_extern,
-                                         matrix_X_continuous_train_extern,
-                                         /* Eval */
-                                         matrix_X_unordered_eval_extern,
-                                         matrix_X_ordered_eval_extern,
-                                         matrix_X_continuous_eval_extern,
-                                         /* Bandwidth */
-                                         matrix_X_continuous_train_extern,
-                                         vector_Y_extern,
-                                         vector_Y_eval_extern,
-                                         &vector_scale_factor[1],
-                                         num_categories_extern,
-                                         ecm,
-                                         eg,
-                                         ecmerr,
-                                         egerr,
-                                         &RS,
-                                         &MSE,
-                                         &MAE,
-                                         &MAPE,
-                                         &CORR,
-                                         &SIGN);
+  if(int_TREE != NP_TREE_TRUE){
+    kernel_estimate_regression_categorical(int_ll_extern,
+                                           KERNEL_reg_extern,
+                                           KERNEL_reg_unordered_extern,
+                                           KERNEL_reg_ordered_extern,
+                                           BANDWIDTH_reg_extern,
+                                           num_obs_train_extern,
+                                           num_obs_eval_extern,
+                                           num_reg_unordered_extern,
+                                           num_reg_ordered_extern,
+                                           num_reg_continuous_extern,
+                                           /* Train */
+                                           matrix_X_unordered_train_extern,
+                                           matrix_X_ordered_train_extern,
+                                           matrix_X_continuous_train_extern,
+                                           /* Eval */
+                                           matrix_X_unordered_eval_extern,
+                                           matrix_X_ordered_eval_extern,
+                                           matrix_X_continuous_eval_extern,
+                                           /* Bandwidth */
+                                           matrix_X_continuous_train_extern,
+                                           vector_Y_extern,
+                                           vector_Y_eval_extern,
+                                           &vector_scale_factor[1],
+                                           num_categories_extern,
+                                           ecm,
+                                           eg,
+                                           ecmerr,
+                                           egerr,
+                                           &RS,
+                                           &MSE,
+                                           &MAE,
+                                           &MAPE,
+                                           &CORR,
+                                           &SIGN);
 
-  if (do_grad){
-    kernel_bandwidth_mean(KERNEL_reg_extern,
-                          BANDWIDTH_reg_extern,
-                          num_obs_train_extern,
-                          num_obs_eval_extern,
-                          0,
-                          0,
-                          0,
-                          num_reg_continuous_extern,
-                          num_reg_unordered_extern,
-                          num_reg_ordered_extern,
-                          &vector_scale_factor[1],
-                          /* Not used */
-                          matrix_Y_continuous_train_extern,
-                          /* Not used */
-                          matrix_Y_continuous_train_extern,
-                          matrix_X_continuous_train_extern,
-                          matrix_X_continuous_eval_extern,
-                          matrix_bandwidth,/* Not used */
-                          matrix_bandwidth,
-                          lambda);
-    kernel_estimate_categorical_gradient_ocg_fast(1,
-                                                  NULL,
-                                                  0,
-                                                  KERNEL_reg_extern,
-                                                  KERNEL_reg_unordered_extern,
-                                                  KERNEL_reg_ordered_extern,
-                                                  BANDWIDTH_reg_extern,
-                                                  int_ll_extern,
-                                                  0,
-                                                  num_obs_train_extern,
-                                                  num_obs_eval_extern,
-                                                  num_reg_unordered_extern,
-                                                  num_reg_ordered_extern,
-                                                  num_reg_continuous_extern,
-                                                  vector_Y_extern,
-                                                  matrix_X_unordered_train_extern,
-                                                  matrix_X_ordered_train_extern,
-                                                  matrix_X_continuous_train_extern,
-                                                  matrix_X_unordered_eval_extern,
-                                                  matrix_X_ordered_eval_extern,
-                                                  matrix_X_continuous_eval_extern,
-                                                  matrix_bandwidth,
-                                                  NULL,
-                                                  lambda,
-                                                  num_categories_extern,
-                                                  matrix_categorical_vals_extern,
-                                                  ecm,
-                                                  &eg[num_reg_continuous_extern]);
+    if (do_grad){
+      kernel_bandwidth_mean(KERNEL_reg_extern,
+                            BANDWIDTH_reg_extern,
+                            num_obs_train_extern,
+                            num_obs_eval_extern,
+                            0,
+                            0,
+                            0,
+                            num_reg_continuous_extern,
+                            num_reg_unordered_extern,
+                            num_reg_ordered_extern,
+                            &vector_scale_factor[1],
+                            /* Not used */
+                            matrix_Y_continuous_train_extern,
+                            /* Not used */
+                            matrix_Y_continuous_train_extern,
+                            matrix_X_continuous_train_extern,
+                            matrix_X_continuous_eval_extern,
+                            matrix_bandwidth,/* Not used */
+                            matrix_bandwidth,
+                            lambda);
+      kernel_estimate_categorical_gradient_ocg_fast(1,
+                                                    NULL,
+                                                    0,
+                                                    KERNEL_reg_extern,
+                                                    KERNEL_reg_unordered_extern,
+                                                    KERNEL_reg_ordered_extern,
+                                                    BANDWIDTH_reg_extern,
+                                                    int_ll_extern,
+                                                    0,
+                                                    num_obs_train_extern,
+                                                    num_obs_eval_extern,
+                                                    num_reg_unordered_extern,
+                                                    num_reg_ordered_extern,
+                                                    num_reg_continuous_extern,
+                                                    vector_Y_extern,
+                                                    matrix_X_unordered_train_extern,
+                                                    matrix_X_ordered_train_extern,
+                                                    matrix_X_continuous_train_extern,
+                                                    matrix_X_unordered_eval_extern,
+                                                    matrix_X_ordered_eval_extern,
+                                                    matrix_X_continuous_eval_extern,
+                                                    matrix_bandwidth,
+                                                    NULL,
+                                                    lambda,
+                                                    num_categories_extern,
+                                                    matrix_categorical_vals_extern,
+                                                    ecm,
+                                                    &eg[num_reg_continuous_extern]);
 
+    }
+    for(i=0;i<num_obs_eval_extern;i++)
+      cm[i] = ecm[i];
+
+    for(i=0;i<num_obs_eval_extern;i++)
+      cmerr[i] = ecmerr[i];
+
+    if(do_grad){
+      for(j=0;j<num_var;j++)
+        for(i=0;i<num_obs_eval_extern;i++)
+          g[j*num_obs_eval_extern+i]=eg[j][i];
+
+      for(j=0;j<num_reg_continuous_extern;j++)
+        for(i=0;i<num_obs_eval_extern;i++)
+          gerr[j*num_obs_eval_extern+i]=egerr[j][i];
+    }
+
+  } else {
+
+    kernel_estimate_regression_categorical_tree_np(int_ll_extern,
+                                                   KERNEL_reg_extern,
+                                                   KERNEL_reg_unordered_extern,
+                                                   KERNEL_reg_ordered_extern,
+                                                   BANDWIDTH_reg_extern,
+                                                   num_obs_train_extern,
+                                                   num_obs_eval_extern,
+                                                   num_reg_unordered_extern,
+                                                   num_reg_ordered_extern,
+                                                   num_reg_continuous_extern,
+                                                   /* Train */
+                                                   matrix_X_unordered_train_extern,
+                                                   matrix_X_ordered_train_extern,
+                                                   matrix_X_continuous_train_extern,
+                                                   /* Eval */
+                                                   matrix_X_unordered_eval_extern,
+                                                   matrix_X_ordered_eval_extern,
+                                                   matrix_X_continuous_eval_extern,
+                                                   vector_Y_extern,
+                                                   vector_Y_eval_extern,
+                                                   &vector_scale_factor[1],
+                                                   num_categories_extern,
+                                                   ecm,
+                                                   NULL,
+                                                   ecmerr,
+                                                   NULL,
+                                                   &RS,
+                                                   &MSE,
+                                                   &MAE,
+                                                   &MAPE,
+                                                   &CORR,
+                                                   &SIGN);
+
+    if(train_is_eval){
+      for(i=0;i<num_obs_eval_extern;i++)
+        cm[ip[i]] = ecm[i];
+
+      for(i=0;i<num_obs_eval_extern;i++)
+        cmerr[ip[i]] = ecmerr[i];
+    } else {
+      for(i=0;i<num_obs_eval_extern;i++)
+        cm[i] = ecm[i];
+
+      for(i=0;i<num_obs_eval_extern;i++)
+        cmerr[i] = ecmerr[i];
+
+    }
+    /*
+    if(do_grad){
+      for(j=0;j<num_var;j++)
+        for(i=0;i<num_obs_eval_extern;i++)
+          g[j*num_obs_eval_extern+ip[i]]=eg[j][i];
+
+      for(j=0;j<num_reg_continuous_extern;j++)
+        for(i=0;i<num_obs_eval_extern;i++)
+          gerr[j*num_obs_eval_extern+ip[i]]=egerr[j][i];
+    }
+
+    */
   }
 
   /* write the return values */
 
-  for(i=0;i<num_obs_eval_extern;i++)
-    cm[i] = ecm[i];
-
-  for(i=0;i<num_obs_eval_extern;i++)
-    cmerr[i] = ecmerr[i];
-
-  if(do_grad){
-    for(j=0;j<num_var;j++)
-      for(i=0;i<num_obs_eval_extern;i++)
-        g[j*num_obs_eval_extern+i]=eg[j][i];
-
-    for(j=0;j<num_reg_continuous_extern;j++)
-      for(i=0;i<num_obs_eval_extern;i++)
-        gerr[j*num_obs_eval_extern+i]=egerr[j][i];
-  }
 
   xtra[0] = RS;
   xtra[1] = MSE;
@@ -3019,9 +3114,17 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
   }
 
+  if(int_TREE == NP_TREE_TRUE){
+    free(ip);
+    ip = NULL;
+
+    free_kdtree(&kdt_extern);
+    int_TREE = NP_TREE_FALSE;
+  }
+
   free_mat(eg, num_var);
   free_mat(egerr, num_var);
-
+  
   free_mat(matrix_bandwidth, num_reg_continuous_extern);
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
