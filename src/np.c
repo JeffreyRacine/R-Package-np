@@ -149,6 +149,9 @@ double np_tgauss2_c0 = .004565578246317041;
 double np_tgauss2_a0 = 0.2993759121518507, np_tgauss2_a1 = 2.0844504723243343E-5;
 double np_tgauss2_a2 = -2.0*0.002351671671248367;
 
+double np_tgauss2_k = 2.90113075268188e-01, np_tgauss2_k2 = 9.17819591566274e-01;
+double np_tgauss2_k22 = 1.40866160472795e-01;
+
 extern double cksup[OP_NCFUN][2];
 
 void np_set_tgauss2(double * coefficients){
@@ -159,6 +162,10 @@ void np_set_tgauss2(double * coefficients){
   np_tgauss2_a0 = coefficients[TG2_A0];
   np_tgauss2_a1 = coefficients[TG2_A1];
   np_tgauss2_a2 = coefficients[TG2_A2];
+
+  np_tgauss2_k = coefficients[TG2_K];
+  np_tgauss2_k2 = coefficients[TG2_K2];
+  np_tgauss2_k22 = coefficients[TG2_K22];
 
   cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_NORMAL]][0] = -np_tgauss2_b;
   cksup[CK_TGAUSS2 + OP_CFUN_OFFSETS[OP_NORMAL]][1] = np_tgauss2_b;

@@ -54,6 +54,7 @@ convergence rate of the bandwidth.
 
 8 = Rectangular kernel
 
+9 = Truncated Gaussian kernel (second order)
 The following techniques are currently supported.
 
 The technique is input via disk files bandwidth_d.ini and bandwidth_r.ini

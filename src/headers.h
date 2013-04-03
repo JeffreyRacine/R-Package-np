@@ -518,5 +518,8 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define TG2_A0 3
 #define TG2_A1 4
 #define TG2_A2 5
+#define TG2_K 6
+#define TG2_K2 7
+#define TG2_K22 8
 
 #endif // _NP__
