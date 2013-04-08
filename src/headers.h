@@ -166,6 +166,8 @@ int check_valid_scale_factor_cv(int KERNEL, int KERNEL_unordered_liracine, int B
 
 int kernel_estimate_regression_categorical(int int_ll, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_reg, int num_obs_train, int num_obs_eval, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double **matrix_X_continuous_bandwidth, double *vector_Y, double *vector_Y_eval, double *vector_scale_factor, int *num_categories, double *mean, double **gradient, double *mean_stderr, double **gradient_stderr, double *R_squared, double *MSE, double *MAE, double *MAPE, double *CORR, double *SIGN);
 
+int kernel_estimate_regression_categorical_tree_np(int int_ll,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_Y_eval,double *vector_scale_factor,int *num_categories,double *mean,double **gradient,double *mean_stderr,double **gradient_stderr,double *R_squared,double *MSE,double *MAE,double *MAPE,double *CORR,double *SIGN);
+
 double func_con_density_quantile(double *quantile);
 
 int kernel_estimate_quantile(int gradient_compute, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered_train, double **matrix_Y_ordered_train, double **matrix_Y_continuous_train, double **matrix_Y_unordered_eval, double **matrix_Y_ordered_eval, double **matrix_Y_continuous_eval, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, double *quan, double *quan_stderr, double **quan_gradient, int seed, double ftol, double tol, double small, int itmax, int iMax_Num_Multistart, double zero);
@@ -459,6 +461,7 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define REG_LL 13
 #define REG_TISEI 14
 #define REG_MLEVI 15
+#define REG_DOTREEI 16
 
 #define KWS_TNOBSI   0
 #define KWS_ENOBSI 1
@@ -509,11 +512,15 @@ static const int OP_UFUN_OFFSETS[4] = { 0, 2, 0, 0 };
 #define CQ_TOLD   1
 #define CQ_SMALLD 2
 
-#define TG2_B 0
+#define TG2_B     0
 #define TG2_ALPHA 1
-#define TG2_C0 2
-#define TG2_A0 3
-#define TG2_A1 4
-#define TG2_A2 5
+#define TG2_C0    2
+#define TG2_A0    3
+#define TG2_A1    4
+#define TG2_A2    5
+#define TG2_K     6
+#define TG2_K2    7
+#define TG2_K22   8
+#define TG2_KM    9
 
 #endif // _NP__

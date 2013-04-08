@@ -250,7 +250,8 @@ npreg.rbandwidth <-
         lc = REGTYPE_LC,
         ll = REGTYPE_LL),
       no.ex = no.ex,
-      mcv.numRow = attr(bws$xmcv, "num.row"))
+      mcv.numRow = attr(bws$xmcv, "num.row"),
+      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
     
 
     myout=

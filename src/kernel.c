@@ -32,7 +32,7 @@ static char rcsid[] = "$Id: kernel.c,v 1.3 2006/11/02 16:56:49 tristen Exp $";
 extern double np_tgauss2_b, np_tgauss2_alpha, np_tgauss2_c0;
 // convolution kernel constants
 extern double np_tgauss2_a0, np_tgauss2_a1, np_tgauss2_a2;
-
+extern double np_tgauss2_k, np_tgauss2_k2, np_tgauss2_k22, np_tgauss2_km;
 /*
 
 The following kernel functions are supported.
@@ -54,6 +54,7 @@ convergence rate of the bandwidth.
 
 8 = Rectangular kernel
 
+9 = Truncated Gaussian kernel (second order)
 The following techniques are currently supported.
 
 The technique is input via disk files bandwidth_d.ini and bandwidth_r.ini
@@ -903,7 +904,7 @@ double *DIFF_KER_PPM)
 			*INT_KERNEL_P = 0.28209479177387814348;
 			*K_INT_KERNEL_P = ipow(*INT_KERNEL_P, num_reg_continuous);
 			*INT_KERNEL_PM_HALF = 0.21969564473386119853;
-			*DIFF_KER_PPM = (2.0 * (*K_INT_KERNEL_P/ *INT_KERNEL_P) * 0.06239914704001694495);
+			*DIFF_KER_PPM = (2.0 * (*K_INT_KERNEL_P/ *INT_KERNEL_P) * 0.062399147040017);
 
 			break;
 
@@ -947,7 +948,7 @@ double *DIFF_KER_PPM)
 			*INT_KERNEL_P = 0.26832815729997476357;
 			*K_INT_KERNEL_P = ipow(*INT_KERNEL_P, num_reg_continuous);
 			*INT_KERNEL_PM_HALF = 0.20250390621232470438;
-			*DIFF_KER_PPM = (2.0 * (*K_INT_KERNEL_P/ *INT_KERNEL_P) * 0.06582425108765005919);
+			*DIFF_KER_PPM = (2.0 * (*K_INT_KERNEL_P/ *INT_KERNEL_P) * 0.0658242510876501);
 
 			break;
 
@@ -992,6 +993,15 @@ double *DIFF_KER_PPM)
 			*DIFF_KER_PPM = (2.0 * (*K_INT_KERNEL_P/ *INT_KERNEL_P) * 0.25);
 
 			break;
+
+    case 9:
+
+			*INT_KERNEL_P = np_tgauss2_k;
+			*K_INT_KERNEL_P = ipow(*INT_KERNEL_P, num_reg_continuous);
+			*INT_KERNEL_PM_HALF = np_tgauss2_km;
+			*DIFF_KER_PPM = 2.0* (*K_INT_KERNEL_P/ *INT_KERNEL_P) * (np_tgauss2_k - np_tgauss2_km);
+
+      break;
 
 	}
 
@@ -1090,6 +1100,11 @@ double *K_INT_KERNEL_P)
 			*K_INT_KERNEL_P = ipow(*INT_KERNEL_P, num_var_continuous);
 
 			break;
+
+  case 9:
+    *INT_KERNEL_P = np_tgauss2_k;
+    *K_INT_KERNEL_P = ipow(*INT_KERNEL_P, num_var_continuous);
+    break;
 
 	}
 

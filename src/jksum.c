@@ -15,7 +15,7 @@
 
 #include "tree.h"
 
-
+#include <assert.h>
 #ifdef MPI2
 
 #include "mpi.h"
@@ -2105,7 +2105,7 @@ int *num_categories){
   operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
 
   for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
-    operator[i] = 0;
+    operator[i] = OP_NORMAL;
 
 #ifdef MPI2
     int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
@@ -3152,4 +3152,474 @@ double *cv){
 
   return(0);
 
+}
+
+// estimation functions
+
+int kernel_estimate_regression_categorical_tree_np(
+int int_ll,
+int KERNEL_reg,
+int KERNEL_unordered_reg,
+int KERNEL_ordered_reg,
+int BANDWIDTH_reg,
+int num_obs_train,
+int num_obs_eval,
+int num_reg_unordered,
+int num_reg_ordered,
+int num_reg_continuous,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double *vector_Y,
+double *vector_Y_eval,
+double *vector_scale_factor,
+int *num_categories,
+double *mean,
+double **gradient,
+double *mean_stderr,
+double **gradient_stderr,
+double *R_squared,
+double *MSE,
+double *MAE,
+double *MAPE,
+double *CORR,
+double *SIGN){
+
+  // note that mean has 2*num_obs allocated for npksum
+  int i, j, l, sf_flag = 0, tsf;
+
+	double INT_KERNEL_P;					 /* Integral of K(z)^2 */
+	double K_INT_KERNEL_P;				 /*  K^p */
+	/* Integral of K(z-0.5)*K(z+0.5) */
+	double INT_KERNEL_PM_HALF = 0.0;
+	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
+
+  double * lambda = NULL, * vsf = NULL;
+  double ** matrix_bandwidth = NULL;
+  double ** matrix_bandwidth_deriv = NULL;
+  int * operator = NULL;
+
+  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+
+  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
+    operator[i] = OP_NORMAL;
+
+#ifdef MPI2
+  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
+  int num_obs_train_alloc = stride_t*iNum_Processors;
+
+  int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int num_obs_eval_alloc = stride_e*iNum_Processors;
+
+#else
+  int num_obs_train_alloc = num_obs_train;
+  int num_obs_eval_alloc = num_obs_eval;
+#endif
+
+  assert((int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED));
+  assert(gradient == NULL);
+
+  // Allocate memory for objects 
+
+  lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
+  matrix_bandwidth = alloc_matd(num_obs_train,num_reg_continuous);
+
+  matrix_bandwidth_deriv = alloc_matd(num_obs_eval,num_reg_continuous);
+
+  if(kernel_bandwidth(KERNEL_reg,
+                      BANDWIDTH_reg,
+                      num_obs_train,
+                      num_obs_eval,
+                      0,
+                      0,
+                      0,
+                      num_reg_continuous,
+                      num_reg_unordered,
+                      num_reg_ordered,
+                      vector_scale_factor,
+                      NULL,			 // Not used 
+                      NULL,			 // Not used 
+                      matrix_X_continuous_train,
+                      matrix_X_continuous_eval,
+                      NULL,					 // Not used 
+                      matrix_bandwidth,
+                      lambda,
+                      matrix_bandwidth_deriv)==1){
+#ifdef MPI2
+		MPI_Barrier(comm[1]);
+		MPI_Finalize();
+#endif
+    error("\n** Error: invalid bandwidth.");
+  }
+
+  if(num_reg_continuous != 0) {
+    initialize_kernel_regression_asymptotic_constants(KERNEL_reg,
+                                                      num_reg_continuous,
+                                                      &INT_KERNEL_P,
+                                                      &K_INT_KERNEL_P,
+                                                      &INT_KERNEL_PM_HALF,
+                                                      &DIFF_KER_PPM);
+  } else {
+    INT_KERNEL_P = 1.0;
+    K_INT_KERNEL_P = 1.0;
+  }
+
+  // Conduct the estimation 
+
+  if(int_ll == LL_LC) { // local constant
+    // Nadaraya-Watson
+    // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
+
+#define NCOL_Y 3
+
+    double * lc_Y[NCOL_Y] = {NULL,NULL,NULL};
+    double * meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
+    
+    if(meany == NULL)
+      error("\n** Error: memory reallocation failed.");
+
+    num_var_continuous_extern = NCOL_Y; // columns in the y_mat
+    num_var_ordered_extern = 0; // columns in weights
+    lc_Y[0] = vector_Y;
+      
+    lc_Y[1] = (double *)malloc(num_obs_train*sizeof(double));
+    lc_Y[2] = (double *)malloc(num_obs_train*sizeof(double));
+
+    if((lc_Y[1] == NULL) || (lc_Y[2] == NULL))
+      error("\n** Error: memory allocation failed.");
+
+    for(int ii = 0; ii < num_obs_train; ii++){
+      lc_Y[1][ii] = 1.0;
+      lc_Y[2][ii] = vector_Y[ii]*vector_Y[ii];
+    }
+
+    kernel_weighted_sum_np(KERNEL_reg,
+                           KERNEL_unordered_reg,
+                           KERNEL_ordered_reg,
+                           BANDWIDTH_reg,
+                           num_obs_train,
+                           num_obs_eval,
+                           num_reg_unordered,
+                           num_reg_ordered,
+                           num_reg_continuous,
+                           0, // no leave one out 
+                           1, // kernel_pow = 1
+                           0, // bandwidth_divide = FALSE when not adaptive
+                           0, // do_smooth_coef_weights = FALSE (not implemented)
+                           0, // not symmetric
+                           0, // do not gather-scatter
+                           0, // do not drop train
+                           0, // do not drop train
+                           operator, // no special operators being used
+                           matrix_X_unordered_train, // TRAIN
+                           matrix_X_ordered_train,
+                           matrix_X_continuous_train,
+                           matrix_X_unordered_eval, // EVAL
+                           matrix_X_ordered_eval,
+                           matrix_X_continuous_eval,
+                           lc_Y,
+                           NULL, // no W matrix
+                           NULL, // no sgn 
+                           vector_scale_factor,
+                           num_categories,
+                           NULL, // no convolution 
+                           meany,
+                           NULL); // do not return kernel weights
+
+    num_var_continuous_extern = 0;
+
+    for(int ii = 0; ii < num_obs_eval; ii++){
+      const int ii3 = NCOL_Y*ii;
+      const double sk = copysign(DBL_MIN, meany[ii3+1]) + meany[ii3+1];
+      mean[ii] = meany[ii3]/sk;
+
+      mean_stderr[ii] = meany[ii3+2]/sk - mean[ii]*mean[ii];
+      mean_stderr[ii] = sqrt(mean_stderr[ii] * K_INT_KERNEL_P / sk);
+    }
+
+    free(meany);
+    free(lc_Y[1]);
+    free(lc_Y[2]);
+#undef NCOL_Y
+  } else { // Local Linear 
+
+    // because we manipulate the training data scale factors can be wrong
+
+    if((sf_flag = (int_LARGE_SF == 0))){ 
+      int_LARGE_SF = 1;
+      vsf = (double *)malloc(num_reg_continuous*sizeof(double));
+      for(int ii = 0; ii < num_reg_continuous; ii++)
+        vsf[ii] = matrix_bandwidth[ii][0];
+    } else {
+      vsf = vector_scale_factor;
+    }
+
+    MATRIX XTKX = mat_creat( num_reg_continuous + 2, num_obs_train, UNDEFINED );
+    MATRIX XTKXINV = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
+    MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
+    MATRIX DELTA = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
+
+    MATRIX KWM = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
+    // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
+    
+    MATRIX TCON = mat_creat(num_reg_continuous, 1, UNDEFINED);
+    MATRIX TUNO = mat_creat(num_reg_unordered, 1, UNDEFINED);
+    MATRIX TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
+
+    const int nrc2 = (num_reg_continuous+2);
+    const int nrc1 = (num_reg_continuous+1);
+    const int nrcc22 = nrc2*nrc2;
+
+    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
+
+    double * PXC[num_reg_continuous]; 
+    double * PXU[num_reg_unordered];
+    double * PXO[num_reg_ordered];
+
+    for(l = 0; l < num_reg_continuous; l++)
+      PXC[l] = matrix_X_continuous_train[l];
+
+    for(l = 0; l < num_reg_unordered; l++)
+      PXU[l] = matrix_X_unordered_train[l];
+
+    for(l = 0; l < num_reg_ordered; l++)
+      PXO[l] = matrix_X_ordered_train[l];
+
+    double * kwm = (double *)malloc(nrcc22*num_obs_eval_alloc*sizeof(double));
+
+    for(int ii = 0; ii < nrcc22*num_obs_eval_alloc; ii++)
+      kwm[ii] = 0.0;
+
+    double * sgn = (double *)malloc((nrc2)*sizeof(double));
+
+    sgn[0] = sgn[1] = 1.0;
+    
+    for(int ii = 0; ii < (num_reg_continuous); ii++)
+      sgn[ii+2] = -1.0;
+    
+    for(int ii = 0; ii < (nrc2); ii++)
+      PXTKX[ii] = XTKX[ii];
+    
+    for(int ii = 0; ii < (nrc1); ii++){
+      PKWM[ii] = KWM[ii];
+      PXTKY[ii] = XTKY[ii];
+
+      KWM[ii] = &kwm[(ii+1)*(nrc2)+1];
+      XTKY[ii] = &kwm[ii+1];
+
+    }
+
+    const double epsilon = 1.0/num_obs_train;
+    double nepsilon;
+
+    // populate the xtkx matrix first 
+    
+    for(i = 0; i < num_obs_train; i++){
+      XTKX[0][i] = vector_Y[i];
+      XTKX[1][i] = 1.0;
+    }
+
+
+    for(j = 0; j < num_obs_eval; j++){ // main loop
+      nepsilon = 0.0;
+
+      for(l = 0; l < (nrc1); l++){
+        KWM[l] = &kwm[j*nrcc22+(l+1)*(nrc2)+1];
+        XTKY[l] = &kwm[j*nrcc22+l+1];
+      }
+
+#ifdef MPI2
+      
+      if((j % iNum_Processors) == 0){
+        if((j+my_rank) < (num_obs_eval)){
+          for(l = 0; l < num_reg_continuous; l++){
+          
+            for(i = 0; i < num_obs_train; i++){
+              XTKX[l+2][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j+my_rank];
+            }
+            TCON[l][0] = matrix_X_continuous_eval[l][j+my_rank]; // temporary storage
+          }
+
+
+          for(l = 0; l < num_reg_unordered; l++)
+            TUNO[l][0] = matrix_X_unordered_eval[l][j+my_rank];
+
+          for(l = 0; l < num_reg_ordered; l++)
+            TORD[l][0] = matrix_X_ordered_eval[l][j+my_rank];
+
+          num_var_continuous_extern = nrc2; // rows in the y_mat
+          num_var_ordered_extern = nrc2; // rows in weights
+
+          kernel_weighted_sum_np(KERNEL_reg,
+                                 KERNEL_unordered_reg,
+                                 KERNEL_ordered_reg,
+                                 BANDWIDTH_reg,
+                                 num_obs_train,
+                                 1,
+                                 num_reg_unordered,
+                                 num_reg_ordered,
+                                 num_reg_continuous,
+                                 0, 
+                                 1, // kernel_pow = 1
+                                 0, // bandwidth_divide = FALSE when not adaptive
+                                 0, // do_smooth_coef_weights = FALSE (not implemented)
+                                 1, // symmetric
+                                 0, // NO gather-scatter sum
+                                 0, // do not drop train
+                                 0, // do not drop train
+                                 operator, // no convolution
+                                 PXU, // TRAIN
+                                 PXO, 
+                                 PXC,
+                                 TUNO, // EVAL
+                                 TORD,
+                                 TCON,
+                                 XTKX,
+                                 XTKX,
+                                 NULL,
+                                 vsf,
+                                 num_categories,
+                                 NULL,
+                                 kwm+(j+my_rank)*nrcc22,  // weighted sum
+                                 NULL); // do not return kernel weights
+
+          num_var_continuous_extern = 0; // set back to number of regressors
+          num_var_ordered_extern = 0; // always zero
+        }
+        // synchro step
+        MPI_Allgather(MPI_IN_PLACE, nrcc22*iNum_Processors, MPI_DOUBLE, kwm+j*nrcc22, nrcc22*iNum_Processors, MPI_DOUBLE, comm[1]);    
+      }
+      
+#else
+
+
+      for(l = 0; l < num_reg_continuous; l++){
+          
+        for(i = 0; i < num_obs_train; i++){
+          XTKX[l+2][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j];
+        }
+        TCON[l][0] = matrix_X_continuous_eval[l][j]; // temporary storage
+      }
+
+
+      for(l = 0; l < num_reg_unordered; l++)
+        TUNO[l][0] = matrix_X_unordered_eval[l][j];
+
+      for(l = 0; l < num_reg_ordered; l++)
+        TORD[l][0] = matrix_X_ordered_eval[l][j];
+
+      num_var_continuous_extern = nrc2; // rows in the y_mat
+      num_var_ordered_extern = nrc2; // rows in weights
+
+      kernel_weighted_sum_np(KERNEL_reg,
+                             KERNEL_unordered_reg,
+                             KERNEL_ordered_reg,
+                             BANDWIDTH_reg,
+                             num_obs_train,
+                             1,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             num_reg_continuous,
+                             0, // we leave one out via the weight matrix
+                             1, // kernel_pow = 1
+                             0, // bandwidth_divide = FALSE when not adaptive
+                             0, // do_smooth_coef_weights = FALSE (not implemented)
+                             1, // symmetric
+                             0, // gather-scatter sum
+                             0, // do not drop train
+                             0, // do not drop train
+                             operator, // no convolution
+                             PXU, // TRAIN
+                             PXO, 
+                             PXC,
+                             TUNO, // EVAL
+                             TORD,
+                             TCON,
+                             XTKX,
+                             XTKX,
+                             NULL,
+                             vsf,
+                             num_categories,
+                             NULL,
+                             kwm+j*nrcc22,  // weighted sum
+                             NULL); // do not return kernel weights
+
+      num_var_continuous_extern = 0; // set back to number of regressors
+      num_var_ordered_extern = 0; // always zero
+
+#endif
+      
+      while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
+        for(int ii = 0; ii < (nrc1); ii++)
+          KWM[ii][ii] += epsilon;
+        nepsilon += epsilon;
+      }
+      
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+
+      DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+      mean[j] = DELTA[0][0];
+
+      const double sk = copysign(DBL_MIN, (kwm+j*nrcc22)[nrc2+1]) + (kwm+j*nrcc22)[nrc2+1];
+
+      mean_stderr[j] = (kwm+j*nrcc22)[0]/sk - mean[j]*mean[j];
+      mean_stderr[j] = sqrt(mean_stderr[j] * K_INT_KERNEL_P / sk);
+    }
+    
+    for(int ii = 0; ii < (nrc1); ii++){
+      KWM[ii] = PKWM[ii];
+      XTKY[ii] = PXTKY[ii];
+    }
+
+    for(int ii = 0; ii < (nrc2); ii++)
+      XTKX[ii] = PXTKX[ii];
+
+    if(sf_flag){
+      int_LARGE_SF = 0;
+      free(vsf);
+    }
+
+    
+    mat_free(XTKX);
+    mat_free(XTKXINV);
+    mat_free(XTKY);
+    mat_free(DELTA);
+    mat_free(KWM);
+
+    mat_free(TCON);
+    mat_free(TUNO);
+    mat_free(TORD);
+
+    free(kwm);
+    free(sgn);
+  }
+
+  free(operator);
+  free(lambda);
+  free_mat(matrix_bandwidth,num_reg_continuous);
+  free_mat(matrix_bandwidth_deriv,num_reg_continuous);
+
+	if(vector_Y_eval != NULL)
+	{
+		*R_squared = fGoodness_of_Fit(num_obs_eval, vector_Y_eval, mean);
+		*MSE = fMSE(num_obs_eval, vector_Y_eval, mean);
+		*MAE = fMAE(num_obs_eval, vector_Y_eval, mean);
+		*MAPE = fMAPE(num_obs_eval, vector_Y_eval, mean);
+		*CORR = fCORR(num_obs_eval, vector_Y_eval, mean);
+		*SIGN = fSIGN(num_obs_eval, vector_Y_eval, mean);
+	}
+	else
+	{
+		*R_squared = 0.0;
+		*MSE = 0.0;
+		*MAE = 0.0;
+		*MAPE = 0.0;
+		*CORR = 0.0;
+		*SIGN = 0.0;
+	}
+
+  return(0);
 }
