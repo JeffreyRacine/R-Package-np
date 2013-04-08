@@ -1351,6 +1351,7 @@ const int gather_scatter,
 const int drop_one_train,
 const int drop_which_train,
 int * operator,
+int permutation_operator,
 double * const * const matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
@@ -2178,6 +2179,7 @@ int *num_categories){
                            0, // do not drop train
                            0, // do not drop train
                            operator, // all regressors use the normal kernels (not cdf or derivative ones) 
+                           OP_NOOP, // no permutations
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2234,6 +2236,7 @@ int *num_categories){
                            0, // do not drop train
                            0, // do not drop train
                            operator, // no special operators being used
+                           OP_NOOP, // no permutations
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2399,6 +2402,7 @@ int *num_categories){
                                    1, // drop train
                                    j+my_rank, // drop this training datum
                                    operator, // no convolution
+                                   OP_NOOP, // no permutations
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -2475,6 +2479,7 @@ int *num_categories){
                                    0, // do not drop train
                                    0, // do not drop train
                                    operator, // no convolution
+                                   OP_NOOP, // no permutations
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -2557,6 +2562,7 @@ int *num_categories){
                                1, // do not drop train
                                j, // do not drop train
                                operator, // no convolution
+                               OP_NOOP, // no permutations
                                PXU, // TRAIN
                                PXO, 
                                PXC,
@@ -2626,6 +2632,7 @@ int *num_categories){
                                  0, // do not drop train
                                  0, // do not drop train
                                  operator, // no convolution
+                                 OP_NOOP, // no permutations
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -2819,6 +2826,7 @@ double * cv){
                            0,
                            0,
                            operator,
+                           OP_NOOP, // no permutations
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -2880,6 +2888,7 @@ double * cv){
                              1,
                              i,
                              operator,
+                             OP_NOOP, // no permutations
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
@@ -3049,6 +3058,7 @@ double *cv){
                            0,
                            0,
                            y_operator,
+                           OP_NOOP, // no permutations
                            matrix_Y_unordered_train,
                            matrix_Y_ordered_train,
                            matrix_Y_continuous_train,
@@ -3082,6 +3092,7 @@ double *cv){
                            0,
                            0,
                            x_operator,
+                           OP_NOOP, // no permutations
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3314,6 +3325,7 @@ double *SIGN){
                            0, // do not drop train
                            0, // do not drop train
                            operator, // no special operators being used
+                           OP_NOOP, // no permutations
                            matrix_X_unordered_train, // TRAIN
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3471,6 +3483,7 @@ double *SIGN){
                                  0, // do not drop train
                                  0, // do not drop train
                                  operator, // no convolution
+                                 OP_NOOP, // no permutations
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -3532,6 +3545,7 @@ double *SIGN){
                              0, // do not drop train
                              0, // do not drop train
                              operator, // no convolution
+                             OP_NOOP, // no permutations
                              PXU, // TRAIN
                              PXO, 
                              PXC,

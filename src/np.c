@@ -3370,6 +3370,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          0, // do not drop train
                          0, // do not drop train
                          operator,
+                         OP_NOOP, // no permutations
                          matrix_X_unordered_train_extern,
                          matrix_X_ordered_train_extern,
                          matrix_X_continuous_train_extern,
