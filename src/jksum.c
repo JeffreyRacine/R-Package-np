@@ -3191,6 +3191,12 @@ double *SIGN){
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l, sf_flag = 0, tsf;
 
+	double INT_KERNEL_P;					 /* Integral of K(z)^2 */
+	double K_INT_KERNEL_P;				 /*  K^p */
+	/* Integral of K(z-0.5)*K(z+0.5) */
+	double INT_KERNEL_PM_HALF = 0.0;
+	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
+
   double * lambda = NULL, * vsf = NULL;
   double ** matrix_bandwidth = NULL;
   double ** matrix_bandwidth_deriv = NULL;
@@ -3249,27 +3255,46 @@ double *SIGN){
     error("\n** Error: invalid bandwidth.");
   }
 
+  if(num_reg_continuous != 0) {
+    initialize_kernel_regression_asymptotic_constants(KERNEL_reg,
+                                                      num_reg_continuous,
+                                                      &INT_KERNEL_P,
+                                                      &K_INT_KERNEL_P,
+                                                      &INT_KERNEL_PM_HALF,
+                                                      &DIFF_KER_PPM);
+  } else {
+    INT_KERNEL_P = 1.0;
+    K_INT_KERNEL_P = 1.0;
+  }
+
   // Conduct the estimation 
 
   if(int_ll == LL_LC) { // local constant
     // Nadaraya-Watson
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
-    double * lc_Y[2];
-    double * meany = (double *)realloc(mean, 2*num_obs_eval_alloc*sizeof(double));
+#define NCOL_Y 3
+
+    double * lc_Y[NCOL_Y] = {NULL,NULL,NULL};
+    double * meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
     
     if(meany == NULL)
       error("\n** Error: memory reallocation failed.");
-    else
-      mean = meany;
 
-    num_var_continuous_extern = 2; // columns in the y_mat
+    num_var_continuous_extern = NCOL_Y; // columns in the y_mat
     num_var_ordered_extern = 0; // columns in weights
     lc_Y[0] = vector_Y;
       
     lc_Y[1] = (double *)malloc(num_obs_train*sizeof(double));
-    for(int ii = 0; ii < num_obs_train; ii++)
+    lc_Y[2] = (double *)malloc(num_obs_train*sizeof(double));
+
+    if((lc_Y[1] == NULL) || (lc_Y[2] == NULL))
+      error("\n** Error: memory allocation failed.");
+
+    for(int ii = 0; ii < num_obs_train; ii++){
       lc_Y[1][ii] = 1.0;
+      lc_Y[2][ii] = vector_Y[ii]*vector_Y[ii];
+    }
 
     kernel_weighted_sum_np(KERNEL_reg,
                            KERNEL_unordered_reg,
@@ -3307,19 +3332,18 @@ double *SIGN){
     num_var_continuous_extern = 0;
 
     for(int ii = 0; ii < num_obs_eval; ii++){
-      const int ii2 = 2*ii;
-      const double sk = copysign(DBL_MIN, meany[ii2+1]) + meany[ii2+1];
-      mean[ii] = mean[ii2]/sk;
+      const int ii3 = NCOL_Y*ii;
+      const double sk = copysign(DBL_MIN, meany[ii3+1]) + meany[ii3+1];
+      mean[ii] = meany[ii3]/sk;
+
+      mean_stderr[ii] = meany[ii3+2]/sk - mean[ii]*mean[ii];
+      mean_stderr[ii] = sqrt(mean_stderr[ii] * K_INT_KERNEL_P / sk);
     }
 
-    meany = (double *)realloc(mean, num_obs_eval_alloc*sizeof(double));
-    
-    if(meany == NULL)
-      error("\n** Error: memory reallocation failed.");
-    else
-      mean = meany;
-
+    free(meany);
     free(lc_Y[1]);
+    free(lc_Y[2]);
+#undef NCOL_Y
   } else { // Local Linear 
 
     // because we manipulate the training data scale factors can be wrong
@@ -3366,7 +3390,7 @@ double *SIGN){
 
     double * kwm = (double *)malloc(nrcc22*num_obs_eval_alloc*sizeof(double));
 
-    for(int ii = 0; ii < nrcc22*num_obs_train_alloc; ii++)
+    for(int ii = 0; ii < nrcc22*num_obs_eval_alloc; ii++)
       kwm[ii] = 0.0;
 
     double * sgn = (double *)malloc((nrc2)*sizeof(double));
@@ -3538,6 +3562,11 @@ double *SIGN){
 
       DELTA = mat_mul(XTKXINV, XTKY, DELTA);
       mean[j] = DELTA[0][0];
+
+      const double sk = copysign(DBL_MIN, (kwm+j*nrcc22)[nrc2+1]) + (kwm+j*nrcc22)[nrc2+1];
+
+      mean_stderr[j] = (kwm+j*nrcc22)[0]/sk - mean[j]*mean[j];
+      mean_stderr[j] = sqrt(mean_stderr[j] * K_INT_KERNEL_P / sk);
     }
     
     for(int ii = 0; ii < (nrc1); ii++){
@@ -3571,6 +3600,7 @@ double *SIGN){
   free(operator);
   free(lambda);
   free_mat(matrix_bandwidth,num_reg_continuous);
+  free_mat(matrix_bandwidth_deriv,num_reg_continuous);
 
 	if(vector_Y_eval != NULL)
 	{
@@ -3590,9 +3620,6 @@ double *SIGN){
 		*CORR = 0.0;
 		*SIGN = 0.0;
 	}
-
-  // to be fixed
-  *mean_stderr = 0.0;
 
   return(0);
 }

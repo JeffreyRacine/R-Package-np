@@ -49,12 +49,13 @@ nptgauss <- function(b){
   k <- integrate(f = function(z) { tgauss(z)^2 }, -b, b)$value
   k2 <- integrate(f = function(z) { z^2*tgauss(z) }, -b, b)$value
   k22 <- integrate(f = function(z) { (z*tgauss(z))^2 }, -b, b)$value
+  km <- integrate(f = function(z) { tgauss(z-0.5)*tgauss(z+0.5) }, -b+0.5, b-0.5)$value
 
   a0 <- (0.5 + 2*b*c0)/integrate(f = function(z){ erf(z/2 + b)*exp(-0.25*z^2) }, -2*b, 0)$value
   a2 <- (c0 + k - a0*erf(b))/erf(b/sqrt(2))
   a1 <- -(a2*erf(b/sqrt(2)) + c0)/(2*b)
 
-  .C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22)), PACKAGE = "np")
+  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "np"))
 }
 
 numNotIn <- function(x){
