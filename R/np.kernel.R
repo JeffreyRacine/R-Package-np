@@ -48,7 +48,7 @@ npksum.numeric <-
            exdat,
            weights,
            leave.one.out, kernel.pow, bandwidth.divide,
-           operator, smooth.coefficient, return.kernel.weights,
+           operator, permutation.operator, smooth.coefficient, return.kernel.weights,
            ...){
 
     txdat <- toFrame(txdat)
@@ -61,7 +61,7 @@ npksum.numeric <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("tydat", "exdat", "weights", "leave.one.out", "kernel.pow", "bandwidth.divide",
-               "operator", "smooth.coefficient", "return.kernel.weights")
+               "operator", "permutation.operator", "smooth.coefficient", "return.kernel.weights")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
@@ -81,7 +81,8 @@ npksum.default <-
            leave.one.out = FALSE,
            kernel.pow = 1.0,
            bandwidth.divide = FALSE,
-           operator = c("normal","convolution","derivative","integral"),
+           operator = names(ALL_OPERATORS),
+           permutation.operator = names(PERMUTATION_OPERATORS),
            smooth.coefficient = FALSE,
            return.kernel.weights = FALSE,
            ...){
@@ -96,6 +97,8 @@ npksum.default <-
       operator <- match.arg(operator)
     else
       operator <- match.arg(operator, several.ok = TRUE)
+
+    permutation.operator <- match.arg(permutation.operator)
     
     txdat = toFrame(txdat)
 
@@ -124,6 +127,7 @@ npksum.default <-
       stop("unordered and ordered variables may only make use of 'normal', 'convolution' and 'integral' operator types")
     
     operator.num <- ALL_OPERATORS[operator]
+    poperator.num <- PERMUTATION_OPERATORS[permutation.operator]
     
     ccon = unlist(lapply(txdat[,bws$icon,drop=FALSE],class))
     if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
@@ -191,6 +195,10 @@ npksum.default <-
     
     length.out = prod(dim.out[which(dim.out > 0)])
 
+    if(permutation.operator != "none")
+      p.length.out <- bws$ncon*length.out
+    else
+      p.length.out <- 0
     
     ##dim.out = dim.out[dim.out > 1]
 
@@ -266,7 +274,8 @@ npksum.default <-
       wncol = dim.in[1],
       yncol = dim.in[2],
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
-      return.kernel.weights = return.kernel.weights)
+      return.kernel.weights = return.kernel.weights,
+      permutation.operator = poperator.num)
     
 
 
@@ -280,6 +289,7 @@ npksum.default <-
          as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
          as.integer(myopti), as.double(kernel.pow),
          ksum = double(length.out),
+         p.ksum = double(p.length.out),
          kernel.weights = double(nkw),
          PACKAGE="np" )[return.names]
 

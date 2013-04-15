@@ -627,15 +627,12 @@ double np_econvol_rect(const double z){
 }
 
 double np_econvol_tgauss2(const double z){
-  if(fabs(z) >= 2*np_tgauss2_b)
+  const double az = fabs(z);
+  if(az >= 2*np_tgauss2_b)
     return 0.0;
   else {
-    if(z < 0)
-      return(np_tgauss2_a0*erfun(0.5*z + np_tgauss2_b)*exp(-0.25*z*z) + np_tgauss2_a1*z + 
-             np_tgauss2_a2*erfun(0.7071067810*(z + np_tgauss2_b)) - np_tgauss2_c0);
-    else
-      return(-np_tgauss2_a0*erfun(0.5*z - np_tgauss2_b)*exp(-0.25*z*z) - np_tgauss2_a1*z -
-             np_tgauss2_a2*erfun(0.7071067810*(z - np_tgauss2_b)) - np_tgauss2_c0);
+    return(-np_tgauss2_a0*erfun(0.5*az - np_tgauss2_b)*exp(-0.25*az*az) - np_tgauss2_a1*az -
+           np_tgauss2_a2*erfun(0.7071067810*(az - np_tgauss2_b)) - np_tgauss2_c0);
 
   }
 }
@@ -818,8 +815,8 @@ double np_cdf_rect(const double z){
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
-                                  np_epan2, np_epan4, np_epan6, np_epan8, 
-                                  np_rect };
+                                     np_epan2, np_epan4, np_epan6, np_epan8, 
+                                     np_rect, np_tgauss2 };
 double (* const allok[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine };
 double (* const alluk[])(int, double, int) = { np_uaa, np_uli_racine };
 
@@ -1364,7 +1361,8 @@ double * sgn,
 double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
-double *weighted_sum,
+double * weighted_sum,
+double * weighted_permutation_sum,
 double * kw){
   
   /* This function takes a vector Y and returns a kernel weighted
@@ -1427,7 +1425,7 @@ double * kw){
     (MAX(num_var_continuous_extern, 1) * MAX(num_var_ordered_extern, 1));
 
   double *lambda, **matrix_bandwidth, **matrix_eval_bandwidth = NULL, *m = NULL;
-  double *tprod, dband, *ws;
+  double *tprod, dband, *ws, ** tprod_mp = NULL;
 
   double * const * const xtc = (BANDWIDTH_reg == BW_ADAP_NN)?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -1466,6 +1464,12 @@ double * kw){
   /* Conduct the estimation */
 
   /* Generate bandwidth vector given scale factors, nearest neighbors, or lambda */
+
+  if(permutation_operator != OP_NOOP){
+    tprod_mp = alloc_tmatd( (BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train, (num_reg_unordered + num_reg_ordered + num_reg_continuous) );
+
+  }
+
 
   if(kernel_bandwidth_mean(
                            KERNEL_reg,
@@ -1714,6 +1718,10 @@ double * kw){
     free_tmat(matrix_eval_bandwidth);
 
   free(tprod);
+
+  if(permutation_operator != OP_NOOP)
+    free_tmat(tprod_mp);
+
   
   return(0);
 }
@@ -2193,6 +2201,7 @@ int *num_categories){
                            num_categories,
                            NULL,
                            aicc,
+                           NULL, // no permutations
                            NULL); // do not return kernel weights
     int_LARGE_SF = tsf;
     num_var_continuous_extern = 0; 
@@ -2250,6 +2259,7 @@ int *num_categories){
                            num_categories,
                            NULL,
                            mean,
+                           NULL, // no permutations
                            NULL); // do not return kernel weights
 
     num_var_continuous_extern = 0;
@@ -2416,6 +2426,7 @@ int *num_categories){
                                    num_categories,
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
+                                   NULL, // no permutations
                                    NULL); // do not return kernel weights
 
             num_var_continuous_extern = 0; // set back to number of regressors
@@ -2493,6 +2504,7 @@ int *num_categories){
                                    num_categories,
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
+                                   NULL, // no permutations
                                    NULL); // do not return kernel weights
 
             num_var_continuous_extern = 0; // set back to number of regressors
@@ -2576,6 +2588,7 @@ int *num_categories){
                                num_categories,
                                NULL,
                                kwm+j*nrcc22,  // weighted sum
+                               NULL, // no permutations
                                NULL); // do not return kernel weights
 
         num_var_continuous_extern = 0; // set back to number of regressors
@@ -2646,6 +2659,7 @@ int *num_categories){
                                  num_categories,
                                  NULL,
                                  kwm+j*nrcc22, // weighted sum
+                                 NULL, // no permutations
                                  NULL);  // no kernel weights
 
           num_var_continuous_extern = 0; // set back to number of regressors
@@ -2840,6 +2854,7 @@ double * cv){
                            num_categories,
                            matrix_categorical_vals,
                            mean,
+                           NULL, // no permutations
                            kw);
 
     for(i = is; i <= ie; i++){
@@ -2902,6 +2917,7 @@ double * cv){
                              num_categories,
                              matrix_categorical_vals,
                              mean,
+                             NULL, // no permutations
                              NULL);
       for(j = 0; j < num_obs_eval; j++){
         indy = 1;
@@ -3072,6 +3088,7 @@ double *cv){
                            num_categories,
                            NULL,
                            mean,
+                           NULL, // no permutations
                            kwy);
 
     kernel_weighted_sum_np(KERNEL_reg,
@@ -3106,6 +3123,7 @@ double *cv){
                            num_categories + (num_var_unordered + num_var_ordered),
                            NULL,
                            mean,
+                           NULL, // no permutations
                            kwx);
 
     for(i = is; i <= ie; i++){     
@@ -3339,6 +3357,7 @@ double *SIGN){
                            num_categories,
                            NULL, // no convolution 
                            meany,
+                           NULL, // no permutations
                            NULL); // do not return kernel weights
 
     num_var_continuous_extern = 0;
@@ -3497,6 +3516,7 @@ double *SIGN){
                                  num_categories,
                                  NULL,
                                  kwm+(j+my_rank)*nrcc22,  // weighted sum
+                                 NULL, // no permutations
                                  NULL); // do not return kernel weights
 
           num_var_continuous_extern = 0; // set back to number of regressors
@@ -3559,6 +3579,7 @@ double *SIGN){
                              num_categories,
                              NULL,
                              kwm+j*nrcc22,  // weighted sum
+                             NULL, // no permutations
                              NULL); // do not return kernel weights
 
       num_var_continuous_extern = 0; // set back to number of regressors

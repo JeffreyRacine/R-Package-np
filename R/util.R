@@ -55,6 +55,8 @@ nptgauss <- function(b){
   a2 <- (c0 + k - a0*erf(b))/erf(b/sqrt(2))
   a1 <- -(a2*erf(b/sqrt(2)) + c0)/(2*b)
 
+  int.kernels[CKER_TGAUSS + 1] <- k
+  
   invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "np"))
 }
 
@@ -774,6 +776,7 @@ CBWM_CCDF = 3 # Added 7/2/2010 jracine
 CDBWM_CVLS = 0
 
 ##integral operators on kernels
+OP_NOOP        = -1
 OP_NORMAL      = 0
 OP_CONVOLUTION = 1
 OP_DERIVATIVE  = 2
@@ -782,7 +785,10 @@ OP_INTEGRAL    = 3
 ALL_OPERATORS = c(OP_NORMAL, OP_CONVOLUTION, OP_DERIVATIVE, OP_INTEGRAL)
 names(ALL_OPERATORS) <- c("normal","convolution", "derivative", "integral")
 
+PERMUTATION_OPERATORS <- c(OP_NOOP, OP_NORMAL, OP_DERIVATIVE, OP_INTEGRAL)
+names(PERMUTATION_OPERATORS) <- c("none", "normal", "derivative", "integral")
+
 ## useful numerical constants of kernel integrals
 int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.62396943688265038571, 0.74785078617543927990,
                  0.26832815729997476357, 0.55901699437494742410, 0.84658823667359826246, 1.1329342579014329689,
-                 0.5)
+                 0.5, 2.90113075268188e-01)
