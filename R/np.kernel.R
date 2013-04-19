@@ -94,11 +94,11 @@ npksum.default <-
     uo.operators <- c("normal","convolution","integral")
 
     if(missing(operator))
-      operator <- match.arg(operator)
+      operator <- match.arg(operator, choices = names(ALL_OPERATORS))
     else
-      operator <- match.arg(operator, several.ok = TRUE)
+      operator <- match.arg(operator, choices = names(ALL_OPERATORS), several.ok = TRUE)
 
-    permutation.operator <- match.arg(permutation.operator)
+    permutation.operator <- match.arg(permutation.operator, choices = names(PERMUTATION_OPERATORS) )
     
     txdat = toFrame(txdat)
 
@@ -195,10 +195,13 @@ npksum.default <-
     
     length.out = prod(dim.out[which(dim.out > 0)])
 
-    if(permutation.operator != "none")
+    if(permutation.operator != "none"){
       p.length.out <- bws$ncon*length.out
+      p.dim.out <- c(dim.out, max(bws$ncon, 0))
+    }
     else
       p.length.out <- 0
+
     
     ##dim.out = dim.out[dim.out > 1]
 
@@ -308,11 +311,17 @@ npksum.default <-
     } else {
       kw <- NULL
     }
-    
+
+    if((permutation.operator != "none") && (p.length.out > 0)) {
+      p.myout <- array(data = myout[["p.ksum"]], dim = p.dim.out[which(p.dim.out > 0)])
+    } else {
+      p.myout <- NULL
+    }
     return( npkernelsum(bws = bws,
                         eval = teval,
                         ksum = myout[["ksum"]],
                         kw = kw,
+                        p.ksum = p.myout,
                         ntrain = tnrow, trainiseval = miss.ex) )
 
   }

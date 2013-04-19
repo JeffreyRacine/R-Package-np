@@ -854,6 +854,107 @@ double cksup[OP_NCFUN][2] = { {-DBL_MAX, DBL_MAX}, {-DBL_MAX, DBL_MAX}, {-DBL_MA
 /* xt = training data */
 /* xw = x weights */
 
+void np_p_ckernelv(const int KERNEL, 
+                   const int P_KERNEL,
+                   const int P_IDX,
+                   const int P_NIDX,
+                   const double * const xt, const int num_xt, 
+                   const int do_xw,
+                   const double x, const double h, 
+                   double * const result,
+                   double * const p_result,
+                   const NL * const nl,
+                   const NL * const p_nl,
+                   const int swap_xxt){
+
+  /* 
+     this should be read as:
+     an array of constant pointers to functions that take a double
+     and return a double
+  */
+
+  int i,j,r,l; 
+  const int bin_do_xw = do_xw > 0;
+  double unit_weight = 1.0;
+  const double sgn = swap_xxt ? -1.0 : 1.0;
+  double * const xw = (bin_do_xw ? result : &unit_weight);
+
+  double * const pxw = (bin_do_xw ? p_result : xw);
+
+  double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, //ordinary kernels
+                                   np_epan2, np_epan4, np_epan6, np_epan8, 
+                                   np_rect, np_tgauss2, 
+                                   np_econvol_gauss2, np_econvol_gauss4, np_econvol_gauss6, np_econvol_gauss8, // convolution kernels
+                                   np_econvol_epan2, np_econvol_epan4, np_econvol_epan6, np_econvol_epan8,
+                                   np_econvol_rect, np_econvol_tgauss2,
+                                   np_deriv_gauss2, np_deriv_gauss4, np_deriv_gauss6, np_deriv_gauss8, // derivative kernels
+                                   np_deriv_epan2, np_deriv_epan4, np_deriv_epan6, np_deriv_epan8, 
+                                   np_deriv_rect, np_deriv_tgauss2,
+                                   np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8, // cdfative kernels
+                                   np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8, 
+                                   np_cdf_rect, np_cdf_tgauss2 };
+
+  double * kbuf = NULL;
+
+  kbuf = (double *)malloc(num_xt*sizeof(double));
+
+  assert(kbuf != NULL);
+
+  if(nl == NULL){
+    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+      const double kn = k[KERNEL]((x-xt[i])*sgn/h);
+
+      result[i] = xw[j]*kn;
+      kbuf[i] = kn;
+
+      p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h);
+
+    }
+
+    for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
+      if(l == P_IDX) continue;
+      for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+        p_result[l*num_xt + i] = pxw[r*num_xt + j]*kbuf[i];
+      }
+    }
+
+  }
+  else{
+    for (int m = 0; m < nl->n; m++){
+      const int istart = kdt_extern->kdn[nl->node[m]].istart;
+      const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+        const double kn = k[KERNEL]((x-xt[i])*sgn/h);
+
+        result[i] = xw[j]*kn;
+        kbuf[i] = kn;
+      }
+    }
+
+    for (int m = 0; m < p_nl->n; m++){
+      const int istart = kdt_extern->kdn[p_nl->node[m]].istart;
+      const int nlev = kdt_extern->kdn[p_nl->node[m]].nlev;
+      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h);
+      }
+    }
+
+
+    for(l = 0, r = 0; l < P_NIDX; l++, r+=bin_do_xw){
+      if(l == P_IDX) continue;
+      for (int m = 0; m < nl->n; m++){
+        const int istart = kdt_extern->kdn[nl->node[m]].istart;
+        const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
+        for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+          p_result[l*num_xt + i] = pxw[r*num_xt + j]*kbuf[i];
+        }
+      }
+    }
+  }
+
+  free(kbuf);
+}
+
 void np_ckernelv(const int KERNEL, 
                  const double * const xt, const int num_xt, 
                  const int do_xw,
@@ -1376,8 +1477,9 @@ double * kw){
   /* Declarations */
 
   int i,j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
-  int do_psum, swap_xxt; 
+  int do_psum, swap_xxt;
 
+  int permutation_kernel = -1;
 
   /* Trees are currently not compatible with all operations */
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED);
@@ -1393,12 +1495,24 @@ double * kw){
   NL nl = {.node = NULL, .n = 0, .nalloc = 0};
   NL * pnl=  np_ks_tree_use ? &nl : NULL;
 
+  NL * p_pnl =  NULL;
+
+  if((np_ks_tree_use) && (permutation_operator != OP_NOOP)){
+    p_pnl = (NL *)malloc(num_reg_continuous*sizeof(NL));
+  }
+
 #ifdef MPI2
   // switch parallelisation strategies based on biggest stride
  
   int stride = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   num_obs_eval_alloc = stride*iNum_Processors;
 
+  int * igatherv = NULL, * idisplsv = NULL;
+
+  igatherv = (int *)malloc(iNum_Processors*sizeof(int));
+  assert(igatherv != NULL);
+  idisplsv = (int *)malloc(iNum_Processors*sizeof(int));
+  assert(idisplsv != NULL);
 #else
   num_obs_eval_alloc = num_obs_eval;
 #endif
@@ -1425,7 +1539,7 @@ double * kw){
     (MAX(num_var_continuous_extern, 1) * MAX(num_var_ordered_extern, 1));
 
   double *lambda, **matrix_bandwidth, **matrix_eval_bandwidth = NULL, *m = NULL;
-  double *tprod, dband, *ws, ** tprod_mp = NULL;
+  double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL;
 
   double * const * const xtc = (BANDWIDTH_reg == BW_ADAP_NN)?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -1466,8 +1580,10 @@ double * kw){
   /* Generate bandwidth vector given scale factors, nearest neighbors, or lambda */
 
   if(permutation_operator != OP_NOOP){
-    tprod_mp = alloc_tmatd( (BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train, (num_reg_unordered + num_reg_ordered + num_reg_continuous) );
+    permutation_kernel = KERNEL_reg + OP_CFUN_OFFSETS[permutation_operator];
+    tprod_mp = (double *)malloc(((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train)*num_reg_continuous*sizeof(double));
 
+    assert(tprod_mp != NULL);
   }
 
 
@@ -1554,21 +1670,41 @@ double * kw){
       weighted_sum[i] = 0.0;
     }
 
+  if((!gather_scatter) && (permutation_operator != OP_NOOP))
+    for(i = 0; i < num_obs_eval_alloc*sum_element_length*num_reg_continuous; i++){
+      weighted_permutation_sum[i] = 0.0;
+    }
+
   if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
 #ifdef MPI2
     if(!gather_scatter){
       js = stride * my_rank;
       je = MIN(num_obs_eval - 1, js + stride - 1);
       ws = weighted_sum + js*sum_element_length;
+      p_ws = weighted_permutation_sum +js*sum_element_length;
+
+      for(i = 0, int ii = 0; ii < iNum_Processors; ii++){
+        i += (js-je+1)*sum_element_length;
+        igatherv[ii] = (js-je+1)*sum_element_length;
+        idisplsv[ii] = i;
+      }
+
     } else {
       js = 0;
       je = num_obs_eval - 1;
       ws = weighted_sum;
+      p_ws = weighted_permutation_sum;
+
+      for(int ii = 0; ii < iNum_Processors; ii++){
+        igatherv[ii] = -1;
+        idisplsv[ii] = -1;
+      }
     }
 #else
     js = 0;
     je = num_obs_eval - 1;
     ws = weighted_sum;
+    p_ws = weighted_permutation_sum;
 #endif
     
 
@@ -1578,15 +1714,30 @@ double * kw){
       js = stride * my_rank;
       je = MIN(num_obs_train - 1, js + stride - 1);
       ws = weighted_sum;
+      p_ws = weighted_permutation_sum;
+
+      for(int ii = 0; ii < iNum_Processors; ii++){
+        igatherv[ii] = -1;
+        idisplsv[ii] = -1;
+      }
+
     } else {
       js = 0;
       je = num_obs_train - 1;
       ws = weighted_sum;
+      p_ws = weighted_permutation_sum;
+
+      for(int ii = 0; ii < iNum_Processors; ii++){
+        igatherv[ii] = -1;
+        idisplsv[ii] = -1;
+      }
+
     }
 #else
     js = 0;
     je = num_obs_train - 1;
     ws = weighted_sum;
+    p_ws = weighted_permutation_sum;
 #endif
   }
 
@@ -1594,7 +1745,7 @@ double * kw){
   if(drop_one_train) lod = drop_which_train;
 
     /* do sums */
-  for(j=js; j <= je; j++, ws += ws_step){
+  for(j=js; j <= je; j++, ws += ws_step, p_ws += ws_step){
     R_CheckUserInterrupt();
 
     dband = 1.0;
@@ -1630,14 +1781,43 @@ double * kw){
       }
 
       boxSearch(kdt_extern, 0, bb, pnl);
+
+      if(permutation_operator == OP_INTEGRAL){
+        for(int ii = 0; ii < num_reg_continuous; ii++){
+          // reset the interaction node list
+          p_pnl[ii].n = 0;
+          double bb[kdt_extern->ndim*2];
+
+          for(i = 0; i < num_reg_continuous; i++){
+            const int knp = (i == ii) ? permutation_kernel : KERNEL_reg_np[i];
+            bb[2*i] = -cksup[knp][1];
+            bb[2*i+1] = -cksup[knp][0];
+
+            bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + m[i]*bb[2*i]);
+            bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + m[i]*bb[2*i+1]);
+          }
+
+          boxSearch(kdt_extern, 0, bb, p_pnl + ii);
+        }
+      } else if(permutation_operator != OP_NOOP) {
+        for(int ii = 0; ii < num_reg_continuous; ii++){
+          p_pnl[ii] = pnl[0];
+        }
+      } 
+
     }
     /* continuous first */
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
     for(i=0; i < num_reg_continuous; i++, l++, m += mstep){
-      if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION))
-        np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl, swap_xxt);
+      if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
+        if(permutation_operator == OP_NOOP){
+          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl, swap_xxt);
+        } else {
+          np_p_ckernelv(KERNEL_reg_np[i], permutation_kernel, i, num_reg_continuous, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pnl, p_pnl+i, swap_xxt);
+        }
+      }
       else
         np_convol_ckernelv(KERNEL_reg, xtc[i], num_xt, l, xc[i][j], 
                            matrix_eval_bandwidth[i], *m, tprod, swap_xxt);
@@ -1679,6 +1859,21 @@ double * kw){
                               gather_scatter,
                               bandwidth_divide, dband,
                               ws, pnl);
+
+        if(permutation_operator != OP_NOOP){
+          for(int ii = 0; ii < num_reg_continuous; ii++){
+            np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
+                                  matrix_Y, num_var_continuous_extern,
+                                  tprod_mp+ii*num_xt, num_xt,
+                                  leave_or_drop, lod,
+                                  kernel_pow,
+                                  do_psum,
+                                  symmetric,
+                                  gather_scatter,
+                                  bandwidth_divide, dband,
+                                  p_ws + ii*num_obs_eval*sum_element_length, p_pnl+ii);
+          }
+        }
     }
 
     if(kw != NULL){ 
@@ -1700,10 +1895,25 @@ double * kw){
     }
 
     if(kw != NULL){
-      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw, stride * num_xt, MPI_DOUBLE, comm[1]);    
+      MPI_Allgather(MPI_IN_PLACE, stride * num_xt, MPI_DOUBLE, kw, stride * num_xt, MPI_DOUBLE, comm[1]);          
+    }
+
+    if(permutation_operator != OP_NOOP){
+      if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
+        for(int ii = 0; ii < num_reg_continuous; ii++){
+          MPI_Allgatherv(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE, weighted_permutation_sum, igatherv, idisplsv, MPI_DOUBLE, comm[1]);
+        }
+      } else if(BANDWIDTH_reg == BW_ADAP_NN){
+        MPI_Allreduce(MPI_IN_PLACE, weighted_permutation_sum, num_reg_continuous*num_obs_eval*sum_element_length, MPI_DOUBLE, MPI_SUM, comm[1]);
+      }
     }
 #endif
   }
+
+#ifdef MPI2
+  free(igatherv);
+  free(idisplsv);
+#endif
 
   if(nl.node != NULL)
     free(nl.node);
@@ -1719,9 +1929,12 @@ double * kw){
 
   free(tprod);
 
-  if(permutation_operator != OP_NOOP)
-    free_tmat(tprod_mp);
+  if(permutation_operator != OP_NOOP){
+    free(tprod_mp);
 
+    if(np_ks_tree_use)
+      free(p_pnl);
+  }
   
   return(0);
 }
