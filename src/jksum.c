@@ -1871,7 +1871,7 @@ double * kw){
                                   symmetric,
                                   gather_scatter,
                                   bandwidth_divide, dband,
-                                  p_ws + ii*num_obs_eval*sum_element_length, p_pnl+ii);
+                                  p_ws + ii*num_obs_eval*sum_element_length, (p_pnl == NULL) ? NULL : (p_pnl+ii));
           }
         }
     }

@@ -1,5 +1,5 @@
 npkernelsum = 
-  function(bws, eval, ksum, kw,
+  function(bws, eval, ksum, kw, p.ksum,
            ntrain, trainiseval = FALSE){
 
     if (missing(bws) | missing(eval) | missing(ksum) | missing(ntrain))
@@ -21,6 +21,7 @@ npkernelsum =
       eval = eval,
       ksum = ksum,
       kw = kw,
+      p.ksum = p.ksum,
       ntrain = ntrain,
       trainiseval = trainiseval
       )

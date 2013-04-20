@@ -243,7 +243,7 @@ npksum.default <-
 
     nkw <- ifelse(return.kernel.weights, tnrow*enrow, 0)
 
-    return.names <- c("ksum","kernel.weights")
+    return.names <- c("ksum","kernel.weights","p.ksum")
       
     myopti = list(
       num_obs_train = tnrow,
@@ -313,7 +313,10 @@ npksum.default <-
     }
 
     if((permutation.operator != "none") && (p.length.out > 0)) {
-      p.myout <- array(data = myout[["p.ksum"]], dim = p.dim.out[which(p.dim.out > 0)])
+      dim.p <- p.dim.out[which(p.dim.out > 1)]
+      if(length(dim.p) == 0) dim.p <- 1
+      
+      p.myout <- array(data = myout[["p.ksum"]], dim = dim.p)
     } else {
       p.myout <- NULL
     }
