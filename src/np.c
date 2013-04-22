@@ -3177,7 +3177,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, do_smooth_coef_weights, no_weights, sum_element_length, return_kernel_weights;
-  int p_operator;
+  int p_operator, do_score;
 
 
   /* match integer options with their globals */
@@ -3218,6 +3218,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int_TREE = myopti[KWS_DOTREEI];
   return_kernel_weights = myopti[KWS_RKWI];
   p_operator = myopti[KWS_POPI];
+  do_score = myopti[KWS_PSCOREI];
 
   no_y = (num_var_continuous_extern == 0);
   no_weights = (num_var_ordered_extern == 0);
@@ -3406,6 +3407,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          0, // do not drop train
                          operator,
                          p_operator,
+                         do_score,
                          matrix_X_unordered_train_extern,
                          matrix_X_ordered_train_extern,
                          matrix_X_continuous_train_extern,

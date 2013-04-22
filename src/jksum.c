@@ -865,7 +865,8 @@ void np_p_ckernelv(const int KERNEL,
                    double * const p_result,
                    const NL * const nl,
                    const NL * const p_nl,
-                   const int swap_xxt){
+                   const int swap_xxt,
+                   const int do_score){
 
   /* 
      this should be read as:
@@ -907,7 +908,7 @@ void np_p_ckernelv(const int KERNEL,
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
 
-      p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h);
+      p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
 
     }
 
@@ -935,7 +936,7 @@ void np_p_ckernelv(const int KERNEL,
       const int istart = kdt_extern->kdn[p_nl->node[m]].istart;
       const int nlev = kdt_extern->kdn[p_nl->node[m]].nlev;
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h);
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
       }
     }
 
@@ -1448,9 +1449,10 @@ const int symmetric,
 const int gather_scatter,
 const int drop_one_train,
 const int drop_which_train,
-int * operator,
-int permutation_operator,
-double * const * const matrix_X_unordered_train,
+const int * const operator,
+const int permutation_operator,
+const int do_score,
+double **matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
 double **matrix_X_unordered_eval,
@@ -1462,9 +1464,9 @@ double * sgn,
 double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
-double * weighted_sum,
-double * weighted_permutation_sum,
-double * kw){
+double * const restrict weighted_sum,
+double * const restrict weighted_permutation_sum,
+double * const restrict kw){
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -1827,7 +1829,7 @@ double * kw){
         if(permutation_operator == OP_NOOP){
           np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pnl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], permutation_kernel, i, num_reg_continuous, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pnl, p_pnl+i, swap_xxt);
+          np_p_ckernelv(KERNEL_reg_np[i], permutation_kernel, i, num_reg_continuous, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pnl, p_pnl+i, swap_xxt, do_score);
         }
       }
       else
@@ -2424,6 +2426,7 @@ int *num_categories){
                            0, // do not drop train
                            operator, // all regressors use the normal kernels (not cdf or derivative ones) 
                            OP_NOOP, // no permutations
+                           0, // no score
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2482,6 +2485,7 @@ int *num_categories){
                            0, // do not drop train
                            operator, // no special operators being used
                            OP_NOOP, // no permutations
+                           0, // no score
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2649,6 +2653,7 @@ int *num_categories){
                                    j+my_rank, // drop this training datum
                                    operator, // no convolution
                                    OP_NOOP, // no permutations
+                                   0, // no score
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -2727,6 +2732,7 @@ int *num_categories){
                                    0, // do not drop train
                                    operator, // no convolution
                                    OP_NOOP, // no permutations
+                                   0, // no score
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -2811,6 +2817,7 @@ int *num_categories){
                                j, // do not drop train
                                operator, // no convolution
                                OP_NOOP, // no permutations
+                               0, // no score
                                PXU, // TRAIN
                                PXO, 
                                PXC,
@@ -2882,6 +2889,7 @@ int *num_categories){
                                  0, // do not drop train
                                  operator, // no convolution
                                  OP_NOOP, // no permutations
+                                 0, // no score
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -3077,6 +3085,7 @@ double * cv){
                            0,
                            operator,
                            OP_NOOP, // no permutations
+                           0, // no score
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3140,6 +3149,7 @@ double * cv){
                              i,
                              operator,
                              OP_NOOP, // no permutations
+                             0, // no score
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
@@ -3311,6 +3321,7 @@ double *cv){
                            0,
                            y_operator,
                            OP_NOOP, // no permutations
+                           0, // no score
                            matrix_Y_unordered_train,
                            matrix_Y_ordered_train,
                            matrix_Y_continuous_train,
@@ -3346,6 +3357,7 @@ double *cv){
                            0,
                            x_operator,
                            OP_NOOP, // no permutations
+                           0, // no score
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3580,6 +3592,7 @@ double *SIGN){
                            0, // do not drop train
                            operator, // no special operators being used
                            OP_NOOP, // no permutations
+                           0, // no score
                            matrix_X_unordered_train, // TRAIN
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3739,6 +3752,7 @@ double *SIGN){
                                  0, // do not drop train
                                  operator, // no convolution
                                  OP_NOOP, // no permutations
+                                 0, // no score
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -3802,6 +3816,7 @@ double *SIGN){
                              0, // do not drop train
                              operator, // no convolution
                              OP_NOOP, // no permutations
+                             0, // no score
                              PXU, // TRAIN
                              PXO, 
                              PXC,
