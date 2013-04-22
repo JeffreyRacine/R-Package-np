@@ -1492,6 +1492,7 @@ double * kw){
     any_convolution |= (operator[i] == OP_CONVOLUTION);
   }
 
+  int p_ipow = 0;
   NL nl = {.node = NULL, .n = 0, .nalloc = 0};
   NL * pnl=  np_ks_tree_use ? &nl : NULL;
 
@@ -1539,7 +1540,7 @@ double * kw){
     (MAX(num_var_continuous_extern, 1) * MAX(num_var_ordered_extern, 1));
 
   double *lambda, **matrix_bandwidth, **matrix_eval_bandwidth = NULL, *m = NULL;
-  double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL;
+  double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
 
   double * const * const xtc = (BANDWIDTH_reg == BW_ADAP_NN)?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -1584,6 +1585,12 @@ double * kw){
     tprod_mp = (double *)malloc(((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train)*num_reg_continuous*sizeof(double));
 
     assert(tprod_mp != NULL);
+
+    p_dband = (double *)malloc(num_reg_continuous*sizeof(double));
+
+    assert(p_dband != NULL);
+
+    p_ipow = (permutation_operator == OP_DERIVATIVE) ? 1 : ((permutation_operator == OP_INTEGRAL) ? -1 : p_ipow);
   }
 
 
@@ -1750,6 +1757,11 @@ double * kw){
 
     dband = 1.0;
 
+    if(permutation_operator != OP_NOOP) {
+      for (int ii = 0; ii < num_reg_continuous; ii++)
+        p_dband[ii] = 1.0;
+    }
+
     // if we are consistently dropping one obs from training data, and we are doing a parallel sum, then that means
     // we need to skip here
 
@@ -1822,6 +1834,15 @@ double * kw){
         np_convol_ckernelv(KERNEL_reg, xtc[i], num_xt, l, xc[i][j], 
                            matrix_eval_bandwidth[i], *m, tprod, swap_xxt);
       dband *= *m;
+
+      if(permutation_operator != OP_NOOP){
+        for(int ii = 0; ii < num_reg_continuous; ii++){
+          if(i != ii)
+            p_dband[ii] *= *m;
+          else
+            p_dband[ii] *= ipow(*m, 1 + p_ipow);
+        }
+      }
     }
 
     /* unordered second */
@@ -1870,7 +1891,7 @@ double * kw){
                                   do_psum,
                                   symmetric,
                                   gather_scatter,
-                                  bandwidth_divide, dband,
+                                  bandwidth_divide, p_dband[ii],
                                   p_ws + ii*num_obs_eval*sum_element_length, (p_pnl == NULL) ? NULL : (p_pnl+ii));
           }
         }
@@ -1934,6 +1955,8 @@ double * kw){
 
     if(np_ks_tree_use)
       free(p_pnl);
+
+    free(p_dband);
   }
   
   return(0);
