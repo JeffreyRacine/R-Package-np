@@ -1518,7 +1518,7 @@ double * const restrict kw){
     any_convolution |= (operator[i] == OP_CONVOLUTION);
   }
 
-  int p_ipow = 0;
+  int p_ipow = 0, * bpow = NULL;
   NL nl = {.node = NULL, .n = 0, .nalloc = 0};
   NL * pnl=  np_ks_tree_use ? &nl : NULL;
 
@@ -1606,6 +1606,13 @@ double * const restrict kw){
 
   /* Generate bandwidth vector given scale factors, nearest neighbors, or lambda */
 
+  bpow = (int *) malloc(num_reg_continuous*sizeof(int));
+  assert(bpow != NULL);
+
+  for(i = 0; i < num_reg_continuous; i++){
+    bpow[i] = (bandwidth_divide ? 1 : 0) + ((operator[i] == OP_DERIVATIVE) ? 1 : ((operator[i] == OP_INTEGRAL) ? -1 : 0));
+  }
+
   if(permutation_operator != OP_NOOP){
     permutation_kernel = KERNEL_reg + OP_CFUN_OFFSETS[permutation_operator];
     tprod_mp = (double *)malloc(((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train)*num_reg_continuous*sizeof(double));
@@ -1616,7 +1623,7 @@ double * const restrict kw){
 
     assert(p_dband != NULL);
 
-    p_ipow = (permutation_operator == OP_DERIVATIVE) ? 1 : ((permutation_operator == OP_INTEGRAL) ? -1 : p_ipow);
+    p_ipow = (bandwidth_divide ? 1 : 0) + (permutation_operator == OP_DERIVATIVE) ? 1 : ((permutation_operator == OP_INTEGRAL) ? -1 : p_ipow);
   }
 
 
@@ -1859,14 +1866,14 @@ double * const restrict kw){
       else
         np_convol_ckernelv(KERNEL_reg, xtc[i], num_xt, l, xc[i][j], 
                            matrix_eval_bandwidth[i], *m, tprod, swap_xxt);
-      dband *= *m;
+      dband *= ipow(*m, bpow[i]);
 
       if(permutation_operator != OP_NOOP){
         for(int ii = 0; ii < num_reg_continuous; ii++){
           if(i != ii)
-            p_dband[ii] *= *m;
+            p_dband[ii] *= ipow(*m, bpow[i]);
           else
-            p_dband[ii] *= ipow(*m, 1 + p_ipow);
+            p_dband[ii] *= ipow(*m, p_ipow);
         }
       }
     }
@@ -1904,7 +1911,7 @@ double * const restrict kw){
                               do_psum,
                               symmetric,
                               gather_scatter,
-                              bandwidth_divide, dband,
+                              1, dband,
                               ws, pnl);
 
         if(permutation_operator != OP_NOOP){
@@ -1917,7 +1924,7 @@ double * const restrict kw){
                                   do_psum,
                                   symmetric,
                                   gather_scatter,
-                                  bandwidth_divide, p_dband[ii],
+                                  1, p_dband[ii],
                                   p_ws + ii*num_obs_eval*sum_element_length, (p_pnl == NULL) ? NULL : (p_pnl+ii));
           }
         }
@@ -1975,7 +1982,7 @@ double * const restrict kw){
     free_tmat(matrix_eval_bandwidth);
 
   free(tprod);
-
+  free(bpow);
   if(permutation_operator != OP_NOOP){
     free(tprod_mp);
 
