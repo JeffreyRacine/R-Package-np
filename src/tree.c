@@ -22,7 +22,7 @@
 
 */
 
-void build_kdtree(double ** p, int nump, int ndim, int nbucket, int ** ip, KDT ** kdt){
+void build_kdtree(double ** p, int nump, int ndim, int nbucket, int * ip, KDT ** kdt){
   KDT * kdx;
   int nodecount;
   int nf = (1 << (1 + (int)floor(log((double)nump/(double)nbucket)/log(2.0))));
@@ -55,18 +55,7 @@ void build_kdtree(double ** p, int nump, int ndim, int nbucket, int ** ip, KDT *
   kdx->nbucket = nbucket;
   kdx->ndim = ndim;
 
-  // tree is now fully allocated and ready to be built
-
-  // for the tree to work, points need to be put into tree order
-  *ip = (int *)malloc(nump*sizeof(int));
-  if(!(*ip != NULL))
-    error("!(*ip != NULL)");
-
-  for(int i = 0; i < nump; i++){
-    (*ip)[i] = i;
-  }
-
-  nodecount = build_tree(p, kdx, *ip, 0, 0, nump, 0);
+  nodecount = build_tree(p, kdx, ip, 0, 0, nump, 0);
 
   if(!(nodecount == numnode))
     error("!(nodecount == numnode)");

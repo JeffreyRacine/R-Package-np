@@ -8,6 +8,27 @@ define(utgaussian(Z), (exp(-Z^2/2) - exp(-tb^2/2))/sqrt(2*%pi) )$
 kernels: [epanechnikov, gaussian, utgaussian]$
 supports: [sqrt(5), inf, tb]$
 
+/* working on a slightly fancier automatic higher-order kernel generator
+
+computeOKernels(ker, b, order) := block(
+  [bml,bmh,bvl,bvh,moms,vars,eqns],
+  bml:limit(c+1/2,c,-b),
+  bmh:limit(c-1/2,c,b),
+  bvl:limit(v-c,c,b),
+  bvh:limit(v+c,c,b),
+  if (order < 2) then return("error: order should be even and greater than 1"),
+  moms : [],
+  vars : [A0,A1,A2,A3,A4,A5,A6],
+  eqns : [],
+  for moment: 0 thru order do (moms : append(moms, [integrate(Z^moment*ker(Z), Z, -b, b)])),
+  for j : 1 thru order do (
+    for n : 1 thru order do (
+      append(eqns, [vars[n]*moms[j] + vars[
+
+  )$
+
+*/
+
 computeKernels(ker, b) := (
 bml:limit(c+1/2,c,-b),
 bmh:limit(c-1/2,c,b),

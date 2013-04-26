@@ -181,7 +181,7 @@ b.star <- function(data,
   } else {
 
     BstarSB <- ifelse(BstarSB > Bmax, Bmax, ifelse(BstarSB < 1, 1, round(BstarSB)))
-    BstarCB <- ifelse(BstarCB > Bmax, Bmax, ifelse(BstarCB < 1, 1, ceiling(BstarCB)))
+    BstarCB <- ifelse(BstarCB > Bmax, Bmax, ifelse(BstarCB < 1, 1, max(1,round(BstarCB))))
 
   }
   

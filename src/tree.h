@@ -27,7 +27,7 @@ struct nl {
 
 typedef struct nl NL;
 
-void build_kdtree(double ** p, int nump, int ndim, int nbucket, int ** ip, KDT ** kdt);
+void build_kdtree(double ** p, int nump, int ndim, int nbucket, int * ip, KDT ** kdt);
 void kdSelect(double ** p, KDT * kdt, int * ip, int d, int k, int l, int r);
 int build_tree(double ** p, KDT * kdt, int * ip, int node, int d, int nlev, int istart);
 void free_kdtree(KDT ** kdt);
