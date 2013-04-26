@@ -124,7 +124,7 @@ npksum.default <-
     if(length(operator) != length(txdat))
       stop("operator not specified for all variables")
 
-    if(!all(operator[c(bws$iuno,bws$iord)] %in% uo.operators))
+    if(!all(operator[c(bws$iuno,bws$iord)] %in% uo.operators) && !compute.score)
       stop("unordered and ordered variables may only make use of 'normal', 'convolution' and 'integral' operator types")
     
     operator.num <- ALL_OPERATORS[operator]
@@ -197,8 +197,9 @@ npksum.default <-
     length.out = prod(dim.out[which(dim.out > 0)])
 
     if(permutation.operator != "none"){
-      p.length.out <- bws$ncon*length.out
-      p.dim.out <- c(dim.out, max(bws$ncon, 0))
+      npvar <- bws$ncon + ifelse(compute.score == FALSE, 0, bws$nuno + bws$nord)
+      p.length.out <- npvar*length.out
+      p.dim.out <- c(dim.out, max(npvar, 0))      
     }
     else
       p.length.out <- 0
