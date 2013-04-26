@@ -1753,7 +1753,7 @@ double * const restrict kw){
 
   /* Declarations */
 
-  int i,j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
+  int i, ii, j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length;
   int do_psum, swap_xxt;
 
   int permutation_kernel = -1;
@@ -1980,7 +1980,7 @@ double * const restrict kw){
       ws = weighted_sum + js*sum_element_length;
       p_ws = weighted_permutation_sum +js*sum_element_length;
 
-      for(i = 0, int ii = 0; ii < iNum_Processors; ii++){
+      for(i = 0, ii = 0; ii < iNum_Processors; ii++){
         i += (js-je+1)*sum_element_length;
         igatherv[ii] = (js-je+1)*sum_element_length;
         idisplsv[ii] = i;
@@ -1992,7 +1992,7 @@ double * const restrict kw){
       ws = weighted_sum;
       p_ws = weighted_permutation_sum;
 
-      for(int ii = 0; ii < iNum_Processors; ii++){
+      for(ii = 0; ii < iNum_Processors; ii++){
         igatherv[ii] = -1;
         idisplsv[ii] = -1;
       }
@@ -2013,7 +2013,7 @@ double * const restrict kw){
       ws = weighted_sum;
       p_ws = weighted_permutation_sum;
 
-      for(int ii = 0; ii < iNum_Processors; ii++){
+      for(ii = 0; ii < iNum_Processors; ii++){
         igatherv[ii] = -1;
         idisplsv[ii] = -1;
       }
@@ -2024,7 +2024,7 @@ double * const restrict kw){
       ws = weighted_sum;
       p_ws = weighted_permutation_sum;
 
-      for(int ii = 0; ii < iNum_Processors; ii++){
+      for(ii = 0; ii < iNum_Processors; ii++){
         igatherv[ii] = -1;
         idisplsv[ii] = -1;
       }
@@ -2048,7 +2048,7 @@ double * const restrict kw){
     dband = 1.0;
 
     if(permutation_operator != OP_NOOP) {
-      for (int ii = 0; ii < p_nvar; ii++)
+      for (ii = 0; ii < p_nvar; ii++)
         p_dband[ii] = 1.0;
     }
 
@@ -2085,7 +2085,7 @@ double * const restrict kw){
       boxSearch(kdt_extern, 0, bb, pnl);
 
       if(permutation_operator == OP_INTEGRAL){
-        for(int ii = 0; ii < num_reg_continuous; ii++){
+        for(ii = 0; ii < num_reg_continuous; ii++){
           // reset the interaction node list
           p_pnl[ii].n = 0;
           double bb[kdt_extern->ndim*2];
@@ -2101,11 +2101,11 @@ double * const restrict kw){
 
           boxSearch(kdt_extern, 0, bb, p_pnl + ii);
         }
-        for(int ii = num_reg_continuous; ii < p_nvar; ii++){
+        for(ii = num_reg_continuous; ii < p_nvar; ii++){
           p_pnl[ii] = pnl[0];
         }
       } else if(permutation_operator != OP_NOOP) {
-        for(int ii = 0; ii < p_nvar; ii++){
+        for(ii = 0; ii < p_nvar; ii++){
           p_pnl[ii] = pnl[0];
         }
       } 
@@ -2129,7 +2129,7 @@ double * const restrict kw){
       dband *= ipow(*m, bpow[i]);
 
       if(permutation_operator != OP_NOOP){
-        for(int ii = 0; ii < num_reg_continuous; ii++){
+        for(ii = 0; ii < num_reg_continuous; ii++){
           if(i != ii)
             p_dband[ii] *= ipow(*m, bpow[i]);
           else
@@ -2139,7 +2139,7 @@ double * const restrict kw){
     }
 
     if(permutation_operator != OP_NOOP){
-      for(int ii = num_reg_continuous; ii < p_nvar; ii++){
+      for(ii = num_reg_continuous; ii < p_nvar; ii++){
         p_dband[ii] = dband;
       }
     }
@@ -2191,7 +2191,7 @@ double * const restrict kw){
                               ws, pnl);
 
         if(permutation_operator != OP_NOOP){
-          for(int ii = 0; ii < p_nvar; ii++){
+          for(ii = 0; ii < p_nvar; ii++){
             np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
                                   matrix_Y, num_var_continuous_extern,
                                   tprod_mp+ii*num_xt, num_xt,
@@ -2230,7 +2230,7 @@ double * const restrict kw){
 
     if(permutation_operator != OP_NOOP){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
-        for(int ii = 0; ii < p_nvar; ii++){
+        for(ii = 0; ii < p_nvar; ii++){
           MPI_Allgatherv(MPI_IN_PLACE, igatherv[my_rank], MPI_DOUBLE, weighted_permutation_sum + ii*num_obs_eval*sum_element_length, igatherv, idisplsv, MPI_DOUBLE, comm[1]);
         }
       } else if(BANDWIDTH_reg == BW_ADAP_NN){
