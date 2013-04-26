@@ -4,7 +4,7 @@ plbandwidth <-
            bwmethod = c("cv.ls","cv.aic"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("gaussian", "epanechnikov","uniform", "truncated gaussian"), 
+           ckertype = c("truncated gaussian", "gaussian", "epanechnikov", "uniform"), 
            ckerorder = c(2,4,6,8),
            ukertype = c("aitchisonaitken", "liracine"),
            okertype = c("wangvanryzin", "liracine"),
