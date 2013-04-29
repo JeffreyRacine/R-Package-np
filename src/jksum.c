@@ -776,7 +776,7 @@ double np_deriv_rect(const double z){
 // cdf kernels
 
 double np_cdf_tgauss2(const double z){
-  return (z <= -np_tgauss2_b) ? 0.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5);
+  return (z <= -np_tgauss2_b) ? 0.0 : ((z >= np_tgauss2_b) ? 1.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5));
 }
 
 
