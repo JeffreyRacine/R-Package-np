@@ -333,7 +333,7 @@ double cdf_kernel(int KERNEL, double z)
 			break;
 
   case 9:
-    return_value = (z < -np_tgauss2_b) ? 0.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5);
+    return_value = (z <= -np_tgauss2_b) ? 0.0 : ((z >= np_tgauss2_b) ? 1.0 : (np_tgauss2_alpha*0.5*erfun(0.7071067810*z)-np_tgauss2_c0*z + 0.5));
     break;
 	}
 
