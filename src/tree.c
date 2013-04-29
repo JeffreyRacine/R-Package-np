@@ -25,10 +25,10 @@
 void build_kdtree(double ** p, int nump, int ndim, int nbucket, int * ip, KDT ** kdt){
   KDT * kdx;
   int nodecount;
-  int nf = (1 << (1 + (int)floor(log((double)nump/(double)nbucket)/log(2.0))));
-  int maxnode = (1 << (1 + (int)ceil(log((double)nump/(double)nbucket)/log(2.0)))) - 1; 
+  int nf = (1 << (1 + (int)floor(log(MAX((double)nump,(double)nbucket)/(double)nbucket)/log(2.0))));
+  int maxnode = (1 << (1 + (int)ceil(log(MAX((double)nump,(double)nbucket)/(double)nbucket)/log(2.0)))) - 1; 
   
-  int numnode = MIN(2*nump - (nbucket-1)*nf - 1, maxnode);
+  int numnode = MIN(2*MAX(nump,nbucket) - (nbucket-1)*nf - 1, maxnode);
 
   *kdt = (KDT *)malloc(sizeof(KDT));
   if(!(*kdt != NULL))
