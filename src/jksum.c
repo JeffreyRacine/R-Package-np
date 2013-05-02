@@ -1771,6 +1771,8 @@ double * const restrict kw){
     any_convolution |= (operator[i] == OP_CONVOLUTION);
   }
 
+  np_ks_tree_use &= (num_reg_continuous != 0);
+
   int p_ipow = 0, * bpow = NULL;
   NL nl = {.node = NULL, .n = 0, .nalloc = 0};
   NL * pnl=  np_ks_tree_use ? &nl : NULL;
@@ -2826,8 +2828,6 @@ int *num_categories){
       //fprintf(stderr,"mj: %e\n",mean[ii2]/(MAX(DBL_MIN, mean[ii2+1])));
     }
 
-    //exit(1);
-
     free(lc_Y[1]);
     free(mean);
   } else { // Local Linear 
@@ -3300,7 +3300,6 @@ int *num_categories){
       cv = log(cv) + (1.0+traceH/((double)num_obs))/(1.0-(traceH+2.0)/((double)num_obs));
     }
   }
-
   return(cv);
 }
 
