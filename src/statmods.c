@@ -621,7 +621,8 @@ double *nn_distance)
 
 int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
                           int num_var_continuous, int num_var_unordered, int num_var_ordered, 
-                          int * num_categories, double **matrix_y){
+                          double * vector_scale_factor, int * num_categories, 
+                          double **matrix_y){
   int i, j;
   int li;
 
@@ -633,6 +634,17 @@ int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num
   for(i = 1; i <= li; i++)
     for(j = 1; j <= li; j++)
       matrix_y[j][i] = (j == i)? 1.0 : 0.0;
+
+  if(vector_scale_factor == NULL) return(0);
+
+  // nvc + nrc
+  // this is only to ensure that initial cv function probes don't
+  // go outside of the allowed ranges for bws
+  li =  num_reg_continuous + num_var_continuous;
+
+  for(i = 1; i <= li; i++){
+    matrix_y[i][i] = sfac * vector_scale_factor[i];
+  }
 
   if(num_categories == NULL) return(0);
 
