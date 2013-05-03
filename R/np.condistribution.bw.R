@@ -81,7 +81,7 @@ npcdistbw.condbandwidth <-
            auto = TRUE,
            nmulti, remin = TRUE, itmax = 10000,
            fast.cdf = TRUE, do.full.integral = FALSE, ngrid = 100,
-           ftol=1.19209e-07, tol=1.49012e-08, small=2.22045e-16,
+           ftol = .Machine$double.eps, tol = sqrt(.Machine$double.eps), small = 10*sqrt(.Machine$double.eps),
            ...){
 
     ydat = toFrame(ydat)
