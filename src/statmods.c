@@ -619,27 +619,62 @@ double *nn_distance)
 }
 
 
-int initialize_nr_hessian(
-int num_var,
-double **matrix_y)
-{
+int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
+                          int num_var_continuous, int num_var_unordered, int num_var_ordered, 
+                          double * vector_scale_factor, int * num_categories, 
+                          double **matrix_y){
+  int i, j;
+  int li;
 
-    int i;
-    int j;
+  const double sfac = 0.25*(sqrt(5.0) + 1.0);
 
-    for(i = 1; i <= num_var; i++)
-    {
-        matrix_y[i][i] = 1.0;
-        for(j = 1; j <= num_var; j++)
-        {
-            if(i!=j)
-            {
-                matrix_y[j][i] = 0.0;
-            }
-        }
-    }
+  li =  num_reg_continuous + num_reg_unordered + num_reg_ordered + 
+    num_var_continuous + num_var_unordered + num_var_ordered;
 
-    return(0);
+  for(i = 1; i <= li; i++)
+    for(j = 1; j <= li; j++)
+      matrix_y[j][i] = (j == i)? 1.0 : 0.0;
+
+  if(vector_scale_factor == NULL) return(0);
+
+  // nvc + nrc
+  // this is only to ensure that initial cv function probes don't
+  // go outside of the allowed ranges for bws
+  li =  num_reg_continuous + num_var_continuous;
+
+  for(i = 1; i <= li; i++){
+    matrix_y[i][i] = sfac * vector_scale_factor[i];
+  }
+
+  if(num_categories == NULL) return(0);
+
+  // nvu
+  li = num_reg_continuous + num_var_continuous;
+  
+  for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++)
+    matrix_y[i][i] = sfac * (1.0 - 1.0/((double)num_categories[j]));
+
+  // nvo
+  li += num_var_unordered;
+
+  for(; i <= (li + num_var_ordered); i++)
+    matrix_y[i][i] = sfac;
+
+  //nru
+  j += num_var_ordered;
+  li += num_var_ordered;
+
+  for(; i <= (li + num_reg_unordered); i++, j++)
+    matrix_y[i][i] = sfac * (1.0 - 1.0/((double)num_categories[j]));
+
+  // nro
+  li += num_reg_unordered;
+
+  for(; i <= (li + num_reg_ordered); i++)
+    matrix_y[i][i] = sfac;
+
+
+  return(0);
 
 }
 

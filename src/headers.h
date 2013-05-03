@@ -87,7 +87,11 @@ int fround(double x);
 
 int initialize_kernel_density_asymptotic_constants(int KERNEL, int num_var_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P);  
 int initialize_kernel_regression_asymptotic_constants(int KERNEL, int num_reg_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P, double *INT_KERNEL_PM_HALF, double *DIFF_KER_PPM); 
-int initialize_nr_hessian(int num_var, double **matrix_y);
+
+int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
+                          int num_var_continuous, int num_var_unordered, int num_var_ordered, 
+                          double * vector_scale_factor,
+                          int * num_categories, double **matrix_y);
 
 int kernel_bandwidth(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda, double **matrix_bandwidth_deriv);
 int kernel_bandwidth_mean(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda);
@@ -148,7 +152,7 @@ void free_tmat(double **x);
 void free_vector(double *v, int nl);
 
 void linmin(int RESTRICT, int INTEGER, double *p_restrict, double *p, double *xi, int n, double tol, double small, int itmax, double *fret, double (*func)(double *));
-void mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double small, double (*func)(double));
+void mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double (*func)(double));
 void nrerror(char error_text[]);
 void powell(int RESTRICT, int INTEGER, double *p_restrict, double *p, double **xi, int n, double ftol, double tol, double small, int itmax, int *iter, double *fret, double (*func)(double *));
 

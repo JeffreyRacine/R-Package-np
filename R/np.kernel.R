@@ -124,7 +124,7 @@ npksum.default <-
     if(length(operator) != length(txdat))
       stop("operator not specified for all variables")
 
-    if(!all(operator[c(bws$iuno,bws$iord)] %in% uo.operators) && !compute.score)
+    if(!all(operator[bws$iuno | bws$iord] %in% uo.operators) && !compute.score)
       stop("unordered and ordered variables may only make use of 'normal', 'convolution' and 'integral' operator types")
     
     operator.num <- ALL_OPERATORS[operator]
