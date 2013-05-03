@@ -334,7 +334,14 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_var, matrix_y);
+  initialize_nr_hessian(num_reg_continuous_extern,
+                        num_reg_unordered_extern,
+                        num_reg_ordered_extern,
+                        0,
+                        0,
+                        0,
+                        num_categories_extern,
+                        matrix_y);
 
   /* When multistarting, set counter */
 
@@ -375,7 +382,15 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_hessian(num_var, matrix_y);
+    initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          0,
+                          0,
+                          0,
+                          num_categories_extern,
+                          matrix_y);
+
 
     powell(0,
            0,
@@ -430,7 +445,14 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_var, matrix_y);
+      initialize_nr_hessian(num_reg_continuous_extern,
+                            num_reg_unordered_extern,
+                            num_reg_ordered_extern,
+                            0,
+                            0,
+                            0,
+                            num_categories_extern,
+                            matrix_y);
 
       /* Conduct direction set search */
 
@@ -450,7 +472,14 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_hessian(num_var, matrix_y);
+        initialize_nr_hessian(num_reg_continuous_extern,
+                              num_reg_unordered_extern,
+                              num_reg_ordered_extern,
+                              0,
+                              0,
+                              0,
+                              num_categories_extern,
+                              matrix_y);
 
         powell(0,
                0,
@@ -691,7 +720,15 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_var, matrix_y);
+  initialize_nr_hessian(num_reg_continuous_extern,
+                        num_reg_unordered_extern,
+                        num_reg_ordered_extern,
+                        0,
+                        0,
+                        0,
+                        num_categories_extern,
+                        matrix_y);
+
 
   /* When multistarting, set counter */
 
@@ -729,8 +766,16 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   /* int_RESTART_FROM_MIN needs to be set */
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+    initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          0,
+                          0,
+                          0,
+                          num_categories_extern,
+                          matrix_y);
 
-    initialize_nr_hessian(num_var, matrix_y);
+
 
     powell(0,
            0,
@@ -785,7 +830,14 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_var, matrix_y);
+      initialize_nr_hessian(num_reg_continuous_extern,
+                            num_reg_unordered_extern,
+                            num_reg_ordered_extern,
+                            0,
+                            0,
+                            0,
+                            num_categories_extern,
+                            matrix_y);
 
       /* Conduct direction set search */
 
@@ -805,7 +857,14 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_hessian(num_var, matrix_y);
+      initialize_nr_hessian(num_reg_continuous_extern,
+                            num_reg_unordered_extern,
+                            num_reg_ordered_extern,
+                            0,
+                            0,
+                            0,
+                            num_categories_extern,
+                            matrix_y);
 
         powell(0,
                0,
@@ -1050,7 +1109,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_all_var, matrix_y);
+  initialize_nr_hessian(num_reg_continuous_extern,
+                        num_reg_unordered_extern,
+                        num_reg_ordered_extern,
+                        num_var_continuous_extern,
+                        num_var_unordered_extern,
+                        num_var_ordered_extern,
+                        num_categories_extern,
+                        matrix_y);
 
   /* When multistarting, set counter */
 
@@ -1108,7 +1174,16 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
          bwmfunc);
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-    initialize_nr_hessian(num_all_var, matrix_y);
+
+    initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          num_var_continuous_extern,
+                          num_var_unordered_extern,
+                          num_var_ordered_extern,
+                          num_categories_extern,
+                          matrix_y);
+
 
     powell(0,
            0,
@@ -1165,7 +1240,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_all_var, matrix_y);
+      initialize_nr_hessian(num_reg_continuous_extern,
+                            num_reg_unordered_extern,
+                            num_reg_ordered_extern,
+                            num_var_continuous_extern,
+                            num_var_unordered_extern,
+                            num_var_ordered_extern,
+                            num_categories_extern,
+                            matrix_y);
 
       /* Conduct direction set search */
       
@@ -1185,7 +1267,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_hessian(num_all_var, matrix_y);
+        initialize_nr_hessian(num_reg_continuous_extern,
+                              num_reg_unordered_extern,
+                              num_reg_ordered_extern,
+                              num_var_continuous_extern,
+                              num_var_unordered_extern,
+                              num_var_ordered_extern,
+                              num_categories_extern,
+                              matrix_y);
 
         powell(0,
                0,
@@ -1456,7 +1545,15 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_all_var, matrix_y);
+  initialize_nr_hessian(num_reg_continuous_extern,
+                        num_reg_unordered_extern,
+                        num_reg_ordered_extern,
+                        num_var_continuous_extern,
+                        num_var_unordered_extern,
+                        num_var_ordered_extern,
+                        num_categories_extern,
+                        matrix_y);
+
 
   /* When multistarting, set counter */
 
@@ -1495,7 +1592,14 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
          bwmfunc);
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-    initialize_nr_hessian(num_all_var, matrix_y);
+    initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          num_var_continuous_extern,
+                          num_var_unordered_extern,
+                          num_var_ordered_extern,
+                          num_categories_extern,
+                          matrix_y);
 
     powell(0,
            0,
@@ -1552,7 +1656,15 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_all_var, matrix_y);
+      initialize_nr_hessian(num_reg_continuous_extern,
+                            num_reg_unordered_extern,
+                            num_reg_ordered_extern,
+                            num_var_continuous_extern,
+                            num_var_unordered_extern,
+                            num_var_ordered_extern,
+                            num_categories_extern,
+                            matrix_y);
+
 
       /* Conduct direction set search */
       
@@ -1572,7 +1684,15 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_hessian(num_all_var, matrix_y);
+        initialize_nr_hessian(num_reg_continuous_extern,
+                              num_reg_unordered_extern,
+                              num_reg_ordered_extern,
+                              num_var_continuous_extern,
+                              num_var_unordered_extern,
+                              num_var_ordered_extern,
+                              num_categories_extern,
+                              matrix_y);
+
 
         powell(0,
                0,
@@ -2554,7 +2674,15 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_var, matrix_y);
+      initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          0,
+                          0,
+                          0,
+                          num_categories_extern,
+                          matrix_y);
+
 
   /* When multistarting, set counter */
 
@@ -2590,7 +2718,15 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_hessian(num_var, matrix_y);
+        initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          0,
+                          0,
+                          0,
+                          num_categories_extern,
+                          matrix_y);
+
 
     powell(0,
            0,
@@ -2646,7 +2782,15 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                         num_categories_extern,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
-      initialize_nr_hessian(num_var, matrix_y);
+          initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          0,
+                          0,
+                          0,
+                          num_categories_extern,
+                          matrix_y);
+
 
       /* Conduct direction set search */
 
@@ -2666,7 +2810,15 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE)	{
 						
-        initialize_nr_hessian(num_var, matrix_y);
+            initialize_nr_hessian(num_reg_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          0,
+                          0,
+                          0,
+                          num_categories_extern,
+                          matrix_y);
+
 						
         powell(0,
                0,
