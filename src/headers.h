@@ -148,7 +148,7 @@ void free_tmat(double **x);
 void free_vector(double *v, int nl);
 
 void linmin(int RESTRICT, int INTEGER, double *p_restrict, double *p, double *xi, int n, double tol, double small, int itmax, double *fret, double (*func)(double *));
-void mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double small, double (*func)(double));
+void mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb, double *fc, double (*func)(double));
 void nrerror(char error_text[]);
 void powell(int RESTRICT, int INTEGER, double *p_restrict, double *p, double **xi, int n, double ftol, double tol, double small, int itmax, int *iter, double *fret, double (*func)(double *));
 

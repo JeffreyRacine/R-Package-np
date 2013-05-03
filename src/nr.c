@@ -12,7 +12,7 @@ static char rcsid[] = "$Id: nr.c,v 1.10 2006/11/02 16:56:49 tristen Exp $";
 extern int int_VERBOSE;
 
 /* The following routines (sort, powell, nrerror, vector, free_vector,
-   linimn, brent, mnbrak, f1dim, erfun, ran3), are based on the
+   linmin, brent, mnbrak, f1dim, erfun, ran3), are based on the
    routine(s) from the book Numerical Recipes in C (Cambridge
    University Press), Copyright (C) Copyright (C) 1987, 1988 by
    Numerical Recipes Software. Permission to include requested August
@@ -54,7 +54,6 @@ great;
 #define M3 243000
 #define IA3 4561
 #define IC3 51349
-
 
 /*
  * Heapsort algorithm based on Knuth's adaptation
@@ -98,7 +97,6 @@ void sort(int n, double ra[])
         ra[i]=rra;
     }
 }
-
 
 void  powell(int RESTRICT, int INTEGER, double *p_restrict, double *p, double **xi, int n, double ftol, double tol, double small, int itmax, int *iter,
 double *fret, double (*func)(double *))
@@ -166,7 +164,6 @@ double *fret, double (*func)(double *))
         }
         if (*iter == itmax)
         {
-/*        nrerror("Too many iterations in routine POWELL");*/
             if(int_VERBOSE == 1)
             {
                 REprintf("\n**Maximum number of iterations reached in routine POWELL\n");
@@ -225,13 +222,11 @@ double *fret, double (*func)(double *))
     }
 }
 
-
 void nrerror(char error_text[])
 {
     REprintf("Numerical Recipes run-time error...\n");
     error("%s\n",error_text);
 }
-
 
 double *vector(int nl,int nh)
 {
@@ -242,14 +237,10 @@ double *vector(int nl,int nh)
     return(v-nl);
 }
 
-
 void free_vector(double *v, int nl)
 {
     free((char*) (v+nl));
 }
-
-
-
 
 int ncom=0;                                       /* defining declarations */
 double *pcom=0,*xicom=0,(*nrfunc)(double *);
@@ -303,7 +294,7 @@ void  linmin(int RESTRICT, int INTEGER, double *p_restrict, double *p, double *x
 
     }
 
-    mnbrak(&ax,&xx,&bx,&fa,&fx,&fb,small,f1dim);
+    mnbrak(&ax,&xx,&bx,&fa,&fx,&fb,f1dim);
     *fret=brent(ax,xx,bx,f1dim,tol,small,itmax,&xmin);
     for (j=1;j<=n;j++)
     {
@@ -314,6 +305,9 @@ void  linmin(int RESTRICT, int INTEGER, double *p_restrict, double *p, double *x
     free_vector(pcom,1);
 }
 
+/* In brent() small is ZEPS, (default 1.0e-10), "a small number which
+   protects against trying to achieve fractional accuracy for a
+   minimum that happens to be exactly zero */
 
 double brent(double ax, double bx, double cx, double (*f)(double), double tol, double small, int itmax, double *xmin)
 {
@@ -384,7 +378,6 @@ double brent(double ax, double bx, double cx, double (*f)(double), double tol, d
             }
         }
     }
-/*  nrerror("Too many iterations in BRENT");*/
     if(int_VERBOSE == 1)
     {
         REprintf("\n**Maximum number of iterations reached in routine BRENT\n");
@@ -393,13 +386,15 @@ double brent(double ax, double bx, double cx, double (*f)(double), double tol, d
     return fx;
 }
 
-
 #include <math.h>
 
+/* tiny (`TINY') is used to prevent any possible division by zero
+   (default 1.0e-20) */
+
 void  mnbrak(double *ax, double *bx, double *cx, double *fa, double *fb,
-double *fc, double small, double (*func)(double))
+double *fc, double (*func)(double))
 {
-    double ulim,u,r,q,fu,dum;
+  double ulim,u,r,q,fu,dum,tiny=1.0e-20;
 
     *fa=(*func)(*ax);
     *fb=(*func)(*bx);
@@ -415,7 +410,7 @@ double *fc, double small, double (*func)(double))
         r=(*bx-*ax)*(*fb-*fc);
         q=(*bx-*cx)*(*fb-*fa);
         u= (double)((*bx)-((*bx-*cx)*q-(*bx-*ax)*r)/
-            (2.0*SIGN(MAX(fabs(q-r),small),q-r)));
+                    (2.0*SIGN(MAX(fabs(q-r),tiny),q-r)));
         ulim=(double)((*bx)+GLIMIT*(*cx-*bx));
         if ((*bx-u)*(u-*cx) > 0.0)
         {
@@ -461,7 +456,6 @@ double *fc, double small, double (*func)(double))
     }
 }
 
-
 extern int ncom;                                  /* defined in LINMIN */
 extern double *pcom,*xicom,(*nrfunc)(double *);
 
@@ -476,10 +470,11 @@ double f1dim(double x)
     free_vector(xt,1);
     return f;
 }
+
 /* This is an approximation to the error function good to 1.2e-07.
-     Compared to erfun() above it yields exact output for CDF
-     estimation, and is substantially faster for computation. Now
-     default replacement as of 10/6/03 */
+   Compared to erfun() above it yields exact output for CDF
+   estimation, and is substantially faster for computation. Now
+   default replacement as of 10/6/03 */
 
 double erfun(double x)
 {
@@ -492,10 +487,6 @@ double erfun(double x)
         t*(-0.82215223+t*0.17087277)))))))));
     return(x >= 0.0 ? -(ans-1.0) : (ans-1.0));
 }
-
-
-/* This version uses dlinmin(), line search using derivatives */
-
 
 #undef SIGN
 #undef MOV3
@@ -519,7 +510,6 @@ double erfun(double x)
 #undef IC3
 
 #undef FREEALL
-
 
 #define MBIG 1000000000
 #define MSEED 161803398
@@ -568,7 +558,6 @@ double ran3(int *idum)
     ma[inext]=mj;
     return(mj*FAC);
 }
-
 
 #undef MBIG
 #undef MSEED
