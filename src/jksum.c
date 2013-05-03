@@ -895,7 +895,7 @@ void np_p_ckernelv(const int KERNEL,
   const double sgn = swap_xxt ? -1.0 : 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double * const pxw = (bin_do_xw ? p_result : xw);
+  double * const pxw = (bin_do_xw ? p_result : &unit_weight);
 
   double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, //ordinary kernels
                                    np_epan2, np_epan4, np_epan6, np_epan8, 
@@ -1078,7 +1078,7 @@ void np_p_ukernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double * const pxw = (bin_do_xw ? p_result : xw);
+  double * const pxw = (bin_do_xw ? p_result : &unit_weight);
 
   double (* const k[])(int, double, int) = { np_uaa, np_uli_racine,
                                              np_econvol_uaa, np_econvol_uli_racine,
@@ -1235,7 +1235,7 @@ void np_p_okernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double * const pxw = (bin_do_xw ? p_result : xw);
+  double * const pxw = (bin_do_xw ? p_result : &unit_weight);
 
   double (* const k[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine,
                                                    np_score_owang_van_ryzin, np_score_oli_racine };
@@ -1878,9 +1878,8 @@ double * const restrict kw){
 
     assert(p_dband != NULL);
 
-    p_ipow = (bandwidth_divide ? 1 : 0) + (permutation_operator == OP_DERIVATIVE) ? 1 : ((permutation_operator == OP_INTEGRAL) ? -1 : p_ipow);
+    p_ipow = (bandwidth_divide ? 1 : 0) + ((permutation_operator == OP_DERIVATIVE) ? 1 : ((permutation_operator == OP_INTEGRAL) ? -1 : 0));
 
-    
     ps_ukernel = KERNEL_unordered_reg + OP_UFUN_OFFSETS[permutation_operator];
     ps_okernel = KERNEL_ordered_reg + OP_OFUN_OFFSETS[permutation_operator];
   }
