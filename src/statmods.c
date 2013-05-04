@@ -626,7 +626,7 @@ int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num
   int i, j;
   int li;
 
-  const double sfac = 0.25*(sqrt(5.0) + 1.0);
+  const double sfac = 0.25*(3.0-sqrt(5));
 
   li =  num_reg_continuous + num_reg_unordered + num_reg_ordered + 
     num_var_continuous + num_var_unordered + num_var_ordered;
@@ -652,26 +652,26 @@ int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num
   li = num_reg_continuous + num_var_continuous;
   
   for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++)
-    matrix_y[i][i] = sfac * (1.0 - 1.0/((double)num_categories[j]));
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0/((double)num_categories[j])) - vector_scale_factor[i])*sfac;
 
   // nvo
   li += num_var_unordered;
 
   for(; i <= (li + num_var_ordered); i++)
-    matrix_y[i][i] = sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * sfac;
 
   //nru
   j += num_var_ordered;
   li += num_var_ordered;
 
   for(; i <= (li + num_reg_unordered); i++, j++)
-    matrix_y[i][i] = sfac * (1.0 - 1.0/((double)num_categories[j]));
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0/((double)num_categories[j])) - vector_scale_factor[i])*sfac;
 
   // nro
   li += num_reg_unordered;
 
   for(; i <= (li + num_reg_ordered); i++)
-    matrix_y[i][i] = sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * sfac;
 
 
   return(0);
