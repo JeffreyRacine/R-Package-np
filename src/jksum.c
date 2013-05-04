@@ -3299,6 +3299,12 @@ int *num_categories){
       cv = log(cv) + (1.0+traceH/((double)num_obs))/(1.0-(traceH+2.0)/((double)num_obs));
     }
   }
+
+  //Rprintf("cv: %3.15g ",cv);
+  //for(int ii = 0; ii < num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern; ii++)
+  //  Rprintf("%3.15g ", vector_scale_factor[ii]);
+  //Rprintf("\n");
+
   return(cv);
 }
 

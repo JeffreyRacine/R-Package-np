@@ -10,6 +10,8 @@
 
 #include "headers.h"
 
+#include <R.h>
+
 #ifdef MPI2
 
 #include "mpi.h"
@@ -132,6 +134,11 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
         num_categories_extern,
         vector_scale_factor) == 1)
     {
+      //Rprintf("toasty!\n");
+      //for(int ii = 1; ii <= num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern; ii++)
+      //  Rprintf("%3.15g ", vector_scale_factor[ii]);
+      //Rprintf("\n");
+
         return(DBL_MAX);
     }
 
