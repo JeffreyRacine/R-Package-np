@@ -63,8 +63,8 @@ npqreg.condbandwidth <-
            exdat,
            tau = 0.5,
            gradients = FALSE,
-           ftol = .Machine$double.eps, tol = sqrt(.Machine$double.eps),
-           small = 10*sqrt(.Machine$double.eps), itmax = 10000,
+           ftol = 1.490116e-07, tol = 1.490116e-04,
+           small = 1.490116e-05, itmax = 10000,
            ...){
 
     no.ex = missing(exdat)
