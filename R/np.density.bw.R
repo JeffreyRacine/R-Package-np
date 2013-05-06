@@ -63,7 +63,7 @@ npudensbw.NULL <-
 npudensbw.bandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
-           ftol = .Machine$double.eps, tol = sqrt(.Machine$double.eps), small = 10*sqrt(.Machine$double.eps), ...){
+           ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05, ...){
 
     dat = toFrame(dat)
 
