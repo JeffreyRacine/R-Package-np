@@ -2131,10 +2131,14 @@ double * const restrict kw){
 
       if(permutation_operator != OP_NOOP){
         for(ii = 0; ii < num_reg_continuous; ii++){
-          if(i != ii)
+          if(i != ii) {
             p_dband[ii] *= ipow(*m, bpow[i]);
-          else
+          } else {
             p_dband[ii] *= ipow(*m, p_ipow);
+            if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
+              p_dband[ii] *= vector_scale_factor[ii]/(*m);
+            }
+          }
         }
       }
     }
