@@ -2719,6 +2719,12 @@ int *num_categories){
     tsf = int_LARGE_SF;
 
     int_LARGE_SF = 1;
+
+    // disable the tree because we are fiddling with the data
+    int tint_TREE = int_TREE;
+
+    int_TREE = NP_TREE_FALSE;
+
     kernel_weighted_sum_np(KERNEL_reg,
                            KERNEL_unordered_reg,
                            KERNEL_ordered_reg,
@@ -2757,6 +2763,7 @@ int *num_categories){
     int_LARGE_SF = tsf;
     num_var_continuous_extern = 0; 
 
+    int_TREE = tint_TREE;
 
     //fprintf(stderr,"\n%e\n",aicc);
   }
