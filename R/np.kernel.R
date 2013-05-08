@@ -318,8 +318,12 @@ npksum.default <-
     if((permutation.operator != "none") && (p.length.out > 0)) {
       dim.p <- p.dim.out[which(p.dim.out > 1)]
       if(length(dim.p) == 0) dim.p <- 1
-      
-      p.myout <- array(data = myout[["p.ksum"]], dim = dim.p)
+
+      p.myout <- matrix(data = myout[["p.ksum"]], ncol = npvar)
+      p.myout[,c(which(bws$icon),which(bws$iuno),which(bws$iord))] <- p.myout
+
+
+      p.myout <- array(data = as.vector(p.myout), dim = dim.p)
     } else {
       p.myout <- NULL
     }
