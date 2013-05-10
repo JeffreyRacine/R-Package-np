@@ -3959,10 +3959,12 @@ double *SIGN){
       vsf = vector_scale_factor;
     }
 
-    MATRIX XTKX = mat_creat( num_reg_continuous + 2, num_obs_train, UNDEFINED );
+    MATRIX XTKX = mat_creat( num_reg_continuous + 3, num_obs_train, UNDEFINED );
     MATRIX XTKXINV = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
     MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
+    MATRIX XTKY2 = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
     MATRIX DELTA = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
+    MATRIX DELTA2 = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
 
     MATRIX KWM = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
@@ -3971,11 +3973,11 @@ double *SIGN){
     MATRIX TUNO = mat_creat(num_reg_unordered, 1, UNDEFINED);
     MATRIX TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
 
-    const int nrc2 = (num_reg_continuous+2);
+    const int nrc3 = (num_reg_continuous+3);
     const int nrc1 = (num_reg_continuous+1);
-    const int nrcc22 = nrc2*nrc2;
+    const int nrcc33 = nrc3*nrc3;
 
-    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
+    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKY2[nrc1], * PXTKX[nrc3];
 
     double * PXC[num_reg_continuous]; 
     double * PXU[num_reg_unordered];
@@ -3990,28 +3992,29 @@ double *SIGN){
     for(l = 0; l < num_reg_ordered; l++)
       PXO[l] = matrix_X_ordered_train[l];
 
-    double * kwm = (double *)malloc(nrcc22*num_obs_eval_alloc*sizeof(double));
+    double * kwm = (double *)malloc(nrcc33*num_obs_eval_alloc*sizeof(double));
 
-    for(int ii = 0; ii < nrcc22*num_obs_eval_alloc; ii++)
+    for(int ii = 0; ii < nrcc33*num_obs_eval_alloc; ii++)
       kwm[ii] = 0.0;
 
-    double * sgn = (double *)malloc((nrc2)*sizeof(double));
+    double * sgn = (double *)malloc((nrc3)*sizeof(double));
 
-    sgn[0] = sgn[1] = 1.0;
+    sgn[0] = sgn[1] = sgn[2] = 1.0;
     
     for(int ii = 0; ii < (num_reg_continuous); ii++)
-      sgn[ii+2] = -1.0;
+      sgn[ii+3] = -1.0;
     
-    for(int ii = 0; ii < (nrc2); ii++)
+    for(int ii = 0; ii < (nrc3); ii++)
       PXTKX[ii] = XTKX[ii];
     
     for(int ii = 0; ii < (nrc1); ii++){
       PKWM[ii] = KWM[ii];
       PXTKY[ii] = XTKY[ii];
+      PXTKY2[ii] = XTKY2[ii];
 
-      KWM[ii] = &kwm[(ii+1)*(nrc2)+1];
-      XTKY[ii] = &kwm[ii+1];
-
+      KWM[ii] = &kwm[(ii+2)*(nrc3)+2];
+      XTKY2[ii] = &kwm[ii+2];
+      XTKY[ii] = &kwm[ii+nrc3+2];
     }
 
     const double epsilon = 1.0/num_obs_train;
@@ -4020,8 +4023,10 @@ double *SIGN){
     // populate the xtkx matrix first 
     
     for(i = 0; i < num_obs_train; i++){
-      XTKX[0][i] = vector_Y[i];
-      XTKX[1][i] = 1.0;
+      const double vyi = vector_Y[i];
+      XTKX[0][i] = vyi*vyi;
+      XTKX[1][i] = vyi;
+      XTKX[2][i] = 1.0;
     }
 
 
@@ -4029,8 +4034,9 @@ double *SIGN){
       nepsilon = 0.0;
 
       for(l = 0; l < (nrc1); l++){
-        KWM[l] = &kwm[j*nrcc22+(l+1)*(nrc2)+1];
-        XTKY[l] = &kwm[j*nrcc22+l+1];
+        KWM[l] = &kwm[j*nrcc33+(l+2)*(nrc3)+2];
+        XTKY[l] = &kwm[j*nrcc33+l+nrc3+2];
+        XTKY2[l] = &kwm[j*nrcc33+l+2];
       }
 
 #ifdef MPI2
@@ -4040,7 +4046,7 @@ double *SIGN){
           for(l = 0; l < num_reg_continuous; l++){
           
             for(i = 0; i < num_obs_train; i++){
-              XTKX[l+2][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j+my_rank];
+              XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j+my_rank];
             }
             TCON[l][0] = matrix_X_continuous_eval[l][j+my_rank]; // temporary storage
           }
@@ -4052,8 +4058,8 @@ double *SIGN){
           for(l = 0; l < num_reg_ordered; l++)
             TORD[l][0] = matrix_X_ordered_eval[l][j+my_rank];
 
-          num_var_continuous_extern = nrc2; // rows in the y_mat
-          num_var_ordered_extern = nrc2; // rows in weights
+          num_var_continuous_extern = nrc3; // rows in the y_mat
+          num_var_ordered_extern = nrc3; // rows in weights
 
           kernel_weighted_sum_np(KERNEL_reg,
                                  KERNEL_unordered_reg,
@@ -4087,7 +4093,7 @@ double *SIGN){
                                  vsf,
                                  num_categories,
                                  NULL,
-                                 kwm+(j+my_rank)*nrcc22,  // weighted sum
+                                 kwm+(j+my_rank)*nrcc33,  // weighted sum
                                  NULL, // no permutations
                                  NULL); // do not return kernel weights
 
@@ -4095,7 +4101,7 @@ double *SIGN){
           num_var_ordered_extern = 0; // always zero
         }
         // synchro step
-        MPI_Allgather(MPI_IN_PLACE, nrcc22*iNum_Processors, MPI_DOUBLE, kwm+j*nrcc22, nrcc22*iNum_Processors, MPI_DOUBLE, comm[1]);    
+        MPI_Allgather(MPI_IN_PLACE, nrcc33*iNum_Processors, MPI_DOUBLE, kwm+j*nrcc33, nrcc33*iNum_Processors, MPI_DOUBLE, comm[1]);    
       }
       
 #else
@@ -4104,7 +4110,7 @@ double *SIGN){
       for(l = 0; l < num_reg_continuous; l++){
           
         for(i = 0; i < num_obs_train; i++){
-          XTKX[l+2][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j];
+          XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j];
         }
         TCON[l][0] = matrix_X_continuous_eval[l][j]; // temporary storage
       }
@@ -4116,8 +4122,8 @@ double *SIGN){
       for(l = 0; l < num_reg_ordered; l++)
         TORD[l][0] = matrix_X_ordered_eval[l][j];
 
-      num_var_continuous_extern = nrc2; // rows in the y_mat
-      num_var_ordered_extern = nrc2; // rows in weights
+      num_var_continuous_extern = nrc3; // rows in the y_mat
+      num_var_ordered_extern = nrc3; // rows in weights
 
       kernel_weighted_sum_np(KERNEL_reg,
                              KERNEL_unordered_reg,
@@ -4151,7 +4157,7 @@ double *SIGN){
                              vsf,
                              num_categories,
                              NULL,
-                             kwm+j*nrcc22,  // weighted sum
+                             kwm+j*nrcc33,  // weighted sum
                              NULL, // no permutations
                              NULL); // do not return kernel weights
 
@@ -4167,22 +4173,25 @@ double *SIGN){
       }
       
       XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      XTKY2[0][0] += nepsilon*XTKY2[0][0]/NZD(KWM[0][0]);
 
       DELTA = mat_mul(XTKXINV, XTKY, DELTA);
       mean[j] = DELTA[0][0];
 
-      const double sk = copysign(DBL_MIN, (kwm+j*nrcc22)[nrc2+1]) + (kwm+j*nrcc22)[nrc2+1];
+      DELTA2 = mat_mul(XTKXINV, XTKY2, DELTA2);
 
-      mean_stderr[j] = (kwm+j*nrcc22)[0]/sk - mean[j]*mean[j];
-      mean_stderr[j] = sqrt(mean_stderr[j] * K_INT_KERNEL_P / sk);
+      const double sk = copysign(DBL_MIN, (kwm+j*nrcc33)[2*nrc3+2]) + (kwm+j*nrcc33)[2*nrc3+2];
+
+      mean_stderr[j] = sqrt((DELTA2[0][0] - mean[j]*mean[j])*K_INT_KERNEL_P / sk);
     }
     
     for(int ii = 0; ii < (nrc1); ii++){
       KWM[ii] = PKWM[ii];
       XTKY[ii] = PXTKY[ii];
+      XTKY2[ii] = PXTKY2[ii];
     }
 
-    for(int ii = 0; ii < (nrc2); ii++)
+    for(int ii = 0; ii < (nrc3); ii++)
       XTKX[ii] = PXTKX[ii];
 
     if(sf_flag){
@@ -4194,7 +4203,9 @@ double *SIGN){
     mat_free(XTKX);
     mat_free(XTKXINV);
     mat_free(XTKY);
+    mat_free(XTKY2);
     mat_free(DELTA);
+    mat_free(DELTA2);
     mat_free(KWM);
 
     mat_free(TCON);
