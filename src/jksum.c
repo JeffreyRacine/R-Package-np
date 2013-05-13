@@ -3776,9 +3776,9 @@ double *vector_Y,
 double *vector_Y_eval,
 double *vector_scale_factor,
 int *num_categories,
-double *mean,
+double * const restrict mean,
 double **gradient,
-double *mean_stderr,
+double * const restrict mean_stderr,
 double **gradient_stderr,
 double *R_squared,
 double *MSE,
@@ -3818,8 +3818,9 @@ double *SIGN){
   int num_obs_eval_alloc = num_obs_eval;
 #endif
 
+  const int do_grad = (gradient != NULL); 
+  const int do_gerr = (gradient_stderr != NULL);
   assert((int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED));
-  assert(gradient == NULL);
 
   // Allocate memory for objects 
 
@@ -3866,6 +3867,9 @@ double *SIGN){
     K_INT_KERNEL_P = 1.0;
   }
 
+  const double gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
+
+
   // Conduct the estimation 
 
   if(int_ll == LL_LC) { // local constant
@@ -3875,10 +3879,18 @@ double *SIGN){
 #define NCOL_Y 3
 
     double * lc_Y[NCOL_Y] = {NULL,NULL,NULL};
-    double * meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
+    double * restrict meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
+    double * restrict permy = NULL;
+    int pop = OP_NOOP;
+    
+    if(do_grad){
+      permy = (double *)malloc(NCOL_Y*num_obs_eval_alloc*num_reg_continuous*sizeof(double));
+      assert(permy != NULL);
+      pop = OP_DERIVATIVE;
+    }
     
     if(meany == NULL)
-      error("\n** Error: memory reallocation failed.");
+      error("\n** Error: memory allocation failed.");
 
     num_var_continuous_extern = NCOL_Y; // columns in the y_mat
     num_var_ordered_extern = 0; // columns in weights
@@ -3913,7 +3925,7 @@ double *SIGN){
                            0, // do not drop train
                            0, // do not drop train
                            operator, // no special operators being used
-                           OP_NOOP, // no permutations
+                           pop, // permutations used for gradients
                            0, // no score
                            matrix_X_unordered_train, // TRAIN
                            matrix_X_ordered_train,
@@ -3928,7 +3940,7 @@ double *SIGN){
                            num_categories,
                            NULL, // no convolution 
                            meany,
-                           NULL, // no permutations
+                           permy, // permutations used for gradients
                            NULL); // do not return kernel weights
 
     num_var_continuous_extern = 0;
@@ -3941,8 +3953,30 @@ double *SIGN){
       mean_stderr[ii] = meany[ii3+2]/sk - mean[ii]*mean[ii];
       mean_stderr[ii] = sqrt(mean_stderr[ii] * K_INT_KERNEL_P / sk);
     }
+   
+    if(do_grad){
+      for(l = 0; l < num_reg_continuous; l++){
+        for(i = 0; i < num_obs_eval; i++){
+          // ordered y, 1, y*y
+          const int ii3 = NCOL_Y*i;
+          const int li3 = l*num_obs_eval*NCOL_Y + ii3;
+          const double sk = copysign(DBL_MIN, meany[ii3+1]) + meany[ii3+1];
+          gradient[l][i] = (permy[li3] - mean[i]*permy[li3+1])/sk;
+          
+          if(do_gerr){
+            gradient_stderr[l][i] = gfac*mean_stderr[i]/matrix_bandwidth[l][i];
+          }
+        }
+      } 
+    }
+
 
     free(meany);
+
+    if(do_grad){
+      free(permy);
+    }
+
     free(lc_Y[1]);
     free(lc_Y[2]);
 #undef NCOL_Y
@@ -4028,7 +4062,6 @@ double *SIGN){
       XTKX[1][i] = vyi;
       XTKX[2][i] = 1.0;
     }
-
 
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
@@ -4183,6 +4216,14 @@ double *SIGN){
       const double sk = copysign(DBL_MIN, (kwm+j*nrcc33)[2*nrc3+2]) + (kwm+j*nrcc33)[2*nrc3+2];
 
       mean_stderr[j] = sqrt((DELTA2[0][0] - mean[j]*mean[j])*K_INT_KERNEL_P / sk);
+
+      if(do_grad){
+        for(int ii = 0; ii < num_reg_continuous; ii++){
+          gradient[ii][j] = DELTA[ii+1][0];
+          if(do_gerr)
+            gradient_stderr[ii][j] = gfac*mean_stderr[j]/matrix_bandwidth[ii][j];
+        }
+      }
     }
     
     for(int ii = 0; ii < (nrc1); ii++){
