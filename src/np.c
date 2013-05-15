@@ -3354,7 +3354,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, do_smooth_coef_weights, no_weights, sum_element_length, return_kernel_weights;
-  int p_operator, do_score, p_nvar;
+  int p_operator, do_score, do_ocg, p_nvar;
 
 
   /* match integer options with their globals */
@@ -3396,6 +3396,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   return_kernel_weights = myopti[KWS_RKWI];
   p_operator = myopti[KWS_POPI];
   do_score = myopti[KWS_PSCOREI];
+  do_ocg = myopti[KWS_POCGI];
 
   no_y = (num_var_continuous_extern == 0);
   no_weights = (num_var_ordered_extern == 0);
@@ -3433,7 +3434,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   if(p_operator != OP_NOOP){
     // right now, we will only allow this for continuous variables
-    p_nvar = num_reg_continuous_extern + (do_score ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
+    p_nvar = num_reg_continuous_extern + ((do_score || do_ocg) ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
     p_ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length*p_nvar);
   }
 
@@ -3586,7 +3587,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          operator,
                          p_operator,
                          do_score,
-                         0, // no ocg (for now)
+                         do_ocg, // no ocg (for now)
                          matrix_X_unordered_train_extern,
                          matrix_X_ordered_train_extern,
                          matrix_X_continuous_train_extern,

@@ -48,7 +48,7 @@ npksum.numeric <-
            exdat,
            weights,
            leave.one.out, kernel.pow, bandwidth.divide,
-           operator, permutation.operator, compute.score, smooth.coefficient, return.kernel.weights,
+           operator, permutation.operator, compute.score, compute.ocg, smooth.coefficient, return.kernel.weights,
            ...){
 
     txdat <- toFrame(txdat)
@@ -61,7 +61,7 @@ npksum.numeric <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("tydat", "exdat", "weights", "leave.one.out", "kernel.pow", "bandwidth.divide",
-               "operator", "permutation.operator", "compute.score", "smooth.coefficient", "return.kernel.weights")
+               "operator", "permutation.operator", "compute.score", "compute.ocg", "smooth.coefficient", "return.kernel.weights")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
@@ -84,6 +84,7 @@ npksum.default <-
            operator = names(ALL_OPERATORS),
            permutation.operator = names(PERMUTATION_OPERATORS),
            compute.score = FALSE,
+           compute.ocg = FALSE,
            smooth.coefficient = FALSE,
            return.kernel.weights = FALSE,
            ...){
@@ -124,6 +125,9 @@ npksum.default <-
     if(length(operator) != length(txdat))
       stop("operator not specified for all variables")
 
+    if(compute.score && compute.ocg)
+      stop("compute.score and compute.ocg are mutually exclusive, and cannot be enabled simultaneously")
+    
     if(!all(operator[bws$iuno | bws$iord] %in% uo.operators) && !compute.score)
       stop("unordered and ordered variables may only make use of 'normal', 'convolution' and 'integral' operator types")
     
@@ -197,7 +201,7 @@ npksum.default <-
     length.out = prod(dim.out[which(dim.out > 0)])
 
     if(permutation.operator != "none"){
-      npvar <- bws$ncon + ifelse(compute.score == FALSE, 0, bws$nuno + bws$nord)
+      npvar <- bws$ncon + ifelse(compute.score | compute.ocg, 0, bws$nuno + bws$nord)
       p.length.out <- npvar*length.out
       p.dim.out <- c(dim.out, max(npvar, 0))      
     }
@@ -281,7 +285,8 @@ npksum.default <-
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
       return.kernel.weights = return.kernel.weights,
       permutation.operator = poperator.num,
-      compute.score = compute.score)
+      compute.score = compute.score,
+      compute.ocg = compute.ocg)
     
 
 
