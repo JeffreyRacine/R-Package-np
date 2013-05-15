@@ -3964,7 +3964,7 @@ double *SIGN){
           gradient[l][i] = (permy[li3] - mean[i]*permy[li3+1])/sk;
           
           if(do_gerr){
-            gradient_stderr[l][i] = gfac*mean_stderr[i]/matrix_bandwidth[l][i];
+            gradient_stderr[l][i] = gfac*mean_stderr[i]/matrix_bandwidth[l][0];
           }
         }
       } 
@@ -4215,7 +4215,7 @@ double *SIGN){
         for(int ii = 0; ii < num_reg_continuous; ii++){
           gradient[ii][j] = DELTA[ii+1][0];
           if(do_gerr)
-            gradient_stderr[ii][j] = gfac*mean_stderr[j]/matrix_bandwidth[ii][j];
+            gradient_stderr[ii][j] = gfac*mean_stderr[j]/matrix_bandwidth[ii][0];
         }
       }
     }
