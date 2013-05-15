@@ -3586,6 +3586,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          operator,
                          p_operator,
                          do_score,
+                         0, // no ocg (for now)
                          matrix_X_unordered_train_extern,
                          matrix_X_ordered_train_extern,
                          matrix_X_continuous_train_extern,
