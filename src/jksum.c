@@ -3996,9 +3996,7 @@ double *SIGN){
     MATRIX XTKX = mat_creat( num_reg_continuous + 3, num_obs_train, UNDEFINED );
     MATRIX XTKXINV = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
     MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
-    MATRIX XTKY2 = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
     MATRIX DELTA = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
-    MATRIX DELTA2 = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
 
     MATRIX KWM = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
@@ -4011,7 +4009,7 @@ double *SIGN){
     const int nrc1 = (num_reg_continuous+1);
     const int nrcc33 = nrc3*nrc3;
 
-    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKY2[nrc1], * PXTKX[nrc3];
+    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc3];
 
     double * PXC[num_reg_continuous]; 
     double * PXU[num_reg_unordered];
@@ -4044,10 +4042,8 @@ double *SIGN){
     for(int ii = 0; ii < (nrc1); ii++){
       PKWM[ii] = KWM[ii];
       PXTKY[ii] = XTKY[ii];
-      PXTKY2[ii] = XTKY2[ii];
 
       KWM[ii] = &kwm[(ii+2)*(nrc3)+2];
-      XTKY2[ii] = &kwm[ii+2];
       XTKY[ii] = &kwm[ii+nrc3+2];
     }
 
@@ -4069,7 +4065,6 @@ double *SIGN){
       for(l = 0; l < (nrc1); l++){
         KWM[l] = &kwm[j*nrcc33+(l+2)*(nrc3)+2];
         XTKY[l] = &kwm[j*nrcc33+l+nrc3+2];
-        XTKY2[l] = &kwm[j*nrcc33+l+2];
       }
 
 #ifdef MPI2
@@ -4206,16 +4201,15 @@ double *SIGN){
       }
       
       XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
-      XTKY2[0][0] += nepsilon*XTKY2[0][0]/NZD(KWM[0][0]);
 
       DELTA = mat_mul(XTKXINV, XTKY, DELTA);
       mean[j] = DELTA[0][0];
 
-      DELTA2 = mat_mul(XTKXINV, XTKY2, DELTA2);
-
       const double sk = copysign(DBL_MIN, (kwm+j*nrcc33)[2*nrc3+2]) + (kwm+j*nrcc33)[2*nrc3+2];
+      const double ey = (kwm+j*nrcc33)[nrc3+1]/sk;
+      const double ey2 = (kwm+j*nrcc33)[0]/sk;
 
-      mean_stderr[j] = sqrt((DELTA2[0][0] - mean[j]*mean[j])*K_INT_KERNEL_P / sk);
+      mean_stderr[j] = sqrt((ey2 - ey*ey)*K_INT_KERNEL_P / sk);
 
       if(do_grad){
         for(int ii = 0; ii < num_reg_continuous; ii++){
@@ -4229,7 +4223,6 @@ double *SIGN){
     for(int ii = 0; ii < (nrc1); ii++){
       KWM[ii] = PKWM[ii];
       XTKY[ii] = PXTKY[ii];
-      XTKY2[ii] = PXTKY2[ii];
     }
 
     for(int ii = 0; ii < (nrc3); ii++)
@@ -4244,9 +4237,7 @@ double *SIGN){
     mat_free(XTKX);
     mat_free(XTKXINV);
     mat_free(XTKY);
-    mat_free(XTKY2);
     mat_free(DELTA);
-    mat_free(DELTA2);
     mat_free(KWM);
 
     mat_free(TCON);
