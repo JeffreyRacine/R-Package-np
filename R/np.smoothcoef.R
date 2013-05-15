@@ -459,9 +459,8 @@ npscoef.scbandwidth <-
 
     if(errors){
       ## kernel^2 integrals
-      if(bws$ckertype == "truncated gaussian")
-        stop("asymptotic errors not implemented for truncated gaussians")
       k <- (int.kernels[switch(bws$ckertype,
+                               "truncated gaussian" = CKER_TGAUSS,
                               gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
                               epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
                               uniform = CKER_UNI)+1])^length(bws$bw)
