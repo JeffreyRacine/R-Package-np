@@ -127,7 +127,6 @@ npksum.default <-
 
     if(compute.score && compute.ocg)
       stop("compute.score and compute.ocg are mutually exclusive, and cannot be enabled simultaneously")
-    
     if(!all(operator[bws$iuno | bws$iord] %in% uo.operators) && !compute.score)
       stop("unordered and ordered variables may only make use of 'normal', 'convolution' and 'integral' operator types")
     
@@ -200,8 +199,8 @@ npksum.default <-
     
     length.out = prod(dim.out[which(dim.out > 0)])
 
-    if(permutation.operator != "none"){
-      npvar <- bws$ncon + ifelse(compute.score | compute.ocg, 0, bws$nuno + bws$nord)
+    if((permutation.operator != "none") || compute.ocg){
+      npvar <- ifelse((permutation.operator != "none"), bws$ncon, 0) + ifelse(compute.score | compute.ocg, bws$nuno + bws$nord, 0)
       p.length.out <- npvar*length.out
       p.dim.out <- c(dim.out, max(npvar, 0))      
     }
@@ -320,13 +319,26 @@ npksum.default <-
       kw <- NULL
     }
 
-    if((permutation.operator != "none") && (p.length.out > 0)) {
+    if(((permutation.operator != "none") || compute.ocg) && (p.length.out > 0)) {
       dim.p <- p.dim.out[which(p.dim.out > 1)]
       if(length(dim.p) == 0) dim.p <- 1
 
       p.myout <- matrix(data = myout[["p.ksum"]], ncol = npvar)
-      p.myout[,c(which(bws$icon),which(bws$iuno),which(bws$iord))] <- p.myout
 
+      ip <- integer(0)
+
+      if((permutation.operator != "none") && (bws$ncon > 0))
+        ip <- which(bws$icon)
+
+      if(compute.ocg || compute.score){
+        if(bws$nuno > 0)
+          ip <- c(ip,which(bws$iuno))
+
+        if(bws$nord > 0)
+          ip <- c(ip,which(bws$iord))
+      }
+
+      p.myout[,ip] <- p.myout
 
       p.myout <- array(data = as.vector(p.myout), dim = dim.p)
     } else {

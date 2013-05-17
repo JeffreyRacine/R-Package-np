@@ -3354,7 +3354,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int i,j,k, num_var, num_obs_eval_alloc;
   int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, do_smooth_coef_weights, no_weights, sum_element_length, return_kernel_weights;
-  int p_operator, do_score, do_ocg, p_nvar;
+  int p_operator, do_score, do_ocg, p_nvar = 0;
 
 
   /* match integer options with their globals */
@@ -3432,9 +3432,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   vector_scale_factor = alloc_vecd(num_var + 1);
   ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length);
 
-  if(p_operator != OP_NOOP){
-    // right now, we will only allow this for continuous variables
-    p_nvar = num_reg_continuous_extern + ((do_score || do_ocg) ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
+  if((p_operator != OP_NOOP) || do_ocg){
+    p_nvar = ((p_operator != OP_NOOP) ? num_reg_continuous_extern : 0) + ((do_score || do_ocg) ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
     p_ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length*p_nvar);
   }
 
@@ -3646,7 +3645,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     safe_free(kw);
   }
 
-  if(p_operator != OP_NOOP){
+  if(p_nvar > 0){
     for(k = 0; k < p_nvar; k++){
       const int kidx = k*num_obs_eval_extern*sum_element_length;
       for(j = 0; j < num_obs_eval_extern; j++)
@@ -3685,7 +3684,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     int_TREE = NP_TREE_FALSE;
   }
 
-  if(p_operator != OP_NOOP){
+  if(p_nvar > 0){
     safe_free(p_ksum);
   }
 
