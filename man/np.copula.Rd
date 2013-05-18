@@ -131,7 +131,7 @@ require(MASS)
 
 set.seed(42)
 
-## Simulate correlated Gaussian data (rho(x,y)=0.95)
+## Simulate correlated Gaussian data (rho(x,y)=0.99)
 
 n <- 1000
 n.eval <- 100
@@ -178,7 +178,7 @@ require(MASS)
 
 set.seed(42)
 
-## Simulate correlated Gaussian data (rho(x,y)=0.95)
+## Simulate correlated Gaussian data (rho(x,y)=0.99)
 
 n <- 1000
 n.eval <- 100

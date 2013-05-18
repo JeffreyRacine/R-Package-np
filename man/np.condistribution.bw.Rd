@@ -39,9 +39,9 @@ npcdistbw(\dots)
           fast.cdf = TRUE,
           do.full.integral = FALSE,
           ngrid = 100,
-          ftol = 1.19209e-07,
-          tol = 1.49012e-08,
-          small = 2.22045e-16,
+          ftol = 1.490116e-07,
+          tol = 1.490116e-04,
+          small = 1.490116e-05,
           \dots)
 
 \method{npcdistbw}{default}(xdat = stop("data 'xdat' missing"),
@@ -276,23 +276,29 @@ npcdistbw(\dots)
     integral. Defaults to \code{100}.
   }
 
-  \item{ftol}{
-    tolerance on the value of the cross-validation function 
-    evaluated at located minima. Defaults to \code{1.19e-07
-      (FLT_EPSILON)}.
+ \item{ftol}{
+    fractional tolerance on the value of the cross-validation function
+    evaluated at located minima (of order the machine precision or
+    perhaps slightly larger so as not to be diddled by
+    roundoff). Defaults to \code{1.490116e-07}
+    (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
   \item{tol}{
-    tolerance on the position of located minima of the 
-    cross-validation function. Defaults to \code{1.49e-08
-      (sqrt(DBL_EPSILON))}.
+    tolerance on the position of located minima of the cross-validation
+    function (tol should generally be no smaller than the square root of
+    your machine's floating point precision). Defaults to \code{
+      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
   }
 
-  \item{small}{ a small number, at about the precision of the data type
-    used. Defaults to \code{2.22e-16 (DBL_EPSILON)}.
-
+  \item{small}{
+    a small number used to bracket a minimum (it is hopeless to ask for
+    a bracketing interval of width less than sqrt(epsilon) times its
+    central value, a fractional width of only about 10-04 (single
+    precision) or 3x10-8 (double prevision)). Defaults to \code{small
+      = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
-
+  
 }
 
 \details{
