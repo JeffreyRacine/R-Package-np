@@ -1709,6 +1709,7 @@ double * sgn,
 double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
 double * const restrict weighted_sum,
 double * const restrict weighted_permutation_sum,
 double * const restrict kw){
@@ -2737,6 +2738,7 @@ int *num_categories){
                            vector_scale_factor,
                            num_categories,
                            NULL,
+                           NULL,
                            aicc,
                            NULL, // no permutations
                            NULL); // do not return kernel weights
@@ -2797,6 +2799,7 @@ int *num_categories){
                            NULL,
                            vector_scale_factor,
                            num_categories,
+                           NULL,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -2965,6 +2968,7 @@ int *num_categories){
                                    vsf,
                                    num_categories,
                                    NULL,
+                                   NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
                                    NULL); // do not return kernel weights
@@ -3044,6 +3048,7 @@ int *num_categories){
                                    sgn,
                                    vsf,
                                    num_categories,
+                                   NULL,
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
@@ -3131,6 +3136,7 @@ int *num_categories){
                                vsf,
                                num_categories,
                                NULL,
+                               NULL,
                                kwm+j*nrcc22,  // weighted sum
                                NULL, // no permutations
                                NULL); // do not return kernel weights
@@ -3203,6 +3209,7 @@ int *num_categories){
                                  sgn,
                                  vsf,
                                  num_categories,
+                                 NULL,
                                  NULL,
                                  kwm+j*nrcc22, // weighted sum
                                  NULL, // no permutations
@@ -3406,6 +3413,7 @@ double * cv){
                            vsf,
                            num_categories,
                            matrix_categorical_vals,
+                           NULL,
                            mean,
                            NULL, // no permutations
                            kw);
@@ -3471,6 +3479,7 @@ double * cv){
                              vsf,
                              num_categories,
                              matrix_categorical_vals,
+                             NULL,
                              mean,
                              NULL, // no permutations
                              NULL);
@@ -3644,6 +3653,7 @@ double *cv){
                            vsfy,
                            num_categories,
                            NULL,
+                           NULL,
                            mean,
                            NULL, // no permutations
                            kwy);
@@ -3680,6 +3690,7 @@ double *cv){
                            NULL,
                            vsfx,
                            num_categories + (num_var_unordered + num_var_ordered),
+                           NULL,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -3929,6 +3940,7 @@ double *SIGN){
                            vector_scale_factor,
                            num_categories,
                            NULL, // no convolution 
+                           NULL, // no ocg
                            meany,
                            permy, // permutations used for gradients
                            NULL); // do not return kernel weights
@@ -4112,6 +4124,7 @@ double *SIGN){
                                  vsf,
                                  num_categories,
                                  NULL,
+                                 NULL,
                                  kwm+(j+my_rank)*nrcc33,  // weighted sum
                                  NULL, // no permutations
                                  NULL); // do not return kernel weights
@@ -4176,6 +4189,7 @@ double *SIGN){
                              NULL,
                              vsf,
                              num_categories,
+                             NULL,
                              NULL,
                              kwm+j*nrcc33,  // weighted sum
                              NULL, // no permutations

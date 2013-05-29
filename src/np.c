@@ -3364,6 +3364,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
+  int ** matrix_ordered_indices = NULL;
 
   /* match integer options with their globals */
 
@@ -3560,8 +3561,12 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     num_categories_extern[j] = i;
   }
 
-  if(do_ocg){
+  if(do_ocg && (num_reg_ordered_extern > 0)){
     otabs = (struct th_table *)malloc(num_reg_ordered_extern*sizeof(struct th_table));
+    matrix_ordered_indices = (int **)malloc(num_reg_ordered_extern*sizeof(int *));
+    int * tc = (int *)malloc(num_reg_ordered_extern*num_obs_eval_extern*sizeof(int));
+    for(i = 0; i < num_reg_unordered_extern; i++)
+      matrix_ordered_indices[i] = tc + i*num_obs_eval_extern;
   }
 
   for(j=num_reg_unordered_extern, k = 0; j < (num_reg_unordered_extern+num_reg_ordered_extern); j++, k++){
@@ -3572,7 +3577,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     } while(++i < max_lev && mcv[j*max_lev+i] != pad_num);
     num_categories_extern[j] = i;
 
-    if(do_ocg && (num_reg_ordered_extern > 0)){
+    if(do_ocg){
       if(thcreate_r((size_t)ceil(1.6*num_categories_extern[j]), otabs + k) == TH_ERROR)
         error("hash table creation failed");
 
@@ -3581,6 +3586,20 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                         .data = i};
         if(thsearch_r(&centry, TH_ENTER, &ret, otabs+k) == TH_FAILURE)
           error("insertion into hash table failed");
+      }
+      
+      // now do lookups
+      struct th_entry te = {.dkey = pad_num, .data = -1};
+      ret = &te;
+      for(i = 0; i < num_obs_eval_extern; i++){
+        if(ret->dkey != matrix_X_ordered_eval_extern[k][i]){
+          te.dkey = matrix_X_ordered_eval_extern[k][i];
+          if(thsearch_r(&te, TH_SEARCH, &ret, otabs+k) == TH_FAILURE)
+            error("hash table lookup failed (which should be impossible)");
+
+        } 
+
+        matrix_ordered_indices[k][i] = ret->data;
       }
     }
   }
@@ -3624,6 +3643,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          &vector_scale_factor[1],
                          num_categories_extern,
                          matrix_categorical_vals_extern,
+                         matrix_ordered_indices,
                          ksum,
                          p_ksum,
                          kw);
@@ -3690,10 +3710,13 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(do_ocg && (num_reg_ordered_extern > 0)){
+
     for(k = 0; k < num_reg_ordered_extern; k++){
       thdestroy_r(otabs+k);
     }
     free(otabs);
+    free(matrix_ordered_indices[0]);
+    free(matrix_ordered_indices);
   }
 
   return;
