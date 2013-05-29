@@ -1226,13 +1226,15 @@ void np_p_okernelv(const int KERNEL,
                    const int P_NIDX,
                    const double * const xt, const int num_xt, 
                    const int do_xw,
-                   const double x, const double lambda, const double cat,
+                   const double x, const double lambda, const double * cats,
                    double * const result,
                    double * const p_result,
                    const NL * const nl,
                    const NL * const p_nl,
                    const int swap_xxt,
-                   const int do_ocg){
+                   const int do_ocg,
+                   const int * const ordered_indices,
+                   const int swapped_index){
 
   /* 
      this should be read as:
@@ -1256,9 +1258,15 @@ void np_p_okernelv(const int KERNEL,
 
   assert(kbuf != NULL);
 
+  double s_cat = 0.0;
+
+  if((!swap_xxt) && do_ocg){
+    s_cat = cats[abs(swapped_index - 1)];
+  }
 
     if(nl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+        const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
         const double c1 = swap_xxt ? x : xt[i];
         const double c2 = swap_xxt ? xt[i] : x;
         const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
@@ -1267,7 +1275,6 @@ void np_p_okernelv(const int KERNEL,
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
-
 
         p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](c1, c3, lambda);
       }
@@ -1298,6 +1305,7 @@ void np_p_okernelv(const int KERNEL,
         const int istart = kdt_extern->kdn[p_nl->node[m]].istart;
         const int nlev = kdt_extern->kdn[p_nl->node[m]].nlev;
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+          const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
           const double c1 = swap_xxt ? x : xt[i];
           const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
@@ -1709,6 +1717,7 @@ double * sgn,
 double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
 double * const restrict weighted_sum,
 double * const restrict weighted_permutation_sum,
 double * const restrict kw){
@@ -2155,8 +2164,8 @@ double * const restrict kw){
         }
       } else {
         np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel, ip, p_nvar, xto[i], num_xt, l,
-                      xo[i][j], lambda[num_reg_unordered+i], matrix_categorical_vals[i+num_reg_unordered][0],
-                      tprod, tprod_mp, pnl, p_pnl + ip, swap_xxt, do_ocg);
+                      xo[i][j], lambda[num_reg_unordered+i], matrix_categorical_vals[i+num_reg_unordered],
+                      tprod, tprod_mp, pnl, p_pnl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
       }
     }
 
@@ -2737,6 +2746,7 @@ int *num_categories){
                            vector_scale_factor,
                            num_categories,
                            NULL,
+                           NULL,
                            aicc,
                            NULL, // no permutations
                            NULL); // do not return kernel weights
@@ -2797,6 +2807,7 @@ int *num_categories){
                            NULL,
                            vector_scale_factor,
                            num_categories,
+                           NULL,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -2965,6 +2976,7 @@ int *num_categories){
                                    vsf,
                                    num_categories,
                                    NULL,
+                                   NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
                                    NULL); // do not return kernel weights
@@ -3044,6 +3056,7 @@ int *num_categories){
                                    sgn,
                                    vsf,
                                    num_categories,
+                                   NULL,
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
@@ -3131,6 +3144,7 @@ int *num_categories){
                                vsf,
                                num_categories,
                                NULL,
+                               NULL,
                                kwm+j*nrcc22,  // weighted sum
                                NULL, // no permutations
                                NULL); // do not return kernel weights
@@ -3203,6 +3217,7 @@ int *num_categories){
                                  sgn,
                                  vsf,
                                  num_categories,
+                                 NULL,
                                  NULL,
                                  kwm+j*nrcc22, // weighted sum
                                  NULL, // no permutations
@@ -3406,6 +3421,7 @@ double * cv){
                            vsf,
                            num_categories,
                            matrix_categorical_vals,
+                           NULL,
                            mean,
                            NULL, // no permutations
                            kw);
@@ -3471,6 +3487,7 @@ double * cv){
                              vsf,
                              num_categories,
                              matrix_categorical_vals,
+                             NULL,
                              mean,
                              NULL, // no permutations
                              NULL);
@@ -3644,6 +3661,7 @@ double *cv){
                            vsfy,
                            num_categories,
                            NULL,
+                           NULL,
                            mean,
                            NULL, // no permutations
                            kwy);
@@ -3680,6 +3698,7 @@ double *cv){
                            NULL,
                            vsfx,
                            num_categories + (num_var_unordered + num_var_ordered),
+                           NULL,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -3929,6 +3948,7 @@ double *SIGN){
                            vector_scale_factor,
                            num_categories,
                            NULL, // no convolution 
+                           NULL, // no ocg
                            meany,
                            permy, // permutations used for gradients
                            NULL); // do not return kernel weights
@@ -4112,6 +4132,7 @@ double *SIGN){
                                  vsf,
                                  num_categories,
                                  NULL,
+                                 NULL,
                                  kwm+(j+my_rank)*nrcc33,  // weighted sum
                                  NULL, // no permutations
                                  NULL); // do not return kernel weights
@@ -4176,6 +4197,7 @@ double *SIGN){
                              NULL,
                              vsf,
                              num_categories,
+                             NULL,
                              NULL,
                              kwm+j*nrcc33,  // weighted sum
                              NULL, // no permutations
