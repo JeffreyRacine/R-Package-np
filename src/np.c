@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include <R.h>
+#include <stdint.h>
 
 #ifdef MPI2
 #include "mpi.h"
@@ -35,6 +36,10 @@ extern MPI_Comm	*comm;
 #include "headers.h"
 #include "matrix.h"
 #include "tree.h"
+
+// categorical hashing
+#include "hash.h"
+
 
 #ifdef RCSID
 static char rcsid[] = "$Id: np.c,v 1.35 2006/11/02 16:56:49 tristen Exp $";
@@ -3335,6 +3340,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   return;
 }
 
+#define NCBUF 25
 
 void np_kernelsum(double * tuno, double * tord, double * tcon, 
                   double * ty, double * weights,
@@ -3356,6 +3362,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int max_lev, do_smooth_coef_weights, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
 
+  struct th_table * otabs = NULL;
+  struct th_entry * ret = NULL;
 
   /* match integer options with their globals */
 
@@ -3552,19 +3560,34 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     num_categories_extern[j] = i;
   }
 
-  for(j=num_reg_unordered_extern; j < (num_reg_unordered_extern+num_reg_ordered_extern); j++){
+  if(do_ocg){
+    otabs = (struct th_table *)malloc(num_reg_ordered_extern*sizeof(struct th_table));
+  }
+
+  for(j=num_reg_unordered_extern, k = 0; j < (num_reg_unordered_extern+num_reg_ordered_extern); j++, k++){
     i = 0;
+
     do { 
       matrix_categorical_vals_extern[j][i] = mcv[j*max_lev+i];
     } while(++i < max_lev && mcv[j*max_lev+i] != pad_num);
     num_categories_extern[j] = i;
+
+    if(do_ocg && (num_reg_ordered_extern > 0)){
+      if(thcreate_r((size_t)ceil(1.6*num_categories_extern[j]), otabs + k) == TH_ERROR)
+        error("hash table creation failed");
+
+      for(i = 0; i < num_categories_extern[j]; i++){
+        const struct th_entry centry = {.dkey = matrix_categorical_vals_extern[j][i], 
+                                        .data = i};
+        if(thsearch_r(&centry, TH_ENTER, &ret, otabs+k) == TH_FAILURE)
+          error("insertion into hash table failed");
+      }
+    }
   }
 
   if(return_kernel_weights){
     kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
   }
-  //if((operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8))
-  //  error("np.c error (operator == OP_CONVOLUTION) && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (KERNEL_reg_extern == 8)");
   
   kernel_weighted_sum_np(KERNEL_reg_extern,
                          KERNEL_reg_unordered_extern,
@@ -3604,28 +3627,6 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          ksum,
                          p_ksum,
                          kw);
-  /*
-    kernel_convolution_weighted_sum(KERNEL_reg_extern,
-                                    KERNEL_reg_unordered_extern,
-                                    KERNEL_reg_ordered_extern,
-                                    BANDWIDTH_reg_extern,
-                                    num_obs_train_extern,
-                                    num_obs_eval_extern,
-                                    num_reg_unordered_extern,
-                                    num_reg_ordered_extern,
-                                    num_reg_continuous_extern,
-                                    matrix_X_unordered_train_extern,
-                                    matrix_X_ordered_train_extern,
-                                    matrix_X_continuous_train_extern,
-                                    matrix_X_unordered_eval_extern,
-                                    matrix_X_ordered_eval_extern,
-                                    matrix_X_continuous_eval_extern,
-                                    vector_Y_extern,
-                                    &vector_scale_factor[1],
-                                    num_categories_extern,
-                                    matrix_categorical_vals_extern,
-                                    ksum);
-  */
 
 
   for(j = 0; j < num_obs_eval_extern; j++)
@@ -3686,6 +3687,13 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   if(p_nvar > 0){
     safe_free(p_ksum);
+  }
+
+  if(do_ocg && (num_reg_ordered_extern > 0)){
+    for(k = 0; k < num_reg_ordered_extern; k++){
+      thdestroy_r(otabs+k);
+    }
+    free(otabs);
   }
 
   return;
