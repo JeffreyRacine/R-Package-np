@@ -3254,6 +3254,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    vector_Y_eval_extern,
                                                    &vector_scale_factor[1],
                                                    num_categories_extern,
+                                                   matrix_categorical_vals_extern,
                                                    ecm,
                                                    do_grad ? eg : NULL,
                                                    ecmerr,
@@ -3565,7 +3566,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     otabs = (struct th_table *)malloc(num_reg_ordered_extern*sizeof(struct th_table));
     matrix_ordered_indices = (int **)malloc(num_reg_ordered_extern*sizeof(int *));
     int * tc = (int *)malloc(num_reg_ordered_extern*num_obs_eval_extern*sizeof(int));
-    for(i = 0; i < num_reg_unordered_extern; i++)
+    for(i = 0; i < num_reg_ordered_extern; i++)
       matrix_ordered_indices[i] = tc + i*num_obs_eval_extern;
   }
 
@@ -3582,14 +3583,19 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
         error("hash table creation failed");
 
       for(i = 0; i < num_categories_extern[j]; i++){
-        const struct th_entry centry = {.dkey = matrix_categorical_vals_extern[j][i], 
-                                        .data = i};
+        struct th_entry centry;
+        centry.dkey = matrix_categorical_vals_extern[j][i];
+        centry.data = i;
+
         if(thsearch_r(&centry, TH_ENTER, &ret, otabs+k) == TH_FAILURE)
           error("insertion into hash table failed");
       }
       
       // now do lookups
-      struct th_entry te = {.dkey = pad_num, .data = -1};
+      struct th_entry te;
+      te.dkey = pad_num;
+      te.data = -1;
+
       ret = &te;
       for(i = 0; i < num_obs_eval_extern; i++){
         if(ret->dkey != matrix_X_ordered_eval_extern[k][i]){
