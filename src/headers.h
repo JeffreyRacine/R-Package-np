@@ -467,6 +467,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 0, 2, 0 };
 #define REG_TISEI 14
 #define REG_MLEVI 15
 #define REG_DOTREEI 16
+#define REG_OLDREGI 17
 
 #define KWS_TNOBSI   0
 #define KWS_ENOBSI 1

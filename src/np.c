@@ -2947,7 +2947,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
 
   int i,j, num_var;
-  int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev;
+  int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev, old_reg;
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
   /* match integer options with their globals */
@@ -2984,6 +2984,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   pad_num = *padnum;
 
   int_TREE = myopti[REG_DOTREEI];
+  old_reg = myopti[REG_OLDREGI];
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX((int)ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -3143,7 +3144,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
      - they have only one kernel type each at the moment 
   */
 
-  if(int_TREE != NP_TREE_TRUE){
+  if(old_reg){
     kernel_estimate_regression_categorical(int_ll_extern,
                                            KERNEL_reg_extern,
                                            KERNEL_reg_unordered_extern,
@@ -3340,8 +3341,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   return;
 }
-
-#define NCBUF 25
 
 void np_kernelsum(double * tuno, double * tord, double * tcon, 
                   double * ty, double * weights,

@@ -1853,16 +1853,16 @@ double * const restrict kw){
   }
 
   if(p_nvar > 0){
-    if(do_perm){
+    if(do_perm)
       permutation_kernel = KERNEL_reg + OP_CFUN_OFFSETS[permutation_operator];
+
+    if(do_score){
       ps_ukernel = KERNEL_unordered_reg + OP_UFUN_OFFSETS[permutation_operator];
       ps_okernel = KERNEL_ordered_reg + OP_OFUN_OFFSETS[permutation_operator];
-    } else { // compute_ocg
-      permutation_kernel = KERNEL_reg;
+    } else if(do_ocg) {
       ps_ukernel = KERNEL_unordered_reg;
       ps_okernel = KERNEL_ordered_reg;
     }
-
 
     tprod_mp = (double *)malloc(((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train)*p_nvar*sizeof(double));
 
@@ -3830,7 +3830,7 @@ double *SIGN){
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
-  assert((int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED));
+  assert(BANDWIDTH_reg == BW_FIXED);
 
   // Allocate memory for objects 
 
@@ -4046,7 +4046,7 @@ double *SIGN){
           const double sk = copysign(DBL_MIN, permy[li3+1]) + permy[li3+1];
           const double s1 = permy[li3]/sk;
           
-          gradient[l][i] = (mean[i] - permy[li3]/sk)*((matrix_ordered_indices[l-num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
+          gradient[l][i] = (mean[i] - permy[li3]/sk)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
 
           if(do_gerr){
             const double se = permy[li3+2]/sk - s1*s1;
