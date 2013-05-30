@@ -2947,7 +2947,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   double RS, MSE, MAE, MAPE, CORR, SIGN, pad_num;
 
   int i,j, num_var;
-  int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev;
+  int ey_is_ty, do_grad, train_is_eval, num_obs_eval_alloc, max_lev, old_reg;
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
   /* match integer options with their globals */
@@ -2984,6 +2984,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   pad_num = *padnum;
 
   int_TREE = myopti[REG_DOTREEI];
+  old_reg = myopti[REG_OLDREGI];
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX((int)ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -3143,7 +3144,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
      - they have only one kernel type each at the moment 
   */
 
-  if(int_TREE != NP_TREE_TRUE){
+  if(old_reg){
     kernel_estimate_regression_categorical(int_ll_extern,
                                            KERNEL_reg_extern,
                                            KERNEL_reg_unordered_extern,
@@ -3254,6 +3255,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    vector_Y_eval_extern,
                                                    &vector_scale_factor[1],
                                                    num_categories_extern,
+                                                   matrix_categorical_vals_extern,
                                                    ecm,
                                                    do_grad ? eg : NULL,
                                                    ecmerr,
@@ -3339,8 +3341,6 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   return;
 }
-
-#define NCBUF 25
 
 void np_kernelsum(double * tuno, double * tord, double * tcon, 
                   double * ty, double * weights,
@@ -3565,7 +3565,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     otabs = (struct th_table *)malloc(num_reg_ordered_extern*sizeof(struct th_table));
     matrix_ordered_indices = (int **)malloc(num_reg_ordered_extern*sizeof(int *));
     int * tc = (int *)malloc(num_reg_ordered_extern*num_obs_eval_extern*sizeof(int));
-    for(i = 0; i < num_reg_unordered_extern; i++)
+    for(i = 0; i < num_reg_ordered_extern; i++)
       matrix_ordered_indices[i] = tc + i*num_obs_eval_extern;
   }
 
@@ -3582,14 +3582,19 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
         error("hash table creation failed");
 
       for(i = 0; i < num_categories_extern[j]; i++){
-        const struct th_entry centry = {.dkey = matrix_categorical_vals_extern[j][i], 
-                                        .data = i};
+        struct th_entry centry;
+        centry.dkey = matrix_categorical_vals_extern[j][i];
+        centry.data = i;
+
         if(thsearch_r(&centry, TH_ENTER, &ret, otabs+k) == TH_FAILURE)
           error("insertion into hash table failed");
       }
       
       // now do lookups
-      struct th_entry te = {.dkey = pad_num, .data = -1};
+      struct th_entry te;
+      te.dkey = pad_num;
+      te.data = -1;
+
       ret = &te;
       for(i = 0; i < num_obs_eval_extern; i++){
         if(ret->dkey != matrix_X_ordered_eval_extern[k][i]){

@@ -13,6 +13,7 @@
 #include "headers.h"
 #include "matrix.h"
 
+#include "hash.h"
 #include "tree.h"
 
 #include <assert.h>
@@ -1852,16 +1853,16 @@ double * const restrict kw){
   }
 
   if(p_nvar > 0){
-    if(do_perm){
+    if(do_perm)
       permutation_kernel = KERNEL_reg + OP_CFUN_OFFSETS[permutation_operator];
+
+    if(do_score){
       ps_ukernel = KERNEL_unordered_reg + OP_UFUN_OFFSETS[permutation_operator];
       ps_okernel = KERNEL_ordered_reg + OP_OFUN_OFFSETS[permutation_operator];
-    } else { // compute_ocg
-      permutation_kernel = KERNEL_reg;
+    } else if(do_ocg) {
       ps_ukernel = KERNEL_unordered_reg;
       ps_okernel = KERNEL_ordered_reg;
     }
-
 
     tprod_mp = (double *)malloc(((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train)*p_nvar*sizeof(double));
 
@@ -3784,6 +3785,7 @@ double *vector_Y,
 double *vector_Y_eval,
 double *vector_scale_factor,
 int *num_categories,
+double ** matrix_categorical_vals,
 double * const restrict mean,
 double **gradient,
 double * const restrict mean_stderr,
@@ -3828,7 +3830,12 @@ double *SIGN){
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
-  assert((int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED));
+
+  struct th_table * otabs = NULL;
+  struct th_entry * ret = NULL;
+  int ** matrix_ordered_indices = NULL;
+
+  assert(BANDWIDTH_reg == BW_FIXED);
 
   // Allocate memory for objects 
 
@@ -3877,6 +3884,44 @@ double *SIGN){
 
   const double gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
 
+  // compute hash stuff here if necessary
+
+  if(do_grad && (num_reg_ordered > 0)){
+    otabs = (struct th_table *)malloc(num_reg_ordered*sizeof(struct th_table));
+    matrix_ordered_indices = (int **)malloc(num_reg_ordered*sizeof(int *));
+    int * tc = (int *)malloc(num_reg_ordered*num_obs_eval*sizeof(int));
+    for(l = 0; l < num_reg_ordered; l++)
+      matrix_ordered_indices[l] = tc + l*num_obs_eval;
+
+    for(l = 0; l < num_reg_ordered; l++){
+      if(thcreate_r((size_t)ceil(1.6*num_categories[l+num_reg_unordered]), otabs + l) == TH_ERROR)
+        error("hash table creation failed");
+
+      for(i = 0; i < num_categories[l+num_reg_unordered]; i++){
+        struct th_entry centry;
+        centry.dkey = matrix_categorical_vals[l+num_reg_unordered][i];
+        centry.data = i;
+
+        if(thsearch_r(&centry, TH_ENTER, &ret, otabs+l) == TH_FAILURE)
+          error("insertion into hash table failed");
+      }
+
+      // now do lookups
+      struct th_entry te;
+      te.dkey = ret->dkey;
+      te.data = ret->data;
+
+      for(i = 0; i < num_obs_eval; i++){
+        if(ret->dkey != matrix_X_ordered_eval[l][i]){
+          te.dkey = matrix_X_ordered_eval[l][i];
+          if(thsearch_r(&te, TH_SEARCH, &ret, otabs+l) == TH_FAILURE)
+            error("hash table lookup failed (which should be impossible)");
+        } 
+
+        matrix_ordered_indices[l][i] = ret->data;
+      }
+    }
+  }
 
   // Conduct the estimation 
 
@@ -3890,9 +3935,10 @@ double *SIGN){
     double * restrict meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
     double * restrict permy = NULL;
     int pop = OP_NOOP;
-    
+    int p_nvar = do_grad ? (num_reg_continuous + num_reg_unordered + num_reg_ordered) : 0;
+  
     if(do_grad){
-      permy = (double *)malloc(NCOL_Y*num_obs_eval_alloc*num_reg_continuous*sizeof(double));
+      permy = (double *)malloc(NCOL_Y*num_obs_eval_alloc*p_nvar*sizeof(double));
       assert(permy != NULL);
       pop = OP_DERIVATIVE;
     }
@@ -3914,7 +3960,7 @@ double *SIGN){
       lc_Y[1][ii] = 1.0;
       lc_Y[2][ii] = vector_Y[ii]*vector_Y[ii];
     }
-
+    
     kernel_weighted_sum_np(KERNEL_reg,
                            KERNEL_unordered_reg,
                            KERNEL_ordered_reg,
@@ -3935,7 +3981,7 @@ double *SIGN){
                            operator, // no special operators being used
                            pop, // permutations used for gradients
                            0, // no score
-                           0, // no ocg (for now)
+                           do_grad, // ocg if grad 
                            matrix_X_unordered_train, // TRAIN
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3947,8 +3993,8 @@ double *SIGN){
                            NULL, // no sgn 
                            vector_scale_factor,
                            num_categories,
-                           NULL, // no convolution 
-                           NULL, // no ocg
+                           matrix_categorical_vals,
+                           matrix_ordered_indices, 
                            meany,
                            permy, // permutations used for gradients
                            NULL); // do not return kernel weights
@@ -3977,7 +4023,39 @@ double *SIGN){
             gradient_stderr[l][i] = gfac*mean_stderr[i]/matrix_bandwidth[l][0];
           }
         }
-      } 
+      }
+
+      for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered); l++){
+        for(i = 0; i < num_obs_eval; i++){
+          const int ii3 = NCOL_Y*i;
+          const int li3 = l*num_obs_eval*NCOL_Y + ii3;
+          const double sk = copysign(DBL_MIN, permy[li3+1]) + permy[li3+1];
+          const double s1 = permy[li3]/sk;
+
+          gradient[l][i] = mean[i] - s1;
+          
+          if(do_gerr){
+            const double se = permy[li3+2]/sk - s1*s1;
+            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+          }
+        }
+      }
+
+      for(l = num_reg_continuous + num_reg_unordered; l < p_nvar; l++){
+        for(i = 0; i < num_obs_eval; i++){
+          const int ii3 = NCOL_Y*i;
+          const int li3 = l*num_obs_eval*NCOL_Y + ii3;
+          const double sk = copysign(DBL_MIN, permy[li3+1]) + permy[li3+1];
+          const double s1 = permy[li3]/sk;
+          
+          gradient[l][i] = (mean[i] - permy[li3]/sk)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
+
+          if(do_gerr){
+            const double se = permy[li3+2]/sk - s1*s1;
+            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+          }
+        }
+      }
     }
 
 
@@ -4260,6 +4338,15 @@ double *SIGN){
 
     free(kwm);
     free(sgn);
+  }
+
+  // clean up hash stuff
+  if(do_grad && (num_reg_ordered > 0)){
+    for(l = 0; l < num_reg_ordered; l++)
+      thdestroy_r(otabs+l);
+    free(otabs);
+    free(matrix_ordered_indices[0]);
+    free(matrix_ordered_indices);
   }
 
   free(operator);
