@@ -4034,9 +4034,11 @@ double *SIGN){
 
           gradient[l][i] = mean[i] - s1;
           
-          if(do_gerr){
+          if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
             gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+          } else {
+            gradient_stderr[l][i] = 0.0;
           }
         }
       }
@@ -4050,9 +4052,11 @@ double *SIGN){
           
           gradient[l][i] = (mean[i] - permy[li3]/sk)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
 
-          if(do_gerr){
+          if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
             gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+          } else {
+            gradient_stderr[l][i] = 0.0;
           }
         }
       }
