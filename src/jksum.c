@@ -4034,9 +4034,11 @@ double *SIGN){
 
           gradient[l][i] = mean[i] - s1;
           
-          if(do_gerr){
+          if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
             gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+          } else {
+            gradient_stderr[l][i] = 0.0;
           }
         }
       }
@@ -4050,9 +4052,11 @@ double *SIGN){
           
           gradient[l][i] = (mean[i] - permy[li3]/sk)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
 
-          if(do_gerr){
+          if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
             gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+          } else {
+            gradient_stderr[l][i] = 0.0;
           }
         }
       }
@@ -4155,75 +4159,6 @@ double *SIGN){
         XTKY[l] = &kwm[j*nrcc33+l+nrc3+2];
       }
 
-#ifdef MPI2
-      
-      if((j % iNum_Processors) == 0){
-        if((j+my_rank) < (num_obs_eval)){
-          for(l = 0; l < num_reg_continuous; l++){
-          
-            for(i = 0; i < num_obs_train; i++){
-              XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j+my_rank];
-            }
-            TCON[l][0] = matrix_X_continuous_eval[l][j+my_rank]; // temporary storage
-          }
-
-
-          for(l = 0; l < num_reg_unordered; l++)
-            TUNO[l][0] = matrix_X_unordered_eval[l][j+my_rank];
-
-          for(l = 0; l < num_reg_ordered; l++)
-            TORD[l][0] = matrix_X_ordered_eval[l][j+my_rank];
-
-          num_var_continuous_extern = nrc3; // rows in the y_mat
-          num_var_ordered_extern = nrc3; // rows in weights
-
-          kernel_weighted_sum_np(KERNEL_reg,
-                                 KERNEL_unordered_reg,
-                                 KERNEL_ordered_reg,
-                                 BANDWIDTH_reg,
-                                 num_obs_train,
-                                 1,
-                                 num_reg_unordered,
-                                 num_reg_ordered,
-                                 num_reg_continuous,
-                                 0, 
-                                 1, // kernel_pow = 1
-                                 0, // bandwidth_divide = FALSE when not adaptive
-                                 0, // do_smooth_coef_weights = FALSE (not implemented)
-                                 1, // symmetric
-                                 0, // NO gather-scatter sum
-                                 0, // do not drop train
-                                 0, // do not drop train
-                                 operator, // no convolution
-                                 OP_NOOP, // no permutations
-                                 0, // no score
-                                 0, // no ocg
-                                 PXU, // TRAIN
-                                 PXO, 
-                                 PXC,
-                                 TUNO, // EVAL
-                                 TORD,
-                                 TCON,
-                                 XTKX,
-                                 XTKX,
-                                 NULL,
-                                 vsf,
-                                 num_categories,
-                                 NULL,
-                                 NULL,
-                                 kwm+(j+my_rank)*nrcc33,  // weighted sum
-                                 NULL, // no permutations
-                                 NULL); // do not return kernel weights
-
-          num_var_continuous_extern = 0; // set back to number of regressors
-          num_var_ordered_extern = 0; // always zero
-        }
-        // synchro step
-        MPI_Allgather(MPI_IN_PLACE, nrcc33*iNum_Processors, MPI_DOUBLE, kwm+j*nrcc33, nrcc33*iNum_Processors, MPI_DOUBLE, comm[1]);    
-      }
-      
-#else
-
 
       for(l = 0; l < num_reg_continuous; l++){
           
@@ -4284,8 +4219,6 @@ double *SIGN){
       num_var_continuous_extern = 0; // set back to number of regressors
       num_var_ordered_extern = 0; // always zero
 
-#endif
-      
       while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
         for(int ii = 0; ii < (nrc1); ii++)
           KWM[ii][ii] += epsilon;
