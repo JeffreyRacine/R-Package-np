@@ -1706,7 +1706,6 @@ const int * const operator,
 const int permutation_operator,
 const int do_score,
 const int do_ocg,
-const int suppress_parallel,
 double **matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
@@ -1720,9 +1719,9 @@ double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
 int ** matrix_ordered_indices,
-double * const weighted_sum,
-double * const weighted_permutation_sum,
-double * const kw){
+double * const restrict weighted_sum,
+double * const restrict weighted_permutation_sum,
+double * const restrict kw){
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -1969,37 +1968,17 @@ double * const kw){
 
   if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
 #ifdef MPI2
-    if((!suppress_parallel) && (!gather_scatter)){
+    if(!gather_scatter){
       js = stride * my_rank;
       je = MIN(num_obs_eval - 1, js + stride - 1);
-
       ws = weighted_sum + js*sum_element_length;
+      p_ws = weighted_permutation_sum +js*sum_element_length;
 
-      if(weighted_permutation_sum != NULL){
-        p_ws = weighted_permutation_sum +js*sum_element_length;
-      } else {
-        p_ws = NULL;
-      }
-
-      // hopefully this now handles the case where there are more processors than observations
-      for(i = 0, ii = 0; ii*stride < num_obs_eval; ii++){
-        i += stride*sum_element_length;
-        igatherv[ii] = stride*sum_element_length;
+      for(i = 0, ii = 0; ii < iNum_Processors; ii++){
+        i += (js-je+1)*sum_element_length;
+        igatherv[ii] = (js-je+1)*sum_element_length;
         idisplsv[ii] = i;
       }
-      
-      if(i < num_obs_eval*sum_element_length){
-        const int de1 = (num_obs_eval - (ii-1)*stride)*sum_element_length;
-        i += de1;
-        igatherv[ii] = de1;
-        idisplsv[ii++] = i;
-      }
-
-      for(; ii < iNum_Processors; ii++){
-        igatherv[ii] = 0;
-        idisplsv[ii] = i;
-      }
-
 
     } else {
       js = 0;
@@ -2022,7 +2001,7 @@ double * const kw){
 
   } else {
 #ifdef MPI2
-    if((!suppress_parallel) && (!gather_scatter)){
+    if(!gather_scatter){
       js = stride * my_rank;
       je = MIN(num_obs_train - 1, js + stride - 1);
       ws = weighted_sum;
@@ -2229,7 +2208,7 @@ double * const kw){
     
   }
 
-  if((!gather_scatter) && (!suppress_parallel)){ 
+  if(!gather_scatter){ 
     // gather_scatter is only used for the local-linear cv
     // note: ll cv + adaptive_nn does not work in parallel
 #ifdef MPI2
@@ -2756,7 +2735,6 @@ int *num_categories){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
-                           0, // don't explicitly suppress parallel
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2819,7 +2797,6 @@ int *num_categories){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
-                           0, // don't explicitly suppress parallel
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2988,7 +2965,6 @@ int *num_categories){
                                    OP_NOOP, // no permutations
                                    0, // no score
                                    0, // no ocg
-                                   1, // explicitly suppress parallel
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -3010,7 +2986,7 @@ int *num_categories){
             num_var_ordered_extern = 0; // always zero
           }
           // synchro step
-          MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);    
+          MPI_Allgather(MPI_IN_PLACE, nrcc22*iNum_Processors, MPI_DOUBLE, kwm+j*nrcc22, nrcc22*iNum_Processors, MPI_DOUBLE, comm[1]);    
         }
       } else {
         if((j % iNum_Processors) == 0){
@@ -3070,7 +3046,6 @@ int *num_categories){
                                    OP_NOOP, // no permutations
                                    0, // no score
                                    0, // no ocg
-                                   1, // explicitly suppress parallel
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -3158,7 +3133,6 @@ int *num_categories){
                                OP_NOOP, // no permutations
                                0, // no score
                                0, // no ocg
-                               0, // don't explicity suppress parallel
                                PXU, // TRAIN
                                PXO, 
                                PXC,
@@ -3233,7 +3207,6 @@ int *num_categories){
                                  OP_NOOP, // no permutations
                                  0, // no score
                                  0, // no ocg
-                                 0, // don't explicity suppress parallel
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -3437,7 +3410,6 @@ double * cv){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
-                           0, // don't explicity suppress parallel
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3504,7 +3476,6 @@ double * cv){
                              OP_NOOP, // no permutations
                              0, // no score
                              0, // no ocg
-                             0, // don't explicity suppress parallel
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
@@ -3679,7 +3650,6 @@ double *cv){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
-                           0, // don't explicity suppress parallel
                            matrix_Y_unordered_train,
                            matrix_Y_ordered_train,
                            matrix_Y_continuous_train,
@@ -3718,7 +3688,6 @@ double *cv){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
-                           0, // don't explicity suppress parallel
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -4013,7 +3982,6 @@ double *SIGN){
                            pop, // permutations used for gradients
                            0, // no score
                            do_grad, // ocg if grad 
-                           0, // don't explicity suppress parallel
                            matrix_X_unordered_train, // TRAIN
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -4234,7 +4202,6 @@ double *SIGN){
                                  OP_NOOP, // no permutations
                                  0, // no score
                                  0, // no ocg
-                                 1, // explicity suppress parallel
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -4256,7 +4223,7 @@ double *SIGN){
           num_var_ordered_extern = 0; // always zero
         }
         // synchro step
-        MPI_Allgather(MPI_IN_PLACE, nrcc33, MPI_DOUBLE, kwm+j*nrcc33, nrcc33, MPI_DOUBLE, comm[1]);    
+        MPI_Allgather(MPI_IN_PLACE, nrcc33*iNum_Processors, MPI_DOUBLE, kwm+j*nrcc33, nrcc33*iNum_Processors, MPI_DOUBLE, comm[1]);    
       }
       
 #else
@@ -4301,7 +4268,6 @@ double *SIGN){
                              OP_NOOP, // no permutations
                              0, // no score
                              0, // no ocg
-                             1, //  explicity suppress parallel
                              PXU, // TRAIN
                              PXO, 
                              PXC,
