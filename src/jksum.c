@@ -1772,7 +1772,7 @@ double * const kw){
   // switch parallelisation strategies based on biggest stride
  
   int stride = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
-  num_obs_eval_alloc = stride*iNum_Processors;
+  num_obs_eval_alloc = suppress_parallel ? num_obs_eval : (stride*iNum_Processors);
 
   int * igatherv = NULL, * idisplsv = NULL;
 
