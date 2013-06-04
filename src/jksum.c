@@ -4082,7 +4082,7 @@ double *SIGN){
           const double sk = copysign(DBL_MIN, permy[li3+1]) + permy[li3+1];
           const double s1 = permy[li3]/sk;
           
-          gradient[l][i] = (mean[i] - permy[li3]/sk)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
+          gradient[l][i] = (mean[i] - s1)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
 
           if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
@@ -4097,7 +4097,7 @@ double *SIGN){
 
     free(meany);
 
-    if(do_grad){
+    if(do_grad && (p_nvar > 0)){
       free(permy);
     }
 
@@ -4153,6 +4153,20 @@ double *SIGN){
     for(int ii = 0; ii < nrcc33*num_obs_eval_alloc; ii++)
       kwm[ii] = 0.0;
 
+    // with local linear, we already have the gradients of the continuous components
+    // so we only need to worry about unordered + ordered comps
+
+    double * permy = NULL;
+    int ** moo = NULL;
+
+    int p_nvar = do_grad ? (num_reg_unordered + num_reg_ordered) : 0;
+    int do_ocg = do_grad && (p_nvar > 0);
+
+    if(do_ocg){
+      permy = (double *)malloc(nrcc33*num_obs_eval_alloc*p_nvar*sizeof(double));
+      assert(permy != NULL);
+    }
+
     double * sgn = (double *)malloc((nrc3)*sizeof(double));
 
     sgn[0] = sgn[1] = sgn[2] = 1.0;
@@ -4191,6 +4205,12 @@ double *SIGN){
         XTKY[l] = &kwm[j*nrcc33+l+nrc3+2];
       }
 
+      if(do_ocg){
+        moo = matrix_ordered_indices;
+        for(l = 0; l < num_reg_ordered; l++){
+          moo[l]++;
+        }
+      }
 #ifdef MPI2
       
       if((j % iNum_Processors) == 0){
@@ -4233,7 +4253,7 @@ double *SIGN){
                                  operator, // no convolution
                                  OP_NOOP, // no permutations
                                  0, // no score
-                                 0, // no ocg
+                                 do_ocg, // ocg
                                  1, // explicity suppress parallel
                                  PXU, // TRAIN
                                  PXO, 
@@ -4246,17 +4266,18 @@ double *SIGN){
                                  NULL,
                                  vsf,
                                  num_categories,
-                                 NULL,
-                                 NULL,
+                                 matrix_categorical_vals,
+                                 moo,
                                  kwm+(j+my_rank)*nrcc33,  // weighted sum
-                                 NULL, // no permutations
+                                 do_ocg ? (permy+(j+my_rank)*nrcc33*p_nvar) : NULL, // ocg
                                  NULL); // do not return kernel weights
 
           num_var_continuous_extern = 0; // set back to number of regressors
           num_var_ordered_extern = 0; // always zero
         }
         // synchro step
-        MPI_Allgather(MPI_IN_PLACE, nrcc33, MPI_DOUBLE, kwm+j*nrcc33, nrcc33, MPI_DOUBLE, comm[1]);    
+        MPI_Allgather(MPI_IN_PLACE, nrcc33, MPI_DOUBLE, kwm+j*nrcc33, nrcc33, MPI_DOUBLE, comm[1]);          
+        MPI_Allgather(MPI_IN_PLACE, nrcc33*p_nvar, MPI_DOUBLE, kwm+j*nrcc33*p_nvar, nrcc33*p_nvar, MPI_DOUBLE, comm[1]);    
       }
       
 #else
@@ -4300,7 +4321,7 @@ double *SIGN){
                              operator, // no convolution
                              OP_NOOP, // no permutations
                              0, // no score
-                             0, // no ocg
+                             do_ocg, // no ocg
                              1, //  explicity suppress parallel
                              PXU, // TRAIN
                              PXO, 
@@ -4313,10 +4334,10 @@ double *SIGN){
                              NULL,
                              vsf,
                              num_categories,
-                             NULL,
-                             NULL,
+                             matrix_categorical_vals,
+                             moo,
                              kwm+j*nrcc33,  // weighted sum
-                             NULL, // no permutations
+                             do_ocg ? (permy+j*nrcc33*p_nvar) : NULL, // no permutations
                              NULL); // do not return kernel weights
 
       num_var_continuous_extern = 0; // set back to number of regressors
@@ -4347,6 +4368,83 @@ double *SIGN){
           if(do_gerr)
             gradient_stderr[ii][j] = gfac*mean_stderr[j]/matrix_bandwidth[ii][0];
         }
+        
+        // we need to do new matrix inversions here for the unordered + ordered data
+        // we can safely taint KWM , XTKXINV, DELTA, and XTKY here
+        for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered); l++){
+          const int dl = l - num_reg_continuous;
+          const int ojp = j*nrcc33*p_nvar + dl*nrcc33;
+
+          for(int ii = 0; ii < nrc1; ii++){
+            KWM[ii] = &permy[ojp +(ii+2)*(nrc3)+2];
+            XTKY[ii] = &permy[ojp + ii + nrc3 + 2];
+          }
+
+          nepsilon = 0.0;
+          while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
+            for(int ii = 0; ii < (nrc1); ii++)
+              KWM[ii][ii] += epsilon;
+            nepsilon += epsilon;
+          }
+
+          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+
+          DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+
+          gradient[l][j] = mean[j] - DELTA[0][0];
+          
+          if(do_gerr){
+            const double skg = copysign(DBL_MIN, (permy+ojp)[2*nrc3+2]) + (permy+ojp)[2*nrc3+2];
+            const double eyg = (permy+ojp)[nrc3+1]/skg;
+            const double ey2g = (permy+ojp)[0]/skg;
+
+            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / skg;
+
+            gradient_stderr[l][j] = sqrt(mean_stderr[j]*mean_stderr[j] + se2);
+          } else {
+            gradient_stderr[l][j] = 0.0;
+          }
+        }
+
+        // we need to do new matrix inversions here for the unordered + ordered data
+        // we can safely taint KWM , XTKXINV, DELTA, and XTKY here
+        for(l = num_reg_continuous + num_reg_unordered; l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++){
+
+          const int dl = l - num_reg_continuous;
+          const int ojp = j*nrcc33*p_nvar + dl*nrcc33;
+
+          for(int ii = 0; ii < nrc1; ii++){
+            KWM[ii] = &permy[ojp +(ii+2)*(nrc3)+2];
+            XTKY[ii] = &permy[ojp + ii + nrc3 + 2];
+          }
+
+          nepsilon = 0.0;
+          while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
+            for(int ii = 0; ii < (nrc1); ii++)
+              KWM[ii][ii] += epsilon;
+            nepsilon += epsilon;
+          }
+
+          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+
+          DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+
+          gradient[l][j] = (mean[j] - DELTA[0][0])*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][j] != 0) ? 1.0 : -1.0);
+          
+          if(do_gerr){
+
+            const double skg = copysign(DBL_MIN, (permy+ojp)[2*nrc3+2]) + (permy+ojp)[2*nrc3+2];
+            const double eyg = (permy+ojp)[nrc3+1]/skg;
+            const double ey2g = (permy+ojp)[0]/skg;
+
+            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / skg;
+
+            gradient_stderr[l][j] = sqrt(mean_stderr[j]*mean_stderr[j] + se2);
+          } else {
+            gradient_stderr[l][j] = 0.0;
+          }
+        }
+
       }
     }
     
@@ -4376,6 +4474,9 @@ double *SIGN){
 
     free(kwm);
     free(sgn);
+
+    if(do_ocg)
+      free(permy);
   }
 
   // clean up hash stuff
