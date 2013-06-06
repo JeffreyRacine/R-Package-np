@@ -1744,7 +1744,7 @@ double * const kw){
   int ps_ukernel = -1, ps_okernel = -1;
 
   /* Trees are currently not compatible with all operations */
-  int np_ks_tree_use = (int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED);
+  int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
   int any_convolution = 0;
 
   int lod;
@@ -2086,11 +2086,12 @@ double * const kw){
       double bb[kdt_extern->ndim*2];
 
       for(i = 0; i < num_reg_continuous; i++){
+        const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
         bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
         bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
 
-        bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + m[i]*bb[2*i]);
-        bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + m[i]*bb[2*i+1]);
+        bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
+        bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
       }
 
       boxSearch(kdt_extern, 0, bb, pnl);
@@ -2106,8 +2107,9 @@ double * const kw){
             bb[2*i] = -cksup[knp][1];
             bb[2*i+1] = -cksup[knp][0];
 
-            bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + m[i]*bb[2*i]);
-            bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + m[i]*bb[2*i+1]);
+            const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+            bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
+            bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
           }
 
           boxSearch(kdt_extern, 0, bb, p_pnl + ii);

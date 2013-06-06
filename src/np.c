@@ -3503,8 +3503,14 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int_TREE = int_TREE && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE == NP_TREE_TRUE){
+    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                  4*num_reg_continuous_extern, ipt, &kdt_extern);
+    } else {
+    build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
+                 4*num_reg_continuous_extern, ipe, &kdt_extern);
+
+    }
 
     //put training data into tree-order using the index array
 
@@ -3660,7 +3666,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
 
   if(return_kernel_weights){
-    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+    if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
       for(j = 0; j < num_obs_eval_extern; j++)
         for(i = 0; i < num_obs_train_extern; i++)
           kernel_weights[ipe[j]*num_obs_train_extern + ipt[i]] = kw[j*num_obs_train_extern + i];
