@@ -4277,7 +4277,7 @@ double *SIGN){
         }
         // synchro step
         MPI_Allgather(MPI_IN_PLACE, nrcc33, MPI_DOUBLE, kwm+j*nrcc33, nrcc33, MPI_DOUBLE, comm[1]);          
-        MPI_Allgather(MPI_IN_PLACE, nrcc33*p_nvar, MPI_DOUBLE, kwm+j*nrcc33*p_nvar, nrcc33*p_nvar, MPI_DOUBLE, comm[1]);    
+        MPI_Allgather(MPI_IN_PLACE, nrcc33*p_nvar, MPI_DOUBLE, permy+j*nrcc33*p_nvar, nrcc33*p_nvar, MPI_DOUBLE, comm[1]);    
       }
       
 #else
