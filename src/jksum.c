@@ -1983,16 +1983,16 @@ double * const kw){
 
       // hopefully this now handles the case where there are more processors than observations
       for(i = 0, ii = 0; ii*stride < num_obs_eval; ii++){
-        i += stride*sum_element_length;
         igatherv[ii] = stride*sum_element_length;
         idisplsv[ii] = i;
+        i += stride*sum_element_length;
       }
       
       if(i < num_obs_eval*sum_element_length){
         const int de1 = (num_obs_eval - (ii-1)*stride)*sum_element_length;
-        i += de1;
         igatherv[ii] = de1;
         idisplsv[ii++] = i;
+        i += de1;
       }
 
       for(; ii < iNum_Processors; ii++){
