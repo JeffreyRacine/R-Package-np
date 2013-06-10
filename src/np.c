@@ -3113,8 +3113,14 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int_TREE = int_TREE && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE == NP_TREE_TRUE){
-    build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
-                 4*num_reg_continuous_extern, ipt, &kdt_extern);
+    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+      build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipt, &kdt_extern);
+    } else {
+      build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipe, &kdt_extern);
+
+    }
 
     //put training data into tree-order using the index array
 
@@ -3134,6 +3140,27 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     /* response variable */
     for( i=0;i<num_obs_train_extern;i++ )
       vector_Y_extern[i] = ty[ipt[i]];
+    
+    /* eval */
+    if(!train_is_eval){
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_ordered_eval_extern[j][i]=eord[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+ipe[i]];
+    }
+
+    if(!ey_is_ty)
+      for(i=0;i<num_obs_eval_extern;i++)
+        vector_Y_eval_extern[i] = ey[ipe[i]];
+
+
   }
 
 

@@ -4199,6 +4199,13 @@ double *SIGN){
       XTKX[2][i] = 1.0;
     }
 
+    if(do_ocg){
+      moo = (int **)malloc(num_reg_ordered*sizeof(int *));
+      for(l = 0; l < num_reg_ordered; l++){
+        moo[l] = matrix_ordered_indices[l];
+      }
+    }
+
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
 
@@ -4207,12 +4214,6 @@ double *SIGN){
         XTKY[l] = &kwm[j*nrcc33+l+nrc3+2];
       }
 
-      if(do_ocg){
-        moo = matrix_ordered_indices;
-        for(l = 0; l < num_reg_ordered; l++){
-          moo[l]++;
-        }
-      }
 #ifdef MPI2
       
       if((j % iNum_Processors) == 0){
@@ -4347,6 +4348,12 @@ double *SIGN){
 
 #endif
       
+      if(do_ocg){
+        for(l = 0; l < num_reg_ordered; l++){
+          moo[l]++;
+        }
+      }
+
       while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
         for(int ii = 0; ii < (nrc1); ii++)
           KWM[ii][ii] += epsilon;
@@ -4477,8 +4484,10 @@ double *SIGN){
     free(kwm);
     free(sgn);
 
-    if(do_ocg)
+    if(do_ocg){
       free(permy);
+      free(moo);
+    }
   }
 
   // clean up hash stuff
