@@ -2614,7 +2614,7 @@ double *x)
 
 /* Compute maximum number of unique distances (could be minimum?) */
 
-    for(i=1; i < num_obs; i++)
+    for(i=0; i < num_obs; i++)
     {
         dist[i] = fabs(x[i]-x_max);
     }
