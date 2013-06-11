@@ -3218,6 +3218,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                             num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
+                            0, // do not suppress_parallel
                             &vector_scale_factor[1],
                             /* Not used */
                             matrix_Y_continuous_train_extern,

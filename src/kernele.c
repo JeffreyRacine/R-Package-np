@@ -707,6 +707,7 @@ double *cv)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_X_continuous,				 /* Not used */
 		matrix_X_continuous,				 /* Not used */
@@ -1436,6 +1437,7 @@ double *cv)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous,
 		matrix_Y_continuous,
@@ -4620,6 +4622,7 @@ double *mean)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			matrix_X_continuous,			 /* Not used */
 			matrix_X_continuous,			 /* Not used */
@@ -4811,6 +4814,7 @@ double *mean)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			matrix_X_continuous,			 /* Not used */
 			matrix_X_continuous,			 /* Not used */
@@ -5383,6 +5387,7 @@ double *mean)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			/* Not used */
 			matrix_X_continuous,
@@ -5570,6 +5575,7 @@ double *mean)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			/* Not used */
 			matrix_X_continuous,
@@ -10773,6 +10779,7 @@ double *log_likelihood)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous_train,
 		matrix_Y_continuous_eval,
@@ -11474,6 +11481,7 @@ int itmax)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous_train,
 		matrix_Y_continuous_eval,
@@ -12000,6 +12008,7 @@ int itmax)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous_train,
 		matrix_Y_continuous_eval,
@@ -12703,6 +12712,7 @@ int itmax)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous_train,
 		matrix_Y_continuous_eval,
@@ -13047,6 +13057,7 @@ double *log_likelihood)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous_train,
 		matrix_Y_continuous_eval,
@@ -14526,6 +14537,7 @@ int itmax)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous_train,
 		matrix_Y_continuous_eval,
@@ -15806,6 +15818,7 @@ double *cv)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		/* Not used */
 		matrix_X_continuous,
@@ -16339,6 +16352,7 @@ double *cv)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress_parallel
 		vector_scale_factor,
 		matrix_Y_continuous,
 		matrix_Y_continuous,
@@ -17503,6 +17517,7 @@ double zero)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			matrix_Y_continuous_train,
 			matrix_Y_continuous_train, /* Same Y for training and evaluation */
@@ -18171,6 +18186,7 @@ int *num_categories)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			matrix_X_continuous,			 /* Not used */
 			matrix_X_continuous,			 /* Not used */
@@ -18370,6 +18386,7 @@ int *num_categories)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			matrix_X_continuous,			 /* Not used */
 			matrix_X_continuous,			 /* Not used */
@@ -18949,6 +18966,7 @@ int *num_categories)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			/* Not used */
 			matrix_X_continuous,
@@ -19145,6 +19163,7 @@ int *num_categories)
 			num_reg_continuous,
 			num_reg_unordered,
 			num_reg_ordered,
+      0, // do not suppress_parallel
 			vector_scale_factor,
 			/* Not used */
 			matrix_X_continuous,

@@ -237,7 +237,7 @@ double standerrd(int n, double *vector)
 /* Returns 0 upon success, 1 upon failure (constant most likely) */
 
 
-int compute_nn_distance(int num_obs, double *vector_data,
+int compute_nn_distance(int num_obs, int suppress_parallel, double *vector_data,
 int int_k_nn, double *nn_distance)
 {
 
@@ -258,6 +258,8 @@ int int_k_nn, double *nn_distance)
 		int return_flag = 0;
 		int return_flag_MPI = 0;
     if(stride < 1) stride = 1;
+
+    int is, ie;
 #endif
 
     vector_dist = alloc_vecd(num_obs);
@@ -351,10 +353,21 @@ int int_k_nn, double *nn_distance)
         return(1);
     }
 
-    pointer_di = &vector_data[my_rank*stride];
+
+    if(!suppress_parallel){
+      pointer_di = &vector_data[my_rank*stride];
+      is = my_rank*stride;
+      ie = MIN(num_obs,(my_rank+1)*stride) - 1;
+
+    } else {
+      pointer_di = &vector_data[0];
+      is = 0;
+      ie = num_obs - 1;
+    }
+
     pointer_nndi = &nn_distance[0];
 
-    for(i=my_rank*stride; (i < num_obs) && (i < (my_rank+1)*stride); i++)
+    for(i=is; i <= ie; i++)
     {
 
         pointer_vj = &vector_dist[0];
@@ -408,17 +421,21 @@ int int_k_nn, double *nn_distance)
         }
     }
 
-    MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
-    MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
+    if(!suppress_parallel){
+      MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
+      MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
+    }
+
 		if(return_flag > 0) {
 			free(vector_dist);
 			free(vector_unique_dist);
 			return(1);
 		}
 
-    MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
-    MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, comm[1]);
-
+    if(!suppress_parallel){
+      MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+      MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, comm[1]);
+    }
 #endif
 
     free(vector_dist);
@@ -430,12 +447,12 @@ int int_k_nn, double *nn_distance)
 
 
 int compute_nn_distance_train_eval(int num_obs_train,
-int num_obs_eval,
-double *vector_data_train,
-double *vector_data_eval,
-int int_k_nn,
-double *nn_distance)
-{
+                                   int num_obs_eval,
+                                   int suppress_parallel,
+                                   double *vector_data_train,
+                                   double *vector_data_eval,
+                                   int int_k_nn,
+                                   double *nn_distance){
 
     int i,j,k;
 
@@ -454,6 +471,7 @@ double *nn_distance)
 		int return_flag = 0;
 		int return_flag_MPI = 0;
     if(stride < 1) stride = 1;
+    int is, ie;
 #endif
 
     if((int_k_nn < 1)||(int_k_nn > num_obs_train-1))
@@ -543,10 +561,18 @@ double *nn_distance)
 
 /* Verified algorithm 3/25/98 */
 
-    pointer_di = &vector_data_eval[my_rank*stride];
+    if(!suppress_parallel){
+      pointer_di = &vector_data_eval[my_rank*stride];
+      is = my_rank*stride;
+      ie = MIN(num_obs_eval,(my_rank+1)*stride) - 1;
+    } else {
+      pointer_di = &vector_data_eval[0];
+      is = 0;
+      ie = num_obs_eval - 1;
+    }
     pointer_nndi = &nn_distance[0];
 
-    for(i=my_rank*stride; (i < num_obs_eval) && (i < (my_rank+1)*stride); i++)
+    for(i=is; i <= ie; i++)
     {
 
         pointer_vj = &vector_dist[0];
@@ -598,17 +624,20 @@ double *nn_distance)
 
     }
 
-    MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
-    MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
+    if(!suppress_parallel){
+      MPI_Reduce(&return_flag_MPI, &return_flag, 1, MPI_INT, MPI_SUM, 0, comm[1]);
+      MPI_Bcast(&return_flag, 1, MPI_INT, 0, comm[1]);
+    }
 		if(return_flag > 0) {
 			free(vector_dist);                    /* Don't forget to free... */
 			free(vector_unique_dist);
 			return(1);
 		}
 
-    MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
-    MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-
+    if(!suppress_parallel){
+      MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+      MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+    }
 #endif
 
     free(vector_dist);
