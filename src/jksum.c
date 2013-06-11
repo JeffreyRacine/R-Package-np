@@ -1394,14 +1394,14 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                            double * const weights, const int num_weights,
                            const int do_leave_one_out, const int which_k,
                            const int kpow,
-                           const int parallel_sum,
+                           const int parallel_sum, const int which_l,
                            const int symmetric,
                            const int gather_scatter,
                            const int bandwidth_divide, const double dband,
                            double * const result,
                            const NL * const nl){
 
-  int i,j,k, l = parallel_sum?which_k:0;
+  int i,j,k, l = parallel_sum?which_l:0;
   const int kstride = (parallel_sum ? (MAX(ncol_A, 1)*MAX(ncol_B, 1)) : 0);
   const int max_A = MAX(ncol_A, 1);
   const int max_B = MAX(ncol_B, 1);
@@ -1747,7 +1747,7 @@ double * const kw){
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
   int any_convolution = 0;
 
-  int lod;
+  int lod = 0;
   
   assert(!(do_score && do_ocg));
 
@@ -2201,7 +2201,7 @@ double * const kw){
                               tprod, num_xt,
                               leave_or_drop, lod,
                               kernel_pow,
-                              do_psum,
+                              do_psum, j,
                               symmetric,
                               gather_scatter,
                               1, dband,
@@ -2214,7 +2214,7 @@ double * const kw){
                                 tprod_mp+ii*num_xt, num_xt,
                                 leave_or_drop, lod,
                                 kernel_pow,
-                                do_psum,
+                                do_psum, j,
                                 symmetric,
                                 gather_scatter,
                                 1, p_dband[ii],
@@ -3969,8 +3969,8 @@ double *SIGN){
 #define NCOL_Y 3
 
     double * lc_Y[NCOL_Y] = {NULL,NULL,NULL};
-    double * restrict meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
-    double * restrict permy = NULL;
+    double * meany = (double *)malloc(NCOL_Y*num_obs_eval_alloc*sizeof(double));
+    double * permy = NULL;
     int pop = OP_NOOP;
     int p_nvar = do_grad ? (num_reg_continuous + num_reg_unordered + num_reg_ordered) : 0;
   
@@ -4251,7 +4251,7 @@ double *SIGN){
                                  num_reg_continuous,
                                  0, 
                                  1, // kernel_pow = 1
-                                 0, // bandwidth_divide = FALSE when not adaptive
+                                 1, // bandwidth_divide = FALSE when not adaptive
                                  0, // do_smooth_coef_weights = FALSE (not implemented)
                                  1, // symmetric
                                  0, // NO gather-scatter sum
@@ -4319,7 +4319,7 @@ double *SIGN){
                              num_reg_continuous,
                              0, // we leave one out via the weight matrix
                              1, // kernel_pow = 1
-                             0, // bandwidth_divide = FALSE when not adaptive
+                             1, // bandwidth_divide = FALSE when not adaptive
                              0, // do_smooth_coef_weights = FALSE (not implemented)
                              1, // symmetric
                              0, // gather-scatter sum
