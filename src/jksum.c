@@ -204,6 +204,7 @@ double *kernel_sum)
 		num_reg_continuous,
 		num_reg_unordered,
 		num_reg_ordered,
+    0, // do not suppress parallel
 		vector_scale_factor,
 		matrix_X_continuous_train,	 /* Not used */
 		matrix_X_continuous_eval,		 /* Not used */
@@ -1889,6 +1890,7 @@ double * const kw){
                            num_reg_continuous,
                            num_reg_unordered,
                            num_reg_ordered,
+                           suppress_parallel, // suppress_parallel if requested
                            vector_scale_factor,
                            matrix_X_continuous_train,				 /* Not used */
                            matrix_X_continuous_eval,				 /* Not used */
@@ -1919,6 +1921,7 @@ double * const kw){
                              num_reg_continuous,
                              num_reg_unordered,
                              num_reg_ordered,
+                             suppress_parallel, // suppress_parallel if requested
                              vector_scale_factor,
                              NULL,				 /* Not used */
                              NULL,				 /* Not used */
@@ -2388,6 +2391,7 @@ double *cv){
                            num_reg_continuous,
                            num_reg_unordered,
                            num_reg_ordered,
+                           0, // do not suppress_parallel
                            vector_scale_factor,
                            matrix_Y_continuous,
                            matrix_Y_continuous,
@@ -2704,6 +2708,7 @@ int *num_categories){
                            num_reg_continuous,
                            num_reg_unordered,
                            num_reg_ordered,
+                           0, // do not suppress_parallel
                            vector_scale_factor,
                            NULL,			 // Not used 
                            NULL,			 // Not used 
