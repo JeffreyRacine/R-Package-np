@@ -4128,6 +4128,13 @@ double *SIGN){
       vsf = vector_scale_factor;
     }
 
+    int tint_TREE = int_TREE;
+    // because we don't evaluate on all the evaluation data with this method
+    // we must disable trees for adaptive
+    if(BANDWIDTH_reg == BW_ADAP_NN){
+      int_TREE = NP_TREE_FALSE;
+    }
+
     MATRIX XTKX = mat_creat( num_reg_continuous + 3, num_obs_train, UNDEFINED );
     MATRIX XTKXINV = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
     MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
@@ -4497,6 +4504,13 @@ double *SIGN){
       free(permy);
       free(moo);
     }
+
+    // because we don't evaluate on all the evaluation data with this method
+    // we must disable trees for adaptive
+    if(BANDWIDTH_reg == BW_ADAP_NN){
+      int_TREE = tint_TREE;
+    }
+
   }
 
   // clean up hash stuff
