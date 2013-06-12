@@ -1751,6 +1751,7 @@ double * const kw){
   int lod = 0;
   
   assert(!(do_score && do_ocg));
+  assert(!(gather_scatter && (BANDWIDTH_reg == BW_ADAP_NN)));
 
   for(i = 0; (i < (num_reg_unordered + num_reg_ordered + num_reg_continuous)); i++){
     np_ks_tree_use &= (operator[i] != OP_CONVOLUTION);
@@ -2057,7 +2058,7 @@ double * const kw){
   }
 
   const int leave_or_drop = leave_one_out || (drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN));
-  if(drop_one_train) lod = drop_which_train;
+  if(drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN)) lod = drop_which_train;
 
     /* do sums */
   for(j=js; j <= je; j++, ws += ws_step, p_ws += ws_step){
@@ -2689,7 +2690,7 @@ int *num_categories){
     num_obs_eval_alloc = num_obs;
 #endif
 
-    int ks_tree_use = (int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED);
+    int ks_tree_use = (int_TREE == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll == LL_LL)));
 
   // Allocate memory for objects 
 
@@ -2872,6 +2873,13 @@ int *num_categories){
         vsf[ii] = matrix_bandwidth[ii][0];
     } else {
       vsf = vector_scale_factor;
+    }
+
+    int tint_TREE = int_TREE;
+    // because we don't evaluate on all the evaluation data with this method
+    // we must disable trees for adaptive
+    if(BANDWIDTH_reg == BW_ADAP_NN){
+      int_TREE = NP_TREE_FALSE;
     }
 
     MATRIX XTKX = mat_creat( num_reg_continuous + 2, num_obs, UNDEFINED );
@@ -3122,7 +3130,7 @@ int *num_categories){
       }
 
 #else
-      if(ks_tree_use){
+      if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
 
         for(l = 0; l < num_reg_continuous; l++){
           
@@ -3300,6 +3308,10 @@ int *num_categories){
       cv += dy*dy; 
     }
     
+    if(BANDWIDTH_reg == BW_ADAP_NN){
+      int_TREE = tint_TREE;
+    }
+
     for(int ii = 0; ii < (nrc1); ii++){
       KWM[ii] = PKWM[ii];
       XTKY[ii] = PXTKY[ii];
