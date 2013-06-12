@@ -142,27 +142,23 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
         return(DBL_MAX);
     }
 
-    if((BANDWIDTH_reg_extern == BW_FIXED)||(int_ll_extern == LL_LC)){ 
-      return(np_kernel_estimate_regression_categorical_ls_aic(
-        int_ll_extern,
-        RBWM_CVLS,
-        KERNEL_reg_extern,
-        KERNEL_reg_unordered_extern,
-        KERNEL_reg_ordered_extern,
-        BANDWIDTH_reg_extern,
-        num_obs_train_extern,
-        num_reg_unordered_extern,
-        num_reg_ordered_extern,
-        num_reg_continuous_extern,
-        matrix_X_unordered_train_extern,
-        matrix_X_ordered_train_extern,
-        matrix_X_continuous_train_extern,
-        vector_Y_extern,
-        &vector_scale_factor[1],
-        num_categories_extern));
-      } else {
-      return(cv_func_regression_categorical_ls_nn(vector_scale_factor));
-      }
+    return(np_kernel_estimate_regression_categorical_ls_aic(
+                                                            int_ll_extern,
+                                                            RBWM_CVLS,
+                                                            KERNEL_reg_extern,
+                                                            KERNEL_reg_unordered_extern,
+                                                            KERNEL_reg_ordered_extern,
+                                                            BANDWIDTH_reg_extern,
+                                                            num_obs_train_extern,
+                                                            num_reg_unordered_extern,
+                                                            num_reg_ordered_extern,
+                                                            num_reg_continuous_extern,
+                                                            matrix_X_unordered_train_extern,
+                                                            matrix_X_ordered_train_extern,
+                                                            matrix_X_continuous_train_extern,
+                                                            vector_Y_extern,
+                                                            &vector_scale_factor[1],
+                                                            num_categories_extern));
 }
 
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor)
@@ -802,41 +798,20 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
         return(DBL_MAX);
     }
 
-    if((BANDWIDTH_reg_extern == BW_FIXED)||(int_ll_extern == LL_LC)){
-      return(np_kernel_estimate_regression_categorical_ls_aic(
-        int_ll_extern,
-        RBWM_CVAIC,
-        KERNEL_reg_extern,
-        KERNEL_reg_unordered_extern,
-        KERNEL_reg_ordered_extern,
-        BANDWIDTH_reg_extern,
-        num_obs_train_extern,
-        num_reg_unordered_extern,
-        num_reg_ordered_extern,
-        num_reg_continuous_extern,
-        matrix_X_unordered_train_extern,
-        matrix_X_ordered_train_extern,
-        matrix_X_continuous_train_extern,
-        vector_Y_extern,
-        &vector_scale_factor[1],
-        num_categories_extern));
-        } else {
-      return(kernel_estimate_regression_categorical_aic_c(
-        int_ll_extern,
-        KERNEL_reg_extern,
-        KERNEL_reg_unordered_extern,
-        KERNEL_reg_ordered_extern,
-        BANDWIDTH_reg_extern,
-        num_obs_train_extern,
-        num_reg_unordered_extern,
-        num_reg_ordered_extern,
-        num_reg_continuous_extern,
-        matrix_X_unordered_train_extern,
-        matrix_X_ordered_train_extern,
-        matrix_X_continuous_train_extern,
-        vector_Y_extern,
-        &vector_scale_factor[1],
-        num_categories_extern));
-    }
-
+    return(np_kernel_estimate_regression_categorical_ls_aic(int_ll_extern,
+                                                            RBWM_CVAIC,
+                                                            KERNEL_reg_extern,
+                                                            KERNEL_reg_unordered_extern,
+                                                            KERNEL_reg_ordered_extern,
+                                                            BANDWIDTH_reg_extern,
+                                                            num_obs_train_extern,
+                                                            num_reg_unordered_extern,
+                                                            num_reg_ordered_extern,
+                                                            num_reg_continuous_extern,
+                                                            matrix_X_unordered_train_extern,
+                                                            matrix_X_ordered_train_extern,
+                                                            matrix_X_continuous_train_extern,
+                                                            vector_Y_extern,
+                                                            &vector_scale_factor[1],
+                                                            num_categories_extern));
 }
