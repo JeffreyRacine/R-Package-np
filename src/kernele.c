@@ -1032,7 +1032,7 @@ double *cv)
 		}
 	}
 
-	*cv /= (double) num_obs;
+
 	#endif
 
 	#ifdef MPI2
@@ -1343,7 +1343,6 @@ double *cv)
 
 	/* Now reduce */
 
-	cv_MPI /= (double) num_obs;
 	MPI_Reduce(&cv_MPI, cv, 1, MPI_DOUBLE, MPI_SUM, 0, comm[1]);
 	MPI_Bcast(cv, 1, MPI_DOUBLE, 0, comm[1]);
 	#endif
