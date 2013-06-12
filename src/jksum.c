@@ -2670,7 +2670,7 @@ int *num_categories){
   double * lambda = NULL, * vsf = NULL;
   double ** matrix_bandwidth = NULL;
 
-  double  * aicc;
+  double aicc = 0.0;
   double traceH = 0.0;
 
   int * operator = NULL;
@@ -2685,10 +2685,8 @@ int *num_categories){
 #ifdef MPI2
     int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
     num_obs_eval_alloc = stride*iNum_Processors;
-    aicc = (double *)malloc(stride*sizeof(double));
 #else
     num_obs_eval_alloc = num_obs;
-    aicc = (double *)malloc(sizeof(double));
 #endif
 
     int ks_tree_use = (int_TREE == NP_TREE_TRUE) && (BANDWIDTH_reg == BW_FIXED);
@@ -2763,7 +2761,7 @@ int *num_categories){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
-                           0, // don't explicitly suppress parallel
+                           1, // explicitly suppress parallel
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2777,7 +2775,7 @@ int *num_categories){
                            num_categories,
                            NULL,
                            NULL,
-                           aicc,
+                           &aicc,
                            NULL, // no permutations
                            NULL); // do not return kernel weights
     int_LARGE_SF = tsf;
@@ -2856,7 +2854,7 @@ int *num_categories){
       const double dy = vector_Y[ii]-mean[ii2]/sk;
       cv += dy*dy;
       if(bwm == RBWM_CVAIC)
-        traceH += aicc[0]/sk;
+        traceH += aicc/sk;
 
       //fprintf(stderr,"mj: %e\n",mean[ii2]/(MAX(DBL_MIN, mean[ii2+1])));
     }
@@ -3282,8 +3280,8 @@ int *num_categories){
       // need to manipulate KWM pointers and XTKY - done
 
       if(bwm == RBWM_CVAIC){
-        KWM[0][0] += aicc[0];
-        XTKY[0][0] += aicc[0]*vector_Y[j];
+        KWM[0][0] += aicc;
+        XTKY[0][0] += aicc*vector_Y[j];
       }
 
       while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
@@ -3293,7 +3291,7 @@ int *num_categories){
       }
       
       if(bwm == RBWM_CVAIC)
-        traceH += XTKXINV[0][0]*aicc[0];
+        traceH += XTKXINV[0][0]*aicc;
    
       XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
@@ -3331,7 +3329,6 @@ int *num_categories){
   }
 
   free(operator);
-  free(aicc);
   free(lambda);
   free_mat(matrix_bandwidth,num_reg_continuous);
 
