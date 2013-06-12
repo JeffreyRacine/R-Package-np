@@ -315,6 +315,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 0, 2, 0 };
 #define BW_NUNOI 11
 #define BW_NORDI 12
 #define BW_NCONI 13
+#define BW_OLDBW 14
 
 #define BW_FTOLD  0
 #define BW_TOLD   1

@@ -62,7 +62,7 @@ npudensbw.NULL <-
 
 npudensbw.bandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
-           bws, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
+           bws, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000, old.dens = TRUE,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05, ...){
 
     dat = toFrame(dat)
@@ -122,7 +122,8 @@ npudensbw.bandwidth <-
           "truncated gaussian" = CKER_TGAUSS),
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
-        ncon = dim(dcon)[2])
+        ncon = dim(dcon)[2],
+        old.dens = old.dens)
       
       myoptd = list(ftol=ftol, tol=tol, small=small)
 
@@ -209,7 +210,7 @@ npudensbw.default <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, bandwidth.compute = TRUE,
            ## dummy arguments for later passing into npudensbw.bandwidth
-           nmulti, remin, itmax, ftol, tol, small,
+           nmulti, remin, itmax, old.dens, ftol, tol, small,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ukertype, okertype,
@@ -246,7 +247,7 @@ npudensbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
+    margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "old.dens", "ftol", "tol",
                "small")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

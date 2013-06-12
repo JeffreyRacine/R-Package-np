@@ -233,6 +233,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int itmax, iter;
   int int_use_starting_values;
 
+  int * ipt = NULL;  // point permutation, see tree.c
+  int old_bw;
+
+
   num_reg_unordered_extern = myopti[BW_NUNOI];
   num_reg_ordered_extern = myopti[BW_NORDI];
   num_reg_continuous_extern = myopti[BW_NCONI];
@@ -254,6 +258,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int_MINIMIZE_IO = myopti[BW_MINIOI];
 
   itmax=myopti[BW_ITMAXI];
+  old_bw=myopti[BW_OLDBW];
 
   ftol=myoptd[BW_FTOLD];
   tol=myoptd[BW_TOLD];
@@ -289,6 +294,39 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   for( j=0;j<num_reg_continuous_extern;j++)
     for( i=0;i<num_obs_train_extern;i++ )
       matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+i];
+
+  ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+  if(!(ipt != NULL))
+    error("!(ipt != NULL)");
+
+  for(int i = 0; i < num_obs_train_extern; i++){
+    ipt[i] = i;
+  }
+
+  // attempt tree build, if enabled 
+  int_TREE = int_TREE && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
+
+  if(int_TREE == NP_TREE_TRUE){
+    build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
+                 4*num_reg_continuous_extern, ipt, &kdt_extern);
+  
+
+    //put training data into tree-order using the index array
+
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_unordered_train_extern[j][i]=myuno[j*num_obs_train_extern+ipt[i]];
+    
+    
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_ordered_train_extern[j][i]=myord[j*num_obs_train_extern+ipt[i]];
+
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+ipt[i]];
+
+  }
 
 
   determine_categorical_vals(
@@ -357,12 +395,15 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   /* Conduct direction set search */
 
   /* assign the function to be optimized */
-  switch(myopti[BW_MI]){
-  case BWM_CVML : bwmfunc = cv_func_density_categorical_ml; break;
-  case BWM_CVLS : bwmfunc = cv_func_density_categorical_ls; break;
-    //case BWM_CVML_NP : bwmfunc = cv_func_np_density_categorical_ml; break;
-  default : REprintf("np.c: invalid bandwidth selection method.");
-    error("np.c: invalid bandwidth selection method."); break;
+  if(old_bw){
+    switch(myopti[BW_MI]){
+    case BWM_CVML : bwmfunc = cv_func_density_categorical_ml; break;
+    case BWM_CVLS : bwmfunc = cv_func_density_categorical_ls; break;
+      //case BWM_CVML_NP : bwmfunc = cv_func_np_density_categorical_ml; break;
+    default : REprintf("np.c: invalid bandwidth selection method.");
+      error("np.c: invalid bandwidth selection method."); break;
+    }
+  } else {
   }
 
   spinner(0);
@@ -558,6 +599,13 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
 
   free(vector_continuous_stddev);
+
+  free(ipt);
+
+  if(int_TREE == NP_TREE_TRUE){
+    free_kdtree(&kdt_extern);
+    int_TREE = NP_TREE_FALSE;
+  }
 
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
