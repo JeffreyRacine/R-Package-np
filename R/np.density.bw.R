@@ -123,7 +123,9 @@ npudensbw.bandwidth <-
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],
-        old.dens = old.dens)
+        old.dens = old.dens,
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+
       
       myoptd = list(ftol=ftol, tol=tol, small=small)
 

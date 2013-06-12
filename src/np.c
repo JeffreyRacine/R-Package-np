@@ -259,6 +259,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   itmax=myopti[BW_ITMAXI];
   old_bw=myopti[BW_OLDBW];
+  int_TREE = myopti[BW_DOTREEI];
 
   ftol=myoptd[BW_FTOLD];
   tol=myoptd[BW_TOLD];
@@ -404,6 +405,13 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       error("np.c: invalid bandwidth selection method."); break;
     }
   } else {
+    switch(myopti[BW_MI]){
+    case BWM_CVML : bwmfunc = np_cv_func_density_categorical_ml; break;
+    case BWM_CVLS : error("np.c: new cv.ls not yet implemented."); break;
+    default : REprintf("np.c: invalid bandwidth selection method.");
+      error("np.c: invalid bandwidth selection method."); break;
+    }
+
   }
 
   spinner(0);
@@ -583,7 +591,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   for( i=0; i<num_var; i++ )
     myans[i]=vector_scale_factor[i+1];
 
-  fval[0] = fret;
+  fval[0] = -fret;
   fval[1] = iImproved;
   /* end return data */
 
