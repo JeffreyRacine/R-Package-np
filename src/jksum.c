@@ -4601,6 +4601,9 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
   for(i = 0; i < num_reg; i++)
     operator[i] = OP_NORMAL;
 
+  num_var_continuous_extern = 0;
+  num_var_ordered_extern = 0;
+
   kernel_weighted_sum_np(KERNEL_den,
                          KERNEL_unordered_den,
                          KERNEL_ordered_den,
