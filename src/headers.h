@@ -50,6 +50,7 @@ double cv_func_density_categorical_ls(double *vector_scale_factor);
 double cv_func_density_categorical_ml(double *vector_scale_factor);
 
 double np_cv_func_density_categorical_ml(double *vector_scale_factor);
+double np_cv_func_density_categorical_ls(double *vector_scale_factor);
 
 double cv_func_con_distribution_categorical_ls(double *vector_scale_factor);
 
@@ -128,6 +129,8 @@ int kernel_estimate_con_distribution_categorical_gradient_categorical(int KERNEL
 int kernel_estimate_density_categorical(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, int *num_categories, double *pdf, double *pdf_stderr, double *log_likelihood);
 
 int kernel_estimate_density_categorical_convolution_cv(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_scale_factor, int *num_categories, double **matrix_categorical_vals, double *cv);
+
+int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_scale_factor, int *num_categories, double **matrix_categorical_vals, double *cv);
 
 int kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_scale_factor, int *num_categories, double *cv);
 

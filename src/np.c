@@ -407,7 +407,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   } else {
     switch(myopti[BW_MI]){
     case BWM_CVML : bwmfunc = np_cv_func_density_categorical_ml; break;
-    case BWM_CVLS : bwmfunc = cv_func_density_categorical_ls; break;
+    case BWM_CVLS : bwmfunc = np_cv_func_density_categorical_ls; break;
     default : REprintf("np.c: invalid bandwidth selection method.");
       error("np.c: invalid bandwidth selection method."); break;
     }
