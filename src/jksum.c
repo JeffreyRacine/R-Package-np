@@ -4613,7 +4613,7 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          num_reg_unordered,
                          num_reg_ordered,
                          num_reg_continuous,
-                         1, // we leave one out via the weight matrix
+                         1, // leave one out 
                          1, // kernel_pow = 1
                          1, // bandwidth_divide = FALSE when not adaptive
                          0, // do_smooth_coef_weights = FALSE (not implemented)
@@ -4646,10 +4646,161 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
   
 
   for(i = 0, *cv = 0.0; i < num_obs; i++)
-    *cv -= (rho[i] < DBL_MIN) ? log_DBL_MIN : log(rho[i]/num_obs);
+    *cv -= (rho[i] < DBL_MIN) ? log_DBL_MIN : log(rho[i]/(num_obs-1.0));
     
 
   free(operator);
   free(rho);
   return(0);
+}
+
+int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
+                                                          int KERNEL_unordered_den,
+                                                          int KERNEL_ordered_den,
+                                                          int BANDWIDTH_den,
+                                                          int num_obs,
+                                                          int num_reg_unordered,
+                                                          int num_reg_ordered,
+                                                          int num_reg_continuous,
+                                                          double **matrix_X_unordered,
+                                                          double **matrix_X_ordered,
+                                                          double **matrix_X_continuous,
+                                                          double *vector_scale_factor,
+                                                          int *num_categories,
+                                                          double **matrix_categorical_vals,
+                                                          double *cv){
+
+  const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
+
+  int i;
+
+  int * operator = NULL;
+
+  int num_obs_alloc;
+
+#ifdef MPI2
+  int stride_t = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
+  
+  num_obs_alloc = stride_t*iNum_Processors;
+#else
+  num_obs_alloc = num_obs;
+#endif
+
+  double * res = (double *)malloc(num_obs_alloc*sizeof(double));
+  double cv1, cv2;
+  
+  if(res == NULL)
+    error("failed to allocate rho");
+
+  operator = (int *)malloc(sizeof(int)*num_reg);
+
+  // first the convolution portion
+  for(i = 0; i < num_reg; i++)
+    operator[i] = OP_CONVOLUTION;
+
+  num_var_continuous_extern = 0;
+  num_var_ordered_extern = 0;
+
+  kernel_weighted_sum_np(KERNEL_den,
+                         KERNEL_unordered_den,
+                         KERNEL_ordered_den,
+                         BANDWIDTH_den,
+                         num_obs,
+                         num_obs,
+                         num_reg_unordered,
+                         num_reg_ordered,
+                         num_reg_continuous,
+                         0, // don't leave one out 
+                         1, // kernel_pow = 1
+                         1, // bandwidth_divide = FALSE when not adaptive
+                         0, // do_smooth_coef_weights = FALSE (not implemented)
+                         0, // symmetric
+                         0, // gather-scatter sum
+                         0, // do not drop train
+                         0, // do not drop train
+                         operator, // convolution
+                         OP_NOOP, // no permutations
+                         0, // no score
+                         0, // no ocg
+                         0, //  explicity suppress parallel
+                         matrix_X_unordered,
+                         matrix_X_ordered,
+                         matrix_X_continuous,
+                         matrix_X_unordered,
+                         matrix_X_ordered,
+                         matrix_X_continuous,
+                         NULL, // no ys
+                         NULL, // no weights
+                         NULL, // no sgn
+                         vector_scale_factor,
+                         num_categories,
+                         matrix_categorical_vals,
+                         NULL, // no ocg
+                         res,  // weighted sum
+                         NULL, // no permutations
+                         NULL); // do not return kernel weights
+  
+  
+
+  for(i = 0, cv1 = 0.0; i < num_obs; i++) cv1 += res[i];
+
+  cv1 /= num_obs*num_obs;
+
+  // then the cross term
+  for(i = 0; i < num_reg; i++)
+    operator[i] = OP_NORMAL;
+
+  num_var_continuous_extern = 0;
+  num_var_ordered_extern = 0;
+
+  kernel_weighted_sum_np(KERNEL_den,
+                         KERNEL_unordered_den,
+                         KERNEL_ordered_den,
+                         BANDWIDTH_den,
+                         num_obs,
+                         num_obs,
+                         num_reg_unordered,
+                         num_reg_ordered,
+                         num_reg_continuous,
+                         1, // leave one out 
+                         1, // kernel_pow = 1
+                         1, // bandwidth_divide = FALSE when not adaptive
+                         0, // do_smooth_coef_weights = FALSE (not implemented)
+                         0, // symmetric
+                         0, // gather-scatter sum
+                         0, // do not drop train
+                         0, // do not drop train
+                         operator, // convolution
+                         OP_NOOP, // no permutations
+                         0, // no score
+                         0, // no ocg
+                         0, //  explicity suppress parallel
+                         matrix_X_unordered,
+                         matrix_X_ordered,
+                         matrix_X_continuous,
+                         matrix_X_unordered,
+                         matrix_X_ordered,
+                         matrix_X_continuous,
+                         NULL, // no ys
+                         NULL, // no weights
+                         NULL, // no sgn
+                         vector_scale_factor,
+                         num_categories,
+                         NULL,
+                         NULL, // no ocg
+                         res,  // weighted sum
+                         NULL, // no permutations
+                         NULL); // do not return kernel weights
+
+
+  for(i = 0, cv2 = 0.0; i < num_obs; i++) cv2 += res[i];
+
+  cv2 /= num_obs*(num_obs-1.0);
+
+  *cv = cv1 - 2.0*cv2;
+
+  free(operator);
+  free(res);
+  return(0);
+
 }
