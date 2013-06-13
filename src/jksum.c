@@ -1754,8 +1754,11 @@ double * const kw){
   assert(!(gather_scatter && (BANDWIDTH_reg == BW_ADAP_NN)));
 
   for(i = 0; (i < (num_reg_unordered + num_reg_ordered + num_reg_continuous)); i++){
-    np_ks_tree_use &= (operator[i] != OP_CONVOLUTION);
     any_convolution |= (operator[i] == OP_CONVOLUTION);
+  }
+
+  if(any_convolution && (BANDWIDTH_reg == BW_ADAP_NN)){
+    np_ks_tree_use = 0;
   }
 
   np_ks_tree_use &= (num_reg_continuous != 0);
