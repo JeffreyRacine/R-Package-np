@@ -28,23 +28,23 @@ npseed <- function(seed){
   invisible()
 }
 
+erf <- function(z) { 2 * pnorm(z*sqrt(2)) - 1 }
+
 nptgauss <- function(b){
-  require(gsl)
+
   rel.tol <- sqrt(.Machine$double.eps)
 
   b.max <- sqrt(-2*log(.Machine$double.eps))
-  
+
   if((b < 0) || (b > b.max))
     stop(paste("b must be between 0 and",b.max))
-  
-  alpha <- 1.0
-  tgauss <- function(z){
-    ifelse(abs(z) >= b, 0.0, alpha/sqrt(2*pi)*(exp(-0.5*z^2) - exp(-0.5*b^2)))
-  }
-  
-  alpha <- 1.0/integrate(tgauss, -b, b, rel.tol = rel.tol)$value
 
-  c0 <- alpha/sqrt(2*pi)*exp(-0.5*b^2)
+  alpha <- 1.0/(pnorm(b)-pnorm(-b)-2*b*dnorm(b))
+
+  tgauss <- function(z)
+    ifelse(abs(z) >= b, 0.0, alpha*(dnorm(z) - dnorm(b)))
+
+  c0 <- alpha*dnorm(b)
 
   k <- integrate(f = function(z) { tgauss(z)^2 }, -b, b)$value
   k2 <- integrate(f = function(z) { z^2*tgauss(z) }, -b, b)$value
@@ -58,6 +58,7 @@ nptgauss <- function(b){
   int.kernels[CKER_TGAUSS + 1] <- k
   
   invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "npRmpi"))
+
 }
 
 numNotIn <- function(x){
