@@ -4646,7 +4646,7 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
   
 
   for(i = 0, *cv = 0.0; i < num_obs; i++)
-    *cv -= (rho[i] < DBL_MIN) ? log_DBL_MIN : log(rho[i]/num_obs);
+    *cv -= (rho[i] < DBL_MIN) ? log_DBL_MIN : log(rho[i]/(num_obs-1.0));
     
 
   free(operator);
