@@ -26,7 +26,7 @@ kbandwidth.numeric <-
   function(bw,
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
-           ckertype = c("truncated gaussian", "gaussian", "epanechnikov", "uniform"),
+           ckertype = c("epanechnikov","truncated gaussian","gaussian","uniform"),
            ckerorder = c(2,4,6,8),
            ukertype = c("aitchisonaitken", "liracine"),
            okertype = c("wangvanryzin", "liracine"),
