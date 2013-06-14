@@ -4944,7 +4944,7 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
 
   for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
     pdf[i] /= (double)num_obs_train;
-    *log_likelihood -= (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]/num_obs_train);
+    *log_likelihood += (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]);
 
     if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
       for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
