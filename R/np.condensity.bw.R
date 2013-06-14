@@ -63,7 +63,7 @@ npcdensbw.conbandwidth <-
            ydat = stop("data 'ydat' missing"),
            bws, bandwidth.compute = TRUE,
            auto = TRUE,
-           nmulti, remin = TRUE, itmax = 10000,
+           nmulti, remin = TRUE, itmax = 10000, old.cdens = FALSE,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
            ...){
 
@@ -179,7 +179,9 @@ npcdensbw.conbandwidth <-
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
         fast = FALSE,
-        auto = auto)
+        auto = auto,
+        old.cdens = old.cdens,
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
       myoptd = list(ftol=ftol, tol=tol, small=small)
 
@@ -329,7 +331,7 @@ npcdensbw.default <-
            ydat = stop("data 'ydat' missing"),
            bws, 
            bandwidth.compute = TRUE,
-           auto, nmulti, remin, itmax,
+           auto, nmulti, remin, itmax, old.cdens,
            ftol, tol, small,
            ## dummy arguments for conbandwidth() function call
            bwmethod, bwscaling, bwtype,
@@ -371,7 +373,7 @@ npcdensbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bandwidth.compute", "auto", "nmulti", "remin", "itmax", "ftol",
+    margs <- c("bandwidth.compute", "auto", "nmulti", "remin", "itmax", "old.cdens", "ftol",
                "tol", "small")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

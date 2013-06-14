@@ -100,6 +100,14 @@ extern double *vector_scale_factor_extern;
 extern double y_min_extern;
 extern double y_max_extern;
 
+// cdens + trees extern
+extern double **matrix_XY_continuous_train_extern_alt;
+extern double **matrix_XY_unordered_train_extern_alt;
+extern double **matrix_XY_ordered_train_extern_alt;
+extern double **matrix_XY_continuous_eval_extern_alt;
+extern double **matrix_XY_unordered_eval_extern_alt;
+extern double **matrix_XY_ordered_eval_extern_alt;
+
 // cdf extern
 extern int int_fast_dls_extern;
 #ifdef RCSID
@@ -460,6 +468,68 @@ double cv_func_con_density_categorical_ml(double *vector_scale_factor)
         matrix_X_unordered_train_extern,
         matrix_X_ordered_train_extern,
         matrix_X_continuous_train_extern,
+        &vector_scale_factor[1],
+        num_categories_extern,
+        &cv)==1)
+    {
+        return(DBL_MAX);
+    }
+
+
+    return(cv);
+
+}
+
+double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
+
+/* Numerical recipes wrapper function for likelihood density
+                    cross-validation */
+
+/* Declarations */
+
+    double cv = 0.0;
+
+    if(check_valid_scale_factor_cv(
+        KERNEL_den_extern,
+        KERNEL_reg_unordered_extern, /* Only for conditioning vars in conditional den */
+        BANDWIDTH_den_extern,
+        BANDWIDTH_den_extern,
+        0,
+        num_obs_train_extern,
+        num_var_continuous_extern,
+        num_var_unordered_extern,
+        num_var_ordered_extern,
+        num_reg_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_categories_extern,
+        vector_scale_factor) == 1) return(DBL_MAX);
+
+/* Compute the cross-validation function */
+
+    if(np_kernel_estimate_con_density_categorical_leave_one_out_cv(KERNEL_den_extern,
+        KERNEL_den_unordered_extern,
+        KERNEL_den_ordered_extern,
+				KERNEL_reg_extern,
+        KERNEL_reg_unordered_extern,
+        KERNEL_reg_ordered_extern,
+        BANDWIDTH_den_extern,
+        num_obs_train_extern,
+        num_var_unordered_extern,
+        num_var_ordered_extern,
+        num_var_continuous_extern,
+        num_reg_unordered_extern,
+        num_reg_ordered_extern,
+        num_reg_continuous_extern,
+        matrix_Y_unordered_train_extern,
+        matrix_Y_ordered_train_extern,
+        matrix_Y_continuous_train_extern,
+        matrix_X_unordered_train_extern,
+        matrix_X_ordered_train_extern,
+        matrix_X_continuous_train_extern,
+        matrix_XY_unordered_train_extern_alt,
+        matrix_XY_ordered_train_extern_alt,
+        matrix_XY_continuous_train_extern_alt,
         &vector_scale_factor[1],
         num_categories_extern,
         &cv)==1)
