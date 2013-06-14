@@ -140,6 +140,8 @@ extern double **matrix_XY_ordered_eval_extern_alt;
 extern int * ipt_extern;
 extern int * ipt_extern_alt;
 
+extern int *num_categories_extern_XY;
+extern int *num_categories_extern_X;
 
 int kernel_convolution_weighted_sum(
 int KERNEL_reg,
@@ -4967,5 +4969,215 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                                 int *num_categories,
                                                                 double *cv){
 
+
+  const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
+  const int num_cvar = num_reg_continuous + num_var_continuous;
+  const int num_uvar = num_reg_unordered + num_var_unordered;
+  const int num_ovar = num_reg_ordered + num_var_ordered;
+  const int num_all_var = num_reg + num_var_continuous + num_var_unordered + num_var_ordered;
+
+  KDT * kdt_swap;
+
+  int i, l;
+
+  int * operator = NULL;
+
+  int num_obs_alloc;
+
+#ifdef MPI2
+  int stride_t = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
+  
+  num_obs_alloc = stride_t*iNum_Processors;
+#else
+  num_obs_alloc = num_obs;
+#endif
+
+  double * vsf_xy = NULL, * vsf_x = NULL;
+
+  vsf_xy = (double *)malloc(num_all_var*sizeof(double));
+
+  if(vsf_xy == NULL)
+    error("failed to allocate vsf_xy");
+
+  vsf_x = (double *)malloc(num_reg*sizeof(double));
+
+  if(vsf_x == NULL)
+    error("failed to allocate vsf_x");
+
+	const double log_DBL_MIN = log(DBL_MIN);
+  double * rhod = (double *)malloc(num_obs_alloc*sizeof(double));
+  
+  if(rhod == NULL)
+    error("failed to allocate rhod");
+
+  double * rhon = (double *)malloc(num_obs_alloc*sizeof(double));
+
+  if(rhon == NULL)
+    error("failed to allocate rhon");
+
+  operator = (int *)malloc(sizeof(int)*num_all_var);
+
+  for(i = 0; i < num_all_var; i++)
+    operator[i] = OP_NORMAL;
+
+
+  // set up xy bws
+
+  for(i = 0, l = 0; i < num_cvar; i++, l++){
+    vsf_xy[l] = vector_scale_factor[i];
+  }
+
+  // copy vsf runo -> vsf_xy runo
+
+  for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
+    vsf_xy[l] = vector_scale_factor[i];
+  }
+
+  // copy vsf vuno -> vsf_xy vuno
+
+  for(i = num_cvar; i < (num_cvar + num_var_unordered); i++, l++){
+    vsf_xy[l] = vector_scale_factor[i];
+  }
+
+  // copy vsf rord -> vsf_xy rord
+
+  for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
+    vsf_xy[l] = vector_scale_factor[i];
+  }
+
+  // copy vsf vord -> vsf_xy vord
+
+  for(i = num_cvar + num_var_unordered; i < (num_cvar + num_var_unordered + num_var_ordered); i++, l++){
+    vsf_xy[l] = vector_scale_factor[i];
+  }
+
+  // vsf xy DONE
+
+  // set up x bws
+
+  // vsf rcon -> vsf_x rcon
+  for(i = 0, l = 0; i < num_reg_continuous; i++, l++){
+    vsf_x[l] = vector_scale_factor[i];
+  }
+
+  // copy vsf runo -> vsf_x runo
+
+  for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
+    vsf_x[l] = vector_scale_factor[i];
+  }
+
+  // copy vsf rord -> vsf_xy rord
+
+  for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
+    vsf_x[l] = vector_scale_factor[i];
+  }
+  
+  // vsf x DONE
+
+  // calculate numerator
+  // swap in the alt tree
+  // will probably need to make a proper interface for this in the future
+  kdt_swap = kdt_extern;
+  kdt_extern = kdt_extern_alt;
+
+  kernel_weighted_sum_np(KERNEL_den,
+                         KERNEL_unordered_den,
+                         KERNEL_ordered_den,
+                         BANDWIDTH_den,
+                         num_obs,
+                         num_obs,
+                         num_uvar,
+                         num_ovar,
+                         num_cvar,
+                         1, // leave one out 
+                         1, // kernel_pow = 1
+                         1, // bandwidth_divide = FALSE when not adaptive
+                         0, // do_smooth_coef_weights = FALSE (not implemented)
+                         0, // symmetric
+                         0, // gather-scatter sum
+                         0, // do not drop train
+                         0, // do not drop train
+                         operator, // no convolution
+                         OP_NOOP, // no permutations
+                         0, // no score
+                         0, // no ocg
+                         0, //  do not explicity suppress parallel
+                         0,
+                         0,
+                         matrix_XY_unordered,
+                         matrix_XY_ordered,
+                         matrix_XY_continuous,
+                         matrix_XY_unordered,
+                         matrix_XY_ordered,
+                         matrix_XY_continuous,
+                         NULL,
+                         NULL,
+                         NULL,
+                         vsf_xy,
+                         num_categories_extern_XY,
+                         NULL,
+                         NULL,
+                         rhon,  // weighted sum
+                         NULL, // no permutations
+                         NULL); // do not return kernel weights
+  
+  // evaluate the denominator
+  kdt_extern = kdt_swap;
+
+  kernel_weighted_sum_np(KERNEL_den,
+                         KERNEL_unordered_den,
+                         KERNEL_ordered_den,
+                         BANDWIDTH_den,
+                         num_obs,
+                         num_obs,
+                         num_reg_unordered,
+                         num_reg_ordered,
+                         num_reg_continuous,
+                         1, // leave one out 
+                         1, // kernel_pow = 1
+                         1, // bandwidth_divide = FALSE when not adaptive
+                         0, // do_smooth_coef_weights = FALSE (not implemented)
+                         0, // symmetric
+                         0, // gather-scatter sum
+                         0, // do not drop train
+                         0, // do not drop train
+                         operator, // no convolution
+                         OP_NOOP, // no permutations
+                         0, // no score
+                         0, // no ocg
+                         0, //  do not explicity suppress parallel
+                         0,
+                         0,
+                         matrix_X_unordered,
+                         matrix_X_ordered,
+                         matrix_X_continuous,
+                         matrix_X_unordered,
+                         matrix_X_ordered,
+                         matrix_X_continuous,
+                         NULL,
+                         NULL,
+                         NULL,
+                         vsf_x,
+                         num_categories_extern_X,
+                         NULL,
+                         NULL,
+                         rhod,  // weighted sum
+                         NULL, // no permutations
+                         NULL); // do not return kernel weights
+  
+
+  for(i = 0, *cv = 0.0; i < num_obs; i++){
+    const double rho = rhon[ipt_extern_alt[i]]/rhod[ipt_extern[i]];
+    *cv -= (rho < DBL_MIN) ? log_DBL_MIN : log(rho);
+  }
+  
+
+  free(operator);
+  free(rhon);
+  free(rhod);
+
+  free(vsf_xy);
+  free(vsf_x);
+  return(0);
 
 }
