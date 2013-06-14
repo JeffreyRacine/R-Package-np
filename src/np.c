@@ -3740,6 +3740,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   struct th_entry * ret = NULL;
   int ** matrix_ordered_indices = NULL;
 
+  int ncol_Y, ncol_W;
+
   /* match integer options with their globals */
 
   num_reg_continuous_extern = myopti[KWS_NCONI];
@@ -3772,8 +3774,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   do_smooth_coef_weights = myopti[KWS_SCOEFI];
 
   /* the y and weight matrices will be contained in these variables */
-  num_var_continuous_extern = myopti[KWS_YNCOLI];
-  num_var_ordered_extern = myopti[KWS_WNCOLI];
+  ncol_Y = myopti[KWS_YNCOLI];
+  ncol_W = myopti[KWS_WNCOLI];
 
   int_TREE = myopti[KWS_DOTREEI];
   return_kernel_weights = myopti[KWS_RKWI];
@@ -3781,10 +3783,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   do_score = myopti[KWS_PSCOREI];
   do_ocg = myopti[KWS_POCGI];
 
-  no_y = (num_var_continuous_extern == 0);
-  no_weights = (num_var_ordered_extern == 0);
+  no_y = (ncol_Y == 0);
+  no_weights = (ncol_W == 0);
 
-  sum_element_length = (no_y ? 1 : num_var_continuous_extern)*(no_weights ? 1 : num_var_ordered_extern);
+  sum_element_length = (no_y ? 1 : ncol_Y)*(no_weights ? 1 : ncol_W);
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -3806,8 +3808,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   /* for the moment we will just allocate a vector of ones */
   /* vector_Y_extern = (no_y)?NULL:alloc_vecd(num_obs_train_extern); */
 
-  matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, num_var_continuous_extern);
-  matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, num_var_ordered_extern);
+  matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, ncol_Y);
+  matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, ncol_W);
 
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
@@ -3844,11 +3846,11 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     for( i=0;i<num_obs_train_extern;i++ )
       matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+i];
 
-  for( j = 0; j < num_var_continuous_extern; j++ )
+  for( j = 0; j < ncol_Y; j++ )
     for( i = 0; i < num_obs_train_extern; i++ )
       matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+i];
 
-  for( j = 0; j < num_var_ordered_extern; j++ )
+  for( j = 0; j < ncol_W; j++ )
     for( i = 0; i < num_obs_train_extern; i++ )
       matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+i];
 
@@ -3901,11 +3903,11 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       for( i=0;i<num_obs_train_extern;i++ )
         matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
 
-    for( j = 0; j < num_var_continuous_extern; j++ )
+    for( j = 0; j < ncol_Y; j++ )
       for( i = 0; i < num_obs_train_extern; i++ )
         matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+ipt[i]];
 
-    for( j = 0; j < num_var_ordered_extern; j++ )
+    for( j = 0; j < ncol_W; j++ )
       for( i = 0; i < num_obs_train_extern; i++ )
         matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+ipt[i]];
   }
@@ -4015,6 +4017,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                          do_score,
                          do_ocg, // no ocg (for now)
                          0, // don't explicity suppress parallel
+                         ncol_Y,
+                         ncol_W,
                          matrix_X_unordered_train_extern,
                          matrix_X_ordered_train_extern,
                          matrix_X_continuous_train_extern,
@@ -4074,8 +4078,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
-  free_mat(matrix_Y_continuous_train_extern, num_var_continuous_extern);
-  free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
+  free_mat(matrix_Y_continuous_train_extern, ncol_Y);
+  free_mat(matrix_Y_ordered_train_extern, ncol_W);
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);

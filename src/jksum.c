@@ -1721,6 +1721,8 @@ const int permutation_operator,
 const int do_score,
 const int do_ocg,
 const int suppress_parallel,
+const int ncol_Y,
+const int ncol_W,
 double **matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
@@ -1742,9 +1744,6 @@ double * const kw){
      leave-one-out sum. By default Y should be a vector of ones
      (simply compute the kernel sum). This function will allow users
      to `roll their own' with mixed data leave-one out kernel sums. */
-
-  /* num_var_ordered_extern contains number of columns of the weight matrix */
-
 
   /* Declarations */
 
@@ -1819,7 +1818,7 @@ double * const kw){
 
   const int num_xt = (BANDWIDTH_reg == BW_ADAP_NN)?num_obs_eval:num_obs_train;
   const int ws_step = (BANDWIDTH_reg == BW_ADAP_NN)? 0 :
-    (MAX(num_var_continuous_extern, 1) * MAX(num_var_ordered_extern, 1));
+    (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
   double *lambda, **matrix_bandwidth, **matrix_eval_bandwidth = NULL, *m = NULL;
   double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
@@ -1854,8 +1853,8 @@ double * const kw){
 
   tprod = alloc_vecd((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train);
 
-  sum_element_length = MAX(num_var_continuous_extern, 1) * 
-    MAX(num_var_ordered_extern, 1);
+  sum_element_length = MAX(ncol_Y, 1) * 
+    MAX(ncol_W, 1);
 
   /* assert(!(BANDWIDTH_reg == BW_ADAP_NN)); */
   /* Conduct the estimation */
@@ -2214,8 +2213,8 @@ double * const kw){
     /* expand matrix outer product, multiply by kernel weights, etc, do sum */
 
     if (!(drop_one_train && do_psum && (j == drop_which_train))){
-        np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
-                              matrix_Y, num_var_continuous_extern,
+        np_outer_weighted_sum(matrix_W, sgn, ncol_W, 
+                              matrix_Y, ncol_Y,
                               tprod, num_xt,
                               leave_or_drop, lod,
                               kernel_pow,
@@ -2227,8 +2226,8 @@ double * const kw){
 
 
         for(ii = 0; ii < p_nvar; ii++){
-          np_outer_weighted_sum(matrix_W, sgn, num_var_ordered_extern, 
-                                matrix_Y, num_var_continuous_extern,
+          np_outer_weighted_sum(matrix_W, sgn, ncol_W, 
+                                matrix_Y, ncol_Y,
                                 tprod_mp+ii*num_xt, num_xt,
                                 leave_or_drop, lod,
                                 kernel_pow,
@@ -2741,9 +2740,6 @@ int *num_categories){
   if(bwm == RBWM_CVAIC){
     // compute normalisation constant
 
-    num_var_continuous_extern = 0; // rows in the y_mat
-    num_var_ordered_extern = 0; // rows in weights
-
     // workaround for bwscaling = TRUE
     // really just want to get the full product kernel evaluated at zero
     tsf = int_LARGE_SF;
@@ -2777,6 +2773,8 @@ int *num_categories){
                            0, // no score
                            0, // no ocg
                            1, // explicitly suppress parallel
+                           0, // no Y
+                           0, // no weights
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2794,7 +2792,6 @@ int *num_categories){
                            NULL, // no permutations
                            NULL); // do not return kernel weights
     int_LARGE_SF = tsf;
-    num_var_continuous_extern = 0; 
 
     int_TREE = tint_TREE;
 
@@ -2810,8 +2807,6 @@ int *num_categories){
     double * lc_Y[2];
     double * mean = (double *)malloc(2*num_obs_eval_alloc*sizeof(double));
 
-    num_var_continuous_extern = 2; // columns in the y_mat
-    num_var_ordered_extern = 0; // columns in weights
     lc_Y[0] = vector_Y;
       
     lc_Y[1] = (double *)malloc(num_obs*sizeof(double));
@@ -2840,6 +2835,8 @@ int *num_categories){
                            0, // no score
                            0, // no ocg
                            0, // don't explicitly suppress parallel
+                           2, // 2 cols in Y
+                           0, // 0 cols in W
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -2857,9 +2854,6 @@ int *num_categories){
                            NULL, // no permutations
                            NULL); // do not return kernel weights
 
-    num_var_continuous_extern = 0;
-
-    
     // every even entry in mean is sum(y*kij)
     // every odd is sum(kij)
 
@@ -2991,9 +2985,6 @@ int *num_categories){
             for(l = 0; l < num_reg_ordered; l++)
               TORD[l][0] = matrix_X_ordered[l][j+my_rank];
 
-            num_var_continuous_extern = nrc2; // rows in the y_mat
-            num_var_ordered_extern = nrc2; // rows in weights
-
             kernel_weighted_sum_np(KERNEL_reg,
                                    KERNEL_unordered_reg,
                                    KERNEL_ordered_reg,
@@ -3016,6 +3007,8 @@ int *num_categories){
                                    0, // no score
                                    0, // no ocg
                                    1, // explicitly suppress parallel
+                                   nrc2, // nrc2 cols in Y
+                                   nrc2, // nrc2 cols in W
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -3033,8 +3026,6 @@ int *num_categories){
                                    NULL, // no permutations
                                    NULL); // do not return kernel weights
 
-            num_var_continuous_extern = 0; // set back to number of regressors
-            num_var_ordered_extern = 0; // always zero
           }
           // synchro step
           MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);    
@@ -3073,9 +3064,6 @@ int *num_categories){
             for(l = 0; l < num_reg_ordered; l++)
               TORD[l][0] = matrix_X_ordered[l][j+my_rank];
 
-            num_var_continuous_extern = nrc2; // rows in the y_mat
-            num_var_ordered_extern = nrc2; // rows in weights
-
             kernel_weighted_sum_np(KERNEL_reg,
                                    KERNEL_unordered_reg,
                                    KERNEL_ordered_reg,
@@ -3098,6 +3086,8 @@ int *num_categories){
                                    0, // no score
                                    0, // no ocg
                                    1, // explicitly suppress parallel
+                                   nrc2, // cols in Y
+                                   nrc2, // cols in W
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -3114,9 +3104,6 @@ int *num_categories){
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
                                    NULL); // do not return kernel weights
-
-            num_var_continuous_extern = 0; // set back to number of regressors
-            num_var_ordered_extern = 0; // always zero
 
             // need to use reference weight to fix weight sum
             for(int jj = j+my_rank+1; jj < num_obs; jj++){
@@ -3161,9 +3148,6 @@ int *num_categories){
         for(l = 0; l < num_reg_ordered; l++)
           TORD[l][0] = matrix_X_ordered[l][j];
 
-        num_var_continuous_extern = nrc2; // rows in the y_mat
-        num_var_ordered_extern = nrc2; // rows in weights
-
         kernel_weighted_sum_np(KERNEL_reg,
                                KERNEL_unordered_reg,
                                KERNEL_ordered_reg,
@@ -3186,6 +3170,8 @@ int *num_categories){
                                0, // no score
                                0, // no ocg
                                0, // don't explicity suppress parallel
+                               nrc2,
+                               nrc2,
                                PXU, // TRAIN
                                PXO, 
                                PXC,
@@ -3203,8 +3189,6 @@ int *num_categories){
                                NULL, // no permutations
                                NULL); // do not return kernel weights
 
-        num_var_continuous_extern = 0; // set back to number of regressors
-        num_var_ordered_extern = 0; // always zero
       } else {
         if(j < (num_obs-1)){
 
@@ -3236,9 +3220,6 @@ int *num_categories){
           for(l = 0; l < num_reg_ordered; l++)
             TORD[l][0] = matrix_X_ordered[l][j];
       
-          num_var_continuous_extern = nrc2; // rows in the y_mat
-          num_var_ordered_extern = nrc2; // rows in weights
-
           kernel_weighted_sum_np(KERNEL_reg,
                                  KERNEL_unordered_reg,
                                  KERNEL_ordered_reg,
@@ -3261,6 +3242,8 @@ int *num_categories){
                                  0, // no score
                                  0, // no ocg
                                  0, // don't explicity suppress parallel
+                                 nrc2,
+                                 nrc2,
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -3277,9 +3260,6 @@ int *num_categories){
                                  kwm+j*nrcc22, // weighted sum
                                  NULL, // no permutations
                                  NULL);  // no kernel weights
-
-          num_var_continuous_extern = 0; // set back to number of regressors
-          num_var_ordered_extern = 0; // always zero
 
           // need to use reference weight to fix weight sum
           for(int jj = j+1; jj < num_obs; jj++){
@@ -3468,6 +3448,8 @@ double * cv){
                            0, // no score
                            0, // no ocg
                            0, // don't explicity suppress parallel
+                           0,
+                           0,
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3535,6 +3517,8 @@ double * cv){
                              0, // no score
                              0, // no ocg
                              0, // don't explicity suppress parallel
+                             0,
+                             0,
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
@@ -3606,12 +3590,6 @@ double **matrix_categorical_vals,
 double *cv){
   int i,j,l, indy;
 
-  // unfortunately kernel_weighted_sum_np uses num_var_ordered_extern and num_var_continuous extern for other purposes
-  // this is bad and should be changed. until then:
-  num_var_unordered_extern = 0;
-  num_var_ordered_extern = 0;
-  num_var_continuous_extern = 0;
- 
   const int num_reg_tot = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int num_var_tot = num_var_continuous+num_var_unordered+num_var_ordered;
 
@@ -3710,6 +3688,8 @@ double *cv){
                            0, // no score
                            0, // no ocg
                            0, // don't explicity suppress parallel
+                           0,
+                           0,
                            matrix_Y_unordered_train,
                            matrix_Y_ordered_train,
                            matrix_Y_continuous_train,
@@ -3749,6 +3729,8 @@ double *cv){
                            0, // no score
                            0, // no ocg
                            0, // don't explicity suppress parallel
+                           0,
+                           0,
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3814,10 +3796,6 @@ double *cv){
   free(x_operator);
   free(y_operator);
   free(mean);
-
-  num_var_unordered_extern = num_var_unordered;
-  num_var_ordered_extern = num_var_ordered;
-  num_var_continuous_extern = num_var_continuous;
 
   return(0);
 
@@ -4011,8 +3989,6 @@ double *SIGN){
     if(meany == NULL)
       error("\n** Error: memory allocation failed.");
 
-    num_var_continuous_extern = NCOL_Y; // columns in the y_mat
-    num_var_ordered_extern = 0; // columns in weights
     lc_Y[0] = vector_Y;
       
     lc_Y[1] = (double *)malloc(num_obs_train*sizeof(double));
@@ -4048,6 +4024,8 @@ double *SIGN){
                            0, // no score
                            do_grad, // ocg if grad 
                            0, // don't explicity suppress parallel
+                           NCOL_Y,
+                           0,
                            matrix_X_unordered_train, // TRAIN
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -4065,7 +4043,6 @@ double *SIGN){
                            permy, // permutations used for gradients
                            NULL); // do not return kernel weights
 
-    num_var_continuous_extern = 0;
 
     for(int ii = 0; ii < num_obs_eval; ii++){
       const int ii3 = NCOL_Y*ii;
@@ -4272,9 +4249,6 @@ double *SIGN){
           for(l = 0; l < num_reg_ordered; l++)
             TORD[l][0] = matrix_X_ordered_eval[l][j+my_rank];
 
-          num_var_continuous_extern = nrc3; // rows in the y_mat
-          num_var_ordered_extern = nrc3; // rows in weights
-
           kernel_weighted_sum_np(KERNEL_reg,
                                  KERNEL_unordered_reg,
                                  KERNEL_ordered_reg,
@@ -4297,6 +4271,8 @@ double *SIGN){
                                  0, // no score
                                  do_ocg, // ocg
                                  1, // explicity suppress parallel
+                                 nrc3,
+                                 nrc3,
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -4314,8 +4290,6 @@ double *SIGN){
                                  do_ocg ? (permy+(j+my_rank)*nrcc33*p_nvar) : NULL, // ocg
                                  NULL); // do not return kernel weights
 
-          num_var_continuous_extern = 0; // set back to number of regressors
-          num_var_ordered_extern = 0; // always zero
         }
         // synchro step
         MPI_Allgather(MPI_IN_PLACE, nrcc33, MPI_DOUBLE, kwm+j*nrcc33, nrcc33, MPI_DOUBLE, comm[1]);          
@@ -4340,9 +4314,6 @@ double *SIGN){
       for(l = 0; l < num_reg_ordered; l++)
         TORD[l][0] = matrix_X_ordered_eval[l][j];
 
-      num_var_continuous_extern = nrc3; // rows in the y_mat
-      num_var_ordered_extern = nrc3; // rows in weights
-
       kernel_weighted_sum_np(KERNEL_reg,
                              KERNEL_unordered_reg,
                              KERNEL_ordered_reg,
@@ -4365,6 +4336,8 @@ double *SIGN){
                              0, // no score
                              do_ocg, // no ocg
                              1, //  explicity suppress parallel
+                             nrc3,
+                             nrc3,
                              PXU, // TRAIN
                              PXO, 
                              PXC,
@@ -4381,9 +4354,6 @@ double *SIGN){
                              kwm+j*nrcc33,  // weighted sum
                              do_ocg ? (permy+j*nrcc33*p_nvar) : NULL, // no permutations
                              NULL); // do not return kernel weights
-
-      num_var_continuous_extern = 0; // set back to number of regressors
-      num_var_ordered_extern = 0; // always zero
 
 #endif
       
@@ -4615,9 +4585,6 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
   for(i = 0; i < num_reg; i++)
     operator[i] = OP_NORMAL;
 
-  num_var_continuous_extern = 0;
-  num_var_ordered_extern = 0;
-
   kernel_weighted_sum_np(KERNEL_den,
                          KERNEL_unordered_den,
                          KERNEL_ordered_den,
@@ -4640,6 +4607,8 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          0, // no score
                          0, // no ocg
                          0, //  explicity suppress parallel
+                         0,
+                         0,
                          matrix_X_unordered,
                          matrix_X_ordered,
                          matrix_X_continuous,
@@ -4712,9 +4681,6 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
   for(i = 0; i < num_reg; i++)
     operator[i] = OP_CONVOLUTION;
 
-  num_var_continuous_extern = 0;
-  num_var_ordered_extern = 0;
-
   kernel_weighted_sum_np(KERNEL_den,
                          KERNEL_unordered_den,
                          KERNEL_ordered_den,
@@ -4737,6 +4703,8 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          0, // no score
                          0, // no ocg
                          0, //  explicity suppress parallel
+                         0,
+                         0,
                          matrix_X_unordered,
                          matrix_X_ordered,
                          matrix_X_continuous,
@@ -4764,9 +4732,6 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
   for(i = 0; i < num_reg; i++)
     operator[i] = OP_NORMAL;
 
-  num_var_continuous_extern = 0;
-  num_var_ordered_extern = 0;
-
   kernel_weighted_sum_np(KERNEL_den,
                          KERNEL_unordered_den,
                          KERNEL_ordered_den,
@@ -4789,6 +4754,8 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          0, // no score
                          0, // no ocg
                          0, //  explicity suppress parallel
+                         0,
+                         0,
                          matrix_X_unordered,
                          matrix_X_ordered,
                          matrix_X_continuous,
@@ -4905,9 +4872,6 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
     error("\n** Error: invalid bandwidth.");
   }
 
-  num_var_continuous_extern = 0;
-  num_var_ordered_extern = 0;
-
   kernel_weighted_sum_np(KERNEL_den,
                          KERNEL_unordered_den,
                          KERNEL_ordered_den,
@@ -4930,6 +4894,8 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          0, // no score
                          0, // no ocg
                          0, //  explicity suppress parallel
+                         0,
+                         0,
                          matrix_X_unordered_train,
                          matrix_X_ordered_train,
                          matrix_X_continuous_train,
