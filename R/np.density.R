@@ -149,7 +149,8 @@ npudens.bandwidth <-
     no.e = no.e,
     mcv.numRow = attr(bws$xmcv, "num.row"),
     densOrDist = NP_DO_DENS,
-    old.dens = old.dens)
+    old.dens = old.dens,
+    int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
   
   myout=
     .C("np_density", as.double(tuno), as.double(tord), as.double(tcon),
