@@ -37,6 +37,7 @@ extern int int_TAYLOR;
 extern int int_WEIGHTS;
 extern int int_LARGE_SF;
 extern int int_TREE;
+extern int int_TREE_ALT;
 
 /*
 int int_LARGE_SF; 
@@ -127,6 +128,18 @@ extern double y_max_extern;
 
 // tree
 extern KDT * kdt_extern;
+extern KDT * kdt_extern_alt;
+
+extern double **matrix_XY_continuous_train_extern_alt;
+extern double **matrix_XY_unordered_train_extern_alt;
+extern double **matrix_XY_ordered_train_extern_alt;
+extern double **matrix_XY_continuous_eval_extern_alt;
+extern double **matrix_XY_unordered_eval_extern_alt;
+extern double **matrix_XY_ordered_eval_extern_alt;
+
+extern int * ipt_extern;
+extern int * ipt_extern_alt;
+
 
 int kernel_convolution_weighted_sum(
 int KERNEL_reg,
@@ -4958,5 +4971,35 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   free(operator);
   free(lambda);
   free_mat(matrix_bandwidth, num_reg_continuous);
+
+}
+
+int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
+                                                                int KERNEL_unordered_den,
+                                                                int KERNEL_ordered_den,
+                                                                int KERNEL_reg,
+                                                                int KERNEL_unordered_reg,
+                                                                int KERNEL_ordered_reg,
+                                                                int BANDWIDTH_den,
+                                                                int num_obs,
+                                                                int num_var_unordered,
+                                                                int num_var_ordered,
+                                                                int num_var_continuous,
+                                                                int num_reg_unordered,
+                                                                int num_reg_ordered,
+                                                                int num_reg_continuous,
+                                                                double **matrix_Y_unordered,
+                                                                double **matrix_Y_ordered,
+                                                                double **matrix_Y_continuous,
+                                                                double **matrix_X_unordered,
+                                                                double **matrix_X_ordered,
+                                                                double **matrix_X_continuous,
+                                                                double **matrix_XY_unordered, 
+                                                                double **matrix_XY_ordered, 
+                                                                double **matrix_XY_continuous, 
+                                                                double *vector_scale_factor,
+                                                                int *num_categories,
+                                                                double *cv){
+
 
 }

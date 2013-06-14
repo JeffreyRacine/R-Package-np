@@ -1383,7 +1383,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     }
   } else {
     switch(ibwmfunc){
-    case CBWM_CVML : bwmfunc = cv_func_con_density_categorical_ml; break;
+    case CBWM_CVML : bwmfunc = np_cv_func_con_density_categorical_ml; break;
     case CBWM_CVLS : bwmfunc = cv_func_con_density_categorical_ls; break;
     case CBWM_NPLS : bwmfunc = np_cv_func_con_density_categorical_ls;break;
     case CBWM_CCDF : bwmfunc = cv_func_con_distribution_categorical_ccdf; break;
