@@ -4805,3 +4805,158 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
   return(0);
 
 }
+
+int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
+                                             int KERNEL_unordered_den,
+                                             int KERNEL_ordered_den,
+                                             int BANDWIDTH_den,
+                                             int num_obs_train,
+                                             int num_obs_eval,
+                                             int num_reg_unordered,
+                                             int num_reg_ordered,
+                                             int num_reg_continuous,
+                                             int dop,
+                                             double **matrix_X_unordered_train,
+                                             double **matrix_X_ordered_train,
+                                             double **matrix_X_continuous_train,
+                                             double **matrix_X_unordered_eval,
+                                             double **matrix_X_ordered_eval,
+                                             double **matrix_X_continuous_eval,
+                                             double *vector_scale_factor,
+                                             int *num_categories,
+                                             double *pdf,
+                                             double *pdf_stderr,
+                                             double *log_likelihood){
+
+  const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
+
+  int i, l;
+
+  const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:
+    ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
+
+  int * operator = NULL;
+
+	double INT_KERNEL_P;					 /* Integral of K(z)^2 */
+	double K_INT_KERNEL_P;				 /*  K^p */
+	/* Integral of K(z-0.5)*K(z+0.5) */
+	double INT_KERNEL_PM_HALF = 0.0;
+	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
+
+  double ** matrix_bandwidth = NULL, * lambda = NULL;
+
+  double pnh = (double)num_obs_train;
+
+	const double log_DBL_MIN = log(DBL_MIN);
+
+  operator = (int *)malloc(sizeof(int)*num_reg);
+
+  for(i = 0; i < num_reg; i++)
+    operator[i] = dop;
+
+  if(num_reg_continuous != 0) {
+    initialize_kernel_regression_asymptotic_constants(KERNEL_den,
+                                                      num_reg_continuous,
+                                                      &INT_KERNEL_P,
+                                                      &K_INT_KERNEL_P,
+                                                      &INT_KERNEL_PM_HALF,
+                                                      &DIFF_KER_PPM);
+  } else {
+    INT_KERNEL_P = 1.0;
+    K_INT_KERNEL_P = 1.0;
+  }
+
+  matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
+	lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
+
+  if(kernel_bandwidth_mean(KERNEL_den,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           num_obs_eval,
+                           0,0,0,
+                           num_reg_continuous,
+                           num_reg_unordered,
+                           num_reg_ordered,
+                           0,
+                           vector_scale_factor,
+                           NULL, NULL,
+                           matrix_X_continuous_train,
+                           matrix_X_continuous_eval,
+                           NULL,
+                           matrix_bandwidth,
+                           lambda)==1){
+#ifdef MPI2
+		MPI_Barrier(comm[1]);
+		MPI_Finalize();
+#endif
+    error("\n** Error: invalid bandwidth.");
+  }
+
+  num_var_continuous_extern = 0;
+  num_var_ordered_extern = 0;
+
+  kernel_weighted_sum_np(KERNEL_den,
+                         KERNEL_unordered_den,
+                         KERNEL_ordered_den,
+                         BANDWIDTH_den,
+                         num_obs_train,
+                         num_obs_eval,
+                         num_reg_unordered,
+                         num_reg_ordered,
+                         num_reg_continuous,
+                         0, // don't leave one out 
+                         1, // kernel_pow = 1
+                         1, // bandwidth_divide = FALSE when not adaptive
+                         0, // do_smooth_coef_weights = FALSE (not implemented)
+                         0, // symmetric
+                         0, // gather-scatter sum
+                         0, // do not drop train
+                         0, // do not drop train
+                         operator, // dens or dist
+                         OP_NOOP, // no permutations
+                         0, // no score
+                         0, // no ocg
+                         0, //  explicity suppress parallel
+                         matrix_X_unordered_train,
+                         matrix_X_ordered_train,
+                         matrix_X_continuous_train,
+                         matrix_X_unordered_eval,
+                         matrix_X_ordered_eval,
+                         matrix_X_continuous_eval,
+                         NULL, // no ys
+                         NULL, // no weights
+                         NULL, // no sgn
+                         vector_scale_factor,
+                         num_categories,
+                         NULL, // no mcv necessary
+                         NULL, // no ocg
+                         pdf,  // weighted sum
+                         NULL, // no permutations
+                         NULL); // do not return kernel weights
+
+  if((BANDWIDTH_den == BW_FIXED) && (dop == OP_NORMAL)){
+    for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){      
+      pnh *= matrix_bandwidth[l][0];
+    }
+  }
+
+
+
+  for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
+    pdf[i] /= (double)num_obs_train;
+    *log_likelihood -= (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]/num_obs_train);
+
+    if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
+      for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
+        pnh *= matrix_bandwidth[l][i];
+      }
+    }
+
+    pdf_stderr[i] = sqrt(pdf[i]*K_INT_KERNEL_P/pnh);
+  }
+
+  free(operator);
+  free(lambda);
+  free_mat(matrix_bandwidth, num_reg_continuous);
+
+}

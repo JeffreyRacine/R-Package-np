@@ -300,7 +300,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   if(!(ipt != NULL))
     error("!(ipt != NULL)");
 
-  for(int i = 0; i < num_obs_train_extern; i++){
+  for(i = 0; i < num_obs_train_extern; i++){
     ipt[i] = i;
   }
 
@@ -2379,7 +2379,9 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   int itmax = 10000;
   int i,j;
-  int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist;
+  int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist, old_dens, int_tree;
+
+  int * ipt = NULL, * ipe = NULL;
   
 
   /* match integer options with their globals */
@@ -2407,6 +2409,8 @@ void np_density(double * tuno, double * tord, double * tcon,
   pad_num = *padnum;
 
   dens_or_dist = myopti[DEN_DODENI];
+  old_dens = myopti[DEN_OLDI];
+  int_tree = myopti[DEN_TREEI];
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
@@ -2485,66 +2489,160 @@ void np_density(double * tuno, double * tord, double * tcon,
     num_categories_extern[j] = i;
   }
 
+  /* data has been copied, now build tree */
+
+  ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+  if(!(ipt != NULL))
+    error("!(ipt != NULL)");
+
+  for(i = 0; i < num_obs_train_extern; i++){
+    ipt[i] = i;
+  }
+
+  if(!train_is_eval) {
+    ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+    if(!(ipe != NULL))
+      error("!(ipe != NULL)");
+
+    for(i = 0; i < num_obs_eval_extern; i++){
+      ipe[i] = i;
+    }
+  } else {
+    ipe = ipt;
+  }
+
+  int_TREE = int_TREE && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
+
+  if(int_TREE == NP_TREE_TRUE){
+    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+      build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipt, &kdt_extern);
+    } else {
+      build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipe, &kdt_extern);
+
+    }
+
+    //put training data into tree-order using the index array
+
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
+    
+    
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
+
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
+
+    /* eval */
+    if(!train_is_eval){
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_ordered_eval_extern[j][i]=eord[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+ipe[i]];
+    }
+  }
+
+
   /* Conduct estimation */
   
-  if (dens_or_dist == NP_DO_DENS){
-  /* nb - KERNEL_(|un)ordered_den are set to zero upon declaration 
-     - they have only one kernel type each at the moment */
-    kernel_estimate_density_categorical(KERNEL_den_extern,
-                                        KERNEL_den_unordered_extern,
-                                        KERNEL_den_ordered_extern,
-                                        BANDWIDTH_den_extern,
-                                        num_obs_train_extern,
-                                        num_obs_eval_extern,
-                                        num_reg_unordered_extern,
-                                        num_reg_ordered_extern,
-                                        num_reg_continuous_extern,
-                                        /* Train */
-                                        matrix_X_unordered_train_extern,
-                                        matrix_X_ordered_train_extern,
-                                        matrix_X_continuous_train_extern,
-                                        /* Eval */
-                                        matrix_X_unordered_eval_extern,
-                                        matrix_X_ordered_eval_extern,
-                                        matrix_X_continuous_eval_extern,
-                                        &vector_scale_factor[1],
-                                        num_categories_extern,
-                                        pdf,
-                                        pdf_stderr,
-                                        &log_likelihood);
-  } else if (dens_or_dist == NP_DO_DIST) {
-    kernel_estimate_distribution_categorical(KERNEL_den_extern,
-                                             KERNEL_den_unordered_extern,
-                                             KERNEL_den_ordered_extern,
-                                             BANDWIDTH_den_extern,
-                                             num_obs_train_extern,
-                                             num_obs_eval_extern,
-                                             num_reg_unordered_extern,
-                                             num_reg_ordered_extern,
-                                             num_reg_continuous_extern,
-                                             /* Train */
-                                             matrix_X_unordered_train_extern,
-                                             matrix_X_ordered_train_extern,
-                                             matrix_X_continuous_train_extern,
-                                             /* Eval */
-                                             matrix_X_unordered_eval_extern,
-                                             matrix_X_ordered_eval_extern,
-                                             matrix_X_continuous_eval_extern,
-                                             &vector_scale_factor[1],
-                                             num_categories_extern,
-                                             matrix_categorical_vals_extern,
-                                             pdf,
-                                             pdf_stderr,
-                                             small, itmax);
+  if(old_dens){
+    if (dens_or_dist == NP_DO_DENS){
+      /* nb - KERNEL_(|un)ordered_den are set to zero upon declaration 
+         - they have only one kernel type each at the moment */
+      kernel_estimate_density_categorical(KERNEL_den_extern,
+                                          KERNEL_den_unordered_extern,
+                                          KERNEL_den_ordered_extern,
+                                          BANDWIDTH_den_extern,
+                                          num_obs_train_extern,
+                                          num_obs_eval_extern,
+                                          num_reg_unordered_extern,
+                                          num_reg_ordered_extern,
+                                          num_reg_continuous_extern,
+                                          /* Train */
+                                          matrix_X_unordered_train_extern,
+                                          matrix_X_ordered_train_extern,
+                                          matrix_X_continuous_train_extern,
+                                          /* Eval */
+                                          matrix_X_unordered_eval_extern,
+                                          matrix_X_ordered_eval_extern,
+                                          matrix_X_continuous_eval_extern,
+                                          &vector_scale_factor[1],
+                                          num_categories_extern,
+                                          pdf,
+                                          pdf_stderr,
+                                          &log_likelihood);
+    } else if (dens_or_dist == NP_DO_DIST) {
+      kernel_estimate_distribution_categorical(KERNEL_den_extern,
+                                               KERNEL_den_unordered_extern,
+                                               KERNEL_den_ordered_extern,
+                                               BANDWIDTH_den_extern,
+                                               num_obs_train_extern,
+                                               num_obs_eval_extern,
+                                               num_reg_unordered_extern,
+                                               num_reg_ordered_extern,
+                                               num_reg_continuous_extern,
+                                               /* Train */
+                                               matrix_X_unordered_train_extern,
+                                               matrix_X_ordered_train_extern,
+                                               matrix_X_continuous_train_extern,
+                                               /* Eval */
+                                               matrix_X_unordered_eval_extern,
+                                               matrix_X_ordered_eval_extern,
+                                               matrix_X_continuous_eval_extern,
+                                               &vector_scale_factor[1],
+                                               num_categories_extern,
+                                               matrix_categorical_vals_extern,
+                                               pdf,
+                                               pdf_stderr,
+                                               small, itmax);
 
+    }
+  } else {
+    const int dop = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
+
+      kernel_estimate_dens_dist_categorical_np(KERNEL_den_extern,
+                                               KERNEL_den_unordered_extern,
+                                               KERNEL_den_ordered_extern,
+                                               BANDWIDTH_den_extern,
+                                               num_obs_train_extern,
+                                               num_obs_eval_extern,
+                                               num_reg_unordered_extern,
+                                               num_reg_ordered_extern,
+                                               num_reg_continuous_extern,
+                                               dop,
+                                               /* Train */
+                                               matrix_X_unordered_train_extern,
+                                               matrix_X_ordered_train_extern,
+                                               matrix_X_continuous_train_extern,
+                                               /* Eval */
+                                               matrix_X_unordered_eval_extern,
+                                               matrix_X_ordered_eval_extern,
+                                               matrix_X_continuous_eval_extern,
+                                               &vector_scale_factor[1],
+                                               num_categories_extern,
+                                               pdf,
+                                               pdf_stderr,
+                                               &log_likelihood);
   }
   
   
   /* write the return values */
 
   for(i=0;i<num_obs_eval_extern;i++){
-    mydens[i] = pdf[i];
-    myderr[i] = pdf_stderr[i];
+    mydens[ipe[i]] = pdf[i];
+    myderr[ipe[i]] = pdf_stderr[i];
   }
   *ll = log_likelihood;
 
@@ -2566,6 +2664,16 @@ void np_density(double * tuno, double * tord, double * tcon,
   safe_free(pdf);
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
+
+  safe_free(ipt);
+
+  if(!train_is_eval)
+    safe_free(ipe);
+
+  if(int_TREE == NP_TREE_TRUE){
+    free_kdtree(&kdt_extern);
+    int_TREE = NP_TREE_FALSE;
+  }
 
   return;
 }
@@ -2675,7 +2783,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   if(!(ipt != NULL))
     error("!(ipt != NULL)");
 
-  for(int i = 0; i < num_obs_train_extern; i++){
+  for(i = 0; i < num_obs_train_extern; i++){
     ipt[i] = i;
   }
 
@@ -3149,7 +3257,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   if(!(ipt != NULL))
     error("!(ipt != NULL)");
 
-  for(int i = 0; i < num_obs_train_extern; i++){
+  for(i = 0; i < num_obs_train_extern; i++){
     ipt[i] = i;
   }
 
@@ -3158,7 +3266,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     if(!(ipe != NULL))
       error("!(ipe != NULL)");
 
-    for(int i = 0; i < num_obs_eval_extern; i++){
+    for(i = 0; i < num_obs_eval_extern; i++){
       ipe[i] = i;
     }
   } else {
@@ -3567,7 +3675,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   if(!(ipt != NULL))
     error("!(ipt != NULL)");
 
-  for(int i = 0; i < num_obs_train_extern; i++){
+  for(i = 0; i < num_obs_train_extern; i++){
     ipt[i] = i;
   }
 
@@ -3576,7 +3684,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     if(!(ipe != NULL))
       error("!(ipe != NULL)");
 
-    for(int i = 0; i < num_obs_eval_extern; i++){
+    for(i = 0; i < num_obs_eval_extern; i++){
       ipe[i] = i;
     }
   } else {

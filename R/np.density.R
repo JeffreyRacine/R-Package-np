@@ -58,7 +58,7 @@ npudens.call <-
 npudens.bandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
-           edat, ...){
+           edat, old.dens = FALSE, ...){
 
   no.e = missing(edat)
 
@@ -148,7 +148,9 @@ npudens.bandwidth <-
       "truncated gaussian" = CKER_TGAUSS),
     no.e = no.e,
     mcv.numRow = attr(bws$xmcv, "num.row"),
-    densOrDist = NP_DO_DENS)
+    densOrDist = NP_DO_DENS,
+    old.dens = old.dens,
+    int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
   
   myout=
     .C("np_density", as.double(tuno), as.double(tord), as.double(tcon),
@@ -168,7 +170,7 @@ npudens.bandwidth <-
   return(ev)
 }
 
-npudens.default <- function(bws, tdat, ...){
+npudens.default <- function(bws, tdat, old.dens, ...){
   sc.names <- names(sys.call())
 
   ## here we check to see if the function was called with tdat =
@@ -177,6 +179,7 @@ npudens.default <- function(bws, tdat, ...){
 
   bws.named <- any(sc.names == "bws")
   tdat.named <- any(sc.names == "tdat")
+  old.dens.named <- any(sc.names == "old.dens")
 
   no.bws <- missing(bws)
   no.tdat <- missing(tdat)
@@ -194,6 +197,7 @@ npudens.default <- function(bws, tdat, ...){
                       ifelse(no.tdat,"",","),
                       ifelse(bws.named,"bws = bws, bandwidth.compute = FALSE",
                              ifelse(no.bws,"","bws")),
+                      ifelse(old.dens.named, "old.dens = old.dens,", ""),
                       ifelse(no.bws,"",","),                      
                       "call = mc, ...",")",sep="")))
 
@@ -222,6 +226,7 @@ npudens.default <- function(bws, tdat, ...){
   eval(parse(text=paste("npudens(bws = tbw",
                ifelse(no.tdat, "",
                       ifelse(tdat.named, ",tdat = tdat",",tdat")),
+               ifelse(old.dens.named, ",old.dens = old.dens",""),
                ",...)")))
 }
 
