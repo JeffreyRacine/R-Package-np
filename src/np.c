@@ -2610,6 +2610,31 @@ void np_density(double * tuno, double * tord, double * tcon,
 
     }
   } else {
+    const int dop = (dens_or_dist == NP_DO_DENS) ? OP_NORMAL : OP_INTEGRAL;
+
+      kernel_estimate_dens_dist_categorical_np(KERNEL_den_extern,
+                                               KERNEL_den_unordered_extern,
+                                               KERNEL_den_ordered_extern,
+                                               BANDWIDTH_den_extern,
+                                               num_obs_train_extern,
+                                               num_obs_eval_extern,
+                                               num_reg_unordered_extern,
+                                               num_reg_ordered_extern,
+                                               num_reg_continuous_extern,
+                                               dop,
+                                               /* Train */
+                                               matrix_X_unordered_train_extern,
+                                               matrix_X_ordered_train_extern,
+                                               matrix_X_continuous_train_extern,
+                                               /* Eval */
+                                               matrix_X_unordered_eval_extern,
+                                               matrix_X_ordered_eval_extern,
+                                               matrix_X_continuous_eval_extern,
+                                               &vector_scale_factor[1],
+                                               num_categories_extern,
+                                               pdf,
+                                               pdf_stderr,
+                                               &log_likelihood);
   }
   
   
