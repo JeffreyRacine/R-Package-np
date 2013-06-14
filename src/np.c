@@ -2379,7 +2379,7 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   int itmax = 10000;
   int i,j;
-  int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist;
+  int num_var, num_obs_eval_alloc, max_lev, train_is_eval, dens_or_dist, old_dens;
   
 
   /* match integer options with their globals */
@@ -2407,6 +2407,7 @@ void np_density(double * tuno, double * tord, double * tcon,
   pad_num = *padnum;
 
   dens_or_dist = myopti[DEN_DODENI];
+  old_dens = myopti[DEN_OLDI];
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
