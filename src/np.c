@@ -1322,11 +1322,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     num_categories_extern_XY[i] = num_categories_extern[j];
 
   // xy rord
-  for(j = (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j < num_all_var; j++, i++)
+  for(j = (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j < (num_all_uvar + num_all_ovar); j++, i++)
     num_categories_extern_XY[i] = num_categories_extern[j];
 
   // xy vord
-  for(j = num_var_unordered_extern; j < num_var_unordered_extern + num_var_ordered_extern; j++, i++)
+  for(j = num_var_unordered_extern; j < (num_var_unordered_extern + num_var_ordered_extern); j++, i++)
     num_categories_extern_XY[i] = num_categories_extern[j];
 
   // now for the x data
@@ -1337,7 +1337,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     num_categories_extern_X[i] = num_categories_extern[j];
 
   // x rord
-  for(j = (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j < num_all_var; j++, i++)
+  for(j = (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j < (num_all_uvar + num_all_ovar); j++, i++)
     num_categories_extern_X[i] = num_categories_extern[j];
 
 
