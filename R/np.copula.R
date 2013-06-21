@@ -127,10 +127,18 @@ npcopula <- function(bws,
       ## Now compute the quasi-inverse from the estimated F for the
       ## evaluation points.
       for(i in 1:n.u) {
-        if(u[i,j]>=0.5) {
-          x.u[i,j] <- max(x.eval[F<=u[i,j]])
+        if(is.numeric(x.marginal)) {
+          if(u[i,j]>=0.5) {
+            x.u[i,j] <- max(x.eval[F<=u[i,j]])
+          } else {
+            x.u[i,j] <-  min(x.eval[F>=u[i,j]])
+          }
         } else {
-          x.u[i,j] <-  min(x.eval[F>=u[i,j]])
+          if(u[i,j]>=1.0) {
+            x.u[i,j] <- max(x.eval[F<=u[i,j]])
+          } else {
+            x.u[i,j] <-  min(x.eval[F>=u[i,j]])
+          }
         }
       }
     }

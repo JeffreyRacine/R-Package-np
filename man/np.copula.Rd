@@ -139,7 +139,7 @@ rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
 mydat <- mvrnorm(n=n, mu, Sigma)
-mydat <- data.frame(x=mydat[,1],y=ordered(as.integer(cut(mydat[,2],c(-Inf,quantile(mydat[,2],seq(0,1,length=10+1)),Inf)))-1))
+mydat <- data.frame(x=mydat[,1],y=ordered(as.integer(cut(mydat[,2],quantile(mydat[,2],seq(0,1,by=.1)),include.lowest=TRUE))-1))
 
 q.min <- 0.0
 q.max <- 1.0
