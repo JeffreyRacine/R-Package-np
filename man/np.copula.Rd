@@ -109,6 +109,13 @@ npcopula(bws,
   grids, concatenate and sort, and these form the final grid of length
   \code{n.quasi.inv} for computing the quasi-inverse.
 
+  Note that if \code{u} is provided and any elements of (the columns of)
+  \code{u} are such that they lie beyond the respective values of
+  \code{F} for the evaluation data for the respective marginal, such
+  values are reset to the minimum/maximum values of \code{F} for the
+  respective marginal. It is therefore prudent to inspect the values of
+  \code{u} returned by \code{\link{npcopula}} when \code{u} is provided.
+
   Note that copula are only defined for data of type
   \code{\link{numeric}} or \code{\link{ordered}}.
 
