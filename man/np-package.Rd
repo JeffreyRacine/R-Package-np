@@ -150,7 +150,7 @@
 
 		\item{Second Order Gaussian (\eqn{x} is continuous)}{
 			\eqn{k(z) = \exp(-z^2/2)/\sqrt{2\pi}}{k(z) =
-				exp(-z^2/2)/sqrt{2*pi}}, where \eqn{z=(x_i-x)/h}{z=(x[i]-x)/h},
+				exp(-z^2/2)/sqrt{2*pi}} where \eqn{z=(x_i-x)/h}{z=(x[i]-x)/h},
       and \eqn{h>0}.
     }
 
@@ -171,32 +171,48 @@
         lambda} if \eqn{x_i=x}{x[i] = x}, and
       \eqn{\lambda/(c-1)}{lambda/(c-1)} if \eqn{x_i \neq x}{x[i] != x},
       where \eqn{c} is the number of (discrete) outcomes assumed by the
-      factor \eqn{x}. Note that \eqn{\lambda}{lambda} must lie between
-      \eqn{0} and \eqn{(c-1)/c}.
-    }
+      factor \eqn{x}.
+
+      Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
+      \eqn{(c-1)/c}.
+   }
 
     \item{Wang and van Ryzin (\eqn{x} is a (discrete) ordered factor)}{
       \eqn{l(x_i,x,\lambda) = 1 - \lambda}{l(x[i],x,lambda) = 1 -
         lambda} if \eqn{|x_i-x|=0}{|x[i] - x| = 0}, and
       \eqn{(1-\lambda)\lambda^{|x_i-x|}/2}{(1-lambda)lambda^|x_i-x|/2}
-      if \eqn{|x_i - x|\ge1}{|x[i] - x|>=1}. Note that
-      \eqn{\lambda}{lambda} must lie between \eqn{0} and \eqn{1}.
+      if \eqn{|x_i - x|\ge1}{|x[i] - x|>=1}.
+
+      Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
+      \eqn{1}.
+
+      Note also that this kernel cannot become a constant function for any
+      value of \eqn{lambda}, it presumes the number of
+      categories increases with the sample size, and with a finite
+      number of outcomes this kernel function can sum to less than
+      one. Its use for unconditional probability and distribution
+      function estimation with a finite (small) number of categories is
+      therefore discouraged.
     }
       
 
     \item{Li and Racine (\eqn{x} is a (discrete) factor)}{
       \eqn{l(x_i,x,\lambda) = 1 }{l(x[i],x,lambda) =
         1} if \eqn{x_i=x}{x[i] = x}, and
-      \eqn{\lambda}{lambda} if \eqn{x_i \neq x}{x[i] != x}. Note that
-      \eqn{\lambda}{lambda} must lie between \eqn{0} and \eqn{1}.
-      }
+      \eqn{\lambda}{lambda} if \eqn{x_i \neq x}{x[i] != x}.
+
+      Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
+      \eqn{1}.
+    }
 
     \item{Li and Racine (\eqn{x} is a (discrete) ordered factor)}{
       \eqn{l(x_i,x,\lambda) = 1}{l(x[i],x,lambda) = 1} if
       \eqn{|x_i-x|=0}{|x[i] - x| = 0}, and
       \eqn{\lambda^{|x_i-x|}}{lambda^|x_i-x|} if \eqn{|x_i -
-        x|\ge1}{|x[i] - x|>=1}. Note that \eqn{\lambda}{lambda} must lie
-      between \eqn{0} and \eqn{1}.
+        x|\ge1}{|x[i] - x|>=1}.
+
+      Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
+      \eqn{1}.
     }
 
   }
