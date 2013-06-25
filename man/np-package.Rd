@@ -150,13 +150,21 @@
 
 		\item{Second Order Gaussian (\eqn{x} is continuous)}{
 			\eqn{k(z) = \exp(-z^2/2)/\sqrt{2\pi}}{k(z) =
-				exp(-z^2/2)/sqrt{2*pi}} where \eqn{z=(x_i-x)/h}{z=(x[i]-x)/h},
+				exp(-z^2/2)/\sqrt 2\pi} where \eqn{z=(x_i-x)/h}{z=(x[i]-x)/h},
       and \eqn{h>0}.
+    }
+    
+    \item{Second Order Truncated Gaussian (\eqn{x} is continuous)}{
+			\eqn{k(z) = (\exp(-z^2/2)-\exp(-b^2/2))/(\text{erf}(b/\sqrt{2})\sqrt{2\pi}-2b\exp(-b^2/2))}{k(z) =
+				(exp(-z^2/2)-exp(-b^2/2))/(erf(b/\sqrt{2})\sqrt{2\pi}-2b\exp(-b^2/2))} where \eqn{z=(x_i-x)/h}{z=(x[i]-x)/h}, \eqn{b>0}, \eqn{|z|\le b}
+      and \eqn{h>0}.
+      
+      See \code{\link{nptgauss}} for details on modifying \eqn{b}.
     }
 
     \item{Second Order Epanechnikov (\eqn{x} is continuous)}{
       \eqn{k(z) =  3\left(1 - z^2/5\right)/(4\sqrt{5})}{
-        k(z) =  3(1 - z^2/5)/(4*sqrt(5))}
+        k(z) =  3(1 - z^2/5)/(4\sqrt 5)}
       if \eqn{z^2<5}, \eqn{0} otherwise, where
       \eqn{z=(x_i-x)/h}{z=(x[i]-x)/h}, and \eqn{h>0}.
     }
