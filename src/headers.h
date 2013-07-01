@@ -265,10 +265,11 @@ int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERN
 #define NP_TREE_FALSE 0
 #define NP_TREE_TRUE  1
 
+// offsets array : ordinary, convolution, derivative, cdfative
 static const int OP_CFUN_OFFSETS[4] = { 0, 10, 20, 30 };
 #define OP_NCFUN 40
 static const int OP_UFUN_OFFSETS[4] = { 0, 2, 4, 0 };
-static const int OP_OFUN_OFFSETS[4] = { 0, 0, 2, 0 };
+static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 // these defines are to facilitate accessing the continuous kernels in their various arrays
 
 #define CK_GAUSS2 0

@@ -648,6 +648,15 @@ double np_score_oli_racine(const double x, const double y, const double lambda){
   return (fabs(x-y)*ipow(lambda, (int)fabs(x-y)-1));
 }
 
+double np_onli_racine(const double x, const double y, const double lambda){w
+  return R_pow_di(lambda, (int)fabs(x-y))*(1.0 - lambda)/(1.0 + lambda);
+}
+
+double np_score_onli_racine(const double x, const double y, const double lambda){
+  const int cxy = (int)fabs(x-y);
+  return ((cxy != 0) || (lambda != 0.0)) ? R_pow_di(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0 *lambda) : -2.0;
+}
+
 // not so simple truncated gaussian convolution kernels
 //   In general for our truncated Gaussian kernel the convolution kernel will be a polynomial of the form:
 // z < 0: 
@@ -740,6 +749,12 @@ double np_econvol_uli_racine(const int same_cat, const double lambda, const int 
   return (same_cat)?(1.0 + (double)(c-1)*lambda*lambda):(lambda*(2.0+(double)(c-2)*lambda));
 }
 
+double np_econvol_onli_racine(const double x, const double y, const double lambda){
+  const int cxy = (int)fabs(x-y);
+  const double lnorm = (1.0 - lambda)/(1.0 + lambda);
+  return lnorm*lnorm*R_pow_di(lambda, cxy)*(1.0/(1.0 - lambda*lambda) + cxy);
+
+}
 // derivative kernels
 
 
@@ -842,6 +857,17 @@ double np_cdf_epan8(const double z){
 
 double np_cdf_rect(const double z){
   return (z < -1.0) ? 0.0 : (z > 1.0) ? 1.0 : (0.5+0.5*z);
+}
+
+double np_cdf_onli_racine(const double x, const double y, const double lambda){
+  const int cxy = (int)fabs(x-y);
+  const double gee = R_pow_di(lambda, cxy)/(1.0+lambda);
+  return (x < y) ? gee : 1.0 - lambda*gee;
+}
+
+// this is a null kernel, it is a placeholder kernel for testing
+double np_onull(const double x, const double y, const double lambda){
+  return(0.0);
 }
 
 // end kernels
@@ -1266,8 +1292,12 @@ void np_p_okernelv(const int KERNEL,
 
   double * const pxw = (bin_do_xw ? p_result : &unit_weight);
 
-  double (* const k[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine,
-                                                   np_score_owang_van_ryzin, np_score_oli_racine };
+  double (* const k[])(double, double, double) = { 
+    np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
+    np_onull, np_onull, np_econvol_onli_racine,
+    np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
+    np_onull, np_onull, np_cdf_onli_racine
+  };
 
   double * kbuf = NULL;
 
@@ -1365,7 +1395,12 @@ void np_okernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double (* const k[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine };
+  double (* const k[])(double, double, double) = { 
+    np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
+    np_onull, np_onull, np_econvol_onli_racine,
+    np_onull, np_onull, np_onull,
+    np_onull, np_onull, np_cdf_onli_racine
+  };
 
   if(!swap_xxt){
     if(nl == NULL){
@@ -1758,6 +1793,8 @@ double * const kw){
   int p_nvar = (do_perm ? num_reg_continuous : 0) + (doscoreocg ? num_reg_unordered + num_reg_ordered : 0);
   int ps_ukernel = -1, ps_okernel = -1;
 
+  int ps_ok_nli = KERNEL_ordered_reg == 2;
+
   /* Trees are currently not compatible with all operations */
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
   int any_convolution = 0;
@@ -1816,7 +1853,7 @@ double * const kw){
 
   // todo - add (better) support for ordered integral / convolution kernels
   for(l = (num_reg_continuous+num_reg_unordered); l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++)
-    KERNEL_ordered_reg_np[l - (num_reg_continuous + num_reg_unordered)] = KERNEL_ordered_reg;
+    KERNEL_ordered_reg_np[l - (num_reg_continuous + num_reg_unordered)] = KERNEL_ordered_reg + OP_OFUN_OFFSETS[operator[l]];
 
   const int num_xt = (BANDWIDTH_reg == BW_ADAP_NN)?num_obs_eval:num_obs_train;
   const int ws_step = (BANDWIDTH_reg == BW_ADAP_NN)? 0 :
@@ -2194,7 +2231,7 @@ double * const kw){
     /* ordered third */
     for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
       if(!doscoreocg){
-        if(operator[l] != OP_CONVOLUTION){
+        if(np_ok_nli || (operator[l] != OP_CONVOLUTION)){
           np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
                       xo[i][j], lambda[num_reg_unordered+i], 
                       tprod, pnl, swap_xxt);      
