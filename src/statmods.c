@@ -36,7 +36,7 @@ extern int int_ROBUST;
 
 #include <math.h>
 
-int fround(double x)
+int np_fround(double x)
 {
     double intpart, fracpart;
     int origint;
@@ -94,9 +94,9 @@ double meand(int n, double *vector)
 
         sort(n, &vector_temp[-1]);                /* NR Code */
 
-        int_med = fround(((double)n-1.0)/2.0);
-        int_medl = fround(((double)n-2.0)/2.0);
-        int_medh = fround(((double)n)/2.0);
+        int_med = np_fround(((double)n-1.0)/2.0);
+        int_medl = np_fround(((double)n-2.0)/2.0);
+        int_medh = np_fround(((double)n)/2.0);
 
 /*stat = (n % 2 ? odd number of obs : even number of obs);*/
 
@@ -162,13 +162,13 @@ double standerrd(int n, double *vector)
 
 /* Interquartile Range */
 
-    int_25 = fround(0.25*((double)n+1.0)-1);
-    int_25l = fround(0.25*((double)n)-1);
-    int_25h = fround(0.25*((double)n));
+    int_25 = np_fround(0.25*((double)n+1.0)-1);
+    int_25l = np_fround(0.25*((double)n)-1);
+    int_25h = np_fround(0.25*((double)n));
 
-    int_75 = fround(0.75*((double)n+1.0)-1);
-    int_75l = fround(0.75*((double)n)-1);
-    int_75h = fround(0.75*((double)n));
+    int_75 = np_fround(0.75*((double)n+1.0)-1);
+    int_75l = np_fround(0.75*((double)n)-1);
+    int_75h = np_fround(0.75*((double)n));
 
 /* (n % 2 ? odd number of obs : even number of obs) */
 
@@ -794,10 +794,10 @@ double *vector_scale_factor)
                     else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
                     {
 /* Always use NN for any sample size */
-                        if( (fround(vector_scale_factor[i+1]) < 1) ||
-                            (fround(vector_scale_factor[i+1]) > (int) (num_obs-1) ))
+                        if( (np_fround(vector_scale_factor[i+1]) < 1) ||
+                            (np_fround(vector_scale_factor[i+1]) > (int) (num_obs-1) ))
                         {
-                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+1]));
+                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+1]));
                             vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
                         }
                     }
@@ -855,10 +855,10 @@ double *vector_scale_factor)
                     else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
                     {
 /* Always use NN for any sample size */
-                        if( (fround(vector_scale_factor[i+num_reg_continuous+1]) < 1) ||
-                            (fround(vector_scale_factor[i+num_reg_continuous+1]) > (int) (num_obs-1) ))
+                        if( (np_fround(vector_scale_factor[i+num_reg_continuous+1]) < 1) ||
+                            (np_fround(vector_scale_factor[i+num_reg_continuous+1]) > (int) (num_obs-1) ))
                         {
-                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+num_reg_continuous+1]));
+                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+num_reg_continuous+1]));
                             vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
                         }
                     }
@@ -1063,10 +1063,10 @@ double *vector_scale_factor)
                 }
                 else
                 {
-                    if( (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
-                        (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
+                    if( (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
+                        (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
                     {
-                        REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
+                        REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
                         vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
                     }
                 }
@@ -1263,12 +1263,12 @@ double *vector_scale_factor)
                     else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
                     {
 /* Always use NN for any sample size */
-                        if( (fround(vector_scale_factor[i+1]) < 1) ||
-                            (fround(vector_scale_factor[i+1]) > (int) (num_obs-1) ))
+                        if( (np_fround(vector_scale_factor[i+1]) < 1) ||
+                            (np_fround(vector_scale_factor[i+1]) > (int) (num_obs-1) ))
                         {
                             if(my_rank == 0)
                             {
-                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+1]));
+                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+1]));
                             }
                             vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
                         }
@@ -1331,12 +1331,12 @@ double *vector_scale_factor)
                     else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
                     {
 /* Always use NN for any sample size */
-                        if( (fround(vector_scale_factor[i+num_reg_continuous+1]) < 1) ||
-                            (fround(vector_scale_factor[i+num_reg_continuous+1]) > (int) (num_obs-1) ))
+                        if( (np_fround(vector_scale_factor[i+num_reg_continuous+1]) < 1) ||
+                            (np_fround(vector_scale_factor[i+num_reg_continuous+1]) > (int) (num_obs-1) ))
                         {
                             if(my_rank == 0)
                             {
-                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", fround(vector_scale_factor[i+num_reg_continuous+1]));
+                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+num_reg_continuous+1]));
                             }
 
                             vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
@@ -1579,12 +1579,12 @@ double *vector_scale_factor)
                 }
                 else
                 {
-                    if( (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
-                        (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
+                    if( (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
+                        (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
                     {
                         if(my_rank == 0)
                         {
-                            REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
+                            REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
                         }
 
                         vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
@@ -2343,7 +2343,7 @@ double *vector_scale_factor)
         }
         else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
         {
-            if( (fround(vector_scale_factor[i]) < 1) || (fround(vector_scale_factor[i]) > num_obs_m_1) )
+            if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > num_obs_m_1) )
             {
                 return(1);
             }
@@ -2364,7 +2364,7 @@ double *vector_scale_factor)
         }
         else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
         {
-            if( (fround(vector_scale_factor[i]) < 1) || (fround(vector_scale_factor[i]) > num_obs_m_1 ) )
+            if( (np_fround(vector_scale_factor[i]) < 1) || (np_fround(vector_scale_factor[i]) > num_obs_m_1 ) )
             {
                 return(1);
             }
@@ -2512,8 +2512,8 @@ double *vector_scale_factor)
         }
         else if((BANDWIDTH_den_ml == 1)||(BANDWIDTH_den_ml == 2))
         {
-            if( (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
-                (fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
+            if( (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
+                (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
             {
                 return(1);
             }

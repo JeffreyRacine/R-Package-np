@@ -607,7 +607,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
       BANDWIDTH_den_extern == BW_ADAP_NN){
     for( i=0; i<num_reg_continuous_extern; i++ )
-      vector_scale_factor[i+1]=fround(vector_scale_factor[i+1]);
+      vector_scale_factor[i+1]=np_fround(vector_scale_factor[i+1]);
   }
 
   for( i=0; i<num_var; i++ )
@@ -1003,7 +1003,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
       BANDWIDTH_den_extern == BW_ADAP_NN){
     for( i=0; i<num_reg_continuous_extern; i++ )
-      vector_scale_factor[i+1]=fround(vector_scale_factor[i+1]);
+      vector_scale_factor[i+1]=np_fround(vector_scale_factor[i+1]);
   }
 
   for( i=0; i<num_var; i++ )
@@ -1597,7 +1597,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
       BANDWIDTH_den_extern == BW_ADAP_NN){
     for( i=0; i<num_reg_continuous_extern+num_var_continuous_extern; i++ )
-      vector_scale_factor[i+1]=fround(vector_scale_factor[i+1]);
+      vector_scale_factor[i+1]=np_fround(vector_scale_factor[i+1]);
   }
 
   for( i=0; i<num_all_var; i++ )
@@ -2039,7 +2039,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
       BANDWIDTH_den_extern == BW_ADAP_NN){
     for( i=0; i<num_reg_continuous_extern+num_var_continuous_extern; i++ )
-      vector_scale_factor[i+1]=fround(vector_scale_factor[i+1]);
+      vector_scale_factor[i+1]=np_fround(vector_scale_factor[i+1]);
   }
 
   for( i=0; i<num_all_var; i++ )
@@ -3283,7 +3283,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   if (BANDWIDTH_reg_extern == BW_GEN_NN || 
       BANDWIDTH_reg_extern == BW_ADAP_NN){
     for( i=0; i<num_reg_continuous_extern; i++ )
-      vector_scale_factor[i+1]=fround(vector_scale_factor[i+1]);
+      vector_scale_factor[i+1]=np_fround(vector_scale_factor[i+1]);
   }
   for( i=0; i<num_var; i++ )
     rbw[i]=vector_scale_factor[i+1];

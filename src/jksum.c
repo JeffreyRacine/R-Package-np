@@ -9,6 +9,7 @@
 
 #include <R.h>
 #include <R_ext/Utils.h>
+#include <Rmath.h>
 
 #include "headers.h"
 #include "matrix.h"
@@ -648,7 +649,7 @@ double np_score_oli_racine(const double x, const double y, const double lambda){
   return (fabs(x-y)*ipow(lambda, (int)fabs(x-y)-1));
 }
 
-double np_onli_racine(const double x, const double y, const double lambda){w
+double np_onli_racine(const double x, const double y, const double lambda){
   return R_pow_di(lambda, (int)fabs(x-y))*(1.0 - lambda)/(1.0 + lambda);
 }
 
@@ -2231,7 +2232,7 @@ double * const kw){
     /* ordered third */
     for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
       if(!doscoreocg){
-        if(np_ok_nli || (operator[l] != OP_CONVOLUTION)){
+        if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
           np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
                       xo[i][j], lambda[num_reg_unordered+i], 
                       tprod, pnl, swap_xxt);      
