@@ -125,13 +125,14 @@ npcopula <- function(bws,
                           okertype=bws$okertype,
                           ukertype=bws$ukertype,data=data))
       ## Now compute the quasi-inverse from the estimated F for the
-      ## evaluation points.
+      ## evaluation points. If u is input and any value lies beyond
+      ## the CDF values for the evaluation points, reset them to the
+      ## min/max CDF values for the evaluation data (otherwise the
+      ## quantiles are undefined).
       for(i in 1:n.u) {
-        if(u[i,j]>=0.5) {
-          x.u[i,j] <- max(x.eval[F<=u[i,j]])
-        } else {
-          x.u[i,j] <-  min(x.eval[F>=u[i,j]])
-        }
+        u[u[,j]<min(F),j] <- min(F)
+        u[u[,j]>max(F),j] <- max(F)        
+        x.u[i,j] <-  min(x.eval[F>=u[i,j]])
       }
     }
     ## To compute the copula we expand the grid of marginal quantiles

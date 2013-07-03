@@ -138,15 +138,23 @@ npudist.dbandwidth <-
         fixed = BW_FIXED,
         generalized_nn = BW_GEN_NN,
         adaptive_nn = BW_ADAP_NN),
-      int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE), 
-      kerneval = switch(bws$ckertype,
+      int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE),
+      ckerneval = switch(bws$ckertype,
         gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
         epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
         uniform = CKER_UNI,
         "truncated gaussian" = CKER_TGAUSS),
+      ukerneval = switch(bws$ukertype,
+        aitchisonaitken = UKER_AIT),
+      okerneval = switch(bws$okertype,
+        wangvanryzin = OKER_WANG,
+        nliracine = OKER_NLR),
       no.e = no.e,
       mcv.numRow = attr(bws$xmcv, "num.row"),
-      densOrDist = NP_DO_DIST)
+      densOrDist = NP_DO_DIST,
+      old.dens = 0,
+      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+
     
     myout=
       .C("np_density", as.double(tuno), as.double(tord), as.double(tcon),

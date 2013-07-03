@@ -109,6 +109,13 @@ npcopula(bws,
   grids, concatenate and sort, and these form the final grid of length
   \code{n.quasi.inv} for computing the quasi-inverse.
 
+  Note that if \code{u} is provided and any elements of (the columns of)
+  \code{u} are such that they lie beyond the respective values of
+  \code{F} for the evaluation data for the respective marginal, such
+  values are reset to the minimum/maximum values of \code{F} for the
+  respective marginal. It is therefore prudent to inspect the values of
+  \code{u} returned by \code{\link{npcopula}} when \code{u} is provided.
+
   Note that copula are only defined for data of type
   \code{\link{numeric}} or \code{\link{ordered}}.
 
@@ -150,7 +157,7 @@ rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
 mydat <- mvrnorm(n=n, mu, Sigma)
-mydat <- data.frame(x=mydat[,1],y=ordered(as.integer(cut(mydat[,2],c(-Inf,quantile(mydat[,2],seq(0,1,length=10+1)),Inf)))-1))
+mydat <- data.frame(x=mydat[,1],y=ordered(as.integer(cut(mydat[,2],quantile(mydat[,2],seq(0,1,by=.1)),include.lowest=TRUE))-1))
 
 q.min <- 0.0
 q.max <- 1.0

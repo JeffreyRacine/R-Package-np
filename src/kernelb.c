@@ -326,7 +326,7 @@ double **matrix_bandwidth_deriv)
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], fround(vector_scale_factor[i]), nn_distance)==1)
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0,matrix_X_train[i], matrix_X_eval[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
 			{
 				return(1);
 			}
@@ -352,7 +352,7 @@ double **matrix_bandwidth_deriv)
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, 0, matrix_Y_train[i], matrix_Y_eval[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
 			{
 				return(1);
 			}
@@ -381,7 +381,7 @@ double **matrix_bandwidth_deriv)
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, 0, matrix_X_train[i], fround(vector_scale_factor[i]), nn_distance)==1)
+			if(compute_nn_distance(num_obs_train, 0, matrix_X_train[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
 			{
 				return(1);
 			}
@@ -406,7 +406,7 @@ double **matrix_bandwidth_deriv)
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, 0, matrix_Y_train[i], fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(compute_nn_distance(num_obs_train, 0, matrix_Y_train[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
 			{
 				return(1);
 			}
@@ -776,7 +776,7 @@ fact constant. */
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], fround(vector_scale_factor[i]), nn_distance)==1)
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_X_train[i], matrix_X_eval[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
 			{
 				return(1);
 			}
@@ -800,7 +800,7 @@ fact constant. */
 
 /* Return 1 for nearest-neighbor which is zero */
 
-			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(compute_nn_distance_train_eval(num_obs_train,num_obs_eval, suppress_parallel, matrix_Y_train[i], matrix_Y_eval[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
 			{
 				return(1);
 			}
@@ -829,7 +829,7 @@ fact constant. */
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_X_train[i], fround(vector_scale_factor[i]), nn_distance)==1)
+			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_X_train[i], np_fround(vector_scale_factor[i]), nn_distance)==1)
 			{
 				return(1);
 			}
@@ -852,7 +852,7 @@ fact constant. */
 		{
 
 /* Return 1 for nearest-neighbor which is zero */
-			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_Y_train[i], fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
+			if(compute_nn_distance(num_obs_train, suppress_parallel, matrix_Y_train[i], np_fround(vector_scale_factor[i+num_reg_cont]), nn_distance)==1)
 			{
 				return(1);
 			}

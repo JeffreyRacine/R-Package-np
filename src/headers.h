@@ -86,7 +86,7 @@ int compute_nn_distance_train_eval(int num_obs_train, int num_obs_eval, int supp
 
 int determine_categorical_vals(int num_obs, int num_var_unordered, int num_var_ordered, int num_reg_unordered, int num_reg_ordered, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_X_unordered, double **matrix_X_ordered, int *num_categories, double **matrix_categorical_vals);
 
-int fround(double x);
+int np_fround(double x);
 
 int initialize_kernel_density_asymptotic_constants(int KERNEL, int num_var_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P);  
 int initialize_kernel_regression_asymptotic_constants(int KERNEL, int num_reg_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P, double *INT_KERNEL_PM_HALF, double *DIFF_KER_PPM); 
@@ -265,10 +265,11 @@ int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERN
 #define NP_TREE_FALSE 0
 #define NP_TREE_TRUE  1
 
+// offsets array : ordinary, convolution, derivative, cdfative
 static const int OP_CFUN_OFFSETS[4] = { 0, 10, 20, 30 };
 #define OP_NCFUN 40
 static const int OP_UFUN_OFFSETS[4] = { 0, 2, 4, 0 };
-static const int OP_OFUN_OFFSETS[4] = { 0, 0, 2, 0 };
+static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 // these defines are to facilitate accessing the continuous kernels in their various arrays
 
 #define CK_GAUSS2 0
@@ -325,11 +326,13 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 0, 2, 0 };
 #define BW_MINIOI  8
 #define BW_MI    9
 #define BW_CKRNEVI 10
-#define BW_NUNOI 11
-#define BW_NORDI 12
-#define BW_NCONI 13
-#define BW_OLDBW 14
-#define BW_DOTREEI 15
+#define BW_UKRNEVI 11
+#define BW_OKRNEVI 12
+#define BW_NUNOI 13
+#define BW_NORDI 14
+#define BW_NCONI 15
+#define BW_OLDBW 16
+#define BW_DOTREEI 17
 
 #define BW_FTOLD  0
 #define BW_TOLD   1
@@ -348,11 +351,13 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 0, 2, 0 };
 #define DBW_MINIOI  9
 #define DBW_MI    10
 #define DBW_CKRNEVI 11
-#define DBW_CDFONTRAIN 12
-#define DBW_NUNOI 13
-#define DBW_NORDI 14
-#define DBW_NCONI 15
-#define DBW_FASTI 16
+#define DBW_UKRNEVI 12
+#define DBW_OKRNEVI 13
+#define DBW_CDFONTRAIN 14
+#define DBW_NUNOI 15
+#define DBW_NORDI 16
+#define DBW_NCONI 17
+#define DBW_FASTI 18
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1
@@ -463,11 +468,13 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 0, 2, 0 };
 #define DEN_DENI 6
 #define DEN_MINIOI 7
 #define DEN_CKRNEVI    8
-#define DEN_TISEI 9
-#define DEN_MLEVI 10
-#define DEN_DODENI 11
-#define DEN_OLDI 12
-#define DEN_TREEI 13
+#define DEN_UKRNEVI    9
+#define DEN_OKRNEVI    10
+#define DEN_TISEI 11
+#define DEN_MLEVI 12
+#define DEN_DODENI 13
+#define DEN_OLDI 14
+#define DEN_TREEI 15
 
 #define REG_TNOBSI   0
 #define REG_ENOBSI   1
