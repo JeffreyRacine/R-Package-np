@@ -753,7 +753,8 @@ double np_econvol_uli_racine(const int same_cat, const double lambda, const int 
 double np_econvol_onli_racine(const double x, const double y, const double lambda){
   const int cxy = (int)fabs(x-y);
   const double lnorm = (1.0 - lambda)/(1.0 + lambda);
-  return lnorm*lnorm*R_pow_di(lambda, cxy)*(1.0/(1.0 - lambda*lambda) + cxy);
+  const double l2 = lambda*lambda;
+  return lnorm*lnorm*R_pow_di(lambda, cxy)*((1.0 + l2)/(1.0 - l2) + cxy);
 
 }
 // derivative kernels
