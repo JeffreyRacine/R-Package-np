@@ -7,7 +7,7 @@ rbandwidth <-
            ckertype = c("epanechnikov","truncated gaussian","gaussian","uniform"),
            ckerorder = c(2,4,6,8),
            ukertype = c("aitchisonaitken", "liracine"),
-           okertype = c("wangvanryzin", "liracine"),
+           okertype = c("wangvanryzin", "liracine", "nliracine"),
            fval = NA,
            ifval = NA,
            nobs = NA,

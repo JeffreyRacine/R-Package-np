@@ -359,10 +359,11 @@ uMaxL <- function(c, kertype = c("aitchisonaitken","liracine")){
          liracine = 1.0)
 }
 
-oMaxL <- function(c, kertype = c("wangvanryzin", "liracine")){
+oMaxL <- function(c, kertype = c("wangvanryzin", "liracine", "nliracine")){
   switch(kertype,
          wangvanryzin = 1.0,
-         liracine = 1.0)
+         liracine = 1.0,
+         nliracine = 1.0)
 }
 
 ## tested with: rbandwidth
@@ -752,6 +753,7 @@ UKER_LR = 1
 
 OKER_WANG = 0
 OKER_LR = 1
+OKER_NLR = 2
 
 ##density 
 BWM_CVML = 0

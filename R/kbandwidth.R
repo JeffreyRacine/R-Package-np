@@ -29,7 +29,7 @@ kbandwidth.numeric <-
            ckertype = c("epanechnikov","truncated gaussian","gaussian","uniform"),
            ckerorder = c(2,4,6,8),
            ukertype = c("aitchisonaitken", "liracine"),
-           okertype = c("wangvanryzin", "liracine"),
+           okertype = c("wangvanryzin", "liracine", "nliracine"),
            nobs = NA,
            xdati = NULL,
            ydati = NULL,

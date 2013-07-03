@@ -7,7 +7,7 @@ conbandwidth <-
            cxkertype = c("epanechnikov","truncated gaussian","gaussian","uniform"), 
            cxkerorder = c(2,4,6,8),
            uxkertype = c("aitchisonaitken","liracine"),
-           oxkertype = c("wangvanryzin","liracine"),
+           oxkertype = c("wangvanryzin","liracine", "nliracine"),
            cykertype = c("epanechnikov","truncated gaussian","gaussian","uniform"), 
            cykerorder = c(2,4,6,8),
            uykertype = c("aitchisonaitken"),
