@@ -270,8 +270,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   iNum_Multistart = myopti[BW_NMULTII];
 
   KERNEL_den_extern = myopti[BW_CKRNEVI];
-  KERNEL_den_unordered_extern = 0;
-  KERNEL_den_ordered_extern = 0;
+  KERNEL_den_unordered_extern = myopti[BW_UKRNEVI];
+  KERNEL_den_ordered_extern = myopti[BW_OKRNEVI];
 
   int_use_starting_values= myopti[BW_USTARTI];
   int_LARGE_SF=myopti[BW_LSFI];
@@ -686,8 +686,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   iNum_Multistart = myopti[DBW_NMULTII];
 
   KERNEL_den_extern = myopti[DBW_CKRNEVI];
-  KERNEL_den_unordered_extern = 0;
-  KERNEL_den_ordered_extern = 0;
+  KERNEL_den_unordered_extern = myopti[DBW_UKRNEVI];
+  KERNEL_den_ordered_extern = myopti[DBW_OKRNEVI];
 
   int_use_starting_values= myopti[DBW_USTARTI];
   int_LARGE_SF=myopti[DBW_LSFI];
@@ -2621,8 +2621,8 @@ void np_density(double * tuno, double * tord, double * tcon,
   num_obs_eval_extern = myopti[DEN_ENOBSI];
 
   KERNEL_den_extern = myopti[DEN_CKRNEVI];
-  KERNEL_den_unordered_extern = 0;
-  KERNEL_den_ordered_extern = 0;
+  KERNEL_den_unordered_extern = myopti[DEN_UKRNEVI];
+  KERNEL_den_ordered_extern = myopti[DEN_OKRNEVI];
 
   int_LARGE_SF = myopti[DEN_LSFI];
   int_MINIMIZE_IO = myopti[DEN_MINIOI];

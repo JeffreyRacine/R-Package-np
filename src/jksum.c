@@ -860,7 +860,7 @@ double np_cdf_rect(const double z){
   return (z < -1.0) ? 0.0 : (z > 1.0) ? 1.0 : (0.5+0.5*z);
 }
 
-double np_cdf_onli_racine(const double x, const double y, const double lambda){
+double np_cdf_onli_racine(const double y, const double x, const double lambda){
   const int cxy = (int)fabs(x-y);
   const double gee = R_pow_di(lambda, cxy)/(1.0+lambda);
   return (x < y) ? gee : 1.0 - lambda*gee;

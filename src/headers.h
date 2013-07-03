@@ -326,11 +326,13 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define BW_MINIOI  8
 #define BW_MI    9
 #define BW_CKRNEVI 10
-#define BW_NUNOI 11
-#define BW_NORDI 12
-#define BW_NCONI 13
-#define BW_OLDBW 14
-#define BW_DOTREEI 15
+#define BW_UKRNEVI 11
+#define BW_OKRNEVI 12
+#define BW_NUNOI 13
+#define BW_NORDI 14
+#define BW_NCONI 15
+#define BW_OLDBW 16
+#define BW_DOTREEI 17
 
 #define BW_FTOLD  0
 #define BW_TOLD   1
@@ -349,11 +351,13 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define DBW_MINIOI  9
 #define DBW_MI    10
 #define DBW_CKRNEVI 11
-#define DBW_CDFONTRAIN 12
-#define DBW_NUNOI 13
-#define DBW_NORDI 14
-#define DBW_NCONI 15
-#define DBW_FASTI 16
+#define DBW_UKRNEVI 12
+#define DBW_OKRNEVI 13
+#define DBW_CDFONTRAIN 14
+#define DBW_NUNOI 15
+#define DBW_NORDI 16
+#define DBW_NCONI 17
+#define DBW_FASTI 18
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1
@@ -464,11 +468,13 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define DEN_DENI 6
 #define DEN_MINIOI 7
 #define DEN_CKRNEVI    8
-#define DEN_TISEI 9
-#define DEN_MLEVI 10
-#define DEN_DODENI 11
-#define DEN_OLDI 12
-#define DEN_TREEI 13
+#define DEN_UKRNEVI    9
+#define DEN_OKRNEVI    10
+#define DEN_TISEI 11
+#define DEN_MLEVI 12
+#define DEN_DODENI 13
+#define DEN_OLDI 14
+#define DEN_TREEI 15
 
 #define REG_TNOBSI   0
 #define REG_ENOBSI   1
