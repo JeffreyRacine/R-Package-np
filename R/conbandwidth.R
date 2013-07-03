@@ -11,7 +11,7 @@ conbandwidth <-
            cykertype = c("epanechnikov","truncated gaussian","gaussian","uniform"), 
            cykerorder = c(2,4,6,8),
            uykertype = c("aitchisonaitken"),
-           oykertype = c("wangvanryzin"),
+           oykertype = c("wangvanryzin", "nliracine"),
            fval = NA,
            ifval = NA,
            nobs = NA,
