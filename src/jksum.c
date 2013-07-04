@@ -143,6 +143,11 @@ extern int * ipt_extern_alt;
 
 extern int *num_categories_extern_XY;
 extern int *num_categories_extern_X;
+extern int *num_categories_extern_Y;
+
+extern double ** matrix_categorical_vals_extern_X;
+extern double ** matrix_categorical_vals_extern_Y;
+extern double ** matrix_categorical_vals_extern_XY;
 
 int kernel_convolution_weighted_sum(
 int KERNEL_reg,
@@ -3708,19 +3713,20 @@ double *cv){
 
   double * mean = (double *)malloc(MAX(num_obs_eval_alloc,num_obs_train_alloc)*sizeof(double));
 
-
   
   if(mean == NULL)
     error("failed to allocate mean");
 
-  for(i = 0; i < num_reg_continuous; i++)
-    vsfx[i] = vector_scale_factor[i];
-
-  for(l = num_reg_continuous, i = num_reg_continuous + num_var_tot; i < (num_reg_tot + num_var_tot); i++, l++)
-    vsfx[l] = vector_scale_factor[i];
-
-  for(l = 0, i = num_reg_continuous; i < (num_reg_continuous + num_var_tot); l++, i++)
-    vsfy[l] = vector_scale_factor[i];
+  np_splitxy_vsf_mcv_nc(num_var_unordered, num_var_ordered, num_var_continuous,
+                        num_reg_unordered, num_reg_ordered, num_reg_continuous,
+                        vector_scale_factor,
+                        NULL,
+                        NULL,
+                        vsfx,
+                        vsfy,
+                        NULL,
+                        NULL, NULL, NULL,
+                        NULL, NULL, NULL);
   
 
   x_operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
@@ -3787,8 +3793,8 @@ double *cv){
                            NULL,
                            NULL,
                            vsfy,
-                           num_categories,
-                           NULL,
+                           num_categories_extern_Y,
+                           matrix_categorical_vals_extern_Y,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -3828,8 +3834,8 @@ double *cv){
                            NULL,
                            NULL,
                            vsfx,
-                           num_categories + (num_var_unordered + num_var_ordered),
-                           NULL,
+                           num_categories_extern_X,
+                           matrix_categorical_vals_extern_X,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -5106,58 +5112,19 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
     operator[i] = OP_NORMAL;
 
 
-  // set up xy bws
+  // put the correct bws in vsf_x, and vsf_xy
 
-  for(i = 0, l = 0; i < num_cvar; i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
+  np_splitxy_vsf_mcv_nc(num_var_unordered, num_var_ordered, num_var_continuous,
+                        num_reg_unordered, num_reg_ordered, num_reg_continuous,
+                        vector_scale_factor,
+                        NULL,
+                        NULL,
+                        vsf_x,
+                        NULL,
+                        vsf_xy,
+                        NULL, NULL, NULL,
+                        NULL, NULL, NULL);
 
-  // copy vsf runo -> vsf_xy runo
-
-  for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf vuno -> vsf_xy vuno
-
-  for(i = num_cvar; i < (num_cvar + num_var_unordered); i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf rord -> vsf_xy rord
-
-  for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf vord -> vsf_xy vord
-
-  for(i = num_cvar + num_var_unordered; i < (num_cvar + num_var_unordered + num_var_ordered); i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // vsf xy DONE
-
-  // set up x bws
-
-  // vsf rcon -> vsf_x rcon
-  for(i = 0, l = 0; i < num_reg_continuous; i++, l++){
-    vsf_x[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf runo -> vsf_x runo
-
-  for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
-    vsf_x[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf rord -> vsf_xy rord
-
-  for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
-    vsf_x[l] = vector_scale_factor[i];
-  }
-  
-  // vsf x DONE
 
   // calculate numerator
   // swap in the alt tree
@@ -5200,7 +5167,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          vsf_xy,
                          num_categories_extern_XY,
-                         NULL,
+                         matrix_categorical_vals_extern_XY,
                          NULL,
                          rhon,  // weighted sum
                          NULL, // no permutations
@@ -5244,7 +5211,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          vsf_x,
                          num_categories_extern_X,
-                         NULL,
+                         matrix_categorical_vals_extern_X,
                          NULL,
                          rhod,  // weighted sum
                          NULL, // no permutations
@@ -5265,4 +5232,161 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   free(vsf_x);
   return(0);
 
+}
+
+void np_splitxy_vsf_mcv_nc(const int num_var_unordered,
+                           const int num_var_ordered,
+                           const int num_var_continuous,
+                           const int num_reg_unordered,
+                           const int num_reg_ordered,
+                           const int num_reg_continuous,
+                           const double * const vector_scale_factor,
+                           const int * const num_categories,
+                           double ** matrix_categorical_vals,
+                           double * vsf_x,
+                           double * vsf_y,
+                           double * vsf_xy,
+                           int * nc_x,
+                           int * nc_y,
+                           int * nc_xy,
+                           double ** mcv_x,
+                           double ** mcv_y,
+                           double ** mcv_xy){
+
+  int i, j, l;
+
+  const int num_cvar = num_var_continuous + num_reg_continuous;
+  const int num_uvar = num_var_unordered + num_reg_unordered;
+  const int num_ovar = num_var_ordered + num_reg_ordered;
+
+  const int num_catvar = num_uvar + num_ovar;
+
+  const int num_all_var = num_var_continuous + num_reg_continuous + num_var_unordered + num_reg_unordered + num_var_ordered + num_reg_ordered;
+
+  // set up xy bws
+  
+  if(vsf_xy != NULL){
+    for(i = 0, l = 0; i < num_cvar; i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf runo -> vsf_xy runo
+
+    for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf vuno -> vsf_xy vuno
+
+    for(i = num_cvar; i < (num_cvar + num_var_unordered); i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf rord -> vsf_xy rord
+
+    for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf vord -> vsf_xy vord
+
+    for(i = num_cvar + num_var_unordered; i < (num_cvar + num_var_unordered + num_var_ordered); i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // vsf xy DONE
+  }
+
+  if(vsf_x != NULL){
+    // set up x bws
+
+    // vsf rcon -> vsf_x rcon
+    for(i = 0, l = 0; i < num_reg_continuous; i++, l++){
+      vsf_x[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf runo -> vsf_x runo
+
+    for(i = num_cvar + num_var_unordered + num_var_ordered; i < num_all_var; i++, l++){
+      vsf_x[l] = vector_scale_factor[i];
+    }
+
+  }
+
+  if(vsf_y != NULL){
+    // set up y bws
+    for(i = num_reg_continuous, l = 0; i < (num_cvar + num_var_unordered + num_var_ordered); i++, l++){
+      vsf_y[l] = vector_scale_factor[i];
+    }
+  }
+
+  // copy num_categories arrays
+  if(nc_xy != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < (num_var_unordered + num_var_ordered + num_reg_unordered); i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+
+    for(i = 0; i < num_var_unordered; i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+
+    for(i = num_var_unordered + num_var_ordered + num_reg_unordered; i < num_catvar; i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+
+    for(i = num_var_unordered; i < (num_var_unordered + num_var_ordered); i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+  }
+
+  if(nc_x != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < num_catvar; i++, l++){
+      nc_x[l] = num_categories[i];
+    }    
+  }
+
+  if(nc_y != NULL){
+    for(i = 0, l = 0; i < (num_var_unordered + num_var_ordered); i++, l++){
+      nc_y[l] = num_categories[i];
+    }    
+  }
+
+  // copy/fix mcv arrays
+
+  if(mcv_xy != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < (num_var_unordered + num_var_ordered + num_reg_unordered); i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+
+    for(i = 0; i < num_var_unordered; i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+
+    for(i = num_var_unordered + num_var_ordered + num_reg_unordered; i < num_catvar; i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+
+    for(i = num_var_unordered; i < (num_var_unordered + num_var_ordered); i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+  }
+
+  if(mcv_x != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < num_catvar; i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_x[l][j] = matrix_categorical_vals[i][j];
+    }    
+  }
+
+  if(mcv_y != NULL){
+    for(i = 0, l = 0; i < (num_var_unordered + num_var_ordered); i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_y[l][j] = matrix_categorical_vals[i][j];
+
+    }    
+  }
 }
