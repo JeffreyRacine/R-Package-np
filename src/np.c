@@ -2880,6 +2880,7 @@ void np_density(double * tuno, double * tord, double * tcon,
                                                matrix_X_continuous_eval_extern,
                                                &vector_scale_factor[1],
                                                num_categories_extern,
+                                               matrix_categorical_vals_extern,
                                                pdf,
                                                pdf_stderr,
                                                &log_likelihood);

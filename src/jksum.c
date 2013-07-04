@@ -4897,6 +4897,7 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                              double **matrix_X_continuous_eval,
                                              double *vector_scale_factor,
                                              int *num_categories,
+                                             double ** matrix_categorical_vals,
                                              double *pdf,
                                              double *pdf_stderr,
                                              double *log_likelihood){
@@ -5000,7 +5001,7 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          NULL, // no sgn
                          vector_scale_factor,
                          num_categories,
-                         NULL, // no mcv necessary
+                         matrix_categorical_vals, // if dist mcv (possibly) necessary
                          NULL, // no ocg
                          pdf,  // weighted sum
                          NULL, // no permutations
