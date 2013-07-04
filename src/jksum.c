@@ -643,7 +643,7 @@ double np_owang_van_ryzin(const double x, const double y, const double lambda, c
 }
 
 double np_score_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
-  return (0.5*ipow(lambda, (int)fabs(x-y))*(fabs(x-y)/lambda - 2.0));
+  return (x == y) ? -1.0 : (0.5*ipow(lambda, (int)fabs(x-y))*(fabs(x-y)/lambda - 2.0));
 }
 
 double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -867,14 +867,9 @@ double np_cdf_rect(const double z){
 }
 
 double np_cdf_owang_van_ryzin(const double y, const double x, const double lambda, const double cl, const double ch){
-  const int xh = (x > ch) ? ch : x;
-  const int cxy = (int)fabs(xh-y);
-  const double gee = R_pow_di(lambda, cxy)/(1.0-lambda);
-  if(x < y){
-    return (x < cl) ? 0.0 : 0.5*(1.0-lambda)*gee*(1.0-R_pow_di(lambda,(int)(x-cl+1)));
-  } else {
-    return 0.5*(1.0-lambda)*((1.0 + lambda - R_pow_di(lambda,(int)(y-cl+1)))/(1.0 - lambda) - lambda*gee);
-  }
+  const int cxy = (int)fabs(x-y);
+  const double gee = R_pow_di(lambda, cxy);
+  return (x < y) ? 0.5*gee : ((x == y) ? (1.0 - 0.5*lambda) : (1.0 - gee));
 }
 
 double np_cdf_oli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
