@@ -861,6 +861,17 @@ double np_cdf_rect(const double z){
   return (z < -1.0) ? 0.0 : (z > 1.0) ? 1.0 : (0.5+0.5*z);
 }
 
+double np_cdf_owang_van_ryzin(const double y, const double x, const double lambda, const double cl, const double ch){
+  const int xh = (x > ch) ? ch : x;
+  const int cxy = (int)fabs(xh-y);
+  const double gee = R_pow_di(lambda, cxy)/(1.0-lambda);
+  if(x < y){
+    return (x < cl) ? 0.0 : 0.5*(1.0-lambda)*gee*(1.0-R_pow_di(lambda,(int)(x-cl+1)));
+  } else {
+    return 0.5*(1.0-lambda)*((1.0 + lambda - R_pow_di(lambda,(int)(y-cl+1)))/(1.0 - lambda) - lambda*gee);
+  }
+}
+
 double np_cdf_oli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
   const int xh = (x > ch) ? ch : x;
   const int cxy = (int)fabs(xh-y);
@@ -1310,7 +1321,7 @@ void np_p_okernelv(const int KERNEL,
     np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
     np_onull, np_onull, np_econvol_onli_racine,
     np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-    np_onull, np_cdf_oli_racine, np_cdf_onli_racine
+    np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
 
   double * kbuf = NULL;
@@ -1416,7 +1427,7 @@ void np_okernelv(const int KERNEL,
     np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
     np_onull, np_onull, np_econvol_onli_racine,
     np_onull, np_onull, np_onull,
-    np_onull, np_cdf_oli_racine, np_cdf_onli_racine
+    np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
 
   const double cl = cats[0];
