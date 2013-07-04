@@ -1335,8 +1335,9 @@ void np_p_okernelv(const int KERNEL,
   if((!swap_xxt) && do_ocg){
     s_cat = cats[abs(swapped_index - 1)];
   }
-  const double cl = cats[0];
-  const double ch = cats[ncat - 1];
+  
+  const double cl = (cats != NULL)? cats[0] : 0.0;
+  const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
 
     if(nl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
@@ -1430,8 +1431,8 @@ void np_okernelv(const int KERNEL,
     np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
 
-  const double cl = cats[0];
-  const double ch = cats[ncat - 1];
+  const double cl = (cats != NULL)? cats[0] : 0.0;
+  const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
 
   if(!swap_xxt){
     if(nl == NULL){
@@ -2264,7 +2265,9 @@ double * const kw){
       if(!doscoreocg){
         if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
           np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
-                      xo[i][j], lambda[num_reg_unordered+i], matrix_categorical_vals[i+num_reg_unordered], num_categories[i+num_reg_unordered],
+                      xo[i][j], lambda[num_reg_unordered+i], 
+                      (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
+                      (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
                       tprod, pnl, swap_xxt);      
         } else {
           np_convol_okernelv(KERNEL_ordered_reg, xto[i], num_xt, l,
@@ -2275,7 +2278,9 @@ double * const kw){
         }
       } else {
         np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel, ip, p_nvar, xto[i], num_xt, l,
-                      xo[i][j], lambda[num_reg_unordered+i], matrix_categorical_vals[i+num_reg_unordered], num_categories[i+num_reg_unordered],
+                      xo[i][j], lambda[num_reg_unordered+i], 
+                      (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
+                      (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
                       tprod, tprod_mp, pnl, p_pnl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
       }
     }
