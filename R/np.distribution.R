@@ -56,7 +56,7 @@ npudist.call <-
 npudist.dbandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
-           edat, ...){
+           edat, old.dist = FALSE, ...){
 
     no.e = missing(edat)
 
@@ -152,7 +152,7 @@ npudist.dbandwidth <-
       no.e = no.e,
       mcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DIST,
-      old.dens = 0,
+      old.dist = old.dist,
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
 
     
@@ -173,7 +173,7 @@ npudist.dbandwidth <-
     return(ev)
   }
 
-npudist.default <- function(bws, tdat, ...){
+npudist.default <- function(bws, tdat, old.dist, ...){
   sc.names <- names(sys.call())
 
   ## here we check to see if the function was called with tdat =
@@ -182,6 +182,8 @@ npudist.default <- function(bws, tdat, ...){
 
   bws.named <- any(sc.names == "bws")
   tdat.named <- any(sc.names == "tdat")
+  old.dist.named <- any(sc.names == "old.dist")
+
 
   no.bws <- missing(bws)
   no.tdat <- missing(tdat)
@@ -199,6 +201,7 @@ npudist.default <- function(bws, tdat, ...){
                       ifelse(no.tdat,"",","),
                       ifelse(bws.named,"bws = bws, bandwidth.compute = FALSE",
                              ifelse(no.bws,"","bws")),
+                      ifelse(old.dist.named, "old.dist = old.dist,", ""),
                       ifelse(no.bws,"",","),                      
                       "call = mc, ...",")",sep="")))
 
@@ -227,5 +230,6 @@ npudist.default <- function(bws, tdat, ...){
   eval(parse(text=paste("npudist(bws = tbw",
                ifelse(no.tdat, "",
                       ifelse(tdat.named, ",tdat = tdat",",tdat")),
+               ifelse(old.dist.named, ",old.dist = old.dist",""),
                ",...)")))
 }
