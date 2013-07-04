@@ -143,6 +143,11 @@ extern int * ipt_extern_alt;
 
 extern int *num_categories_extern_XY;
 extern int *num_categories_extern_X;
+extern int *num_categories_extern_Y;
+
+extern double ** matrix_categorical_vals_extern_X;
+extern double ** matrix_categorical_vals_extern_Y;
+extern double ** matrix_categorical_vals_extern_XY;
 
 int kernel_convolution_weighted_sum(
 int KERNEL_reg,
@@ -633,27 +638,27 @@ double np_score_uli_racine(const int same_cat, const double lambda, const int c)
   return (same_cat)?0.0:1.0;
 }
 
-double np_owang_van_ryzin(const double x, const double y, const double lambda){
+double np_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
   return (x == y)?(1.0-lambda):ipow(lambda, (int)fabs(x-y))*(1.0-lambda)*0.5;
 }
 
-double np_score_owang_van_ryzin(const double x, const double y, const double lambda){
+double np_score_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
   return (0.5*ipow(lambda, (int)fabs(x-y))*(fabs(x-y)/lambda - 2.0));
 }
 
-double np_oli_racine(const double x, const double y, const double lambda){
-  return (x == y)?1.0:ipow(lambda, (int)fabs(x-y));
+double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
+  return R_pow_di(lambda, (int)fabs(x-y));
 }
 
-double np_score_oli_racine(const double x, const double y, const double lambda){
-  return (fabs(x-y)*ipow(lambda, (int)fabs(x-y)-1));
+double np_score_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
+  return (fabs(x-y)*R_pow_di(lambda, (int)fabs(x-y)-1));
 }
 
-double np_onli_racine(const double x, const double y, const double lambda){
+double np_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
   return R_pow_di(lambda, (int)fabs(x-y))*(1.0 - lambda)/(1.0 + lambda);
 }
 
-double np_score_onli_racine(const double x, const double y, const double lambda){
+double np_score_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
   const int cxy = (int)fabs(x-y);
   return ((cxy != 0) || (lambda != 0.0)) ? R_pow_di(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0 *lambda) : -2.0;
 }
@@ -750,7 +755,7 @@ double np_econvol_uli_racine(const int same_cat, const double lambda, const int 
   return (same_cat)?(1.0 + (double)(c-1)*lambda*lambda):(lambda*(2.0+(double)(c-2)*lambda));
 }
 
-double np_econvol_onli_racine(const double x, const double y, const double lambda){
+double np_econvol_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
   const int cxy = (int)fabs(x-y);
   const double lnorm = (1.0 - lambda)/(1.0 + lambda);
   const double l2 = lambda*lambda;
@@ -861,14 +866,36 @@ double np_cdf_rect(const double z){
   return (z < -1.0) ? 0.0 : (z > 1.0) ? 1.0 : (0.5+0.5*z);
 }
 
-double np_cdf_onli_racine(const double y, const double x, const double lambda){
+double np_cdf_owang_van_ryzin(const double y, const double x, const double lambda, const double cl, const double ch){
+  const int xh = (x > ch) ? ch : x;
+  const int cxy = (int)fabs(xh-y);
+  const double gee = R_pow_di(lambda, cxy)/(1.0-lambda);
+  if(x < y){
+    return (x < cl) ? 0.0 : 0.5*(1.0-lambda)*gee*(1.0-R_pow_di(lambda,(int)(x-cl+1)));
+  } else {
+    return 0.5*(1.0-lambda)*((1.0 + lambda - R_pow_di(lambda,(int)(y-cl+1)))/(1.0 - lambda) - lambda*gee);
+  }
+}
+
+double np_cdf_oli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
+  const int xh = (x > ch) ? ch : x;
+  const int cxy = (int)fabs(xh-y);
+  const double gee = R_pow_di(lambda, cxy)/(1.0-lambda);
+  if(x < y){
+    return (x < cl) ? 0.0 : gee*(1.0-R_pow_di(lambda,(int)(x-cl+1)));
+  } else {
+    return (1.0 + lambda - R_pow_di(lambda,(int)(y-cl+1)))/(1.0 - lambda) - lambda*gee;
+  }
+}
+
+double np_cdf_onli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
   const int cxy = (int)fabs(x-y);
   const double gee = R_pow_di(lambda, cxy)/(1.0+lambda);
   return (x < y) ? gee : 1.0 - lambda*gee;
 }
 
 // this is a null kernel, it is a placeholder kernel for testing
-double np_onull(const double x, const double y, const double lambda){
+double np_onull(const double x, const double y, const double lambda, const double cl, const double ch){
   return(0.0);
 }
 
@@ -877,7 +904,7 @@ double np_onull(const double x, const double y, const double lambda){
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
                                      np_epan2, np_epan4, np_epan6, np_epan8, 
                                      np_rect, np_tgauss2 };
-double (* const allok[])(double, double, double) = { np_owang_van_ryzin, np_oli_racine };
+double (* const allok[])(double, double, double, double, double) = { np_owang_van_ryzin, np_oli_racine };
 double (* const alluk[])(int, double, int) = { np_uaa, np_uli_racine };
 
 // in cksup we define a scale length for all kernels, outside of which the kernel is 0
@@ -1271,7 +1298,8 @@ void np_p_okernelv(const int KERNEL,
                    const int P_NIDX,
                    const double * const xt, const int num_xt, 
                    const int do_xw,
-                   const double x, const double lambda, const double * cats,
+                   const double x, const double lambda, 
+                   const double * cats, const int ncat,
                    double * const result,
                    double * const p_result,
                    const NL * const nl,
@@ -1294,11 +1322,11 @@ void np_p_okernelv(const int KERNEL,
 
   double * const pxw = (bin_do_xw ? p_result : &unit_weight);
 
-  double (* const k[])(double, double, double) = { 
+  double (* const k[])(double, double, double, double, double) = { 
     np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
     np_onull, np_onull, np_econvol_onli_racine,
     np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-    np_onull, np_onull, np_cdf_onli_racine
+    np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
 
   double * kbuf = NULL;
@@ -1312,6 +1340,9 @@ void np_p_okernelv(const int KERNEL,
   if((!swap_xxt) && do_ocg){
     s_cat = cats[abs(swapped_index - 1)];
   }
+  
+  const double cl = (cats != NULL)? cats[0] : 0.0;
+  const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
 
     if(nl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
@@ -1320,12 +1351,12 @@ void np_p_okernelv(const int KERNEL,
         const double c2 = swap_xxt ? xt[i] : x;
         const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
-        const double kn = k[KERNEL](c1, c2, lambda);
+        const double kn = k[KERNEL](c1, c2, lambda, cl, ch);
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
 
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](c1, c3, lambda);
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](c1, c3, lambda, cl, ch);
       }
 
       for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
@@ -1343,7 +1374,7 @@ void np_p_okernelv(const int KERNEL,
           const double c1 = swap_xxt ? x : xt[i];
           const double c2 = swap_xxt ? xt[i] : x;
 
-          const double kn = k[KERNEL](c1, c2, lambda);
+          const double kn = k[KERNEL](c1, c2, lambda, cl, ch);
 
           result[i] = xw[j]*kn;
           kbuf[i] = kn;
@@ -1358,7 +1389,7 @@ void np_p_okernelv(const int KERNEL,
           const double c1 = swap_xxt ? x : xt[i];
           const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
-          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](c1, c3, lambda);
+          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](c1, c3, lambda, cl, ch);
         }
       }
 
@@ -1382,6 +1413,7 @@ void np_okernelv(const int KERNEL,
                  const double * const xt, const int num_xt, 
                  const int do_xw,
                  const double x, const double lambda,
+                 const double * cats, const int ncat,
                  double * const result,
                  const NL * const nl,
                  const int swap_xxt){
@@ -1397,18 +1429,21 @@ void np_okernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double (* const k[])(double, double, double) = { 
+  double (* const k[])(double, double, double, double, double) = { 
     np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
     np_onull, np_onull, np_econvol_onli_racine,
     np_onull, np_onull, np_onull,
-    np_onull, np_onull, np_cdf_onli_racine
+    np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
+
+  const double cl = (cats != NULL)? cats[0] : 0.0;
+  const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
 
   if(!swap_xxt){
     if(nl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
         if(xw[j] == 0.0) continue;
-        result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+        result[i] = xw[j]*k[KERNEL](xt[i], x, lambda, cl, ch);
       }
     } else {
       for (int m = 0; m < nl->n; m++){
@@ -1416,7 +1451,7 @@ void np_okernelv(const int KERNEL,
         const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           if(xw[j] == 0.0) continue;
-          result[i] = xw[j]*k[KERNEL](xt[i], x, lambda);
+          result[i] = xw[j]*k[KERNEL](xt[i], x, lambda, cl, ch);
         }
       }
     }
@@ -1424,7 +1459,7 @@ void np_okernelv(const int KERNEL,
     if(nl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
         if(xw[j] == 0.0) continue;
-        result[i] = xw[j]*k[KERNEL](x, xt[i], lambda);
+        result[i] = xw[j]*k[KERNEL](x, xt[i], lambda, cl, ch);
       }
     } else {
       for (int m = 0; m < nl->n; m++){
@@ -1432,7 +1467,7 @@ void np_okernelv(const int KERNEL,
         const int nlev = kdt_extern->kdn[nl->node[m]].nlev;
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           if(xw[j] == 0.0) continue;
-          result[i] = xw[j]*k[KERNEL](x, xt[i], lambda);
+          result[i] = xw[j]*k[KERNEL](x, xt[i], lambda, cl, ch);
         }
       }
     }
@@ -2236,6 +2271,8 @@ double * const kw){
         if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
           np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
                       xo[i][j], lambda[num_reg_unordered+i], 
+                      (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
+                      (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
                       tprod, pnl, swap_xxt);      
         } else {
           np_convol_okernelv(KERNEL_ordered_reg, xto[i], num_xt, l,
@@ -2246,7 +2283,9 @@ double * const kw){
         }
       } else {
         np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel, ip, p_nvar, xto[i], num_xt, l,
-                      xo[i][j], lambda[num_reg_unordered+i], matrix_categorical_vals[i+num_reg_unordered],
+                      xo[i][j], lambda[num_reg_unordered+i], 
+                      (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
+                      (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
                       tprod, tprod_mp, pnl, p_pnl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
       }
     }
@@ -2389,8 +2428,8 @@ double *cv){
 
   double (* const yck)(double) = allck[KERNEL_den];
   double (* const xck)(double) = allck[KERNEL_reg];
-  double (* const yok)(double, double, double) = allok[KERNEL_ordered_den];
-  double (* const xok)(double, double, double) = allok[KERNEL_ordered_reg];
+  double (* const yok)(double, double, double, double, double) = allok[KERNEL_ordered_den];
+  double (* const xok)(double, double, double, double, double) = allok[KERNEL_ordered_reg];
   double (* const yuk)(int, double, int) = alluk[KERNEL_unordered_den];
   double (* const xuk)(int, double, int) = alluk[KERNEL_unordered_reg];
 
@@ -2539,7 +2578,11 @@ double *cv){
           }
 
           for(l = 0; l < num_reg_ordered; l++){
-            blk_xj[ib] *= xok(matrix_X_ordered[l][blk+n],matrix_X_ordered[l][blj+m],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
+            const int lcat = l+num_var_unordered+num_var_ordered+num_reg_unordered;
+            const double cl = matrix_categorical_vals[lcat][0];
+            const double ch = matrix_categorical_vals[lcat][num_categories[lcat]-1];
+
+            blk_xj[ib] *= xok(matrix_X_ordered[l][blk+n],matrix_X_ordered[l][blj+m],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered],cl,ch);
           }
 
           // k(yj-yi)
@@ -2555,7 +2598,11 @@ double *cv){
           }
 
           for(l = 0; l < num_var_ordered; l++){
-            ts *= yok(matrix_Y_ordered[l][blk+n],matrix_Y_ordered[l][blj+m],lambda[l+num_var_unordered]);
+            const int lcat = l+num_var_unordered;
+            const double cl = matrix_categorical_vals[lcat][0];
+            const double ch = matrix_categorical_vals[lcat][num_categories[lcat]-1];
+
+            ts *= yok(matrix_Y_ordered[l][blk+n],matrix_Y_ordered[l][blj+m],lambda[l+num_var_unordered],cl,ch);
           }
 
           // accumulate marginals and kernel sums along the way
@@ -2591,7 +2638,11 @@ double *cv){
             }
 
             for(l = 0; l < num_reg_ordered; l++){
-              blk_xi[ib] *= xok(matrix_X_ordered[l][blk+n],matrix_X_ordered[l][bli+m],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered]);
+              const int lcat = l+num_var_unordered+num_var_ordered+num_reg_unordered;
+              const double cl = matrix_categorical_vals[lcat][0];
+              const double ch = matrix_categorical_vals[lcat][num_categories[lcat]-1];
+
+              blk_xi[ib] *= xok(matrix_X_ordered[l][blk+n],matrix_X_ordered[l][bli+m],lambda[l+num_var_unordered+num_var_ordered+num_reg_unordered],cl,ch);
             }
 
             // k(2)(yj-yi)
@@ -3662,19 +3713,20 @@ double *cv){
 
   double * mean = (double *)malloc(MAX(num_obs_eval_alloc,num_obs_train_alloc)*sizeof(double));
 
-
   
   if(mean == NULL)
     error("failed to allocate mean");
 
-  for(i = 0; i < num_reg_continuous; i++)
-    vsfx[i] = vector_scale_factor[i];
-
-  for(l = num_reg_continuous, i = num_reg_continuous + num_var_tot; i < (num_reg_tot + num_var_tot); i++, l++)
-    vsfx[l] = vector_scale_factor[i];
-
-  for(l = 0, i = num_reg_continuous; i < (num_reg_continuous + num_var_tot); l++, i++)
-    vsfy[l] = vector_scale_factor[i];
+  np_splitxy_vsf_mcv_nc(num_var_unordered, num_var_ordered, num_var_continuous,
+                        num_reg_unordered, num_reg_ordered, num_reg_continuous,
+                        vector_scale_factor,
+                        NULL,
+                        NULL,
+                        vsfx,
+                        vsfy,
+                        NULL,
+                        NULL, NULL, NULL,
+                        NULL, NULL, NULL);
   
 
   x_operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
@@ -3741,8 +3793,8 @@ double *cv){
                            NULL,
                            NULL,
                            vsfy,
-                           num_categories,
-                           NULL,
+                           num_categories_extern_Y,
+                           matrix_categorical_vals_extern_Y,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -3782,8 +3834,8 @@ double *cv){
                            NULL,
                            NULL,
                            vsfx,
-                           num_categories + (num_var_unordered + num_var_ordered),
-                           NULL,
+                           num_categories_extern_X,
+                           matrix_categorical_vals_extern_X,
                            NULL,
                            mean,
                            NULL, // no permutations
@@ -4845,6 +4897,7 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                              double **matrix_X_continuous_eval,
                                              double *vector_scale_factor,
                                              int *num_categories,
+                                             double ** matrix_categorical_vals,
                                              double *pdf,
                                              double *pdf_stderr,
                                              double *log_likelihood){
@@ -4948,7 +5001,7 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          NULL, // no sgn
                          vector_scale_factor,
                          num_categories,
-                         NULL, // no mcv necessary
+                         matrix_categorical_vals, // if dist mcv (possibly) necessary
                          NULL, // no ocg
                          pdf,  // weighted sum
                          NULL, // no permutations
@@ -5060,58 +5113,19 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
     operator[i] = OP_NORMAL;
 
 
-  // set up xy bws
+  // put the correct bws in vsf_x, and vsf_xy
 
-  for(i = 0, l = 0; i < num_cvar; i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
+  np_splitxy_vsf_mcv_nc(num_var_unordered, num_var_ordered, num_var_continuous,
+                        num_reg_unordered, num_reg_ordered, num_reg_continuous,
+                        vector_scale_factor,
+                        NULL,
+                        NULL,
+                        vsf_x,
+                        NULL,
+                        vsf_xy,
+                        NULL, NULL, NULL,
+                        NULL, NULL, NULL);
 
-  // copy vsf runo -> vsf_xy runo
-
-  for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf vuno -> vsf_xy vuno
-
-  for(i = num_cvar; i < (num_cvar + num_var_unordered); i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf rord -> vsf_xy rord
-
-  for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf vord -> vsf_xy vord
-
-  for(i = num_cvar + num_var_unordered; i < (num_cvar + num_var_unordered + num_var_ordered); i++, l++){
-    vsf_xy[l] = vector_scale_factor[i];
-  }
-
-  // vsf xy DONE
-
-  // set up x bws
-
-  // vsf rcon -> vsf_x rcon
-  for(i = 0, l = 0; i < num_reg_continuous; i++, l++){
-    vsf_x[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf runo -> vsf_x runo
-
-  for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
-    vsf_x[l] = vector_scale_factor[i];
-  }
-
-  // copy vsf rord -> vsf_xy rord
-
-  for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
-    vsf_x[l] = vector_scale_factor[i];
-  }
-  
-  // vsf x DONE
 
   // calculate numerator
   // swap in the alt tree
@@ -5154,7 +5168,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          vsf_xy,
                          num_categories_extern_XY,
-                         NULL,
+                         matrix_categorical_vals_extern_XY,
                          NULL,
                          rhon,  // weighted sum
                          NULL, // no permutations
@@ -5198,7 +5212,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          vsf_x,
                          num_categories_extern_X,
-                         NULL,
+                         matrix_categorical_vals_extern_X,
                          NULL,
                          rhod,  // weighted sum
                          NULL, // no permutations
@@ -5219,4 +5233,161 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   free(vsf_x);
   return(0);
 
+}
+
+void np_splitxy_vsf_mcv_nc(const int num_var_unordered,
+                           const int num_var_ordered,
+                           const int num_var_continuous,
+                           const int num_reg_unordered,
+                           const int num_reg_ordered,
+                           const int num_reg_continuous,
+                           const double * const vector_scale_factor,
+                           const int * const num_categories,
+                           double ** matrix_categorical_vals,
+                           double * vsf_x,
+                           double * vsf_y,
+                           double * vsf_xy,
+                           int * nc_x,
+                           int * nc_y,
+                           int * nc_xy,
+                           double ** mcv_x,
+                           double ** mcv_y,
+                           double ** mcv_xy){
+
+  int i, j, l;
+
+  const int num_cvar = num_var_continuous + num_reg_continuous;
+  const int num_uvar = num_var_unordered + num_reg_unordered;
+  const int num_ovar = num_var_ordered + num_reg_ordered;
+
+  const int num_catvar = num_uvar + num_ovar;
+
+  const int num_all_var = num_var_continuous + num_reg_continuous + num_var_unordered + num_reg_unordered + num_var_ordered + num_reg_ordered;
+
+  // set up xy bws
+  
+  if(vsf_xy != NULL){
+    for(i = 0, l = 0; i < num_cvar; i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf runo -> vsf_xy runo
+
+    for(i = num_cvar + num_var_unordered + num_var_ordered; i < (num_cvar + num_uvar + num_var_ordered); i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf vuno -> vsf_xy vuno
+
+    for(i = num_cvar; i < (num_cvar + num_var_unordered); i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf rord -> vsf_xy rord
+
+    for(i = num_cvar + num_uvar + num_var_ordered; i < num_all_var; i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf vord -> vsf_xy vord
+
+    for(i = num_cvar + num_var_unordered; i < (num_cvar + num_var_unordered + num_var_ordered); i++, l++){
+      vsf_xy[l] = vector_scale_factor[i];
+    }
+
+    // vsf xy DONE
+  }
+
+  if(vsf_x != NULL){
+    // set up x bws
+
+    // vsf rcon -> vsf_x rcon
+    for(i = 0, l = 0; i < num_reg_continuous; i++, l++){
+      vsf_x[l] = vector_scale_factor[i];
+    }
+
+    // copy vsf runo -> vsf_x runo
+
+    for(i = num_cvar + num_var_unordered + num_var_ordered; i < num_all_var; i++, l++){
+      vsf_x[l] = vector_scale_factor[i];
+    }
+
+  }
+
+  if(vsf_y != NULL){
+    // set up y bws
+    for(i = num_reg_continuous, l = 0; i < (num_cvar + num_var_unordered + num_var_ordered); i++, l++){
+      vsf_y[l] = vector_scale_factor[i];
+    }
+  }
+
+  // copy num_categories arrays
+  if(nc_xy != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < (num_var_unordered + num_var_ordered + num_reg_unordered); i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+
+    for(i = 0; i < num_var_unordered; i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+
+    for(i = num_var_unordered + num_var_ordered + num_reg_unordered; i < num_catvar; i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+
+    for(i = num_var_unordered; i < (num_var_unordered + num_var_ordered); i++, l++){
+      nc_xy[l] = num_categories[i];
+    }
+  }
+
+  if(nc_x != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < num_catvar; i++, l++){
+      nc_x[l] = num_categories[i];
+    }    
+  }
+
+  if(nc_y != NULL){
+    for(i = 0, l = 0; i < (num_var_unordered + num_var_ordered); i++, l++){
+      nc_y[l] = num_categories[i];
+    }    
+  }
+
+  // copy/fix mcv arrays
+
+  if(mcv_xy != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < (num_var_unordered + num_var_ordered + num_reg_unordered); i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+
+    for(i = 0; i < num_var_unordered; i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+
+    for(i = num_var_unordered + num_var_ordered + num_reg_unordered; i < num_catvar; i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+
+    for(i = num_var_unordered; i < (num_var_unordered + num_var_ordered); i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_xy[l][j] = matrix_categorical_vals[i][j];
+    }
+  }
+
+  if(mcv_x != NULL){
+    for(i = num_var_unordered + num_var_ordered, l = 0; i < num_catvar; i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_x[l][j] = matrix_categorical_vals[i][j];
+    }    
+  }
+
+  if(mcv_y != NULL){
+    for(i = 0, l = 0; i < (num_var_unordered + num_var_ordered); i++, l++){
+      for(j = 0; j < num_categories[i]; j++)
+        mcv_y[l][j] = matrix_categorical_vals[i][j];
+
+    }    
+  }
 }

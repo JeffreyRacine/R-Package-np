@@ -100,9 +100,11 @@ double **matrix_Y_ordered_eval_extern;
 
 int * num_categories_extern_XY;
 int * num_categories_extern_X;
+int * num_categories_extern_Y;
 
 double **matrix_categorical_vals_extern_XY;
 double **matrix_categorical_vals_extern_X;
+double **matrix_categorical_vals_extern_Y;
 
 double **matrix_XY_continuous_train_extern_alt;
 double **matrix_XY_unordered_train_extern_alt;
@@ -1133,6 +1135,14 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
                num_reg_unordered_extern + num_reg_ordered_extern);
 
+  matrix_categorical_vals_extern_X = 
+    alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+
+  matrix_categorical_vals_extern_XY = 
+    alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
+               num_reg_unordered_extern + num_reg_ordered_extern);
+
+
   /* in v_s_f order is creg, cvar, uvar, ovar, ureg, oreg  */
 
   if (int_use_starting_values)
@@ -1312,33 +1322,15 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                              num_categories_extern,
                              matrix_categorical_vals_extern);
   
-  // xy runo
-  for(i = 0, j = num_var_unordered_extern + num_var_ordered_extern; 
-      j < (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j++, i++)
-    num_categories_extern_XY[i] = num_categories_extern[j];
+  np_splitxy_vsf_mcv_nc(num_var_unordered_extern, num_var_ordered_extern, num_var_continuous_extern,
+                        num_reg_unordered_extern, num_reg_ordered_extern, num_reg_continuous_extern,
+                        vector_scale_factor+1,
+                        num_categories_extern,
+                        matrix_categorical_vals_extern,
+                        NULL, NULL, NULL,
+                        num_categories_extern_X, NULL, num_categories_extern_XY,
+                        matrix_categorical_vals_extern_X, NULL, matrix_categorical_vals_extern_XY);
 
-  // xy vuno
-  for(j = 0; j < (num_var_unordered_extern); j++, i++)
-    num_categories_extern_XY[i] = num_categories_extern[j];
-
-  // xy rord
-  for(j = (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j < (num_all_uvar + num_all_ovar); j++, i++)
-    num_categories_extern_XY[i] = num_categories_extern[j];
-
-  // xy vord
-  for(j = num_var_unordered_extern; j < (num_var_unordered_extern + num_var_ordered_extern); j++, i++)
-    num_categories_extern_XY[i] = num_categories_extern[j];
-
-  // now for the x data
-
-  // x runo
-  for(i = 0, j = num_var_unordered_extern + num_var_ordered_extern; 
-      j < (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j++, i++)
-    num_categories_extern_X[i] = num_categories_extern[j];
-
-  // x rord
-  for(j = (num_var_unordered_extern+num_var_ordered_extern+num_reg_unordered_extern); j < (num_all_uvar + num_all_ovar); j++, i++)
-    num_categories_extern_X[i] = num_categories_extern[j];
 
 
   vector_continuous_stddev = alloc_vecd(num_var_continuous_extern + num_reg_continuous_extern);
@@ -1625,6 +1617,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
 
+  free_mat(matrix_categorical_vals_extern_X, num_reg_unordered_extern + num_reg_ordered_extern);
+
+  free_mat(matrix_categorical_vals_extern_XY, num_reg_unordered_extern + num_reg_ordered_extern +
+           num_var_unordered_extern + num_var_ordered_extern);
+
   safe_free(vector_continuous_stddev);
 
   safe_free(ipt);
@@ -1743,12 +1740,23 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   num_categories_extern = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
                                      num_reg_unordered_extern + num_reg_ordered_extern);
+
+  num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
+  num_categories_extern_Y = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern);
+
   matrix_y = alloc_matd(num_all_var + 1, num_all_var + 1);
   vector_scale_factor = alloc_vecd(num_all_var + 1);
   
   matrix_categorical_vals_extern = 
     alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern + 
                num_reg_unordered_extern + num_reg_ordered_extern);
+
+  matrix_categorical_vals_extern_X = 
+    alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
+
+  matrix_categorical_vals_extern_Y = 
+    alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern);
+
 
   /* in v_s_f order is creg, cvar, uvar, ovar, ureg, oreg  */
 
@@ -1810,6 +1818,15 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                              matrix_X_ordered_train_extern,
                              num_categories_extern,
                              matrix_categorical_vals_extern);
+
+  np_splitxy_vsf_mcv_nc(num_var_unordered_extern, num_var_ordered_extern, num_var_continuous_extern,
+                        num_reg_unordered_extern, num_reg_ordered_extern, num_reg_continuous_extern,
+                        vector_scale_factor+1,
+                        num_categories_extern,
+                        matrix_categorical_vals_extern,
+                        NULL, NULL, NULL,
+                        num_categories_extern_X, num_categories_extern_Y, NULL,
+                        matrix_categorical_vals_extern_X, matrix_categorical_vals_extern_Y, NULL);
 
 
   vector_continuous_stddev = alloc_vecd(num_var_continuous_extern + num_reg_continuous_extern);
@@ -2068,9 +2085,15 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   free_mat(matrix_y, num_all_var + 1);
   safe_free(vector_scale_factor);
   safe_free(num_categories_extern);
+  safe_free(num_categories_extern_X);
+  safe_free(num_categories_extern_Y);
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
+
+  free_mat(matrix_categorical_vals_extern_X, num_reg_unordered_extern + num_reg_ordered_extern);
+
+  free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
 
   safe_free(vector_continuous_stddev);
 
@@ -2857,6 +2880,7 @@ void np_density(double * tuno, double * tord, double * tcon,
                                                matrix_X_continuous_eval_extern,
                                                &vector_scale_factor[1],
                                                num_categories_extern,
+                                               matrix_categorical_vals_extern,
                                                pdf,
                                                pdf_stderr,
                                                &log_likelihood);
