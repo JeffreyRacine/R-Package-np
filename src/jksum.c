@@ -762,6 +762,15 @@ double np_econvol_onli_racine(const double x, const double y, const double lambd
   return lnorm*lnorm*R_pow_di(lambda, cxy)*((1.0 + l2)/(1.0 - l2) + cxy);
 
 }
+
+double np_econvol_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
+  if(x == y) return 0.5*(1.0-lambda)*(1.0-lambda)*(1.0 + 1.0/(1.0-lambda*lambda));
+
+  const int cxy = (int)fabs(x-y);
+  const double lnorm = 0.5*(1.0 - lambda);
+  const double l2 = lambda*lambda;
+  return lnorm*lnorm*R_pow_di(lambda, cxy)*(1.0 + cxy + 2.0/(1.0-lambda*lambda));
+}
 // derivative kernels
 
 
@@ -867,9 +876,10 @@ double np_cdf_rect(const double z){
 }
 
 double np_cdf_owang_van_ryzin(const double y, const double x, const double lambda, const double cl, const double ch){
+  if(x == y) return 1.0 - 0.5*lambda;
   const int cxy = (int)fabs(x-y);
   const double gee = R_pow_di(lambda, cxy);
-  return (x < y) ? 0.5*gee : ((x == y) ? (1.0 - 0.5*lambda) : (1.0 - gee));
+  return (x < y) ? 0.5*gee : (1.0 - gee);
 }
 
 double np_cdf_oli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
@@ -1319,7 +1329,7 @@ void np_p_okernelv(const int KERNEL,
 
   double (* const k[])(double, double, double, double, double) = { 
     np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
-    np_onull, np_onull, np_econvol_onli_racine,
+    np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
     np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
     np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
@@ -1426,7 +1436,7 @@ void np_okernelv(const int KERNEL,
 
   double (* const k[])(double, double, double, double, double) = { 
     np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
-    np_onull, np_onull, np_econvol_onli_racine,
+    np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
     np_onull, np_onull, np_onull,
     np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
@@ -1825,7 +1835,7 @@ double * const kw){
   int p_nvar = (do_perm ? num_reg_continuous : 0) + (doscoreocg ? num_reg_unordered + num_reg_ordered : 0);
   int ps_ukernel = -1, ps_okernel = -1;
 
-  int ps_ok_nli = KERNEL_ordered_reg == 2;
+  int ps_ok_nli = KERNEL_ordered_reg != 1;
 
   /* Trees are currently not compatible with all operations */
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
