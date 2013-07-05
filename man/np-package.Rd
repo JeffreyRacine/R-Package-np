@@ -207,9 +207,9 @@
     }
     
         \item{Li and Racine Normalised (\eqn{x} is a (discrete) factor)}{
-      \eqn{l(x_i,x,\lambda) = 1 }{l(x[i],x,lambda) =
+      \eqn{l(x_i,x,\lambda) = 1/(1+(c-1)\lambda) }{l(x[i],x,lambda) =
         1/(1+(c-1)lambda)} if \eqn{x_i=x}{x[i] = x}, and
-      \eqn{\lambda}{lambda/(1+(c-1)lambda)} if \eqn{x_i \neq x}{x[i] != x}.
+      \eqn{\lambda/(1+(c-1)\lambda)}{lambda/(1+(c-1)lambda)} if \eqn{x_i \neq x}{x[i] != x}.
 
       Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
       \eqn{1}.
@@ -226,9 +226,9 @@
     }
     
     \item{Li and Racine Normalised (\eqn{x} is a (discrete) ordered factor)}{
-      \eqn{l(x_i,x,\lambda) = (1-lambda)/(1+lambda)}{l(x[i],x,lambda) = (1-lambda)/(1+lambda)} if
+      \eqn{l(x_i,x,\lambda) = (1-\lambda)/(1+\lambda)}{l(x[i],x,lambda) = (1-lambda)/(1+lambda)} if
       \eqn{|x_i-x|=0}{|x[i] - x| = 0}, and
-      \eqn{\lambda^{|x_i-x|}}{ (1-lambda)/(1+lambda)lambda^|x_i-x|} if \eqn{|x_i -
+      \eqn{(1-\lambda)/(1+\lambda)\lambda^{|x_i-x|}}{ (1-lambda)/(1+lambda)lambda^|x_i-x|} if \eqn{|x_i -
         x|\ge1}{|x[i] - x|>=1}.
 
       Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
