@@ -155,7 +155,7 @@
     }
     
     \item{Second Order Truncated Gaussian (\eqn{x} is continuous)}{
-			\eqn{k(z) = (\exp(-z^2/2)-\exp(-b^2/2))/(\text{erf}(b/\sqrt{2})\sqrt{2\pi}-2b\exp(-b^2/2))}{k(z) =
+			\eqn{k(z) = (\exp(-z^2/2)-\exp(-b^2/2))/(\textrm{erf}(b/\sqrt{2})\sqrt{2\pi}-2b\exp(-b^2/2))}{k(z) =
 				(exp(-z^2/2)-exp(-b^2/2))/(erf(b/\sqrt{2})\sqrt{2\pi}-2b\exp(-b^2/2))} where \eqn{z=(x_i-x)/h}{z=(x[i]-x)/h}, \eqn{b>0}, \eqn{|z|\le b}
       and \eqn{h>0}.
       
