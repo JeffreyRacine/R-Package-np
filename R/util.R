@@ -705,6 +705,51 @@ EssDee <- function(y){
   
 }
 
+## consolidating various bits of code related to converting internal settings
+## to printable strings
+
+bwmToPrint <- function(s){
+  switch(s,
+         cv.cdf = "Least Squares Cross-Validation",
+         "normal-reference" = "Normal Reference")
+}
+
+bwtToPrint <- function(s){
+  switch(s,
+         fixed = "Fixed",
+         generalized_nn = "Generalized Nearest Neighbour",
+         adaptive_nn = "Adaptive Nearest Neighbour" )
+}
+
+cktToPrint <- function(s, order = ""){
+  switch(s,
+         gaussian = paste(order,"Gaussian"),
+         epanechnikov =  paste(order,"Epanechnikov"),
+         uniform = "Uniform",
+         "truncated gaussian" = "Truncated Gaussian")
+}
+
+uktToPrint <- function(s){
+  switch(s,
+         aitchisonaitken = "Aitchison and Aitken",
+         liracine = "Li and Racine (normalised)")
+}
+
+oktToPrint <- function(s, normalized = FALSE) {
+  if(normalized){
+    pok <- 
+      switch(s,
+             wangvanryzin = "Wang and Van Ryzin", 
+             liracine = "Li and Racine (normalized)")
+  } else {
+    pok <- 
+      switch(s,
+             wangvanryzin = "Wang and Van Ryzin", 
+             liracine = "Li and Racine")
+  }
+  return(pok)
+}
+
 ### holding place for some generic methods
 
 se <- function(x){

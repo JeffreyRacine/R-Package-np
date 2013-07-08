@@ -185,7 +185,7 @@ npudistbw.dbandwidth <-
           aitchisonaitken = UKER_AIT),
         okerneval = switch(bws$okertype,
           wangvanryzin = OKER_WANG,
-          nliracine = OKER_NLR),
+          liracine = OKER_NLR),
         cdf_on_train = cdf_on_train,
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
