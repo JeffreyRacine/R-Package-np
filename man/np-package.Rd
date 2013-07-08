@@ -127,13 +127,13 @@
 
 }
 
-\details{
-	The kernel methods in \code{np} employ the so-called `generalized
-	product kernels' found in Hall, Racine, and Li (2004), Li and Racine
-  (2003), Li and Racine (2004), Li and Racine (2007), Ouyang, Li,
-  and Racine (2006), and Racine and Li (2004), among others. For
-  details on a particular method, kindly refer to the original
-  references listed above.
+\details{ The kernel methods in \code{np} employ the so-called
+	`generalized product kernels' found in Hall, Racine, and Li (2004),
+	Li, Lin, and Racine (2013), Li, Ouyang, and Racine (2013), Li and
+	Racine (2003), Li and Racine (2004), Li and Racine (2007), Li and
+	Racine (2010), Ouyang, Li, and Racine (2006), and Racine and Li
+	(2004), among others. For details on a particular method, kindly refer
+	to the original references listed above.
 
   We briefly describe the particulars of various univariate kernels used
   to generate the generalized product kernels that underlie the kernel
@@ -207,9 +207,9 @@
     }
     
         \item{Li and Racine Normalised (\eqn{x} is a (discrete) factor)}{
-      \eqn{l(x_i,x,\lambda) = 1 }{l(x[i],x,lambda) =
+      \eqn{l(x_i,x,\lambda) = 1/(1+(c-1)\lambda) }{l(x[i],x,lambda) =
         1/(1+(c-1)lambda)} if \eqn{x_i=x}{x[i] = x}, and
-      \eqn{\lambda}{lambda/(1+(c-1)lambda)} if \eqn{x_i \neq x}{x[i] != x}.
+      \eqn{\lambda/(1+(c-1)\lambda)}{lambda/(1+(c-1)lambda)} if \eqn{x_i \neq x}{x[i] != x}.
 
       Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
       \eqn{1}.
@@ -226,9 +226,9 @@
     }
     
     \item{Li and Racine Normalised (\eqn{x} is a (discrete) ordered factor)}{
-      \eqn{l(x_i,x,\lambda) = (1-lambda)/(1+lambda)}{l(x[i],x,lambda) = (1-lambda)/(1+lambda)} if
+      \eqn{l(x_i,x,\lambda) = (1-\lambda)/(1+\lambda)}{l(x[i],x,lambda) = (1-lambda)/(1+lambda)} if
       \eqn{|x_i-x|=0}{|x[i] - x| = 0}, and
-      \eqn{\lambda^{|x_i-x|}}{ (1-lambda)/(1+lambda)lambda^|x_i-x|} if \eqn{|x_i -
+      \eqn{(1-\lambda)/(1+\lambda)\lambda^{|x_i-x|}}{ (1-lambda)/(1+lambda)lambda^|x_i-x|} if \eqn{|x_i -
         x|\ge1}{|x[i] - x|>=1}.
 
       Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
@@ -275,32 +275,44 @@
 \references{
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
-    discrimination by the kernel method,} Biometrika, 63, 413-420.
+  discrimination by the kernel method,} Biometrika, 63, 413-420.
 
-  Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation and the
-    estimation of conditional probability densities,} Journal of the
-  American Statistical Association, 99, 1015-1026.
+  Hall, P. and J.S. Racine and Q. Li (2004), \dQuote{Cross-validation
+  and the estimation of conditional probability densities,} Journal of
+  the American Statistical Association, 99, 1015-1026.
+
+  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
+  Selection for Nonparametric Conditional Distribution and Quantile
+  Functions}, Journal of Business and Economic Statistics, 31, 57-65.
+
+  Li, Q. and D. Ouyang and J.S. Racine (2013), \dQuote{Categorical
+  Semiparametric Varying-Coefficient Models,} Journal of Applied
+  Econometrics, 28, 551-589.
 
   Li, Q. and J.S. Racine (2003), \dQuote{Nonparametric estimation of
-    distributions with categorical and continuous data,} Journal
-  of Multivariate Analysis, 86, 266-292.
+  distributions with categorical and continuous data,} Journal of
+  Multivariate Analysis, 86, 266-292.
 
   Li, Q. and J.S. Racine (2004), \dQuote{Cross-validated local linear
   nonparametric regression,} Statistica Sinica, 14, 485-512.
 
- Ouyang, D. and Q. Li and J.S. Racine (2006), \dQuote{Cross-validation
-   and the estimation of probability distributions with categorical data,}
- Journal of Nonparametric Statistics, 18, 69-100.
+  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics:
+  Theory and Practice,} Princeton University Press.
 
- Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of
+  Li, Q. and J.S. Racine (2010), \dQuote{Smooth varying-coefficient
+  estimation and inference for qualitative and quantitative data,}
+  Econometric Theory, 26, 1-31.
+
+  Ouyang, D. and Q. Li and J.S. Racine (2006), \dQuote{Cross-validation
+  and the estimation of probability distributions with categorical
+  data,} Journal of Nonparametric Statistics, 18, 69-100.
+
+  Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of
 	regression functions with both categorical and continuous data,}
 	Journal of Econometrics, 119, 99-130.
   
-  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics:
-		Theory and Practice,} Princeton University Press.
-
-  Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
-  University Press. 
+  Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
+  Cambridge University Press.
 
   Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
   Practice and Visualization,} New York: Wiley.
@@ -308,8 +320,8 @@
   Silverman, B.W. (1986), \emph{Density Estimation,} London: Chapman and
   Hall.
 
-  Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators
-    for discrete distributions,}  Biometrika, 68, 301-309.
+  Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
+  estimators for discrete distributions,} Biometrika, 68, 301-309.
 
 }
 \keyword{package}
