@@ -710,6 +710,7 @@ EssDee <- function(y){
 
 bwmToPrint <- function(s){
   switch(s,
+         cv.aic = "Expected Kullback-Leibler Cross-Validation",
          cv.ml = "Maximum Likelihood Cross-Validation",
          cv.cdf = "Least Squares Cross-Validation",
          "normal-reference" = "Normal Reference")
