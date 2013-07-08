@@ -710,6 +710,7 @@ EssDee <- function(y){
 
 bwmToPrint <- function(s){
   switch(s,
+         manual = "Manual",
          cv.aic = "Expected Kullback-Leibler Cross-Validation",
          cv.ml = "Maximum Likelihood Cross-Validation",
          cv.cdf = "Least Squares Cross-Validation",
@@ -744,12 +745,14 @@ oktToPrint <- function(s, normalized = FALSE) {
     pok <- 
       switch(s,
              wangvanryzin = "Wang and Van Ryzin", 
-             liracine = "Li and Racine (normalized)")
+             liracine = "Li and Racine (normalized)",
+             nliracine = "Li and Racine (normalized)")
   } else {
     pok <- 
       switch(s,
              wangvanryzin = "Wang and Van Ryzin", 
-             liracine = "Li and Racine")
+             liracine = "Li and Racine",
+             nliracine = "Li and Racine (normalized)")
   }
   return(pok)
 }
