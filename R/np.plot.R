@@ -777,6 +777,7 @@ uocquantile <- function(x, prob) {
   if (is.ordered(x)){
     tq = unclass(table(x))
     tq = tq / sum(tq)
+    tq[length(tq)] <- 1.0
     bscape <- sort(unique(x))
     tq <- sapply(1:length(tq), function(y){ sum(tq[1:y]) })
     j <- sapply(prob, function(p){ which(tq >= p)[1] })

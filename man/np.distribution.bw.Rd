@@ -386,14 +386,6 @@ npudistbw(\dots)
   intended on mixed data types and will coerce the data to the same
   type.
 
-  Note that in certain settings (hopefully rare) using
-  \code{do.full.integral=FALSE} (default) has been observed to have
-  pathological consequences with purely discrete multivariate data that
-  is highly negatively correlated (the pathology being
-  oversmoothing). When large bandwidths are returned it would be prudent
-  to re-run the procedure with the option \code{do.full.integral=TRUE}
-  and, if a substantial discrepancy arises, to use the latter.
-
   Caution: multivariate data-driven bandwidth selection methods are, by
   their nature, \emph{computationally intensive}. Virtually all methods
   require dropping the \eqn{i}th observation from the data set, computing an

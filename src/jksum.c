@@ -634,8 +634,17 @@ double np_uli_racine(const int same_cat, const double lambda, const int c){
   return (same_cat)?1.0:lambda;
 }
 
+double np_unli_racine(const int same_cat, const double lambda, const int c){
+  return ((same_cat)?1.0:lambda)/((c-1.0)*lambda + 1.0);
+}
+
 double np_score_uli_racine(const int same_cat, const double lambda, const int c){
   return (same_cat)?0.0:1.0;
+}
+
+double np_score_unli_racine(const int same_cat, const double lambda, const int c){
+  const double inorm = 1.0/((c-1.0)*lambda + 1.0);
+  return (same_cat)?(1.0-c)*inorm*inorm:inorm*(lambda*(1.0-c)*inorm + 1.0);
 }
 
 double np_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -753,6 +762,11 @@ double np_econvol_uaa(const int same_cat, const double lambda, const int c){
 
 double np_econvol_uli_racine(const int same_cat, const double lambda, const int c){
   return (same_cat)?(1.0 + (double)(c-1)*lambda*lambda):(lambda*(2.0+(double)(c-2)*lambda));
+}
+
+double np_econvol_unli_racine(const int same_cat, const double lambda, const int c){
+  const double inorm = 1.0/((c-1.0)*lambda + 1.0);
+  return ((same_cat)?(1.0 + (double)(c-1)*lambda*lambda):(lambda*(2.0+(double)(c-2)*lambda)))*inorm*inorm;
 }
 
 double np_econvol_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -910,7 +924,7 @@ double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8,
                                      np_epan2, np_epan4, np_epan6, np_epan8, 
                                      np_rect, np_tgauss2 };
 double (* const allok[])(double, double, double, double, double) = { np_owang_van_ryzin, np_oli_racine };
-double (* const alluk[])(int, double, int) = { np_uaa, np_uli_racine };
+double (* const alluk[])(int, double, int) = { np_uaa, np_unli_racine };
 
 // in cksup we define a scale length for all kernels, outside of which the kernel is 0
 // for fixed bandwidths and finite support kernels, only points within += 1 scale length
@@ -1164,9 +1178,9 @@ void np_p_ukernelv(const int KERNEL,
 
   const double ex = do_ocg ? cat : x;
 
-  double (* const k[])(int, double, int) = { np_uaa, np_uli_racine,
-                                             np_econvol_uaa, np_econvol_uli_racine,
-                                             np_score_uaa, np_score_uli_racine };
+  double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
+                                             np_econvol_uaa, np_econvol_unli_racine,
+                                             np_score_uaa, np_score_unli_racine };
 
   double * kbuf = NULL;
 
@@ -1249,8 +1263,8 @@ void np_ukernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double (* const k[])(int, double, int) = { np_uaa, np_uli_racine,
-                                             np_econvol_uaa, np_econvol_uli_racine };
+  double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
+                                             np_econvol_uaa, np_econvol_unli_racine };
 
   if(nl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
