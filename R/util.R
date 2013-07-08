@@ -713,6 +713,8 @@ bwmToPrint <- function(s){
          cv.aic = "Expected Kullback-Leibler Cross-Validation",
          cv.ml = "Maximum Likelihood Cross-Validation",
          cv.cdf = "Least Squares Cross-Validation",
+         cv.ls = "Least Squares Cross-Validation",
+         cv.ls.np = "Least Squares Cross-Validation (block algorithm)",
          "normal-reference" = "Normal Reference")
 }
 
