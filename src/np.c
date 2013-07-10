@@ -672,7 +672,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int itmax, iter;
   int int_use_starting_values, cdfontrain;
 
-  int * ipt = NULL;  // point permutation, see tree.c
+  int * ipt = NULL, * ipe = NULL;
 
   cdfontrain =  myopti[DBW_CDFONTRAIN];
 
@@ -776,27 +776,57 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     ipt[i] = i;
   }
 
+  if(!cdfontrain) {
+    ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+    if(!(ipe != NULL))
+      error("!(ipe != NULL)");
+
+    for(i = 0; i < num_obs_eval_extern; i++){
+      ipe[i] = i;
+    }
+  } else {
+    ipe = ipt;
+  }
+
   // attempt tree build, if enabled 
   int_TREE = int_TREE && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE == NP_TREE_TRUE){
-    build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
-                 4*num_reg_continuous_extern, ipt, &kdt_extern);
-  
+    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+      build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipt, &kdt_extern);
 
-    //put training data into tree-order using the index array
+      //put training data into tree-order using the index array
 
-    for( j=0;j<num_reg_unordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_unordered_train_extern[j][i]=myuno[j*num_obs_train_extern+ipt[i]];  
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_unordered_train_extern[j][i]=myuno[j*num_obs_train_extern+ipt[i]];  
     
-    for( j=0;j<num_reg_ordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_ordered_train_extern[j][i]=myord[j*num_obs_train_extern+ipt[i]];
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_ordered_train_extern[j][i]=myord[j*num_obs_train_extern+ipt[i]];
 
-    for( j=0;j<num_reg_continuous_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+ipt[i]];
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+ipt[i]];
+
+    } else {
+      build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipe, &kdt_extern);      
+
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_unordered_eval_extern[j][i]=myeuno[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_ordered_eval_extern[j][i]=myeord[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_continuous_eval_extern[j][i]=myecon[j*num_obs_eval_extern+ipe[i]];
+
+    }
 
   }
 
@@ -1071,6 +1101,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   free(vector_continuous_stddev);
 
   free(ipt);
+  if(!cdfontrain)
+    free(ipe);
 
   if(int_TREE == NP_TREE_TRUE){
     free_kdtree(&kdt_extern);
@@ -2807,29 +2839,25 @@ void np_density(double * tuno, double * tord, double * tcon,
     if(BANDWIDTH_reg_extern != BW_ADAP_NN){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern);
+
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
+    
+    
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
+
     } else {
       build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipe, &kdt_extern);
 
-    }
 
-    //put training data into tree-order using the index array
-
-    for( j=0;j<num_reg_unordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
-    
-    
-    for( j=0;j<num_reg_ordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
-
-    for( j=0;j<num_reg_continuous_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
-
-    /* eval */
-    if(!train_is_eval){
       for( j=0;j<num_reg_unordered_extern;j++)
         for( i=0;i<num_obs_eval_extern;i++ )
           matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+ipe[i]];
@@ -2842,6 +2870,7 @@ void np_density(double * tuno, double * tord, double * tcon,
         for( i=0;i<num_obs_eval_extern;i++ )
           matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+ipe[i]];
     }
+
   }
 
 
@@ -3571,33 +3600,30 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
     if(BANDWIDTH_reg_extern != BW_ADAP_NN){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern);
+
+      //put training data into tree-order using the index array
+
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
+    
+    
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
+
+      /* response variable */
+      for( i=0;i<num_obs_train_extern;i++ )
+        vector_Y_extern[i] = ty[ipt[i]];
+
     } else {
       build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipe, &kdt_extern);
 
-    }
-
-    //put training data into tree-order using the index array
-
-    for( j=0;j<num_reg_unordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
-    
-    
-    for( j=0;j<num_reg_ordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
-
-    for( j=0;j<num_reg_continuous_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
-
-    /* response variable */
-    for( i=0;i<num_obs_train_extern;i++ )
-      vector_Y_extern[i] = ty[ipt[i]];
-    
-    /* eval */
-    if(!train_is_eval){
       for( j=0;j<num_reg_unordered_extern;j++)
         for( i=0;i<num_obs_eval_extern;i++ )
           matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+ipe[i]];
@@ -3609,13 +3635,11 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
       for( j=0;j<num_reg_continuous_extern;j++)
         for( i=0;i<num_obs_eval_extern;i++ )
           matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+ipe[i]];
-    }
 
-    if(!ey_is_ty)
       for(i=0;i<num_obs_eval_extern;i++)
         vector_Y_eval_extern[i] = ey[ipe[i]];
 
-
+    }
   }
 
 
@@ -3989,53 +4013,50 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   if(int_TREE == NP_TREE_TRUE){
     if(BANDWIDTH_reg_extern != BW_ADAP_NN){
-    build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
-                 4*num_reg_continuous_extern, ipt, &kdt_extern);
+      build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipt, &kdt_extern);
+
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
+    
+    
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_train_extern;i++ )
+          matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
+
+      for( j = 0; j < ncol_Y; j++ )
+        for( i = 0; i < num_obs_train_extern; i++ )
+          matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+ipt[i]];
+
+      for( j = 0; j < ncol_W; j++ )
+        for( i = 0; i < num_obs_train_extern; i++ )
+          matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+ipt[i]];
+
     } else {
-    build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
-                 4*num_reg_continuous_extern, ipe, &kdt_extern);
+      build_kdtree(matrix_X_continuous_eval_extern, num_obs_eval_extern, num_reg_continuous_extern, 
+                   4*num_reg_continuous_extern, ipe, &kdt_extern);
+
+
+      for( j=0;j<num_reg_unordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_ordered_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_ordered_eval_extern[j][i]=eord[j*num_obs_eval_extern+ipe[i]];
+
+      for( j=0;j<num_reg_continuous_extern;j++)
+        for( i=0;i<num_obs_eval_extern;i++ )
+          matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+ipe[i]];
 
     }
-
-    //put training data into tree-order using the index array
-
-    for( j=0;j<num_reg_unordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+ipt[i]];
-    
-    
-    for( j=0;j<num_reg_ordered_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+ipt[i]];
-
-    for( j=0;j<num_reg_continuous_extern;j++)
-      for( i=0;i<num_obs_train_extern;i++ )
-        matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+ipt[i]];
-
-    for( j = 0; j < ncol_Y; j++ )
-      for( i = 0; i < num_obs_train_extern; i++ )
-        matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+ipt[i]];
-
-    for( j = 0; j < ncol_W; j++ )
-      for( i = 0; i < num_obs_train_extern; i++ )
-        matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+ipt[i]];
   }
 
-  /* eval */
-
-  if(!train_is_eval){
-    for( j=0;j<num_reg_unordered_extern;j++)
-      for( i=0;i<num_obs_eval_extern;i++ )
-        matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+ipe[i]];
-
-    for( j=0;j<num_reg_ordered_extern;j++)
-      for( i=0;i<num_obs_eval_extern;i++ )
-        matrix_X_ordered_eval_extern[j][i]=eord[j*num_obs_eval_extern+ipe[i]];
-
-    for( j=0;j<num_reg_continuous_extern;j++)
-      for( i=0;i<num_obs_eval_extern;i++ )
-        matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+ipe[i]];
-  }
 
 
   /* bandwidths */
