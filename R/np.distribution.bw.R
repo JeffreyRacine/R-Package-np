@@ -78,7 +78,7 @@ npudistbw.NULL <-
 npudistbw.dbandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws, gdat = NULL, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
-           fast.cdf = TRUE, do.full.integral = FALSE, ngrid = 100,
+           fast.cdf = TRUE, do.full.integral = TRUE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05, ...){
 
     dat = toFrame(dat)
@@ -191,7 +191,8 @@ npudistbw.dbandwidth <-
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],
-        fast.cdf = fast.cdf)
+        fast.cdf = fast.cdf,
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
       myoptd = list(ftol=ftol, tol=tol, small=small)
 

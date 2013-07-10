@@ -360,6 +360,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define DBW_NORDI 16
 #define DBW_NCONI 17
 #define DBW_FASTI 18
+#define DBW_DOTREEI 19
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1

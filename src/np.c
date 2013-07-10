@@ -672,6 +672,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int itmax, iter;
   int int_use_starting_values, cdfontrain;
 
+  int * ipt = NULL;  // point permutation, see tree.c
+
   cdfontrain =  myopti[DBW_CDFONTRAIN];
 
   num_reg_unordered_extern = myopti[DBW_NUNOI];
@@ -700,6 +702,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   itmax=myopti[DBW_ITMAXI];
 
   int_fast_dls_extern = myopti[DBW_FASTI];
+  int_TREE = myopti[DBW_DOTREEI];
 
   ftol=myoptd[DBW_FTOLD];
   tol=myoptd[DBW_TOLD];
@@ -763,6 +766,38 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     for( j=0;j<num_reg_continuous_extern;j++)
       for( i=0;i<num_obs_eval_extern;i++ )
         matrix_X_continuous_eval_extern[j][i]=myecon[j*num_obs_eval_extern+i];
+  }
+
+  ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+  if(!(ipt != NULL))
+    error("!(ipt != NULL)");
+
+  for(i = 0; i < num_obs_train_extern; i++){
+    ipt[i] = i;
+  }
+
+  // attempt tree build, if enabled 
+  int_TREE = int_TREE && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
+
+  if(int_TREE == NP_TREE_TRUE){
+    build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
+                 4*num_reg_continuous_extern, ipt, &kdt_extern);
+  
+
+    //put training data into tree-order using the index array
+
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_unordered_train_extern[j][i]=myuno[j*num_obs_train_extern+ipt[i]];  
+    
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_ordered_train_extern[j][i]=myord[j*num_obs_train_extern+ipt[i]];
+
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_continuous_train_extern[j][i]=mycon[j*num_obs_train_extern+ipt[i]];
+
   }
 
   determine_categorical_vals(
@@ -1034,6 +1069,13 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
 
   free(vector_continuous_stddev);
+
+  free(ipt);
+
+  if(int_TREE == NP_TREE_TRUE){
+    free_kdtree(&kdt_extern);
+    int_TREE = NP_TREE_FALSE;
+  }
 
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
