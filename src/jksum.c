@@ -2193,6 +2193,11 @@ double * const kw){
     // that includes convolutions 
 
     if(np_ks_tree_use){
+
+      if(kw != NULL)
+        for(i = 0; i < num_xt; i++)
+          tprod[i] = 0.0;
+
       // reset the interaction node list
       nl.n = 0;
       double bb[kdt_extern->ndim*2];
@@ -3581,10 +3586,10 @@ double * cv){
     for(i = is; i <= ie; i++){
       for(j = 0; j < num_obs_eval; j++){
         indy = 1;
-        for(l = 0; l < num_reg_ordered; l++){
+        for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
           indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
         }
-        for(l = 0; l < num_reg_continuous; l++){
+        for(l = 0; (l < num_reg_continuous) && (indy != 0); l++){
           indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
         }
         if(BANDWIDTH_den != BW_ADAP_NN){
