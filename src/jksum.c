@@ -140,6 +140,8 @@ extern double **matrix_XY_ordered_eval_extern_alt;
 
 extern int * ipt_extern;
 extern int * ipt_extern_alt;
+extern int * ipt_lookup_extern;
+extern int * ipt_lookup_extern_alt;
 
 extern int *num_categories_extern_XY;
 extern int *num_categories_extern_X;
@@ -3697,6 +3699,9 @@ double **matrix_Y_continuous_train,
 double **matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
+double **matrix_XY_unordered_train, 
+double **matrix_XY_ordered_train, 
+double **matrix_XY_continuous_train, 
 double **matrix_Y_unordered_eval,
 double **matrix_Y_ordered_eval,
 double **matrix_Y_continuous_eval,
@@ -3708,15 +3713,24 @@ double *cv){
 
   const int num_reg_tot = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int num_var_tot = num_var_continuous+num_var_unordered+num_var_ordered;
+  const int num_all_var = num_reg_tot + num_var_tot;
 
-  int * x_operator = NULL, * y_operator = NULL;
+  const int num_all_cvar = num_reg_continuous + num_var_continuous;
+  const int num_all_uvar = num_reg_unordered + num_var_unordered;
+  const int num_all_ovar = num_reg_ordered + num_var_ordered;
+
+  int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
 
   double vsfx[num_reg_tot];
   double vsfy[num_var_tot];
+  double vsfxy[num_var_tot+num_reg_tot];
   double xyj;
 
   int is,ie;
   int num_obs_eval_alloc, num_obs_train_alloc;
+
+  KDT * kdt_swap;
+  int * itt = NULL;
 
 #ifdef MPI2
   int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
@@ -3748,7 +3762,7 @@ double *cv){
                         NULL,
                         vsfx,
                         vsfy,
-                        NULL,
+                        vsfxy,
                         NULL, NULL, NULL,
                         NULL, NULL, NULL);
   
@@ -3768,62 +3782,186 @@ double *cv){
 
   for(i = 0; i < (num_var_continuous+num_var_unordered+num_var_ordered); i++)
     y_operator[i] = OP_INTEGRAL;
+
+  xy_operator = (int *)malloc(sizeof(int)*num_all_var);
+
+  if(xy_operator == NULL)
+    error("failed to allocate xy_operator");
+
+  for(i = 0; i < num_reg_continuous; i++)
+    xy_operator[i] = OP_NORMAL;
+
+  for(i = num_reg_continuous; i < num_all_cvar; i++)
+    xy_operator[i] = OP_INTEGRAL;
+
+  // no cdf for unordered
+  for(i = num_all_cvar; i < (num_all_cvar+num_all_uvar+num_reg_ordered); i++)
+    xy_operator[i] = OP_NORMAL;
+
+  for(i = num_all_cvar+num_all_uvar+num_reg_ordered; i < num_all_var; i++)
+    xy_operator[i] = OP_INTEGRAL;
+
   
   *cv = 0;
 
-  if(fast){
-    double * kwx = (double *)malloc(num_obs_train_alloc*num_obs_train_alloc*sizeof(double));
+  if(!int_TREE_ALT){
+    if(fast){
+      double * kwx = (double *)malloc(num_obs_train_alloc*num_obs_train_alloc*sizeof(double));
 
-    if(kwx == NULL)
-      error("failed to allocate kwx, try setting fast.cdf = false");
+      if(kwx == NULL)
+        error("failed to allocate kwx, try setting fast.cdf = false");
 
-    double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_eval_alloc*sizeof(double));
+      double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_eval_alloc*sizeof(double));
 
-    if(kwy == NULL)
-      error("failed to allocate kwy, try reducing num_obs_eval");
+      if(kwy == NULL)
+        error("failed to allocate kwy, try reducing num_obs_eval");
 
-    // compute y weights first
-    kernel_weighted_sum_np(KERNEL_den,
-                           KERNEL_unordered_den,
-                           KERNEL_ordered_den,
-                           BANDWIDTH_den,
-                           num_obs_train,
-                           num_obs_eval,
-                           num_var_unordered,
-                           num_var_ordered,
-                           num_var_continuous,
-                           0,
-                           1,
-                           0,
-                           0,
-                           0,
-                           0,
-                           0,
-                           0,
-                           y_operator,
-                           OP_NOOP, // no permutations
-                           0, // no score
-                           0, // no ocg
-                           0, // don't explicity suppress parallel
-                           0,
-                           0,
-                           matrix_Y_unordered_train,
-                           matrix_Y_ordered_train,
-                           matrix_Y_continuous_train,
-                           matrix_Y_unordered_eval,
-                           matrix_Y_ordered_eval,
-                           matrix_Y_continuous_eval,
-                           NULL,
-                           NULL,
-                           NULL,
-                           vsfy,
-                           num_categories_extern_Y,
-                           matrix_categorical_vals_extern_Y,
-                           NULL,
-                           mean,
-                           NULL, // no permutations
-                           kwy);
+      // compute y weights first
+      kernel_weighted_sum_np(KERNEL_den,
+                             KERNEL_unordered_den,
+                             KERNEL_ordered_den,
+                             BANDWIDTH_den,
+                             num_obs_train,
+                             num_obs_eval,
+                             num_var_unordered,
+                             num_var_ordered,
+                             num_var_continuous,
+                             0,
+                             1,
+                             0,
+                             0,
+                             0,
+                             0,
+                             0,
+                             0,
+                             y_operator,
+                             OP_NOOP, // no permutations
+                             0, // no score
+                             0, // no ocg
+                             0, // don't explicity suppress parallel
+                             0,
+                             0,
+                             matrix_Y_unordered_train,
+                             matrix_Y_ordered_train,
+                             matrix_Y_continuous_train,
+                             matrix_Y_unordered_eval,
+                             matrix_Y_ordered_eval,
+                             matrix_Y_continuous_eval,
+                             NULL,
+                             NULL,
+                             NULL,
+                             vsfy,
+                             num_categories_extern_Y,
+                             matrix_categorical_vals_extern_Y,
+                             NULL,
+                             mean,
+                             NULL, // no permutations
+                             kwy);
 
+      kernel_weighted_sum_np(KERNEL_reg,
+                             KERNEL_unordered_reg,
+                             KERNEL_ordered_reg,
+                             BANDWIDTH_den,
+                             num_obs_train,
+                             num_obs_train,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             num_reg_continuous,
+                             1, // compute the leave-one-out marginals
+                             1,
+                             0,
+                             0,
+                             0,
+                             0,
+                             0,
+                             0,
+                             x_operator,
+                             OP_NOOP, // no permutations
+                             0, // no score
+                             0, // no ocg
+                             0, // don't explicity suppress parallel
+                             0,
+                             0,
+                             matrix_X_unordered_train,
+                             matrix_X_ordered_train,
+                             matrix_X_continuous_train,
+                             matrix_X_unordered_train,
+                             matrix_X_ordered_train,
+                             matrix_X_continuous_train,
+                             NULL,
+                             NULL,
+                             NULL,
+                             vsfx,
+                             num_categories_extern_X,
+                             matrix_categorical_vals_extern_X,
+                             NULL,
+                             mean,
+                             NULL, // no permutations
+                             kwx);
+
+      for(i = is; i <= ie; i++){     
+        for(j = 0; j < num_obs_eval; j++){
+          indy = 1;
+          for(l = 0; l < num_var_ordered; l++){
+            indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
+          }
+          for(l = 0; l < num_var_continuous; l++){
+            indy *= (matrix_Y_continuous_train[l][i] <= matrix_Y_continuous_eval[l][j]);
+          }
+          if(BANDWIDTH_den != BW_ADAP_NN){
+            // leave-one-out joint density
+
+            xyj = 0.0;
+            for(l = 0; l < num_obs_train; l++)
+              xyj += kwy[j*num_obs_train+l]*kwx[i*num_obs_train+l];
+            xyj -= kwy[j*num_obs_train+i]*kwx[i*num_obs_train+i];
+
+            const double tvd = (indy - xyj/mean[i]);
+            *cv += tvd*tvd;
+          } else {
+            // leave-one-out joint density
+
+            xyj = 0.0;
+            for(l = 0; l < num_obs_train; l++)
+              xyj += kwy[l*num_obs_eval+j]*kwx[l*num_obs_train+i];
+            xyj -= kwy[i*num_obs_eval+j]*kwx[i*num_obs_train+i];
+
+            const double tvd = (indy - xyj/mean[i]);
+            *cv += tvd*tvd;
+          }
+
+        }
+      }
+
+#ifdef MPI2
+      MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
+#endif
+      *cv /= (double) num_obs_train*num_obs_eval;
+
+      free(kwx);
+      free(kwy);
+    } else {
+      error("slow ccdf cv not yet implemented!");
+    }
+  } else {
+
+    // need array to hold joint cdf/pdf
+
+    double * jmean = (double *)malloc(num_obs_eval_alloc*sizeof(double));
+
+    if(jmean == NULL)
+      error("failed to allocate jmean");
+
+    double ** matrix_XY_unordered_eval, ** matrix_XY_ordered_eval, ** matrix_XY_continuous_eval;
+
+    matrix_XY_continuous_eval = alloc_matd(num_obs_eval, num_all_cvar);
+    matrix_XY_unordered_eval = alloc_matd(num_obs_eval, num_all_uvar);
+    matrix_XY_ordered_eval = alloc_matd(num_obs_eval, num_all_ovar);
+
+    if(BANDWIDTH_reg_extern == BW_ADAP_NN)
+      itt = (int *)malloc(num_obs_eval*sizeof(int));
+
+    // estimate loo density of X
     kernel_weighted_sum_np(KERNEL_reg,
                            KERNEL_unordered_reg,
                            KERNEL_ordered_reg,
@@ -3835,7 +3973,7 @@ double *cv){
                            num_reg_continuous,
                            1, // compute the leave-one-out marginals
                            1,
-                           0,
+                           1,
                            0,
                            0,
                            0,
@@ -3863,55 +4001,135 @@ double *cv){
                            NULL,
                            mean,
                            NULL, // no permutations
-                           kwx);
+                           NULL);
 
-    for(i = is; i <= ie; i++){     
+    kdt_swap = kdt_extern;
+    kdt_extern = kdt_extern_alt;
+
+    for(i = 0; i < num_obs_train; i++){     
+
+      for(l = 0; l < num_reg_unordered; l++)
+        for(j = 0; j < num_obs_eval; j++)
+          matrix_XY_unordered_eval[l][j] = matrix_X_unordered_train[l][i];
+
+      for(l = 0; l < num_var_unordered; l++)
+        for(j = 0; j < num_obs_eval; j++)
+          matrix_XY_unordered_eval[l+num_reg_unordered][j] = matrix_Y_unordered_eval[l][j];
+
+      for(l = 0; l < num_reg_ordered; l++)
+        for(j = 0; j < num_obs_eval; j++)
+          matrix_XY_ordered_eval[l][j] = matrix_X_ordered_train[l][i];
+
+      for(l = 0; l < num_var_ordered; l++)
+        for(j = 0; j < num_obs_eval; j++)
+          matrix_XY_ordered_eval[l+num_reg_ordered][j] = matrix_Y_ordered_eval[l][j];
+
+      for(l = 0; l < num_reg_continuous; l++)
+        for(j = 0; j < num_obs_eval; j++)
+          matrix_XY_continuous_eval[l][j] = matrix_X_continuous_train[l][i];
+
+      for(l = 0; l < num_var_continuous; l++)
+        for(j = 0; j < num_obs_eval; j++)
+          matrix_XY_continuous_eval[l+num_reg_continuous][j] = matrix_Y_continuous_eval[l][j];
+
+      if(BANDWIDTH_reg_extern == BW_ADAP_NN){
+        // if adaptive, build alt tree here
+        for(j = 0; j < num_obs_eval; j++){
+          itt[j] = j;
+        }
+
+        build_kdtree(matrix_XY_continuous_eval, num_obs_eval, num_all_cvar, 4*num_all_cvar, itt, &kdt_extern);
+
+        // since all the x's are the same, only need to reshuffle ys
+        for(l = 0; l < num_var_unordered; l++)
+          for(j = 0; j < num_obs_eval; j++)
+            matrix_XY_unordered_eval[l+num_reg_unordered][j] = matrix_Y_unordered_eval[l][itt[j]];
+
+        for(l = 0; l < num_var_ordered; l++)
+          for(j = 0; j < num_obs_eval; j++)
+            matrix_XY_ordered_eval[l+num_reg_ordered][j] = matrix_Y_ordered_eval[l][itt[j]];
+
+        for(l = 0; l < num_var_continuous; l++)
+          for(j = 0; j < num_obs_eval; j++)
+            matrix_XY_continuous_eval[l+num_reg_continuous][j] = matrix_Y_continuous_eval[l][itt[j]];
+        // ta-da!
+      }
+
+      // estimate loo cdf + pdf of xy
+      kernel_weighted_sum_np(KERNEL_reg,
+                             KERNEL_unordered_reg,
+                             KERNEL_ordered_reg,
+                             BANDWIDTH_den,
+                             num_obs_train,
+                             num_obs_eval,
+                             num_all_uvar,
+                             num_all_ovar,
+                             num_all_cvar,
+                             0, 
+                             1,
+                             1,
+                             0,
+                             0,
+                             0,
+                             1,// omit ith obs from training data
+                             ipt_lookup_extern[ipt_extern[i]],
+                             xy_operator,
+                             OP_NOOP, // no permutations
+                             0, // no score
+                             0, // no ocg
+                             0, // don't explicity suppress parallel
+                             0, 
+                             0,
+                             matrix_XY_unordered_train,
+                             matrix_XY_ordered_train,
+                             matrix_XY_continuous_train,
+                             matrix_XY_unordered_eval,
+                             matrix_XY_ordered_eval,
+                             matrix_XY_continuous_eval,
+                             NULL,
+                             NULL,
+                             NULL,
+                             vsfxy,
+                             num_categories_extern_XY,
+                             matrix_categorical_vals_extern_XY,
+                             NULL,
+                             jmean,
+                             NULL, // no permutations
+                             NULL);
+
+      if(BANDWIDTH_reg_extern == BW_ADAP_NN)
+        free_kdtree(&kdt_extern);
+
       for(j = 0; j < num_obs_eval; j++){
         indy = 1;
-        for(l = 0; l < num_var_ordered; l++){
+        for(l = 0; (l < num_var_ordered) && (indy != 0); l++){
           indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
         }
-        for(l = 0; l < num_var_continuous; l++){
+        for(l = 0; (l < num_var_continuous) && (indy != 0); l++){
           indy *= (matrix_Y_continuous_train[l][i] <= matrix_Y_continuous_eval[l][j]);
         }
-        if(BANDWIDTH_den != BW_ADAP_NN){
-          // leave-one-out joint density
 
-          xyj = 0.0;
-          for(l = 0; l < num_obs_train; l++)
-            xyj += kwy[j*num_obs_train+l]*kwx[i*num_obs_train+l];
-          xyj -= kwy[j*num_obs_train+i]*kwx[i*num_obs_train+i];
-
-          const double tvd = (indy - xyj/mean[i]);
-          *cv += tvd*tvd;
-        } else {
-          // leave-one-out joint density
-
-          xyj = 0.0;
-          for(l = 0; l < num_obs_train; l++)
-            xyj += kwy[l*num_obs_eval+j]*kwx[l*num_obs_train+i];
-          xyj -= kwy[i*num_obs_eval+j]*kwx[i*num_obs_train+i];
-
-          const double tvd = (indy - xyj/mean[i]);
-          *cv += tvd*tvd;
-        }
-
+        const double tvd = (indy - jmean[j]/mean[i]);
+        *cv += tvd*tvd;
       }
     }
 
-#ifdef MPI2
-    MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
-#endif
+    kdt_extern = kdt_swap;
+
     *cv /= (double) num_obs_train*num_obs_eval;
 
-    free(kwx);
-    free(kwy);
-  } else {
-    error("slow ccdf cv not yet implemented!");
+    if(BANDWIDTH_reg_extern == BW_ADAP_NN)
+      free(itt);
+
+    free(jmean);
+    free_mat(matrix_XY_continuous_eval, num_all_cvar);
+    free_mat(matrix_XY_unordered_eval, num_all_uvar);
+    free_mat(matrix_XY_ordered_eval, num_all_ovar);
   }
 
   free(x_operator);
   free(y_operator);
+  free(xy_operator);
   free(mean);
 
   return(0);
