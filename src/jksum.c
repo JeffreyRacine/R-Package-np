@@ -145,8 +145,9 @@ extern int * ipt_extern_X;
 extern int * ipt_extern_Y;
 extern int * ipt_extern_XY;
 
-extern int * ipt_lookup_extern;
-extern int * ipt_lookup_extern_alt;
+extern int * ipt_lookup_extern_X;
+extern int * ipt_lookup_extern_Y;
+extern int * ipt_lookup_extern_XY;
 
 extern int *num_categories_extern_XY;
 extern int *num_categories_extern_X;
@@ -4083,7 +4084,7 @@ double *cv){
                              0,
                              0,
                              1,// omit ith obs from training data
-                             ipt_lookup_extern[ipt_extern_X[i]],
+                             ipt_lookup_extern_XY[ipt_extern_X[i]],
                              xy_operator,
                              OP_NOOP, // no permutations
                              0, // no score
@@ -5466,12 +5467,9 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL, // no permutations
                          NULL); // do not return kernel weights
   
-  // this is a bug
   for(i = 0, *cv = 0.0; i < num_obs; i++){
-    const double rho = rhon[ipt_extern_XY[i]]/rhod[ipt_extern_X[i]];
-    *cv -= (rho < DBL_MIN) ? log_DBL_MIN : log(rho);
+    *cv -= log(rhon[i]) - log(rhod[i]);
   }
-  
 
   free(operator);
   free(rhon);

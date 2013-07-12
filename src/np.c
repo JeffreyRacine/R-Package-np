@@ -118,8 +118,9 @@ int * ipt_extern_X;
 int * ipt_extern_Y;
 int * ipt_extern_XY;
 
-int * ipt_lookup_extern;
-int * ipt_lookup_extern_alt;
+int * ipt_lookup_extern_X;
+int * ipt_lookup_extern_Y;
+int * ipt_lookup_extern_XY;
 
 /* Quantile - no Y ordered or unordered used, but defined anyways */
 
@@ -2036,7 +2037,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       ipt_lookup[ipt_alt[i]] = i;
     }
     
-    ipt_lookup_extern = ipt_lookup;
+    ipt_lookup_extern_XY = ipt_lookup;
   }
 
   determine_categorical_vals(
