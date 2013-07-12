@@ -1,3 +1,6 @@
+#ifndef KDT_INCLUDED
+#define KDT_INCLUDED
+
 #define KD_NOCHILD -1
 
 #define KD_MISS 0
@@ -33,3 +36,4 @@ int build_tree(double ** p, KDT * kdt, int * ip, int node, int d, int nlev, int 
 void free_kdtree(KDT ** kdt);
 int boxIntersect(double * bbs, double * bbb, int ndim);
 void boxSearch(KDT * kdt, int node, double * bb, NL * nl);
+#endif

@@ -7,6 +7,8 @@
 #include <float.h>
 #include <time.h>
 
+#include "tree.h"
+
 #define MAX_OBS INT_MAX
 #define MAX_REG 100                               /* Allows flexibility while trapping error... */
 #define VERSION 1.1
@@ -14,6 +16,7 @@
 #ifndef M_PI
 #define M_PI        3.14159265358979323846
 #endif
+
 
 /* SUNOS does not have ANSI difftime(), so create a workaround */
 
@@ -197,7 +200,7 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor);
 int unique(int num_obs, double *x);
 void spinner(int num);
 
-int kernel_weighted_sum_np(const int KERNEL_reg, const int KERNEL_unordered_reg, const int KERNEL_ordered_reg, const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const int leave_one_out, const int kernel_pow, const int bandwidth_divide, const int do_smooth_coef_weights, const int symmetric, const int gather_scatter, const int drop_one_train, const int drop_which_train, const int * const operator, const int permutation_operator, const int do_score, const int do_ocg, const int suppress_parallel, const int ncol_Y, const int ncol_W, double ** matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double ** matrix_Y, double ** matrix_W, double * sgn, double *vector_scale_factor,int *num_categories,double ** matrix_categorical_vals, int ** matrix_ordered_indices, double * const restrict weighted_sum,  double * const restrict weighted_permutation_sum, double * const restrict kw);
+int kernel_weighted_sum_np(const int KERNEL_reg, const int KERNEL_unordered_reg, const int KERNEL_ordered_reg, const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const int leave_one_out, const int kernel_pow, const int bandwidth_divide, const int do_smooth_coef_weights, const int symmetric, const int gather_scatter, const int drop_one_train, const int drop_which_train, const int * const operator, const int permutation_operator, const int do_score, const int do_ocg, const int suppress_parallel, const int ncol_Y, const int ncol_W, const int int_TREE, KDT * const kdt, double ** matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double ** matrix_Y, double ** matrix_W, double * sgn, double *vector_scale_factor,int *num_categories,double ** matrix_categorical_vals, int ** matrix_ordered_indices, double * const restrict weighted_sum,  double * const restrict weighted_permutation_sum, double * const restrict kw);
 
 int kernel_convolution_weighted_sum(int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *kernel_sum);
 
@@ -263,6 +266,8 @@ void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordere
 #define OP_CONVOLUTION 1
 #define OP_DERIVATIVE  2
 #define OP_INTEGRAL    3
+
+#define NP_NTREE 3
 
 #define NP_TREE_FALSE 0
 #define NP_TREE_TRUE  1
