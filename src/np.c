@@ -1904,28 +1904,38 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
   num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
 
-  // tree 1 is for the training xi
-  // tree 2 (alt) is for xy
+  // we need 3 trees to accelerate ccdf :)
 
   ipt_X = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_X != NULL))
     error("!(ipt_X != NULL)");
 
+  ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
+  if(!(ipt_lookup_X != NULL))
+    error("!(ipt_lookup_X != NULL)");
+
   for(i = 0; i < num_obs_train_extern; i++){
-    ipt_X[i] = i;
+    ipt_lookup_X[i] = ipt_X[i] = i;
   }
 
   ipt_extern_X = ipt_X;
+  ipt_lookup_extern_X = ipt_lookup_X;
+
 
   ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_Y != NULL))
     error("!(ipt_Y != NULL)");
 
+  ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
+  if(!(ipt_lookup_Y != NULL))
+    error("!(ipt_lookup_Y != NULL)");
+
   for(i = 0; i < num_obs_train_extern; i++){
-    ipt_Y[i] = i;
+    ipt_lookup_Y[i] = ipt_Y[i] = i;
   }
 
   ipt_extern_Y = ipt_Y;
+  ipt_lookup_extern_Y = ipt_lookup_Y;
 
   num_obs_alt = (BANDWIDTH_reg_extern != BW_ADAP_NN) ? num_obs_train_extern : num_obs_eval_extern;
 
@@ -1933,11 +1943,16 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   if(!(ipt_XY != NULL))
     error("!(ipt_XY != NULL)");
 
+  ipt_lookup_XY = (int *)malloc(num_obs_alt*sizeof(int));
+  if(!(ipt_lookup_XY != NULL))
+    error("!(ipt_lookup_XY != NULL)");
+
   for(i = 0; i < num_obs_alt; i++){
-    ipt_XY[i] = i;
+    ipt_lookup_XY[i] = ipt_XY[i] = i;
   }
 
   ipt_extern_XY = ipt_XY;
+  ipt_lookup_extern_XY = ipt_lookup_XY;
 
   int_TREE_XY = int_TREE_XY && (((num_all_cvar) != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
 
@@ -1963,15 +1978,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       for( i=0;i<num_obs_train_extern;i++ )
         matrix_X_continuous_train_extern[j][i]=u_con[j*num_obs_train_extern+ipt_X[i]];
 
-    ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
-    if(!(ipt_lookup_X != NULL))
-      error("!(ipt_lookup_X != NULL)");
-
     for(i = 0; i < num_obs_train_extern; i++){
       ipt_lookup_X[ipt_X[i]] = i;
     }
-    
-    ipt_lookup_extern_X = ipt_lookup_X;
 
   }
 
@@ -1993,15 +2002,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       for(i=0;i<num_obs_train_extern;i++)
         matrix_Y_continuous_train_extern[j][i]=c_con[j*num_obs_train_extern+ipt_Y[i]];
 
-    ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
-    if(!(ipt_lookup_Y != NULL))
-      error("!(ipt_lookup_Y != NULL)");
-
     for(i = 0; i < num_obs_train_extern; i++){
       ipt_lookup_Y[ipt_Y[i]] = i;
     }
     
-    ipt_lookup_extern_Y = ipt_lookup_Y;
   }
 
   matrix_XY_continuous_train_extern_alt = alloc_matd(num_obs_alt, num_all_cvar);
@@ -2066,15 +2070,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       for(i = 0; i < num_obs_train_extern; i++)
         matrix_XY_continuous_train_extern_alt[j][i]=c_con[(j-num_reg_continuous_extern)*num_obs_train_extern+ipt_XY[i]];
 
-    ipt_lookup_XY = (int *)malloc(num_obs_train_extern*sizeof(int));
-    if(!(ipt_lookup_XY != NULL))
-      error("!(ipt_lookup_XY != NULL)");
-
     for(i = 0; i < num_obs_train_extern; i++){
       ipt_lookup_XY[ipt_XY[i]] = i;
     }
     
-    ipt_lookup_extern_XY = ipt_lookup_XY;
   }
 
   determine_categorical_vals(
