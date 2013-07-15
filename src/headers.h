@@ -227,6 +227,8 @@ int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERN
 
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 
+void np_kernelxy(const int kernel_var_continuous, const int kernel_var_unordered, const int kernel_var_ordered, const int kernel_reg_continuous, const int kernel_reg_unordered, const int kernel_reg_ordered, const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, double * kernel_cx, double * kernel_ux, double * kernel_ox, double * kernel_cy, double * kernel_uy, double * kernel_oy, double * kernel_cxy, double * kernel_uxy, double * kernel_oxy);
+
 // some general np and R-c interface related defines
 #define safe_free(x) if((x) != NULL) free((x))
 

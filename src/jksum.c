@@ -5880,3 +5880,83 @@ void np_splitxy_vsf_mcv_nc(const int num_var_unordered,
     }    
   }
 }
+
+void np_kernelxy(const int kernel_var_continuous,
+                 const int kernel_var_unordered,
+                 const int kernel_var_ordered,
+                 const int kernel_reg_continuous,
+                 const int kernel_reg_unordered,
+                 const int kernel_reg_ordered,
+                 const int num_var_unordered,
+                 const int num_var_ordered,
+                 const int num_var_continuous,
+                 const int num_reg_unordered,
+                 const int num_reg_ordered,
+                 const int num_reg_continuous,
+                 double * kernel_cx,
+                 double * kernel_ux,
+                 double * kernel_ox,
+                 double * kernel_cy,
+                 double * kernel_uy,
+                 double * kernel_oy,
+                 double * kernel_cxy,
+                 double * kernel_uxy,
+                 double * kernel_oxy){
+
+  const int num_cvar = num_var_continuous + num_reg_continuous;
+  const int num_uvar = num_var_unordered + num_reg_unordered;
+  const int num_ovar = num_var_ordered + num_reg_ordered;
+
+  int i;
+  // x data
+  
+  if(kernel_cx != NULL)
+    for(i = 0; i < num_reg_continuous; i++)
+      kernel_cx[i] = kernel_reg_continuous;
+
+  if(kernel_ux != NULL)
+    for(i = 0; i < num_reg_unordered; i++)
+      kernel_ux[i] = kernel_reg_unordered;
+
+  if(kernel_ox != NULL)
+    for(i = 0; i < num_reg_ordered; i++)
+      kernel_ox[i] = kernel_reg_ordered;
+
+  // y data
+  if(kernel_cy != NULL)
+    for(i = 0; i < num_var_continuous; i++)
+      kernel_cy[i] = kernel_var_continuous;
+
+  if(kernel_uy != NULL)
+    for(i = 0; i < num_var_unordered; i++)
+      kernel_uy[i] = kernel_var_unordered;
+
+  if(kernel_oy != NULL)
+    for(i = 0; i < num_var_ordered; i++)
+      kernel_oy[i] = kernel_var_ordered;
+  
+  // xy data
+  if(kernel_cxy != NULL){
+    for(i = 0; i < num_reg_continuous; i++)
+      kernel_cxy[i] = kernel_reg_continuous;
+
+    for(i = num_reg_continuous; i < num_cvar; i++)
+      kernel_cxy[i] = kernel_var_continuous;
+  }
+
+  if(kernel_uxy != NULL){
+    for(i = 0; i < num_reg_unordered; i++)
+      kernel_uxy[i] = kernel_reg_unordered;
+
+    for(i = num_reg_unordered; i < num_uvar; i++)
+      kernel_uxy[i] = kernel_var_unordered;
+  }
+
+  if(kernel_oxy != NULL){
+    for(i = 0; i < num_reg_ordered; i++)
+      kernel_oxy[i] = kernel_reg_ordered;
+
+    for(i = num_reg_ordered; i < num_ovar; i++)
+      kernel_oxy[i] = kernel_var_ordered;
+  }
+}
