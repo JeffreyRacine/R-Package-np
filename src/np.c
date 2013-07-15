@@ -4103,6 +4103,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   int ncol_Y, ncol_W;
 
+  int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
+
   /* match integer options with their globals */
 
   num_reg_continuous_extern = myopti[KWS_NCONI];
@@ -4353,9 +4355,25 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
   }
   
-  kernel_weighted_sum_np(KERNEL_reg_extern,
-                         KERNEL_reg_unordered_extern,
-                         KERNEL_reg_ordered_extern,
+  kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous_extern);
+
+  for(i = 0; i < num_reg_continuous_extern; i++)
+    kernel_c[i] = KERNEL_reg_extern;
+
+  kernel_u = (int *)malloc(sizeof(int)*num_reg_unordered_extern);
+
+  for(i = 0; i < num_reg_unordered_extern; i++)
+    kernel_u[i] = KERNEL_reg_unordered_extern;
+
+  kernel_o = (int *)malloc(sizeof(int)*num_reg_ordered_extern);
+
+  for(i = 0; i < num_reg_ordered_extern; i++)
+    kernel_o[i] = KERNEL_reg_ordered_extern;
+
+
+  kernel_weighted_sum_np(kernel_c,
+                         kernel_u,
+                         kernel_o,
                          BANDWIDTH_reg_extern,
                          num_obs_train_extern,
                          num_obs_eval_extern,
@@ -4446,6 +4464,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   safe_free(ksum);
 
   safe_free(ipt);
+
+  free(kernel_c);
+  free(kernel_u);
+  free(kernel_o);
 
   if(!train_is_eval)
     safe_free(ipe);
