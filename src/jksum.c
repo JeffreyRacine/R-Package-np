@@ -1807,9 +1807,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 // this will be fixed by using the mpi*v functions
 
 int kernel_weighted_sum_np(
-const int * const KERNEL_reg,
-const int * const KERNEL_unordered_reg,
-const int * const KERNEL_ordered_reg,
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
 const int BANDWIDTH_reg,
 const int num_obs_train,
 const int num_obs_eval,
@@ -2278,7 +2278,7 @@ double * const kw){
         if(p_nvar == 0){
           np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, kdt, pnl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], permutation_kernel[i], ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, kdt, pnl, p_pnl+ip, swap_xxt, do_perm, do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, kdt, pnl, p_pnl+ip, swap_xxt, do_perm, do_score);
         }
       }
       else
