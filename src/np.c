@@ -799,7 +799,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE_X == NP_TREE_TRUE){
-    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+    if((BANDWIDTH_reg_extern != BW_ADAP_NN) || ((BANDWIDTH_reg_extern == BW_ADAP_NN) && cdfontrain)){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern_X);
 
@@ -3063,7 +3063,7 @@ void np_density(double * tuno, double * tord, double * tcon,
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE_X == NP_TREE_TRUE){
-    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+    if((BANDWIDTH_reg_extern != BW_ADAP_NN) || ((BANDWIDTH_reg_extern == BW_ADAP_NN) && train_is_eval)){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern_X);
 
@@ -3824,7 +3824,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE_X == NP_TREE_TRUE){
-    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+    if((BANDWIDTH_reg_extern != BW_ADAP_NN) || ((BANDWIDTH_reg_extern == BW_ADAP_NN) && train_is_eval)){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern_X);
 
@@ -4216,6 +4216,19 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     for( i = 0; i < num_obs_train_extern; i++ )
       matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+i];
 
+  if(!train_is_eval){
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_eval_extern;i++ )
+        matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+i];
+
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_eval_extern;i++ )
+        matrix_X_ordered_eval_extern[j][i]=eord[j*num_obs_eval_extern+i];
+
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_eval_extern;i++ )
+        matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+i];
+  }
 
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt != NULL))
@@ -4241,7 +4254,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE_X == NP_TREE_TRUE){
-    if(BANDWIDTH_reg_extern != BW_ADAP_NN){
+    if((BANDWIDTH_reg_extern != BW_ADAP_NN) || ((BANDWIDTH_reg_extern == BW_ADAP_NN) && train_is_eval)){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern_X);
 
