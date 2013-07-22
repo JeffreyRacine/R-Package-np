@@ -238,7 +238,8 @@ npcdistbw.condbandwidth <-
         xncon = dim(xcon)[2],
         auto = auto,
         fast.cdf = fast.cdf,
-        cdf_on_train = cdf_on_train)
+        cdf_on_train = cdf_on_train,
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
       myoptd = list(ftol=ftol, tol=tol, small=small)
 
