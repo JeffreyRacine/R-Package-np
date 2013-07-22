@@ -569,4 +569,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define TG2_K22   8
 #define TG2_KM    9
 
+#define KWSNP_ERR_NOEVAL 1
+#define KWSNP_ERR_BADBW 2
+#define KWSNP_ERR_BADINVOC 3
 #endif // _NP__

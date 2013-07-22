@@ -4104,6 +4104,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
+  int npks_err = 0;
+
   /* match integer options with their globals */
 
   num_reg_continuous_extern = myopti[KWS_NCONI];
@@ -4382,79 +4384,82 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   for(i = 0; i < num_reg_ordered_extern; i++)
     kernel_o[i] = KERNEL_reg_ordered_extern;
 
-
-  kernel_weighted_sum_np(kernel_c,
-                         kernel_u,
-                         kernel_o,
-                         BANDWIDTH_reg_extern,
-                         num_obs_train_extern,
-                         num_obs_eval_extern,
-                         num_reg_unordered_extern,
-                         num_reg_ordered_extern,
-                         num_reg_continuous_extern,
-                         leave_one_out,
-                         (int)(*kpow),
-                         do_divide_bw,
-                         do_smooth_coef_weights,
-                         0, //not symmetric
-                         0, //disable 'twisting'
-                         0, // do not drop train
-                         0, // do not drop train
-                         operator,
-                         p_operator,
-                         do_score,
-                         do_ocg, // no ocg (for now)
-                         0, // don't explicity suppress parallel
-                         ncol_Y,
-                         ncol_W,
-                         int_TREE_X,
-                         kdt_extern_X,
-                         matrix_X_unordered_train_extern,
-                         matrix_X_ordered_train_extern,
-                         matrix_X_continuous_train_extern,
-                         matrix_X_unordered_eval_extern,
-                         matrix_X_ordered_eval_extern,
-                         matrix_X_continuous_eval_extern,
-                         /* ys matrix */
-                         matrix_Y_continuous_train_extern,
-                         /* weights matrix */
-                         matrix_Y_ordered_train_extern,
-                         NULL,
-                         &vector_scale_factor[1],
-                         num_categories_extern,
-                         matrix_categorical_vals_extern,
-                         matrix_ordered_indices,
-                         ksum,
-                         p_ksum,
-                         kw);
-
-
-  for(j = 0; j < num_obs_eval_extern; j++)
-    for(i = 0; i < sum_element_length; i++)
-      weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
-
-  if(return_kernel_weights){
-    if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
-      for(j = 0; j < num_obs_eval_extern; j++)
-        for(i = 0; i < num_obs_train_extern; i++)
-          kernel_weights[ipe[j]*num_obs_train_extern + ipt[i]] = kw[j*num_obs_train_extern + i];
-    } else {
-      for(j = 0; j < num_obs_train_extern; j++)
-        for(i = 0; i < num_obs_eval_extern; i++)
-          kernel_weights[ipe[i]*num_obs_train_extern + ipt[j]] = kw[j*num_obs_eval_extern + i];      
-    }
-    safe_free(kw);
+  
+  if((npks_err=kernel_weighted_sum_np(kernel_c,
+                                      kernel_u,
+                                      kernel_o,
+                                      BANDWIDTH_reg_extern,
+                                      num_obs_train_extern,
+                                      num_obs_eval_extern,
+                                      num_reg_unordered_extern,
+                                      num_reg_ordered_extern,
+                                      num_reg_continuous_extern,
+                                      leave_one_out,
+                                      (int)(*kpow),
+                                      do_divide_bw,
+                                      do_smooth_coef_weights,
+                                      0, //not symmetric
+                                      0, //disable 'twisting'
+                                      0, // do not drop train
+                                      0, // do not drop train
+                                      operator,
+                                      p_operator,
+                                      do_score,
+                                      do_ocg, // no ocg (for now)
+                                      0, // don't explicity suppress parallel
+                                      ncol_Y,
+                                      ncol_W,
+                                      int_TREE_X,
+                                      kdt_extern_X,
+                                      matrix_X_unordered_train_extern,
+                                      matrix_X_ordered_train_extern,
+                                      matrix_X_continuous_train_extern,
+                                      matrix_X_unordered_eval_extern,
+                                      matrix_X_ordered_eval_extern,
+                                      matrix_X_continuous_eval_extern,
+                                      /* ys matrix */
+                                      matrix_Y_continuous_train_extern,
+                                      /* weights matrix */
+                                      matrix_Y_ordered_train_extern,
+                                      NULL,
+                                      &vector_scale_factor[1],
+                                      num_categories_extern,
+                                      matrix_categorical_vals_extern,
+                                      matrix_ordered_indices,
+                                      ksum,
+                                      p_ksum,
+                                      kw)) == 1){
+    Rprintf("kernel_weighted_sum_np has reported an error, probably due to invalid bandwidths\n");
   }
 
-  if(p_nvar > 0){
-    for(k = 0; k < p_nvar; k++){
-      const int kidx = k*num_obs_eval_extern*sum_element_length;
-      for(j = 0; j < num_obs_eval_extern; j++)
-        for(i = 0; i < sum_element_length; i++)
-          weighted_p_sum[kidx + ipe[j]*sum_element_length + i] = p_ksum[kidx + j*sum_element_length + i];
-    }
-  }
 
+  if(!npks_err){
+    for(j = 0; j < num_obs_eval_extern; j++)
+      for(i = 0; i < sum_element_length; i++)
+        weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
+
+    if(return_kernel_weights){
+      if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
+        for(j = 0; j < num_obs_eval_extern; j++)
+          for(i = 0; i < num_obs_train_extern; i++)
+            kernel_weights[ipe[j]*num_obs_train_extern + ipt[i]] = kw[j*num_obs_train_extern + i];
+      } else {
+        for(j = 0; j < num_obs_train_extern; j++)
+          for(i = 0; i < num_obs_eval_extern; i++)
+            kernel_weights[ipe[i]*num_obs_train_extern + ipt[j]] = kw[j*num_obs_eval_extern + i];      
+      }
+    }
+
+    if(p_nvar > 0){
+      for(k = 0; k < p_nvar; k++){
+        const int kidx = k*num_obs_eval_extern*sum_element_length;
+        for(j = 0; j < num_obs_eval_extern; j++)
+          for(i = 0; i < sum_element_length; i++)
+            weighted_p_sum[kidx + ipe[j]*sum_element_length + i] = p_ksum[kidx + j*sum_element_length + i];
+      }
+    }
+
+  }
   /* clean up */
 
   free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
@@ -4474,6 +4479,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
   safe_free(ksum);
+
+  safe_free(kw);
 
   safe_free(ipt);
 

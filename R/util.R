@@ -176,6 +176,54 @@ validateBandwidth <- function(bws){
   invisible(vbl)
 }
 
+validateBandwidthTF <- function(bws){
+  vari <- names(bws$bandwidth)
+  bchecker <- function(j){
+    v <- vari[j]
+    dati <- bws$dati[[v]]
+    bwv <- bws$bandwidth[[j]]
+
+    if(length(bwv) != length(dati$iord))
+      return(FALSE)
+
+    cd <- function(a,b){
+      (a-b)/(a+b+.Machine$double.eps) > 5.0*.Machine$double.eps
+    }
+    
+    vb <- sapply(1:length(bwv), function(i){
+      falg <- (bwv[i] < 0)
+
+      if (dati$icon[i]) {
+        if(bws$type == "fixed") {
+          if(falg || (!is.finite(bwv[i]))){
+            return(FALSE)
+          }
+        } else if((bwv[i] < 1) || (!is.finite(bwv[i]))) {
+          return(FALSE)
+        }
+      }
+      
+      if (dati$iord[i] &&
+          (falg || cd(bwv[i],oMaxL(dati$all.nlev[[i]],
+                         kertype = bws$klist[[v]]$okertype)))){
+        return(FALSE)
+      }
+      
+      if (dati$iuno[i] &&
+          (falg || cd(bwv[i],uMaxL(dati$all.nlev[[i]],
+                         kertype = bws$klist[[v]]$ukertype)))){
+        return(FALSE)
+      }
+      return(TRUE)
+    })
+    
+    return(all(vb))
+  }
+  vbl <- all(unlist(lapply(1:length(vari), bchecker)))
+  return(vbl)
+}
+
+
 explodeFormula <- function(formula){
   res <- strsplit(strsplit(paste(deparse(formula), collapse=""),
                            " *[~] *")[[1]], " *[+] *")

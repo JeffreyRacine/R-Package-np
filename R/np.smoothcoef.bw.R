@@ -218,9 +218,11 @@ npscoefbw.scbandwidth <-
 
     if (bandwidth.compute){
       maxPenalty <- sqrt(.Machine$double.xmax)
-
       overall.cv.ls <- function(param) {
-        if (any(param < 0) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
+        sbw <- bws
+        sbw$bw <- param
+        sbw$bandwidth[[1]] <- param
+        if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
           return(maxPenalty)
         
         bws$bw <- param
@@ -276,7 +278,11 @@ npscoefbw.scbandwidth <-
                             'betas = TRUE)'))
       
       partial.cv.ls <- function(param, partial.index) {
-        if (any(param < 0) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
+        sbw <- bws
+        sbw$bw <- param
+        sbw$bandwidth[[1]] <- param
+
+        if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
           return(maxPenalty)
         
         if (backfit.iterate){

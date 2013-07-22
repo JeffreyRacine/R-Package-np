@@ -1951,7 +1951,7 @@ double * const kw){
     matrix_X_ordered_train:matrix_X_ordered_eval;
 
   if (num_obs_eval == 0) {
-    return(1);
+    return(KWSNP_ERR_NOEVAL);
   }
 
   do_psum = BANDWIDTH_reg == BW_ADAP_NN;
@@ -2041,7 +2041,7 @@ double * const kw){
     free_tmat(matrix_bandwidth);
     free(tprod);
 
-    return(1);
+    return(KWSNP_ERR_BADBW);
   }
 
   if((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution){ // need additional bandwidths 
@@ -2073,7 +2073,7 @@ double * const kw){
       free_tmat(matrix_eval_bandwidth);
       free(tprod);
 
-      return(1);
+      return(KWSNP_ERR_BADBW);
     }
 
   }
@@ -2083,7 +2083,7 @@ double * const kw){
     free(lambda);
     free_tmat(matrix_bandwidth);
     free(tprod);
-    return(1);
+    return(KWSNP_ERR_BADINVOC);
 
   }
 
@@ -2093,7 +2093,7 @@ double * const kw){
     free(lambda);
     free_tmat(matrix_bandwidth);
     free(tprod);
-    return(1);
+    return(KWSNP_ERR_BADINVOC);
   }
 
   if(!gather_scatter)
@@ -3794,6 +3794,9 @@ double *cv){
   const int num_all_uvar = num_reg_unordered + num_var_unordered;
   const int num_all_ovar = num_reg_ordered + num_var_ordered;
 
+  const int data_size = 3000000;
+  const int kwx_size = num_obs_train*num_obs_train;
+
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
 
   double vsfx[num_reg_tot];
@@ -3805,6 +3808,7 @@ double *cv){
   int num_obs_eval_alloc, num_obs_train_alloc;
 
   int * itt = NULL;
+
 
 #ifdef MPI2
   int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
