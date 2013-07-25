@@ -223,7 +223,7 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor);
 
 double np_kernel_estimate_distribution_ls_cv(int KERNEL_den,int KERNEL_den_unordered,int KERNEL_den_ordered,int BANDWIDTH_den,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous, int fast,double ** matrix_X_unordered_train,double ** matrix_X_ordered_train,double ** matrix_X_continuous_train,double ** matrix_X_unordered_eval,double ** matrix_X_ordered_eval,double ** matrix_X_continuous_eval,double * vsf,int * num_categories,double ** matrix_categorical_vals,double * cv);
 
-int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERNEL_den,int KERNEL_unordered_den,int KERNEL_ordered_den,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_den,int num_obs,int num_obs_eval,int num_var_unordered,int num_var_ordered,int num_var_continuous,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,int fast,double **matrix_Y_unordered_train,double **matrix_Y_ordered_train,double **matrix_Y_continuous_train,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_Y_unordered_eval,double **matrix_Y_ordered_eval,double **matrix_Y_continuous_eval,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *cv);
+int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERNEL_den,int KERNEL_unordered_den,int KERNEL_ordered_den,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_den,int num_obs,int num_obs_eval,int num_var_unordered,int num_var_ordered,int num_var_continuous,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,int fast,double memfac, double **matrix_Y_unordered_train,double **matrix_Y_ordered_train,double **matrix_Y_continuous_train,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_Y_unordered_eval,double **matrix_Y_ordered_eval,double **matrix_Y_continuous_eval,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *cv);
 
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 
@@ -443,6 +443,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CDBW_FTOLD  0
 #define CDBW_TOLD   1
 #define CDBW_SMALLD 2
+#define CDBW_MEMFACD 3
 
 #define CDBWM_CVLS 0
 

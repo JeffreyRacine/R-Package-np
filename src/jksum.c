@@ -3783,6 +3783,7 @@ int num_reg_unordered,
 int num_reg_ordered,
 int num_reg_continuous,
 int fast,
+double memfac,
 double **matrix_Y_unordered_train,
 double **matrix_Y_ordered_train,
 double **matrix_Y_continuous_train,
@@ -3810,7 +3811,7 @@ double *cv){
   const int num_all_uvar = num_reg_unordered + num_var_unordered;
   const int num_all_ovar = num_reg_ordered + num_var_ordered;
 
-  const int Nm = 300000;
+  const int Nm = (int)ceil(memfac*300000.0);
   
   int wx, wy, N, nwx, nwy;
 

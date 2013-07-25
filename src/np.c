@@ -151,6 +151,7 @@ int BANDWIDTH_den_extern;
 
 // cdf algorithm extern
 int int_fast_dls_extern = 1;
+double dbl_memfac_ccdf_extern = 1.0;
 
 /* Statics for dependence metric */
 
@@ -1803,6 +1804,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   ftol=myoptd[CDBW_FTOLD];
   tol=myoptd[CDBW_TOLD];
   small=myoptd[CDBW_SMALLD];
+  dbl_memfac_ccdf_extern = myoptd[CDBW_MEMFACD];
 
   int_fast_dls_extern = myopti[CDBW_FASTI];
 

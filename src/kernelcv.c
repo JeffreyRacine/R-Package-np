@@ -110,6 +110,7 @@ extern double **matrix_XY_ordered_eval_extern_alt;
 
 // cdf extern
 extern int int_fast_dls_extern;
+extern double dbl_memfac_ccdf_extern;
 #ifdef RCSID
 static char rcsid[] = "$Id: kernelcv.c,v 1.9 2006/11/02 16:56:49 tristen Exp $";
 #endif
@@ -398,6 +399,7 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
                                                                            num_reg_ordered_extern,
                                                                            num_reg_continuous_extern,
                                                                            int_fast_dls_extern,
+                                                                           dbl_memfac_ccdf_extern,
                                                                            matrix_Y_unordered_train_extern,
                                                                            matrix_Y_ordered_train_extern,
                                                                            matrix_Y_continuous_train_extern,
