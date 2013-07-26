@@ -4056,68 +4056,69 @@ double *cv){
                              NULL, // no permutations
                              kwx);
 
-      for(i = wxo; i < (wxo + dwx); i++){     
-        const int io = i - wxo;
-        for(iwy = 0; iwy < nwy; iwy++){
+      for(iwy = 0; iwy < nwy; iwy++){
 
-          const int wyo = iwy*wy;
-          const int dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
+        const int wyo = iwy*wy;
+        const int dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
 
-          for(l = 0; l < num_var_continuous; l++)
-            matrix_wY_continuous_eval[l] = matrix_Y_continuous_eval[l] + wyo;
+        for(l = 0; l < num_var_continuous; l++)
+          matrix_wY_continuous_eval[l] = matrix_Y_continuous_eval[l] + wyo;
 
-          for(l = 0; l < num_var_unordered; l++)
-            matrix_wY_unordered_eval[l] = matrix_Y_unordered_eval[l] + wyo;
+        for(l = 0; l < num_var_unordered; l++)
+          matrix_wY_unordered_eval[l] = matrix_Y_unordered_eval[l] + wyo;
 
-          for(l = 0; l < num_var_ordered; l++)
-            matrix_wY_ordered_eval[l] = matrix_Y_ordered_eval[l] + wyo;
+        for(l = 0; l < num_var_ordered; l++)
+          matrix_wY_ordered_eval[l] = matrix_Y_ordered_eval[l] + wyo;
 
-          // compute y weights first
-          kernel_weighted_sum_np(kernel_cy,
-                                 kernel_uy,
-                                 kernel_oy,
-                                 BANDWIDTH_den,
-                                 num_obs_train,
-                                 dwy,
-                                 num_var_unordered,
-                                 num_var_ordered,
-                                 num_var_continuous,
-                                 0,
-                                 0,
-                                 1,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 y_operator,
-                                 OP_NOOP, // no permutations
-                                 0, // no score
-                                 0, // no ocg
-                                 0, // don't explicity suppress parallel
-                                 0,
-                                 0,
-                                 int_TREE_Y,
-                                 kdt_extern_Y,
-                                 matrix_Y_unordered_train,
-                                 matrix_Y_ordered_train,
-                                 matrix_Y_continuous_train,
-                                 matrix_wY_unordered_eval,
-                                 matrix_wY_ordered_eval,
-                                 matrix_wY_continuous_eval,
-                                 NULL,
-                                 NULL,
-                                 NULL,
-                                 vsfy,
-                                 num_categories_extern_Y,
-                                 matrix_categorical_vals_extern_Y,
-                                 NULL,
-                                 NULL,
-                                 NULL, // no permutations
-                                 kwy);
+        // compute y weights first
+        kernel_weighted_sum_np(kernel_cy,
+                               kernel_uy,
+                               kernel_oy,
+                               BANDWIDTH_den,
+                               num_obs_train,
+                               dwy,
+                               num_var_unordered,
+                               num_var_ordered,
+                               num_var_continuous,
+                               0,
+                               0,
+                               1,
+                               0,
+                               0,
+                               0,
+                               0,
+                               0,
+                               0,
+                               y_operator,
+                               OP_NOOP, // no permutations
+                               0, // no score
+                               0, // no ocg
+                               0, // don't explicity suppress parallel
+                               0,
+                               0,
+                               int_TREE_Y,
+                               kdt_extern_Y,
+                               matrix_Y_unordered_train,
+                               matrix_Y_ordered_train,
+                               matrix_Y_continuous_train,
+                               matrix_wY_unordered_eval,
+                               matrix_wY_ordered_eval,
+                               matrix_wY_continuous_eval,
+                               NULL,
+                               NULL,
+                               NULL,
+                               vsfy,
+                               num_categories_extern_Y,
+                               matrix_categorical_vals_extern_Y,
+                               NULL,
+                               NULL,
+                               NULL, // no permutations
+                               kwy);
 
-          const int je_dwy = MIN(je,dwy);
+        const int je_dwy = MIN(je,dwy);
+
+        for(i = wxo; i < (wxo + dwx); i++){     
+          const int io = i - wxo;
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
             const int jo = j - wyo;
@@ -4257,85 +4258,86 @@ double *cv){
         }
       }
 
-      for(i = wxo; i < (wxo + dwx); i++){
-        const int io = i - wxo;
+      for(iwy = 0; iwy < nwy; iwy++){
+        const int wyo = iwy*wy;
+        const int dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
 
-        for(l = 0; l < num_reg_continuous; l++){
-          bb[2*l] = -cksup[KERNEL_XY[l]][1];
-          bb[2*l+1] = -cksup[KERNEL_XY[l]][0];
+        for(l = 0; l < num_var_continuous; l++)
+          matrix_wY_continuous_eval[l] = matrix_Y_continuous_eval[l] + wyo;
 
-          bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_X_continuous_train[l][i] + bb[2*l]*vsfxy[l]);
-          bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_X_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
+        for(l = 0; l < num_var_unordered; l++)
+          matrix_wY_unordered_eval[l] = matrix_Y_unordered_eval[l] + wyo;
+
+        for(l = 0; l < num_var_ordered; l++)
+          matrix_wY_ordered_eval[l] = matrix_Y_ordered_eval[l] + wyo;
+
+        // compute y weights first
+        kernel_weighted_sum_np(kernel_cy,
+                               kernel_uy,
+                               kernel_oy,
+                               BANDWIDTH_den,
+                               num_obs_train,
+                               dwy,
+                               num_var_unordered,
+                               num_var_ordered,
+                               num_var_continuous,
+                               0,
+                               0,
+                               1,
+                               0,
+                               0,
+                               0,
+                               0,
+                               0,
+                               0,
+                               y_operator,
+                               OP_NOOP, // no permutations
+                               0, // no score
+                               0, // no ocg
+                               0, // don't explicity suppress parallel
+                               0,
+                               0,
+                               int_TREE_Y,
+                               kdt_extern_Y,
+                               matrix_Y_unordered_train,
+                               matrix_Y_ordered_train,
+                               matrix_Y_continuous_train,
+                               matrix_wY_unordered_eval,
+                               matrix_wY_ordered_eval,
+                               matrix_wY_continuous_eval,
+                               NULL,
+                               NULL,
+                               NULL,
+                               vsfy,
+                               num_categories_extern_Y,
+                               matrix_categorical_vals_extern_Y,
+                               NULL,
+                               NULL,
+                               NULL, // no permutations
+                               kwy);
+
+        // put kwys into cols - xy, rows - y order
+        for(q = wyo; q < (wyo + dwy); q++){
+          const int qo = q - wyo;
+          for(p = 0; p < num_obs_train; p++)
+            kwys[qo*num_obs_train + p] = kwy[qo*num_obs_train + ipt_lookup_extern_Y[ipt_extern_XY[p]]];
         }
 
-        const double mi = mean[io] - kwx[io*num_obs_train + i];
+        const int je_dwy = MIN(je,dwy);
 
-        for(iwy = 0; iwy < nwy; iwy++){
-          const int wyo = iwy*wy;
-          const int dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
+        for(i = wxo; i < (wxo + dwx); i++){
+          const int io = i - wxo;
 
-          for(l = 0; l < num_var_continuous; l++)
-            matrix_wY_continuous_eval[l] = matrix_Y_continuous_eval[l] + wyo;
+          for(l = 0; l < num_reg_continuous; l++){
+            bb[2*l] = -cksup[KERNEL_XY[l]][1];
+            bb[2*l+1] = -cksup[KERNEL_XY[l]][0];
 
-          for(l = 0; l < num_var_unordered; l++)
-            matrix_wY_unordered_eval[l] = matrix_Y_unordered_eval[l] + wyo;
-
-          for(l = 0; l < num_var_ordered; l++)
-            matrix_wY_ordered_eval[l] = matrix_Y_ordered_eval[l] + wyo;
-
-          // compute y weights first
-          kernel_weighted_sum_np(kernel_cy,
-                                 kernel_uy,
-                                 kernel_oy,
-                                 BANDWIDTH_den,
-                                 num_obs_train,
-                                 dwy,
-                                 num_var_unordered,
-                                 num_var_ordered,
-                                 num_var_continuous,
-                                 0,
-                                 0,
-                                 1,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 0,
-                                 y_operator,
-                                 OP_NOOP, // no permutations
-                                 0, // no score
-                                 0, // no ocg
-                                 0, // don't explicity suppress parallel
-                                 0,
-                                 0,
-                                 int_TREE_Y,
-                                 kdt_extern_Y,
-                                 matrix_Y_unordered_train,
-                                 matrix_Y_ordered_train,
-                                 matrix_Y_continuous_train,
-                                 matrix_wY_unordered_eval,
-                                 matrix_wY_ordered_eval,
-                                 matrix_wY_continuous_eval,
-                                 NULL,
-                                 NULL,
-                                 NULL,
-                                 vsfy,
-                                 num_categories_extern_Y,
-                                 matrix_categorical_vals_extern_Y,
-                                 NULL,
-                                 NULL,
-                                 NULL, // no permutations
-                                 kwy);
-
-          // put kwys into cols - xy, rows - y order
-          for(q = wyo; q < (wyo + dwy); q++){
-            const int qo = q - wyo;
-            for(p = 0; p < num_obs_train; p++)
-              kwys[qo*num_obs_train + p] = kwy[qo*num_obs_train + ipt_lookup_extern_Y[ipt_extern_XY[p]]];
+            bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_X_continuous_train[l][i] + bb[2*l]*vsfxy[l]);
+            bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_X_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
           }
 
-          const int je_dwy = MIN(je,dwy);
+          const double mi = mean[io] - kwx[io*num_obs_train + i];
+
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
             const int jo = j - wyo;
