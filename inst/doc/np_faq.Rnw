@@ -507,6 +507,9 @@ To find the location of a demo type
 then you can take the source code for this demo and modify it for your
 particular application.
 
+You can also find examples and illustrations at the `Gallery' located
+at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
+
 \subsection{Is
     there a way to figure out roughly how long
     cross-validation will take on a large sample?}

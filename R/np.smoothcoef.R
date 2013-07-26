@@ -384,11 +384,7 @@ npscoef.scbandwidth <-
                          bws=bws,
                          leave.one.out=leave.one.out)$ksum
 
-          ## This iteration is `finicky' and using NZD leads to
-          ## non-convergence
-
-          coef.mat[j,] <- twww[1,2,]/
-            (ifelse(twww[2,2,]>=0, 1, -1)*max(.Machine$double.eps,abs(twww[2,2,])))
+          coef.mat[j,] <- twww[1,2,]/NZD(twww[2,2,])
 
           ## estimate new full residuals
           resid <- partial - W[,j] * coef.mat[j,]
