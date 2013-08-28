@@ -1137,7 +1137,7 @@ npregiv <- function(y,
   
   if(is.null(zeval)) zeval <- z
   if(is.null(weval)) weval <- w
-  if(is.null(weval)) xeval <- x
+  if(is.null(xeval)) xeval <- x
 
   ## Need to determine how many x, w, z are numeric
 
