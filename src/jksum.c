@@ -3837,6 +3837,10 @@ double *cv){
 
   int * itt = NULL;
 
+  //static int fcount = 0;
+  //fcount++;
+  //Rprintf("fcount %d: ", fcount);
+
   // blocking algo calculations
   N = num_obs_train*num_obs_train + num_obs_eval*num_obs_train + num_obs_train + (num_obs_train + num_obs_eval)*num_obs_train;
 
