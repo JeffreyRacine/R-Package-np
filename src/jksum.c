@@ -3812,7 +3812,7 @@ double *cv){
   const int num_all_ovar = num_reg_ordered + num_var_ordered;
 
   const int Nm = (int)ceil(memfac*300000.0);
-  
+
   int wx, wy, N, nwx, nwy;
 
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
@@ -3837,6 +3837,10 @@ double *cv){
 
   int * itt = NULL;
 
+  //static int fcount = 0;
+  //fcount++;
+  //Rprintf("fcount %d: ", fcount);
+
   // blocking algo calculations
   N = num_obs_train*num_obs_train + num_obs_eval*num_obs_train + num_obs_train + (num_obs_train + num_obs_eval)*num_obs_train;
 
@@ -3853,7 +3857,11 @@ double *cv){
     nwy = 1;
   }
 
-  //Rprintf("ntrain: %d\t wx: %d\nneval: %d\t wy: %d\n", num_obs_train, wx, num_obs_eval, wy);
+  static int dbg = 0;
+  if (0 == dbg){
+    Rprintf("ntrain: %d\t wx: %d\nneval: %d\t wy: %d\n", num_obs_train, wx, num_obs_eval, wy);
+    dbg = 1;
+  }
 #ifdef MPI2
   int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
@@ -4145,7 +4153,7 @@ double *cv){
               xyj -= kwy[io*num_obs_eval+jo]*kwx[io*num_obs_train+io];
             }
 
-            const double tvd = (indy - xyj/(mean[io] - kwx[io*num_obs_train+i]));
+            const double tvd = (indy - xyj/(mean[io] - kwx[io*num_obs_train+i] + DBL_MIN));
             *cv += tvd*tvd;
           }
         }
@@ -4373,7 +4381,7 @@ double *cv){
               }
             }
             xyj -= kwys[jo*num_obs_train+ipt_lookup_extern_XY[ipt_extern_X[i]]]*kwxs[io*num_obs_train+ipt_lookup_extern_XY[ipt_extern_X[i]]];
-            const double tvd = (indy - xyj/mi);
+            const double tvd = (indy - xyj/(mi + DBL_MIN));
             *cv += tvd*tvd;
           }
         }

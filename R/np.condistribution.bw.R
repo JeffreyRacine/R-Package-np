@@ -82,6 +82,7 @@ npcdistbw.condbandwidth <-
            nmulti, remin = TRUE, itmax = 10000,
            fast.cdf = TRUE, do.full.integral = FALSE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
+           memfac = 1.0,
            ...){
 
     ydat = toFrame(ydat)
@@ -241,7 +242,7 @@ npcdistbw.condbandwidth <-
         cdf_on_train = cdf_on_train,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
-      myoptd = list(ftol=ftol, tol=tol, small=small)
+      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac)
 
       if (bws$method != "normal-reference"){
         myout=
@@ -394,7 +395,7 @@ npcdistbw.default <-
            bandwidth.compute = TRUE,
            auto, nmulti, remin, itmax,
            fast.cdf, do.full.integral, ngrid,
-           ftol, tol, small,
+           ftol, tol, small, memfac,
            ## dummy arguments for condbandwidth() function call
            bwmethod, bwscaling, bwtype,
            cxkertype, cxkerorder,
@@ -437,7 +438,7 @@ npcdistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gydat", "bandwidth.compute", "auto", "nmulti", "remin", "itmax", "fast.cdf", "do.full.integral", "ngrid", "ftol",
-               "tol", "small")
+               "tol", "small", "memfac")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
