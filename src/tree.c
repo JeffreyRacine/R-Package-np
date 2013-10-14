@@ -189,6 +189,37 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
   }
 }
 
+// purely tail-recursive version
+void boxSearchNL(KDT * kdt, NL * search, double * bb, NL * nl){
+  const int node = search->node[search->n - 1];
+  int res = boxIntersect(bb, kdt->kdn[node].bb, kdt->ndim);
+
+  if(res == KD_MISS) return;
+
+  check_grow_nl(nl);
+
+  if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
+    nl->node[nl->n++] = node;
+    search->n--;
+  }
+  else { // KD_HITOPEN
+    check_grow_nl(search);
+    search->node[search->n++] = kdt->kdn[node].childu;
+    search->node[search->n++] = kdt->kdn[node].childl;
+    boxSearchNL(kdt, search, bb, nl);
+  }
+}
+
+void check_grow_nl(NL * nl){
+  if(nl->n == nl->nalloc){
+    nl->node = realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
+    if(!(nl->node != NULL))
+      error("!(nl->node != NULL)");
+    
+    nl->nalloc = MAX(10, 2*nl->nalloc);
+  }
+}
+
 void free_kdtree(KDT ** kdt){
   KDT * kdx = *kdt;
   

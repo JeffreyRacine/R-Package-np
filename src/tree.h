@@ -36,4 +36,6 @@ int build_tree(double ** p, KDT * kdt, int * ip, int node, int d, int nlev, int 
 void free_kdtree(KDT ** kdt);
 int boxIntersect(double * bbs, double * bbb, int ndim);
 void boxSearch(KDT * kdt, int node, double * bb, NL * nl);
+void check_grow_nl(NL * nl);
+void boxSearchNL(KDT * kdt, NL * search, double * bb, NL * nl);
 #endif
