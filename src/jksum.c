@@ -3857,11 +3857,6 @@ double *cv){
     nwy = 1;
   }
 
-  static int dbg = 0;
-  if (0 == dbg){
-    Rprintf("ntrain: %d\t wx: %d\nneval: %d\t wy: %d\n", num_obs_train, wx, num_obs_eval, wy);
-    dbg = 1;
-  }
 #ifdef MPI2
   int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
