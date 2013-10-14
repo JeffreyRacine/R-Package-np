@@ -189,28 +189,32 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
   }
 }
 
-// purely tail-recursive version
-void boxSearchNL(KDT * kdt, NL * search, double * bb, NL * nl){
-  const int node = search->node[search->n - 1];
-  int res = boxIntersect(bb, kdt->kdn[node].bb, kdt->ndim);
+// purely iterative version
+void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl){
+  while (search->n > 0){
+    const int node = search->node[search->n - 1];
 
-  if(res == KD_MISS) return;
+    int res = boxIntersect(bb, kdt->kdn[node].bb, kdt->ndim);
 
-  check_grow_nl(nl);
+    if(res == KD_MISS) {
+      search->n--;
+      continue;
+    }
 
-  if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
-    nl->node[nl->n++] = node;
-    search->n--;
-  }
-  else { // KD_HITOPEN
-    check_grow_nl(search);
-    search->node[search->n++] = kdt->kdn[node].childu;
-    search->node[search->n++] = kdt->kdn[node].childl;
-    boxSearchNL(kdt, search, bb, nl);
+    if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
+      check_grow_nl(nl);
+      nl->node[nl->n++] = node;
+      search->n--;
+    }
+    else { // KD_HITOPEN
+      check_grow_nl(search);
+      search->node[search->n - 1] = kdt->kdn[node].childu;
+      search->node[search->n++] = kdt->kdn[node].childl;
+    }
   }
 }
 
-void check_grow_nl(NL * nl){
+void check_grow_nl(NL * restrict nl){
   if(nl->n == nl->nalloc){
     nl->node = realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
     if(!(nl->node != NULL))
@@ -218,6 +222,13 @@ void check_grow_nl(NL * nl){
     
     nl->nalloc = MAX(10, 2*nl->nalloc);
   }
+}
+
+void clean_nl(NL * nl){
+  if(nl->node != NULL)
+    free(nl->node);
+  nl->node = NULL;
+  nl->n = nl->nalloc = 0;    
 }
 
 void free_kdtree(KDT ** kdt){

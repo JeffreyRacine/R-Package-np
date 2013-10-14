@@ -37,5 +37,6 @@ void free_kdtree(KDT ** kdt);
 int boxIntersect(double * bbs, double * bbb, int ndim);
 void boxSearch(KDT * kdt, int node, double * bb, NL * nl);
 void check_grow_nl(NL * nl);
-void boxSearchNL(KDT * kdt, NL * search, double * bb, NL * nl);
+void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl);
+void clean_nl(NL * restrict nl);
 #endif

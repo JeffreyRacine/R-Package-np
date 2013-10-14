@@ -2443,8 +2443,10 @@ double * const kw){
       free(ps_okernel);
     }
 
-    if(np_ks_tree_use)
+    if(np_ks_tree_use){
+      clean_nl(pnl);
       free(p_pnl);
+    }
 
     free(p_dband);
   }
@@ -4164,6 +4166,8 @@ double *cv){
     free(kwy);
   } else {
     NL nl = {.node = NULL, .n = 0, .nalloc = 0};
+    NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+
     double bb[2*num_all_cvar];
 
     int KERNEL_XY[num_all_cvar], m;
@@ -4193,6 +4197,9 @@ double *cv){
 
     if(kwys == NULL)
       error("failed to allocate kwys, try reducing num_obs_eval");
+
+    nls.node = (int *)malloc(10*sizeof(int));
+    nls.nalloc = 10;
 
     for(iwx = 0; iwx < nwx; iwx++){
       const int wxo = iwx*wx;
@@ -4356,6 +4363,9 @@ double *cv){
             // reset the interaction node list
             nl.n = 0;
 
+            nls.node[0] = 0;
+            nls.n = 1;
+
             for(l = num_reg_continuous; l < num_all_cvar; l++){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
               bb[2*l+1] = -cksup[KERNEL_XY[l]][0];
@@ -4364,7 +4374,7 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Y_continuous_eval[l-num_reg_continuous][j] + bb[2*l+1]*vsfxy[l]);
             }
 
-            boxSearch(kdt_extern_XY, 0, bb, &nl);
+            boxSearchNL(kdt_extern_XY, &nls, bb, &nl);
 
             xyj = 0.0;
 
@@ -4392,6 +4402,9 @@ double *cv){
     free(kwy);
     free(kwxs);
     free(kwys);
+
+    clean_nl(&nl);
+    clean_nl(&nls);
 
   }
 
