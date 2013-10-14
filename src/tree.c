@@ -231,6 +231,18 @@ void clean_nl(NL * nl){
   nl->n = nl->nalloc = 0;    
 }
 
+void mirror_nl(NL * restrict nla, NL * restrict nlb){
+  if(nla->n > nlb->nalloc){
+    nlb->node = realloc(nlb->node, (1+nla->n)*sizeof(int));
+    nlb->nalloc = nla->n + 1;
+  }
+
+  for(int i = 0; i < nla->n; i++)
+    nlb->node[i] = nla->node[i];
+  
+  nlb->n = nla->n; 
+}
+
 void free_kdtree(KDT ** kdt){
   KDT * kdx = *kdt;
   

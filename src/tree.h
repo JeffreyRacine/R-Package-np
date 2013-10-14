@@ -39,4 +39,5 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl);
 void check_grow_nl(NL * nl);
 void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl);
 void clean_nl(NL * restrict nl);
+void mirror_nl(NL * restrict nla, NL * restrict nlb);
 #endif

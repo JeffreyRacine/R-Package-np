@@ -4166,6 +4166,7 @@ double *cv){
     free(kwy);
   } else {
     NL nl = {.node = NULL, .n = 0, .nalloc = 0};
+    NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
     NL nls = {.node = NULL, .n = 0, .nalloc = 0};
 
     double bb[2*num_all_cvar];
@@ -4346,8 +4347,22 @@ double *cv){
             bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_X_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
           }
 
+          // testing for partial search algo
+          for(l = num_reg_continuous; l < num_all_cvar; l++){
+            bb[2*l] = -DBL_MAX;
+            bb[2*l+1] = DBL_MAX;
+          }
+
           const double mi = mean[io] - kwx[io*num_obs_train + i];
 
+          // search for the point (x_i,y_j) in the xy tree
+          // reset the interaction node list
+          nlps.n = 0;
+
+          nls.node[0] = 0;
+          nls.n = 1;
+
+          boxSearchNL(kdt_extern_XY, &nls, bb, &nlps);
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
             const int jo = j - wyo;
@@ -4363,8 +4378,7 @@ double *cv){
             // reset the interaction node list
             nl.n = 0;
 
-            nls.node[0] = 0;
-            nls.n = 1;
+            mirror_nl(&nlps, &nls);
 
             for(l = num_reg_continuous; l < num_all_cvar; l++){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
@@ -4405,6 +4419,7 @@ double *cv){
 
     clean_nl(&nl);
     clean_nl(&nls);
+    clean_nl(&nlps);
 
   }
 
