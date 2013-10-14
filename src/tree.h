@@ -40,4 +40,7 @@ void check_grow_nl(NL * nl);
 void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl);
 void clean_nl(NL * restrict nl);
 void mirror_nl(NL * restrict nla, NL * restrict nlb);
+int boxIntersectPartial(double * bbs, double * bbb, int * restrict idim, int nidim);
+void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, int * restrict idim, int nidim);
+
 #endif

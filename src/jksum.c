@@ -4169,6 +4169,8 @@ double *cv){
     NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
     NL nls = {.node = NULL, .n = 0, .nalloc = 0};
 
+    int icx[num_reg_continuous], icy[num_var_continuous];
+
     double bb[2*num_all_cvar];
 
     int KERNEL_XY[num_all_cvar], m;
@@ -4201,6 +4203,12 @@ double *cv){
 
     nls.node = (int *)malloc(10*sizeof(int));
     nls.nalloc = 10;
+
+    for(l = 0; l < num_reg_continuous; l++)
+      icx[l] = l;
+
+    for(l = num_reg_continuous; l < num_all_cvar; l++)
+      icy[l-num_reg_continuous] = l;
 
     for(iwx = 0; iwx < nwx; iwx++){
       const int wxo = iwx*wx;
@@ -4347,12 +4355,6 @@ double *cv){
             bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_X_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
           }
 
-          // testing for partial search algo
-          for(l = num_reg_continuous; l < num_all_cvar; l++){
-            bb[2*l] = -DBL_MAX;
-            bb[2*l+1] = DBL_MAX;
-          }
-
           const double mi = mean[io] - kwx[io*num_obs_train + i];
 
           // search for the point (x_i,y_j) in the xy tree
@@ -4362,7 +4364,7 @@ double *cv){
           nls.node[0] = 0;
           nls.n = 1;
 
-          boxSearchNL(kdt_extern_XY, &nls, bb, &nlps);
+          boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, icx, num_reg_continuous);
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
             const int jo = j - wyo;
@@ -4388,7 +4390,7 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Y_continuous_eval[l-num_reg_continuous][j] + bb[2*l+1]*vsfxy[l]);
             }
 
-            boxSearchNL(kdt_extern_XY, &nls, bb, &nl);
+            boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nl, icy, num_var_continuous);
 
             xyj = 0.0;
 
