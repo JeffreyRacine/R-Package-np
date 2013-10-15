@@ -164,6 +164,25 @@ int boxIntersect(double * bbs, double * bbb, int ndim){
   return(hdone ? KD_HITDONE : KD_HITOPEN);
 }
 
+int boxIntersectPartial(double * bbs, double * bbb, int * restrict idim, int nidim){
+  int i, tt[4], miss;
+  int hdone = 1;
+
+  // here we build up a 'truth table' of sorts
+  // at the same time we test for a total miss and break
+  // away early if that's the case
+  for(i = 0; i < nidim; i++){
+    miss  = tt[0] = bbs[2*idim[i]] < bbb[2*idim[i]];
+    miss += tt[1] = bbs[2*idim[i]] < bbb[2*idim[i]+1];
+    miss += tt[2] = bbs[2*idim[i]+1] < bbb[2*idim[i]];
+    miss += tt[3] = bbs[2*idim[i]+1] < bbb[2*idim[i]+1];
+    if(miss%4 == 0) return(KD_MISS);
+
+    hdone = hdone && (tt[0]^tt[2]) && (tt[1]^tt[3]);
+  }
+  return(hdone ? KD_HITDONE : KD_HITOPEN);
+}
+
 /*
   builds a list of nodes intersected by search box bb
   it uses the nl (node list) structure to aggregate results as the search progresses
@@ -187,6 +206,85 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
     boxSearch(kdt, kdt->kdn[node].childl, bb, nl);
     boxSearch(kdt, kdt->kdn[node].childu, bb, nl);
   }
+}
+
+// purely iterative version
+void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl){
+  while (search->n > 0){
+    const int node = search->node[search->n - 1];
+
+    int res = boxIntersect(bb, kdt->kdn[node].bb, kdt->ndim);
+
+    if(res == KD_MISS) {
+      search->n--;
+      continue;
+    }
+
+    if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
+      check_grow_nl(nl);
+      nl->node[nl->n++] = node;
+      search->n--;
+    }
+    else { // KD_HITOPEN
+      check_grow_nl(search);
+      search->node[search->n - 1] = kdt->kdn[node].childu;
+      search->node[search->n++] = kdt->kdn[node].childl;
+    }
+  }
+}
+
+// purely iterative version
+void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, int * idim, int nidim){
+  while (search->n > 0){
+    const int node = search->node[search->n - 1];
+
+    int res = boxIntersectPartial(bb, kdt->kdn[node].bb, idim, nidim);
+
+    if(res == KD_MISS) {
+      search->n--;
+      continue;
+    }
+
+    if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
+      check_grow_nl(nl);
+      nl->node[nl->n++] = node;
+      search->n--;
+    }
+    else { // KD_HITOPEN
+      check_grow_nl(search);
+      search->node[search->n - 1] = kdt->kdn[node].childu;
+      search->node[search->n++] = kdt->kdn[node].childl;
+    }
+  }
+}
+
+void check_grow_nl(NL * restrict nl){
+  if(nl->n == nl->nalloc){
+    nl->node = realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
+    if(!(nl->node != NULL))
+      error("!(nl->node != NULL)");
+    
+    nl->nalloc = MAX(10, 2*nl->nalloc);
+  }
+}
+
+void clean_nl(NL * nl){
+  if(nl->node != NULL)
+    free(nl->node);
+  nl->node = NULL;
+  nl->n = nl->nalloc = 0;    
+}
+
+void mirror_nl(NL * restrict nla, NL * restrict nlb){
+  if(nla->n > nlb->nalloc){
+    nlb->node = realloc(nlb->node, (1+nla->n)*sizeof(int));
+    nlb->nalloc = nla->n + 1;
+  }
+
+  for(int i = 0; i < nla->n; i++)
+    nlb->node[i] = nla->node[i];
+  
+  nlb->n = nla->n; 
 }
 
 void free_kdtree(KDT ** kdt){

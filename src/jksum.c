@@ -2443,8 +2443,10 @@ double * const kw){
       free(ps_okernel);
     }
 
-    if(np_ks_tree_use)
+    if(np_ks_tree_use){
+      clean_nl(pnl);
       free(p_pnl);
+    }
 
     free(p_dband);
   }
@@ -3857,11 +3859,6 @@ double *cv){
     nwy = 1;
   }
 
-  static int dbg = 0;
-  if (0 == dbg){
-    Rprintf("ntrain: %d\t wx: %d\nneval: %d\t wy: %d\n", num_obs_train, wx, num_obs_eval, wy);
-    dbg = 1;
-  }
 #ifdef MPI2
   int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
@@ -4169,6 +4166,11 @@ double *cv){
     free(kwy);
   } else {
     NL nl = {.node = NULL, .n = 0, .nalloc = 0};
+    NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
+    NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+
+    int icx[num_reg_continuous], icy[num_var_continuous];
+
     double bb[2*num_all_cvar];
 
     int KERNEL_XY[num_all_cvar], m;
@@ -4198,6 +4200,15 @@ double *cv){
 
     if(kwys == NULL)
       error("failed to allocate kwys, try reducing num_obs_eval");
+
+    nls.node = (int *)malloc(10*sizeof(int));
+    nls.nalloc = 10;
+
+    for(l = 0; l < num_reg_continuous; l++)
+      icx[l] = l;
+
+    for(l = num_reg_continuous; l < num_all_cvar; l++)
+      icy[l-num_reg_continuous] = l;
 
     for(iwx = 0; iwx < nwx; iwx++){
       const int wxo = iwx*wx;
@@ -4346,6 +4357,14 @@ double *cv){
 
           const double mi = mean[io] - kwx[io*num_obs_train + i];
 
+          // search for the point (x_i,y_j) in the xy tree
+          // reset the interaction node list
+          nlps.n = 0;
+
+          nls.node[0] = 0;
+          nls.n = 1;
+
+          boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, icx, num_reg_continuous);
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
             const int jo = j - wyo;
@@ -4361,6 +4380,8 @@ double *cv){
             // reset the interaction node list
             nl.n = 0;
 
+            mirror_nl(&nlps, &nls);
+
             for(l = num_reg_continuous; l < num_all_cvar; l++){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
               bb[2*l+1] = -cksup[KERNEL_XY[l]][0];
@@ -4369,7 +4390,7 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Y_continuous_eval[l-num_reg_continuous][j] + bb[2*l+1]*vsfxy[l]);
             }
 
-            boxSearch(kdt_extern_XY, 0, bb, &nl);
+            boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nl, icy, num_var_continuous);
 
             xyj = 0.0;
 
@@ -4397,6 +4418,10 @@ double *cv){
     free(kwy);
     free(kwxs);
     free(kwys);
+
+    clean_nl(&nl);
+    clean_nl(&nls);
+    clean_nl(&nlps);
 
   }
 
