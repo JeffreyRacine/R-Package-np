@@ -18,6 +18,8 @@
 #include "tree.h"
 
 #include <assert.h>
+
+#include <inttypes.h>
 #ifdef MPI2
 
 #include "mpi.h"
@@ -3776,8 +3778,8 @@ int KERNEL_reg,
 int KERNEL_unordered_reg,
 int KERNEL_ordered_reg,
 int BANDWIDTH_den,
-int num_obs_train,
-int num_obs_eval,
+int64_t num_obs_train,
+int64_t num_obs_eval,
 int num_var_unordered,
 int num_var_ordered,
 int num_var_continuous,
@@ -3802,8 +3804,9 @@ double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
 double *cv){
-  int i,j,l,iwx,iwy, indy;
-  int p, q;
+  int indy;
+  int64_t i,j,l,iwx,iwy;
+  int64_t p, q;
 
   const int num_reg_tot = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int num_var_tot = num_var_continuous+num_var_unordered+num_var_ordered;
@@ -3813,9 +3816,10 @@ double *cv){
   const int num_all_uvar = num_reg_unordered + num_var_unordered;
   const int num_all_ovar = num_reg_ordered + num_var_ordered;
 
-  const int Nm = (int)ceil(memfac*300000.0);
+  size_t Nm = MIN((size_t)ceil(memfac*300000.0), (size_t)SIZE_MAX/10);
 
-  int wx, wy, N, nwx, nwy;
+  int64_t N, num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc, num_obs_wy_alloc;
+  int64_t wx, wy, nwx, nwy;
 
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
 
@@ -3834,8 +3838,8 @@ double *cv){
   double **matrix_wY_ordered_eval;
   double **matrix_wY_continuous_eval;
 
-  int js, je;
-  int num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc, num_obs_wy_alloc;
+  int64_t js, je;
+
 
   int * itt = NULL;
 
@@ -3847,7 +3851,7 @@ double *cv){
   N = num_obs_train*num_obs_train + num_obs_eval*num_obs_train + num_obs_train + (num_obs_train + num_obs_eval)*num_obs_train;
 
   if(N > Nm){
-    const int wy0 = (Nm - 2*num_obs_train - 1)/(2*num_obs_train);
+    const int64_t wy0 = (Nm - 2*num_obs_train - 1)/(2*num_obs_train);
     wy = ((wy0 > num_obs_eval) || (wy0 <= 0)) ? num_obs_eval : wy0;
     wx = (wy0 > 0) ? (Nm - 2*num_obs_train*wy)/(1 + 2*num_obs_train) : 1;
     nwx = num_obs_train/wx + (((num_obs_train % wx) > 0) ? 1 : 0);
@@ -3860,20 +3864,17 @@ double *cv){
   }
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
-  int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
+  int64_t stride_e = MAX((int64_t)ceil((double) num_obs_eval / (double) iNum_Processors),1);
 
-  int stride_wx = MAX((int)ceil((double)wx / (double) iNum_Processors),1);
-  int stride_wy = MAX((int)ceil((double)wy / (double) iNum_Processors),1);
+  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
+  int64_t stride_wy = MAX((int64_t)ceil((double)wy / (double) iNum_Processors),1);
 
   num_obs_train_alloc = stride_t*iNum_Processors;
   num_obs_eval_alloc = stride_e*iNum_Processors;
 
   num_obs_wx_alloc = stride_wx*iNum_Processors;
   num_obs_wy_alloc = stride_wy*iNum_Processors;
-
-  int stride_ns = Nm/iNum_Processors + ((Nm % iNum_Processors) > 0);
-  int mystart_ns = stride_ns*my_rank;
 
   js = stride_wy*my_rank;
   je = MIN(wy, js + stride_wy);
@@ -3996,16 +3997,16 @@ double *cv){
     double * kwx = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
     if(kwx == NULL)
-      error("failed to allocate kwx, try setting fast.cdf = false");
+      error("failed to allocate kwx, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
     double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
     if(kwy == NULL)
-      error("failed to allocate kwy, try reducing num_obs_eval");
+      error("failed to allocate kwy, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
     
     for(iwx = 0; iwx < nwx; iwx++){
-      const int wxo = iwx*wx;
-      const int dwx = (iwx != (nwx - 1)) ? wx : num_obs_train - (nwx - 1)*wx;
+      const int64_t wxo = iwx*wx;
+      const int64_t dwx = (iwx != (nwx - 1)) ? wx : num_obs_train - (nwx - 1)*wx;
 
       for(l = 0; l < num_reg_continuous; l++)
         matrix_wX_continuous_train[l] = matrix_X_continuous_train[l] + wxo;
@@ -4063,8 +4064,8 @@ double *cv){
 
       for(iwy = 0; iwy < nwy; iwy++){
 
-        const int wyo = iwy*wy;
-        const int dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
+        const int64_t wyo = iwy*wy;
+        const int64_t dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
 
         for(l = 0; l < num_var_continuous; l++)
           matrix_wY_continuous_eval[l] = matrix_Y_continuous_eval[l] + wyo;
@@ -4120,13 +4121,13 @@ double *cv){
                                NULL, // no permutations
                                kwy);
 
-        const int je_dwy = MIN(je,dwy);
+        const int64_t je_dwy = MIN(je,dwy);
 
         for(i = wxo; i < (wxo + dwx); i++){     
-          const int io = i - wxo;
+          const int64_t io = i - wxo;
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
-            const int jo = j - wyo;
+            const int64_t jo = j - wyo;
             indy = 1;
             for(l = 0; l < num_var_ordered; l++){
               indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
@@ -4184,22 +4185,22 @@ double *cv){
     double * kwx = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
     if(kwx == NULL)
-      error("failed to allocate kwx, try setting fast.cdf = false");
+      error("failed to allocate kwx, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
     double * kwxs = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
     if(kwxs == NULL)
-      error("failed to allocate kwxs, try setting fast.cdf = false");
+      error("failed to allocate kwxs, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
     double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
     if(kwy == NULL)
-      error("failed to allocate kwy, try reducing num_obs_eval");
+      error("failed to allocate kwy, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
     double * kwys = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
     if(kwys == NULL)
-      error("failed to allocate kwys, try reducing num_obs_eval");
+      error("failed to allocate kwys, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
     nls.node = (int *)malloc(10*sizeof(int));
     nls.nalloc = 10;
@@ -4211,8 +4212,8 @@ double *cv){
       icy[l-num_reg_continuous] = l;
 
     for(iwx = 0; iwx < nwx; iwx++){
-      const int wxo = iwx*wx;
-      const int dwx = (iwx != (nwx - 1)) ? wx : num_obs_train - (nwx - 1)*wx;
+      const int64_t wxo = iwx*wx;
+      const int64_t dwx = (iwx != (nwx - 1)) ? wx : num_obs_train - (nwx - 1)*wx;
 
       for(l = 0; l < num_reg_continuous; l++)
         matrix_wX_continuous_train[l] = matrix_X_continuous_train[l] + wxo;
@@ -4271,15 +4272,15 @@ double *cv){
       // put kwx into rows orig, cols xy order
       // can only do a partial reorder: rows X order, cols xy order
       for(q = wxo; q < (wxo + dwx); q++){
-        const int qo = q - wxo;
+        const int64_t qo = q - wxo;
         for(p = 0; p < num_obs_train; p++){
           kwxs[qo*num_obs_train + p] = kwx[qo*num_obs_train+ipt_lookup_extern_X[ipt_extern_XY[p]]];
         }
       }
 
       for(iwy = 0; iwy < nwy; iwy++){
-        const int wyo = iwy*wy;
-        const int dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
+        const int64_t wyo = iwy*wy;
+        const int64_t dwy = (iwy != (nwy - 1)) ? wy : num_obs_eval - (nwy - 1)*wy;
 
         for(l = 0; l < num_var_continuous; l++)
           matrix_wY_continuous_eval[l] = matrix_Y_continuous_eval[l] + wyo;
@@ -4337,15 +4338,15 @@ double *cv){
 
         // put kwys into cols - xy, rows - y order
         for(q = wyo; q < (wyo + dwy); q++){
-          const int qo = q - wyo;
+          const int64_t qo = q - wyo;
           for(p = 0; p < num_obs_train; p++)
             kwys[qo*num_obs_train + p] = kwy[qo*num_obs_train + ipt_lookup_extern_Y[ipt_extern_XY[p]]];
         }
 
-        const int je_dwy = MIN(je,dwy);
+        const int64_t je_dwy = MIN(je,dwy);
 
         for(i = wxo; i < (wxo + dwx); i++){
-          const int io = i - wxo;
+          const int64_t io = i - wxo;
 
           for(l = 0; l < num_reg_continuous; l++){
             bb[2*l] = -cksup[KERNEL_XY[l]][1];
@@ -4367,7 +4368,7 @@ double *cv){
           boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, icx, num_reg_continuous);
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
-            const int jo = j - wyo;
+            const int64_t jo = j - wyo;
             indy = 1;
             for(l = 0; l < num_var_ordered; l++){
               indy *= (matrix_Y_ordered_train[l][ipt_lookup_extern_Y[ipt_extern_X[i]]] <= matrix_Y_ordered_eval[l][j]);
@@ -4395,8 +4396,8 @@ double *cv){
             xyj = 0.0;
 
             for (m = 0; m < nl.n; m++){
-              const int istart = kdt_extern_XY->kdn[nl.node[m]].istart;
-              const int nlev = kdt_extern_XY->kdn[nl.node[m]].nlev;
+              const int64_t istart = kdt_extern_XY->kdn[nl.node[m]].istart;
+              const int64_t nlev = kdt_extern_XY->kdn[nl.node[m]].nlev;
               for (l = istart; l < (istart + nlev); l++){
                 xyj += kwys[jo*num_obs_train+l]*kwxs[io*num_obs_train+l];
               }
