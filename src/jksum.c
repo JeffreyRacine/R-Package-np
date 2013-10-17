@@ -3843,35 +3843,45 @@ double *cv){
 
   int * itt = NULL;
 
-  //static int fcount = 0;
-  //fcount++;
-  //Rprintf("fcount %d: ", fcount);
-
-  // blocking algo calculations
-  N = num_obs_train*num_obs_train + num_obs_eval*num_obs_train + num_obs_train + (num_obs_train + num_obs_eval)*num_obs_train;
-
-  if(N > Nm){
-    const int64_t wy0 = (Nm - 2*num_obs_train - 1)/(2*num_obs_train);
-    wy = ((wy0 > num_obs_eval) || (wy0 <= 0)) ? num_obs_eval : wy0;
-    wx = (wy0 > 0) ? (Nm - 2*num_obs_train*wy)/(1 + 2*num_obs_train) : 1;
-    nwx = num_obs_train/wx + (((num_obs_train % wx) > 0) ? 1 : 0);
-    nwy = num_obs_eval/wy + (((num_obs_eval % wy) > 0) ? 1 : 0);
-  } else {
-    wx = num_obs_train;
-    wy = num_obs_eval;
-    nwx = 1;
-    nwy = 1;
-  }
 
 #ifdef MPI2
   int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
   int64_t stride_e = MAX((int64_t)ceil((double) num_obs_eval / (double) iNum_Processors),1);
 
-  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
-  int64_t stride_wy = MAX((int64_t)ceil((double)wy / (double) iNum_Processors),1);
-
   num_obs_train_alloc = stride_t*iNum_Processors;
   num_obs_eval_alloc = stride_e*iNum_Processors;
+
+#else
+  num_obs_train_alloc = num_obs_train;
+  num_obs_eval_alloc = num_obs_eval;
+
+  js = 0;
+  je = num_obs_eval;
+#endif
+
+
+  // blocking algo calculations
+  N = num_obs_train_alloc*num_obs_train_alloc + num_obs_eval_alloc*num_obs_train_alloc + num_obs_train_alloc + (num_obs_train_alloc + num_obs_eval_alloc)*num_obs_train_alloc;
+  
+  const int64_t sa = num_obs_train_alloc*num_obs_train_alloc*sizeof(double);
+  const int64_t sb = num_obs_eval_alloc*num_obs_train_alloc*sizeof(double);
+
+  if((N > Nm) || (sa > (((int64_t)1<<31)-1)) || (sb > (((int64_t)1<<31)-1))){
+    const int64_t wy0 = (Nm - 2*num_obs_train_alloc - 1)/(2*num_obs_train_alloc);
+    wy = ((wy0 > num_obs_eval_alloc) || (wy0 <= 0)) ? num_obs_eval_alloc : wy0;
+    wx = (wy0 > 0) ? (Nm - 2*num_obs_train_alloc*wy)/(1 + 2*num_obs_train_alloc) : 1;
+    nwx = num_obs_train_alloc/wx + (((num_obs_train_alloc % wx) > 0) ? 1 : 0);
+    nwy = num_obs_eval_alloc/wy + (((num_obs_eval_alloc % wy) > 0) ? 1 : 0);
+  } else {
+    wx = num_obs_train_alloc;
+    wy = num_obs_eval_alloc;
+    nwx = 1;
+    nwy = 1;
+  }
+
+#ifdef MPI2
+  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
+  int64_t stride_wy = MAX((int64_t)ceil((double)wy / (double) iNum_Processors),1);
 
   num_obs_wx_alloc = stride_wx*iNum_Processors;
   num_obs_wy_alloc = stride_wy*iNum_Processors;
@@ -3879,14 +3889,8 @@ double *cv){
   js = stride_wy*my_rank;
   je = MIN(wy, js + stride_wy);
 #else
-  num_obs_train_alloc = num_obs_train;
-  num_obs_eval_alloc = num_obs_eval;
-
   num_obs_wx_alloc = wx;
   num_obs_wy_alloc = wy;
-
-  js = 0;
-  je = num_obs_eval;
 #endif
 
   int * kernel_cx = NULL, * kernel_ux = NULL, * kernel_ox = NULL;
