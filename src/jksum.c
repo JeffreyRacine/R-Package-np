@@ -4468,7 +4468,6 @@ int num_var_continuous,
 int num_reg_unordered,
 int num_reg_ordered,
 int num_reg_continuous,
-int fast,
 double memfac,
 double **matrix_Y_unordered_train,
 double **matrix_Y_ordered_train,
@@ -6399,7 +6398,8 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   const int num_ovar = num_reg_ordered + num_var_ordered;
   const int num_all_var = num_reg + num_var_continuous + num_var_unordered + num_var_ordered;
 
-  int i, l;
+  int i, l; 
+  int ret = 0;
 
   int * operator = NULL;
 
@@ -6591,6 +6591,10 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL); // do not return kernel weights
   
   for(i = 0, *cv = 0.0; i < num_obs; i++){
+    if((rhon[i] == 0.0) || (rhod[i] == 0.0)){
+      ret = 1;
+      break;
+    }
     *cv -= log(rhon[i]) - log(rhod[i]);
   }
 
@@ -6608,7 +6612,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
 
   free(vsf_xy);
   free(vsf_x);
-  return(0);
+  return(ret);
 
 }
 
