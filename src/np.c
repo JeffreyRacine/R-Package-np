@@ -1806,7 +1806,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   small=myoptd[CDBW_SMALLD];
   dbl_memfac_ccdf_extern = myoptd[CDBW_MEMFACD];
 
-  int_fast_dls_extern = myopti[CDBW_FASTI];
 
 /* Allocate memory for objects */
 
