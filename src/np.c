@@ -1189,9 +1189,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   old_cdens = myopti[CBW_OLDI];
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
 
+  ibwmfunc = myopti[CBW_MI];
+
   ftol=myoptd[CBW_FTOLD];
   tol=myoptd[CBW_TOLD];
   small=myoptd[CBW_SMALLD];
+  dbl_memfac_ccdf_extern = myoptd[CBW_MEMFACD];
 
 /* Allocate memory for objects */
 
@@ -1532,8 +1535,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   /* assign the function to be optimized */
 
-  ibwmfunc = myopti[CBW_MI];
-
   /* 7/2/2010 */
   
   /*  if((ibwmfunc != CBWM_CVML) && autoSelectCVLS){*/
@@ -1772,12 +1773,15 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   safe_free(vector_continuous_stddev);
 
   safe_free(ipt_X);
-  safe_free(ipt_Y);
   safe_free(ipt_XY);
 
   safe_free(ipt_lookup_X);
-  safe_free(ipt_lookup_Y);
   safe_free(ipt_lookup_XY);
+
+  if(ibwmfunc == CBWM_CVLS){
+    safe_free(ipt_Y);
+    safe_free(ipt_lookup_Y);
+  }
 
   if(int_TREE_X == NP_TREE_TRUE){
     free_kdtree(&kdt_extern_X);

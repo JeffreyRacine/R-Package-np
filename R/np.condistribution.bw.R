@@ -82,7 +82,7 @@ npcdistbw.condbandwidth <-
            nmulti, remin = TRUE, itmax = 10000,
            do.full.integral = FALSE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           memfac = 100.0,
+           memfac = 250.0,
            ...){
 
     ydat = toFrame(ydat)

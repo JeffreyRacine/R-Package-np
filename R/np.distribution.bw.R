@@ -79,7 +79,7 @@ npudistbw.dbandwidth <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, gdat = NULL, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
            fast.cdf = TRUE, do.full.integral = TRUE, ngrid = 100,
-           ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05, memfac = 1.0, ...){
+           ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05, ...){
 
     dat = toFrame(dat)
 
@@ -194,7 +194,7 @@ npudistbw.dbandwidth <-
         fast.cdf = fast.cdf,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
-      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac)
+      myoptd = list(ftol=ftol, tol=tol, small=small)
 
       if (bws$method != "normal-reference"){
         myout=
@@ -280,7 +280,7 @@ npudistbw.default <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, gdat, bandwidth.compute = TRUE,
            ## dummy arguments for later passing into npudistbw.bandwidth
-           nmulti, remin, itmax, fast.cdf, do.full.integral, ngrid, ftol, tol, small, memfac,
+           nmulti, remin, itmax, fast.cdf, do.full.integral, ngrid, ftol, tol, small,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, okertype,
@@ -318,7 +318,7 @@ npudistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gdat","bandwidth.compute", "nmulti", "remin", "itmax", "fast.cdf", "do.full.integral", "ngrid", "ftol", "tol",
-               "small", "memfac")
+               "small")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
