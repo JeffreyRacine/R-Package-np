@@ -4510,7 +4510,6 @@ double *cv){
   double vsfx[num_reg_tot];
   double vsfy[num_var_tot];
   double vsfxy[num_var_tot+num_reg_tot];
-  double xyj;
 
   double **matrix_Yk_unordered_train;
   double **matrix_Yk_ordered_train;
@@ -4532,7 +4531,7 @@ double *cv){
   double **matrix_Xk_ordered_train;
   double **matrix_Xk_continuous_train;
 
-  double tcvk, tcvj;
+  double tcvk, tcvj, yh;
 
   int64_t bs, be, b;
   int64_t is0, ie0;
@@ -4580,6 +4579,8 @@ double *cv){
   be = MIN(b0, b1 * (my_rank+1));
 #else
   num_obs_wi_alloc = num_obs_wj_alloc = num_obs_wk_alloc = wi;
+  bs = 0;
+  be = wi*wj*wk;
 #endif
 
   int * kernel_cx = NULL, * kernel_ux = NULL, * kernel_ox = NULL;
@@ -4681,6 +4682,10 @@ double *cv){
                         NULL, NULL, NULL,
                         NULL, NULL, NULL);
   
+
+  // get the y bw product
+  for(i = 0, yh = 1.0; i < num_var_continuous; i++)
+    yh *= vsfy[i];
 
   x_operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
 
@@ -5001,7 +5006,7 @@ double *cv){
                                0, // (do not) compute the leave-one-out marginals
                                0,
                                1,
-                               0,
+                               0, // divide bw for the convolution kernels 
                                0,
                                0,
                                0,
@@ -5041,18 +5046,19 @@ double *cv){
           for(j = j0, tcvj = 0.0; (j < (j0 + dwj0)) && (b < be); j++){              
             const int64_t k0 = wko + (b % wjk) % wk;
             const int64_t dwk0 = MIN(num_obs_train, k0+dwk) - k0;
+            tcvk = 0.0;
             if(j == i){
               b += dwk0;
               continue;
             }
-            for(k = k0, tcvk = 0.0; (k < (k0 + dwk0)) && (b < be); k++,b++){
+            for(k = k0; (k < (k0 + dwk0)) && (b < be); k++,b++){
               if(k == i) continue;
-              tcvk += kx_ik[i*wk + k]*ky_jk[j*wk + k];
+              tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[(j-wjo)*wk + k-wko];
             }
 
-            tcvj += kx_ij[i*wj + j]*tcvk;
+            tcvj += kx_ij[(i-wio)*wj + j-wjo]*tcvk;
           }
-          *cv += tcvj/mean[i];
+          *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
         }
       }
     }
@@ -5063,7 +5069,7 @@ double *cv){
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
 
-  *cv /= (double) num_obs_train;
+  *cv /= (double)num_obs_train*yh;
 
   free(mean);
 
