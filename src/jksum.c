@@ -4598,7 +4598,6 @@ double *cv){
 
   double tcvk, tcvj, yh;
 
-  int64_t bs, be, b;
   int64_t is0, ie0;
 
   int m;
@@ -4657,15 +4656,8 @@ double *cv){
 
   is0 = stride_wi*my_rank;
   ie0 = MIN(num_obs_train, is0 + stride_wi);
-
-  const int64_t b0 = wi*wj*wk;
-  const int64_t b1 = b0 / iNum_Processors + ((b0 % iNum_Processors) > 0);
-  bs = b1 * my_rank;
-  be = MIN(b0, b1 * (my_rank+1));
 #else
   num_obs_wi_alloc = num_obs_wj_alloc = num_obs_wk_alloc = wi;
-  bs = 0;
-  be = wi*wj*wk;
 #endif
 
   int * kernel_cx = NULL, * kernel_ux = NULL, * kernel_ox = NULL;
@@ -5154,36 +5146,29 @@ double *cv){
                                NULL, // no permutations
                                ky_jk);
 
-        if((!int_TREE_XY) && (!int_TREE_X)){
-          const int64_t i0 = wio + bs / wjk;
-          for(i = i0, b = bs; (i < (i0+dwi)) && (i < num_obs_train) && (b < be); i++){
-            const int64_t j0 = wjo + (b % wjk)/wk;
-            const int64_t dwj0 = MIN(num_obs_train, j0+dwj) - j0;
-            for(j = j0, tcvj = 0.0; (j < (j0 + dwj0)) && (b < be); j++){              
-              const int64_t k0 = wko + (b % wjk) % wk;
-              const int64_t dwk0 = MIN(num_obs_train, k0+dwk) - k0;
+        if(!int_TREE_XY){
+          const int64_t ie_dwi = MIN(ie0,dwi);
+          for(i = is0+wio; i < (wio+ie_dwi); i++){
+            for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
               tcvk = 0.0;
               if(j == i){
-                b += dwk0;
                 continue;
               }
 
               const double tkxij = kx_ij[(i-wio)*wj + j-wjo];
 
               if (tkxij != 0.0) {
-                for(k = k0; (k < (k0 + dwk0)) && (b < be); k++,b++){
+                for(k = wko; k < (wko + dwk); k++){
                   if(k == i) continue;
                   tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[(j-wjo)*wk + k-wko];
                 }
-              } else {
-                b += dwk0;
-              }
-
+              } 
               tcvj += tkxij*tcvk;
             }
             *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
           }
         } else {
+          /*
           const int64_t i0 = wio + bs / wjk;
           for(i = i0, b = bs; (i < (i0+dwi)) && (i < num_obs_train) && (b < be); i++){
             const int64_t j0 = wjo + (b % wjk)/wk;
@@ -5222,7 +5207,7 @@ double *cv){
             const int tixy = ipt_lookup_extern_X[ipt_extern_XY[i]];
             *cv += tcvj/(mean[tixy]*mean[tixy] + DBL_MIN);
           }
-
+          */
         }
       }
     }
