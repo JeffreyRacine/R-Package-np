@@ -4995,13 +4995,14 @@ double *cv){
 
 
       // compute block kx_ij
+      // i is eval, j is train
 
       kernel_weighted_sum_np(kernel_cx,
                              kernel_ux,
                              kernel_ox,
                              BANDWIDTH_den,
-                             dwi,
                              dwj,
+                             dwi,
                              num_reg_unordered,
                              num_reg_ordered,
                              num_reg_continuous,
@@ -5026,13 +5027,13 @@ double *cv){
                              kdt_extern_XY,
                              &nls, 
                              xyd,
-                             idxi,
-                             matrix_Xi_unordered_train,
-                             matrix_Xi_ordered_train,
-                             matrix_Xi_continuous_train,
+                             idxj,
                              matrix_Xj_unordered_train,
                              matrix_Xj_ordered_train,
                              matrix_Xj_continuous_train,
+                             matrix_Xi_unordered_train,
+                             matrix_Xi_ordered_train,
+                             matrix_Xi_continuous_train,
                              NULL,
                              NULL,
                              NULL,
@@ -5079,8 +5080,8 @@ double *cv){
                                  kernel_ux,
                                  kernel_ox,
                                  BANDWIDTH_den,
-                                 dwi,
                                  dwk,
+                                 dwi,
                                  num_reg_unordered,
                                  num_reg_ordered,
                                  num_reg_continuous,
@@ -5105,13 +5106,13 @@ double *cv){
                                  kdt_extern_XY,
                                  &nls, 
                                  xyd,
-                                 idxi,
-                                 matrix_Xi_unordered_train,
-                                 matrix_Xi_ordered_train,
-                                 matrix_Xi_continuous_train,
+                                 idxk,
                                  matrix_Xk_unordered_train,
                                  matrix_Xk_ordered_train,
                                  matrix_Xk_continuous_train,
+                                 matrix_Xi_unordered_train,
+                                 matrix_Xi_ordered_train,
+                                 matrix_Xi_continuous_train,
                                  NULL,
                                  NULL,
                                  NULL,
@@ -5132,8 +5133,8 @@ double *cv){
                                kernel_uy,
                                kernel_oy,
                                BANDWIDTH_den,
-                               dwj,
                                dwk,
+                               dwj,
                                num_var_unordered,
                                num_var_ordered,
                                num_var_continuous,
@@ -5158,13 +5159,13 @@ double *cv){
                                kdt_extern_XY,
                                &nls, 
                                xyd + num_reg_continuous,
-                               idxj,
-                               matrix_Yj_unordered_train,
-                               matrix_Yj_ordered_train,
-                               matrix_Yj_continuous_train,
+                               idxk,
                                matrix_Yk_unordered_train,
                                matrix_Yk_ordered_train,
                                matrix_Yk_continuous_train,
+                               matrix_Yj_unordered_train,
+                               matrix_Yj_ordered_train,
+                               matrix_Yj_continuous_train,
                                NULL,
                                NULL,
                                NULL,
@@ -5191,9 +5192,9 @@ double *cv){
                 for(k = wko; k < (wko + dwk); k++){
                   if(k == i) continue;
                   tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[(j-wjo)*wk + k-wko];
-                }
-              } 
-              tcvj += tkxij*tcvk;
+                }               
+                tcvj += tkxij*tcvk;
+              }
             }
             *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
           }
@@ -5232,13 +5233,14 @@ double *cv){
                 }
 
                 const double tkxij = kx_ij[(i-wio)*wj + j];
+                if (tkxij != 0.0) {
+                  for(k = wko; k < (wko + dwk); k++){
+                    if(k == i) continue;
+                    tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[j*wk + k-wko];
+                  }
 
-                for(k = wko; k < (wko + dwk); k++){
-                  if(k == i) continue;
-                  tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[j*wk + k-wko];
+                  tcvj += tkxij*tcvk;
                 }
-
-                tcvj += tkxij*tcvk;
               }
             }
             const int tixy = ipt_lookup_extern_X[ipt_extern_XY[i]];

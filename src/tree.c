@@ -348,7 +348,7 @@ void create_fake_nodes(KDT * restrict kdt, NL * restrict nl, int * restrict idx)
 
   for(i = 0; i < nl->n; i++){    
     kdt->kdn[kdt->numnode].istart = MAX(idx[0], kdt->kdn[nl->node[i]].istart) - idx[0];
-    kdt->kdn[kdt->numnode].nlev = MIN(idx[1], kdt->kdn[nl->node[i]].childu) - kdt->kdn[kdt->numnode].istart + 1;
+    kdt->kdn[kdt->numnode].nlev = MIN(idx[1], kdt->kdn[nl->node[i]].istart + kdt->kdn[nl->node[i]].nlev - 1) - kdt->kdn[kdt->numnode].istart + 1;
 
     nl->node[i] = kdt->numnode++;
   }
