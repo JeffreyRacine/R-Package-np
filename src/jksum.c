@@ -4614,9 +4614,10 @@ double *cv){
   int64_t is, ie;
   int64_t is_i2n, ie_i2n;
 
-  int m;
+  int m_ij, m_ik;
 
   NL nl = {.node = NULL, .n = 0, .nalloc = 0};
+  NL nl_alt = {.node = NULL, .n = 0, .nalloc = 0};
   NL nls = {.node = NULL, .n = 0, .nalloc = 0};
   NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
 
@@ -5219,10 +5220,18 @@ double *cv){
             boxSearchNLPartialIdx(kdt_extern_XY, &nlps, bb, &nl, xyd, num_reg_continuous, idxj);
             create_fake_nodes(kdt_extern_XY, &nl, idxj);
 
+            // kx-ik interactions
+            nl_alt.n = 0;
+
+            mirror_nl(&nls, &nlps);
+
+            boxSearchNLPartialIdx(kdt_extern_XY, &nlps, bb, &nl_alt, xyd, num_reg_continuous, idxk);
+            create_fake_nodes(kdt_extern_XY, &nl_alt, idxk);
+
             tcvj = 0.0;
-            for (m = 0; m < nl.n; m++){
-              const int64_t jstart = kdt_extern_XY->kdn[nl.node[m]].istart;
-              const int64_t jnlev = kdt_extern_XY->kdn[nl.node[m]].nlev;
+            for (m_ij = 0; m_ij < nl.n; m_ij++){
+              const int64_t jstart = kdt_extern_XY->kdn[nl.node[m_ij]].istart;
+              const int64_t jnlev = kdt_extern_XY->kdn[nl.node[m_ij]].nlev;
               // nb, create_fake_nodes means that j -> j-wjo, and we don't need to compute the offsets
               // when indexing with j
 
@@ -5234,11 +5243,15 @@ double *cv){
 
                 const double tkxij = kx_ij[(i-wio)*wj + j];
                 if (tkxij != 0.0) {
-                  for(k = wko; k < (wko + dwk); k++){
-                    if(k == i) continue;
-                    tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[j*wk + k-wko];
-                  }
+                  for (m_ik = 0; m_ik < nl_alt.n; m_ik++){
+                    const int64_t kstart = kdt_extern_XY->kdn[nl_alt.node[m_ik]].istart;
+                    const int64_t knlev = kdt_extern_XY->kdn[nl_alt.node[m_ik]].nlev;
 
+                    for(k = kstart; k < (kstart + knlev); k++){
+                      if((k+wko) == i) continue;
+                      tcvk += kx_ik[(i-wio)*wk + k]*ky_jk[j*wk + k];
+                    }
+                  }
                   tcvj += tkxij*tcvk;
                 }
               }
@@ -5302,6 +5315,7 @@ double *cv){
   free(matrix_Yk_ordered_train);
 
   clean_nl(&nl);
+  clean_nl(&nl_alt);
   clean_nl(&nls);
   clean_nl(&nlps);
 
