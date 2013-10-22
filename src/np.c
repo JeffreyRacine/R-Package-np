@@ -1537,20 +1537,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   /* 7/2/2010 */
   
-  /*  if((ibwmfunc != CBWM_CVML) && autoSelectCVLS){*/
-  if((ibwmfunc != CBWM_CVML && ibwmfunc != CBWM_CCDF) && autoSelectCVLS){
-#ifdef MPI2
-    int nobs_proc = (num_obs_train_extern / iNum_Processors) + 
-      ((num_obs_train_extern%iNum_Processors) != 0);
-    
-    ibwmfunc = (nobs_proc < CBW_MINOBS) ? CBWM_CVLS : CBWM_NPLS;
-    int_WEIGHTS = (nobs_proc < CBW_MINOBS);
-#else //MPI
-    ibwmfunc = (num_obs_train_extern < CBW_MINOBS) ? CBWM_CVLS : CBWM_NPLS;
-    int_WEIGHTS = (num_obs_train_extern < CBW_MINOBS);
-#endif //MPI
-  }
-
   if(old_cdens){
     switch(ibwmfunc){
     case CBWM_CVML : bwmfunc = cv_func_con_density_categorical_ml; break;
