@@ -1839,6 +1839,7 @@ const int do_partial_tree,
 KDT * const kdt,
 NL * const inl,
 int * const nld,
+int * const idx,
 double **matrix_X_unordered_train,
 double **matrix_X_ordered_train,
 double **matrix_X_continuous_train,
@@ -2263,8 +2264,13 @@ double * const kw){
           bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
           bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
         }
-
-        boxSearchNLPartial(kdt, &nls, bb, &nl, nld, num_reg_continuous);
+        if(idx == NULL)
+          boxSearchNLPartial(kdt, &nls, bb, &nl, nld, num_reg_continuous);
+        else {
+          reset_fake_nodes(kdt);
+          boxSearchNLPartialIdx(kdt, &nls, bb, &nl, nld, num_reg_continuous, idx);
+          create_fake_nodes(kdt, &nl, idx);
+        }
       }
 
       if(permutation_operator == OP_INTEGRAL){
@@ -2297,9 +2303,12 @@ double * const kw){
               bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
               bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
             }
-
-            boxSearchNLPartial(kdt, &nls, bb, p_pnl + ii, nld, num_reg_continuous);
-
+            if(idx == NULL)
+              boxSearchNLPartial(kdt, &nls, bb, p_pnl + ii, nld, num_reg_continuous);
+            else{
+              boxSearchNLPartialIdx(kdt, &nls, bb, p_pnl + ii, nld, num_reg_continuous, idx);
+              create_fake_nodes(kdt, p_pnl + ii, idx);
+            }
           }
         }
         for(ii = num_reg_continuous; ii < p_nvar; ii++){
@@ -2486,6 +2495,7 @@ double * const kw){
     if(np_ks_tree_use){
       clean_nl(pnl);
       free(p_pnl);
+      reset_fake_nodes(kdt);
     }
 
     free(p_dband);
@@ -2996,6 +3006,7 @@ int *num_categories){
                            NULL,
                            NULL,
                            NULL,
+                           NULL,
                            matrix_X_unordered, // TRAIN
                            matrix_X_ordered,
                            matrix_X_continuous,
@@ -3060,6 +3071,7 @@ int *num_categories){
                            int_TREE_X,
                            0,
                            kdt_extern_X,
+                           NULL,
                            NULL,
                            NULL,
                            matrix_X_unordered, // TRAIN
@@ -3233,6 +3245,7 @@ int *num_categories){
                                    (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
                                    NULL,
                                    NULL,
+                                   NULL,
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -3315,7 +3328,7 @@ int *num_categories){
                                    nrc2, // cols in W
                                    0, // no tree?
                                    0,
-                                   NULL, NULL, NULL,
+                                   NULL, NULL, NULL, NULL,
                                    PXU, // TRAIN
                                    PXO, 
                                    PXC,
@@ -3404,7 +3417,7 @@ int *num_categories){
                                (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
                                0,
                                (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                               NULL, NULL,
+                               NULL, NULL, NULL,
                                PXU, // TRAIN
                                PXO, 
                                PXC,
@@ -3480,7 +3493,7 @@ int *num_categories){
                                  nrc2,
                                  0, // no trees
                                  0,
-                                 NULL, NULL, NULL,
+                                 NULL, NULL, NULL, NULL,
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -3708,7 +3721,7 @@ double * cv){
                            int_TREE_X,
                            0,
                            kdt_extern_X, 
-                           NULL, NULL,
+                           NULL, NULL, NULL,
                            matrix_X_unordered_train,
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -3782,7 +3795,7 @@ double * cv){
                              int_TREE_X,
                              0,
                              kdt_extern_X,
-                             NULL, NULL,
+                             NULL, NULL, NULL,
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
@@ -4100,7 +4113,7 @@ double *cv){
                              int_TREE_X,
                              0,
                              kdt_extern_X,
-                             NULL, NULL,
+                             NULL, NULL, NULL,
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
@@ -4161,7 +4174,7 @@ double *cv){
                                int_TREE_Y,
                                0,
                                kdt_extern_Y,
-                               NULL, NULL,
+                               NULL, NULL, NULL,
                                matrix_Y_unordered_train,
                                matrix_Y_ordered_train,
                                matrix_Y_continuous_train,
@@ -4311,7 +4324,7 @@ double *cv){
                              int_TREE_X,
                              0,
                              kdt_extern_X,
-                             NULL, NULL,
+                             NULL, NULL, NULL,
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
@@ -4380,7 +4393,7 @@ double *cv){
                                int_TREE_Y,
                                0,
                                kdt_extern_Y,
-                               NULL, NULL,
+                               NULL, NULL, NULL,
                                matrix_Y_unordered_train,
                                matrix_Y_ordered_train,
                                matrix_Y_continuous_train,
@@ -4598,7 +4611,8 @@ double *cv){
 
   double tcvk, tcvj, yh;
 
-  int64_t is0, ie0;
+  int64_t is, ie;
+  int64_t is_i2n, ie_i2n;
 
   int m;
 
@@ -4616,6 +4630,7 @@ double *cv){
   nlps.nalloc = 10;
 
   int xyd[num_all_cvar];
+  int idxi[2], idxj[2], idxk[2];
 
   for(i = 0; i < num_all_cvar; i++)
     xyd[i] = i;
@@ -4624,11 +4639,14 @@ double *cv){
   int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
 
   num_obs_train_alloc = stride_t*iNum_Processors;
+
+  is_i2n = stride_t*my_rank;
+  ie_i2n = MIN(num_obs_train, is_i2n + stride_t);
 #else
   num_obs_train_alloc = num_obs_train;
 
-  is0 = 0;
-  ie0 = num_obs_train;
+  is = is_i2n = 0;
+  ie = ie_i2n = num_obs_train;
 #endif
 
   // since we don't have an algorithm yet, it's hard to compute N exactly :)
@@ -4654,8 +4672,8 @@ double *cv){
 
   num_obs_wi_alloc = num_obs_wj_alloc = num_obs_wk_alloc = stride_wi*iNum_Processors;
 
-  is0 = stride_wi*my_rank;
-  ie0 = MIN(num_obs_train, is0 + stride_wi);
+  is = stride_wi*my_rank;
+  ie = MIN(num_obs_train, is + stride_wi);
 #else
   num_obs_wi_alloc = num_obs_wj_alloc = num_obs_wk_alloc = wi;
 #endif
@@ -4840,7 +4858,7 @@ double *cv){
                          int_TREE_XY,
                          0,
                          kdt_extern_XY,
-                         NULL, NULL,
+                         NULL, NULL, NULL,
                          matrix_XY_unordered_train,
                          matrix_XY_ordered_train,
                          matrix_XY_continuous_train,
@@ -4887,7 +4905,7 @@ double *cv){
                          int_TREE_X,
                          0,
                          kdt_extern_X,
-                         NULL, NULL, 
+                         NULL, NULL, NULL,
                          matrix_X_unordered_train,
                          matrix_X_ordered_train,
                          matrix_X_continuous_train,
@@ -4906,10 +4924,10 @@ double *cv){
                          NULL);
 
   if((!int_TREE_XY) && (!int_TREE_X)){
-    for(i = is0; i < ie0; i++)
+    for(i = is_i2n; i < ie_i2n; i++)
       *cv -= 2.0*jmean[i]/(mean[i] + DBL_MIN);
   } else {
-    for(i = is0; i < ie0; i++)
+    for(i = is_i2n; i < ie_i2n; i++)
       *cv -= 2.0*jmean[ipt_lookup_extern_XY[ipt_extern_X[i]]]/(mean[i] + DBL_MIN);
   }
 
@@ -4937,6 +4955,9 @@ double *cv){
     const int64_t wio = iwi*wi;
     const int64_t dwi = (iwi != (nwi - 1)) ? wi : num_obs_train - (nwi - 1)*wi;
 
+    idxi[0] = wio;
+    idxi[1] = wio + dwi -1;
+
     for(l = 0; l < num_reg_continuous; l++)
       matrix_Xi_continuous_train[l] = matrix_XY_continuous_train[l] + wio;
 
@@ -4949,6 +4970,9 @@ double *cv){
     for(iwj = 0; iwj < nwj; iwj++){
       const int64_t wjo = iwj*wj;
       const int64_t dwj = (iwj != (nwj - 1)) ? wj : num_obs_train - (nwj - 1)*wj;
+
+      idxj[0] = wjo;
+      idxj[1] = wjo + dwj -1;
 
       for(l = 0; l < num_reg_continuous; l++)
         matrix_Xj_continuous_train[l] = matrix_XY_continuous_train[l] + wjo;
@@ -5002,6 +5026,7 @@ double *cv){
                              kdt_extern_XY,
                              &nls, 
                              xyd,
+                             idxi,
                              matrix_Xi_unordered_train,
                              matrix_Xi_ordered_train,
                              matrix_Xi_continuous_train,
@@ -5022,6 +5047,9 @@ double *cv){
       for(iwk = 0; iwk < nwk; iwk++){
         const int64_t wko = iwk*wk;
         const int64_t dwk = (iwk != (nwk - 1)) ? wk : num_obs_train - (nwk - 1)*wk;
+
+        idxk[0] = wko;
+        idxk[1] = wko + dwk -1;
 
         kx_ik = pkx_ik;
 
@@ -5077,6 +5105,7 @@ double *cv){
                                  kdt_extern_XY,
                                  &nls, 
                                  xyd,
+                                 idxi,
                                  matrix_Xi_unordered_train,
                                  matrix_Xi_ordered_train,
                                  matrix_Xi_continuous_train,
@@ -5129,6 +5158,7 @@ double *cv){
                                kdt_extern_XY,
                                &nls, 
                                xyd + num_reg_continuous,
+                               idxj,
                                matrix_Yj_unordered_train,
                                matrix_Yj_ordered_train,
                                matrix_Yj_continuous_train,
@@ -5147,8 +5177,8 @@ double *cv){
                                ky_jk);
 
         if(!int_TREE_XY){
-          const int64_t ie_dwi = MIN(ie0,dwi);
-          for(i = is0+wio; i < (wio+ie_dwi); i++){
+          const int64_t ie_dwi = MIN(ie,dwi);
+          for(i = is+wio; i < (wio+ie_dwi); i++){
             for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
               tcvk = 0.0;
               if(j == i){
@@ -5168,12 +5198,9 @@ double *cv){
             *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
           }
         } else {
-          /*
-          const int64_t i0 = wio + bs / wjk;
-          for(i = i0, b = bs; (i < (i0+dwi)) && (i < num_obs_train) && (b < be); i++){
-            const int64_t j0 = wjo + (b % wjk)/wk;
-            const int64_t dwj0 = MIN(num_obs_train, j0+dwj) - j0;
+          const int64_t ie_dwi = MIN(ie,dwi);
 
+          for(i = is+wio; i < (wio+ie_dwi); i++){
             // generate the kx-ij interaction list
             nl.n = 0;
 
@@ -5187,27 +5214,37 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Xi_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
             }
 
-            boxSearchNLPartial(kdt_extern_XY, &nlps, bb, &nl, xyd, num_reg_continuous);
+            reset_fake_nodes(kdt_extern_XY);
+            boxSearchNLPartialIdx(kdt_extern_XY, &nlps, bb, &nl, xyd, num_reg_continuous, idxj);
+            create_fake_nodes(kdt_extern_XY, &nl, idxj);
 
-            for(j = j0, tcvj = 0.0; (j < (j0 + dwj0)) && (b < be); j++){              
-              const int64_t k0 = wko + (b % wjk) % wk;
-              const int64_t dwk0 = MIN(num_obs_train, k0+dwk) - k0;
-              tcvk = 0.0;
-              if(j == i){
-                b += dwk0;
-                continue;
-              }
-              for(k = k0; (k < (k0 + dwk0)) && (b < be); k++,b++){
-                if(k == i) continue;
-                tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[(j-wjo)*wk + k-wko];
-              }
+            tcvj = 0.0;
+            for (m = 0; m < nl.n; m++){
+              const int64_t jstart = kdt_extern_XY->kdn[nl.node[m]].istart;
+              const int64_t jnlev = kdt_extern_XY->kdn[nl.node[m]].nlev;
+              // nb, create_fake_nodes means that j -> j-wjo, and we don't need to compute the offsets
+              // when indexing with j
 
-              tcvj += kx_ij[(i-wio)*wj + j-wjo]*tcvk;
+              for(j = jstart; j < (jstart + jnlev); j++){              
+                tcvk = 0.0;
+                if((j+wjo) == i){
+                  continue;
+                }
+
+                const double tkxij = kx_ij[(i-wio)*wj + j];
+
+                for(k = wko; k < (wko + dwk); k++){
+                  if(k == i) continue;
+                  tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[j*wk + k-wko];
+                }
+
+                tcvj += tkxij*tcvk;
+              }
             }
             const int tixy = ipt_lookup_extern_X[ipt_extern_XY[i]];
             *cv += tcvj/(mean[tixy]*mean[tixy] + DBL_MIN);
           }
-          */
+
         }
       }
     }
@@ -5265,6 +5302,8 @@ double *cv){
   clean_nl(&nl);
   clean_nl(&nls);
   clean_nl(&nlps);
+
+  reset_fake_nodes(kdt_extern_XY);
 
   return(0);
 }
@@ -5515,7 +5554,7 @@ double *SIGN){
                            int_TREE_X,
                            0,
                            kdt_extern_X,
-                           NULL, NULL,
+                           NULL, NULL, NULL,
                            matrix_X_unordered_train, // TRAIN
                            matrix_X_ordered_train,
                            matrix_X_continuous_train,
@@ -5760,7 +5799,7 @@ double *SIGN){
                                  (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
                                  0,
                                  (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                                 NULL, NULL,
+                                 NULL, NULL, NULL,
                                  PXU, // TRAIN
                                  PXO, 
                                  PXC,
@@ -5830,7 +5869,7 @@ double *SIGN){
                              (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
                              0,
                              (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
-                             NULL, NULL,
+                             NULL, NULL, NULL,
                              PXU, // TRAIN
                              PXO, 
                              PXC,
@@ -6120,7 +6159,7 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          int_TREE_X,
                          0,
                          kdt_extern_X,
-                         NULL, NULL,
+                         NULL, NULL, NULL,
                          matrix_X_unordered,
                          matrix_X_ordered,
                          matrix_X_continuous,
@@ -6242,7 +6281,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          int_TREE_X,
                          0,
                          kdt_extern_X,
-                         NULL, NULL,
+                         NULL, NULL, NULL,
                          matrix_X_unordered,
                          matrix_X_ordered,
                          matrix_X_continuous,
@@ -6298,7 +6337,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          int_TREE_X,
                          0,
                          kdt_extern_X,
-                         NULL, NULL,
+                         NULL, NULL, NULL,
                          matrix_X_unordered,
                          matrix_X_ordered,
                          matrix_X_continuous,
@@ -6465,7 +6504,7 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          int_TREE_X,
                          0,
                          kdt_extern_X,
-                         NULL, NULL,
+                         NULL, NULL, NULL,
                          matrix_X_unordered_train,
                          matrix_X_ordered_train,
                          matrix_X_continuous_train,
@@ -6678,7 +6717,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          int_TREE_XY,
                          0,
                          kdt_extern_XY,
-                         NULL, NULL,
+                         NULL, NULL, NULL,
                          matrix_XY_unordered,
                          matrix_XY_ordered,
                          matrix_XY_continuous,
@@ -6725,7 +6764,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          int_TREE_X,
                          0,
                          kdt_extern_X,
-                         NULL, NULL,
+                         NULL, NULL, NULL,
                          matrix_X_unordered,
                          matrix_X_ordered,
                          matrix_X_continuous,

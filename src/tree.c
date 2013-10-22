@@ -50,8 +50,9 @@ void build_kdtree(double ** p, int nump, int ndim, int nbucket, int * ip, KDT **
     kdx->kdn[i].childl = -1;
     kdx->kdn[i].childu = -1;
   }
-
+  kdx->numnode_tree = numnode;
   kdx->numnode = numnode;
+  kdx->nallocnode = numnode;
   kdx->nbucket = nbucket;
   kdx->ndim = ndim;
 
@@ -258,6 +259,49 @@ void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restr
   }
 }
 
+// index-restricted (inclusive) partial search
+// NB - 
+// 1) use create_fake_nodes to ensure that all indices are relative to idx[0], and are clamped to the range idx[0]..idx[1]
+// 2) once you are done with your fake results, call reset_fake_nodes
+// 3) call create_fake_nodes before reuse if reset_fake_nodes has been called in the meanwhile
+
+void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, int * idim, int nidim, int * idx){
+  int res, tt[4], i;
+  while (search->n > 0){
+    const int node = search->node[search->n - 1];
+    
+    const int il = kdt->kdn[node].istart;
+    const int ih = kdt->kdn[node].istart+kdt->kdn[node].nlev-1;
+
+    tt[0] = (il >= idx[0]);
+    tt[1] = (il > idx[1]);
+
+    tt[2] = (ih < idx[0]);
+    tt[3] = (ih <= idx[1]);
+
+    if(!((tt[0] == tt[1]) && (tt[2] == tt[3])))
+      res = boxIntersectPartial(bb, kdt->kdn[node].bb, idim, nidim);
+    else
+      res = KD_MISS;
+
+    if(res == KD_MISS) {
+      search->n--;
+      continue;
+    }
+
+    if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
+      check_grow_nl(nl);
+      nl->node[nl->n++] = node;
+      search->n--;
+    }
+    else { // KD_HITOPEN
+      check_grow_nl(search);
+      search->node[search->n - 1] = kdt->kdn[node].childu;
+      search->node[search->n++] = kdt->kdn[node].childl;
+    }
+  }
+}
+
 void check_grow_nl(NL * restrict nl){
   if(nl->n == nl->nalloc){
     nl->node = realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
@@ -285,6 +329,35 @@ void mirror_nl(NL * restrict nla, NL * restrict nlb){
     nlb->node[i] = nla->node[i];
   
   nlb->n = nla->n; 
+}
+
+void check_grow_kdt(KDT * kdx, int n){
+  if((kdx->numnode+n) > kdx->nallocnode){
+    kdx->kdn = (KDN *)realloc(kdx->kdn, (kdx->nallocnode + 10*n)*sizeof(KDN));
+
+    if(kdx->kdn == NULL)
+      error("failed to grow tree");
+    
+    kdx->nallocnode += 10*n;
+  }
+}
+
+void create_fake_nodes(KDT * restrict kdt, NL * restrict nl, int * restrict idx){
+  int i;
+  check_grow_kdt(kdt, nl->n);
+
+  for(i = 0; i < nl->n; i++){    
+    kdt->kdn[kdt->numnode].istart = MAX(idx[0], kdt->kdn[nl->node[i]].istart) - idx[0];
+    kdt->kdn[kdt->numnode].nlev = MIN(idx[1], kdt->kdn[nl->node[i]].childu) - kdt->kdn[kdt->numnode].istart + 1;
+
+    nl->node[i] = kdt->numnode++;
+  }
+
+}
+
+void reset_fake_nodes(KDT * restrict kdx){
+  if(kdx != NULL)
+    kdx->numnode = kdx->numnode_tree;
 }
 
 void free_kdtree(KDT ** kdt){
