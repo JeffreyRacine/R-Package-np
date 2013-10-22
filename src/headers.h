@@ -200,7 +200,7 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor);
 int unique(int num_obs, double *x);
 void spinner(int num);
 
-int kernel_weighted_sum_np(int * KERNEL_reg, int * KERNEL_unordered_reg, int * KERNEL_ordered_reg, const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const int leave_one_out, const int leave_one_out_offset, const int kernel_pow, const int bandwidth_divide, const int do_smooth_coef_weights, const int symmetric, const int gather_scatter, const int drop_one_train, const int drop_which_train, const int * const operator, const int permutation_operator, const int do_score, const int do_ocg, const int suppress_parallel, const int ncol_Y, const int ncol_W, const int int_TREE, KDT * const kdt, double ** matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double ** matrix_Y, double ** matrix_W, double * sgn, double *vector_scale_factor,int *num_categories,double ** matrix_categorical_vals, int ** matrix_ordered_indices, double * const restrict weighted_sum,  double * const restrict weighted_permutation_sum, double * const restrict kw);
+int kernel_weighted_sum_np(int * KERNEL_reg, int * KERNEL_unordered_reg, int * KERNEL_ordered_reg, const int BANDWIDTH_reg, const int num_obs_train, const int num_obs_eval, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const int leave_one_out, const int leave_one_out_offset, const int kernel_pow, const int bandwidth_divide, const int do_smooth_coef_weights, const int symmetric, const int gather_scatter, const int drop_one_train, const int drop_which_train, const int * const operator, const int permutation_operator, const int do_score, const int do_ocg, const int suppress_parallel, const int ncol_Y, const int ncol_W, const int int_TREE, const int do_partial_tree, KDT * const kdt, NL * const inl, int * const nld, int * const idx, double ** matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double ** matrix_Y, double ** matrix_W, double * sgn, double *vector_scale_factor,int *num_categories,double ** matrix_categorical_vals, int ** matrix_ordered_indices, double * const restrict weighted_sum,  double * const restrict weighted_permutation_sum, double * const restrict kw);
 
 int kernel_convolution_weighted_sum(int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_reg,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_X_unordered_eval,double **matrix_X_ordered_eval,double **matrix_X_continuous_eval,double *vector_Y,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *kernel_sum);
 
@@ -220,10 +220,14 @@ int np_cuokernelv_loo_mlcv(int KERNEL, int uKERNEL, int oKERNEL,
 int np_kernel_estimate_con_density_categorical_convolution_cv(int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_Y_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *vector_scale_factor, int *num_categories, double ** matrix_categorical_vals, double *cv);
 double np_cv_func_con_density_categorical_ls(double *vector_scale_factor);
 double np_cv_func_con_density_categorical_ml(double *vector_scale_factor);
+double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor);
 
 double np_kernel_estimate_distribution_ls_cv(int KERNEL_den,int KERNEL_den_unordered,int KERNEL_den_ordered,int BANDWIDTH_den,int num_obs_train,int num_obs_eval,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous, int fast,double ** matrix_X_unordered_train,double ** matrix_X_ordered_train,double ** matrix_X_continuous_train,double ** matrix_X_unordered_eval,double ** matrix_X_ordered_eval,double ** matrix_X_continuous_eval,double * vsf,int * num_categories,double ** matrix_categorical_vals,double * cv);
 
-int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERNEL_den,int KERNEL_unordered_den,int KERNEL_ordered_den,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_den,int num_obs,int num_obs_eval,int num_var_unordered,int num_var_ordered,int num_var_continuous,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,int fast,double memfac, double **matrix_Y_unordered_train,double **matrix_Y_ordered_train,double **matrix_Y_continuous_train,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_Y_unordered_eval,double **matrix_Y_ordered_eval,double **matrix_Y_continuous_eval,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *cv);
+int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERNEL_den,int KERNEL_unordered_den,int KERNEL_ordered_den,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_den,int64_t num_obs_train,int64_t num_obs_eval,int num_var_unordered,int num_var_ordered,int num_var_continuous,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double memfac, double **matrix_Y_unordered_train,double **matrix_Y_ordered_train,double **matrix_Y_continuous_train,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_Y_unordered_eval,double **matrix_Y_ordered_eval,double **matrix_Y_continuous_eval,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *cv);
+
+int np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv(int KERNEL_var,int KERNEL_unordered_var,int KERNEL_ordered_var,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_den,int64_t num_obs_train,int num_var_unordered,int num_var_ordered,int num_var_continuous,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double memfac,double **matrix_Y_unordered_train,double **matrix_Y_ordered_train,double **matrix_Y_continuous_train,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_XY_unordered_train,double **matrix_XY_ordered_train,double **matrix_XY_continuous_train,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *cv);
+
 
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 
@@ -403,6 +407,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CBW_FTOLD  0
 #define CBW_TOLD   1
 #define CBW_SMALLD 2
+#define CBW_MEMFACD 3
 
 #define CBWM_CVML 0
 #define CBWM_CVLS 1
@@ -436,9 +441,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CDBW_UNORDI 21
 #define CDBW_UNCONI 22
 #define CDBW_AUTOI 23
-#define CDBW_FASTI 24
-#define CDBW_CDFONTRAIN 25
-#define CDBW_TREEI 26
+#define CDBW_CDFONTRAIN 24
+#define CDBW_TREEI 25
 
 #define CDBW_FTOLD  0
 #define CDBW_TOLD   1
