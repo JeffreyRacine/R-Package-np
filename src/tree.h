@@ -46,13 +46,15 @@ void check_grow_nl(NL * nl);
 void check_grow_kdt(KDT * kdx, int n);
 void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl);
 void clean_nl(NL * restrict nl);
+void clean_xl(XL * restrict xl);
 void mirror_nl(NL * restrict nla, NL * restrict nlb);
 int boxIntersectPartial(double * bbs, double * bbb, int * restrict idim, int nidim);
-void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, int * restrict idim, int nidim);
-void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, int * idim, int nidim, int * idx);
+void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl, int * idim, int nidim);
+void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl, int * idim, int nidim, int * idx);
 
 void reset_fake_nodes(KDT * restrict kdx);
 void create_fake_nodes(KDT * restrict kdt, NL * restrict nl, int * restrict idx);
 
 void merge_end_xl(XL * restrict xl, KDN * restrict kdn);
+void merge_end_xl_idx(XL * restrict xl, KDN * restrict kdn, int * restrict idx);
 #endif

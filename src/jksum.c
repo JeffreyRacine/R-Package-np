@@ -1897,7 +1897,6 @@ double * const kw){
 
   int p_ipow = 0, * bpow = NULL;
   NL nl = {.node = NULL, .n = 0, .nalloc = 0};
-  NL nls = {.node = NULL, .n = 0, .nalloc = 0};
 
   NL * pnl=  np_ks_tree_use ? &nl : NULL;
 
@@ -2253,8 +2252,6 @@ double * const kw){
 
         boxSearch(kdt, 0, bb, pnl);
       } else {
-        // set the search list
-        mirror_nl(inl, &nls);
 
         for(i = 0; i < num_reg_continuous; i++){
           const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
@@ -2265,10 +2262,10 @@ double * const kw){
           bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
         }
         if(idx == NULL)
-          boxSearchNLPartial(kdt, &nls, bb, &nl, nld, num_reg_continuous);
+          boxSearchNLPartial(kdt, inl, bb, &nl, NULL, nld, num_reg_continuous);
         else {
           reset_fake_nodes(kdt);
-          boxSearchNLPartialIdx(kdt, &nls, bb, &nl, nld, num_reg_continuous, idx);
+          boxSearchNLPartialIdx(kdt, inl, bb, &nl, NULL, nld, num_reg_continuous, idx);
           create_fake_nodes(kdt, &nl, idx);
         }
       }
@@ -2291,9 +2288,6 @@ double * const kw){
 
             boxSearch(kdt, 0, bb, p_pnl + ii);
           } else {
-            // set the search list
-            mirror_nl(inl, &nls);
-
             for(i = 0; i < num_reg_continuous; i++){
               const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
               bb[2*nld[i]] = -cksup[knp][1];
@@ -2304,9 +2298,9 @@ double * const kw){
               bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
             }
             if(idx == NULL)
-              boxSearchNLPartial(kdt, &nls, bb, p_pnl + ii, nld, num_reg_continuous);
+              boxSearchNLPartial(kdt, inl, bb, p_pnl + ii, NULL, nld, num_reg_continuous);
             else{
-              boxSearchNLPartialIdx(kdt, &nls, bb, p_pnl + ii, nld, num_reg_continuous, idx);
+              boxSearchNLPartialIdx(kdt, inl, bb, p_pnl + ii, NULL, nld, num_reg_continuous, idx);
               create_fake_nodes(kdt, p_pnl + ii, idx);
             }
           }
@@ -2468,7 +2462,6 @@ double * const kw){
 #endif
 
   clean_nl(&nl);
-  clean_nl(&nls);
 
   free(KERNEL_reg_np);
   free(KERNEL_unordered_reg_np);
@@ -4237,9 +4230,10 @@ double *cv){
     free(kwx);
     free(kwy);
   } else {
-    NL nl = {.node = NULL, .n = 0, .nalloc = 0};
-    NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
     NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+    NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
+
+    XL xl = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
 
     int icx[num_reg_continuous], icy[num_var_continuous];
 
@@ -4273,8 +4267,11 @@ double *cv){
     if(kwys == NULL)
       error("failed to allocate kwys, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
-    nls.node = (int *)malloc(10*sizeof(int));
-    nls.nalloc = 10;
+    nls.node = (int *)malloc(sizeof(int));
+    nls.nalloc = 1;
+
+    nls.node[0] = 0;
+    nls.n = 1;
 
     for(l = 0; l < num_reg_continuous; l++)
       icx[l] = l;
@@ -4437,10 +4434,7 @@ double *cv){
           // reset the interaction node list
           nlps.n = 0;
 
-          nls.node[0] = 0;
-          nls.n = 1;
-
-          boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, icx, num_reg_continuous);
+          boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, NULL, icx, num_reg_continuous);
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
             const int64_t jo = j - wyo;
@@ -4454,9 +4448,7 @@ double *cv){
 
             // search for the point (x_i,y_j) in the xy tree
             // reset the interaction node list
-            nl.n = 0;
-
-            mirror_nl(&nlps, &nls);
+            xl.n = 0;
 
             for(l = num_reg_continuous; l < num_all_cvar; l++){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
@@ -4466,14 +4458,12 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Y_continuous_eval[l-num_reg_continuous][j] + bb[2*l+1]*vsfxy[l]);
             }
 
-            boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nl, icy, num_var_continuous);
+            boxSearchNLPartial(kdt_extern_XY, &nlps, bb, NULL, &xl, icy, num_var_continuous);
 
             xyj = 0.0;
 
-            for (m = 0; m < nl.n; m++){
-              const int64_t istart = kdt_extern_XY->kdn[nl.node[m]].istart;
-              const int64_t nlev = kdt_extern_XY->kdn[nl.node[m]].nlev;
-              for (l = istart; l < (istart + nlev); l++){
+            for (m = 0; m < xl.n; m++){
+              for (l = xl.istart[m]; l < (xl.istart[m] + xl.nlev[m]); l++){
                 xyj += kwys[jo*num_obs_train+l]*kwxs[io*num_obs_train+l];
               }
             }
@@ -4495,10 +4485,10 @@ double *cv){
     free(kwxs);
     free(kwys);
 
-    clean_nl(&nl);
     clean_nl(&nls);
     clean_nl(&nlps);
 
+    clean_xl(&xl);
   }
 
   free(x_operator);
@@ -4616,20 +4606,20 @@ double *cv){
 
   int m_ij, m_ik;
 
-  NL nl = {.node = NULL, .n = 0, .nalloc = 0};
-  NL nl_alt = {.node = NULL, .n = 0, .nalloc = 0};
   NL nls = {.node = NULL, .n = 0, .nalloc = 0};
-  NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
+
+  NL nl_xik = {.node = NULL, .n = 0, .nalloc = 0};
+
+  XL xl_xij = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
+  XL xl_xik = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
+  XL xl_yjk = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
 
   nls.node = (int *)malloc(sizeof(int));
   nls.nalloc = 1;
 
   nls.node[0] = 0;
   nls.n = 1;
-
-  nlps.node = (int *)malloc(10*sizeof(int));
-  nlps.nalloc = 10;
-
+  
   int xyd[num_all_cvar];
   int idxi[2], idxj[2], idxk[2];
 
@@ -5203,10 +5193,9 @@ double *cv){
           const int64_t ie_dwi = MIN(ie,dwi);
 
           for(i = is+wio; i < (wio+ie_dwi); i++){
-            // generate the kx-ij interaction list
-            nl.n = 0;
-
-            mirror_nl(&nls, &nlps);
+            // reset interaction lists
+            xl_xij.n = 0;
+            xl_xik.n = 0;
 
             for(l = 0; l < num_reg_continuous; l++){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
@@ -5216,24 +5205,14 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Xi_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
             }
 
-            reset_fake_nodes(kdt_extern_XY);
-            boxSearchNLPartialIdx(kdt_extern_XY, &nlps, bb, &nl, xyd, num_reg_continuous, idxj);
-            create_fake_nodes(kdt_extern_XY, &nl, idxj);
-
-            // kx-ik interactions
-            nl_alt.n = 0;
-
-            mirror_nl(&nls, &nlps);
-
-            boxSearchNLPartialIdx(kdt_extern_XY, &nlps, bb, &nl_alt, xyd, num_reg_continuous, idxk);
-            create_fake_nodes(kdt_extern_XY, &nl_alt, idxk);
+            boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xij, xyd, num_reg_continuous, idxj);
+            boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xik, xyd, num_reg_continuous, idxk);
 
             tcvj = 0.0;
-            for (m_ij = 0; m_ij < nl.n; m_ij++){
-              const int64_t jstart = kdt_extern_XY->kdn[nl.node[m_ij]].istart;
-              const int64_t jnlev = kdt_extern_XY->kdn[nl.node[m_ij]].nlev;
-              // nb, create_fake_nodes means that j -> j-wjo, and we don't need to compute the offsets
-              // when indexing with j
+            for (m_ij = 0; m_ij < xl_xij.n; m_ij++){
+              // j is offset by wjo!
+              const int64_t jstart = xl_xij.istart[m_ij] - wjo;
+              const int64_t jnlev = xl_xij.nlev[m_ij];
 
               for(j = jstart; j < (jstart + jnlev); j++){              
                 tcvk = 0.0;
@@ -5243,9 +5222,9 @@ double *cv){
 
                 const double tkxij = kx_ij[(i-wio)*wj + j];
                 if (tkxij != 0.0) {
-                  for (m_ik = 0; m_ik < nl_alt.n; m_ik++){
-                    const int64_t kstart = kdt_extern_XY->kdn[nl_alt.node[m_ik]].istart;
-                    const int64_t knlev = kdt_extern_XY->kdn[nl_alt.node[m_ik]].nlev;
+                  for (m_ik = 0; m_ik < xl_xik.n; m_ik++){
+                    const int64_t kstart = xl_xik.istart[m_ik] - wko;
+                    const int64_t knlev = xl_xik.nlev[m_ik];
 
                     for(k = kstart; k < (kstart + knlev); k++){
                       if((k+wko) == i) continue;
@@ -5314,12 +5293,12 @@ double *cv){
   free(matrix_Yk_unordered_train);
   free(matrix_Yk_ordered_train);
 
-  clean_nl(&nl);
-  clean_nl(&nl_alt);
   clean_nl(&nls);
-  clean_nl(&nlps);
+  clean_nl(&nl_xik);
 
-  reset_fake_nodes(kdt_extern_XY);
+  clean_xl(&xl_xij);
+  clean_xl(&xl_xik);
+  clean_xl(&xl_yjk);
 
   return(0);
 }

@@ -194,7 +194,7 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
   if(res == KD_MISS) return;
 
   if(nl->n == nl->nalloc){
-    nl->node = realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
+    nl->node = (int *)realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
     if(!(nl->node != NULL))
       error("!(nl->node != NULL)");
     
@@ -211,7 +211,7 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
 
 // purely iterative version
 void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl){
-  NL nls;
+  NL nls = {.node = NULL, .n = 0, .nalloc = 0};
   mirror_nl(search, &nls);
 
   while (nls.n > 0){
@@ -246,26 +246,36 @@ void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb,
 }
 
 // purely iterative version
-void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, int * idim, int nidim){
-  while (search->n > 0){
-    const int node = search->node[search->n - 1];
+void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl, int * idim, int nidim){
+  NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+  mirror_nl(search, &nls);
+
+  while (nls.n > 0){
+    const int node = nls.node[nls.n - 1];
 
     int res = boxIntersectPartial(bb, kdt->kdn[node].bb, idim, nidim);
 
     if(res == KD_MISS) {
-      search->n--;
+      nls.n--;
       continue;
     }
 
     if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
-      check_grow_nl(nl);
-      nl->node[nl->n++] = node;
-      search->n--;
+      if(nl != NULL){
+        check_grow_nl(nl);
+        nl->node[nl->n++] = node;
+      }
+
+      if(xl != NULL){
+        merge_end_xl(xl, &kdt->kdn[node]);
+      }
+
+      nls.n--;
     }
     else { // KD_HITOPEN
-      check_grow_nl(search);
-      search->node[search->n - 1] = kdt->kdn[node].childu;
-      search->node[search->n++] = kdt->kdn[node].childl;
+      check_grow_nl(&nls);
+      nls.node[nls.n - 1] = kdt->kdn[node].childu;
+      nls.node[nls.n++] = kdt->kdn[node].childl;
     }
   }
 }
@@ -276,10 +286,14 @@ void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restr
 // 2) once you are done with your fake results, call reset_fake_nodes
 // 3) call create_fake_nodes before reuse if reset_fake_nodes has been called in the meanwhile
 
-void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, int * idim, int nidim, int * idx){
+void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl, int * idim, int nidim, int * idx){
   int res, tt[4], i;
-  while (search->n > 0){
-    const int node = search->node[search->n - 1];
+
+  NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+  mirror_nl(search, &nls);
+
+  while (nls.n > 0){
+    const int node = nls.node[nls.n - 1];
     
     const int il = kdt->kdn[node].istart;
     const int ih = kdt->kdn[node].istart+kdt->kdn[node].nlev-1;
@@ -296,26 +310,33 @@ void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * re
       res = KD_MISS;
 
     if(res == KD_MISS) {
-      search->n--;
+      nls.n--;
       continue;
     }
 
     if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
-      check_grow_nl(nl);
-      nl->node[nl->n++] = node;
-      search->n--;
+      if(nl != NULL){
+        check_grow_nl(nl);
+        nl->node[nl->n++] = node;
+      }
+
+      if(xl != NULL){
+        merge_end_xl_idx(xl, &kdt->kdn[node], idx);
+      }
+
+      nls.n--;
     }
     else { // KD_HITOPEN
-      check_grow_nl(search);
-      search->node[search->n - 1] = kdt->kdn[node].childu;
-      search->node[search->n++] = kdt->kdn[node].childl;
+      check_grow_nl(&nls);
+      nls.node[nls.n - 1] = kdt->kdn[node].childu;
+      nls.node[nls.n++] = kdt->kdn[node].childl;
     }
   }
 }
 
 void check_grow_nl(NL * restrict nl){
   if(nl->n == nl->nalloc){
-    nl->node = realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
+    nl->node = (int *)realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
     if(!(nl->node != NULL))
       error("!(nl->node != NULL)");
     
@@ -323,16 +344,27 @@ void check_grow_nl(NL * restrict nl){
   }
 }
 
-void clean_nl(NL * nl){
+void clean_nl(NL * restrict nl){
   if(nl->node != NULL)
     free(nl->node);
   nl->node = NULL;
   nl->n = nl->nalloc = 0;    
 }
 
+void clean_xl(XL * restrict xl){
+  if(xl->istart != NULL)
+    free(xl->istart);
+
+  if(xl->nlev != NULL)
+    free(xl->nlev);
+
+  xl->nlev = xl->istart = NULL;
+  xl->n = xl->nalloc = 0;    
+}
+
 void mirror_nl(NL * restrict nla, NL * restrict nlb){
   if(nla->n > nlb->nalloc){
-    nlb->node = realloc(nlb->node, (1+nla->n)*sizeof(int));
+    nlb->node = (int *)realloc(nlb->node, (1+nla->n)*sizeof(int));
     nlb->nalloc = nla->n + 1;
   }
 
@@ -379,11 +411,29 @@ void merge_end_xl(XL * restrict xl, KDN * restrict kdn){
     xl->nalloc = MAX(10, 2*xl->nalloc);
   }
 
-  if(kdn->istart == (xl->istart[xl->n-1] + xl->nlev[xl->n-1])){
+  if((xl->n != 0) && (kdn->istart == (xl->istart[xl->n-1] + xl->nlev[xl->n-1]))){
     xl->nlev[xl->n-1] += kdn->nlev;
   } else {
     xl->istart[xl->n] = kdn->istart;
     xl->nlev[xl->n++] = kdn->nlev;
+  }
+}
+
+void merge_end_xl_idx(XL * restrict xl, KDN * restrict kdn, int * restrict idx){
+  if(xl->n == xl->nalloc){
+    xl->istart = (int *)realloc(xl->istart, MAX(10,2*xl->nalloc)*sizeof(int));
+    xl->nlev = (int *)realloc(xl->nlev, MAX(10,2*xl->nalloc)*sizeof(int));
+
+    xl->nalloc = MAX(10, 2*xl->nalloc);
+  }
+
+  if((xl->n != 0) && (kdn->istart == (xl->istart[xl->n-1] + xl->nlev[xl->n-1]))){
+    xl->nlev[xl->n-1] += kdn->nlev;
+    xl->nlev[xl->n-1] = MIN(idx[1], xl->istart[xl->n-1] + xl->nlev[xl->n-1] - 1) - xl->istart[xl->n-1] + 1;
+  } else {
+    xl->istart[xl->n] = MAX(idx[0], kdn->istart);
+    xl->nlev[xl->n] = MIN(idx[1], kdn->istart + kdn->nlev - 1) - xl->istart[xl->n] + 1;
+    xl->n++;
   }
 }
 
