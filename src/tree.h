@@ -30,6 +30,12 @@ struct nl {
 
 typedef struct nl NL;
 
+struct xl {
+  int * istart, * nlev, n, nalloc;
+};
+
+typedef struct xl XL;
+
 void build_kdtree(double ** p, int nump, int ndim, int nbucket, int * ip, KDT ** kdt);
 void kdSelect(double ** p, KDT * kdt, int * ip, int d, int k, int l, int r);
 int build_tree(double ** p, KDT * kdt, int * ip, int node, int d, int nlev, int istart);
@@ -38,7 +44,7 @@ int boxIntersect(double * bbs, double * bbb, int ndim);
 void boxSearch(KDT * kdt, int node, double * bb, NL * nl);
 void check_grow_nl(NL * nl);
 void check_grow_kdt(KDT * kdx, int n);
-void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl);
+void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl);
 void clean_nl(NL * restrict nl);
 void mirror_nl(NL * restrict nla, NL * restrict nlb);
 int boxIntersectPartial(double * bbs, double * bbb, int * restrict idim, int nidim);
@@ -48,4 +54,5 @@ void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * re
 void reset_fake_nodes(KDT * restrict kdx);
 void create_fake_nodes(KDT * restrict kdt, NL * restrict nl, int * restrict idx);
 
+void merge_end_xl(XL * restrict xl, KDN * restrict kdn);
 #endif

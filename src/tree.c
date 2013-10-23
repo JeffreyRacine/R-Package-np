@@ -210,28 +210,39 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
 }
 
 // purely iterative version
-void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl){
-  while (search->n > 0){
-    const int node = search->node[search->n - 1];
+void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl){
+  NL nls;
+  mirror_nl(search, &nls);
+
+  while (nls.n > 0){
+    const int node = nls.node[nls.n - 1];
 
     int res = boxIntersect(bb, kdt->kdn[node].bb, kdt->ndim);
 
     if(res == KD_MISS) {
-      search->n--;
+      nls.n--;
       continue;
     }
 
     if((res == KD_HITDONE) || (kdt->kdn[node].childl == KD_NOCHILD)){
-      check_grow_nl(nl);
-      nl->node[nl->n++] = node;
-      search->n--;
+      if(nl != NULL){
+        check_grow_nl(nl);
+        nl->node[nl->n++] = node;
+      }
+
+      if(xl != NULL){
+        merge_end_xl(xl, &kdt->kdn[node]);
+      }
+
+      nls.n--;
     }
     else { // KD_HITOPEN
-      check_grow_nl(search);
-      search->node[search->n - 1] = kdt->kdn[node].childu;
-      search->node[search->n++] = kdt->kdn[node].childl;
+      check_grow_nl(&nls);
+      nls.node[nls.n - 1] = kdt->kdn[node].childu;
+      nls.node[nls.n++] = kdt->kdn[node].childl;
     }
   }
+  clean_nl(&nls);
 }
 
 // purely iterative version
@@ -358,6 +369,22 @@ void create_fake_nodes(KDT * restrict kdt, NL * restrict nl, int * restrict idx)
 void reset_fake_nodes(KDT * restrict kdx){
   if(kdx != NULL)
     kdx->numnode = kdx->numnode_tree;
+}
+
+void merge_end_xl(XL * restrict xl, KDN * restrict kdn){
+  if(xl->n == xl->nalloc){
+    xl->istart = (int *)realloc(xl->istart, MAX(10,2*xl->nalloc)*sizeof(int));
+    xl->nlev = (int *)realloc(xl->nlev, MAX(10,2*xl->nalloc)*sizeof(int));
+
+    xl->nalloc = MAX(10, 2*xl->nalloc);
+  }
+
+  if(kdn->istart == (xl->istart[xl->n-1] + xl->nlev[xl->n-1])){
+    xl->nlev[xl->n-1] += kdn->nlev;
+  } else {
+    xl->istart[xl->n] = kdn->istart;
+    xl->nlev[xl->n++] = kdn->nlev;
+  }
 }
 
 void free_kdtree(KDT ** kdt){
