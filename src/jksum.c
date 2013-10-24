@@ -979,7 +979,6 @@ void np_p_ckernelv(const int KERNEL,
                    const double x, const double h, 
                    double * const result,
                    double * const p_result,
-                   KDT * const kdt,
                    const XL * const xl,
                    const XL * const p_xl,
                    const int swap_xxt,
@@ -1081,7 +1080,6 @@ void np_ckernelv(const int KERNEL,
                  const int do_xw,
                  const double x, const double h, 
                  double * const result,
-                 KDT * const kdt,
                  const XL * const xl,
                  const int swap_xxt){
 
@@ -1170,7 +1168,6 @@ void np_p_ukernelv(const int KERNEL,
                    const double cat,
                    double * const result,
                    double * const p_result,
-                   KDT * const kdt,
                    const XL * const xl,
                    const XL * const p_xl,
                    const int swap_xxt,
@@ -1263,7 +1260,6 @@ void np_ukernelv(const int KERNEL,
                  const int do_xw,
                  const double x, const double lambda, const int ncat,
                  double * const result,
-                 KDT * const kdt,
                  const XL * const xl){
 
   /* 
@@ -1335,7 +1331,6 @@ void np_p_okernelv(const int KERNEL,
                    const double * cats, const int ncat,
                    double * const result,
                    double * const p_result,
-                   KDT * const kdt,
                    const XL * const xl,
                    const XL * const p_xl,
                    const int swap_xxt,
@@ -1449,7 +1444,6 @@ void np_okernelv(const int KERNEL,
                  const double x, const double lambda,
                  const double * cats, const int ncat,
                  double * const result,
-                 KDT * const kdt,
                  const XL * const xl,
                  const int swap_xxt){
   
@@ -1522,7 +1516,6 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                            const int gather_scatter,
                            const int bandwidth_divide, const double dband,
                            double * const result,
-                           KDT * const kdt,
                            const XL * const xl){
 
   int i,j,k, l = parallel_sum?which_l:0;
@@ -2325,9 +2318,9 @@ double * const kw){
     for(i = 0, l = 0, ip = 0; i < num_reg_continuous; i++, l++, m += mstep, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, kdt, pxl, swap_xxt);
+          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, kdt, pxl, p_pxl+ip, swap_xxt, do_perm, do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+ip, swap_xxt, do_perm, do_score);
         }
       }
       else
@@ -2359,10 +2352,10 @@ double * const kw){
     for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
       if(doscoreocg){
         np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], ip, p_nvar, xtu[i], num_xt, l, xu[i][j], 
-                      lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, kdt, pxl, p_pxl + ip, swap_xxt, do_ocg);
+                      lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + ip, swap_xxt, do_ocg);
       } else {
         np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
-                    lambda[i], num_categories[i], tprod, kdt, pxl);
+                    lambda[i], num_categories[i], tprod, pxl);
       }
     }
 
@@ -2374,7 +2367,7 @@ double * const kw){
                       xo[i][j], lambda[num_reg_unordered+i], 
                       (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                       (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                      tprod, kdt, pxl, swap_xxt);      
+                      tprod, pxl, swap_xxt);      
         } else {
           np_convol_okernelv(KERNEL_ordered_reg[i], xto[i], num_xt, l,
                              xo[i][j], lambda[num_reg_unordered+i], 
@@ -2387,7 +2380,7 @@ double * const kw){
                       xo[i][j], lambda[num_reg_unordered+i], 
                       (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                       (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                      tprod, tprod_mp, kdt, pxl, p_pxl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
+                      tprod, tprod_mp, pxl, p_pxl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
       }
     }
 
@@ -2404,7 +2397,7 @@ double * const kw){
                               symmetric,
                               gather_scatter,
                               1, dband,
-                              ws, kdt, pxl);
+                              ws, pxl);
       }
 
 
@@ -2418,7 +2411,7 @@ double * const kw){
                                 symmetric,
                                 gather_scatter,
                                 1, p_dband[ii],
-                                p_ws + ii*num_obs_eval*sum_element_length, kdt, (p_pxl == NULL) ? NULL : (p_pxl+ii));
+                                p_ws + ii*num_obs_eval*sum_element_length, (p_pxl == NULL) ? NULL : (p_pxl+ii));
         }
 
     }
