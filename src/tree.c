@@ -50,9 +50,7 @@ void build_kdtree(double ** p, int nump, int ndim, int nbucket, int * ip, KDT **
     kdx->kdn[i].childl = -1;
     kdx->kdn[i].childu = -1;
   }
-  kdx->numnode_tree = numnode;
   kdx->numnode = numnode;
-  kdx->nallocnode = numnode;
   kdx->nbucket = nbucket;
   kdx->ndim = ndim;
 
@@ -376,35 +374,6 @@ void mirror_nl(NL * restrict nla, NL * restrict nlb){
     nlb->node[i] = nla->node[i];
   
   nlb->n = nla->n; 
-}
-
-void check_grow_kdt(KDT * kdx, int n){
-  if((kdx->numnode+n) > kdx->nallocnode){
-    kdx->kdn = (KDN *)realloc(kdx->kdn, (kdx->nallocnode + 10*n)*sizeof(KDN));
-
-    if(kdx->kdn == NULL)
-      error("failed to grow tree");
-    
-    kdx->nallocnode += 10*n;
-  }
-}
-
-void create_fake_nodes(KDT * restrict kdt, NL * restrict nl, int * restrict idx){
-  int i;
-  check_grow_kdt(kdt, nl->n);
-
-  for(i = 0; i < nl->n; i++){    
-    kdt->kdn[kdt->numnode].istart = MAX(idx[0], kdt->kdn[nl->node[i]].istart) - idx[0];
-    kdt->kdn[kdt->numnode].nlev = MIN(idx[1], kdt->kdn[nl->node[i]].istart + kdt->kdn[nl->node[i]].nlev - 1) - kdt->kdn[kdt->numnode].istart + 1;
-
-    nl->node[i] = kdt->numnode++;
-  }
-
-}
-
-void reset_fake_nodes(KDT * restrict kdx){
-  if(kdx != NULL)
-    kdx->numnode = kdx->numnode_tree;
 }
 
 void merge_end_xl(XL * restrict xl, KDN * restrict kdn){
