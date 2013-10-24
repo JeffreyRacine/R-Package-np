@@ -399,13 +399,14 @@ void merge_end_xl_idx(XL * restrict xl, KDN * restrict kdn, int * restrict idx){
 
     xl->nalloc = MAX(10, 2*xl->nalloc);
   }
-
-  if((xl->n != 0) && (kdn->istart == (xl->istart[xl->n-1] + xl->nlev[xl->n-1]))){
-    xl->nlev[xl->n-1] += kdn->nlev;
-    xl->nlev[xl->n-1] = MIN(idx[1], xl->istart[xl->n-1] + xl->nlev[xl->n-1] - 1) - xl->istart[xl->n-1] + 1;
+  
+  const int xln = xl->n;
+  if((xln != 0) && ((kdn->istart - idx[0]) == (xl->istart[xln-1] + xl->nlev[xln-1]))){
+    xl->nlev[xln-1] += kdn->nlev;
+    xl->nlev[xln-1] = MIN(idx[1], xl->istart[xln-1] + xl->nlev[xln-1] - 1) - xl->istart[xln-1] + 1;
   } else {
-    xl->istart[xl->n] = MAX(idx[0], kdn->istart);
-    xl->nlev[xl->n] = MIN(idx[1], kdn->istart + kdn->nlev - 1) - xl->istart[xl->n] + 1;
+    xl->istart[xln] = MAX(0, kdn->istart-idx[0]);
+    xl->nlev[xln] = MIN(idx[1], kdn->istart + kdn->nlev - 1) - idx[0] - xl->istart[xln] + 1;
     xl->n++;
   }
 }

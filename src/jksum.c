@@ -5209,7 +5209,7 @@ double *cv){
             tcvj = 0.0;
             for (m_ij = 0; m_ij < xl_xij.n; m_ij++){
               // j is offset by wjo!
-              const int64_t jstart = xl_xij.istart[m_ij] - wjo;
+              const int64_t jstart = xl_xij.istart[m_ij];
               const int64_t jnlev = xl_xij.nlev[m_ij];
 
               for(j = jstart; j < (jstart + jnlev); j++){              
@@ -5221,7 +5221,7 @@ double *cv){
                 const double tkxij = kx_ij[(i-wio)*wj + j];
                 if (tkxij != 0.0) {
                   for (m_ik = 0; m_ik < xl_xik.n; m_ik++){
-                    const int64_t kstart = xl_xik.istart[m_ik] - wko;
+                    const int64_t kstart = xl_xik.istart[m_ik];
                     const int64_t knlev = xl_xik.nlev[m_ik];
 
                     for(k = kstart; k < (kstart + knlev); k++){
