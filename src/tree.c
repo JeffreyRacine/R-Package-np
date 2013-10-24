@@ -376,6 +376,21 @@ void mirror_nl(NL * restrict nla, NL * restrict nlb){
   nlb->n = nla->n; 
 }
 
+void mirror_xl(XL * restrict xla, XL * restrict xlb){
+  if(xla->n > xlb->nalloc){
+    xlb->istart = (int *)realloc(xlb->istart, (1+xla->n)*sizeof(int));
+    xlb->nlev = (int *)realloc(xlb->nlev, (1+xla->n)*sizeof(int));
+    xlb->nalloc = xla->n + 1;
+  }
+
+  for(int i = 0; i < xla->n; i++){
+    xlb->istart[i] = xla->istart[i];
+    xlb->nlev[i] = xla->nlev[i];
+  }
+  
+  xlb->n = xla->n; 
+}
+
 void merge_end_xl(XL * restrict xl, KDN * restrict kdn){
   if(xl->n == xl->nalloc){
     xl->istart = (int *)realloc(xl->istart, MAX(10,2*xl->nalloc)*sizeof(int));

@@ -47,6 +47,7 @@ void boxSearchNL(KDT * restrict kdt, NL * restrict search, double * restrict bb,
 void clean_nl(NL * restrict nl);
 void clean_xl(XL * restrict xl);
 void mirror_nl(NL * restrict nla, NL * restrict nlb);
+void mirror_xl(XL * restrict xla, XL * restrict xlb);
 int boxIntersectPartial(double * bbs, double * bbb, int * restrict idim, int nidim);
 void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl, int * idim, int nidim);
 void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl, int * idim, int nidim, int * idx);

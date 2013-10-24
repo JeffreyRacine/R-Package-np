@@ -4606,11 +4606,8 @@ double *cv){
 
   NL nls = {.node = NULL, .n = 0, .nalloc = 0};
 
-  NL nl_xik = {.node = NULL, .n = 0, .nalloc = 0};
-
   XL xl_xij = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
   XL xl_xik = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
-  XL xl_yjk = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
 
   nls.node = (int *)malloc(sizeof(int));
   nls.nalloc = 1;
@@ -5204,7 +5201,12 @@ double *cv){
             }
 
             boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xij, xyd, num_reg_continuous, idxj);
-            boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xik, xyd, num_reg_continuous, idxk);
+
+            if((idxj[0] != idxk[0]) || (idxj[1] != idxk[1])){
+              boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xik, xyd, num_reg_continuous, idxk);
+            } else {
+              mirror_xl(&xl_xij,&xl_xik);
+            }
 
             tcvj = 0.0;
             for (m_ij = 0; m_ij < xl_xij.n; m_ij++){
@@ -5292,11 +5294,9 @@ double *cv){
   free(matrix_Yk_ordered_train);
 
   clean_nl(&nls);
-  clean_nl(&nl_xik);
 
   clean_xl(&xl_xij);
   clean_xl(&xl_xik);
-  clean_xl(&xl_yjk);
 
   return(0);
 }
