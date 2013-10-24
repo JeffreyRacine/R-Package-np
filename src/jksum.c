@@ -979,9 +979,8 @@ void np_p_ckernelv(const int KERNEL,
                    const double x, const double h, 
                    double * const result,
                    double * const p_result,
-                   KDT * const kdt,
-                   const NL * const nl,
-                   const NL * const p_nl,
+                   const XL * const xl,
+                   const XL * const p_xl,
                    const int swap_xxt,
                    const int do_perm,
                    const int do_score){
@@ -1019,7 +1018,7 @@ void np_p_ckernelv(const int KERNEL,
 
   assert(kbuf != NULL);
 
-  if(nl == NULL){
+  if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       const double kn = k[KERNEL]((x-xt[i])*sgn/h);
 
@@ -1040,9 +1039,9 @@ void np_p_ckernelv(const int KERNEL,
 
   }
   else{
-    for (int m = 0; m < nl->n; m++){
-      const int istart = kdt->kdn[nl->node[m]].istart;
-      const int nlev = kdt->kdn[nl->node[m]].nlev;
+    for (int m = 0; m < xl->n; m++){
+      const int istart = xl->istart[m];
+      const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
         const double kn = k[KERNEL]((x-xt[i])*sgn/h);
 
@@ -1052,9 +1051,9 @@ void np_p_ckernelv(const int KERNEL,
     }
 
     if(do_perm){
-      for (int m = 0; m < p_nl->n; m++){
-        const int istart = kdt->kdn[p_nl->node[m]].istart;
-        const int nlev = kdt->kdn[p_nl->node[m]].nlev;
+      for (int m = 0; m < p_xl->n; m++){
+        const int istart = p_xl->istart[m];
+        const int nlev = p_xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
         }
@@ -1063,9 +1062,9 @@ void np_p_ckernelv(const int KERNEL,
 
     for(l = 0, r = 0; l < P_NIDX; l++, r+=bin_do_xw){
       if((l == P_IDX) && do_perm) continue;
-      for (int m = 0; m < nl->n; m++){
-        const int istart = kdt->kdn[nl->node[m]].istart;
-        const int nlev = kdt->kdn[nl->node[m]].nlev;
+      for (int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           p_result[l*num_xt + i] = pxw[r*num_xt + j]*kbuf[i];
         }
@@ -1081,8 +1080,7 @@ void np_ckernelv(const int KERNEL,
                  const int do_xw,
                  const double x, const double h, 
                  double * const result,
-                 KDT * const kdt,
-                 const NL * const nl,
+                 const XL * const xl,
                  const int swap_xxt){
 
   /* 
@@ -1110,15 +1108,15 @@ void np_ckernelv(const int KERNEL,
                                    np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8, 
                                    np_cdf_rect, np_cdf_tgauss2 };
 
-  if(nl == NULL)
+  if(xl == NULL)
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       if(xw[j] == 0.0) continue;
       result[i] = xw[j]*k[KERNEL]((x-xt[i])*sgn/h);
     }
   else{
-    for (int m = 0; m < nl->n; m++){
-      const int istart = kdt->kdn[nl->node[m]].istart;
-      const int nlev = kdt->kdn[nl->node[m]].nlev;
+    for (int m = 0; m < xl->n; m++){
+      const int istart = xl->istart[m];
+      const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
         if(xw[j] == 0.0) continue;
         result[i] = xw[j]*k[KERNEL]((x-xt[i])*sgn/h);
@@ -1170,9 +1168,8 @@ void np_p_ukernelv(const int KERNEL,
                    const double cat,
                    double * const result,
                    double * const p_result,
-                   KDT * const kdt,
-                   const NL * const nl,
-                   const NL * const p_nl,
+                   const XL * const xl,
+                   const XL * const p_xl,
                    const int swap_xxt,
                    const int do_ocg){
 
@@ -1201,7 +1198,7 @@ void np_p_ukernelv(const int KERNEL,
 
   assert(kbuf != NULL);
 
-  if(nl == NULL){
+  if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       const double kn = k[KERNEL]((xt[i]==x), lambda, ncat);
 
@@ -1222,9 +1219,9 @@ void np_p_ukernelv(const int KERNEL,
 
   }
   else{
-    for (int m = 0; m < nl->n; m++){
-      const int istart = kdt->kdn[nl->node[m]].istart;
-      const int nlev = kdt->kdn[nl->node[m]].nlev;
+    for (int m = 0; m < xl->n; m++){
+      const int istart = xl->istart[m];
+      const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
         const double kn = k[KERNEL]((xt[i]==x), lambda, ncat);
 
@@ -1233,9 +1230,9 @@ void np_p_ukernelv(const int KERNEL,
       }
     }
 
-    for (int m = 0; m < p_nl->n; m++){
-      const int istart = kdt->kdn[p_nl->node[m]].istart;
-      const int nlev = kdt->kdn[p_nl->node[m]].nlev;
+    for (int m = 0; m < p_xl->n; m++){
+      const int istart = p_xl->istart[m];
+      const int nlev = p_xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
         const int iscat = (swap_xxt && do_ocg) ? (cat == x) : (xt[i] == ex);
         p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](iscat, lambda, ncat);
@@ -1245,9 +1242,9 @@ void np_p_ukernelv(const int KERNEL,
 
     for(l = 0, r = 0; l < P_NIDX; l++, r+=bin_do_xw){
       if(l == P_IDX) continue;
-      for (int m = 0; m < nl->n; m++){
-        const int istart = kdt->kdn[nl->node[m]].istart;
-        const int nlev = kdt->kdn[nl->node[m]].nlev;
+      for (int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           p_result[l*num_xt + i] = pxw[r*num_xt + j]*kbuf[i];
         }
@@ -1263,8 +1260,7 @@ void np_ukernelv(const int KERNEL,
                  const int do_xw,
                  const double x, const double lambda, const int ncat,
                  double * const result,
-                 KDT * const kdt,
-                 const NL * const nl){
+                 const XL * const xl){
 
   /* 
      this should be read as:
@@ -1280,15 +1276,15 @@ void np_ukernelv(const int KERNEL,
   double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
                                              np_econvol_uaa, np_econvol_unli_racine };
 
-  if(nl == NULL){
+  if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       if(xw[j] == 0.0) continue;
       result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
     }
   } else {
-    for (int m = 0; m < nl->n; m++){
-      const int istart = kdt->kdn[nl->node[m]].istart;
-      const int nlev = kdt->kdn[nl->node[m]].nlev;
+    for (int m = 0; m < xl->n; m++){
+      const int istart = xl->istart[m];
+      const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
         if(xw[j] == 0.0) continue;
         result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
@@ -1335,9 +1331,8 @@ void np_p_okernelv(const int KERNEL,
                    const double * cats, const int ncat,
                    double * const result,
                    double * const p_result,
-                   KDT * const kdt,
-                   const NL * const nl,
-                   const NL * const p_nl,
+                   const XL * const xl,
+                   const XL * const p_xl,
                    const int swap_xxt,
                    const int do_ocg,
                    const int * const ordered_indices,
@@ -1378,7 +1373,7 @@ void np_p_okernelv(const int KERNEL,
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
 
-    if(nl == NULL){
+    if(xl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
         const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
         const double c1 = swap_xxt ? x : xt[i];
@@ -1401,9 +1396,9 @@ void np_p_okernelv(const int KERNEL,
       }
 
     } else {
-      for (int m = 0; m < nl->n; m++){
-        const int istart = kdt->kdn[nl->node[m]].istart;
-        const int nlev = kdt->kdn[nl->node[m]].nlev;
+      for (int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           const double c1 = swap_xxt ? x : xt[i];
           const double c2 = swap_xxt ? xt[i] : x;
@@ -1415,9 +1410,9 @@ void np_p_okernelv(const int KERNEL,
         }
       }
 
-      for (int m = 0; m < p_nl->n; m++){
-        const int istart = kdt->kdn[p_nl->node[m]].istart;
-        const int nlev = kdt->kdn[p_nl->node[m]].nlev;
+      for (int m = 0; m < p_xl->n; m++){
+        const int istart = p_xl->istart[m];
+        const int nlev = p_xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           const double cat = do_ocg ? (swap_xxt ? cats[abs(ordered_indices[i] - 1)] : s_cat) : 0.0;
           const double c1 = swap_xxt ? x : xt[i];
@@ -1430,9 +1425,9 @@ void np_p_okernelv(const int KERNEL,
 
       for(l = 0, r = 0; l < P_NIDX; l++, r+=bin_do_xw){
         if(l == P_IDX) continue;
-        for (int m = 0; m < nl->n; m++){
-          const int istart = kdt->kdn[nl->node[m]].istart;
-          const int nlev = kdt->kdn[nl->node[m]].nlev;
+        for (int m = 0; m < xl->n; m++){
+          const int istart = xl->istart[m];
+          const int nlev = xl->nlev[m];
           for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
             p_result[l*num_xt + i] = pxw[r*num_xt + j]*kbuf[i];
           }
@@ -1449,8 +1444,7 @@ void np_okernelv(const int KERNEL,
                  const double x, const double lambda,
                  const double * cats, const int ncat,
                  double * const result,
-                 KDT * const kdt,
-                 const NL * const nl,
+                 const XL * const xl,
                  const int swap_xxt){
   
   /* 
@@ -1475,15 +1469,15 @@ void np_okernelv(const int KERNEL,
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
 
   if(!swap_xxt){
-    if(nl == NULL){
+    if(xl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
         if(xw[j] == 0.0) continue;
         result[i] = xw[j]*k[KERNEL](xt[i], x, lambda, cl, ch);
       }
     } else {
-      for (int m = 0; m < nl->n; m++){
-        const int istart = kdt->kdn[nl->node[m]].istart;
-        const int nlev = kdt->kdn[nl->node[m]].nlev;
+      for (int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           if(xw[j] == 0.0) continue;
           result[i] = xw[j]*k[KERNEL](xt[i], x, lambda, cl, ch);
@@ -1491,15 +1485,15 @@ void np_okernelv(const int KERNEL,
       }
     }
   } else {
-    if(nl == NULL){
+    if(xl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
         if(xw[j] == 0.0) continue;
         result[i] = xw[j]*k[KERNEL](x, xt[i], lambda, cl, ch);
       }
     } else {
-      for (int m = 0; m < nl->n; m++){
-        const int istart = kdt->kdn[nl->node[m]].istart;
-        const int nlev = kdt->kdn[nl->node[m]].nlev;
+      for (int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
           if(xw[j] == 0.0) continue;
           result[i] = xw[j]*k[KERNEL](x, xt[i], lambda, cl, ch);
@@ -1522,8 +1516,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
                            const int gather_scatter,
                            const int bandwidth_divide, const double dband,
                            double * const result,
-                           KDT * const kdt,
-                           const NL * const nl){
+                           const XL * const xl){
 
   int i,j,k, l = parallel_sum?which_l:0;
   const int kstride = (parallel_sum ? (MAX(ncol_A, 1)*MAX(ncol_B, 1)) : 0);
@@ -1555,7 +1548,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     weights[which_k] = 0.0;
   }
   
-  if(nl == NULL){
+  if(xl == NULL){
     if(!gather_scatter){
       if(!symmetric){
         if(kpow == 1){
@@ -1658,9 +1651,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     if(!gather_scatter){
       if(!symmetric){
         if(kpow == 1){
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
               if(weights[k] == 0.0) continue;
@@ -1670,9 +1663,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             }
           }
         } else { // kpow != 1
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
               if(weights[k] == 0.0) continue;
@@ -1684,9 +1677,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
         }
       } else { // symmetric
         if(kpow == 1){
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
               if(weights[k] == 0.0) continue;
@@ -1698,9 +1691,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             }
           }
         } else { // kpow != 1
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
               if(weights[k] == 0.0) continue;
@@ -1723,9 +1716,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
     } else { // gather_scatter
       if(!symmetric){
         if(kpow == 1){
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
               if(weights[k] == 0.0) continue;
@@ -1735,9 +1728,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             }
           }
         } else { // kpow != 1
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++, l+=linc){
               if(weights[k] == 0.0) continue;
@@ -1749,9 +1742,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
         }
       } else { // symmetric
         if(kpow == 1){
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++){
               if(weights[k] != 0.0){
@@ -1770,9 +1763,9 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             }
           }
         } else { // kpow != 1
-          for (int m = 0; m < nl->n; m++){
-            const int istart = kdt->kdn[nl->node[m]].istart;
-            const int nlev = kdt->kdn[nl->node[m]].nlev;
+          for (int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
             l = linc ? istart : l;
             for (k = istart; k < istart+nlev; k++){
               if(weights[k] == 0.0) continue;
@@ -1896,16 +1889,21 @@ double * const kw){
   np_ks_tree_use &= (num_reg_continuous != 0);
 
   int p_ipow = 0, * bpow = NULL;
-  NL nl = {.node = NULL, .n = 0, .nalloc = 0};
+
   NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+  XL xl = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
 
-  NL * pnl=  np_ks_tree_use ? &nl : NULL;
-
-  NL * p_pnl =  NULL;
+  XL * pxl=  np_ks_tree_use ? &xl : NULL;
+  XL * p_pxl =  NULL;
 
   if((np_ks_tree_use) && (p_nvar > 0)){
-    p_pnl = (NL *)malloc(p_nvar*sizeof(NL));
+    p_pxl = (XL *)malloc(p_nvar*sizeof(XL));
   }
+
+  // root node
+  nls.node = (int *)malloc(sizeof(int));
+  nls.node[0] = 0;
+  nls.nalloc = nls.n = 1;
 
 #ifdef MPI2
   // switch parallelisation strategies based on biggest stride
@@ -2240,7 +2238,7 @@ double * const kw){
       double bb[kdt->ndim*2];
 
       // reset the interaction node list
-      nl.n = 0;
+      xl.n = 0;
       if(!do_partial_tree){
         for(i = 0; i < num_reg_continuous; i++){
           const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
@@ -2251,10 +2249,8 @@ double * const kw){
           bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
         }
 
-        boxSearch(kdt, 0, bb, pnl);
+        boxSearchNL(kdt, &nls, bb, NULL, pxl);
       } else {
-        // set the search list
-        mirror_nl(inl, &nls);
 
         for(i = 0; i < num_reg_continuous; i++){
           const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
@@ -2265,18 +2261,16 @@ double * const kw){
           bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
         }
         if(idx == NULL)
-          boxSearchNLPartial(kdt, &nls, bb, &nl, nld, num_reg_continuous);
+          boxSearchNLPartial(kdt, inl, bb, NULL, pxl, nld, num_reg_continuous);
         else {
-          reset_fake_nodes(kdt);
-          boxSearchNLPartialIdx(kdt, &nls, bb, &nl, nld, num_reg_continuous, idx);
-          create_fake_nodes(kdt, &nl, idx);
+          boxSearchNLPartialIdx(kdt, inl, bb, NULL, pxl, nld, num_reg_continuous, idx);
         }
       }
 
       if(permutation_operator == OP_INTEGRAL){
         for(ii = 0; ii < num_reg_continuous; ii++){
           // reset the interaction node list
-          p_pnl[ii].n = 0;
+          p_pxl[ii].n = 0;
 
           if(!do_partial_tree){
             for(i = 0; i < num_reg_continuous; i++){
@@ -2289,11 +2283,8 @@ double * const kw){
               bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
             }
 
-            boxSearch(kdt, 0, bb, p_pnl + ii);
+            boxSearchNL(kdt, &nls, bb, NULL, p_pxl + ii);
           } else {
-            // set the search list
-            mirror_nl(inl, &nls);
-
             for(i = 0; i < num_reg_continuous; i++){
               const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
               bb[2*nld[i]] = -cksup[knp][1];
@@ -2304,19 +2295,18 @@ double * const kw){
               bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
             }
             if(idx == NULL)
-              boxSearchNLPartial(kdt, &nls, bb, p_pnl + ii, nld, num_reg_continuous);
+              boxSearchNLPartial(kdt, inl, bb, NULL, p_pxl + ii, nld, num_reg_continuous);
             else{
-              boxSearchNLPartialIdx(kdt, &nls, bb, p_pnl + ii, nld, num_reg_continuous, idx);
-              create_fake_nodes(kdt, p_pnl + ii, idx);
+              boxSearchNLPartialIdx(kdt, inl, bb, NULL, p_pxl + ii, nld, num_reg_continuous, idx);
             }
           }
         }
         for(ii = num_reg_continuous; ii < p_nvar; ii++){
-          p_pnl[ii] = pnl[0];
+          p_pxl[ii] = pxl[0];
         }
       } else {
         for(ii = 0; ii < p_nvar; ii++){
-          p_pnl[ii] = pnl[0];
+          p_pxl[ii] = pxl[0];
         }
       } 
 
@@ -2328,9 +2318,9 @@ double * const kw){
     for(i = 0, l = 0, ip = 0; i < num_reg_continuous; i++, l++, m += mstep, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, kdt, pnl, swap_xxt);
+          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, kdt, pnl, p_pnl+ip, swap_xxt, do_perm, do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+ip, swap_xxt, do_perm, do_score);
         }
       }
       else
@@ -2362,10 +2352,10 @@ double * const kw){
     for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
       if(doscoreocg){
         np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], ip, p_nvar, xtu[i], num_xt, l, xu[i][j], 
-                      lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, kdt, pnl, p_pnl + ip, swap_xxt, do_ocg);
+                      lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + ip, swap_xxt, do_ocg);
       } else {
         np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
-                    lambda[i], num_categories[i], tprod, kdt, pnl);
+                    lambda[i], num_categories[i], tprod, pxl);
       }
     }
 
@@ -2377,7 +2367,7 @@ double * const kw){
                       xo[i][j], lambda[num_reg_unordered+i], 
                       (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                       (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                      tprod, kdt, pnl, swap_xxt);      
+                      tprod, pxl, swap_xxt);      
         } else {
           np_convol_okernelv(KERNEL_ordered_reg[i], xto[i], num_xt, l,
                              xo[i][j], lambda[num_reg_unordered+i], 
@@ -2390,7 +2380,7 @@ double * const kw){
                       xo[i][j], lambda[num_reg_unordered+i], 
                       (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                       (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                      tprod, tprod_mp, kdt, pnl, p_pnl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
+                      tprod, tprod_mp, pxl, p_pxl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
       }
     }
 
@@ -2407,7 +2397,7 @@ double * const kw){
                               symmetric,
                               gather_scatter,
                               1, dband,
-                              ws, kdt, pnl);
+                              ws, pxl);
       }
 
 
@@ -2421,7 +2411,7 @@ double * const kw){
                                 symmetric,
                                 gather_scatter,
                                 1, p_dband[ii],
-                                p_ws + ii*num_obs_eval*sum_element_length, kdt, (p_pnl == NULL) ? NULL : (p_pnl+ii));
+                                p_ws + ii*num_obs_eval*sum_element_length, (p_pxl == NULL) ? NULL : (p_pxl+ii));
         }
 
     }
@@ -2467,9 +2457,6 @@ double * const kw){
   free(idisplsv);
 #endif
 
-  clean_nl(&nl);
-  clean_nl(&nls);
-
   free(KERNEL_reg_np);
   free(KERNEL_unordered_reg_np);
   free(KERNEL_ordered_reg_np);
@@ -2481,6 +2468,10 @@ double * const kw){
 
   free(tprod);
   free(bpow);
+  
+  clean_xl(pxl);
+  clean_nl(&nls);
+
   if(p_nvar > 0){
     free(tprod_mp);
 
@@ -2493,9 +2484,9 @@ double * const kw){
     }
 
     if(np_ks_tree_use){
-      clean_nl(pnl);
-      free(p_pnl);
-      reset_fake_nodes(kdt);
+      for(l = 0; l < p_nvar; l++)
+        clean_xl(p_pxl+l);
+      free(p_pxl);
     }
 
     free(p_dband);
@@ -4237,9 +4228,10 @@ double *cv){
     free(kwx);
     free(kwy);
   } else {
-    NL nl = {.node = NULL, .n = 0, .nalloc = 0};
-    NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
     NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+    NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
+
+    XL xl = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
 
     int icx[num_reg_continuous], icy[num_var_continuous];
 
@@ -4273,8 +4265,11 @@ double *cv){
     if(kwys == NULL)
       error("failed to allocate kwys, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
-    nls.node = (int *)malloc(10*sizeof(int));
-    nls.nalloc = 10;
+    nls.node = (int *)malloc(sizeof(int));
+    nls.nalloc = 1;
+
+    nls.node[0] = 0;
+    nls.n = 1;
 
     for(l = 0; l < num_reg_continuous; l++)
       icx[l] = l;
@@ -4437,10 +4432,7 @@ double *cv){
           // reset the interaction node list
           nlps.n = 0;
 
-          nls.node[0] = 0;
-          nls.n = 1;
-
-          boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, icx, num_reg_continuous);
+          boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, NULL, icx, num_reg_continuous);
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
             const int64_t jo = j - wyo;
@@ -4454,9 +4446,7 @@ double *cv){
 
             // search for the point (x_i,y_j) in the xy tree
             // reset the interaction node list
-            nl.n = 0;
-
-            mirror_nl(&nlps, &nls);
+            xl.n = 0;
 
             for(l = num_reg_continuous; l < num_all_cvar; l++){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
@@ -4466,14 +4456,12 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Y_continuous_eval[l-num_reg_continuous][j] + bb[2*l+1]*vsfxy[l]);
             }
 
-            boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nl, icy, num_var_continuous);
+            boxSearchNLPartial(kdt_extern_XY, &nlps, bb, NULL, &xl, icy, num_var_continuous);
 
             xyj = 0.0;
 
-            for (m = 0; m < nl.n; m++){
-              const int64_t istart = kdt_extern_XY->kdn[nl.node[m]].istart;
-              const int64_t nlev = kdt_extern_XY->kdn[nl.node[m]].nlev;
-              for (l = istart; l < (istart + nlev); l++){
+            for (m = 0; m < xl.n; m++){
+              for (l = xl.istart[m]; l < (xl.istart[m] + xl.nlev[m]); l++){
                 xyj += kwys[jo*num_obs_train+l]*kwxs[io*num_obs_train+l];
               }
             }
@@ -4495,10 +4483,10 @@ double *cv){
     free(kwxs);
     free(kwys);
 
-    clean_nl(&nl);
     clean_nl(&nls);
     clean_nl(&nlps);
 
+    clean_xl(&xl);
   }
 
   free(x_operator);
@@ -4616,20 +4604,17 @@ double *cv){
 
   int m_ij, m_ik;
 
-  NL nl = {.node = NULL, .n = 0, .nalloc = 0};
-  NL nl_alt = {.node = NULL, .n = 0, .nalloc = 0};
   NL nls = {.node = NULL, .n = 0, .nalloc = 0};
-  NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
+
+  XL xl_xij = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
+  XL xl_xik = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
 
   nls.node = (int *)malloc(sizeof(int));
   nls.nalloc = 1;
 
   nls.node[0] = 0;
   nls.n = 1;
-
-  nlps.node = (int *)malloc(10*sizeof(int));
-  nlps.nalloc = 10;
-
+  
   int xyd[num_all_cvar];
   int idxi[2], idxj[2], idxk[2];
 
@@ -5203,10 +5188,9 @@ double *cv){
           const int64_t ie_dwi = MIN(ie,dwi);
 
           for(i = is+wio; i < (wio+ie_dwi); i++){
-            // generate the kx-ij interaction list
-            nl.n = 0;
-
-            mirror_nl(&nls, &nlps);
+            // reset interaction lists
+            xl_xij.n = 0;
+            xl_xik.n = 0;
 
             for(l = 0; l < num_reg_continuous; l++){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
@@ -5216,24 +5200,19 @@ double *cv){
               bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Xi_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
             }
 
-            reset_fake_nodes(kdt_extern_XY);
-            boxSearchNLPartialIdx(kdt_extern_XY, &nlps, bb, &nl, xyd, num_reg_continuous, idxj);
-            create_fake_nodes(kdt_extern_XY, &nl, idxj);
+            boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xij, xyd, num_reg_continuous, idxj);
 
-            // kx-ik interactions
-            nl_alt.n = 0;
-
-            mirror_nl(&nls, &nlps);
-
-            boxSearchNLPartialIdx(kdt_extern_XY, &nlps, bb, &nl_alt, xyd, num_reg_continuous, idxk);
-            create_fake_nodes(kdt_extern_XY, &nl_alt, idxk);
+            if((idxj[0] != idxk[0]) || (idxj[1] != idxk[1])){
+              boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xik, xyd, num_reg_continuous, idxk);
+            } else {
+              mirror_xl(&xl_xij,&xl_xik);
+            }
 
             tcvj = 0.0;
-            for (m_ij = 0; m_ij < nl.n; m_ij++){
-              const int64_t jstart = kdt_extern_XY->kdn[nl.node[m_ij]].istart;
-              const int64_t jnlev = kdt_extern_XY->kdn[nl.node[m_ij]].nlev;
-              // nb, create_fake_nodes means that j -> j-wjo, and we don't need to compute the offsets
-              // when indexing with j
+            for (m_ij = 0; m_ij < xl_xij.n; m_ij++){
+              // j is offset by wjo!
+              const int64_t jstart = xl_xij.istart[m_ij];
+              const int64_t jnlev = xl_xij.nlev[m_ij];
 
               for(j = jstart; j < (jstart + jnlev); j++){              
                 tcvk = 0.0;
@@ -5243,9 +5222,9 @@ double *cv){
 
                 const double tkxij = kx_ij[(i-wio)*wj + j];
                 if (tkxij != 0.0) {
-                  for (m_ik = 0; m_ik < nl_alt.n; m_ik++){
-                    const int64_t kstart = kdt_extern_XY->kdn[nl_alt.node[m_ik]].istart;
-                    const int64_t knlev = kdt_extern_XY->kdn[nl_alt.node[m_ik]].nlev;
+                  for (m_ik = 0; m_ik < xl_xik.n; m_ik++){
+                    const int64_t kstart = xl_xik.istart[m_ik];
+                    const int64_t knlev = xl_xik.nlev[m_ik];
 
                     for(k = kstart; k < (kstart + knlev); k++){
                       if((k+wko) == i) continue;
@@ -5314,12 +5293,10 @@ double *cv){
   free(matrix_Yk_unordered_train);
   free(matrix_Yk_ordered_train);
 
-  clean_nl(&nl);
-  clean_nl(&nl_alt);
   clean_nl(&nls);
-  clean_nl(&nlps);
 
-  reset_fake_nodes(kdt_extern_XY);
+  clean_xl(&xl_xij);
+  clean_xl(&xl_xik);
 
   return(0);
 }
