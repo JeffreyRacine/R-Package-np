@@ -345,21 +345,25 @@ void check_grow_nl(NL * restrict nl){
 }
 
 void clean_nl(NL * restrict nl){
-  if(nl->node != NULL)
-    free(nl->node);
-  nl->node = NULL;
-  nl->n = nl->nalloc = 0;    
+  if(nl){
+    if(nl->node != NULL)
+      free(nl->node);
+    nl->node = NULL;
+    nl->n = nl->nalloc = 0;    
+  }
 }
 
 void clean_xl(XL * restrict xl){
-  if(xl->istart != NULL)
-    free(xl->istart);
+  if(xl){
+    if(xl->istart != NULL)
+      free(xl->istart);
 
-  if(xl->nlev != NULL)
-    free(xl->nlev);
+    if(xl->nlev != NULL)
+      free(xl->nlev);
 
-  xl->nlev = xl->istart = NULL;
-  xl->n = xl->nalloc = 0;    
+    xl->nlev = xl->istart = NULL;
+    xl->n = xl->nalloc = 0;    
+  }
 }
 
 void mirror_nl(NL * restrict nla, NL * restrict nlb){
