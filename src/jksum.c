@@ -4255,11 +4255,6 @@ double *cv){
     if(kwy == NULL)
       error("failed to allocate kwy, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
-    double * kwys = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
-
-    if(kwys == NULL)
-      error("failed to allocate kwys, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
-
     nls.node = (int *)malloc(sizeof(int));
     nls.nalloc = 1;
 
@@ -4371,13 +4366,13 @@ double *cv){
                                0, // don't explicity suppress parallel
                                0,
                                0,
-                               int_TREE_Y,
-                               0,
-                               kdt_extern_Y,
-                               NULL, NULL, NULL,
-                               matrix_Y_unordered_train,
-                               matrix_Y_ordered_train,
-                               matrix_Y_continuous_train,
+                               int_TREE_XY,
+                               1,
+                               kdt_extern_XY,
+                               &nls, icy, NULL,
+                               matrix_XY_unordered_train + num_reg_unordered,
+                               matrix_XY_ordered_train + num_reg_ordered,
+                               matrix_XY_continuous_train + num_reg_continuous,
                                matrix_wY_unordered_eval,
                                matrix_wY_ordered_eval,
                                matrix_wY_continuous_eval,
@@ -4391,13 +4386,6 @@ double *cv){
                                NULL,
                                NULL, // no permutations
                                kwy);
-
-        // put kwys into cols - xy, rows - y order
-        for(q = wyo; q < (wyo + dwy); q++){
-          const int64_t qo = q - wyo;
-          for(p = 0; p < num_obs_train; p++)
-            kwys[qo*num_obs_train + p] = kwy[qo*num_obs_train + ipt_lookup_extern_Y[ipt_extern_XY[p]]];
-        }
 
         const int64_t je_dwy = MIN(je,dwy);
 
@@ -4448,10 +4436,10 @@ double *cv){
 
             for (m = 0; m < xl.n; m++){
               for (l = xl.istart[m]; l < (xl.istart[m] + xl.nlev[m]); l++){
-                xyj += kwys[jo*num_obs_train+l]*kwx[io*num_obs_train+l];
+                xyj += kwy[jo*num_obs_train+l]*kwx[io*num_obs_train+l];
               }
             }
-            xyj -= kwys[jo*num_obs_train+i]*kwx[io*num_obs_train+i];
+            xyj -= kwy[jo*num_obs_train+i]*kwx[io*num_obs_train+i];
             const double tvd = (indy - xyj/(mi + DBL_MIN));
             *cv += tvd*tvd;
           }
@@ -4466,7 +4454,6 @@ double *cv){
 
     free(kwx);
     free(kwy);
-    free(kwys);
 
     clean_nl(&nls);
     clean_nl(&nlps);
