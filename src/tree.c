@@ -276,6 +276,7 @@ void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restr
       nls.node[nls.n++] = kdt->kdn[node].childl;
     }
   }
+  clean_nl(&nls);
 }
 
 // index-restricted (inclusive) partial search
@@ -330,6 +331,7 @@ void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * re
       nls.node[nls.n++] = kdt->kdn[node].childl;
     }
   }
+  clean_nl(&nls);
 }
 
 void check_grow_nl(NL * restrict nl){
