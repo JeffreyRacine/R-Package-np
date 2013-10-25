@@ -4250,11 +4250,6 @@ double *cv){
     if(kwx == NULL)
       error("failed to allocate kwx, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
-    double * kwxs = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
-
-    if(kwxs == NULL)
-      error("failed to allocate kwxs, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
-
     double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
     if(kwy == NULL)
@@ -4282,13 +4277,13 @@ double *cv){
       const int64_t dwx = (iwx != (nwx - 1)) ? wx : num_obs_train - (nwx - 1)*wx;
 
       for(l = 0; l < num_reg_continuous; l++)
-        matrix_wX_continuous_train[l] = matrix_X_continuous_train[l] + wxo;
+        matrix_wX_continuous_train[l] = matrix_XY_continuous_train[l] + wxo;
 
       for(l = 0; l < num_reg_unordered; l++)
-        matrix_wX_unordered_train[l] = matrix_X_unordered_train[l] + wxo;
+        matrix_wX_unordered_train[l] = matrix_XY_unordered_train[l] + wxo;
 
       for(l = 0; l < num_reg_ordered; l++)
-        matrix_wX_ordered_train[l] = matrix_X_ordered_train[l] + wxo;
+        matrix_wX_ordered_train[l] = matrix_XY_ordered_train[l] + wxo;
 
 
       kernel_weighted_sum_np(kernel_cx,
@@ -4316,13 +4311,13 @@ double *cv){
                              0, // don't explicity suppress parallel
                              0,
                              0,
-                             int_TREE_X,
-                             0,
-                             kdt_extern_X,
-                             NULL, NULL, NULL,
-                             matrix_X_unordered_train,
-                             matrix_X_ordered_train,
-                             matrix_X_continuous_train,
+                             int_TREE_XY,
+                             1,
+                             kdt_extern_XY,
+                             &nls, icx, NULL,
+                             matrix_XY_unordered_train,
+                             matrix_XY_ordered_train,
+                             matrix_XY_continuous_train,
                              matrix_wX_unordered_train,
                              matrix_wX_ordered_train,
                              matrix_wX_continuous_train,
@@ -4336,15 +4331,6 @@ double *cv){
                              mean,
                              NULL, // no permutations
                              kwx);
-
-      // put kwx into rows orig, cols xy order
-      // can only do a partial reorder: rows X order, cols xy order
-      for(q = wxo; q < (wxo + dwx); q++){
-        const int64_t qo = q - wxo;
-        for(p = 0; p < num_obs_train; p++){
-          kwxs[qo*num_obs_train + p] = kwx[qo*num_obs_train+ipt_lookup_extern_X[ipt_extern_XY[p]]];
-        }
-      }
 
       for(iwy = 0; iwy < nwy; iwy++){
         const int64_t wyo = iwy*wy;
@@ -4422,8 +4408,8 @@ double *cv){
             bb[2*l] = -cksup[KERNEL_XY[l]][1];
             bb[2*l+1] = -cksup[KERNEL_XY[l]][0];
 
-            bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_X_continuous_train[l][i] + bb[2*l]*vsfxy[l]);
-            bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_X_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
+            bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_XY_continuous_train[l][i] + bb[2*l]*vsfxy[l]);
+            bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_XY_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
           }
 
           const double mi = mean[io] - kwx[io*num_obs_train + i];
@@ -4438,10 +4424,10 @@ double *cv){
             const int64_t jo = j - wyo;
             indy = 1;
             for(l = 0; l < num_var_ordered; l++){
-              indy *= (matrix_Y_ordered_train[l][ipt_lookup_extern_Y[ipt_extern_X[i]]] <= matrix_Y_ordered_eval[l][j]);
+              indy *= (matrix_XY_ordered_train[l+num_reg_ordered][i] <= matrix_Y_ordered_eval[l][j]);
             }
             for(l = 0; l < num_var_continuous; l++){
-              indy *= (matrix_Y_continuous_train[l][ipt_lookup_extern_Y[ipt_extern_X[i]]] <= matrix_Y_continuous_eval[l][j]);
+              indy *= (matrix_XY_continuous_train[l+num_reg_continuous][i] <= matrix_Y_continuous_eval[l][j]);
             }
 
             // search for the point (x_i,y_j) in the xy tree
@@ -4462,10 +4448,10 @@ double *cv){
 
             for (m = 0; m < xl.n; m++){
               for (l = xl.istart[m]; l < (xl.istart[m] + xl.nlev[m]); l++){
-                xyj += kwys[jo*num_obs_train+l]*kwxs[io*num_obs_train+l];
+                xyj += kwys[jo*num_obs_train+l]*kwx[io*num_obs_train+l];
               }
             }
-            xyj -= kwys[jo*num_obs_train+ipt_lookup_extern_XY[ipt_extern_X[i]]]*kwxs[io*num_obs_train+ipt_lookup_extern_XY[ipt_extern_X[i]]];
+            xyj -= kwys[jo*num_obs_train+i]*kwx[io*num_obs_train+i];
             const double tvd = (indy - xyj/(mi + DBL_MIN));
             *cv += tvd*tvd;
           }
@@ -4480,7 +4466,6 @@ double *cv){
 
     free(kwx);
     free(kwy);
-    free(kwxs);
     free(kwys);
 
     clean_nl(&nls);
