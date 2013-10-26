@@ -325,8 +325,10 @@ npscoef.scbandwidth <-
                     ifelse(miss.ex, "", "exdat = ezdat,"),
                     "bws = bws)$ksum")))
 
-    tyw <- tww[-1,1,]
-    tww <- tww[-1,-1,]
+    tyw <- tww[-1,1,,drop=FALSE]
+    dim(tyw) <- dim(tyw)[-2]
+    
+    tww <- tww[-1,-1,,drop=FALSE]
 
     tnrow <- nrow(txdat)
     enrow <- ifelse(miss.ex, nrow(txdat), nrow(exdat))
