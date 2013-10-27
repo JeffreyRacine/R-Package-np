@@ -5405,6 +5405,10 @@ double *SIGN){
     error("\n** Error: invalid bandwidth.");
   }
 
+  for(l = 0, hprod = 1.0; l < num_reg_continuous; l++)
+    hprod *= matrix_bandwidth[l][0];
+
+
   if(num_reg_continuous != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_reg,
                                                       num_reg_continuous,
@@ -5540,23 +5544,12 @@ double *SIGN){
                            permy, // permutations used for gradients
                            NULL); // do not return kernel weights
 
-
-    if(BANDWIDTH_reg == BW_FIXED){
-      for(l = 0, hprod = 1.0; l < num_reg_continuous; l++)
-        hprod *= matrix_bandwidth[l][0];
-    }
-
     for(int ii = 0; ii < num_obs_eval; ii++){
       const int ii3 = NCOL_Y*ii;
       const double sk = copysign(DBL_MIN, meany[ii3+1]) + meany[ii3+1];
       mean[ii] = meany[ii3]/sk;
 
       mean_stderr[ii] = meany[ii3+2]/sk - mean[ii]*mean[ii];
-
-      if(BANDWIDTH_reg == BW_GEN_NN){
-        for(l = 0, hprod = 1.0; l < num_reg_continuous; l++)
-          hprod *= matrix_bandwidth[l][ii];
-      }
 
       mean_stderr[ii] = sqrt(mean_stderr[ii] * K_INT_KERNEL_P / (sk*hprod));
     }
@@ -5584,11 +5577,6 @@ double *SIGN){
           const double s1 = permy[li3]/sk;
 
           gradient[l][i] = mean[i] - s1;
-
-          if(BANDWIDTH_reg == BW_GEN_NN){
-            for(m = 0, hprod = 1.0; m < num_reg_continuous; m++)
-              hprod *= matrix_bandwidth[m][i];
-          }
           
           if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
@@ -5607,11 +5595,6 @@ double *SIGN){
           const double s1 = permy[li3]/sk;
           
           gradient[l][i] = (mean[i] - s1)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
-
-          if(BANDWIDTH_reg == BW_GEN_NN){
-            for(m = 0, hprod = 1.0; m < num_reg_continuous; m++)
-              hprod *= matrix_bandwidth[m][i];
-          }
 
           if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
@@ -5899,7 +5882,7 @@ double *SIGN){
       const double ey = (kwm+j*nrcc33)[nrc3+2]/sk;
       const double ey2 = (kwm+j*nrcc33)[nrc3+1]/sk;
 
-      mean_stderr[j] = sqrt((ey2 - ey*ey)*K_INT_KERNEL_P / sk);
+      mean_stderr[j] = sqrt((ey2 - ey*ey)*K_INT_KERNEL_P / (sk*hprod));
 
       if(do_grad){
         for(int ii = 0; ii < num_reg_continuous; ii++){
@@ -5937,7 +5920,7 @@ double *SIGN){
             const double eyg = (permy+ojp)[nrc3+2]/skg;
             const double ey2g = (permy+ojp)[nrc3+1]/skg;
 
-            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / skg;
+            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
 
             gradient_stderr[l][j] = sqrt(mean_stderr[j]*mean_stderr[j] + se2);
           } else {
@@ -5976,7 +5959,7 @@ double *SIGN){
             const double eyg = (permy+ojp)[nrc3+2]/skg;
             const double ey2g = (permy+ojp)[nrc3+1]/skg;
 
-            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / skg;
+            const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / (skg*hprod);
 
             gradient_stderr[l][j] = sqrt(mean_stderr[j]*mean_stderr[j] + se2);
           } else {
