@@ -2484,8 +2484,10 @@ double * const kw){
     }
 
     if(np_ks_tree_use){
-      for(l = 0; l < p_nvar; l++)
-        clean_xl(p_pxl+l);
+      if(permutation_operator == OP_INTEGRAL){
+        for(l = 0; l < num_reg_continuous; l++)
+          clean_xl(p_pxl+l);
+      }
       free(p_pxl);
     }
 
@@ -2881,7 +2883,7 @@ double *vector_scale_factor,
 int *num_categories){
 
   // note that mean has 2*num_obs allocated for npksum
-  int i, j, l, sf_flag = 0, num_obs_eval_alloc, tsf;
+  int i, j, l, m, sf_flag = 0, num_obs_eval_alloc, tsf;
 
   double cv = 0.0;
   double * lambda = NULL, * vsf = NULL;
@@ -5309,13 +5311,14 @@ double *CORR,
 double *SIGN){
 
   // note that mean has 2*num_obs allocated for npksum
-  int i, j, l, sf_flag = 0, tsf;
+  int i, j, l, m, sf_flag = 0, tsf;
 
 	double INT_KERNEL_P;					 /* Integral of K(z)^2 */
 	double K_INT_KERNEL_P;				 /*  K^p */
 	/* Integral of K(z-0.5)*K(z+0.5) */
 	double INT_KERNEL_PM_HALF = 0.0;
 	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
+  double hprod;
 
   double * lambda = NULL, * vsf = NULL;
   double ** matrix_bandwidth = NULL;
@@ -5538,13 +5541,24 @@ double *SIGN){
                            NULL); // do not return kernel weights
 
 
+    if(BANDWIDTH_reg == BW_FIXED){
+      for(l = 0, hprod = 1.0; l < num_reg_continuous; l++)
+        hprod *= matrix_bandwidth[l][0];
+    }
+
     for(int ii = 0; ii < num_obs_eval; ii++){
       const int ii3 = NCOL_Y*ii;
       const double sk = copysign(DBL_MIN, meany[ii3+1]) + meany[ii3+1];
       mean[ii] = meany[ii3]/sk;
 
       mean_stderr[ii] = meany[ii3+2]/sk - mean[ii]*mean[ii];
-      mean_stderr[ii] = sqrt(mean_stderr[ii] * K_INT_KERNEL_P / sk);
+
+      if(BANDWIDTH_reg == BW_GEN_NN){
+        for(l = 0, hprod = 1.0; l < num_reg_continuous; l++)
+          hprod *= matrix_bandwidth[l][ii];
+      }
+
+      mean_stderr[ii] = sqrt(mean_stderr[ii] * K_INT_KERNEL_P / (sk*hprod));
     }
    
     if(do_grad){
@@ -5570,10 +5584,15 @@ double *SIGN){
           const double s1 = permy[li3]/sk;
 
           gradient[l][i] = mean[i] - s1;
+
+          if(BANDWIDTH_reg == BW_GEN_NN){
+            for(m = 0, hprod = 1.0; m < num_reg_continuous; m++)
+              hprod *= matrix_bandwidth[m][i];
+          }
           
           if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
-            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/(sk*hprod));
           } else {
             gradient_stderr[l][i] = 0.0;
           }
@@ -5589,9 +5608,14 @@ double *SIGN){
           
           gradient[l][i] = (mean[i] - s1)*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][i] != 0) ? 1.0 : -1.0);
 
+          if(BANDWIDTH_reg == BW_GEN_NN){
+            for(m = 0, hprod = 1.0; m < num_reg_continuous; m++)
+              hprod *= matrix_bandwidth[m][i];
+          }
+
           if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
-            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/sk);
+            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/(sk*hprod));
           } else {
             gradient_stderr[l][i] = 0.0;
           }
@@ -5872,8 +5896,8 @@ double *SIGN){
       mean[j] = DELTA[0][0];
 
       const double sk = copysign(DBL_MIN, (kwm+j*nrcc33)[2*nrc3+2]) + (kwm+j*nrcc33)[2*nrc3+2];
-      const double ey = (kwm+j*nrcc33)[nrc3+1]/sk;
-      const double ey2 = (kwm+j*nrcc33)[0]/sk;
+      const double ey = (kwm+j*nrcc33)[nrc3+2]/sk;
+      const double ey2 = (kwm+j*nrcc33)[nrc3+1]/sk;
 
       mean_stderr[j] = sqrt((ey2 - ey*ey)*K_INT_KERNEL_P / sk);
 
@@ -5910,8 +5934,8 @@ double *SIGN){
           
           if(do_gerr){
             const double skg = copysign(DBL_MIN, (permy+ojp)[2*nrc3+2]) + (permy+ojp)[2*nrc3+2];
-            const double eyg = (permy+ojp)[nrc3+1]/skg;
-            const double ey2g = (permy+ojp)[0]/skg;
+            const double eyg = (permy+ojp)[nrc3+2]/skg;
+            const double ey2g = (permy+ojp)[nrc3+1]/skg;
 
             const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / skg;
 
@@ -5949,8 +5973,8 @@ double *SIGN){
           if(do_gerr){
 
             const double skg = copysign(DBL_MIN, (permy+ojp)[2*nrc3+2]) + (permy+ojp)[2*nrc3+2];
-            const double eyg = (permy+ojp)[nrc3+1]/skg;
-            const double ey2g = (permy+ojp)[0]/skg;
+            const double eyg = (permy+ojp)[nrc3+2]/skg;
+            const double ey2g = (permy+ojp)[nrc3+1]/skg;
 
             const double se2 = (ey2g - eyg*eyg)*K_INT_KERNEL_P / skg;
 
