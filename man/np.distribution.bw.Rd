@@ -32,7 +32,7 @@ npudistbw(\dots)
           remin = TRUE,
           itmax = 10000,
           fast.cdf = TRUE,
-          do.full.integral = FALSE,
+          do.full.integral = TRUE,
           ngrid = 100,
           ftol = 1.490116e-07,
           tol = 1.490116e-04,

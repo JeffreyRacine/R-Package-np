@@ -70,7 +70,7 @@ npreg.rbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
-           exdat, eydat, gradients = FALSE, residuals = FALSE, old.reg = FALSE,
+           exdat, eydat, gradients = FALSE, residuals = FALSE, 
            ...){
 
     no.ex = missing(exdat)
@@ -252,7 +252,7 @@ npreg.rbandwidth <-
       no.ex = no.ex,
       mcv.numRow = attr(bws$xmcv, "num.row"),
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
-      old.reg = old.reg)
+      old.reg = FALSE)
     
 
     myout=

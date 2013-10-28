@@ -35,6 +35,7 @@ npcdensbw(\dots)
           ftol = 1.490116e-07,
           tol = 1.490116e-04,
           small = 1.490116e-05,
+          memfac = 250,
           \dots)
 
 \method{npcdensbw}{default}(xdat = stop("data 'xdat' missing"),
@@ -48,6 +49,7 @@ npcdensbw(\dots)
           ftol,
           tol,
           small,
+          memfac,
           bwmethod,
           bwscaling,
           bwtype,
@@ -265,6 +267,19 @@ npcdensbw(\dots)
     precision) or 3x10-8 (double prevision)). Defaults to \code{small
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
+
+  \item{memfac}{
+    The algorithm to compute the least-squares objective function uses
+    a block-based algorithm to eliminate or minimize redundant kernel
+    evaluations. Due to memory, hardware and software constraints, a
+    maximum block size must be imposed by the algorithm. This block size
+    is roughly equal to memfac*10^5 elements. Empirical tests on
+    modern hardware find that a memfac of around 250 performs well. If
+    you experience out of memory errors, or strange behaviour for
+    large data sets (>100k elements) setting memfac to a lower value may
+    fix the problem.
+  }
+
 }
 
 \details{

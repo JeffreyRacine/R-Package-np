@@ -36,12 +36,12 @@ npcdistbw(\dots)
           nmulti,
           remin = TRUE,
           itmax = 10000,
-          fast.cdf = TRUE,
           do.full.integral = FALSE,
           ngrid = 100,
           ftol = 1.490116e-07,
           tol = 1.490116e-04,
           small = 1.490116e-05,
+          memfac = 250.0,
           \dots)
 
 \method{npcdistbw}{default}(xdat = stop("data 'xdat' missing"),
@@ -53,12 +53,12 @@ npcdistbw(\dots)
           nmulti,
           remin,
           itmax,
-          fast.cdf,
           do.full.integral,
           ngrid,
           ftol,
           tol,
           small,
+          memfac,
           bwmethod,
           bwscaling,
           bwtype,
@@ -261,11 +261,6 @@ npcdistbw(\dots)
     optimization routine. Defaults to \code{10000}.
   }
 
-  \item{fast.cdf}{
-    a logical value which when set as \code{TRUE} uses a computationally
-    efficient but potentially memory intensive computational algorithm.
-  }
-
   \item{do.full.integral}{
     a logical value which when set as \code{TRUE} evaluates the
     moment-based integral on the entire sample.
@@ -298,7 +293,19 @@ npcdistbw(\dots)
     precision) or 3x10-8 (double prevision)). Defaults to \code{small
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
-  
+
+  \item{memfac}{
+    The algorithm to compute the least-squares objective function uses
+    a block-based algorithm to eliminate or minimize redundant kernel
+    evaluations. Due to memory, hardware and software constraints, a
+    maximum block size must be imposed by the algorithm. This block size
+    is roughly equal to memfac*10^5 elements. Empirical tests on
+    modern hardware find that a memfac of around 250 performs well. If
+    you experience out of memory errors, or strange behaviour for
+    large data sets (>100k elements) setting memfac to a lower value may
+    fix the problem.
+  }
+
 }
 
 \details{
