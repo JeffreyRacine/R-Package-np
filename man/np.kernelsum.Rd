@@ -24,7 +24,10 @@ npksum(\dots)
        leave.one.out = FALSE,
        kernel.pow = 1.0,
        bandwidth.divide = FALSE,
-       operator = c("normal","convolution","derivative","integral"),
+       operator = names(ALL_OPERATORS),
+       permutation.operator = names(PERMUTATION_OPERATORS),
+       compute.score = FALSE,
+       compute.ocg = FALSE,
        smooth.coefficient = FALSE,
        return.kernel.weights = FALSE,
        \dots)
@@ -38,6 +41,9 @@ npksum(\dots)
        kernel.pow,
        bandwidth.divide,
        operator,
+       permutation.operator,
+       compute.score,
+       compute.ocg,
        smooth.coefficient,
        return.kernel.weights,
        \dots)
@@ -125,8 +131,33 @@ npksum(\dots)
   \item{operator}{
     a string specifying whether the \code{normal}, \code{convolution},
     \code{derivative}, or \code{integral} kernels are to be
-    used. Defaults to \code{normal} and applies to all elements in a
+    used. Operators scale results by factors of \eqn{h} or \eqn{1/h} where
+    appropriate. Defaults to \code{normal} and applies to all elements in a
     multivariate object. See details.
+  }
+
+  \item{permutation.operator}{
+    a string which can have a value of \code{none}, \code{normal},
+    \code{derivative}, or \code{integral}. If set to something other
+    than \code{none} (the default), then a separate result will be returned for each
+    term in the product kernel, with the operator applied to that term.
+    Permutation operators scale results by factors of \eqn{h} or \eqn{1/h} where
+    appropriate. This is useful for computing gradients, for example.
+  }
+
+  \item{compute.score}{
+    a logical specifying whether or not to return the score
+    (the \sQuote{grad h} terms) for each dimension in addition to the kernel
+    sum. Cannot be \code{TRUE} if a permutation operator other than
+    \code{"none"} is selected. 
+  }
+
+  \item{compute.ocg}{
+    a logical specifying whether or not to return a separate
+    result for each unordered and ordered dimension, where the product
+    kernel term for that dimension is evaluation at an appropriate
+    reference category. This is used primarily in \code{np} to compute ordered and
+    unordered categorical gradients. See details.
   }
 
   \item{smooth.coefficient}{
@@ -218,8 +249,36 @@ npksum(\dots)
   data frame of \link{numeric} datatypes,
   \code{operator=c("normal","derivative")} will use the normal
   (i.e. PDF) kernel for variable one and the derivative of the PDF
-  kernel for variable two
+  kernel for variable two. Please note that applying operators will scale the
+  results by factors of \eqn{h} or \eqn{1/h} where appropriate.
 
+  The option \code{permutation.operator=} can be used to \sQuote{mix and match}
+  operator strings to create a \sQuote{hybrid} kernel, in addition to
+  the kernel sum with no operators applied, one for each continuous
+  dimension in the data. For example, for a two-dimensional
+  data frame of \link{numeric} datatypes,
+  \code{permutation.operator=c("derivative")} will return the usual
+  kernel sum as if \code{operator = c("normal","normal")} in the
+  \code{ksum} member, and in the \code{p.ksum} member, it will return
+  kernel sums for \code{operator = c("derivative","normal")}, and
+  \code{operator = c("normal","derivative")}. This makes the computation
+  of gradients much easier.
+
+  The option \code{compute.score=} can be used compute the gradients
+  with respect to \eqn{h} in addition to the normal kernel sum. Like
+  permutations, the additional results are returned in the
+  \code{p.ksum}. This option does not work in conjunction with
+  \code{permutation.operator}.
+
+  The option \code{compute.ocg=} works much like \code{permutation.operator},
+  but for discrete variables. The kernel is evaluated at a reference
+  category in each dimension: for ordered data, the next lowest category
+  is selected, except in the case of the lowest category, where the
+  second lowest category is selected; for unordered data, the first
+  category is selected. These additional data are returned in the
+  \code{p.ksum} member. This option can be set simultaneously with
+  \code{permutation.operator}.
+  
   The option \code{return.kernel.weights=TRUE} returns a matrix of
   dimension \sQuote{number of training observations} by \sQuote{number
   of evaluation observations} and contains only the generalized product

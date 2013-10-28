@@ -58,7 +58,7 @@ npudens.call <-
 npudens.bandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
-           edat, old.dens = FALSE, ...){
+           edat, ...){
 
   no.e = missing(edat)
 
@@ -155,7 +155,7 @@ npudens.bandwidth <-
     no.e = no.e,
     mcv.numRow = attr(bws$xmcv, "num.row"),
     densOrDist = NP_DO_DENS,
-    old.dens = old.dens,
+    old.dens = FALSE,
     int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
   
   myout=
@@ -176,7 +176,7 @@ npudens.bandwidth <-
   return(ev)
 }
 
-npudens.default <- function(bws, tdat, old.dens, ...){
+npudens.default <- function(bws, tdat, ...){
   sc.names <- names(sys.call())
 
   ## here we check to see if the function was called with tdat =
@@ -185,7 +185,6 @@ npudens.default <- function(bws, tdat, old.dens, ...){
 
   bws.named <- any(sc.names == "bws")
   tdat.named <- any(sc.names == "tdat")
-  old.dens.named <- any(sc.names == "old.dens")
 
   no.bws <- missing(bws)
   no.tdat <- missing(tdat)
@@ -203,7 +202,6 @@ npudens.default <- function(bws, tdat, old.dens, ...){
                       ifelse(no.tdat,"",","),
                       ifelse(bws.named,"bws = bws, bandwidth.compute = FALSE",
                              ifelse(no.bws,"","bws")),
-                      ifelse(old.dens.named, "old.dens = old.dens,", ""),
                       ifelse(no.bws,"",","),                      
                       "call = mc, ...",")",sep="")))
 
@@ -232,7 +230,6 @@ npudens.default <- function(bws, tdat, old.dens, ...){
   eval(parse(text=paste("npudens(bws = tbw",
                ifelse(no.tdat, "",
                       ifelse(tdat.named, ",tdat = tdat",",tdat")),
-               ifelse(old.dens.named, ",old.dens = old.dens",""),
                ",...)")))
 }
 
