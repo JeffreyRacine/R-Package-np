@@ -16,7 +16,7 @@ Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-np/zipball
 library(devtools); install_github('R-Package-np', 'JeffreyRacine')
 ```
 
-Note Windows users have to first install [Rtools](http://www.murdoch-sutherland.com/Rtools/).
+Note Windows users have to first install [Rtools](http://cran.r-project.org/bin/windows/Rtools).
 
 For more information on this project please visit the maintainer's website (http://www.economics.mcmaster.ca/faculty/racinej).
 
