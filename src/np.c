@@ -4466,7 +4466,6 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       0,
                                       (int)(*kpow),
                                       do_divide_bw,
-                                      do_smooth_coef_weights,
                                       0, //not symmetric
                                       0, //disable 'twisting'
                                       0, // do not drop train

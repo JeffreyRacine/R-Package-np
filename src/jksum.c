@@ -1815,7 +1815,6 @@ const int leave_one_out,
 const int leave_one_out_offset,
 const int kernel_pow,
 const int bandwidth_divide,
-const int do_smooth_coef_weights,
 const int symmetric,
 const int gather_scatter,
 const int drop_one_train,
@@ -2982,7 +2981,6 @@ int *num_categories){
                            0,
                            1, // kernel_pow = 1
                            (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                           0, // do_smooth_coef_weights = FALSE (not implemented)
                            0, // not symmetric
                            0, // do not gather-scatter
                            0, // do not drop train
@@ -3049,7 +3047,6 @@ int *num_categories){
                            0,
                            1, // kernel_pow = 1
                            (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                           0, // do_smooth_coef_weights = FALSE (not implemented)
                            0, // not symmetric
                            0, // do not gather-scatter
                            0, // do not drop train
@@ -3221,7 +3218,6 @@ int *num_categories){
                                    0,
                                    1, // kernel_pow = 1
                                    (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                                   0, // do_smooth_coef_weights = FALSE (not implemented)
                                    1, // symmetric
                                    0, // NO gather-scatter sum
                                    1, // drop train
@@ -3307,7 +3303,6 @@ int *num_categories){
                                    0,
                                    1, // kernel_pow = 1
                                    (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                                   0, // do_smooth_coef_weights = FALSE (not implemented)
                                    1, // symmetric
                                    1, // gather-scatter sum
                                    0, // do not drop train
@@ -3395,7 +3390,6 @@ int *num_categories){
                                0, 
                                1, // kernel_pow = 1
                                (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                               0, // do_smooth_coef_weights = FALSE (not implemented)
                                1, // symmetric
                                0, // gather-scatter sum
                                1, // do not drop train
@@ -3472,7 +3466,6 @@ int *num_categories){
                                  0,
                                  1, // kernel_pow = 1
                                  (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
-                                 0, // do_smooth_coef_weights = FALSE (not implemented)
                                  1, // symmetric
                                  1, // gather-scatter sum
                                  0, // do not drop train
@@ -3703,7 +3696,6 @@ double * cv){
                            0,
                            0,
                            0,
-                           0,
                            operator,
                            OP_NOOP, // no permutations
                            0, // no score
@@ -3773,7 +3765,6 @@ double * cv){
                              0,
                              1,
                              1,
-                             0,
                              0,
                              0,
                              1,
@@ -4095,7 +4086,6 @@ double *cv){
                              0,
                              0,
                              0,
-                             0,
                              x_operator,
                              OP_NOOP, // no permutations
                              0, // no score
@@ -4151,7 +4141,6 @@ double *cv){
                                0,
                                0,
                                1,
-                               0,
                                0,
                                0,
                                0,
@@ -4300,7 +4289,6 @@ double *cv){
                              0,
                              0,
                              0,
-                             0,
                              x_operator,
                              OP_NOOP, // no permutations
                              0, // no score
@@ -4355,7 +4343,6 @@ double *cv){
                                0,
                                0,
                                1,
-                               0,
                                0,
                                0,
                                0,
@@ -4807,7 +4794,6 @@ double *cv){
                          0,
                          0,
                          0,
-                         0,
                          xy_operator,
                          OP_NOOP, // no permutations
                          0, // no score
@@ -4849,7 +4835,6 @@ double *cv){
                          1, // compute the leave-one-out marginals
                          0,
                          1,
-                         0,
                          0,
                          0,
                          0,
@@ -4974,7 +4959,6 @@ double *cv){
                              0,
                              0,
                              0,
-                             0,
                              x_operator,
                              OP_NOOP, // no permutations
                              0, // no score
@@ -5053,7 +5037,6 @@ double *cv){
                                  0,
                                  0,
                                  0,
-                                 0,
                                  x_operator,
                                  OP_NOOP, // no permutations
                                  0, // no score
@@ -5102,7 +5085,6 @@ double *cv){
                                0,
                                1,
                                0, // divide bw for the convolution kernels 
-                               0,
                                0,
                                0,
                                0,
@@ -5511,7 +5493,6 @@ double *SIGN){
                            0,
                            1, // kernel_pow = 1
                            1, // bandwidth_divide = TRUE, always
-                           0, // do_smooth_coef_weights = FALSE (not implemented)
                            0, // not symmetric
                            0, // do not gather-scatter
                            0, // do not drop train
@@ -5756,7 +5737,6 @@ double *SIGN){
                                  0,
                                  1, // kernel_pow = 1
                                  1, // bandwidth_divide = FALSE when not adaptive
-                                 0, // do_smooth_coef_weights = FALSE (not implemented)
                                  1, // symmetric
                                  0, // NO gather-scatter sum
                                  0, // do not drop train
@@ -5826,7 +5806,6 @@ double *SIGN){
                              0,
                              1, // kernel_pow = 1
                              1, // bandwidth_divide = FALSE when not adaptive
-                             0, // do_smooth_coef_weights = FALSE (not implemented)
                              1, // symmetric
                              0, // gather-scatter sum
                              0, // do not drop train
@@ -6116,7 +6095,6 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          0,
                          1, // kernel_pow = 1
                          1, // bandwidth_divide = FALSE when not adaptive
-                         0, // do_smooth_coef_weights = FALSE (not implemented)
                          0, // symmetric
                          0, // gather-scatter sum
                          0, // do not drop train
@@ -6238,7 +6216,6 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          0,
                          1, // kernel_pow = 1
                          1, // bandwidth_divide = FALSE when not adaptive
-                         0, // do_smooth_coef_weights = FALSE (not implemented)
                          0, // symmetric
                          0, // gather-scatter sum
                          0, // do not drop train
@@ -6294,7 +6271,6 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          0,
                          1, // kernel_pow = 1
                          1, // bandwidth_divide = FALSE when not adaptive
-                         0, // do_smooth_coef_weights = FALSE (not implemented)
                          0, // symmetric
                          0, // gather-scatter sum
                          0, // do not drop train
@@ -6461,7 +6437,6 @@ int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          0,
                          1, // kernel_pow = 1
                          1, // bandwidth_divide = FALSE when not adaptive
-                         0, // do_smooth_coef_weights = FALSE (not implemented)
                          0, // symmetric
                          0, // gather-scatter sum
                          0, // do not drop train
@@ -6674,7 +6649,6 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          0,
                          1, // kernel_pow = 1
                          1, // bandwidth_divide = FALSE when not adaptive
-                         0, // do_smooth_coef_weights = FALSE (not implemented)
                          0, // symmetric
                          0, // gather-scatter sum
                          0, // do not drop train
@@ -6721,7 +6695,6 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          0,
                          1, // kernel_pow = 1
                          1, // bandwidth_divide = FALSE when not adaptive
-                         0, // do_smooth_coef_weights = FALSE (not implemented)
                          0, // symmetric
                          0, // gather-scatter sum
                          0, // do not drop train
