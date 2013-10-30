@@ -2418,8 +2418,12 @@ double * const kw){
 
     if(kw != NULL){ 
       // if using adaptive bandwidths, kw is returned transposed
-      for(i = 0; i < num_xt; i++)
-        kw[j*num_xt + i] = tprod[i];
+      if(bandwidth_divide_weights)
+        for(i = 0; i < num_xt; i++)
+          kw[j*num_xt + i] = tprod[i]/dband;
+      else
+        for(i = 0; i < num_xt; i++)
+          kw[j*num_xt + i] = tprod[i];
     }
     
   }
@@ -4549,6 +4553,9 @@ double *cv){
   double vsfy[num_var_tot];
   double vsfxy[num_var_tot+num_reg_tot];
 
+  double lambdax[num_reg_unordered+num_reg_ordered];
+  double **matrix_bandwidth_x;
+
   double **matrix_Yk_unordered_train;
   double **matrix_Yk_ordered_train;
   double **matrix_Yk_continuous_train;
@@ -4571,7 +4578,7 @@ double *cv){
 
   double * pkx_ij = NULL, * pkx_ik = NULL, * pky_jk = NULL;
 
-  double tcvk, tcvj, yh;
+  double tcvk, tcvj;
 
   int64_t is, ie;
   int64_t is_i2n, ie_i2n;
@@ -4738,10 +4745,6 @@ double *cv){
                         NULL, NULL, NULL);
   
 
-  // get the y bw product
-  for(i = 0, yh = 1.0; i < num_var_continuous; i++)
-    yh *= vsfy[i];
-
   x_operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
 
   if(x_operator == NULL)
@@ -4776,6 +4779,33 @@ double *cv){
   for(i = num_all_cvar+num_all_uvar+num_reg_ordered; i < num_all_var; i++)
     xy_operator[i] = OP_NORMAL;
 
+  // special bandwidths
+  if(BANDWIDTH_den == BW_GEN_NN){
+    matrix_bandwidth_x = alloc_matd(num_obs_train, num_reg_continuous);
+
+    kernel_bandwidth_mean(KERNEL_reg,
+                          BANDWIDTH_den,
+                          num_obs_train,
+                          num_obs_train,
+                          0,
+                          0,
+                          0,
+                          num_reg_continuous,
+                          num_reg_unordered,
+                          num_reg_ordered,
+                          0, // do not suppress_parallel
+                          vsfx,
+                          NULL,
+                          NULL,
+                          matrix_X_continuous_train,
+                          matrix_X_continuous_train,
+                          NULL,					 // Not used 
+                          matrix_bandwidth_x,
+                          lambdax);
+  } else if (BANDWIDTH_den == BW_FIXED) {
+    matrix_bandwidth_x = (double **)malloc(sizeof(double*));
+    matrix_bandwidth_x[0] = vsfx;
+  }
 
   // extra kernel bookkeeping for trees
   int KERNEL_XY[num_all_cvar];
@@ -4802,7 +4832,7 @@ double *cv){
                          1, // compute the leave-one-out marginals
                          0,
                          1, // kpow = 1
-                         0,
+                         1, // bw divide
                          0, 
                          0,
                          0,
@@ -4848,8 +4878,8 @@ double *cv){
                          num_reg_continuous,
                          1, // compute the leave-one-out marginals
                          0,
-                         1,
-                         0,
+                         1, // kpow
+                         1, // bw divide
                          0, 
                          0,
                          0,
@@ -4968,9 +4998,9 @@ double *cv){
                              num_reg_continuous,
                              0, // (do not) compute the leave-one-out marginals
                              0,
-                             1,
-                             0,
-                             0, 
+                             1, // kpow
+                             1, // bw divide
+                             1, // divide weights 
                              0,
                              0,
                              0,
@@ -5047,9 +5077,9 @@ double *cv){
                                  num_reg_continuous,
                                  0, // (do not) compute the leave-one-out marginals
                                  0,
-                                 1,
-                                 0,
-                                 0, 
+                                 1, // kpow
+                                 1, // bw divide
+                                 1, // divide weights
                                  0,
                                  0,
                                  0,
@@ -5101,8 +5131,8 @@ double *cv){
                                0, // (do not) compute the leave-one-out marginals
                                0,
                                1,
-                               0, // divide bw for the convolution kernels 
-                               0, 
+                               1, // divide bw for the convolution kernels 
+                               1, // divide weights 
                                0,
                                0,
                                0,
@@ -5137,7 +5167,7 @@ double *cv){
                                NULL, // no permutations
                                ky_jk);
 
-        if(!int_TREE_XY){
+        if(!int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN)){
           const int64_t ie_dwi = MIN(ie,dwi);
           for(i = is+wio; i < (wio+ie_dwi); i++){
             for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
@@ -5162,16 +5192,19 @@ double *cv){
           const int64_t ie_dwi = MIN(ie,dwi);
 
           for(i = is+wio; i < (wio+ie_dwi); i++){
+
             // reset interaction lists
             xl_xij.n = 0;
             xl_xik.n = 0;
 
             for(l = 0; l < num_reg_continuous; l++){
+              const double tbw = (BANDWIDTH_den == BW_FIXED) ? vsfx[l] : matrix_bandwidth_x[l][i];
+
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
               bb[2*l+1] = -cksup[KERNEL_XY[l]][0];
 
-              bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_Xi_continuous_train[l][i] + bb[2*l]*vsfxy[l]);
-              bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Xi_continuous_train[l][i] + bb[2*l+1]*vsfxy[l]);
+              bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_Xi_continuous_train[l][i] + bb[2*l]*tbw);
+              bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Xi_continuous_train[l][i] + bb[2*l+1]*tbw);
             }
 
             boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xij, xyd, num_reg_continuous, idxj);
@@ -5223,7 +5256,7 @@ double *cv){
   MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
 #endif
 
-  *cv /= (double)num_obs_train*yh;
+  *cv /= (double)num_obs_train;
 
   free(mean);
 
@@ -5246,6 +5279,11 @@ double *cv){
   free(kernel_ux);
   free(kernel_uy);
   free(kernel_uxy);
+
+  if(BANDWIDTH_den == BW_GEN_NN)
+    free_mat(matrix_bandwidth_x, num_reg_continuous);
+  else if (BANDWIDTH_den == BW_FIXED)
+    free(matrix_bandwidth_x);
 
   free(matrix_Xi_continuous_train);
   free(matrix_Xi_unordered_train);
