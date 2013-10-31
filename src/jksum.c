@@ -5476,7 +5476,7 @@ double *SIGN){
 
       for(i = 0; i < num_categories[l+num_reg_unordered]; i++){
         struct th_entry centry;
-        centry.dkey = matrix_categorical_vals[l+num_reg_unordered][i];
+        centry.key.dkey = matrix_categorical_vals[l+num_reg_unordered][i];
         centry.data = i;
 
         if(thsearch_r(&centry, TH_ENTER, &ret, otabs+l) == TH_FAILURE)
@@ -5485,12 +5485,12 @@ double *SIGN){
 
       // now do lookups
       struct th_entry te;
-      te.dkey = ret->dkey;
+      te.key.dkey = ret->key.dkey;
       te.data = ret->data;
 
       for(i = 0; i < num_obs_eval; i++){
-        if(ret->dkey != matrix_X_ordered_eval[l][i]){
-          te.dkey = matrix_X_ordered_eval[l][i];
+        if(ret->key.dkey != matrix_X_ordered_eval[l][i]){
+          te.key.dkey = matrix_X_ordered_eval[l][i];
           if(thsearch_r(&te, TH_SEARCH, &ret, otabs+l) == TH_FAILURE)
             error("hash table lookup failed (which should be impossible)");
         } 

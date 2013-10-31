@@ -7,22 +7,22 @@
 #define TH_SEARCH 1
 
 
-struct th_entry {
+typedef struct th_entry {
   union {
     double dkey;
     uint64_t ukey;
-  };
+  } key;
   
   int data;
   uint8_t vacant;
-};
+} _TH_ENTRY;
 
 
-struct th_table {
+typedef struct th_table {
   struct th_entry * ht;
 
   size_t size, maxsize;
-};
+} _TH_TABLE;
 
 int thcreate_r(size_t nel, struct th_table * tab);
 int thdestroy_r(struct th_table *tab);

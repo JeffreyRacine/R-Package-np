@@ -4410,7 +4410,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
       for(i = 0; i < num_categories_extern[j]; i++){
         struct th_entry centry;
-        centry.dkey = matrix_categorical_vals_extern[j][i];
+        centry.key.dkey = matrix_categorical_vals_extern[j][i];
         centry.data = i;
 
         if(thsearch_r(&centry, TH_ENTER, &ret, otabs+k) == TH_FAILURE)
@@ -4419,13 +4419,13 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       
       // now do lookups
       struct th_entry te;
-      te.dkey = pad_num;
+      te.key.dkey = pad_num;
       te.data = -1;
 
       ret = &te;
       for(i = 0; i < num_obs_eval_extern; i++){
-        if(ret->dkey != matrix_X_ordered_eval_extern[k][i]){
-          te.dkey = matrix_X_ordered_eval_extern[k][i];
+        if(ret->key.dkey != matrix_X_ordered_eval_extern[k][i]){
+          te.key.dkey = matrix_X_ordered_eval_extern[k][i];
           if(thsearch_r(&te, TH_SEARCH, &ret, otabs+k) == TH_FAILURE)
             error("hash table lookup failed (which should be impossible)");
 

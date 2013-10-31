@@ -6,6 +6,7 @@
 #include <limits.h>
 #include <float.h>
 #include <time.h>
+#include <stdint.h>
 
 #include "tree.h"
 

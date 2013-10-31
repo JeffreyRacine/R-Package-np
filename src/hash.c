@@ -36,14 +36,14 @@ int thsearch_r(const struct th_entry * const q, int action, struct th_entry ** r
   struct th_entry * ht = NULL;
   const size_t nel = tab->maxsize;
 
-  it = thfhash0(q->ukey,tab->maxsize);
+  it = thfhash0(q->key.ukey,tab->maxsize);
 
   ht = tab->ht;
 
   if(action == TH_ENTER) {
     if(tab->size == tab->maxsize) return TH_FAILURE;
     if(tab->size == 0){
-      ht[it].ukey = q->ukey;
+      ht[it].key.ukey = q->key.ukey;
       ht[it].data = q->data;
       ht[it].vacant = 0;
       tab->size += 1;
@@ -62,7 +62,7 @@ int thsearch_r(const struct th_entry * const q, int action, struct th_entry ** r
 
     if(ht[ot].vacant){
       if(action == TH_ENTER){
-        ht[ot].ukey = q->ukey;
+        ht[ot].key.ukey = q->key.ukey;
         ht[ot].data = q->data;
         ht[ot].vacant = 0;
         tab->size += 1;
@@ -74,7 +74,7 @@ int thsearch_r(const struct th_entry * const q, int action, struct th_entry ** r
       }
     }
 
-    if(ht[ot].ukey == q->ukey){
+    if(ht[ot].key.ukey == q->key.ukey){
       if(action == TH_SEARCH){
         *ret = ht + ot;
         return TH_SUCCESS;
