@@ -1,2 +1,0 @@
-# -*- Makefile -*-
-PKG_CFLAGS="-std=c99"
