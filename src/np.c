@@ -1198,6 +1198,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
 /* Allocate memory for objects */
 
+  if((BANDWIDTH_den_extern != BW_FIXED) && (ibwmfunc == CBWM_CVLS))
+    old_cdens = 1;
+
   matrix_Y_unordered_train_extern = alloc_matd(num_obs_train_extern, num_var_unordered_extern);
   matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, num_var_ordered_extern);
   matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, num_var_continuous_extern);
