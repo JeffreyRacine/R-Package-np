@@ -1,2 +1,2 @@
 # -*- Makefile -*-
-PKG_CFLAGS="-std=gnu99"
+PKG_CFLAGS="-std=c99"
