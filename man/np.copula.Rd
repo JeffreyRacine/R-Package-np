@@ -157,8 +157,10 @@ rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
 mydat <- mvrnorm(n=n, mu, Sigma)
-mydat <- data.frame(x=mydat[,1],y=ordered(as.integer(cut(mydat[,2],quantile(mydat[,2],seq(0,1,by=.1)),include.lowest=TRUE))-1))
-
+mydat <- data.frame(x=mydat[,1],
+                    y=ordered(as.integer(cut(mydat[,2],
+                      quantile(mydat[,2],seq(0,1,by=.1)),
+                      include.lowest=TRUE))-1))
 q.min <- 0.0
 q.max <- 1.0
 grid.seq <- seq(q.min,q.max,length=n.eval)
@@ -176,8 +178,16 @@ mpi.bcast.cmd(copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat),
 
 ## Plot the copula
 
-contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2",main="Copula Contour")
-persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
+
+contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
+        xlab="u1",
+        ylab="u2",
+        main="Copula Contour")
+
+persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
+      ticktype="detailed",
+      xlab="u1",
+      ylab="u2",
       zlab="Copula",zlim=c(0,1))
 
 ## Plot the empirical copula
@@ -195,8 +205,11 @@ mpi.bcast.cmd(copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat),
 
 ## Plot the copula density
 
-persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",
-      ylab="u2",zlab="Copula Density")
+persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
+      ticktype="detailed",
+      xlab="u1",
+      ylab="u2",
+      zlab="Copula Density")
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
@@ -253,9 +266,17 @@ mpi.bcast.cmd(copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat),
 
 ## Plot the copula
 
-contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),xlab="u1",ylab="u2",main="Copula Contour")
-persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",xlab="u1",ylab="u2",
-      zlab="Copula",zlim=c(0,1))
+contour(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
+        xlab="u1",
+        ylab="u2",
+        main="Copula Contour")
+
+persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
+      ticktype="detailed",
+      xlab="u1",
+      ylab="u2",
+      zlab="Copula",
+      zlim=c(0,1))
 
 ## Plot the empirical copula
 

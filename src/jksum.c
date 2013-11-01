@@ -6381,7 +6381,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
 
 }
 
-int kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
+void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                                              int KERNEL_unordered_den,
                                              int KERNEL_ordered_den,
                                              int BANDWIDTH_den,
