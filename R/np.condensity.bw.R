@@ -65,7 +65,7 @@ npcdensbw.conbandwidth <-
            auto = TRUE,
            nmulti, remin = TRUE, itmax = 10000, 
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           memfac = 250.0,
+           memfac = 500.0,
            ...){
 
     ydat = toFrame(ydat)
