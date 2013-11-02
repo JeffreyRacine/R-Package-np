@@ -35,7 +35,7 @@ npcdensbw(\dots)
           ftol = 1.490116e-07,
           tol = 1.490116e-04,
           small = 1.490116e-05,
-          memfac = 250,
+          memfac = 500,
           \dots)
 
 \method{npcdensbw}{default}(xdat = stop("data 'xdat' missing"),
@@ -274,7 +274,7 @@ npcdensbw(\dots)
     evaluations. Due to memory, hardware and software constraints, a
     maximum block size must be imposed by the algorithm. This block size
     is roughly equal to memfac*10^5 elements. Empirical tests on
-    modern hardware find that a memfac of around 250 performs well. If
+    modern hardware find that a memfac of 500 performs well. If
     you experience out of memory errors, or strange behaviour for
     large data sets (>100k elements) setting memfac to a lower value may
     fix the problem.
