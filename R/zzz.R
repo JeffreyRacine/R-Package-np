@@ -5,7 +5,7 @@
     options(np.messages = TRUE)
 
   if(is.null(options('np.tree')$np.tree))
-    options(np.tree = TRUE)
+    options(np.tree = FALSE)
 
 }
 .onUnload <- function (lpath){
