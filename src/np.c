@@ -3851,7 +3851,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
         matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+i];
   }
 
-  if (vector_Y_eval_extern != NULL)
+  if (!ey_is_ty)
     for(i=0;i<num_obs_eval_extern;i++)
       vector_Y_eval_extern[i] = ey[i];
 
@@ -3933,7 +3933,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
         for( i=0;i<num_obs_eval_extern;i++ )
           matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+ipe[i]];
 
-      if(vector_Y_eval_extern != NULL)
+      if(!ey_is_ty)
         for(i=0;i<num_obs_eval_extern;i++)
           vector_Y_eval_extern[i] = ey[ipe[i]];
 
