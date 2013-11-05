@@ -1,7 +1,8 @@
 Package: np
 Version: 0.50-2
 Date: 2013-10-31
-Depends: boot, cubature
+Depends:
+Imports: boot, cubature, stats
 Suggests: quantreg, MASS
 Title: Nonparametric kernel smoothing methods for mixed data types
 Author: Tristen Hayfield <hayfield@mpia.de>, Jeffrey S. Racine <racinej@mcmaster.ca>
