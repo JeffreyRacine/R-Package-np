@@ -1,5 +1,5 @@
 useDynLib(npRmpi)
-import(stats)
+import(stats, boot, cubature)
 export(b.star
        ,.docall
        ,.force.type
