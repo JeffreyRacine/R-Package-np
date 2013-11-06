@@ -6382,27 +6382,27 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
 }
 
 void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
-                                             int KERNEL_unordered_den,
-                                             int KERNEL_ordered_den,
-                                             int BANDWIDTH_den,
-                                             int num_obs_train,
-                                             int num_obs_eval,
-                                             int num_reg_unordered,
-                                             int num_reg_ordered,
-                                             int num_reg_continuous,
-                                             int dop,
-                                             double **matrix_X_unordered_train,
-                                             double **matrix_X_ordered_train,
-                                             double **matrix_X_continuous_train,
-                                             double **matrix_X_unordered_eval,
-                                             double **matrix_X_ordered_eval,
-                                             double **matrix_X_continuous_eval,
-                                             double *vector_scale_factor,
-                                             int *num_categories,
-                                             double ** matrix_categorical_vals,
-                                             double *pdf,
-                                             double *pdf_stderr,
-                                             double *log_likelihood){
+                                              int KERNEL_unordered_den,
+                                              int KERNEL_ordered_den,
+                                              int BANDWIDTH_den,
+                                              int num_obs_train,
+                                              int num_obs_eval,
+                                              int num_reg_unordered,
+                                              int num_reg_ordered,
+                                              int num_reg_continuous,
+                                              int dop,
+                                              double **matrix_X_unordered_train,
+                                              double **matrix_X_ordered_train,
+                                              double **matrix_X_continuous_train,
+                                              double **matrix_X_unordered_eval,
+                                              double **matrix_X_ordered_eval,
+                                              double **matrix_X_continuous_eval,
+                                              double *vector_scale_factor,
+                                              int *num_categories,
+                                              double ** matrix_categorical_vals,
+                                              double *pdf,
+                                              double *pdf_stderr,
+                                              double *log_likelihood){
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
 
@@ -6539,18 +6539,24 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   }
 
 
+  if (dop == OP_NORMAL) {
+    for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
+      pdf[i] /= (double)num_obs_train;
+      *log_likelihood += (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]);
 
-  for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
-    pdf[i] /= (double)num_obs_train;
-    *log_likelihood += (pdf[i] < DBL_MIN) ? log_DBL_MIN : log(pdf[i]);
-
-    if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
-      for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
-        pnh *= matrix_bandwidth[l][i];
+      if((BANDWIDTH_den == BW_GEN_NN) && (dop == OP_NORMAL)){
+        for(l = 0, pnh = num_obs_train; l < num_reg_continuous; l++){
+          pnh *= matrix_bandwidth[l][i];
+        }
       }
-    }
 
-    pdf_stderr[i] = sqrt(pdf[i]*K_INT_KERNEL_P/pnh);
+      pdf_stderr[i] = sqrt(pdf[i]*K_INT_KERNEL_P/pnh);
+    }
+  } else {
+    for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
+      pdf[i] /= (double)num_obs_train;
+      pdf_stderr[i] = sqrt(pdf[i]*(1.0-pdf[i])/(double)num_obs_train);
+    }
   }
 
   free(operator);
