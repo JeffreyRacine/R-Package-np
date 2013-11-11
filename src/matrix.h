@@ -91,3 +91,4 @@ MATRIX mat_sub_rem_mat( MATRIX A, int il, int iu, MATRIX S );
 double mat_det( MATRIX a );
 
 
+int isFiniteMatrix(MATRIX A);

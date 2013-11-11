@@ -151,8 +151,19 @@ if(FALSE){
   mytree <- build.kdtree(q, nbucket = nbucket)
 
   attach(mytree)
-  plot(p[1,],p[2,],pch=19)
-  rect(trd["bbl.1",], trd["bbl.2",], trd["bbu.1",], trd["bbu.2",],lwd = 4, border = 'blue')
+
+  op <- par(mfrow = c(2, 2), pty = "s")
+
+  for(i in 1:4){
+    plot(p[1,],p[2,],pch=19, type = 'n', xlab = 'x', ylab = 'y', main = paste("level",i))
+    ilev <- round(log(n / tri["nlev",])/log(2))+1
+    lev.plot <- c(i)
+    i.plot <- ilev %in% lev.plot
+    colors <- c("blue","green","orange", "red", "purple")
+    rect(trd["bbl.1",i.plot], trd["bbl.2",i.plot], trd["bbu.1",i.plot], trd["bbu.2",i.plot],lwd = 4, border = (colors[ilev])[i.plot])
+    points(p[1,],p[2,],pch=19)
+  }
+  
   detach(mytree)
 
   ## do a box search
@@ -179,4 +190,5 @@ if(FALSE){
       rect(bbb[1],bbb[3],bbb[2],bbb[4], border = 'green')
     }
   }
+
 }
