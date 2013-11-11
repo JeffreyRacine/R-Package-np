@@ -457,6 +457,9 @@ MATRIX mat_inv( MATRIX a , MATRIX C)
 		mat_free(B);
 		mat_free(P);
 
+    if(!isFiniteMatrix(C))
+      return NULL;
+
 		return (C);
 
 	}
@@ -688,53 +691,17 @@ MATRIX mat_backsubs1( MATRIX A, MATRIX B, MATRIX X, MATRIX P, int xcol )
 }
 
 
+int isFiniteMatrix(MATRIX A){
+	int i, j;
 
+	const int nc = MatCol(A);
+	const int nr = MatRow(A);
 
-/*
- *-----------------------------------------------------------------------------
- * file: matsub.c
- * desc: matrix subtraction
- * by: ko shu pui, Patrick
- * date: 24 nov 91 v0.1
- * revi: Nov 25 1994 by J. Racine - added error checking, passing matrix
- *       rather than allocating
- * ref:
- *       [1] Mary L.Boas, "Mathematical Methods in the Physical Science,"
- * John Wiley & Sons, 2nd Ed., 1983. Chap 3.
- *
- *-----------------------------------------------------------------------------
- */
-
-
-
-
-/*
- *-----------------------------------------------------------------------------
- * file: matsubx.c
- * desc: find submatrix
- * by: ko shu pui, Patrick
- * date: 24 may 92 v0.4
- * revi:
- * ref:
- *       [1] Mary L.Boas, "Mathematical Methods in the Physical Science,"
- * John Wiley & Sons, 2nd Ed., 1983. Chap 3.
- *
- *-----------------------------------------------------------------------------
- */
-/*
- *-----------------------------------------------------------------------------
- * file: mattran.c
- * desc: matrix mathematics
- * by: ko shu pui, Patrick
- * date: v0.1 - 24 nov 91
- * revi: v0.2 - 14 may 92
- * ref:
- *       [1] Mary L.Boas, "Mathematical Methods in the Physical Science,"
- * John Wiley & Sons, 2nd Ed., 1983. Chap 3.
- *
- *-----------------------------------------------------------------------------
- */
-
-
-
-
+  for(i = 0; i < nr; i++){
+    for(j = 0; j < nc; j++){
+      if(!isfinite(A[i][j]))
+        return 0;
+    }
+  }
+  return 1;
+}
