@@ -1,12 +1,13 @@
-# This function implements a test of significance for both discrete
-# and continuous variables. It accepts a data frame for explanatory
-# data (mixed datatypes allowed), a vector for y for a regression
-# model, an npregbw object, and a set of indices for the columns of X
-# for which the test is to be run (default = all).
+# This function implements an individual test of significance for both
+# discrete (Racine, hart, Li, 2006, ER) and continuous variables
+# (Racine, 1997, JBES). It accepts a data frame for explanatory data
+# (mixed datatypes allowed), a vector for y for a regression model, an
+# npregbw object, and a set of indices for the columns of X for which
+# the test is to be run (default = all).
 
 # Note - this conducts _individual_ tests of significance only. It
 # uses a wild bootstrap to handle potential heteroskedasticity (though
-# it perhaps could be readily changed to resample (y.star, X) pairs
+# it perhaps could be readily modified to resample (y.star, X) pairs
 # and perhaps this is desirable).
 
 npsigtest <-
@@ -70,7 +71,7 @@ npsigtest.npregression <-
     environment(ev$call) <- parent.frame()
     return(ev)
   }
-  
+
 npsigtest.rbandwidth <- function(bws,
                                  xdat = stop("data xdat missing"),
                                  ydat = stop("data ydat missing"),
@@ -81,7 +82,6 @@ npsigtest.rbandwidth <- function(bws,
                                  random.seed = 42,
                                  ...) {
 
-  
   xdat <- toFrame(xdat)
 
   if(boot.num < 9) stop("number of bootstrap replications must be >= 9")
@@ -96,11 +96,10 @@ npsigtest.rbandwidth <- function(bws,
 
   xdat <- xdat[goodrows,,drop = FALSE]
   ydat <- ydat[goodrows]
-  
 
   if (is.factor(ydat))
     stop("dependent variable must be continuous.")
-  
+
   ## Save seed prior to setting
 
   if(exists(".Random.seed", .GlobalEnv)) {
@@ -113,7 +112,7 @@ npsigtest.rbandwidth <- function(bws,
   set.seed(random.seed)
 
   boot.type <- match.arg(boot.type)
-  boot.method <- match.arg(boot.method)  
+  boot.method <- match.arg(boot.method)
 
   if(boot.type=="II") {
     ## Store a copy of the bandwidths passed in
@@ -121,7 +120,7 @@ npsigtest.rbandwidth <- function(bws,
   }
 
   num.obs <- nrow(xdat)
-  
+
   In <- numeric(length(index))
   P <- numeric(length(index))
 
@@ -152,7 +151,7 @@ npsigtest.rbandwidth <- function(bws,
     if(boot.type=="II") {
 
       ## Reset bw vals to original as the ith component of bws gets
-      ## overwritten when index changes so needs to be seet to its
+      ## overwritten when index changes so needs to be set to its
       ## original value
 
       bws <- bws.original
@@ -164,8 +163,13 @@ npsigtest.rbandwidth <- function(bws,
     ## Construct In, the average value of the squared derivatives of
     ## the jth element, discrete or continuous
 
-    In[ii] <- mean((npreg(txdat = xdat, tydat = ydat,
-                          bws=bws, gradients=TRUE,...)$grad[,i])^2)
+    npreg.out <- npreg(txdat = xdat,
+                       tydat = ydat,
+                       bws=bws,
+                       gradients=TRUE,
+                       ...)
+
+    In[ii] <- mean(npreg.out$grad[,i]^2)
 
     ## We now construct mhat.xi holding constant the variable whose
     ## significance is being tested at its median. First, make a copy
@@ -173,28 +177,22 @@ npsigtest.rbandwidth <- function(bws,
 
     xdat.eval <- xdat
 
-    ## Check whether variable being tested is a factor (unordered or
-    ## ordered) or not. If it is, cast the median as a factor. Note
-    ## that ## all we do is to replace the ith column of xdat with its
-    ## median, then ## evaluate the mean holding xdat[,i] constant at
-    ## this value.
+    ## Impose the null by evaluating the conditional holding xdat[,i]
+    ## constant at its median (numeric) or mode (factor/ordered) using
+    ## uocquantile()
 
-    ##if(is.factor(xdat[,i])) {
-    ##      xdat.eval[,i] <- cast(levels(xdat[,i])[median(as.integer(xdat[,i]))], xdat[,i])
-    ##} else {
-    ##  xdat.eval[,i] <- median(xdat[,i])
-    ##}
-    ##xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
-
-    xdat.eval[,i] <- sample(xdat[,i], replace=TRUE)
+    xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
 
     mhat.xi <-  npreg(txdat = xdat,
                       tydat = ydat,
                       exdat=xdat.eval,
-                      bws=bws,...)$mean
-    
+                      bws=bws,
+                      ...)$mean
+
+    ## Recenter the residuals
+
     delta.bar <- mean(ydat-mhat.xi)
-  
+
     ei <- ydat - mhat.xi - delta.bar
 
     for(i.star in 1:boot.num) {
@@ -232,31 +230,22 @@ npsigtest.rbandwidth <- function(bws,
       } else if(boot.method == "wild") {
 
         ## Conduct a wild bootstrap. We generate a sample for ydat
-        ## (ydat.star) drawn from the conditional mean evaluated holding
-        ## the variable tested at its median, and add to that a wild
-        ## bootstrap draw from the original disturbance vector
-        
-##        ydat.star <- mhat.xi + (ei-mean(ei))*
-##          ifelse(rbinom(num.obs, 1, P.a) == 1, a, b)+
-##            mean(ei)
+        ## (ydat.star) drawn from the conditional mean evaluated
+        ## holding the variable tested at its median, and add to that
+        ## a wild bootstrap draw from the original disturbance vector
 
         ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, a, b)
 
       } else if(boot.method == "wild-rademacher") {
 
         ## Conduct a wild bootstrap. We generate a sample for ydat
-        ## (ydat.star) drawn from the conditional mean evaluated holding
-        ## the variable tested at its median, and add to that a wild
-        ## bootstrap draw from the original disturbance vector
-        
-##        ydat.star <- mhat.xi + (ei-mean(ei))*
-##          ifelse(rbinom(num.obs, 1,0.5) == 1, -1, 1)+
-##            mean(ei)
+        ## (ydat.star) drawn from the conditional mean evaluated
+        ## holding the variable tested at its median, and add to that
+        ## a wild bootstrap draw from the original disturbance vector
 
-        ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, a, b)
-        
+        ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, -1, 1)
 
-      } 
+      }
 
       if(boot.type=="II") {
 
@@ -266,22 +255,27 @@ npsigtest.rbandwidth <- function(bws,
         ## new bw for variable i along with the original bandwidths
         ## for the remaining variables
 
-        bws.boot <- npregbw(xdat = xdat, ydat = ydat.star,
-                            bws=bws.original,...)        
+        bws.boot <- npregbw(xdat = xdat,
+                            ydat = ydat.star,
+                            bws=bws.original,
+                            ...)
 
         ## Copy the new cross-validated bandwidth for variable i into
         ## bw.original and use this below.
-        
+
         bws <- bws.original
 
         bws$bw[i] <- bws.boot$bw[i]
 
       }
 
-      In.vec[i.star] <- mean((npreg(txdat = xdat,
-                                    tydat = ydat.star,
-                                    bws=bws,
-                                    gradients=TRUE,...)$grad[,i])^2)
+      npreg.boot <- npreg(txdat = xdat,
+                          tydat = ydat.star,
+                          bws=bws,
+                          gradients=TRUE,
+                          ...)
+
+      In.vec[i.star] <- mean(npreg.boot$grad[,i]^2)
 
       console <- printPop(console)
     }
@@ -300,20 +294,24 @@ npsigtest.rbandwidth <- function(bws,
   ## Restore seed
 
   if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
-  
-  sigtest(In=In, In.mat, P=P,
+
+  sigtest(In=In,
+          In.mat,
+          P=P,
           bws = bws,
           ixvar = index,
-          boot.method, boot.type, boot.num)
+          boot.method,
+          boot.type,
+          boot.num)
 
 }
 
 npsigtest.default <- function(bws, xdat, ydat, ...){
   sc.names <- names(sys.call())
 
-  ## here we check to see if the function was called with tdat =
-  ## if it was, we need to catch that and map it to dat =
-  ## otherwise the call is passed unadulterated to npudensbw
+  ## here we check to see if the function was called with tdat = if it
+  ## was, we need to catch that and map it to dat = otherwise the call
+  ## is passed unadulterated to npudensbw
 
   bws.named <- any(sc.names == "bws")
   xdat.named <- any(sc.names == "xdat")
@@ -324,7 +322,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   no.ydat <- missing(ydat)
 
   ## if bws was passed in explicitly, do not compute bandwidths
-    
+
   if(xdat.named)
     xdat <- toFrame(xdat)
 
@@ -334,21 +332,16 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
                    ifelse(no.xdat, "", "xdat,"))
   ty.str <- ifelse(ydat.named, "ydat = ydat,",
                    ifelse(no.ydat, "", "ydat,"))
-  
+
   tbw <- eval(parse(text = paste("npregbw(",
-                      ifelse(bws.named,                             
+                      ifelse(bws.named,
                              paste(tx.str, ty.str,
                                    "bws = bws, bandwidth.compute = FALSE,"),
                              paste(ifelse(no.bws, "", "bws,"), tx.str, ty.str)),
                       "call = mc, ...",")",sep="")))
 
-  ## xnames = names(xdat)
-  ##tbw <- updateBwNameMetadata(nameList =
-  ##                            list(ynames = deparse(substitute(ydat))),
-  ##                            bws = tbw)
-
   repair.args <- c("data", "subset", "na.action")
-  
+
   m.par <- match(repair.args, names(mc), nomatch = 0)
   m.child <- match(repair.args, names(tbw$call), nomatch = 0)
 
@@ -360,7 +353,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   m.bws.par <- match(c("bws","xdat","ydat"), names(mc), nomatch = 0)
   m.bws.child <- match(c("bws","xdat","ydat"), as.character(tbw$call), nomatch = 0)
   m.bws.union <- (m.bws.par > 0) & (m.bws.child > 0)
-  
+
   tbw$call[m.bws.child[m.bws.union]] <- mc[m.bws.par[m.bws.union]]
 
   environment(tbw$call) <- parent.frame()
@@ -371,13 +364,13 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
     ty.str <- ",ydat = ydat"
   } else {
     tx.str <- ifelse(xdat.named, ",xdat = xdat","")
-    ty.str <- ifelse(ydat.named, ",ydat = ydat","")    
+    ty.str <- ifelse(ydat.named, ",ydat = ydat","")
     if((!bws.named) && (!xdat.named)){
       ty.str <- ifelse(ydat.named, ",ydat = ydat",
                        ifelse(no.ydat,"",",ydat"))
     }
   }
-  
+
   ev <- eval(parse(text=paste("npsigtest(bws = tbw", tx.str, ty.str, ",...)")))
 
   ev$call <- match.call(expand.dots = FALSE)
