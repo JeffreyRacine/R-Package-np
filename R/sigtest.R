@@ -4,6 +4,7 @@ sigtest <- function(In,
                     bws = NA,
                     ixvar,
                     boot.method,
+                    pivot,
                     boot.type,
                     boot.num){
 
@@ -16,6 +17,7 @@ sigtest <- function(In,
                  "iid" = "IID",
                  "wild" ="Wild",
                  "wild-rademacher" = "Rademacher Wild"),
+               pivot = pivot,
                ptype = boot.type,
                boot.num = boot.num)
   
@@ -41,8 +43,10 @@ sigtest <- function(In,
 
 print.sigtest <- function(x, ...){
   cat("\nKernel Regression Significance Test",
-      "\nType ", x$ptype," Test with ", x$pmethod, " Bootstrap (",x$boot.num,
-      " replications)",
+      "\nType ", x$ptype,
+      " Test with ", x$pmethod,
+      " Bootstrap (",x$boot.num," replications, ",
+      " Pivot = ", x$pivot,")",
       "\nExplanatory variables tested for significance:\n",
       paste(paste(x$bws$xnames[x$ixvar]," (",x$ixvar,")", sep=""), collapse=", "),"\n\n",
       sep="")

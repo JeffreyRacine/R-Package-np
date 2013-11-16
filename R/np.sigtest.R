@@ -76,8 +76,9 @@ npsigtest.rbandwidth <- function(bws,
                                  xdat = stop("data xdat missing"),
                                  ydat = stop("data ydat missing"),
                                  boot.num=399,
-                                 boot.method=c("iid","wild","wild-rademacher"),
+                                 boot.method=c("iid","wild","wild-rademacher","pairwise"),
                                  boot.type=c("I","II"),
+                                 pivot=TRUE,
                                  index=seq(1,ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
@@ -169,34 +170,44 @@ npsigtest.rbandwidth <- function(bws,
                        gradients=TRUE,
                        ...)
 
-    In[ii] <- mean(npreg.out$grad[,i]^2)
+    In[ii] <- if(!pivot) {
+      mean(npreg.out$grad[,i]^2)
+    } else {
+      ## Temporarily trap NaN XXX
+      npreg.out$gerr[is.nan(npreg.out$gerr)] <- .Machine$double.xmax
+      mean((npreg.out$grad[,i]/NZD(npreg.out$gerr[,i]))^2)
+    }
 
-    ## We now construct mhat.xi holding constant the variable whose
-    ## significance is being tested at its median. First, make a copy
-    ## of the data frame xdat
+    if(boot.method != "pairwise") {
 
-    xdat.eval <- xdat
-
-    ## Impose the null by evaluating the conditional holding xdat[,i]
-    ## constant at its median (numeric) or mode (factor/ordered) using
-    ## uocquantile()
-
-    xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
-
-    mhat.xi <-  npreg(txdat = xdat,
-                      tydat = ydat,
-                      exdat=xdat.eval,
-                      bws=bws,
-                      ...)$mean
-
-    ## Recenter the residuals
-
-    delta.bar <- mean(ydat-mhat.xi)
-
-    ei <- ydat - mhat.xi - delta.bar
-
+      ## We now construct mhat.xi holding constant the variable whose
+      ## significance is being tested at its median. First, make a copy
+      ## of the data frame xdat
+      
+      xdat.eval <- xdat
+      
+      ## Impose the null by evaluating the conditional holding xdat[,i]
+      ## constant at its median (numeric) or mode (factor/ordered) using
+      ## uocquantile()
+      
+      xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
+      
+      mhat.xi <-  npreg(txdat = xdat,
+                        tydat = ydat,
+                        exdat=xdat.eval,
+                        bws=bws,
+                        ...)$mean
+      
+      ## Recenter the residuals
+      
+      delta.bar <- mean(ydat-mhat.xi)
+      
+      ei <- ydat - mhat.xi - delta.bar
+      
+    }
+    
     for(i.star in 1:boot.num) {
-
+      
       if(boot.type=="I") {
         msg <- paste("Bootstrap replication ",
                      i.star,
@@ -245,6 +256,16 @@ npsigtest.rbandwidth <- function(bws,
 
         ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, -1, 1)
 
+      } else if(boot.method =="pairwise") {
+
+        ## Leave variable being tested untouched, resample remaining
+        ## pairs of y,X thereby breaking any systematic relationship
+        ## between variable being tested in y
+        boot.index <- sample(1:num.obs,replace=TRUE)
+        ydat.star <- ydat[boot.index]
+        xdat.star <- xdat
+        xdat.star[,-i] <- xdat[boot.index,-i]
+
       }
 
       if(boot.type=="II") {
@@ -255,10 +276,21 @@ npsigtest.rbandwidth <- function(bws,
         ## new bw for variable i along with the original bandwidths
         ## for the remaining variables
 
-        bws.boot <- npregbw(xdat = xdat,
-                            ydat = ydat.star,
-                            bws=bws.original,
-                            ...)
+        if(boot.method == "pairwise") {
+
+          bws.boot <- npregbw(xdat = xdat.star,
+                              ydat = ydat.star,
+                              bws=bws.original,
+                              ...)
+
+        } else {
+
+          bws.boot <- npregbw(xdat = xdat,
+                              ydat = ydat.star,
+                              bws=bws.original,
+                              ...)
+
+        }
 
         ## Copy the new cross-validated bandwidth for variable i into
         ## bw.original and use this below.
@@ -269,13 +301,31 @@ npsigtest.rbandwidth <- function(bws,
 
       }
 
-      npreg.boot <- npreg(txdat = xdat,
-                          tydat = ydat.star,
-                          bws=bws,
-                          gradients=TRUE,
-                          ...)
+      if(boot.method == "pairwise") {
 
-      In.vec[i.star] <- mean(npreg.boot$grad[,i]^2)
+        npreg.boot <- npreg(txdat = xdat.star,
+                            tydat = ydat.star,
+                            bws=bws,
+                            gradients=TRUE,
+                            ...)
+
+      } else {
+
+        npreg.boot <- npreg(txdat = xdat,
+                            tydat = ydat.star,
+                            bws=bws,
+                            gradients=TRUE,
+                            ...)
+
+      }
+
+      In.vec[i.star] <- if(!pivot) {
+        mean(npreg.boot$grad[,i]^2)
+      } else {
+        ## Temporarily trap NaN XXX
+        npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
+        mean((npreg.boot$grad[,i]/NZD(npreg.boot$gerr[,i]))^2)
+      }
 
       console <- printPop(console)
     }
@@ -301,6 +351,7 @@ npsigtest.rbandwidth <- function(bws,
           bws = bws,
           ixvar = index,
           boot.method,
+          pivot,
           boot.type,
           boot.num)
 
