@@ -79,6 +79,7 @@ npsigtest.rbandwidth <- function(bws,
                                  boot.method=c("iid","wild","wild-rademacher","pairwise"),
                                  boot.type=c("I","II"),
                                  pivot=TRUE,
+                                 joint=FALSE,
                                  index=seq(1,ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
@@ -122,8 +123,12 @@ npsigtest.rbandwidth <- function(bws,
 
   num.obs <- nrow(xdat)
 
-  In <- numeric(length(index))
-  P <- numeric(length(index))
+  if(!joint) {
+
+    In <- numeric(length(index))
+    P <- numeric(length(index))
+
+  }
 
   ## Some constants for the wild bootstrap
 
@@ -135,19 +140,13 @@ npsigtest.rbandwidth <- function(bws,
 
   In.vec <- numeric(boot.num)
 
-  ## ii is the counter for successive elements of In and P...
-
-  In.mat = matrix(data = 0, ncol = length(index), nrow = boot.num)
-
-  ii <- 0
-
   console <- newLineConsole()
 
-  for(i in index) {
+  if(joint==TRUE) {
 
-    ## Increment counter...
+    ## Joint test
 
-    ii <- ii + 1
+    In.mat = matrix(data = 0, ncol = 1, nrow = boot.num)
 
     if(boot.type=="II") {
 
@@ -170,12 +169,12 @@ npsigtest.rbandwidth <- function(bws,
                        gradients=TRUE,
                        ...)
 
-    In[ii] <- if(!pivot) {
-      mean(npreg.out$grad[,i]^2)
+    In <- if(!pivot) {
+      mean(npreg.out$grad[,index]^2)
     } else {
       ## Temporarily trap NaN XXX
       npreg.out$gerr[is.nan(npreg.out$gerr)] <- .Machine$double.xmax
-      mean((npreg.out$grad[,i]/NZD(npreg.out$gerr[,i]))^2)
+      mean((npreg.out$grad[,index]/NZD(npreg.out$gerr[,index]))^2)
     }
 
     if(boot.method != "pairwise") {
@@ -189,8 +188,8 @@ npsigtest.rbandwidth <- function(bws,
       ## Impose the null by evaluating the conditional holding xdat[,i]
       ## constant at its median (numeric) or mode (factor/ordered) using
       ## uocquantile()
-      
-      xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
+
+      for(i in index) xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
       
       mhat.xi <-  npreg(txdat = xdat,
                         tydat = ydat,
@@ -213,8 +212,6 @@ npsigtest.rbandwidth <- function(bws,
                      i.star,
                      "/",
                      boot.num,
-                     " for variable ",
-                     i,
                      " of (",
                      paste(index,collapse=","),
                      ")... ",
@@ -224,8 +221,6 @@ npsigtest.rbandwidth <- function(bws,
                      i.star,
                      "/",
                      boot.num,
-                     " for variable ",
-                     i,
                      " of (",
                      paste(index,collapse=","),
                      ")... ",
@@ -263,8 +258,8 @@ npsigtest.rbandwidth <- function(bws,
         ## between variable being tested in y
         boot.index <- sample(1:num.obs,replace=TRUE)
         ydat.star <- ydat[boot.index]
-        xdat.star <- xdat
-        xdat.star[,-i] <- xdat[boot.index,-i]
+        xdat.star <- xdat[boot.index,]
+        for(i in index) xdat.star[,i] <- xdat[,i]
 
       }
 
@@ -297,7 +292,7 @@ npsigtest.rbandwidth <- function(bws,
 
         bws <- bws.original
 
-        bws$bw[i] <- bws.boot$bw[i]
+        bws$bw[index] <- bws.boot$bw[index]
 
       }
 
@@ -320,11 +315,11 @@ npsigtest.rbandwidth <- function(bws,
       }
 
       In.vec[i.star] <- if(!pivot) {
-        mean(npreg.boot$grad[,i]^2)
+        mean(npreg.boot$grad[,index]^2)
       } else {
         ## Temporarily trap NaN XXX
         npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
-        mean((npreg.boot$grad[,i]/NZD(npreg.boot$gerr[,i]))^2)
+        mean((npreg.boot$grad[,index]/NZD(npreg.boot$gerr[,index]))^2)
       }
 
       console <- printPop(console)
@@ -332,12 +327,217 @@ npsigtest.rbandwidth <- function(bws,
 
     ## Compute the P-value
 
-    P[ii] <- mean(ifelse(In.vec>In[ii],1,0))
+    P <- mean(ifelse(In.vec>In,1,0))
 
-    In.mat[,ii] = In.vec
+    In.mat[,1] = In.vec
 
-  }
+  } else {
 
+    ## Individual test
+
+    ## ii is the counter for successive elements of In and P...
+
+    In.mat = matrix(data = 0, ncol = length(index), nrow = boot.num)
+
+    ii <- 0
+
+    for(i in index) {
+      
+      ## Increment counter...
+      
+      ii <- ii + 1
+      
+      if(boot.type=="II") {
+        
+        ## Reset bw vals to original as the ith component of bws gets
+        ## overwritten when index changes so needs to be set to its
+        ## original value
+        
+        bws <- bws.original
+        
+      }
+      
+      ## Note - xdat must be a data frame
+      
+      ## Construct In, the average value of the squared derivatives of
+      ## the jth element, discrete or continuous
+      
+      npreg.out <- npreg(txdat = xdat,
+                         tydat = ydat,
+                         bws=bws,
+                         gradients=TRUE,
+                         ...)
+      
+      In[ii] <- if(!pivot) {
+        mean(npreg.out$grad[,i]^2)
+      } else {
+        ## Temporarily trap NaN XXX
+        npreg.out$gerr[is.nan(npreg.out$gerr)] <- .Machine$double.xmax
+        mean((npreg.out$grad[,i]/NZD(npreg.out$gerr[,i]))^2)
+      }
+      
+      if(boot.method != "pairwise") {
+        
+        ## We now construct mhat.xi holding constant the variable whose
+        ## significance is being tested at its median. First, make a copy
+        ## of the data frame xdat
+        
+        xdat.eval <- xdat
+        
+        ## Impose the null by evaluating the conditional holding xdat[,i]
+        ## constant at its median (numeric) or mode (factor/ordered) using
+        ## uocquantile()
+        
+        xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
+        
+        mhat.xi <-  npreg(txdat = xdat,
+                          tydat = ydat,
+                          exdat=xdat.eval,
+                          bws=bws,
+                          ...)$mean
+        
+        ## Recenter the residuals
+        
+        delta.bar <- mean(ydat-mhat.xi)
+        
+        ei <- ydat - mhat.xi - delta.bar
+        
+      }
+      
+      for(i.star in 1:boot.num) {
+        
+        if(boot.type=="I") {
+          msg <- paste("Bootstrap replication ",
+                       i.star,
+                       "/",
+                       boot.num,
+                       " for variable ",
+                       i,
+                       " of (",
+                       paste(index,collapse=","),
+                       ")... ",
+                       sep="")
+        } else {
+          msg <- paste("Bootstrap rep. ",
+                       i.star,
+                       "/",
+                       boot.num,
+                       " for variable ",
+                       i,
+                       " of (",
+                       paste(index,collapse=","),
+                       ")... ",
+                       sep="")
+        }
+        
+        console <- printPush(msg = msg, console)
+        
+        if(boot.method == "iid") {
+          
+          ydat.star <- mhat.xi + sample(ei, replace=TRUE)
+          
+        } else if(boot.method == "wild") {
+          
+          ## Conduct a wild bootstrap. We generate a sample for ydat
+          ## (ydat.star) drawn from the conditional mean evaluated
+          ## holding the variable tested at its median, and add to that
+          ## a wild bootstrap draw from the original disturbance vector
+          
+          ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, a, b)
+          
+        } else if(boot.method == "wild-rademacher") {
+          
+          ## Conduct a wild bootstrap. We generate a sample for ydat
+          ## (ydat.star) drawn from the conditional mean evaluated
+          ## holding the variable tested at its median, and add to that
+          ## a wild bootstrap draw from the original disturbance vector
+          
+          ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, -1, 1)
+          
+        } else if(boot.method =="pairwise") {
+          
+          ## Leave variable being tested untouched, resample remaining
+          ## pairs of y,X thereby breaking any systematic relationship
+          ## between variable being tested in y
+          boot.index <- sample(1:num.obs,replace=TRUE)
+          ydat.star <- ydat[boot.index]
+          xdat.star <- xdat
+          xdat.star[,-i] <- xdat[boot.index,-i]
+          
+        }
+        
+        if(boot.type=="II") {
+          
+          ## For Bootstrap II method, starting values are taken from
+          ## bandwidths passed in (bws.original). We then conduct
+          ## cross-validation for the bootstrap sample and use only the
+          ## new bw for variable i along with the original bandwidths
+          ## for the remaining variables
+          
+          if(boot.method == "pairwise") {
+            
+            bws.boot <- npregbw(xdat = xdat.star,
+                                ydat = ydat.star,
+                                bws=bws.original,
+                                ...)
+            
+          } else {
+            
+            bws.boot <- npregbw(xdat = xdat,
+                                ydat = ydat.star,
+                                bws=bws.original,
+                                ...)
+            
+          }
+          
+          ## Copy the new cross-validated bandwidth for variable i into
+          ## bw.original and use this below.
+          
+          bws <- bws.original
+          
+          bws$bw[i] <- bws.boot$bw[i]
+          
+        }
+        
+        if(boot.method == "pairwise") {
+          
+          npreg.boot <- npreg(txdat = xdat.star,
+                              tydat = ydat.star,
+                              bws=bws,
+                              gradients=TRUE,
+                              ...)
+          
+        } else {
+          
+          npreg.boot <- npreg(txdat = xdat,
+                              tydat = ydat.star,
+                              bws=bws,
+                              gradients=TRUE,
+                              ...)
+          
+        }
+        
+        In.vec[i.star] <- if(!pivot) {
+          mean(npreg.boot$grad[,i]^2)
+        } else {
+          ## Temporarily trap NaN XXX
+          npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
+          mean((npreg.boot$grad[,i]/NZD(npreg.boot$gerr[,i]))^2)
+        }
+        
+        console <- printPop(console)
+      }
+      
+      ## Compute the P-value
+      
+      P[ii] <- mean(ifelse(In.vec>In[ii],1,0))
+      
+      In.mat[,ii] = In.vec
+      
+    }
+    
+  } ## End invididual test
+  
   ## Return a list containing the statistic and its P-value
   ## bootstrapped In.vec for each variable...
 
@@ -352,6 +552,7 @@ npsigtest.rbandwidth <- function(bws,
           ixvar = index,
           boot.method,
           pivot,
+          joint,
           boot.type,
           boot.num)
 

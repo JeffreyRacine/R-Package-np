@@ -33,6 +33,8 @@ npsigtest(bws, \dots)
           boot.num = 399,
           boot.method = c("iid","wild","wild-rademacher"),
           boot.type = c("I","II"),
+          pivot=TRUE,
+          joint=FALSE,
           index = seq(1,ncol(xdat)),
           random.seed = 42,
           \dots)
@@ -94,6 +96,18 @@ npsigtest(bws, \dots)
     each bootstrap replication and uses the new cross-validated
     bandwidth for variable \eqn{i} and the original ones for the
     remaining variables. Defaults to \code{boot.type="I"}.
+  }
+
+  \item{pivot}{
+    a logical value which specifies whether to bootstrap a pivotal
+    statistic or not. Defaults to \code{TRUE}.
+  }
+
+  \item{joint}{
+    a logical value which specifies whether to conduct a
+    joint test or individual test. This is to be used in conjunction
+    with \code{index} where \code{index} contains two or more
+    integers. Defaults to \code{FALSE}.
   }
 
   \item{index}{

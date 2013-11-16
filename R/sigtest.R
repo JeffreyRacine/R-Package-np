@@ -5,6 +5,7 @@ sigtest <- function(In,
                     ixvar,
                     boot.method,
                     pivot,
+                    joint,
                     boot.type,
                     boot.num){
 
@@ -18,6 +19,7 @@ sigtest <- function(In,
                  "wild" ="Wild",
                  "wild-rademacher" = "Rademacher Wild"),
                pivot = pivot,
+               joint = joint,
                ptype = boot.type,
                boot.num = boot.num)
   
@@ -46,7 +48,7 @@ print.sigtest <- function(x, ...){
       "\nType ", x$ptype,
       " Test with ", x$pmethod,
       " Bootstrap (",x$boot.num," replications, ",
-      " Pivot = ", x$pivot,")",
+      " Pivot = ", x$pivot,", joint = ",x$joint,")",
       "\nExplanatory variables tested for significance:\n",
       paste(paste(x$bws$xnames[x$ixvar]," (",x$ixvar,")", sep=""), collapse=", "),"\n\n",
       sep="")
@@ -58,9 +60,14 @@ print.sigtest <- function(x, ...){
 
   maxNameLen <- max(nc <- nchar(nm <- x$bws$xnames[x$ixvar]))
 
-  cat("\nSignificance Tests\n")
-  cat("P Value:", paste("\n", nm, ' ', blank(maxNameLen-nc), format.pval(x$P),
-                        " ", x$reject, sep=''))
+  if(!x$joint) {
+    cat("\nIndividual Significance Tests\n")
+    cat("P Value:", paste("\n", nm," ", blank(maxNameLen-nc), format.pval(x$P),
+                          " ", x$reject, sep=''))
+  } else {
+    cat("\nJoint Significance Test\n")
+    cat("P Value:", paste(" ", format.pval(x$P)," ", x$reject, sep=''))
+  }
   cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1\n\n")
 }
 
