@@ -212,18 +212,12 @@ npsigtest.rbandwidth <- function(bws,
                      i.star,
                      "/",
                      boot.num,
-                     " of (",
-                     paste(index,collapse=","),
-                     ")... ",
                      sep="")
       } else {
         msg <- paste("Bootstrap rep. ",
                      i.star,
                      "/",
                      boot.num,
-                     " of (",
-                     paste(index,collapse=","),
-                     ")... ",
                      sep="")
       }
 
@@ -526,6 +520,7 @@ npsigtest.rbandwidth <- function(bws,
         }
         
         console <- printPop(console)
+
       }
       
       ## Compute the P-value
@@ -537,6 +532,10 @@ npsigtest.rbandwidth <- function(bws,
     }
     
   } ## End invididual test
+
+  console <- printPush(msg ="                                                                                ", console)
+  console <- printPop(console)
+  console <- printClear(console)
   
   ## Return a list containing the statistic and its P-value
   ## bootstrapped In.vec for each variable...
