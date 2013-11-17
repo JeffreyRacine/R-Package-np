@@ -5,11 +5,6 @@
 # npregbw object, and a set of indices for the columns of X for which
 # the test is to be run (default = all).
 
-# Note - this conducts _individual_ tests of significance only. It
-# uses a wild bootstrap to handle potential heteroskedasticity (though
-# it perhaps could be readily modified to resample (y.star, X) pairs
-# and perhaps this is desirable).
-
 npsigtest <-
   function(bws, ...){
     args <- list(...)
