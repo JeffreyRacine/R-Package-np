@@ -11,7 +11,7 @@
 \title{Kernel Regression Significance Test with Mixed Data Types}
 \description{
   \code{npsigtest} implements a consistent test of significance of
-  an explanatory variable in a nonparametric regression setting that is
+  an explanatory variable(s) in a nonparametric regression setting that is
   analogous to a simple \eqn{t}-test in a parametric regression
   setting. The test is based on Racine, Hart, and Li (2006) and
   Racine (1997).
@@ -55,24 +55,23 @@ npsigtest(bws, \dots)
   }
 
   \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(bws)}, typically the environment from which
-    \code{\link{npregbw}} was called.
+    an optional data frame, list or environment (or object coercible to
+    a data frame by \code{\link{as.data.frame}}) containing the
+    variables in the model. If not found in data, the variables are
+    taken from \code{environment(bws)}, typically the environment from
+    which \code{\link{npregbw}} was called.
   }
 
   \item{xdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators.
+    a \eqn{p}-variate data frame of explanatory data (training data)
+    used to calculate the regression estimators.
   }
 
   \item{ydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
+    a one (1) dimensional numeric or integer vector of dependent data,
+    each element \eqn{i} corresponding to each observation (row) \eqn{i}
+    of \code{xdat}.
   }
-
 
   \item{boot.method}{
     a character string used to specify the bootstrap method for
@@ -89,7 +88,6 @@ npsigtest(bws, \dots)
     use. Defaults to \code{399}.
   }
 
-
   \item{boot.type}{
     a character string specifying whether to use a `Bootstrap I' or
     `Bootstrap II' method (see Racine, Hart, and Li (2006) for
@@ -105,23 +103,26 @@ npsigtest(bws, \dots)
   }
 
   \item{joint}{
-    a logical value which specifies whether to conduct a
-    joint test or individual test. This is to be used in conjunction
-    with \code{index} where \code{index} contains two or more
-    integers. Defaults to \code{FALSE}.
+    a logical value which specifies whether to conduct a joint test or
+    individual test. This is to be used in conjunction with \code{index}
+    where \code{index} contains two or more integers corresponding to
+    the variables being tested, where the integers correspond to the
+    variables in the order in which they appear among the set of
+    explanatory variables in the function call to
+    \code{npreg}/\code{npregbw}. Defaults to \code{FALSE}.
   }
 
   \item{index}{
     a vector of indices for the columns of \code{xdat} for which the
-    test of significance is to be conducted. Defaults to (1,2,\dots,\eqn{p})
-    where \eqn{p} is the number of columns in \code{xdat}.
+    test of significance is to be conducted. Defaults to
+    (1,2,\dots,\eqn{p}) where \eqn{p} is the number of columns in
+    \code{xdat}.
   }
 
   \item{random.seed}{
     an integer used to seed R's random number generator. This is to
     ensure replicability. Defaults to 42.
   }
-
 
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
@@ -172,20 +173,22 @@ npsigtest(bws, \dots)
 }
 
 \section{Usage Issues}{
+
   If you are using data of mixed types, then it is advisable to use the
   \code{\link{data.frame}} function to construct your input data and not
-  \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
-  intended on mixed data types and will coerce the data to the same
+  \code{\link{cbind}}, since \code{\link{cbind}} will typically not work
+  as intended on mixed data types and will coerce the data to the same
   type.
 
   Caution: bootstrap methods are, by their nature, \emph{computationally
-    intensive}. This can be frustrating for users possessing large
+  intensive}. This can be frustrating for users possessing large
   datasets. For exploratory purposes, you may wish to override the
   default number of bootstrap replications, say, setting them to
-  boot.num=99 A version of this package using the \code{Rmpi} wrapper is
-  under development that allows one to deploy this software in a
-  clustered computing environment to facilitate computation involving
-  large datasets.
+  \code{boot.num=99} A version of this package using the \code{Rmpi}
+  wrapper is under development that allows one to deploy this software
+  in a clustered computing environment to facilitate computation
+  involving large datasets.
+
 }
 
 \examples{
