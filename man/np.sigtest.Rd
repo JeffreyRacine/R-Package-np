@@ -10,11 +10,11 @@
 
 \title{Kernel Regression Significance Test with Mixed Data Types}
 \description{
-  \code{npsigtest} implements a consistent test of significance of
-  an explanatory variable(s) in a nonparametric regression setting that is
-  analogous to a simple \eqn{t}-test in a parametric regression
-  setting. The test is based on Racine, Hart, and Li (2006) and
-  Racine (1997).
+  \code{npsigtest} implements a consistent test of significance of an
+  explanatory variable(s) in a nonparametric regression setting that is
+  analogous to a simple \eqn{t}-test (\eqn{F}-test) in a parametric
+  regression setting. The test is based on Racine, Hart, and Li (2006)
+  and Racine (1997).
 }
 \usage{
 npsigtest(bws, \dots)
@@ -99,7 +99,9 @@ npsigtest(bws, \dots)
 
   \item{pivot}{
     a logical value which specifies whether to bootstrap a pivotal
-    statistic or not. Defaults to \code{TRUE}.
+    statistic or not (pivoting is achieved by dividing gradient
+    estimates by their asymptotic standard errors). Defaults to
+    \code{TRUE}.
   }
 
   \item{joint}{

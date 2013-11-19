@@ -1,6 +1,6 @@
 Package: np
 Version: 0.50-2
-Date: 2013-11-16
+Date: 2013-11-19
 Depends:
 Imports: boot, cubature, stats
 Suggests: quantreg, MASS
