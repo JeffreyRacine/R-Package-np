@@ -151,9 +151,9 @@ npsigtest(bws, \dots)
   size \eqn{n=100} for some data generating processes).  If the default
   setting (\code{boot.type="I"}) delivers a P-value that is in the
   neighborhood (i.e.\ slightly smaller) of any classical level
-  (e.g. 0.05), it would be prudent to re-run the test using the more
-  computationally intensive \code{boot.type="II"} to confirm the
-  original result.
+  (e.g. 0.05) and you only have a modest amount of data, it might be
+  prudent to re-run the test using the more computationally intensive
+  \code{boot.type="II"} setting to confirm the original result.
 
 }  
 
