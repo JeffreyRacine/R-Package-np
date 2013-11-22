@@ -70,12 +70,12 @@ npsigtest.npregression <-
 npsigtest.rbandwidth <- function(bws,
                                  xdat = stop("data xdat missing"),
                                  ydat = stop("data ydat missing"),
-                                 boot.num=399,
-                                 boot.method=c("pairwise","iid","wild","wild-rademacher"),
-                                 boot.type=c("I","II"),
-                                 pivot=TRUE,
-                                 joint=FALSE,
-                                 index=seq(1,ncol(xdat)),
+                                 boot.num = 399,
+                                 boot.method = c("pairwise","iid","wild","wild-rademacher"),
+                                 boot.type = c("I","II"),
+                                 pivot = TRUE,
+                                 joint = FALSE,
+                                 index = seq(1,ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
 
@@ -165,8 +165,8 @@ npsigtest.rbandwidth <- function(bws,
 
     npreg.out <- npreg(txdat = xdat,
                        tydat = ydat,
-                       bws=bws,
-                       gradients=TRUE,
+                       bws = bws,
+                       gradients = TRUE,
                        ...)
 
     In <- if(!pivot) {
@@ -193,8 +193,8 @@ npsigtest.rbandwidth <- function(bws,
       
       mhat.xi <-  npreg(txdat = xdat,
                         tydat = ydat,
-                        exdat=xdat.eval,
-                        bws=bws,
+                        exdat = xdat.eval,
+                        bws = bws,
                         ...)$mean
       
       ## Recenter the residuals
@@ -269,14 +269,14 @@ npsigtest.rbandwidth <- function(bws,
 
           bws.boot <- npregbw(xdat = xdat.star,
                               ydat = ydat.star,
-                              bws=bws.original,
+                              bws = bws.original,
                               ...)
 
         } else {
 
           bws.boot <- npregbw(xdat = xdat,
                               ydat = ydat.star,
-                              bws=bws.original,
+                              bws = bws.original,
                               ...)
 
         }
@@ -294,16 +294,16 @@ npsigtest.rbandwidth <- function(bws,
 
         npreg.boot <- npreg(txdat = xdat.star,
                             tydat = ydat.star,
-                            bws=bws,
-                            gradients=TRUE,
+                            bws = bws,
+                            gradients = TRUE,
                             ...)
 
       } else {
 
         npreg.boot <- npreg(txdat = xdat,
                             tydat = ydat.star,
-                            bws=bws,
-                            gradients=TRUE,
+                            bws = bws,
+                            gradients = TRUE,
                             ...)
 
       }
@@ -358,8 +358,8 @@ npsigtest.rbandwidth <- function(bws,
       
       npreg.out <- npreg(txdat = xdat,
                          tydat = ydat,
-                         bws=bws,
-                         gradients=TRUE,
+                         bws = bws,
+                         gradients = TRUE,
                          ...)
       
       In[ii] <- if(!pivot) {
@@ -386,8 +386,8 @@ npsigtest.rbandwidth <- function(bws,
         
         mhat.xi <-  npreg(txdat = xdat,
                           tydat = ydat,
-                          exdat=xdat.eval,
-                          bws=bws,
+                          exdat = xdat.eval,
+                          bws = bws,
                           ...)$mean
         
         ## Recenter the residuals
@@ -472,14 +472,14 @@ npsigtest.rbandwidth <- function(bws,
             
             bws.boot <- npregbw(xdat = xdat.star,
                                 ydat = ydat.star,
-                                bws=bws.original,
+                                bws = bws.original,
                                 ...)
             
           } else {
             
             bws.boot <- npregbw(xdat = xdat,
                                 ydat = ydat.star,
-                                bws=bws.original,
+                                bws = bws.original,
                                 ...)
             
           }
@@ -497,16 +497,16 @@ npsigtest.rbandwidth <- function(bws,
           
           npreg.boot <- npreg(txdat = xdat.star,
                               tydat = ydat.star,
-                              bws=bws,
-                              gradients=TRUE,
+                              bws = bws,
+                              gradients = TRUE,
                               ...)
           
         } else {
           
           npreg.boot <- npreg(txdat = xdat,
                               tydat = ydat.star,
-                              bws=bws,
-                              gradients=TRUE,
+                              bws = bws,
+                              gradients = TRUE,
                               ...)
           
         }

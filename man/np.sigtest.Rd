@@ -132,6 +132,30 @@ npsigtest(bws, \dots)
   }
 
 }
+\details{
+
+  \code{npsigtest} implements a variety of methods for computing the
+  null distribution of the test statistic and allows the user to
+  investigate the impact of a variety of default settings including
+  whether or not to pivot the statistic (\code{pivot}), whether pairwise
+  or residual resampling is to be used (\code{boot.method}), and whether
+  or not to recompute the bandwidths for the variables being tested
+  (\code{boot.type}), among others.
+
+  Defaults are chosen so as to provide reasonable behaviour in a broad
+  range of settings and this involves a trade-off between computational
+  expense and finite-sample performance. However, the default
+  \code{boot.type="I"}, though computationally expedient, can deliver a
+  test that can be slightly over-sized in small sample settings (e.g.\
+  at the 5\% level the test might reject 8\% of the time for samples of
+  size \eqn{n=100} for some data generating processes).  If the default
+  setting (\code{boot.type="I"}) delivers a P-value that is in the
+  neighborhood (i.e.\ slightly smaller) of any classical level
+  (e.g. 0.05), it would be prudent to re-run the test using the more
+  computationally intensive \code{boot.type="II"} to confirm the
+  original result.
+
+}  
 
 \value{
   \code{npsigtest} returns an object of type
