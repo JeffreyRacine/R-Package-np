@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.83 2013/03/16 02:04:19 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.84 2013/11/27 15:36:28 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
