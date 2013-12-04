@@ -49,29 +49,26 @@ K <- npksum(txdat=X,
             ckertype=ckertype,
             return.kernel.weights=TRUE)$kw
 
-## Create the uniform weights p.u and matrix A for which t(A)%*%p is
-## the constrained local constant estimator \hat g(x|p).
+## Compute the matrix for which t(A)%*%p is the local constant
+## estimator
 
-A <- K*y/rowSums(K)
-p.u <- rep(1,n)
-fit.unres <- t(A)%*%p.u
+A <- K*y/colSums(K)
 
 ## Solve the quadratic program. The function solve.QP in the quadprog
 ## package solves the problem min (p-p.u)'(p-p.u) subject to the
 ## constraints Amat^T p >= bvec. Note that we construct Amat to
-## contain the constraints a) the weights sum to n (rep(1,n)), b) A^T
-## p >= lower, and c) -A^Tp >= -upper (here A^T = \hat g(x|p)). Note
-## that the argument meq=1 indicates that there is one equality
-## constraint which occurs in the first row of Amat.
+## contain the constraints a) ) A^T p >= lower, and b) -A^Tp >= -upper
+## (here A^T = \hat g(x|p)).
 
 p.hat <- solve.QP(Dmat=diag(n),
-                  dvec=p.u,
-                  Amat=cbind(p.u,A,-A),
-                  bvec=c(n,lower,-upper),
-                  meq=1)$solution
+                  dvec=rep(1,n),
+                  Amat=cbind(A,-A),
+                  bvec=c(lower,-upper))$solution
 
-## Compute the constrained estimator.
+## Compute the unconstrained and constrained estimator.
 
+p.u <- rep(1,n)
+fit.unres <- t(A)%*%p.u
 fit.res <- t(A)%*%p.hat
 
 ## Plot the DGP, unrestricted, and restricted fits along with the
