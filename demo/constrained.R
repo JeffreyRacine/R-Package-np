@@ -38,6 +38,14 @@ x <- sort(runif(n))
 dgp <- cos(2*pi*x)
 y <- dgp + sd(dgp)*rnorm(n,sd=0.25)
 
+## Set up bounds for the quadratic program. We are going to require
+## the lower and upper constraints l(x) and u(x) for g(x). Here the
+## upper bound is a constant, the lower bound depends on x.
+
+lower <- -1.5+2*x
+upper <- rep(0.5,n)
+if(any(lower>upper)) stop(" constraints are inconsistent")
+
 ## X (data frame of regressors) and y are passed below, so if you add
 ## extra regressors simply add them to X here and to the formula (used
 ## to compute cross-validated smoothing parameters) and be done.
@@ -59,13 +67,6 @@ p <- model.glp$degree
 
 W <- crs:::W.glp(xdat=X,
                  degree=rep(p,NCOL(X)))
-
-## Set up bounds for the quadratic program. We are going to require
-## the lower and upper constraints l(x) and u(x) for g(x). Here the
-## upper bound is a constant, the lower bound depends on x.
-
-lower <- -1+x
-upper <- rep(0.5,n)
 
 ## Generate the matrix of kernel weights using data-driven bandwidths
 ## that are optimal for the unconstrained model.
@@ -118,7 +119,7 @@ lines(x,lower,lty=1,col="lightgrey")
 lines(x,upper,lty=1,col="lightgrey")
 
 legend("topleft",
-       c("DGP","Unconstrained","Constrained","Constraints [l(x) <= g(x|p) <= u(x)]"),
+       c("DGP","Unconstrained [g(x)]","Constrained [g(x|p)]","Constraints [l(x) <= g(x|p) <= u(x)]"),
        lty=c(1,1,1,1),
        col=c(1:3,"lightgrey"),
        bty="n",
