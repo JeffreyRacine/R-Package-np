@@ -416,7 +416,7 @@ npindex.sibandwidth <-
 
       uhat <- tydat - index.tmean ## Training y and training mean
 
-      Vinv <- solve(dg.db.xmex%*%t(dg.db.xmex))
+      Vinv <- chol2inv(chol(dg.db.xmex%*%t(dg.db.xmex)))
 
       Sigma <- (uhat*dg.db.xmex)%*%t(uhat*dg.db.xmex)
 
