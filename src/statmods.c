@@ -681,7 +681,7 @@ int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num
   li = num_reg_continuous + num_var_continuous;
   
   for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0/((double)num_categories[j])) - vector_scale_factor[i])*sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*sfac;
 
   // nvo
   li += num_var_unordered;
@@ -694,7 +694,7 @@ int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num
   li += num_var_ordered;
 
   for(; i <= (li + num_reg_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0/((double)num_categories[j])) - vector_scale_factor[i])*sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*sfac;
 
   // nro
   li += num_reg_unordered;
