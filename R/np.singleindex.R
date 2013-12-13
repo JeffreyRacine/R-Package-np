@@ -416,7 +416,7 @@ npindex.sibandwidth <-
 
       uhat <- tydat - index.tmean ## Training y and training mean
 
-      Vinv <- solve(dg.db.xmex%*%t(dg.db.xmex))
+      Vinv <- chol2inv(chol(dg.db.xmex%*%t(dg.db.xmex)))
 
       Sigma <- (uhat*dg.db.xmex)%*%t(uhat*dg.db.xmex)
 
@@ -440,8 +440,8 @@ npindex.sibandwidth <-
 
       q <- ncol(txdat)
       Bvcov <- matrix(0,q,q)
-      Bvcov[-1,-1] <- solve(t(dg.db[keep,])%*%(dg.db[keep,]/(index.tmean[keep]*
-        (1-index.tmean[keep]))))
+      Bvcov[-1,-1] <- chol2inv(chol(t(dg.db[keep,])%*%(dg.db[keep,]/(index.tmean[keep]*
+        (1-index.tmean[keep])))))
 
       dimnames(Bvcov) <- list(bws$xnames,bws$xnames)
 

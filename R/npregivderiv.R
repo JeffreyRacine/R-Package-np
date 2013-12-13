@@ -196,7 +196,8 @@ npregivderiv <- function(y,
                            txdat=X.train,
                            bws=bws,
                            ukertype="liracine",
-                           okertype="liracine")$ksum
+                           okertype="liracine",
+                           ...)$ksum
 
       } else {
 
@@ -206,7 +207,8 @@ npregivderiv <- function(y,
                            weights=W,
                            bws=bws,
                            ukertype="liracine",
-                           okertype="liracine")$ksum[,,1]
+                           okertype="liracine",
+                           ...)$ksum[,,1]
 
       }
 
@@ -218,7 +220,8 @@ npregivderiv <- function(y,
                   exdat=X.train,
                   bws=bws,
                   ukertype="liracine",
-                  okertype="liracine")$ksum
+                  okertype="liracine",
+                  ...)$ksum
 
       ## p == 0
 
@@ -228,7 +231,7 @@ npregivderiv <- function(y,
 
       ## No singularity problems...
 
-      if(tryCatch(Wmat.sum.inv <- as.matrix(solve(Wmat.sum)),
+      if(tryCatch(Wmat.sum.inv <- as.matrix(chol2inv(chol(Wmat.sum))),
                   error = function(e){
                     return(matrix(FALSE,nc,nc))
                   })[1,1]!=FALSE) {
@@ -253,14 +256,14 @@ npregivderiv <- function(y,
           epsilon <- 1/n.train
           ridge <- 0
 
-          while(tryCatch(as.matrix(solve(Wmat.sum+diag(rep(ridge,nc)))),
+          while(tryCatch(as.matrix(chol2inv(chol(Wmat.sum+diag(rep(ridge,nc))))),
                          error = function(e){
                            return(matrix(FALSE,nc,nc))
                          })[1,1]==FALSE) {
             ridge <- ridge + epsilon
           }
 
-          Wmat.sum.inv <- as.matrix(solve(Wmat.sum+diag(rep(ridge,nc))))
+          Wmat.sum.inv <- as.matrix(chol2inv(chol(Wmat.sum+diag(rep(ridge,nc)))))
 
           ## Add for debugging...
 
@@ -796,7 +799,7 @@ npregivderiv <- function(y,
         }
 
         trH <- kernel.i.eq.j*sum(sapply(1:n,function(i){
-          W[i,, drop = FALSE] %*% solve(tww[,,i]+diag(rep(ridge[i],nc))) %*% t(W[i,, drop = FALSE])
+          W[i,, drop = FALSE] %*% chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc)))) %*% t(W[i,, drop = FALSE])
         }))
 
         if (!any(ghat == maxPenalty)){
@@ -1291,7 +1294,10 @@ npregivderiv <- function(y,
                                  exdat=zeval,
                                  tydat=as.matrix(predicted.E.mu.w),
                                  operator="integral",
-                                 bws=bw$bw)$ksum/length(y)
+                                 ukertype="liracine",
+                                 okertype="liracine",
+                                 bws=bw$bw,
+                                 ...)$ksum/length(y)
 
   survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
@@ -1400,7 +1406,10 @@ npregivderiv <- function(y,
                                    exdat=zeval,
                                    tydat=as.matrix(predicted.E.mu.w),
                                    operator="integral",
-                                   bws=bw$bw)$ksum/length(y)
+                                   ukertype="liracine",
+                                   okertype="liracine",
+                                   bws=bw$bw,
+                                   ...)$ksum/length(y)
 
     survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 

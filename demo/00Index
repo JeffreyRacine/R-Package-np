@@ -1,3 +1,4 @@
 tree        R code for trees (some routines now support trees for improved computational efficiency)
 npregiv     R example for npregiv
 Engel95     R example for Engel 1995 data
+constrained R example of constrained estimation
