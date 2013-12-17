@@ -545,7 +545,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            1, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED);
 
 
 
@@ -1013,7 +1013,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            1, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED);
 
       /* Conduct direction set search */
 
@@ -1664,7 +1664,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            1, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED);
 
       /* Conduct direction set search */
       
@@ -2340,7 +2340,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            1, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED);
 
 
       /* Conduct direction set search */
