@@ -418,7 +418,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                         0,
                         vector_scale_factor,
                         num_categories_extern,
-                        matrix_y);
+                        matrix_y,
+                        0, int_RANDOM_SEED);
 
   /* When multistarting, set counter */
 
@@ -477,7 +478,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                           0,
                           vector_scale_factor,
                           num_categories_extern,
-                          matrix_y);
+                          matrix_y,
+                          0, int_RANDOM_SEED);
 
 
 
@@ -542,7 +544,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                             0,
                             vector_scale_factor,
                             num_categories_extern,
-                            matrix_y);
+                            matrix_y,
+                            1, int_RANDOM_SEED);
 
 
 
@@ -571,7 +574,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                               0,
                               vector_scale_factor,
                               num_categories_extern,
-                              matrix_y);
+                              matrix_y,
+                              0, int_RANDOM_SEED);
 
 
 
@@ -894,7 +898,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         0,
                         vector_scale_factor,
                         num_categories_extern,
-                        matrix_y);
+                        matrix_y,
+                        0, int_RANDOM_SEED);
 
 
   /* When multistarting, set counter */
@@ -941,7 +946,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                           0,
                           vector_scale_factor,
                           num_categories_extern,
-                          matrix_y);
+                          matrix_y,
+                          0, int_RANDOM_SEED);
 
 
 
@@ -1006,7 +1012,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                             0,
                             vector_scale_factor,
                             num_categories_extern,
-                            matrix_y);
+                            matrix_y,
+                            1, int_RANDOM_SEED);
 
       /* Conduct direction set search */
 
@@ -1034,7 +1041,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                             0,
                             vector_scale_factor,
                             num_categories_extern,
-                            matrix_y);
+                            matrix_y,
+                            0, int_RANDOM_SEED);
 
         powell(0,
                0,
@@ -1527,7 +1535,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                         num_var_ordered_extern,
                         vector_scale_factor,
                         num_categories_extern,
-                        matrix_y);
+                        matrix_y,
+                        0, int_RANDOM_SEED);
 
   /* When multistarting, set counter */
 
@@ -1587,7 +1596,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                           num_var_ordered_extern,
                           vector_scale_factor,
                           num_categories_extern,
-                          matrix_y);
+                          matrix_y,
+                          0, int_RANDOM_SEED);
 
 
     powell(0,
@@ -1653,7 +1663,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                             num_var_ordered_extern,
                             vector_scale_factor,
                             num_categories_extern,
-                            matrix_y);
+                            matrix_y,
+                            1, int_RANDOM_SEED);
 
       /* Conduct direction set search */
       
@@ -1681,7 +1692,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                               num_var_ordered_extern,
                               vector_scale_factor,
                               num_categories_extern,
-                              matrix_y);
+                              matrix_y,
+                              0, int_RANDOM_SEED);
 
         powell(0,
                0,
@@ -2212,7 +2224,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                         num_var_ordered_extern,
                         vector_scale_factor,
                         num_categories_extern,
-                        matrix_y);
+                        matrix_y,
+                        0, int_RANDOM_SEED);
 
 
   /* When multistarting, set counter */
@@ -2260,7 +2273,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                           num_var_ordered_extern,
                           vector_scale_factor,
                           num_categories_extern,
-                          matrix_y);
+                          matrix_y,
+                          0, int_RANDOM_SEED);
 
     powell(0,
            0,
@@ -2325,7 +2339,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                             num_var_ordered_extern,
                             vector_scale_factor,
                             num_categories_extern,
-                            matrix_y);
+                            matrix_y,
+                            1, int_RANDOM_SEED);
 
 
       /* Conduct direction set search */
@@ -2354,7 +2369,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                               num_var_ordered_extern,
                               vector_scale_factor,
                               num_categories_extern,
-                              matrix_y);
+                              matrix_y, 
+                              0, int_RANDOM_SEED);
 
 
         powell(0,
@@ -3306,7 +3322,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   double **matrix_y;
 
   double *vector_continuous_stddev;
-  double *vector_scale_factor, *vector_scale_factor_multistart;
+  double *vector_scale_factor, *vector_scale_factor_multistart, * vsfh;
 
   double fret, fret_best;
   double ftol, tol, small;
@@ -3364,6 +3380,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_y = alloc_matd(num_var + 1, num_var +1);
   vector_scale_factor = alloc_vecd(num_var + 1);
+  vsfh = alloc_vecd(num_var + 1);
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
@@ -3480,15 +3497,40 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
+  // this is for vsfh which is used to initialize the hessian...
+  initialize_nr_vector_scale_factor(
+                                    BANDWIDTH_reg_extern,
+                                    BANDWIDTH_den_extern,
+                                    0,                /* Not Random (0) Random (1) */
+                                    int_RANDOM_SEED,
+                                    0,                /* regression (0) regression ml (1) */
+                                    int_LARGE_SF,
+                                    num_obs_train_extern,
+                                    0,
+                                    0,
+                                    0,
+                                    num_reg_continuous_extern,
+                                    num_reg_unordered_extern,
+                                    num_reg_ordered_extern,
+                                    matrix_Y_continuous_train_extern,
+                                    matrix_X_continuous_train_extern,
+                                    0,
+                                    pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    num_categories_extern,
+                                    vector_continuous_stddev,
+                                    vsfh);
+
+
   initialize_nr_hessian(num_reg_continuous_extern,
                         num_reg_unordered_extern,
                         num_reg_ordered_extern,
                         0,
                         0,
                         0,
-                        vector_scale_factor,
+                        vsfh,
                         num_categories_extern,
-                        matrix_y);
+                        matrix_y,
+                        0, int_RANDOM_SEED);
 
 
   /* When multistarting, set counter */
@@ -3531,9 +3573,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                           0,
                           0,
                           0,
-                          vector_scale_factor,
+                          vsfh,
                           num_categories_extern,
-                          matrix_y);
+                          matrix_y,
+                          0, int_RANDOM_SEED);
 
 
     powell(0,
@@ -3597,9 +3640,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                             0,
                             0,
                             0,
-                            vector_scale_factor,
+                            vsfh,
                             num_categories_extern,
-                            matrix_y);
+                            matrix_y,
+                            1, int_RANDOM_SEED);
 
 
       /* Conduct direction set search */
@@ -3626,9 +3670,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                               0,
                               0,
                               0,
-                              vector_scale_factor,
+                              vsfh,
                               num_categories_extern,
-                              matrix_y);
+                              matrix_y,
+                              0, int_RANDOM_SEED);
 
 						
         powell(0,
@@ -3694,6 +3739,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   free_mat(matrix_y, num_var + 1);
   safe_free(vector_scale_factor);
+  safe_free(vsfh);
   safe_free(num_categories_extern);
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
