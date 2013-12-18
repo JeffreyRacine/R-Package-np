@@ -410,7 +410,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_reg_continuous_extern,
+  initialize_nr_directions(num_reg_continuous_extern,
                         num_reg_unordered_extern,
                         num_reg_ordered_extern,
                         0,
@@ -419,7 +419,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                         vector_scale_factor,
                         num_categories_extern,
                         matrix_y,
-                        0, int_RANDOM_SEED);
+                        0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
   /* When multistarting, set counter */
 
@@ -470,7 +470,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_hessian(num_reg_continuous_extern,
+    initialize_nr_directions(num_reg_continuous_extern,
                           num_reg_unordered_extern,
                           num_reg_ordered_extern,
                           0,
@@ -479,7 +479,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                           vector_scale_factor,
                           num_categories_extern,
                           matrix_y,
-                          0, int_RANDOM_SEED);
+                          0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
 
@@ -512,7 +512,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
        	
     for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
 
-      /* Initialize scale factors and hessian for NR modules */
+      /* Initialize scale factors and directions for NR modules */
 
       initialize_nr_vector_scale_factor(
                                         BANDWIDTH_den_extern,
@@ -536,7 +536,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_reg_continuous_extern,
+      initialize_nr_directions(num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
                             0,
@@ -545,7 +545,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            0, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
 
@@ -566,7 +566,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
              bwmfunc);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-        initialize_nr_hessian(num_reg_continuous_extern,
+        initialize_nr_directions(num_reg_continuous_extern,
                               num_reg_unordered_extern,
                               num_reg_ordered_extern,
                               0,
@@ -575,7 +575,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                               vector_scale_factor,
                               num_categories_extern,
                               matrix_y,
-                              0, int_RANDOM_SEED);
+                              0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
 
@@ -866,7 +866,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                             matrix_X_continuous_train_extern,
                             vector_continuous_stddev);
 
-  /* Initialize scale factors and Hessian for NR modules */
+  /* Initialize scale factors and Directions for NR modules */
 
   initialize_nr_vector_scale_factor(
                                     BANDWIDTH_den_extern,
@@ -890,7 +890,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_reg_continuous_extern,
+  initialize_nr_directions(num_reg_continuous_extern,
                         num_reg_unordered_extern,
                         num_reg_ordered_extern,
                         0,
@@ -899,7 +899,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         vector_scale_factor,
                         num_categories_extern,
                         matrix_y,
-                        0, int_RANDOM_SEED);
+                        0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
   /* When multistarting, set counter */
@@ -938,7 +938,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   /* int_RESTART_FROM_MIN needs to be set */
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-    initialize_nr_hessian(num_reg_continuous_extern,
+    initialize_nr_directions(num_reg_continuous_extern,
                           num_reg_unordered_extern,
                           num_reg_ordered_extern,
                           0,
@@ -947,7 +947,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                           vector_scale_factor,
                           num_categories_extern,
                           matrix_y,
-                          0, int_RANDOM_SEED);
+                          0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
 
@@ -980,7 +980,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
        	
     for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
 
-      /* Initialize scale factors and hessian for NR modules */
+      /* Initialize scale factors and directions for NR modules */
 
       initialize_nr_vector_scale_factor(
                                         BANDWIDTH_den_extern,
@@ -1004,7 +1004,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_reg_continuous_extern,
+      initialize_nr_directions(num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
                             0,
@@ -1013,7 +1013,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            0, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
       /* Conduct direction set search */
 
@@ -1033,7 +1033,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-      initialize_nr_hessian(num_reg_continuous_extern,
+      initialize_nr_directions(num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
                             0,
@@ -1042,7 +1042,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            0, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
         powell(0,
                0,
@@ -1503,7 +1503,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                             matrix_X_continuous_train_extern,
                             vector_continuous_stddev);
 
-  /* Initialize scale factors and Hessian for NR modules */
+  /* Initialize scale factors and Directions for NR modules */
 
   initialize_nr_vector_scale_factor(
                                     BANDWIDTH_den_extern,
@@ -1527,7 +1527,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_reg_continuous_extern,
+  initialize_nr_directions(num_reg_continuous_extern,
                         num_reg_unordered_extern,
                         num_reg_ordered_extern,
                         num_var_continuous_extern,
@@ -1536,7 +1536,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                         vector_scale_factor,
                         num_categories_extern,
                         matrix_y,
-                        0, int_RANDOM_SEED);
+                        0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
   /* When multistarting, set counter */
 
@@ -1588,7 +1588,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_hessian(num_reg_continuous_extern,
+    initialize_nr_directions(num_reg_continuous_extern,
                           num_reg_unordered_extern,
                           num_reg_ordered_extern,
                           num_var_continuous_extern,
@@ -1597,7 +1597,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                           vector_scale_factor,
                           num_categories_extern,
                           matrix_y,
-                          0, int_RANDOM_SEED);
+                          0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
     powell(0,
@@ -1632,7 +1632,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 		
     for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
 
-      /* Initialize scale factors and hessian for NR modules */
+      /* Initialize scale factors and directions for NR modules */
       initialize_nr_vector_scale_factor(
                                         BANDWIDTH_den_extern,
                                         BANDWIDTH_den_extern,
@@ -1655,7 +1655,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_reg_continuous_extern,
+      initialize_nr_directions(num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
                             num_var_continuous_extern,
@@ -1664,7 +1664,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            0, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
       /* Conduct direction set search */
       
@@ -1684,7 +1684,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_hessian(num_reg_continuous_extern,
+        initialize_nr_directions(num_reg_continuous_extern,
                               num_reg_unordered_extern,
                               num_reg_ordered_extern,
                               num_var_continuous_extern,
@@ -1693,7 +1693,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                               vector_scale_factor,
                               num_categories_extern,
                               matrix_y,
-                              0, int_RANDOM_SEED);
+                              0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
         powell(0,
                0,
@@ -2192,7 +2192,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                             matrix_X_continuous_train_extern,
                             vector_continuous_stddev);
 
-  /* Initialize scale factors and Hessian for NR modules */
+  /* Initialize scale factors and Directions for NR modules */
 
   initialize_nr_vector_scale_factor(
                                     BANDWIDTH_den_extern,
@@ -2216,7 +2216,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_hessian(num_reg_continuous_extern,
+  initialize_nr_directions(num_reg_continuous_extern,
                         num_reg_unordered_extern,
                         num_reg_ordered_extern,
                         num_var_continuous_extern,
@@ -2225,7 +2225,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                         vector_scale_factor,
                         num_categories_extern,
                         matrix_y,
-                        0, int_RANDOM_SEED);
+                        0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
   /* When multistarting, set counter */
@@ -2265,7 +2265,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
          bwmfunc);
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-    initialize_nr_hessian(num_reg_continuous_extern,
+    initialize_nr_directions(num_reg_continuous_extern,
                           num_reg_unordered_extern,
                           num_reg_ordered_extern,
                           num_var_continuous_extern,
@@ -2274,7 +2274,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                           vector_scale_factor,
                           num_categories_extern,
                           matrix_y,
-                          0, int_RANDOM_SEED);
+                          0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
     powell(0,
            0,
@@ -2308,7 +2308,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 		
     for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
 
-      /* Initialize scale factors and hessian for NR modules */
+      /* Initialize scale factors and directions for NR modules */
       initialize_nr_vector_scale_factor(
                                         BANDWIDTH_den_extern,
                                         BANDWIDTH_den_extern,
@@ -2331,7 +2331,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_reg_continuous_extern,
+      initialize_nr_directions(num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
                             num_var_continuous_extern,
@@ -2340,7 +2340,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                             vector_scale_factor,
                             num_categories_extern,
                             matrix_y,
-                            0, int_RANDOM_SEED);
+                            0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
       /* Conduct direction set search */
@@ -2361,7 +2361,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_hessian(num_reg_continuous_extern,
+        initialize_nr_directions(num_reg_continuous_extern,
                               num_reg_unordered_extern,
                               num_reg_ordered_extern,
                               num_var_continuous_extern,
@@ -2370,7 +2370,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                               vector_scale_factor,
                               num_categories_extern,
                               matrix_y, 
-                              0, int_RANDOM_SEED);
+                              0, int_RANDOM_SEED, 0.0, 0.0, 1.0);
 
 
         powell(0,
@@ -3328,6 +3328,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   double ftol, tol, small;
   double (* bwmfunc)(double *) = NULL;
 
+  double lbc, hbc, cfac;
+
   int i,j;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
@@ -3365,6 +3367,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   ftol=myoptd[RBW_FTOLD];
   tol=myoptd[RBW_TOLD];
   small=myoptd[RBW_SMALLD];
+
+  lbc=myoptd[RBW_LBCD];
+  hbc=myoptd[RBW_HBCD];
+  cfac=myoptd[RBW_CD];
 
   imsnum = 0;
   imstot = iNum_Multistart;
@@ -3473,7 +3479,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                             matrix_X_continuous_train_extern,
                             vector_continuous_stddev);
 
-  /* Initialize scale factors and Hessian for NR modules */
+  /* Initialize scale factors and Directions for NR modules */
 
   initialize_nr_vector_scale_factor(
                                     BANDWIDTH_reg_extern,
@@ -3497,7 +3503,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  // this is for vsfh which is used to initialize the hessian...
+  // this is for vsfh which is used to initialize the directions...
   initialize_nr_vector_scale_factor(
                                     BANDWIDTH_reg_extern,
                                     BANDWIDTH_den_extern,
@@ -3521,7 +3527,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     vsfh);
 
 
-  initialize_nr_hessian(num_reg_continuous_extern,
+  initialize_nr_directions(num_reg_continuous_extern,
                         num_reg_unordered_extern,
                         num_reg_ordered_extern,
                         0,
@@ -3530,7 +3536,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                         vsfh,
                         num_categories_extern,
                         matrix_y,
-                        0, int_RANDOM_SEED);
+                        0, int_RANDOM_SEED, lbc, hbc, cfac);
 
 
   /* When multistarting, set counter */
@@ -3567,7 +3573,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_hessian(num_reg_continuous_extern,
+    initialize_nr_directions(num_reg_continuous_extern,
                           num_reg_unordered_extern,
                           num_reg_ordered_extern,
                           0,
@@ -3576,7 +3582,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                           vsfh,
                           num_categories_extern,
                           matrix_y,
-                          0, int_RANDOM_SEED);
+                          0, int_RANDOM_SEED, lbc, hbc, cfac);
 
 
     powell(0,
@@ -3611,7 +3617,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
     for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
 
-      /* Initialize scale factors and hessian for NR modules */
+      /* Initialize scale factors and directions for NR modules */
 				
       initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                         BANDWIDTH_den_extern,
@@ -3634,7 +3640,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
 
-      initialize_nr_hessian(num_reg_continuous_extern,
+      initialize_nr_directions(num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
                             0,
@@ -3643,7 +3649,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                             vsfh,
                             num_categories_extern,
                             matrix_y,
-                            1, int_RANDOM_SEED);
+                            1, int_RANDOM_SEED, lbc, hbc, cfac);
 
 
       /* Conduct direction set search */
@@ -3664,7 +3670,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE)	{
 						
-        initialize_nr_hessian(num_reg_continuous_extern,
+        initialize_nr_directions(num_reg_continuous_extern,
                               num_reg_unordered_extern,
                               num_reg_ordered_extern,
                               0,
@@ -3673,7 +3679,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                               vsfh,
                               num_categories_extern,
                               matrix_y,
-                              0, int_RANDOM_SEED);
+                              0, int_RANDOM_SEED, lbc, hbc, cfac);
 
 						
         powell(0,

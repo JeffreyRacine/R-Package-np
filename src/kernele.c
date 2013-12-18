@@ -17578,12 +17578,12 @@ double zero)
 
 		quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-    initialize_nr_hessian(1, 0, 0,
+    initialize_nr_directions(1, 0, 0,
                           0, 0, 0,
                           vector_scale_factor,
                           NULL,
                           matrix_y,
-                          0, seed);
+                          0, seed, 0.0, 0.0, 1.0);
 
 		powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17599,12 +17599,12 @@ double zero)
 
 				quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-        initialize_nr_hessian(1, 0, 0,
+        initialize_nr_directions(1, 0, 0,
                               0, 0, 0,
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed);
+                              0, seed, 0.0, 0.0, 1.0);
 
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
@@ -17658,12 +17658,12 @@ double zero)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_hessian(1, 0, 0,
+		    initialize_nr_directions(1, 0, 0,
                               0, 0, 0,
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed);
+                              0, seed, 0.0, 0.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17677,12 +17677,12 @@ double zero)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_hessian(1, 0, 0,
+				    initialize_nr_directions(1, 0, 0,
                                   0, 0, 0,
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed);
+                                  0, seed, 0.0, 0.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17724,12 +17724,12 @@ double zero)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_hessian(1, 0, 0,
+		    initialize_nr_directions(1, 0, 0,
                               0, 0, 0,
                               vector_scale_factor,
                               NULL,
                               matrix_y, 
-                              0, seed);
+                              0, seed, 0.0, 0.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17743,12 +17743,12 @@ double zero)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_hessian(1, 0, 0,
+				    initialize_nr_directions(1, 0, 0,
                                   0, 0, 0,
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed);
+                                  0, seed, 0.0, 0.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17838,12 +17838,12 @@ double zero)
 
 		quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-    initialize_nr_hessian(1, 0, 0,
+    initialize_nr_directions(1, 0, 0,
                           0, 0, 0,
                           vector_scale_factor,
                           NULL,
                           matrix_y,
-                          0, seed);
+                          0, seed, 0.0, 0.0, 1.0);
 
 		powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17857,12 +17857,12 @@ double zero)
 
 				quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-		    initialize_nr_hessian(1, 0, 0,
+		    initialize_nr_directions(1, 0, 0,
                               0, 0, 0,
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed);
+                              0, seed, 0.0, 0.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17914,12 +17914,12 @@ double zero)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_hessian(1, 0, 0,
+		    initialize_nr_directions(1, 0, 0,
                               0, 0, 0,
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed);
+                              0, seed, 0.0, 0.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17933,12 +17933,12 @@ double zero)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_hessian(1, 0, 0,
+				    initialize_nr_directions(1, 0, 0,
                                   0, 0, 0,
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed);
+                                  0, seed, 0.0, 0.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17985,12 +17985,12 @@ double zero)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_hessian(1, 0, 0,
+		    initialize_nr_directions(1, 0, 0,
                               0, 0, 0,
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed);
+                              0, seed, 0.0, 0.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -18004,12 +18004,12 @@ double zero)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_hessian(1, 0, 0,
+				    initialize_nr_directions(1, 0, 0,
                                   0, 0, 0,
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed);
+                                  0, seed, 0.0, 0.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 

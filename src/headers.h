@@ -96,10 +96,11 @@ int initialize_kernel_density_asymptotic_constants(int KERNEL, int num_var_conti
 int initialize_kernel_regression_asymptotic_constants(int KERNEL, int num_reg_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P, double *INT_KERNEL_PM_HALF, double *DIFF_KER_PPM); 
 
 
-int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
-                          int num_var_continuous, int num_var_unordered, int num_var_ordered, 
-                          double * vector_scale_factor, int * num_categories, 
-                          double **matrix_y, int random, int seed);
+int initialize_nr_directions(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
+                             int num_var_continuous, int num_var_unordered, int num_var_ordered, 
+                             double * vector_scale_factor, int * num_categories, 
+                             double **matrix_y, int random, int seed,
+                             double lbc, double hbc, double c);
 
 
 int kernel_bandwidth(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda, double **matrix_bandwidth_deriv);
@@ -327,6 +328,9 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define RBW_FTOLD  0
 #define RBW_TOLD   1
 #define RBW_SMALLD 2
+#define RBW_LBCD   3
+#define RBW_HBCD   4
+#define RBW_CD     5
 
 #define MPI_RANKI 0
 #define MPI_NUMPI 1

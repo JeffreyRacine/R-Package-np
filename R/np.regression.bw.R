@@ -70,7 +70,8 @@ npregbw.rbandwidth <-
            ydat = stop("invoked without data 'ydat'"),
            bws, bandwidth.compute = TRUE,
            nmulti, remin = TRUE, itmax = 10000,
-           ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05, ...){
+           ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
+           lbc = 0.1, hbc = 50.0, cfac = 1.0, ...){
 
     xdat <- toFrame(xdat)
 
@@ -159,7 +160,7 @@ npregbw.rbandwidth <-
           ll = REGTYPE_LL),
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
-      myoptd = list(ftol=ftol, tol=tol, small=small)
+      myoptd = list(ftol=ftol, tol=tol, small=small, lbc = lbc, hbc = hbc, cfac = cfac)
 
       myout=
         .C("np_regression_bw",
@@ -239,6 +240,7 @@ npregbw.default <-
            bws,
            bandwidth.compute = TRUE, nmulti,
            remin, itmax, ftol, tol, small,
+           lbc, hbc, cfac,
            ## dummy arguments for later passing into rbandwidth()
            regtype, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ukertype, okertype,
@@ -271,7 +273,7 @@ npregbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
-               "small")
+               "small", "lbc", "hbc", "cfac")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
