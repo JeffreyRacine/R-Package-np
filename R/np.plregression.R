@@ -210,7 +210,7 @@ npplreg.plbandwidth <-
 
     Bvcov = sum((tmp.ty-(mmy$mean + resx  %*% B))^2)/
       (dim(txdat)[1]-dim(txdat)[2]-dim(tzdat)[2])*
-      solve(t(model.matrix(model))%*%model.matrix(model))
+      chol2inv(chol(t(model.matrix(model))%*%model.matrix(model)))
 
     Berr = sqrt(diag(Bvcov))
 

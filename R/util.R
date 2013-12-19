@@ -785,7 +785,7 @@ cktToPrint <- function(s, order = ""){
 uktToPrint <- function(s){
   switch(s,
          aitchisonaitken = "Aitchison and Aitken",
-         liracine = "Li and Racine (normalised)")
+         liracine = "Li and Racine (normalized)")
 }
 
 oktToPrint <- function(s, normalized = FALSE) {

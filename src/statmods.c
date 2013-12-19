@@ -648,14 +648,24 @@ int compute_nn_distance_train_eval(int num_obs_train,
 }
 
 
-int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
-                          int num_var_continuous, int num_var_unordered, int num_var_ordered, 
-                          double * vector_scale_factor, int * num_categories, 
-                          double **matrix_y){
+int initialize_nr_directions(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
+                             int num_var_continuous, int num_var_unordered, int num_var_ordered, 
+                             double * vector_scale_factor, int * num_categories, 
+                             double **matrix_y, int random, int seed, double lbc, double hbc, double c){
   int i, j;
   int li;
 
   const double sfac = 0.25*(3.0-sqrt(5));
+  const double csfac = 2.5*(3.0-sqrt(5))*c;
+
+  double rsfac = 1.0;
+  double rcsfac = 1.0;
+
+  if(random){
+    rcsfac = rsfac = ran3(&seed);
+
+    rcsfac = (hbc-lbc)*rcsfac + lbc;
+  }
 
   li =  num_reg_continuous + num_reg_unordered + num_reg_ordered + 
     num_var_continuous + num_var_unordered + num_var_ordered;
@@ -672,7 +682,7 @@ int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num
   li =  num_reg_continuous + num_var_continuous;
 
   for(i = 1; i <= li; i++){
-    matrix_y[i][i] = sfac * vector_scale_factor[i];
+    matrix_y[i][i] = rcsfac*csfac * vector_scale_factor[i];
   }
 
   if(num_categories == NULL) return(0);
@@ -681,26 +691,26 @@ int initialize_nr_hessian(int num_reg_continuous, int num_reg_unordered, int num
   li = num_reg_continuous + num_var_continuous;
   
   for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0/((double)num_categories[j])) - vector_scale_factor[i])*sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*rsfac*sfac;
 
   // nvo
   li += num_var_unordered;
 
   for(; i <= (li + num_var_ordered); i++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * rsfac*sfac;
 
   //nru
   j += num_var_ordered;
   li += num_var_ordered;
 
   for(; i <= (li + num_reg_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0/((double)num_categories[j])) - vector_scale_factor[i])*sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*rsfac*sfac;
 
   // nro
   li += num_reg_unordered;
 
   for(; i <= (li + num_reg_ordered); i++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * rsfac*sfac;
 
 
   return(0);

@@ -145,6 +145,11 @@ npconmode.conbandwidth <-
       mdens[tf] = tdens[tf]
     }
 
+    if(any(indices==0)) {
+      warning("identical probabilities for choices produced, randomizing mode")
+      indices[indices==0] <- sample(nlevels(efac),length(indices[indices==0]))
+    }
+
     con.mode <- eval(parse(text = paste("conmode(bws = bws,",
                              "xeval = ", ifelse(no.ex, "txdat", "exdat"), ",",
                              ifelse(no.ey & !no.ex, "",

@@ -63,7 +63,8 @@ npudensbw.NULL <-
 npudensbw.bandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000, 
-           ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05, ...){
+           ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
+           lbc = 0.5, hbc = 1.5, cfac = 1.0, ...){
 
     dat = toFrame(dat)
 
@@ -133,7 +134,7 @@ npudensbw.bandwidth <-
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
 
       
-      myoptd = list(ftol=ftol, tol=tol, small=small)
+      myoptd = list(ftol=ftol, tol=tol, small=small, lbc = lbc, hbc = hbc, cfac = cfac)
 
       if (bws$method != "normal-reference"){
         myout=
@@ -218,7 +219,7 @@ npudensbw.default <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, bandwidth.compute = TRUE,
            ## dummy arguments for later passing into npudensbw.bandwidth
-           nmulti, remin, itmax, ftol, tol, small,
+           nmulti, remin, itmax, ftol, tol, small, lbc, hbc, cfac,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ukertype, okertype,
@@ -256,7 +257,7 @@ npudensbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
-               "small")
+               "small", "lbc","hbc","cfac")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

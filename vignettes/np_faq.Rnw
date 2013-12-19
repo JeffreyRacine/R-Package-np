@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.82 2013/03/15 12:44:07 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.84 2013/11/27 15:36:28 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{npRmpi}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -40,9 +40,19 @@ these routines along with processing of the data required for a
 seamless user experience may produce unexpected or undesired results
 in some settings.
 
-Kindly report any issues you encounter to me, and please include your
-code, data, version of the package and version of R used so that I can
-help track down any such issues
+If you encounter any issues with the \texttt{np} package, kindly first
+ensure that you have the most recent version of \texttt{np},
+\texttt{R}, and \texttt{RStudio} (if appropriate) installed. Sometimes
+issues encountered using outdated versions of software have been
+resolved in the current versions, so this is the first thing one ought
+to investigate when the unexpected occurs.
+
+Having ensured that the problem persists with the most recently
+available versions of all software involved, kindly report any issues
+you encounter to me, and \textsl{please include} your code, data,
+version of the \texttt{np} package, version of \texttt{R}, and
+operating system (with version number) used so that I can help track
+down any such issues
 (\href{mailto:racinej@mcmaster.ca}{racinej@mcmaster.ca}). And, of
 course, if you encounter an issue that you think might be of interest
 to others, kindly email me the relevant information and I will

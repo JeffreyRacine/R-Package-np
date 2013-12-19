@@ -5589,7 +5589,7 @@ double *SIGN){
 
       mean_stderr[ii] = meany[ii3+2]/sk - mean[ii]*mean[ii];
 
-      mean_stderr[ii] = sqrt(mean_stderr[ii] * K_INT_KERNEL_P / (sk*hprod));
+      mean_stderr[ii] = (mean_stderr[ii] <= 0.0) ? 0.0 : sqrt(mean_stderr[ii] * K_INT_KERNEL_P / (sk*hprod));
     }
    
     if(do_grad){
@@ -5618,7 +5618,8 @@ double *SIGN){
           
           if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
-            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/(sk*hprod));
+            const double senn = (se <= 0.0) ? 0.0 : se;
+            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + senn*K_INT_KERNEL_P/(sk*hprod));
           } else {
             gradient_stderr[l][i] = 0.0;
           }
@@ -5636,7 +5637,8 @@ double *SIGN){
 
           if(do_gerr && (num_reg_continuous > 0)){
             const double se = permy[li3+2]/sk - s1*s1;
-            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + se*K_INT_KERNEL_P/(sk*hprod));
+            const double senn = (se <= 0.0) ? 0.0 : se;
+            gradient_stderr[l][i] = sqrt(mean_stderr[i]*mean_stderr[i] + senn*K_INT_KERNEL_P/(sk*hprod));
           } else {
             gradient_stderr[l][i] = 0.0;
           }

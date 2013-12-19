@@ -65,7 +65,7 @@ npcdensbw.conbandwidth <-
            auto = TRUE,
            nmulti, remin = TRUE, itmax = 10000, 
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           memfac = 500.0,
+           memfac = 500.0, lbc = 0.5, hbc = 1.5, cfac = 1.0,
            ...){
 
     ydat = toFrame(ydat)
@@ -184,7 +184,7 @@ npcdensbw.conbandwidth <-
         old.cdens = FALSE,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
-      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac)
+      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac, lbc = lbc, hbc = hbc, cfac = cfac)
 
       if (bws$method != "normal-reference"){
         myout=
@@ -333,7 +333,7 @@ npcdensbw.default <-
            bws, 
            bandwidth.compute = TRUE,
            auto, nmulti, remin, itmax, 
-           ftol, tol, small,memfac,
+           ftol, tol, small,memfac, lbc, hbc, cfac,
            ## dummy arguments for conbandwidth() function call
            bwmethod, bwscaling, bwtype,
            cxkertype, cxkerorder,
@@ -375,7 +375,7 @@ npcdensbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "auto", "nmulti", "remin", "itmax", "ftol",
-               "tol", "small", "memfac")
+               "tol", "small", "memfac", "lbc", "hbc", "cfac")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
