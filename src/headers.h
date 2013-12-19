@@ -357,6 +357,9 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define BW_FTOLD  0
 #define BW_TOLD   1
 #define BW_SMALLD 2
+#define BW_LBCD   3
+#define BW_HBCD   4
+#define BW_CD     5
 
 // distribution defines
 #define DBW_NOBSI   0
@@ -383,6 +386,10 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define DBW_FTOLD  0
 #define DBW_TOLD   1
 #define DBW_SMALLD 2
+#define DBW_LBCD   3
+#define DBW_HBCD   4
+#define DBW_CD     5
+
 
 #define CBW_NOBSI   0
 #define CBW_IMULTII 1
@@ -415,6 +422,10 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CBW_TOLD   1
 #define CBW_SMALLD 2
 #define CBW_MEMFACD 3
+#define CBW_LBCD   4
+#define CBW_HBCD   5
+#define CBW_CD     6
+
 
 #define CBWM_CVML 0
 #define CBWM_CVLS 1
@@ -455,6 +466,9 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CDBW_TOLD   1
 #define CDBW_SMALLD 2
 #define CDBW_MEMFACD 3
+#define CDBW_LBCD   4
+#define CDBW_HBCD   5
+#define CDBW_CD     6
 
 #define CDBWM_CVLS 0
 

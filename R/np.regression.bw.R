@@ -71,7 +71,7 @@ npregbw.rbandwidth <-
            bws, bandwidth.compute = TRUE,
            nmulti, remin = TRUE, itmax = 10000,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           lbc = 0.1, hbc = 50.0, cfac = 1.0, ...){
+           lbc = 0.5, hbc = 1.5, cfac = 1.0, ...){
 
     xdat <- toFrame(xdat)
 
