@@ -1609,8 +1609,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     0,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     num_categories_extern,
-                                    vsfh,
-                                    vector_scale_factor);
+                                    vector_continuous_stddev,
+                                    vsfh);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -2326,8 +2326,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     0,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     num_categories_extern,
-                                    vsfh,
-                                    vector_scale_factor);
+                                    vector_continuous_stddev,
+                                    vsfh);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
