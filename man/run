@@ -29,6 +29,7 @@ sed -i bak -f sed_run.scr np.qregression.Rd
 sed -i bak -f sed_run.scr np.regression.Rd
 sed -i bak -f sed_run.scr np.regression.bw.Rd
 sed -i bak -f sed_run.scr np.regressioniv.Rd
+sed -i bak -f sed_run.scr np.regressionivderiv.Rd
 sed -i bak -f sed_run.scr np.sigtest.Rd
 sed -i bak -f sed_run.scr np.singleindex.Rd
 sed -i bak -f sed_run.scr np.singleindex.bw.Rd

@@ -1106,7 +1106,7 @@ npregivderiv <- function(y,
   bw <- npudensbw(dat=z,bwmethod="normal-reference")
   model.fz <- npudens(tdat=z,bws=bw)
   f.z <- predict(model.fz,newdata=zeval)
-  model.Sz <- npudist(tdat=z,bws=bw)
+  model.Sz <- npudist(tdat=z,bws=bw$bw)
   S.z <- 1-predict(model.Sz,newdata=zeval)
 
   console <- printClear(console)

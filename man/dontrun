@@ -28,6 +28,7 @@ sed -i bak -f sed_dontrun.scr np.qcmstest.Rd
 sed -i bak -f sed_dontrun.scr np.qregression.Rd
 sed -i bak -f sed_dontrun.scr np.regression.Rd
 sed -i bak -f sed_dontrun.scr np.regressioniv.Rd
+sed -i bak -f sed_dontrun.scr np.regressionivderiv.Rd
 sed -i bak -f sed_dontrun.scr np.regression.bw.Rd
 sed -i bak -f sed_dontrun.scr np.sigtest.Rd
 sed -i bak -f sed_dontrun.scr np.singleindex.Rd
