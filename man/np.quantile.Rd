@@ -50,9 +50,11 @@ npquantile(bws = NULL,
   smooth quantiles based on the quasi-inverse of a \code{\link{npudist}}
   object where \eqn{F(x)} is replaced with its kernel estimator and
   bandwidth selection is that appropriate for such objects. For
-  construction of the quasi-inverse we create a grid of points based
-  partly on the function \code{\link{extendrange}}. The coarseness of
-  this grid is controlled by \code{num.eval}.
+  construction of the quasi-inverse we create a grid of points based on
+  the function \code{\link{extendrange}} along with the sample quantiles
+  themselves computed from invocation of \code{\link{quantile}}. The
+  coarseness of the grid defined by \code{\link{extendrange}} (which has
+  been passed the option \code{f=1}) is controlled by \code{num.eval}.
   
   See Definition 2.3.6, page 21, Nelsen 2006 for further details on
   computation of the quasi-inverse of \eqn{F(x)}.
