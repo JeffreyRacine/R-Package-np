@@ -11,7 +11,10 @@
 
 }
 \usage{
-npquantile(bws, dat, \dots)
+npquantile(bws=NULL,
+           dat=NULL,
+           tau=c(0.01,0.025,0.50,0.75,0.95,0.99),
+           num.eval=5000)
 }
 
 \arguments{
