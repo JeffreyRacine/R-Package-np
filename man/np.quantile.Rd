@@ -4,17 +4,17 @@
 \title{ Kernel Quantile Estimation }
 \description{
 
-  \code{npquantile} computes smooth quantiles from a kernel
-  unconditional cumulative distribution estimate given data and
-  a bandwidth specification (a \code{dbandwidth} object) using the
-  method of Li and Racine (2013).
+  \code{npquantile} computes smooth quantiles from a univariate kernel
+  unconditional cumulative distribution estimate given data and a
+  bandwidth specification (a \code{dbandwidth} object) using the
+  bandwidth selection of method of Li and Racine (2013).
 
 }
 \usage{
-npquantile(bws=NULL,
-           dat=NULL,
-           tau=c(0.01,0.025,0.50,0.75,0.95,0.99),
-           num.eval=5000)
+npquantile(bws = NULL,
+           dat = NULL,
+           tau = c(0.01,0.025,0.50,0.75,0.95,0.99),
+           num.eval = 5000)
 }
 
 \arguments{
