@@ -42,9 +42,9 @@ npquantile(bws = NULL,
 
 \details{
 
-  The quantile function \eqn{q_\tau} is defined as the generalized
-  inverse of the distribution function \eqn{F(x)},
-  i.e. \eqn{q_\tau = inf{x: F(x) \ge \tau}}.
+  The quantile function \eqn{q_\tau} is defined as the quasi-inverse of
+  the distribution function \eqn{F(x)}, i.e. \eqn{q_\tau = inf{x: F(x)
+  \ge \tau}}.
  
   The function \code{npquantile} implements a method for estimating
   smooth quantiles based on the quasi-inverse of a \code{\link{npudist}}
