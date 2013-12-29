@@ -5,7 +5,7 @@
 \description{
 
   \code{npquantile} computes smooth quantiles from a kernel
-  unconditional cumulative distribution estimate given a set of data and
+  unconditional cumulative distribution estimate given data and
   a bandwidth specification (a \code{dbandwidth} object) using the
   method of Li and Racine (2013).
 
@@ -17,7 +17,7 @@ npquantile(bws, dat, \dots)
 \arguments{
   \item{bws}{
     a \code{dbandwidth} specification. This must be set as a \code{dbandwidth}
-    object returned from an invocation of \code{\link{npquantilebw}}.
+    object returned from an invocation of \code{\link{npudistbw}}.
   }
   \item{dat}{
     a univariate vector of type \code{numeric} containing sample
@@ -32,7 +32,7 @@ npquantile(bws, dat, \dots)
   }
   \item{num.eval}{
     an optional integer specifying the length of the grid on which the
-    quasi-inverse is computed.
+    quasi-inverse is computed. Defaults to \code{5000}.
   }
   
 }
