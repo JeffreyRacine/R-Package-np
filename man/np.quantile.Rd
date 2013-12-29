@@ -7,7 +7,7 @@
   \code{npquantile} computes smooth quantiles from a univariate kernel
   unconditional cumulative distribution estimate given data and a
   bandwidth specification (a \code{dbandwidth} object) using the
-  bandwidth selection of method of Li and Racine (2013).
+  bandwidth selection method of Li and Racine (2013).
 
 }
 \usage{
@@ -23,7 +23,7 @@ npquantile(bws = NULL,
     object returned from an invocation of \code{\link{npudistbw}}.
   }
   \item{dat}{
-    a univariate vector of type \code{numeric} containing sample
+    a univariate vector of type \code{\link{numeric}} containing sample
     realizations (training data) used to estimate the cumulative
     distribution (must be the same training data used to compute the
     bandwidth object \code{bws} passed in).
@@ -42,9 +42,21 @@ npquantile(bws = NULL,
 
 \details{
 
-  \code{npquantile} implements a method for estimating smooth quantiles
-  based on the quasi-inverse of a \code{\link{npudist}} object. See
-  Definition 2.3.6, page 21, Nelsen 2006 for details.
+  The quantile function \eqn{q_\tau} is defined as the generalized
+  inverse of the distribution function \eqn{F(x)},
+  i.e. \eqn{q_\tau = inf{x: F(x) \ge \tau}}.
+ 
+  The function \code{npquantile} implements a method for estimating
+  smooth quantiles based on the quasi-inverse of a \code{\link{npudist}}
+  object where \eqn{F(x)} is replaced with its kernel estimator and
+  bandwidth selection is that appropriate for such objects. For
+  construction of the quasi-inverse we create a grid of points based
+  partly on the function \code{\link{extendrange}}. The coarseness of
+  this grid is controlled by \code{num.eval}.
+  
+  See Definition 2.3.6, page 21, Nelsen 2006 for further details on
+  computation of the quasi-inverse of \eqn{F(x)}.
+
 
 }
 \value{
@@ -53,6 +65,10 @@ npquantile(bws = NULL,
   to \code{tau}.
   
 }
+\seealso{
+  \code{\link{quantile}}, \code{\link[logspline]{qlogspline}},
+  \code{\link[ks]{qkde}}
+  }
 \references{
   Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
   Edition, Springer-Verlag.
