@@ -1,7 +1,7 @@
 \name{npquantile}
 \alias{npquantile}
 
-\title{ Kernel Quantile Estimation }
+\title{ Kernel Univariate Quantile Estimation }
 \description{
 
   \code{npquantile} computes smooth quantiles from a univariate kernel
