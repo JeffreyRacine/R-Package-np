@@ -13,7 +13,7 @@
 \usage{
 npquantile(bws = NULL,
            dat = NULL,
-           tau = c(0.01,0.025,0.50,0.75,0.95,0.99),
+           tau = c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
            num.eval = 5000)
 }
 
@@ -31,7 +31,7 @@ npquantile(bws = NULL,
   \item{tau}{
     an optional vector containing the quantile(s) to be estimated (must
     contain numbers strictly between 0 and 1). Defaults to
-    \code{c(0.01,0.025,0.50,0.75,0.95,0.99)}.
+    \code{c(0.01,0.05,0.25,0.50,0.75,0.95,0.99)}.
   }
   \item{num.eval}{
     an optional integer specifying the length of the grid on which the
@@ -99,10 +99,10 @@ bw <- npudistbw(~x)
 npquantile(bw,x)
 
 ## Compute the nonsmooth empirical quantiles
-quantile(x,c(0.01,0.025,0.50,0.75,0.95,0.99))
+quantile(x,c(0.01,0.05,0.25,0.50,0.75,0.95,0.99))
 
 ## Compute the true quantiles
-qchisq(c(0.01,0.025,0.50,0.75,0.95,0.99),df=df)
+qchisq(c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),df=df)
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS

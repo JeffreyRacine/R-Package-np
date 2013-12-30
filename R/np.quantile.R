@@ -1,6 +1,6 @@
 npquantile <- function(bws=NULL,
                        dat=NULL,
-                       tau=c(0.01,0.025,0.50,0.75,0.95,0.99),
+                       tau=c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
                        num.eval=5000) {
 
   ## Note - options for npudist are passed in/taken from the bandwidth
