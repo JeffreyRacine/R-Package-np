@@ -22,8 +22,8 @@ npquantile <- function(bws=NULL,
   ## grid. For finer grain grid increase length=5000 below.
 
   dat.er <- extendrange(dat,f=1)
-  dat.q <- quantile(dat,tau)
-  dat.eval <- sort(c(seq(dat.er[1],dat.er[2],length=num.eval),dat.q))
+  dat.eval <- sort(c(seq(dat.er[1],dat.er[2],length=num.eval),
+                     quantile(dat,tau)))
 
   F <- fitted(npudist(tdat=dat,
                       edat=dat.eval,
