@@ -12,6 +12,7 @@
 }
 \usage{
 npquantile(x,...)
+
 ## Default S3 method:
 npquantile(x = NULL,
            tau = c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
