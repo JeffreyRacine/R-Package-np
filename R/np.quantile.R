@@ -1,4 +1,4 @@
-npquantile <- function(dat=NULL,
+npquantile <- function(x=NULL,
                        tau=c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
                        num.eval=5000,
                        bws=NULL,
@@ -9,26 +9,26 @@ npquantile <- function(dat=NULL,
 
   ## Some basic error checking.
 
-  if(is.null(dat)) stop("must provide data")
-  if(class(dat) != "numeric") stop("dat must be numeric and univariate")
+  if(is.null(x)) stop("must provide data")
+  if(class(x) != "numeric") stop("x must be numeric and univariate")
 
   if(any(tau<=0)|any(tau>=1)) stop("tau must lie in the open interval (0,1)")
   if(length(bws$xnames)>1) stop("bw object must be univariate")
   if(num.eval < 100) stop("num.eval must be >= 100")
 
-  if(is.null(bws)) bws <- npudistbw(~dat,...)
+  if(is.null(bws)) bws <- npudistbw(~x,...)
   if(class(bws)!="dbandwidth") stop("bw object must be a npudistbw() object")
 
   ## Create grid from which quasi-inverse is extracted - extend the
-  ## range of dat for evaluation grid, also add empirical quantiles to
+  ## range of x for evaluation grid, also add empirical quantiles to
   ## grid. For finer grain grid increase length=5000 below.
 
-  dat.er <- extendrange(dat,f=1)
-  dat.eval <- sort(c(seq(dat.er[1],dat.er[2],length=num.eval),
-                     quantile(dat,tau)))
+  x.er <- extendrange(x,f=1)
+  x.eval <- sort(c(seq(x.er[1],x.er[2],length=num.eval),
+                     quantile(x,tau)))
 
-  F <- fitted(npudist(tdat=dat,
-                      edat=dat.eval,
+  F <- fitted(npudist(tdat=x,
+                      edat=x.eval,
                       bws=bws))
 
   ## Now compute the quasi-inverse from the estimated F for the
@@ -37,16 +37,16 @@ npquantile <- function(dat=NULL,
   ## CDF values for the evaluation data (otherwise the quantiles are
   ## undefined).
 
-  dat.tau <- numeric(length(tau))
+  x.tau <- numeric(length(tau))
   
   for(i in 1:length(tau)) {
     tau[tau<min(F)] <- min(F)
     tau[tau>max(F)] <- max(F)        
-    dat.tau[i] <-  min(dat.eval[F>=tau[i]])
+    x.tau[i] <-  min(x.eval[F>=tau[i]])
   }
 
-  names(dat.tau) <- paste(tau*100,"%",sep="")
+  names(x.tau) <- paste(tau*100,"%",sep="")
 
-  return(dat.tau)
+  return(x.tau)
 
 }

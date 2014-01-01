@@ -11,7 +11,9 @@
 
 }
 \usage{
-npquantile(dat = NULL,
+npquantile(x,...)
+## Default S3 method:
+npquantile(x = NULL,
            tau = c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
            num.eval = 5000,
            bws = NULL,
@@ -19,7 +21,7 @@ npquantile(dat = NULL,
 }
 
 \arguments{
-  \item{dat}{
+  \item{x}{
     a univariate vector of type \code{\link{numeric}} containing sample
     realizations (training data) used to estimate the cumulative
     distribution (must be the same training data used to compute the
@@ -35,10 +37,11 @@ npquantile(dat = NULL,
     quasi-inverse is computed. Defaults to \code{5000}.
   }
   \item{bws}{
-    a \code{dbandwidth} specification. This must be set as a \code{dbandwidth}
-    object returned from an invocation of \code{\link{npudistbw}}. If
-    not provided \code{\link{npudistbw}} is invoked with optional
-    arguments passed via \code{\dots}.
+    a optional \code{dbandwidth} specification (if already computed
+    avoid unnecessary computation inside \code{npquantile}). This must
+    be set as a \code{dbandwidth} object returned from an invocation of
+    \code{\link{npudistbw}}. If not provided \code{\link{npudistbw}} is
+    invoked with optional arguments passed via \code{\dots}.
   }
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
@@ -89,24 +92,33 @@ npquantile(dat = NULL,
 }
 
 \seealso{
-  \code{\link{quantile}}, \code{\link[logspline]{qlogspline}},
-  \code{\link[ks]{qkde}}, \code{\link{ecdf}}
-  }
+
+  \code{\link{quantile}} for various types of sample quantiles;
+  \code{\link{ecdf}} for empirical distributions of which
+  \code{\link{quantile}} is an inverse; \code{\link{boxplot.stats}} and
+  \code{\link{fivenum}} for computing other versions of quartiles;
+  \code{\link[logspline]{qlogspline}} for logspline density quantiles;
+  \code{\link[ks]{qkde}} for alternative kernel quantiles, etc.
+
+}
 
 \examples{
 \dontrun{
-## Simulate data
-set.seed(42)
+## Simulate data from a chi-square distribution
 df <- 50
 x <- rchisq(100,df=df)
 
-npquantile(x,c(0.01,0.05,0.25,0.50,0.75,0.95,0.99))
+## Vector of quantiles desired
+tau <- c(0.01,0.05,0.25,0.50,0.75,0.95,0.99)
 
-## Compute the empirical quantiles using the default method in R (Type 7)
-quantile(x,c(0.01,0.05,0.25,0.50,0.75,0.95,0.99))
+## Compute kernel smoothed sample quantiles
+npquantile(x,tau)
 
-## Compute the true quantiles
-qchisq(c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),df=df)
+## Compute sample quantiles using the default method in R (Type 7)
+quantile(x,tau)
+
+## True quantiles based on known distribution
+qchisq(tau,df=df)
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
