@@ -11,17 +11,14 @@
 
 }
 \usage{
-npquantile(bws = NULL,
-           dat = NULL,
+npquantile(dat = NULL,
            tau = c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
-           num.eval = 5000)
+           num.eval = 5000,
+           bws = NULL,
+           \dots)
 }
 
 \arguments{
-  \item{bws}{
-    a \code{dbandwidth} specification. This must be set as a \code{dbandwidth}
-    object returned from an invocation of \code{\link{npudistbw}}.
-  }
   \item{dat}{
     a univariate vector of type \code{\link{numeric}} containing sample
     realizations (training data) used to estimate the cumulative
@@ -36,6 +33,17 @@ npquantile(bws = NULL,
   \item{num.eval}{
     an optional integer specifying the length of the grid on which the
     quasi-inverse is computed. Defaults to \code{5000}.
+  }
+  \item{bws}{
+    a \code{dbandwidth} specification. This must be set as a \code{dbandwidth}
+    object returned from an invocation of \code{\link{npudistbw}}. If
+    not provided \code{\link{npudistbw}} is invoked with optional
+    arguments passed via \code{\dots}.
+  }
+  \item{\dots}{
+    additional arguments supplied to specify the bandwidth type,
+    kernel types, selection methods, and so on. See
+    \code{\link{npudistbw}} for details.
   }
   
 }
@@ -92,13 +100,9 @@ set.seed(42)
 df <- 50
 x <- rchisq(100,df=df)
 
-## Compute npudist bandwidth object
-bw <- npudistbw(~x)
+npquantile(x,c(0.01,0.05,0.25,0.50,0.75,0.95,0.99))
 
-## Pass the bandwidth object and data to npquantile()
-npquantile(bw,x)
-
-## Compute the nonsmooth empirical quantiles
+## Compute the empirical quantiles using the default method in R (Type 7)
 quantile(x,c(0.01,0.05,0.25,0.50,0.75,0.95,0.99))
 
 ## Compute the true quantiles

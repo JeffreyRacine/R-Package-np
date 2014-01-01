@@ -1,21 +1,23 @@
-npquantile <- function(bws=NULL,
-                       dat=NULL,
+npquantile <- function(dat=NULL,
                        tau=c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
-                       num.eval=5000) {
+                       num.eval=5000,
+                       bws=NULL,
+                       ...) {
 
   ## Note - options for npudist are passed in/taken from the bandwidth
   ## object.
 
   ## Some basic error checking.
 
-  if(is.null(bws)) stop("must provide bw object")
   if(is.null(dat)) stop("must provide data")
   if(class(dat) != "numeric") stop("dat must be numeric and univariate")
 
   if(any(tau<=0)|any(tau>=1)) stop("tau must lie in the open interval (0,1)")
   if(length(bws$xnames)>1) stop("bw object must be univariate")
-  if(class(bws)!="dbandwidth") stop("bw object must be a npudistbw() object")
   if(num.eval < 100) stop("num.eval must be >= 100")
+
+  if(is.null(bws)) bws <- npudistbw(~dat,...)
+  if(class(bws)!="dbandwidth") stop("bw object must be a npudistbw() object")
 
   ## Create grid from which quasi-inverse is extracted - extend the
   ## range of dat for evaluation grid, also add empirical quantiles to
@@ -42,6 +44,8 @@ npquantile <- function(bws=NULL,
     tau[tau>max(F)] <- max(F)        
     dat.tau[i] <-  min(dat.eval[F>=tau[i]])
   }
+
+  names(dat.tau) <- paste(tau*100,"%",sep="")
 
   return(dat.tau)
 
