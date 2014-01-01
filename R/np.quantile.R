@@ -1,18 +1,16 @@
 npquantile <- function(x=NULL,
                        tau=c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
-                       num.eval=5000,
+                       num.eval=10000,
                        bws=NULL,
+                       f=1,
                        ...) {
-
-  ## Note - options for npudist are passed in/taken from the bandwidth
-  ## object.
 
   ## Some basic error checking.
 
   if(is.null(x)) stop("must provide data")
   if(class(x) != "numeric") stop("x must be numeric and univariate")
 
-  if(any(tau<=0)|any(tau>=1)) stop("tau must lie in the open interval (0,1)")
+  if(any(tau<0)|any(tau>1)) stop("tau must lie in the closed interval [0,1]")
   if(length(bws$xnames)>1) stop("bw object must be univariate")
   if(num.eval < 100) stop("num.eval must be >= 100")
 
@@ -21,9 +19,9 @@ npquantile <- function(x=NULL,
 
   ## Create grid from which quasi-inverse is extracted - extend the
   ## range of x for evaluation grid, also add empirical quantiles to
-  ## grid. For finer grain grid increase length=5000 below.
+  ## grid.
 
-  x.er <- extendrange(x,f=1)
+  x.er <- extendrange(x,f=f)
   x.eval <- sort(c(seq(x.er[1],x.er[2],length=num.eval),
                      quantile(x,tau)))
 

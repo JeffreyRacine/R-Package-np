@@ -16,8 +16,9 @@ npquantile(x,...)
 ## Default S3 method:
 npquantile(x = NULL,
            tau = c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
-           num.eval = 5000,
+           num.eval = 10000,
            bws = NULL,
+           f = 1,
            \dots)
 }
 
@@ -29,25 +30,29 @@ npquantile(x = NULL,
     bandwidth object \code{bws} passed in).
   }
   \item{tau}{
-    an optional vector containing the quantile(s) to be estimated (must
-    contain numbers strictly between 0 and 1). Defaults to
+    an optional vector containing the probabilities for quantile(s) to
+    be estimated (must contain numbers in \eqn{[0,1]}). Defaults to
     \code{c(0.01,0.05,0.25,0.50,0.75,0.95,0.99)}.
   }
   \item{num.eval}{
     an optional integer specifying the length of the grid on which the
-    quasi-inverse is computed. Defaults to \code{5000}.
+    quasi-inverse is computed. Defaults to \code{10000}.
   }
   \item{bws}{
-    a optional \code{dbandwidth} specification (if already computed
+    an optional \code{dbandwidth} specification (if already computed
     avoid unnecessary computation inside \code{npquantile}). This must
     be set as a \code{dbandwidth} object returned from an invocation of
     \code{\link{npudistbw}}. If not provided \code{\link{npudistbw}} is
     invoked with optional arguments passed via \code{\dots}.
   }
+  \item{f}{
+    an optional argument fed to \code{\link{extendrange}} (Defaults to
+    \code{1}). See \code{?\link{extendrange}} for details.
+  }
   \item{\dots}{
-    additional arguments supplied to specify the bandwidth type,
-    kernel types, selection methods, and so on. See
-    \code{\link{npudistbw}} for details.
+    additional arguments supplied to specify the bandwidth type, kernel
+    types, bandwidth selection methods, and so on. See
+    \code{?\link{npudistbw}} for details.
   }
   
 }
@@ -56,20 +61,26 @@ npquantile(x = NULL,
 
   The quantile function \eqn{q_\tau} is defined as the quasi-inverse of
   the distribution function \eqn{F(x)}, i.e. \eqn{q_\tau = \inf\{x: F(x)
-  \ge \tau\}}.
+  \ge \tau\}}; see Definition 2.3.6, page 21, Nelsen 2006 for a
+  definition of the quasi-inverse of \eqn{F(x)}.
  
   The function \code{npquantile} implements a method for estimating
   smooth quantiles based on the quasi-inverse of a \code{\link{npudist}}
   object where \eqn{F(x)} is replaced with its kernel estimator and
-  bandwidth selection is that appropriate for such objects. For
-  construction of the quasi-inverse we create a grid of points based on
-  the function \code{\link{extendrange}} along with the sample quantiles
-  themselves computed from invocation of \code{\link{quantile}}. The
-  coarseness of the grid defined by \code{\link{extendrange}} (which has
-  been passed the option \code{f=1}) is controlled by \code{num.eval}.
+  bandwidth selection is that appropriate for such objects.
+
+  For construction of the quasi-inverse we create a grid of evaluation
+  points based on the function \code{\link{extendrange}} along with the
+  sample quantiles themselves computed from invocation of
+  \code{\link{quantile}}. The coarseness of the grid defined by
+  \code{\link{extendrange}} (which has been passed the option
+  \code{f=1}) is controlled by \code{num.eval}.
   
-  See Definition 2.3.6, page 21, Nelsen 2006 for further details on
-  computation of the quasi-inverse of \eqn{F(x)}.
+  Note that for any value of \eqn{\tau} less/greater than the
+  smallest/largest value of \eqn{F(x)} computed for the evaluation data
+  (i.e. that outlined in the paragraph above), the quantile returned for
+  such values is that associated with the smallest/largest value of
+  \eqn{F(x)}, respectively.
 
 
 }
@@ -86,6 +97,15 @@ npquantile(x = NULL,
   Li, H. and J.S. Racine (2013), \dQuote{Cross-validated estimation of
   cumulative distribution functions with categorical and continuous
   data,} manuscript.
+}
+\section{Usage Issues}{
+  Cross-validated bandwidth selection is used by default
+  (\code{\link{npudistbw}}). For large datasets this can be
+  computationally demanding. In such cases one might instead consider a
+  rule-of-thumb bandwidth (\code{bwmethod="normal-reference"}) or,
+  alternatively, use kd-trees (\code{options(np.tree=TRUE)} along with a
+  bounded kernel (\code{ckertype="epanechnikov"}), both of which will
+  reduce the computational burden appreciably.
 }
 \author{
     Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine
