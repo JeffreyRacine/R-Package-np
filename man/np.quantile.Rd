@@ -46,8 +46,8 @@ npquantile(x = NULL,
     invoked with optional arguments passed via \code{\dots}.
   }
   \item{f}{
-    an optional argument fed to \code{\link{extendrange}} (Defaults to
-    \code{1}). See \code{?\link{extendrange}} for details.
+    an optional argument fed to \code{\link{extendrange}}. Defaults to
+    \code{1}. See \code{?\link{extendrange}} for details.
   }
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type, kernel
