@@ -59,15 +59,24 @@ npquantile(x = NULL,
 
 \details{
 
-  The quantile function \eqn{q_\tau} is defined as the quasi-inverse of
-  the distribution function \eqn{F(x)}, i.e. \eqn{q_\tau = \inf\{x: F(x)
-  \ge \tau\}}; see Definition 2.3.6, page 21, Nelsen 2006 for a
-  definition of the quasi-inverse of \eqn{F(x)}.
+  The quantile function \eqn{q_\tau} is defined to be the
+  left-continuous inverse of the distribution function \eqn{F(x)},
+  i.e. \eqn{q_\tau = \inf\{x: F(x) \ge \tau\}}.
+
+  A traditional estimator of \eqn{q_\tau} is the \eqn{\tau}th sample
+  quantile. However, these estimates suffer from lack of efficiency
+  arising from variability of individual order statistics; see Sheather
+  and Marron (1990) and Hyndman and Fan (1996) for methods that
+  interpolate/smooth the order statistics, each of which discussed in
+  the latter can be invoked through \code{\link{quantile}} via
+  \code{type=j}, \code{j=1,\dots,9}.
  
   The function \code{npquantile} implements a method for estimating
   smooth quantiles based on the quasi-inverse of a \code{\link{npudist}}
   object where \eqn{F(x)} is replaced with its kernel estimator and
-  bandwidth selection is that appropriate for such objects.
+  bandwidth selection is that appropriate for such objects; see
+  Definition 2.3.6, page 21, Nelsen 2006 for a definition of the
+  quasi-inverse of \eqn{F(x)}.
 
   For construction of the quasi-inverse we create a grid of evaluation
   points based on the function \code{\link{extendrange}} along with the
@@ -82,7 +91,6 @@ npquantile(x = NULL,
   such values is that associated with the smallest/largest value of
   \eqn{F(x)}, respectively.
 
-
 }
 \value{
   
@@ -91,12 +99,21 @@ npquantile(x = NULL,
   
 }
 \references{
-  Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
-  Edition, Springer-Verlag.
+
+  Hyndman, R. J. and Fan, Y. (1996), \dQuote{Sample quantiles in
+  statistical packages,} American Statistician, \bold{50}, 361-365.
 
   Li, H. and J.S. Racine (2013), \dQuote{Cross-validated estimation of
   cumulative distribution functions with categorical and continuous
   data,} manuscript.
+
+  Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
+  Edition, Springer-Verlag.
+
+  Sheather, S. and J. S. Marron (1990), \dQuote{Kernel Quantile
+  Estimators,} Journal of the American Statistical Association,
+  Vol. 85, No. 410, 410-416.
+  
 }
 \section{Usage Issues}{
   Cross-validated bandwidth selection is used by default
