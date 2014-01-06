@@ -1783,7 +1783,9 @@ npplot.scbandwidth <-
         temp.mean[1:xi.neval] = tobj$mean
 
         if (plot.errors){
-          if (plot.errors.method == "bootstrap"){
+          if (plot.errors.method == "asymptotic")
+            temp.err[1:xi.neval,1:2] = 2.0*tobj$merr
+          else if (plot.errors.method == "bootstrap"){
             temp.boot <- eval(parse(text = paste("compute.bootstrap.errors(",
                                       "xdat = xdat, ydat = ydat,",
                                       ifelse(miss.z, "", "zdat = zdat,"),
@@ -1889,7 +1891,9 @@ npplot.scbandwidth <-
           temp.mean[1:xi.neval] = tobj$mean
 
           if (plot.errors){
-            if (plot.errors.method == "bootstrap"){
+            if (plot.errors.method == "asymptotic")
+              temp.err[1:xi.neval,1:2] = 2.0*tobj$merr
+          else if (plot.errors.method == "bootstrap"){
               temp.boot <- compute.bootstrap.errors(
                                                     xdat = xdat,
                                                     ydat = ydat,
