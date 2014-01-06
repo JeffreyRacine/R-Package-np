@@ -414,9 +414,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CBW_UNORDI 20
 #define CBW_UNCONI 21
 #define CBW_FASTI 22
-#define CBW_AUTOI 23
-#define CBW_OLDI 24
-#define CBW_TREEI 25
+#define CBW_OLDI 23
+#define CBW_TREEI 24
 
 #define CBW_FTOLD  0
 #define CBW_TOLD   1
@@ -458,9 +457,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CDBW_UNUNOI 20
 #define CDBW_UNORDI 21
 #define CDBW_UNCONI 22
-#define CDBW_AUTOI 23
-#define CDBW_CDFONTRAIN 24
-#define CDBW_TREEI 25
+#define CDBW_CDFONTRAIN 23
+#define CDBW_TREEI 24
 
 #define CDBW_FTOLD  0
 #define CDBW_TOLD   1
@@ -545,17 +543,15 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define KWS_OKRNEVI 10
 #define KWS_TISEI 11
 #define KWS_LOOI 12
-#define KWS_IPOWI 13
-#define KWS_BDIVI 14
-#define KWS_MLEVI 15
-#define KWS_SCOEFI 16
-#define KWS_WNCOLI 17
-#define KWS_YNCOLI 18
-#define KWS_DOTREEI 19
-#define KWS_RKWI 20
-#define KWS_POPI 21
-#define KWS_PSCOREI 22
-#define KWS_POCGI 23
+#define KWS_BDIVI 13
+#define KWS_MLEVI 14
+#define KWS_WNCOLI 15
+#define KWS_YNCOLI 16
+#define KWS_DOTREEI 17
+#define KWS_RKWI 18
+#define KWS_POPI 19
+#define KWS_PSCOREI 20
+#define KWS_POCGI 21
 
 #define CQ_TNOBSI 0
 #define CQ_ENOBSI   1
