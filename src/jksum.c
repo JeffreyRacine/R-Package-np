@@ -793,7 +793,7 @@ double np_econvol_owang_van_ryzin(const double x, const double y, const double l
   const int cxy = (int)fabs(x-y);
   const double lnorm = 0.5*(1.0 - lambda);
   const double l2 = lambda*lambda;
-  return lnorm*lnorm*R_pow_di(lambda, cxy)*(1.0 + cxy + 2.0/(1.0-lambda*lambda));
+  return lnorm*lnorm*R_pow_di(lambda, cxy)*(1.0 + cxy + 2.0/(1.0-l2));
 }
 // derivative kernels
 
@@ -2887,7 +2887,7 @@ double *vector_scale_factor,
 int *num_categories){
 
   // note that mean has 2*num_obs allocated for npksum
-  int i, j, l, m, sf_flag = 0, num_obs_eval_alloc, tsf;
+  int i, j, l, sf_flag = 0, num_obs_eval_alloc, tsf;
 
   double cv = 0.0;
   double * lambda = NULL, * vsf = NULL;
@@ -3870,7 +3870,6 @@ double **matrix_categorical_vals,
 double *cv){
   int indy;
   int64_t i,j,l,iwx,iwy;
-  int64_t p, q;
 
   const int num_reg_tot = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int num_var_tot = num_var_continuous+num_var_unordered+num_var_ordered;
@@ -3878,7 +3877,6 @@ double *cv){
 
   const int num_all_cvar = num_reg_continuous + num_var_continuous;
   const int num_all_uvar = num_reg_unordered + num_var_unordered;
-  const int num_all_ovar = num_reg_ordered + num_var_ordered;
 
   size_t Nm = MIN((size_t)ceil(memfac*300000.0), (size_t)SIZE_MAX/10);
 
@@ -4529,7 +4527,6 @@ double **matrix_categorical_vals,
 double *cv){
 
   int64_t i,j,k,l;
-  int64_t p, q;
 
   int64_t iwi, iwj, iwk;
 
@@ -4545,7 +4542,7 @@ double *cv){
 
   int64_t N, num_obs_train_alloc, num_obs_wi_alloc, num_obs_wj_alloc, num_obs_wk_alloc;
 
-  int64_t wi, wk, wj, nwi, nwk, nwj, wjk;
+  int64_t wi, wk, wj, nwi, nwk, nwj;
 
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
 
@@ -4597,7 +4594,7 @@ double *cv){
   nls.n = 1;
   
   int xyd[num_all_cvar];
-  int idxi[2], idxj[2], idxk[2];
+  int idxj[2], idxk[2];
 
   for(i = 0; i < num_all_cvar; i++)
     xyd[i] = i;
@@ -4633,7 +4630,6 @@ double *cv){
     nwi = nwk = nwj = 1;
   }
 
-  wjk = wj*wk;
 #ifdef MPI2
   int64_t stride_wi = MAX((int64_t)ceil((double)wi / (double) iNum_Processors),1);
 
@@ -4944,9 +4940,6 @@ double *cv){
   for(iwi = 0; iwi < nwi; iwi++){
     const int64_t wio = iwi*wi;
     const int64_t dwi = (iwi != (nwi - 1)) ? wi : num_obs_train - (nwi - 1)*wi;
-
-    idxi[0] = wio;
-    idxi[1] = wio + dwi -1;
 
     for(l = 0; l < num_reg_continuous; l++)
       matrix_Xi_continuous_train[l] = matrix_XY_continuous_train[l] + wio;
@@ -5349,7 +5342,7 @@ double *CORR,
 double *SIGN){
 
   // note that mean has 2*num_obs allocated for npksum
-  int i, j, l, m, sf_flag = 0, tsf;
+  int i, j, l, sf_flag = 0;
 
 	double INT_KERNEL_P;					 /* Integral of K(z)^2 */
 	double K_INT_KERNEL_P;				 /*  K^p */
@@ -5370,7 +5363,6 @@ double *SIGN){
 
 #ifdef MPI2
   int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
-  int num_obs_train_alloc = stride_t*iNum_Processors;
 
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   int num_obs_eval_alloc = stride_e*iNum_Processors;
@@ -6604,7 +6596,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   const int num_ovar = num_reg_ordered + num_var_ordered;
   const int num_all_var = num_reg + num_var_continuous + num_var_unordered + num_var_ordered;
 
-  int i, l; 
+  int i; 
   int ret = 0;
 
   int * operator = NULL;
@@ -6631,7 +6623,6 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   if(vsf_x == NULL)
     error("failed to allocate vsf_x");
 
-	const double log_DBL_MIN = log(DBL_MIN);
   double * rhod = (double *)malloc(num_obs_alloc*sizeof(double));
   
   if(rhod == NULL)

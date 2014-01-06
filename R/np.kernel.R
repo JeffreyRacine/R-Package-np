@@ -48,7 +48,7 @@ npksum.numeric <-
            exdat,
            weights,
            leave.one.out, kernel.pow, bandwidth.divide,
-           operator, permutation.operator, compute.score, compute.ocg, smooth.coefficient, return.kernel.weights,
+           operator, permutation.operator, compute.score, compute.ocg, return.kernel.weights,
            ...){
 
     txdat <- toFrame(txdat)
@@ -61,7 +61,7 @@ npksum.numeric <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("tydat", "exdat", "weights", "leave.one.out", "kernel.pow", "bandwidth.divide",
-               "operator", "permutation.operator", "compute.score", "compute.ocg", "smooth.coefficient", "return.kernel.weights")
+               "operator", "permutation.operator", "compute.score", "compute.ocg", "return.kernel.weights")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
@@ -85,7 +85,6 @@ npksum.default <-
            permutation.operator = names(PERMUTATION_OPERATORS),
            compute.score = FALSE,
            compute.ocg = FALSE,
-           smooth.coefficient = FALSE,
            return.kernel.weights = FALSE,
            ...){
 
@@ -276,10 +275,8 @@ npksum.default <-
         nliracine = OKER_NLR),
       miss.ex = miss.ex,
       leave.one.out = leave.one.out, 
-      ipow = integer.pow,
       bandwidth.divide = bandwidth.divide,
       mcv.numRow = attr(bws$xmcv, "num.row"),
-      smooth.coefficient = smooth.coefficient,
       wncol = dim.in[1],
       yncol = dim.in[2],
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),

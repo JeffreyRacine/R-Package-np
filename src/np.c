@@ -1210,7 +1210,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int itmax, iter;
-  int int_use_starting_values, autoSelectCVLS, ibwmfunc, old_cdens;
+  int int_use_starting_values, ibwmfunc, old_cdens;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
 
@@ -1250,7 +1250,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   itmax=myopti[CBW_ITMAXI];
   int_WEIGHTS = myopti[CBW_FASTI];
-  autoSelectCVLS = myopti[CBW_AUTOI];
   old_cdens = myopti[CBW_OLDI];
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
 
@@ -1919,7 +1918,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int itmax, iter;
-  int int_use_starting_values, autoSelectCVLS, ibwmfunc;
+  int int_use_starting_values, ibwmfunc;
   int cdfontrain;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
@@ -1963,8 +1962,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_MINIMIZE_IO = myopti[CDBW_MINIOI];
 
   itmax=myopti[CDBW_ITMAXI];
-
-  autoSelectCVLS = myopti[CDBW_AUTOI];
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
 
@@ -4329,8 +4326,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   double * vector_scale_factor, * ksum, * p_ksum = NULL, pad_num, * kw = NULL;
   int i,j,k, num_var, num_obs_eval_alloc;
-  int no_y, do_ipow, leave_one_out, train_is_eval, do_divide_bw;
-  int max_lev, do_smooth_coef_weights, no_weights, sum_element_length, return_kernel_weights;
+  int no_y, leave_one_out, train_is_eval, do_divide_bw;
+  int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
 
   struct th_table * otabs = NULL;
@@ -4365,14 +4362,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   train_is_eval = myopti[KWS_TISEI];
   // no_y = myopti[KWS_NOYI];
   leave_one_out = myopti[KWS_LOOI];
-  do_ipow = myopti[KWS_IPOWI];
   do_divide_bw = myopti[KWS_BDIVI];
   
   max_lev = myopti[KWS_MLEVI];
   pad_num = *padnum;
-
-  // do_weights = myopti[KWS_DOWI];
-  do_smooth_coef_weights = myopti[KWS_SCOEFI];
 
   /* the y and weight matrices will be contained in these variables */
   ncol_Y = myopti[KWS_YNCOLI];

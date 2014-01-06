@@ -78,7 +78,6 @@ npcdistbw.condbandwidth <-
            ydat = stop("data 'ydat' missing"),
            gydat = NULL,
            bws, bandwidth.compute = TRUE,
-           auto = TRUE,
            nmulti, remin = TRUE, itmax = 10000,
            do.full.integral = FALSE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
@@ -240,7 +239,6 @@ npcdistbw.condbandwidth <-
         xnuno = dim(xuno)[2],
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
-        auto = auto,
         cdf_on_train = cdf_on_train,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
@@ -395,7 +393,7 @@ npcdistbw.default <-
            gydat,
            bws, 
            bandwidth.compute = TRUE,
-           auto, nmulti, remin, itmax,
+           nmulti, remin, itmax,
            do.full.integral, ngrid,
            ftol, tol, small, memfac, lbc, hbc, cfac,
            ## dummy arguments for condbandwidth() function call
@@ -439,7 +437,7 @@ npcdistbw.default <-
     ## next grab dummies for actual bandwidth selection and perform call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("gydat", "bandwidth.compute", "auto", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
+    margs <- c("gydat", "bandwidth.compute", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
                "tol", "small", "memfac", "lbc", "hbc", "cfac")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
