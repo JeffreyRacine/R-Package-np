@@ -225,9 +225,14 @@ compute.bootstrap.errors.scbandwidth =
 
     all.bp <- list()
 
-    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+    if ((slice.index > 0) && (((slice.index <= ncol(xdat)) && (bws$xdati$iord | bws$xdati$iuno)[slice.index]) ||
+                              ((slice.index > ncol(xdat)) && (bws$zdati$iord | bws$zdati$iuno)[slice.index-ncol(xdat)]))) {
       boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- bws$xdati$all.ulev[[slice.index]]
+
+      if(slice.index <= ncol(xdat))
+          u.lev <- bws$xdati$all.ulev[[slice.index]]
+      else
+          u.lev <- bws$zdati$all.ulev[[slice.index-ncol(xdat)]]
 
       ## if we are bootstrapping a factor, there should be one
       ## set of replications for each level
@@ -244,7 +249,11 @@ compute.bootstrap.errors.scbandwidth =
         all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
       }
       all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- bws$xdati$all.lev[[slice.index]]
+
+      if(slice.index <= ncol(xdat))
+          all.bp$names <- bws$xdati$all.lev[[slice.index]]
+      else
+          all.bp$names <- bws$zdati$all.lev[[slice.index-ncol(xdat)]]
       rm(boot.frame)
     }
     
