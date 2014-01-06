@@ -286,7 +286,7 @@ void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restr
 // 3) call create_fake_nodes before reuse if reset_fake_nodes has been called in the meanwhile
 
 void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * restrict bb, NL * restrict nl, XL * restrict xl, int * idim, int nidim, int * idx){
-  int res, tt[4], i;
+  int res, tt[4];
 
   NL nls = {.node = NULL, .n = 0, .nalloc = 0};
   mirror_nl(search, &nls);
