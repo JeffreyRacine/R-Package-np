@@ -57,7 +57,7 @@ int thsearch_r(const struct th_entry * const q, int action, struct th_entry ** r
     return TH_FAILURE;
   }
 
-  for(i = 0; i < tab->size; i++, it++){
+  for(i = 0; i < tab->maxsize; i++, it++){
     const size_t ot = it % nel;
 
     if(ht[ot].vacant){
