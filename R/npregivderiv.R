@@ -1103,10 +1103,16 @@ npregivderiv <- function(y,
   ## density for the moment. Use the normal-reference rule for speed
   ## considerations.
 
-  bw <- npudensbw(dat=z,bwmethod="normal-reference")
-  model.fz <- npudens(tdat=z,bws=bw)
+  bw <- npudensbw(dat=z,
+                  bwmethod="normal-reference",
+                  ...)
+  model.fz <- npudens(tdat=z,
+                      bws=bw$bw,
+                      ...)
   f.z <- predict(model.fz,newdata=zeval)
-  model.Sz <- npudist(tdat=z,bws=bw)
+  model.Sz <- npudist(tdat=z,
+                      bws=bw$bw,
+                      ...)
   S.z <- 1-predict(model.Sz,newdata=zeval)
 
   console <- printClear(console)
@@ -1167,7 +1173,8 @@ npregivderiv <- function(y,
                                    txdat=z,
                                    exdat=zeval,
                                    bws=h$bw,
-                                   gradients=TRUE))[,1]
+                                   gradients=TRUE,
+                                   ...))[,1]
 
     } else {
 

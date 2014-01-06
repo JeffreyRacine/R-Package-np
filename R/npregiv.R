@@ -167,8 +167,9 @@ npregiv <- function(y,
                       bws=NULL,
                       p=0,
                       shrink=TRUE,
-                      warning.immediate=TRUE) {
-  
+                      warning.immediate=TRUE,
+                      ...) {
+
     ## Basic error checking...
   
     if(is.null(mydata.train)) stop("You must provide training data")
@@ -268,7 +269,7 @@ npregiv <- function(y,
           }
         }
       }
-  
+
       if(p == 0) {
   
         Wmat.sum <- npksum(exdat=X.eval[j,],
@@ -513,7 +514,7 @@ npregiv <- function(y,
                      degree=NULL,
                      leave.one.out=FALSE,
                      ...) {
-  
+
     ## Don't think this error checking is robust
     
     if(is.null(tydat)) stop("Error: You must provide y data")
@@ -1194,7 +1195,11 @@ npregiv <- function(y,
                     degree=rep(p, num.w.numeric),
                     ...)$mean
 
-    KYW <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hyw$bw, p=rep(p, num.w.numeric))
+    KYW <- Kmat.lp(mydata.train=data.frame(w),
+                   mydata.eval=data.frame(w=weval),
+                   bws=hyw$bw,
+                   p=rep(p, num.w.numeric),
+                   ...)
     
     ## We conduct local polynomial kernel regression of E(y|w) on z
     
@@ -1226,7 +1231,11 @@ npregiv <- function(y,
                         degree=rep(p, num.z.numeric),
                         ...)$mean
 
-    KYWZ <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hywz$bw, p=rep(p, num.z.numeric))
+    KYWZ <- Kmat.lp(mydata.train=data.frame(z),
+                    mydata.eval=data.frame(z=zeval),
+                    bws=hywz$bw,
+                    p=rep(p, num.z.numeric),
+                    ...)
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov function) to
@@ -1284,7 +1293,11 @@ npregiv <- function(y,
                          degree=rep(p, num.w.numeric),
                          ...)$mean
 
-    KPHIW <- Kmat.lp(mydata.train=data.frame(w), mydata.eval=data.frame(w=weval), bws=hphiw$bw, p=rep(p, num.w.numeric))
+    KPHIW <- Kmat.lp(mydata.train=data.frame(w),
+                     mydata.eval=data.frame(w=weval),
+                     bws=hphiw$bw,
+                     p=rep(p, num.w.numeric),
+                     ...)
     
     console <- printClear(console)
     console <- printPop(console)
@@ -1306,7 +1319,11 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
 
-    KPHIWZ <- Kmat.lp(mydata.train=data.frame(z), mydata.eval=data.frame(z=zeval), bws=hphiwz$bw, p=rep(p, num.z.numeric))
+    KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
+                      mydata.eval=data.frame(z=zeval),
+                      bws=hphiwz$bw,
+                      p=rep(p, num.z.numeric),
+                      ...)
     
     ## Next, we minimize the function ittik to obtain the optimal value
     ## of alpha (here we use the iterated Tikhonov approach) to

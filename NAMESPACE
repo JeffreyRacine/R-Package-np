@@ -140,6 +140,7 @@ export(b.star
        ,npplot
        ,npksum
        ,npqreg
+       ,npquantile
        ,npcmstest
        ,npconmode
        ,npdeneqtest
