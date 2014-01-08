@@ -3135,9 +3135,13 @@ int *num_categories){
 
     double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
 
-    double * PXC[num_reg_continuous]; 
-    double * PXU[num_reg_unordered];
-    double * PXO[num_reg_ordered];
+    double * PXC[MIN(1,num_reg_continuous)]; 
+    double * PXU[MIN(1,num_reg_unordered)];
+    double * PXO[MIN(1,num_reg_ordered)];
+
+    PXC[0] = NULL;
+    PXU[0] = NULL;
+    PXO[0] = NULL;
 
     for(l = 0; l < num_reg_continuous; l++)
       PXC[l] = matrix_X_continuous[l];
@@ -5679,9 +5683,13 @@ double *SIGN){
 
     double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc3];
 
-    double * PXC[num_reg_continuous]; 
-    double * PXU[num_reg_unordered];
-    double * PXO[num_reg_ordered];
+    double * PXC[MIN(1,num_reg_continuous)]; 
+    double * PXU[MIN(1,num_reg_unordered)];
+    double * PXO[MIN(1,num_reg_ordered)];
+
+    PXC[0] = NULL;
+    PXU[0] = NULL;
+    PXO[0] = NULL;
 
     for(l = 0; l < num_reg_continuous; l++)
       PXC[l] = matrix_X_continuous_train[l];
