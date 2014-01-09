@@ -7,7 +7,7 @@ kbandwidth.integer <-
   function(bw, ...) { kbandwidth.numeric(bw = bw, ...) }
 
 kbandwidth.default <- function(bw, ...){
-  kbandwidth.numeric(bw = bw$bandwidth,
+  kbandwidth.numeric(bw = unlist(bw$bandwidth),
                      bwscaling = FALSE,
                      bwtype = bw$type,
                      ckertype = bw$ckertype,
