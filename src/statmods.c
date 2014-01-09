@@ -233,6 +233,17 @@ double standerrd(int n, double *vector)
 }
 
 
+double max_unordered_bw(int num_categories,
+                        int kernel){
+  return((kernel == UKERNEL_UAA) ? (num_categories - 1.0)/num_categories : 1.0);
+}
+
+int is_valid_unordered_bw(double lambda,
+                          int num_categories,
+                          int kernel){
+  return ((lambda >= 0.0) || (lambda <= max_unordered_bw(num_categories, kernel)));
+}
+
 /* Population variance, double precision */
 /* Returns 0 upon success, 1 upon failure (constant most likely) */
 
@@ -717,1028 +728,107 @@ int initialize_nr_directions(int num_reg_continuous, int num_reg_unordered, int 
 
 }
 
+void initialize_nr_vector_scale_factor(int BANDWIDTH,
+                                       int RANDOM,
+                                       int seed,
+                                       int int_large,
+                                       int num_obs,
+                                       int num_var_continuous,
+                                       int num_var_unordered,
+                                       int num_var_ordered,
+                                       int num_reg_continuous,
+                                       int num_reg_unordered,
+                                       int num_reg_ordered,
+                                       int kernel_yu,
+                                       int kernel_xu,
+                                       int int_use_starting_values,
+                                       double init_continuous,
+                                       double nconfac, double ncatfac,
+                                       int *num_categories,
+                                       double *vector_continuous_stddev,
+                                       double *vector_scale_factor){
+  int i, l = 0;
 
-int initialize_nr_vector_scale_factor(
-int BANDWIDTH,
-int BANDWIDTH_den,
-int RANDOM,
-int seed,
-int REGRESSION_ML,
-int int_large,
-int num_obs,
-int num_var_continuous,
-int num_var_unordered,
-int num_var_ordered,
-int num_reg_continuous,
-int num_reg_unordered,
-int num_reg_ordered,
-double **matrix_Y_continuous,
-double **matrix_X_continuous,
-int int_use_starting_values,
-double init_continuous,
-int *num_categories,
-double *vector_continuous_stddev,
-double *vector_scale_factor)
-{
+  const int fixed_bw = (BANDWIDTH == BW_FIXED);
+  const double bw_nf = MAX(1.0,ceil(sqrt((double)num_obs)));
+  const double bw_cmin = fixed_bw ? 0.0 : 1.0;
+  const double bw_cmax = fixed_bw ? DBL_MAX : num_obs-1;
+  const int ncon = num_reg_continuous + num_var_continuous;
 
-/* In vector_scale_factor, order is continuous reg, continuous var, */
-/* unordered variables, ordered variables, unordered regressors, ordered regressors */
+  int_use_starting_values = int_use_starting_values && (!RANDOM);
 
-/* int_large == 0 is normalize, == 1 is raw */
+  for(i = 0; i < ncon; i++,l++){
+    const double bwi = fixed_bw ? init_continuous*(int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
-    int i;
-
-    double n_norm = pow((double)num_obs, 2.0/(4.0 + (double) (num_reg_continuous+num_var_continuous)));
-    double n_norm_1_inv = 1.0/pow((double)num_obs, (1.0/(4.0 + (double) (num_reg_continuous+num_var_continuous))));
-
-#ifndef MPI2
-
-    if(RANDOM == 0)
-    {
-
-/* Continuous Regressors */
-
-        for(i = 0; i < num_reg_continuous; i++)
-        {
-/* If not using starting values give standard initial values */
-            if(int_use_starting_values == 0)
-            {
-                if(BANDWIDTH == 0)
-                {
-                    if(int_large == 0)
-                    {
-/* sf and h different */
-                        vector_scale_factor[i+1] = init_continuous;
-                    }
-                    else
-                    {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-/* i.e. for h, sf and h the same when raw */
-                        vector_scale_factor[i+1] = init_continuous*vector_continuous_stddev[i]*n_norm_1_inv;
-                    }
-                }
-                else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                {
-/* Always use NN for any sample size */
-                    vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
-                }
-            }
-            else
-            {
-/* If using starting values check for admissible values */
-                if(BANDWIDTH == 0)
-                {
-                    if( (vector_scale_factor[i+1] <= 0.0) || (vector_scale_factor[i+1] > DBL_MAX))
-                    {
-                        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+1]);
-                        if(int_large == 0)
-                        {
-                            vector_scale_factor[i+1] = init_continuous;
-                        }
-                        else
-                        {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                            vector_scale_factor[i+1] = init_continuous*vector_continuous_stddev[i]*n_norm_1_inv;
-                        }
-                    }
-                    else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                    {
-/* Always use NN for any sample size */
-                        if( (np_fround(vector_scale_factor[i+1]) < 1) ||
-                            (np_fround(vector_scale_factor[i+1]) > (int) (num_obs-1) ))
-                        {
-                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+1]));
-                            vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
-                        }
-                    }
-                }
-            }
-
+    if(!int_use_starting_values){
+      vector_scale_factor[l+1] = bwi;
+      if(RANDOM){
+        if(fixed_bw){
+          vector_scale_factor[l+1] *= ran3(&seed);
+        } else {
+          vector_scale_factor[l+1] = ceil(sqrt(((double)num_obs)*ran3(&seed)+1.0));
         }
-
-/* Continuous Variables */
-
-        for(i = 0; i < num_var_continuous; i++)
-        {
-/* If not using starting values give standard initial values */
-            if(int_use_starting_values == 0)
-            {
-                if(BANDWIDTH == 0)
-                {
-                    if(int_large == 0)
-                    {
-/* sf and h different */
-                        vector_scale_factor[i+num_reg_continuous+1] = init_continuous;
-                    }
-                    else
-                    {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-/* i.e. for h, sf and h the same when raw */
-                        vector_scale_factor[i+num_reg_continuous+1] = init_continuous*vector_continuous_stddev[i+num_reg_continuous]*n_norm_1_inv;
-                    }
-                }
-                else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                {
-/* Always use NN for any sample size */
-                    vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
-                }
-            }
-            else
-            {
-/* If using starting values check for admissible values */
-                if(BANDWIDTH == 0)
-                {
-                    if( (vector_scale_factor[i+num_reg_continuous+1] <= 0.0) ||
-                        (vector_scale_factor[i+num_reg_continuous+1] > DBL_MAX))
-                    {
-                        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+1]);
-                        if(int_large == 0)
-                        {
-                            vector_scale_factor[i+num_reg_continuous+1] = init_continuous;
-                        }
-                        else
-                        {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                            vector_scale_factor[i+num_reg_continuous+1] = init_continuous*vector_continuous_stddev[i+num_reg_continuous]*n_norm_1_inv;
-                        }
-                    }
-                    else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                    {
-/* Always use NN for any sample size */
-                        if( (np_fround(vector_scale_factor[i+num_reg_continuous+1]) < 1) ||
-                            (np_fround(vector_scale_factor[i+num_reg_continuous+1]) > (int) (num_obs-1) ))
-                        {
-                            REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+num_reg_continuous+1]));
-                            vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
-                        }
-                    }
-                }
-            }
-        }
-
-/* Unordered categorical Variables */
-
-        for(i = 0; i < num_var_unordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = n_norm*(1.0-1.0/(double)num_categories[i])*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm) > (1.0 - 1.0/(double) num_categories[i])) ||
-                        ((vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm) < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1], vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm);
-                        vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] > (1.0 - 1.0/(double) num_categories[i])) ||
-                        (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]);
-                        vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
-                    }
-                }
-            }
-        }
-
-/* Ordered categorical Variables */
-
-        for(i = 0; i < num_var_ordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = n_norm*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm) > 1.0) ||
-                        ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm) < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm);
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] > 1.0) ||
-                        (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]);
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
-                    }
-                }
-            }
-        }
-
-/* Unordered categorical regressors */
-
-        for(i = 0; i < num_reg_unordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = n_norm*(1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm) > (1.0 - 1.0/(double) num_categories[i+num_var_unordered+num_var_ordered])) ||
-                        ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm) < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm);
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] > (1.0 - 1.0/(double) num_categories[i+num_var_unordered+num_var_ordered])) ||
-                        (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]);
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                    }
-                }
-            }
-        }
-
-/* Ordered categorical regressors */
-
-        for(i = 0; i < num_reg_ordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = n_norm*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm) > 1.0) ||
-                        ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm) < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm);
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] > 1.0) ||
-                        (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] < 0.0))
-                    {
-                        REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]);
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
-                    }
-                }
-            }
-        }
-
-/* Density SF for regression */
-/* Perhaps need to rescale these as well... */
-
-        if(REGRESSION_ML == 1)
-        {
-            if(BANDWIDTH_den == 0)
-            {
-
-                if(int_use_starting_values == 0)
-                {
-/* Normal rule of thumb for starting point */
-                    vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = init_continuous;
-                }
-                else
-                {
-/* Check for admissible value of density scale factor */
-                    if( (vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] <= 0.0) ||
-                        (vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] > DBL_MAX))
-                    {
-                        REprintf("\n** Warning: invalid sf for disturbance in init_nr_sf() [%g]\n", vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]);
-                        vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = init_continuous;
-                    }
-                }
-
-            }
-            else if((BANDWIDTH_den == 1)||(BANDWIDTH_den == 2))
-            {
-                if(int_use_starting_values == 0)
-                {
-                    vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
-                }
-                else
-                {
-                    if( (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
-                        (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
-                    {
-                        REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
-                        vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
-                    }
-                }
-
-            }
-
-        }
-
+      }
+    } else {
+      if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_cmax)){
+        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+        vector_scale_factor[l+1] = bwi;
+      }
     }
-    else
-    {
+  }
 
-/* Random */
+  for(i = 0; i < num_var_unordered; i++,l++){
+    const double bwi = (int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_yu);
 
-/* Continuous Regressors */
-
-        for(i = 0; i < num_reg_continuous; i++)
-        {
-            if(BANDWIDTH == 0)
-            {
-                if(int_large == 0)
-                {
-                    vector_scale_factor[i+1] = ran3(&seed)*init_continuous;
-                }
-                else
-                {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                    vector_scale_factor[i+1] = ran3(&seed)*init_continuous*vector_continuous_stddev[i]*n_norm_1_inv;
-                }
-            }
-            else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-            {
-/* Always use NN for any sample size */
-                vector_scale_factor[i+1] = sqrt(ran3(&seed)* (double) unique(num_obs, &matrix_X_continuous[i][0]));
-
-            }
-
-        }
-
-/* Continuous Variables */
-
-        for(i = 0; i < num_var_continuous; i++)
-        {
-            if(BANDWIDTH == 0)
-            {
-                if(int_large == 0)
-                {
-                    vector_scale_factor[i+num_reg_continuous+1] = ran3(&seed)*init_continuous;
-                }
-                else
-                {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                    vector_scale_factor[i+num_reg_continuous+1] = ran3(&seed)*init_continuous*vector_continuous_stddev[i+num_reg_continuous]*n_norm_1_inv;
-                }
-            }
-            else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-            {
-/* Always use NN for any sample size */
-                vector_scale_factor[i+num_reg_continuous+1] = sqrt(ran3(&seed)* (double) unique(num_obs, &matrix_Y_continuous[i][0]));
-            }
-
-        }
-
-/* Unordered categorical Variables */
-
-        for(i = 0; i < num_var_unordered; i++)
-        {
-
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = ran3(&seed)*n_norm*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = ran3(&seed)*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-        }
-
-/* Ordered categorical Variables */
-
-        for(i = 0; i < num_var_ordered; i++)
-        {
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = ran3(&seed)*n_norm*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_reg_continuous+num_var_continuous+num_reg_continuous+1] = ran3(&seed);
-            }
-        }
-
-/* Unordered categorical regressors */
-
-        for(i = 0; i < num_reg_unordered; i++)
-        {
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = ran3(&seed)*n_norm*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = ran3(&seed)*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-        }
-
-/* Ordered categorical regressors */
-
-        for(i = 0; i < num_reg_ordered; i++)
-        {
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = ran3(&seed)*n_norm*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = ran3(&seed);
-            }
-        }
-
-/* Density SF for regression */
-/* Perhaps need to rescale these as well... */
-
-        if(REGRESSION_ML == 1)
-        {
-            if(BANDWIDTH_den == 0)
-            {
-                vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = ran3(&seed)*init_continuous;
-            }
-            else if((BANDWIDTH_den == 1)||(BANDWIDTH_den == 2))
-            {
-                vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = (double) (ran3(&seed)*sqrt((double)num_obs));
-
-            }
-
-        }
-
+    if(!int_use_starting_values){
+      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+    } else {
+      if(!is_valid_unordered_bw(vector_scale_factor[l+1], num_categories[l-ncon], kernel_yu)){
+        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+        vector_scale_factor[l+1] = bwi;
+      }
     }
-#endif
+  }
 
-#ifdef MPI2
+  for(i = 0; i < num_var_ordered; i++,l++){
+    const double bwi = (int_large ? ncatfac : 1.0)* 0.5;
 
-    if(RANDOM == 0)
-    {
-
-/* Continuous Regressors */
-
-        for(i = 0; i < num_reg_continuous; i++)
-        {
-/* If not using starting values give standard initial values */
-            if(int_use_starting_values == 0)
-            {
-                if(BANDWIDTH == 0)
-                {
-                    if(int_large == 0)
-                    {
-/* sf and h different */
-                        vector_scale_factor[i+1] = init_continuous;
-                    }
-                    else
-                    {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-/* i.e. for h, sf and h the same when raw */
-                        vector_scale_factor[i+1] = init_continuous*vector_continuous_stddev[i]*n_norm_1_inv;
-                    }
-                }
-                else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                {
-/* Always use NN for any sample size */
-                    vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
-                }
-            }
-            else
-            {
-/* If using starting values check for admissible values */
-                if(BANDWIDTH == 0)
-                {
-                    if( (vector_scale_factor[i+1] <= 0.0) || (vector_scale_factor[i+1] > DBL_MAX))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+1]);
-                        }
-                        if(int_large == 0)
-                        {
-                            vector_scale_factor[i+1] = init_continuous;
-                        }
-                        else
-                        {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                            vector_scale_factor[i+1] = init_continuous*vector_continuous_stddev[i]*n_norm_1_inv;
-                        }
-                    }
-                    else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                    {
-/* Always use NN for any sample size */
-                        if( (np_fround(vector_scale_factor[i+1]) < 1) ||
-                            (np_fround(vector_scale_factor[i+1]) > (int) (num_obs-1) ))
-                        {
-                            if(my_rank == 0)
-                            {
-                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+1]));
-                            }
-                            vector_scale_factor[i+1] = sqrt((double) unique(num_obs, &matrix_X_continuous[i][0]));
-                        }
-                    }
-                }
-            }
-
-        }
-
-/* Continuous Variables */
-
-        for(i = 0; i < num_var_continuous; i++)
-        {
-/* If not using starting values give standard initial values */
-            if(int_use_starting_values == 0)
-            {
-                if(BANDWIDTH == 0)
-                {
-                    if(int_large == 0)
-                    {
-/* sf and h different */
-                        vector_scale_factor[i+num_reg_continuous+1] = init_continuous;
-                    }
-                    else
-                    {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-/* i.e. for h, sf and h the same when raw */
-                        vector_scale_factor[i+num_reg_continuous+1] = init_continuous*vector_continuous_stddev[i+num_reg_continuous]*n_norm_1_inv;
-                    }
-                }
-                else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                {
-/* Always use NN for any sample size */
-                    vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
-                }
-            }
-            else
-            {
-/* If using starting values check for admissible values */
-                if(BANDWIDTH == 0)
-                {
-                    if( (vector_scale_factor[i+num_reg_continuous+1] <= 0.0) ||
-                        (vector_scale_factor[i+num_reg_continuous+1] > DBL_MAX))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+1]);
-                        }
-
-                        if(int_large == 0)
-                        {
-                            vector_scale_factor[i+num_reg_continuous+1] = init_continuous;
-                        }
-                        else
-                        {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                            vector_scale_factor[i+num_reg_continuous+1] = init_continuous*vector_continuous_stddev[i+num_reg_continuous]*n_norm_1_inv;
-                        }
-                    }
-                    else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-                    {
-/* Always use NN for any sample size */
-                        if( (np_fround(vector_scale_factor[i+num_reg_continuous+1]) < 1) ||
-                            (np_fround(vector_scale_factor[i+num_reg_continuous+1]) > (int) (num_obs-1) ))
-                        {
-                            if(my_rank == 0)
-                            {
-                                REprintf("\n** Warning: invalid int in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[i+num_reg_continuous+1]));
-                            }
-
-                            vector_scale_factor[i+num_reg_continuous+1] = sqrt((double) unique(num_obs, &matrix_Y_continuous[i][0]));
-                        }
-                    }
-                }
-            }
-        }
-
-/* Unordered categorical Variables */
-
-        for(i = 0; i < num_var_unordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = n_norm*(1.0-1.0/(double)num_categories[i])*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm) > (1.0 - 1.0/(double) num_categories[i])) ||
-                        ((vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm) < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_reg_continuous+1], vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]/n_norm);
-                        }
-
-                        vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] > (1.0 - 1.0/(double) num_categories[i])) ||
-                        (vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_reg_continuous+num_var_continuous+1]);
-                        }
-
-                        vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = (1.0-1.0/(double)num_categories[i])*0.5;
-                    }
-                }
-            }
-        }
-
-/* Ordered categorical Variables */
-
-        for(i = 0; i < num_var_ordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = n_norm*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm) > 1.0) ||
-                        ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm) < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]/n_norm);
-                        }
-
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] > 1.0) ||
-                        (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1]);
-                        }
-
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = 0.5;
-                    }
-                }
-            }
-        }
-
-/* Unordered categorical regressors */
-
-        for(i = 0; i < num_reg_unordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = n_norm*(1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm) > (1.0 - 1.0/(double) num_categories[i+num_var_unordered+num_var_ordered])) ||
-                        ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm) < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]/n_norm);
-                        }
-
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] > (1.0 - 1.0/(double) num_categories[i+num_var_unordered+num_var_ordered])) ||
-                        (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1]);
-                        }
-
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = (1.0-1.0/(double)num_categories[i+num_var_unordered+num_var_ordered])*0.5;
-                    }
-                }
-            }
-        }
-
-/* Ordered categorical regressors */
-
-        for(i = 0; i < num_reg_ordered; i++)
-        {
-            if(int_use_starting_values == 0)
-            {
-                if(int_large == 0)
-                {
-/* lambda and sf different */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = n_norm*0.5;
-                }
-                else
-                {
-/* lambda and sf same */
-                    vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
-                }
-            }
-            else
-            {
-/* Check for admissible value of lambda - in inadmissible, set to admissible */
-                if(int_large == 0)
-                {
-                    if( ( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm) > 1.0) ||
-                        ((vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm) < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g (%g)]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1], vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]/n_norm);
-                        }
-
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
-                    }
-                }
-                else
-                {
-                    if( (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] > 1.0) ||
-                        (vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] < 0.0))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid lambda in init_nr_sf() [%g]\n", vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1]);
-                        }
-
-                        vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = 0.5;
-                    }
-                }
-            }
-        }
-
-/* Density SF for regression */
-/* Perhaps need to rescale these as well... */
-
-        if(REGRESSION_ML == 1)
-        {
-            if(BANDWIDTH_den == 0)
-            {
-
-                if(int_use_starting_values == 0)
-                {
-/* Normal rule of thumb for starting point */
-                    vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = init_continuous;
-                }
-                else
-                {
-/* Check for admissible value of density scale factor */
-                    if( (vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] <= 0.0) ||
-                        (vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] > DBL_MAX))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid sf for disturbance in init_nr_sf() [%g]\n", vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]);
-                        }
-
-                        vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = init_continuous;
-                    }
-                }
-
-            }
-            else if((BANDWIDTH_den == 1)||(BANDWIDTH_den == 2))
-            {
-                if(int_use_starting_values == 0)
-                {
-                    vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
-                }
-                else
-                {
-                    if( (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) < 1) ||
-                        (np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]) > (int) (num_obs-1) ))
-                    {
-                        if(my_rank == 0)
-                        {
-                            REprintf("\n** Warning: invalid int for disturbance in init_nr_sf() [%d]\n", np_fround(vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1]));
-                        }
-
-                        vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = sqrt((double) num_obs);
-                    }
-                }
-
-            }
-
-        }
-
+    if(!int_use_starting_values){
+      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+    } else {
+      if((vector_scale_factor[l+1] < 0.0) || (vector_scale_factor[l+1] > 1.0)){
+        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+        vector_scale_factor[l+1] = bwi;
+      }
     }
-    else
-    {
+  }
 
-/* Random */
+  for(i = 0; i < num_reg_unordered; i++,l++){
+    const double bwi = (int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_xu);
 
-/* Continuous Regressors */
-
-        for(i = 0; i < num_reg_continuous; i++)
-        {
-            if(BANDWIDTH == 0)
-            {
-                if(int_large == 0)
-                {
-                    vector_scale_factor[i+1] = ran3(&seed)*init_continuous;
-                }
-                else
-                {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                    vector_scale_factor[i+1] = ran3(&seed)*init_continuous*vector_continuous_stddev[i]*n_norm_1_inv;
-                }
-            }
-            else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-            {
-/* Always use NN for any sample size */
-                vector_scale_factor[i+1] = sqrt(ran3(&seed)* (double) unique(num_obs, &matrix_X_continuous[i][0]));
-            }
-
-        }
-
-/* Continuous Variables */
-
-        for(i = 0; i < num_var_continuous; i++)
-        {
-            if(BANDWIDTH == 0)
-            {
-                if(int_large == 0)
-                {
-                    vector_scale_factor[i+num_reg_continuous+1] = ran3(&seed)*init_continuous;
-                }
-                else
-                {
-/* Raw need to be rescaled for sigma and n to avoid too small (large) a value */
-                    vector_scale_factor[i+num_reg_continuous+1] = ran3(&seed)*init_continuous*vector_continuous_stddev[i+num_reg_continuous]*n_norm_1_inv;
-                }
-            }
-            else if((BANDWIDTH == 1)||(BANDWIDTH == 2))
-            {
-/* Always use NN for any sample size */
-                vector_scale_factor[i+num_reg_continuous+1] = sqrt(ran3(&seed)* (double) unique(num_obs, &matrix_Y_continuous[i][0]));
-            }
-
-        }
-
-/* Unordered categorical Variables */
-
-        for(i = 0; i < num_var_unordered; i++)
-        {
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = ran3(&seed)*n_norm*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_reg_continuous+num_var_continuous+1] = ran3(&seed)*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-        }
-
-/* Ordered categorical Variables */
-
-        for(i = 0; i < num_var_ordered; i++)
-        {
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+1] = ran3(&seed)*n_norm*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_reg_continuous+1] = ran3(&seed);
-            }
-        }
-
-/* Unordered categorical regressors */
-
-        for(i = 0; i < num_reg_unordered; i++)
-        {
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = ran3(&seed)*n_norm*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+1] = ran3(&seed)*(1.0-1.0/(double)num_categories[i])*0.5;
-            }
-        }
-
-/* Ordered categorical regressors */
-
-        for(i = 0; i < num_reg_ordered; i++)
-        {
-            if(int_large == 0)
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = ran3(&seed)*n_norm*0.5;
-            }
-            else
-            {
-                vector_scale_factor[i+num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+1] = ran3(&seed);
-            }
-        }
-
-/* Density SF for regression */
-/* Perhaps need to rescale these as well... */
-
-        if(REGRESSION_ML == 1)
-        {
-            if(BANDWIDTH_den == 0)
-            {
-                vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = ran3(&seed)*init_continuous;
-            }
-            else if((BANDWIDTH_den == 1)||(BANDWIDTH_den == 2))
-            {
-                vector_scale_factor[num_var_continuous+num_reg_continuous+num_var_unordered+num_var_ordered+num_reg_unordered+num_reg_ordered+1] = (double) (ran3(&seed)*sqrt((double)num_obs));
-            }
-
-        }
-
+    if(!int_use_starting_values){
+      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+    } else {
+      if(!is_valid_unordered_bw(vector_scale_factor[l+1], num_categories[l-ncon], kernel_xu)){
+        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+        vector_scale_factor[l+1] = bwi;
+      }
     }
-#endif
+  }
 
-    return(0);
+  for(i = 0; i < num_reg_ordered; i++,l++){
+    const double bwi = (int_large ? ncatfac : 1.0)* 0.5;
 
+    if(!int_use_starting_values){
+      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+    } else {
+      if((vector_scale_factor[l+1] < 0.0) || (vector_scale_factor[l+1] > 1.0)){
+        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+        vector_scale_factor[l+1] = bwi;
+      }
+    }
+  }
 }
-
-
 
 double fGoodness_of_Fit(int iNum_Obs, double *fvector_Y, double *fkernel_fit)
 {

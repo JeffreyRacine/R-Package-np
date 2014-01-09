@@ -221,6 +221,8 @@ npreg.rbandwidth <-
       econ = data.frame()
     }
 
+    nconfac <- tnrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
+    ncatfac <- tnrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
     
     myopti = list(
       num_obs_train = tnrow,
@@ -261,6 +263,7 @@ npreg.rbandwidth <-
          as.double(euno),  as.double(eord),  as.double(econ), as.double(eydat),
          as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+         as.double(nconfac), as.double(ncatfac),
          as.integer(myopti),
          mean = double(enrow),
          merr = double(enrow),

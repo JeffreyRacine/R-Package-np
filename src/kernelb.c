@@ -25,6 +25,10 @@ extern  MPI_Status status;
 #endif
 
 extern int int_LARGE_SF;
+extern double nconfac_extern;
+extern double ncatfac_extern;
+extern double * vector_continuous_stddev_extern;
+
 /*
 int int_DEBUG;
 int int_VERBOSE;
@@ -575,7 +579,8 @@ fact constant. */
 		for(i=0; i < num_reg_cont; i++)
 		{
 
-			vec_sdev_x[i] = standerrd(num_obs_train, matrix_X_train[i]);
+			//vec_sdev_x[i] = standerrd(num_obs_train, matrix_X_train[i]);
+      vec_sdev_x[i] = vector_continuous_stddev_extern[i];
 
 			if(vec_sdev_x[i] <= DBL_MIN)
 			{
@@ -591,7 +596,8 @@ fact constant. */
 		for(i=0; i < num_var_cont; i++)
 		{
 
-			vec_sdev_y[i] = standerrd(num_obs_train, matrix_Y_train[i]);
+			//vec_sdev_y[i] = standerrd(num_obs_train, matrix_Y_train[i]);
+      vec_sdev_y[i] = vector_continuous_stddev_extern[i+num_reg_cont];
 
 			if(vec_sdev_y[i] <= DBL_MIN)
 			{
@@ -639,94 +645,8 @@ fact constant. */
 #endif
 
 /* Set appropriate constants for scaling factor */
-
-	switch(KERNEL)
-	{
-
-		case 0:
-
-/* Gaussian Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(4.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 1:
-
-/* Fourth Order Gaussian Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(8.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 2:
-
-/* Sixth Order Gaussian Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(12.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 3:
-
-/* Eighth Order Gaussian Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(16.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 4:
-
-/* Second Order Epanechnikov Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(4.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 5:
-
-/* Fourth Order Epanechnikov Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(8.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 6:
-
-/* Sixth Order Epanechnikov Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(12.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 7:
-
-/* Eighth Order Epanechnikov Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(16.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 8:
-
-/* Rectangular kernel - using second order Epanechnikov for now */
-
-/* Second Order Epanechnikov Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(4.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-		case 9:
-
-/* COPIED FROM Gaussian Kernel */
-
-			temp_pow = 1.0/pow((double)num_obs_train, (1.0/(4.0 + (double) num_reg_cont + num_var_cont)));
-
-			break;
-
-
-	}
+  temp_pow = nconfac_extern;
+	
 
 	if(BANDWIDTH == 0)
 	{
@@ -876,7 +796,7 @@ fact constant. */
 /* In vector_scale_factor, order is continuous reg, continuous var, */
 /* unordered variables, ordered variables, unordered regressors, ordered regressors */
 
-	temp_inv = ipow(temp_pow, 2);
+	temp_inv = ncatfac_extern;
 
 /* Unordered categorical variables */
 

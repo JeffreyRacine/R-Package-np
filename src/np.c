@@ -178,6 +178,11 @@ KDT * kdt_extern_X = NULL;
 KDT * kdt_extern_Y = NULL;
 KDT * kdt_extern_XY = NULL;
 
+// to facilitate bandwidth->scale-factor conversions
+ double * vector_continuous_stddev_extern = NULL;
+double nconfac_extern = 0.0;
+double ncatfac_extern = 0.0;
+
 extern int iff;
 
 double np_tgauss2_b = 3.0, np_tgauss2_alpha = 1.030174731161562;
@@ -245,7 +250,7 @@ void np_mpi_init(int * mpi_status){
 
 
 void np_density_bw(double * myuno, double * myord, double * mycon, 
-                   int * myopti, double * myoptd, double * myans, double * fval){
+                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -301,6 +306,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   hbc=myoptd[BW_HBCD];
   cfac=myoptd[BW_CD];
 
+  nconfac_extern = myoptd[BW_NCONFD];
+  ncatfac_extern = myoptd[BW_NCATFD];
+
 /* Allocate memory for objects */
 
   matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
@@ -315,6 +323,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   matrix_categorical_vals_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
+  
   if (int_use_starting_values)
     for( i=0;i<num_var; i++ )
       vector_scale_factor[i+1] = myans[i];
@@ -383,57 +392,49 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
 
-  compute_continuous_stddev(
-                            int_LARGE_SF,
-                            num_obs_train_extern,
-                            0,
-                            num_reg_continuous_extern,
-                            matrix_Y_continuous_train_extern,
-                            matrix_X_continuous_train_extern,
-                            vector_continuous_stddev);
+  for (j = 0; j < num_reg_continuous_extern; j++)
+    vector_continuous_stddev[j] = mysd[j];
+
+  vector_continuous_stddev_extern = vector_continuous_stddev;
 
   /* Initialize scale factors and Hessian for NR modules */
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
-                                    0,
+                                    0, 
                                     0,
                                     0,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    0, 
+                                    KERNEL_den_unordered_extern,                                    
                                     int_use_starting_values,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
-                                    0,
+                                    0, 
                                     0,
                                     0,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    0, 
+                                    KERNEL_den_unordered_extern,                                    
                                     0,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vsfh);
@@ -542,27 +543,26 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
       /* Initialize scale factors and directions for NR modules */
 
-      initialize_nr_vector_scale_factor(
-                                        BANDWIDTH_den_extern,
-                                        BANDWIDTH_den_extern,
-                                        1,        /* Not Random (0) Random (1) */
+      initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+                                        1,                /* Not Random (0) Random (1) */
                                         int_RANDOM_SEED,
-                                        0,        /* regression (0) regression ml (1) */
                                         int_LARGE_SF,
                                         num_obs_train_extern,
-                                        0,
+                                        0, 
                                         0,
                                         0,
                                         num_reg_continuous_extern,
                                         num_reg_unordered_extern,
                                         num_reg_ordered_extern,
-                                        matrix_Y_continuous_train_extern,
-                                        matrix_X_continuous_train_extern,
-                                        int_use_starting_values,
-                                        pow((double)4.0/(double)3.0,0.2),     /* Init for continuous vars */
+                                        0, 
+                                        KERNEL_den_unordered_extern,                                    
+                                        0,
+                                        pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                        nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
+
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
@@ -753,6 +753,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   hbc=myoptd[DBW_HBCD];
   cfac=myoptd[DBW_CD];
 
+  nconfac_extern = myoptd[DBW_NCONFD];
+  ncatfac_extern = myoptd[DBW_NCATFD];
+
 /* Allocate memory for objects */
 
   matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
@@ -902,12 +905,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   /* Initialize scale factors and Directions for NR modules */
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     0,
@@ -916,20 +916,18 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    0,
+                                    KERNEL_den_unordered_extern,
                                     int_use_starting_values,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     0,
@@ -938,10 +936,11 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    0,
+                                    KERNEL_den_unordered_extern,
                                     0,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vsfh);
@@ -1038,12 +1037,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
       /* Initialize scale factors and directions for NR modules */
 
-      initialize_nr_vector_scale_factor(
-                                        BANDWIDTH_den_extern,
-                                        BANDWIDTH_den_extern,
+      initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                         1,        /* Not Random (0) Random (1) */
                                         int_RANDOM_SEED,
-                                        0,        /* regression (0) regression ml (1) */
                                         int_LARGE_SF,
                                         num_obs_train_extern,
                                         0,
@@ -1052,10 +1048,11 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                         num_reg_continuous_extern,
                                         num_reg_unordered_extern,
                                         num_reg_ordered_extern,
-                                        matrix_Y_continuous_train_extern,
-                                        matrix_X_continuous_train_extern,
-                                        int_use_starting_values,
+                                        0,
+                                        KERNEL_den_unordered_extern,
+                                        0,
                                         pow((double)4.0/(double)3.0,0.2),     /* Init for continuous vars */
+                                        nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
@@ -1264,6 +1261,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   hbc=myoptd[CBW_HBCD];
   cfac=myoptd[CBW_CD];
 
+  nconfac_extern = myoptd[CBW_NCONFD];
+  ncatfac_extern = myoptd[CBW_NCATFD];
 
 /* Allocate memory for objects */
 
@@ -1567,12 +1566,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   /* Initialize scale factors and Directions for NR modules */
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     num_var_continuous_extern,
@@ -1581,20 +1577,18 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    KERNEL_den_unordered_extern,
+                                    KERNEL_reg_unordered_extern,
                                     int_use_starting_values,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     num_var_continuous_extern,
@@ -1603,10 +1597,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    KERNEL_den_unordered_extern,
+                                    KERNEL_reg_unordered_extern,
                                     0,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vsfh);
@@ -1717,12 +1712,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
 
       /* Initialize scale factors and directions for NR modules */
-      initialize_nr_vector_scale_factor(
-                                        BANDWIDTH_den_extern,
-                                        BANDWIDTH_den_extern,
+      initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                         1,                /* Not Random (0) Random (1) */
                                         int_RANDOM_SEED,
-                                        0,                /* regression (0) regression ml (1) */
                                         int_LARGE_SF,
                                         num_obs_train_extern,
                                         num_var_continuous_extern,
@@ -1731,10 +1723,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                         num_reg_continuous_extern,
                                         num_reg_unordered_extern,
                                         num_reg_ordered_extern,
-                                        matrix_Y_continuous_train_extern,
-                                        matrix_X_continuous_train_extern,
-                                        int_use_starting_values,
+                                        KERNEL_den_unordered_extern,
+                                        KERNEL_reg_unordered_extern,
+                                        0,
                                         pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                        nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
@@ -1974,6 +1967,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   hbc=myoptd[CDBW_HBCD];
   cfac=myoptd[CDBW_CD];
 
+  nconfac_extern = myoptd[CDBW_NCONFD];
+  ncatfac_extern = myoptd[CDBW_NCATFD];
 
 /* Allocate memory for objects */
 
@@ -2282,12 +2277,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   /* Initialize scale factors and Directions for NR modules */
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     num_var_continuous_extern,
@@ -2296,20 +2288,18 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    KERNEL_den_unordered_extern,
+                                    KERNEL_reg_unordered_extern,
                                     int_use_starting_values,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_den_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     num_var_continuous_extern,
@@ -2318,10 +2308,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    KERNEL_den_unordered_extern,
+                                    KERNEL_reg_unordered_extern,
                                     0,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vsfh);
@@ -2419,12 +2410,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     for(imsnum = iMs_counter = 1; iMs_counter < iNum_Multistart; imsnum++,iMs_counter++){
 
       /* Initialize scale factors and directions for NR modules */
-      initialize_nr_vector_scale_factor(
-                                        BANDWIDTH_den_extern,
-                                        BANDWIDTH_den_extern,
+      initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                         1,                /* Not Random (0) Random (1) */
                                         int_RANDOM_SEED,
-                                        0,                /* regression (0) regression ml (1) */
                                         int_LARGE_SF,
                                         num_obs_train_extern,
                                         num_var_continuous_extern,
@@ -2433,10 +2421,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                         num_reg_continuous_extern,
                                         num_reg_unordered_extern,
                                         num_reg_ordered_extern,
-                                        matrix_Y_continuous_train_extern,
-                                        matrix_X_continuous_train_extern,
-                                        int_use_starting_values,
+                                        KERNEL_den_unordered_extern,
+                                        KERNEL_reg_unordered_extern,
+                                        0,
                                         pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                        nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
@@ -2611,6 +2600,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             double * mybw, 
                             double * ymcv, double * ypadnum,
                             double * xmcv, double * xpadnum,
+                            double * nconfac, double * ncatfac,
                             int * myopti, 
                             double * cdens, double * cderr, 
                             double * cg, double * cgerr,
@@ -2670,6 +2660,9 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
   ypad_num = *ypadnum;
   xpad_num = *xpadnum;
+
+  nconfac_extern = *nconfac;
+  ncatfac_extern = *ncatfac;
 
   dens_or_dist = myopti[CD_DODENI];
 
@@ -3116,12 +3109,14 @@ void np_density(double * tuno, double * tord, double * tcon,
                 double * euno, double * eord, double * econ, 
                 double * dbw, 
                 double * mcv, double * padnum, 
+                double * nconfac, double * ncatfac, double * mysd,
                 int * myopti, double * mydens, double * myderr, double * ll){
 
 
   double small = 1.0e-16;
   double * vector_scale_factor, * pdf, * pdf_stderr, log_likelihood = 0.0;
   double pad_num;
+  double *vector_continuous_stddev;
 
   int itmax = 10000;
   int i,j;
@@ -3153,6 +3148,9 @@ void np_density(double * tuno, double * tord, double * tcon,
 
   max_lev = myopti[DEN_MLEVI];
   pad_num = *padnum;
+
+  nconfac_extern = *nconfac;
+  ncatfac_extern = *ncatfac;
 
   dens_or_dist = myopti[DEN_DODENI];
   old_dens = myopti[DEN_OLDI];
@@ -3187,8 +3185,14 @@ void np_density(double * tuno, double * tord, double * tcon,
   /* note use of num_obs_eval_alloc */
   pdf = alloc_vecd(num_obs_eval_alloc);
   pdf_stderr = alloc_vecd(num_obs_eval_alloc);
-
   
+  vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
+
+  for (j = 0; j < num_reg_continuous_extern; j++)
+    vector_continuous_stddev[j] = mysd[j];
+
+  vector_continuous_stddev_extern = vector_continuous_stddev;
+
   /* Parse data */
 	
   /* train */
@@ -3402,6 +3406,7 @@ void np_density(double * tuno, double * tord, double * tcon,
     free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
   }
 
+  safe_free(vector_continuous_stddev);
   safe_free(vector_scale_factor);
   safe_free(num_categories_extern);
   safe_free(pdf_stderr);
@@ -3482,6 +3487,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   lbc=myoptd[RBW_LBCD];
   hbc=myoptd[RBW_HBCD];
   cfac=myoptd[RBW_CD];
+
+  nconfac_extern = myoptd[RBW_NCONFD];
+  ncatfac_extern = myoptd[RBW_NCATFD];
 
   imsnum = 0;
   imstot = iNum_Multistart;
@@ -3592,12 +3600,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   /* Initialize scale factors and Directions for NR modules */
 
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_reg_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     0,
@@ -3606,21 +3611,18 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    0,
+                                    KERNEL_reg_unordered_extern,
                                     int_use_starting_values,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vector_scale_factor);
 
-  // this is for vsfh which is used to initialize the directions...
-  initialize_nr_vector_scale_factor(
-                                    BANDWIDTH_reg_extern,
-                                    BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
-                                    0,                /* regression (0) regression ml (1) */
                                     int_LARGE_SF,
                                     num_obs_train_extern,
                                     0,
@@ -3629,14 +3631,14 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     num_reg_continuous_extern,
                                     num_reg_unordered_extern,
                                     num_reg_ordered_extern,
-                                    matrix_Y_continuous_train_extern,
-                                    matrix_X_continuous_train_extern,
+                                    0,
+                                    KERNEL_reg_unordered_extern,
                                     0,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
+                                    nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
                                     vsfh);
-
 
   initialize_nr_directions(num_reg_continuous_extern,
                         num_reg_unordered_extern,
@@ -3730,11 +3732,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
       /* Initialize scale factors and directions for NR modules */
 				
-      initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
-                                        BANDWIDTH_den_extern,
+      initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                         1,        /* Not Random (0) Random (1) */
                                         int_RANDOM_SEED,
-                                        0,        /* regression (0) regression ml (1) */
                                         int_LARGE_SF,
                                         num_obs_train_extern,
                                         0,
@@ -3743,10 +3743,11 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                         num_reg_continuous_extern,
                                         num_reg_unordered_extern,
                                         num_reg_ordered_extern,
-                                        matrix_Y_continuous_train_extern,
-                                        matrix_X_continuous_train_extern,
+                                        0,
+                                        KERNEL_reg_unordered_extern,
                                         int_use_starting_values,
                                         pow((double)4.0/(double)3.0,0.2),     /* Init for continuous vars */
+                                        nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
                                         vector_scale_factor);
@@ -3882,6 +3883,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * euno, double * eord, double * econ, double * ey,
                    double * rbw, 
                    double * mcv, double * padnum, 
+                   double * nconfac, double * ncatfac,
                    int * myopti, 
                    double * cm, double * cmerr, double * g, double *gerr, 
                    double * xtra){
@@ -3926,6 +3928,9 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   max_lev = myopti[REG_MLEVI];
   pad_num = *padnum;
+
+  nconfac_extern = *nconfac;
+  ncatfac_extern = *ncatfac;
 
   int_TREE_X = myopti[REG_DOTREEI];
   old_reg = myopti[REG_OLDREGI];
@@ -4377,6 +4382,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   do_score = myopti[KWS_PSCOREI];
   do_ocg = myopti[KWS_POCGI];
 
+  nconfac_extern = ncatfac_extern = 0.0;
+
   no_y = (ncol_Y == 0);
   no_weights = (ncol_W == 0);
 
@@ -4814,6 +4821,9 @@ void np_quantile_conditional(double * tc_con,
   ftol = myoptd[CQ_FTOLD];
   tol = myoptd[CQ_TOLD];
   small = myoptd[CQ_SMALLD];
+
+  nconfac_extern = myoptd[CQ_NCONFD];
+  ncatfac_extern = myoptd[CQ_NCATFD];
 
   gamma_extern = *quantile;
 

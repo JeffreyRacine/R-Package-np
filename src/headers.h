@@ -181,7 +181,7 @@ int pgplot_xy_errorbars(int int_GENERATE, char *output, int num_obs, int num_var
 
 int compute_continuous_stddev(int int_LARGE, int num_obs, int num_var_continuous, int num_reg_continuous, double **matrix_Y_continuous, double **matrix_X_continuous, double *vector_continuous_stddev);
 
-int initialize_nr_vector_scale_factor(int BANDWIDTH, int BANDWIDTH_den, int RANDOM, int seed, int REGRESSION_ML, int int_large, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, double **matrix_Y_continuous, double **matrix_X_continuous, int int_use_starting_values, double init_continuous, int *num_categories, double *vector_continuous_stddev, double *vector_scale_factor);
+void initialize_nr_vector_scale_factor(int BANDWIDTH, int RANDOM, int seed, int int_large, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int kernel_yu, int kernel_xu, int int_use_starting_values, double init_continuous, double nconfac, double ncatfac, int *num_categories, double *vector_continuous_stddev, double *vector_scale_factor);
 
 int kernel_weights_conditional_convolution_cv(int int_WEIGHTS, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_Y_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *lambda, double **matrix_bandwidth_var, double **matrix_bandwidth_reg, int *num_categories, double **matrix_categorical_vals, double **matrix_weights_K_x, double **matrix_weights_K_xy, double **matrix_weights_K_convol_y);
 
@@ -236,6 +236,12 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv(int KERNEL_va
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 
 void np_kernelxy(const int kernel_var_continuous, const int kernel_var_unordered, const int kernel_var_ordered, const int kernel_reg_continuous, const int kernel_reg_unordered, const int kernel_reg_ordered, const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, double * kernel_cx, double * kernel_ux, double * kernel_ox, double * kernel_cy, double * kernel_uy, double * kernel_oy, double * kernel_cxy, double * kernel_uxy, double * kernel_oxy);
+
+int is_valid_unordered_bw(double lambda,
+                          int num_categories,
+                          int kernel);
+double max_unordered_bw(int num_categories,
+                        int kernel);
 
 // some general np and R-c interface related defines
 #define safe_free(x) if((x) != NULL) free((x))
@@ -331,6 +337,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define RBW_LBCD   3
 #define RBW_HBCD   4
 #define RBW_CD     5
+#define RBW_NCONFD   6
+#define RBW_NCATFD   7
 
 #define MPI_RANKI 0
 #define MPI_NUMPI 1
@@ -360,6 +368,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define BW_LBCD   3
 #define BW_HBCD   4
 #define BW_CD     5
+#define BW_NCONFD     6
+#define BW_NCATFD     7
 
 // distribution defines
 #define DBW_NOBSI   0
@@ -389,6 +399,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define DBW_LBCD   3
 #define DBW_HBCD   4
 #define DBW_CD     5
+#define DBW_NCONFD     6
+#define DBW_NCATFD     7
 
 
 #define CBW_NOBSI   0
@@ -424,6 +436,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CBW_LBCD   4
 #define CBW_HBCD   5
 #define CBW_CD     6
+#define CBW_NCONFD     7
+#define CBW_NCATFD     8
 
 
 #define CBWM_CVML 0
@@ -467,6 +481,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CDBW_LBCD   4
 #define CDBW_HBCD   5
 #define CDBW_CD     6
+#define CDBW_NCONFD     7
+#define CDBW_NCATFD     8
 
 #define CDBWM_CVLS 0
 
@@ -579,6 +595,9 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CQ_FTOLD  0
 #define CQ_TOLD   1
 #define CQ_SMALLD 2
+#define CQ_NCONFD 3
+#define CQ_NCATFD 4
+
 
 #define TG2_B     0
 #define TG2_ALPHA 1
@@ -594,4 +613,8 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define KWSNP_ERR_NOEVAL 1
 #define KWSNP_ERR_BADBW 2
 #define KWSNP_ERR_BADINVOC 3
+
+#define UKERNEL_UAA 0
+#define UKERNEL_ULIR 1
+
 #endif // _NP__

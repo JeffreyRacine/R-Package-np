@@ -155,7 +155,10 @@ npqreg.condbandwidth <-
       excon = data.frame()
       exord = data.frame()
     }
-    
+
+    nconfac <- tnrow^(-1.0/(2.0*bws$cxkerorder+bws$ncon))
+    ncatfac <- tnrow^(-2.0/(2.0*bws$cxkerorder+bws$ncon))
+
     myopti = list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
@@ -216,6 +219,7 @@ npqreg.condbandwidth <-
                      bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
                      bws$xbw[bws$ixuno],bws$xbw[bws$ixord])),
          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+         as.double(nconfac), as.double(ncatfac),
          as.integer(myopti),
          as.double(myoptd),
          yq = double(enrow),

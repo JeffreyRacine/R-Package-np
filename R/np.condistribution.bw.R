@@ -195,6 +195,10 @@ npcdistbw.condbandwidth <-
       }
 
     }
+
+    nconfac <- nrow^(-1.0/(2.0*bws$cxkerorder+bws$ncon))
+    ncatfac <- nrow^(-2.0/(2.0*bws$cxkerorder+bws$ncon))
+
     if (bandwidth.compute){
       myopti = list(num_obs_train = nrow,
         num_obs_grid = nog,
@@ -262,7 +266,7 @@ npcdistbw.condbandwidth <-
           nbw[1:bws$xncon] <- 1.06
           nbw[(bws$xncon+1):gbw] <- 1.587
           if(!bws$scaling)
-            nbw[1:gbw]=nbw[1:gbw]*EssDee(data.frame(xcon,ycon))*nrow^(-1.0/(2.0*bws$cxkerorder+gbw))
+            nbw[1:gbw]=nbw[1:gbw]*EssDee(data.frame(xcon,ycon))*nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
       }
@@ -307,7 +311,7 @@ npcdistbw.condbandwidth <-
     myf <- if(tbw$scaling) bwf else sff
     
     if ((tbw$xnuno+tbw$ynuno) > 0){
-      dfactor <- nrow^(-2.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- ncatfac
       dfactor <- list(x = dfactor, y = dfactor)
 
       tl <- list(x = tbw$xdati$iuno, y = tbw$ydati$iuno)
@@ -316,7 +320,7 @@ npcdistbw.condbandwidth <-
     }
 
     if ((tbw$xnord+tbw$ynord) > 0){
-      dfactor <- nrow^(-2.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- ncatfac
       dfactor <- list(x = dfactor, y = dfactor)
 
       tl <- list(x = tbw$xdati$iord, y = tbw$ydati$iord)
@@ -326,7 +330,7 @@ npcdistbw.condbandwidth <-
 
       
     if (tbw$ncon > 0){
-      dfactor <- nrow^(-1.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- nconfac
       dfactor <- list(x = EssDee(xcon)*dfactor, y = EssDee(ycon)*dfactor)
 
       tl <- list(x = tbw$xdati$icon, y = tbw$ydati$icon)
