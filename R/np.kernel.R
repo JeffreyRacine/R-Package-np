@@ -292,7 +292,7 @@ npksum.default <-
          as.double(tuno), as.double(tord), as.double(tcon),
          as.double(tydat), as.double(weights),
          as.double(euno),  as.double(eord),  as.double(econ), 
-         as.double(c(bws$bandwidth[bws$icon],bws$bandwidth[bws$iuno],bws$bandwidth[bws$iord])),
+         as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
          as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
          as.integer(myopti), as.double(kernel.pow),
