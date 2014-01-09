@@ -19,7 +19,11 @@ condbandwidth <-
            xnames = character(length(xbw)),
            ynames = character(length(ybw)),
            sfactor = NA, bandwidth = NA,
-           rows.omit = NA, bandwidth.compute = TRUE,...){
+           rows.omit = NA,
+           nconfac = NA,
+           ncatfac = NA,
+           sdev = NA,
+           bandwidth.compute = TRUE,...){
 
   if (missing(xbw) | missing(ybw))
     stop("improper invocation of condbandwidth constructor: 'bw' or i[cuo]* missing")
@@ -163,6 +167,9 @@ condbandwidth <-
     ymcv = mcvConstruct(ydati),
     sfactor = sfactor,
     bandwidth = bandwidth,
+    nconfac = nconfac,
+    ncatfac = ncatfac,
+    sdev = sdev,
     sumNum = sumNum,
     dati = dati, 
     varnames = list(x = xnames, y = ynames),

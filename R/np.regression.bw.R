@@ -126,6 +126,7 @@ npregbw.rbandwidth <-
 
     tbw <- bws
 
+    mysd <- EssDee(rcon)
     nconfac <- nrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
     ncatfac <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
 
@@ -168,6 +169,7 @@ npregbw.rbandwidth <-
       myout=
         .C("np_regression_bw",
            as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
+           as.double(mysd),
            as.integer(myopti), as.double(myoptd), 
            bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
            fval = double(2),
@@ -201,7 +203,7 @@ npregbw.rbandwidth <-
     }
 
     if (tbw$ncon > 0){
-      dfactor <- EssDee(rcon)*nconfac
+      dfactor <- mysd*nconfac
 
       if (tbw$scaling) {
         tbw$bandwidth[tbw$xdati$icon] <- tbw$bandwidth[tbw$xdati$icon]*dfactor
@@ -231,6 +233,9 @@ npregbw.rbandwidth <-
                       sfactor = tbw$sfactor,
                       bandwidth = tbw$bandwidth,
                       rows.omit = rows.omit,
+                      nconfac = nconfac,
+                      ncatfac = ncatfac,
+                      sdev = mysd,
                       bandwidth.compute = bandwidth.compute)
     tbw
   }

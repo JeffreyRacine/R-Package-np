@@ -196,6 +196,7 @@ npcdistbw.condbandwidth <-
 
     }
 
+    mysd <- EssDee(data.frame(xcon,ycon))
     nconfac <- nrow^(-1.0/(2.0*bws$cxkerorder+bws$ncon))
     ncatfac <- nrow^(-2.0/(2.0*bws$cxkerorder+bws$ncon))
 
@@ -253,6 +254,7 @@ npcdistbw.condbandwidth <-
           .C("np_distribution_conditional_bw", as.double(yuno), as.double(yord), as.double(ycon),
              as.double(xuno), as.double(xord), as.double(xcon),
              as.double(gyuno), as.double(gyord), as.double(gycon),
+             as.double(mysd),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$xbw[bws$ixcon],bws$ybw[bws$iycon],
                bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
@@ -266,7 +268,7 @@ npcdistbw.condbandwidth <-
           nbw[1:bws$xncon] <- 1.06
           nbw[(bws$xncon+1):gbw] <- 1.587
           if(!bws$scaling)
-            nbw[1:gbw]=nbw[1:gbw]*EssDee(data.frame(xcon,ycon))*nconfac
+            nbw[1:gbw]=nbw[1:gbw]*mysd*nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
       }
@@ -361,6 +363,9 @@ npcdistbw.condbandwidth <-
                         sfactor = tbw$sfactor,
                         bandwidth = tbw$bandwidth,
                         rows.omit = rows.omit,
+                        nconfac = nconfac,
+                        ncatfac = ncatfac,
+                        sdev = mysd,
                         bandwidth.compute = bandwidth.compute)
            
     tbw

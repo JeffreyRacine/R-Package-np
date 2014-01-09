@@ -190,9 +190,6 @@ npcdens.conbandwidth <- function(bws,
     exord = data.frame()
   }
 
-  nconfac <- tnrow^(-1.0/(2.0*bws$cxkerorder+bws$ncon))
-  ncatfac <- tnrow^(-2.0/(2.0*bws$cxkerorder+bws$ncon))
-
   myopti = list(
     num_obs_train = tnrow,
     num_obs_eval = enrow,
@@ -247,7 +244,7 @@ npcdens.conbandwidth <- function(bws,
                    bws$xbw[bws$ixuno],bws$xbw[bws$ixord])),
        as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
        as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-       as.double(nconfac), as.double(ncatfac),
+       as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
        as.integer(myopti),
        condens = double(enrow),
        conderr = double(enrow),

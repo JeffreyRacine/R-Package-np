@@ -17,6 +17,9 @@ rbandwidth <-
            ynames = character(1),
            sfactor = NA, bandwidth = NA,
            rows.omit = NA,
+           nconfac = NA,
+           ncatfac = NA,
+           sdev = NA,
            bandwidth.compute = TRUE,...){
 
   ndim = length(bw)
@@ -98,6 +101,9 @@ rbandwidth <-
     xmcv = mcvConstruct(xdati),
     sfactor = list(x = sfactor),
     bandwidth = list(x = bandwidth),
+    nconfac = nconfac,
+    ncatfac = ncatfac,
+    sdev = sdev,
     sumNum = list(x = sumNum),
     dati = list(x = xdati, y = ydati),
     varnames = list(x = xnames, y = ynames),

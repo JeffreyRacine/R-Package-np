@@ -1186,6 +1186,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                double * u_uno, double * u_ord, double * u_con,
+                               double * mysd,
                                int * myopti, double * myoptd, double * myans, double * fval){
 /* Likelihood bandwidth selection for density estimation */
 
@@ -1553,13 +1554,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   vector_continuous_stddev = alloc_vecd(num_var_continuous_extern + num_reg_continuous_extern);
 
-  compute_continuous_stddev(int_LARGE_SF,
-                            num_obs_train_extern,
-                            num_var_continuous_extern,
-                            num_reg_continuous_extern,
-                            matrix_Y_continuous_train_extern,
-                            matrix_X_continuous_train_extern,
-                            vector_continuous_stddev);
+  for(j = 0; j < (num_var_continuous_extern + num_reg_continuous_extern); j++)
+    vector_continuous_stddev[j] = mysd[j];
+
+  vector_continuous_stddev_extern = vector_continuous_stddev;
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -2597,7 +2595,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             double * mybw, 
                             double * ymcv, double * ypadnum,
                             double * xmcv, double * xpadnum,
-                            double * nconfac, double * ncatfac,
+                            double * nconfac, double * ncatfac, double * mysd,
                             int * myopti, 
                             double * cdens, double * cderr, 
                             double * cg, double * cgerr,
@@ -2719,6 +2717,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
   for( i=0;i<num_all_var; i++ )
     vector_scale_factor[i+1] = mybw[i];
+
+  vector_continuous_stddev_extern = mysd;
 
   /* Parse data */
 
@@ -3091,6 +3091,8 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     free_mat(pdf_deriv_stderr, num_var);
   }
 
+  vector_continuous_stddev_extern = NULL;
+
   safe_free(vector_scale_factor);
   safe_free(num_categories_extern);
   safe_free(pdf);
@@ -3113,7 +3115,6 @@ void np_density(double * tuno, double * tord, double * tcon,
   double small = 1.0e-16;
   double * vector_scale_factor, * pdf, * pdf_stderr, log_likelihood = 0.0;
   double pad_num;
-  double *vector_continuous_stddev;
 
   int itmax = 10000;
   int i,j;
@@ -3183,12 +3184,7 @@ void np_density(double * tuno, double * tord, double * tcon,
   pdf = alloc_vecd(num_obs_eval_alloc);
   pdf_stderr = alloc_vecd(num_obs_eval_alloc);
   
-  vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
-
-  for (j = 0; j < num_reg_continuous_extern; j++)
-    vector_continuous_stddev[j] = mysd[j];
-
-  vector_continuous_stddev_extern = vector_continuous_stddev;
+  vector_continuous_stddev_extern = mysd;
 
   /* Parse data */
 	
@@ -3403,7 +3399,8 @@ void np_density(double * tuno, double * tord, double * tcon,
     free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
   }
 
-  safe_free(vector_continuous_stddev);
+  vector_continuous_stddev_extern = NULL;
+
   safe_free(vector_scale_factor);
   safe_free(num_categories_extern);
   safe_free(pdf_stderr);
@@ -3426,7 +3423,7 @@ void np_density(double * tuno, double * tord, double * tcon,
 
 
 void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      int * myopti, double * myoptd, double * rbw, double * fval){
+                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -3507,6 +3504,11 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
 
+  for(j = 0; j < num_reg_continuous_extern; j++)
+    vector_continuous_stddev[j] = mysd[j];
+
+  vector_continuous_stddev_extern = vector_continuous_stddev;
+
   /* Request starting values for optimization if values already exist */
 
   /* bandwidths */
@@ -3585,15 +3587,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                              num_categories_extern,
                              matrix_categorical_vals_extern);
 
-
-  compute_continuous_stddev(
-                            int_LARGE_SF,
-                            num_obs_train_extern,
-                            0,
-                            num_reg_continuous_extern,
-                            matrix_Y_continuous_train_extern,
-                            matrix_X_continuous_train_extern,
-                            vector_continuous_stddev);
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -3880,7 +3873,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * euno, double * eord, double * econ, double * ey,
                    double * rbw, 
                    double * mcv, double * padnum, 
-                   double * nconfac, double * ncatfac,
+                   double * nconfac, double * ncatfac, double * mysd,
                    int * myopti, 
                    double * cm, double * cmerr, double * g, double *gerr, 
                    double * xtra){
@@ -3984,6 +3977,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   matrix_bandwidth = alloc_matd((BANDWIDTH_reg_extern==BW_GEN_NN)?num_obs_eval_extern:
                                 ((BANDWIDTH_reg_extern==BW_ADAP_NN)?num_obs_train_extern:1),num_reg_continuous_extern);  
 
+  vector_continuous_stddev_extern = mysd;
   /* train */
 
   for( j=0;j<num_reg_unordered_extern;j++)
@@ -4306,6 +4300,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
+  vector_continuous_stddev_extern = NULL;
 
   safe_free(lambda);
 
