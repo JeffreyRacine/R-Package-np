@@ -7,8 +7,8 @@ kbandwidth.integer <-
   function(bw, ...) { kbandwidth.numeric(bw = bw, ...) }
 
 kbandwidth.default <- function(bw, ...){
-  kbandwidth.numeric(bw = bw$bw,
-                     bwscaling = bw$scaling,
+  kbandwidth.numeric(bw = bw$bandwidth,
+                     bwscaling = FALSE,
                      bwtype = bw$type,
                      ckertype = bw$ckertype,
                      ckerorder = bw$ckerorder,
@@ -51,6 +51,9 @@ kbandwidth.numeric <-
         stop("ckerorder must be one of ", paste(kord,collapse=" "))
     }
 
+    if(bwscaling != FALSE)
+        stop("npksum only uses raw bandwidths, therefore bwscaling = TRUE is not allowed")
+    
     ukertype = match.arg(ukertype)
     okertype = match.arg(okertype)
 

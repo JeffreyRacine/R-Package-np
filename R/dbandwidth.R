@@ -13,7 +13,11 @@ dbandwidth <-
            xdati = stop("dbandwidth:argument 'xdati' missing"),
            xnames = character(length(bw)),
            sfactor = NA, bandwidth = NA,
-           rows.omit = NA, bandwidth.compute = TRUE, ...){
+           rows.omit = NA,
+           nconfac = NA,
+           ncatfac = NA,
+           sdev = NA,
+           bandwidth.compute = TRUE, ...){
     
     ndim = length(bw)
     bwmethod = match.arg(bwmethod)
@@ -92,6 +96,9 @@ dbandwidth <-
       xdati = xdati,
       sfactor = list(x = sfactor),
       bandwidth = list(x = bandwidth),
+      nconfac = nconfac,
+      ncatfac = ncatfac,
+      sdev = sdev,
       sumNum = list(x = sumNum),
       xmcv = mcvConstruct(xdati),
       dati = list(x = xdati),

@@ -1,2 +1,6 @@
 npver
 mknpkg.sh
+man/run
+man/dontrun
+man/sed_dontrun.scr
+man/sed_run.scr

@@ -5,15 +5,12 @@
 \description{
 
   \code{npquantile} computes smooth quantiles from a univariate kernel
-  unconditional cumulative distribution estimate given data and a
-  bandwidth specification (a \code{dbandwidth} object) using the
-  bandwidth selection method of Li and Racine (2013).
+  unconditional cumulative distribution estimate given data and,
+  optionally, a bandwidth specification i.e. a \code{dbandwidth} object
+  using the bandwidth selection method of Li and Racine (2013).
 
 }
 \usage{
-npquantile(x,...)
-
-## Default S3 method:
 npquantile(x = NULL,
            tau = c(0.01,0.05,0.25,0.50,0.75,0.95,0.99),
            num.eval = 10000,
@@ -58,6 +55,12 @@ npquantile(x = NULL,
 }
 
 \details{
+
+  Typical usage is
+  \preformatted{
+    x <- rchisq(100,df=10)
+    npquantile(x)
+  }
 
   The quantile function \eqn{q_\tau} is defined to be the
   left-continuous inverse of the distribution function \eqn{F(x)},
@@ -121,7 +124,7 @@ npquantile(x = NULL,
   computationally demanding. In such cases one might instead consider a
   rule-of-thumb bandwidth (\code{bwmethod="normal-reference"}) or,
   alternatively, use kd-trees (\code{options(np.tree=TRUE)} along with a
-  bounded kernel (\code{ckertype="epanechnikov"}), both of which will
+  bounded kernel (\code{ckertype="epanechnikov"})), both of which will
   reduce the computational burden appreciably.
 }
 \author{

@@ -126,7 +126,6 @@ npudist.dbandwidth <-
       econ = data.frame()
     }
 
-    
     myopti = list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
@@ -162,6 +161,7 @@ npudist.dbandwidth <-
          as.double(euno),  as.double(eord),  as.double(econ), 
          as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+         as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
          as.integer(myopti),
          dist = double(enrow),
          derr = double(enrow),

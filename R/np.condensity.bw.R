@@ -133,6 +133,10 @@ npcdensbw.conbandwidth <-
 
     tbw <- bws
 
+    mysd <- EssDee(data.frame(xcon,ycon))
+    nconfac <- nrow^(-1.0/(2.0*bws$cxkerorder+bws$ncon))
+    ncatfac <- nrow^(-2.0/(2.0*bws$cxkerorder+bws$ncon))
+
     if (bandwidth.compute){
       myopti = list(num_obs_train = nrow,
         iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
@@ -182,12 +186,13 @@ npcdensbw.conbandwidth <-
         old.cdens = FALSE,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
       
-      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac, lbc = lbc, hbc = hbc, cfac = cfac)
+      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac, lbc = lbc, hbc = hbc, cfac = cfac, nconfac = nconfac, ncatfac = ncatfac)
 
       if (bws$method != "normal-reference"){
         myout=
           .C("np_density_conditional_bw", as.double(yuno), as.double(yord), as.double(ycon),
              as.double(xuno), as.double(xord), as.double(xcon),
+             as.double(mysd),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$xbw[bws$ixcon],bws$ybw[bws$iycon],
                bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
@@ -200,7 +205,7 @@ npcdensbw.conbandwidth <-
         if (gbw > 0){
           nbw[1:gbw] = (4/3)^0.2
           if(!bws$scaling)
-            nbw[1:gbw]=nbw[1:gbw]*EssDee(data.frame(xcon,ycon))*nrow^(-1.0/(2.0*bws$cxkerorder+gbw))
+            nbw[1:gbw]=nbw[1:gbw]*mysd*nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
       }
@@ -245,7 +250,7 @@ npcdensbw.conbandwidth <-
     myf <- if(tbw$scaling) bwf else sff
     
     if ((tbw$xnuno+tbw$ynuno) > 0){
-      dfactor <- nrow^(-2.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- ncatfac
       dfactor <- list(x = dfactor, y = dfactor)
 
       tl <- list(x = tbw$xdati$iuno, y = tbw$ydati$iuno)
@@ -254,7 +259,7 @@ npcdensbw.conbandwidth <-
     }
 
     if ((tbw$xnord+tbw$ynord) > 0){
-      dfactor <- nrow^(-2.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- ncatfac
       dfactor <- list(x = dfactor, y = dfactor)
 
       tl <- list(x = tbw$xdati$iord, y = tbw$ydati$iord)
@@ -264,7 +269,7 @@ npcdensbw.conbandwidth <-
 
       
     if (tbw$ncon > 0){
-      dfactor <- nrow^(-1.0/(2.0*tbw$cxkerorder+tbw$ncon))
+      dfactor <- nconfac
       dfactor <- list(x = EssDee(xcon)*dfactor, y = EssDee(ycon)*dfactor)
 
       tl <- list(x = tbw$xdati$icon, y = tbw$ydati$icon)
@@ -295,6 +300,9 @@ npcdensbw.conbandwidth <-
                         sfactor = tbw$sfactor,
                         bandwidth = tbw$bandwidth,
                         rows.omit = rows.omit,
+                        nconfac = nconfac,
+                        ncatfac = ncatfac,
+                        sdev = mysd,
                         bandwidth.compute = bandwidth.compute)
            
     tbw

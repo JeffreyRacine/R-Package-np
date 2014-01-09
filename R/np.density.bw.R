@@ -101,6 +101,10 @@ npudensbw.bandwidth <-
 
     tbw <- bws
 
+    mysd <- EssDee(dcon)
+    nconfac <- nrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
+    ncatfac <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))                     
+
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(dat)[1], 
         iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
@@ -134,22 +138,22 @@ npudensbw.bandwidth <-
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
 
       
-      myoptd = list(ftol=ftol, tol=tol, small=small, lbc = lbc, hbc = hbc, cfac = cfac)
+      myoptd = list(ftol=ftol, tol=tol, small=small, lbc = lbc, hbc = hbc, cfac = cfac, nconfac = nconfac, ncatfac = ncatfac)
 
       if (bws$method != "normal-reference"){
         myout=
           .C("np_density_bw", as.double(duno), as.double(dord), as.double(dcon),
+             as.double(mysd),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
              fval = double(2),
              PACKAGE="npRmpi" )[c("bw","fval")]
       } else {
         nbw = double(ncol)
-        gbw = sum(bws$icon)
-        if (gbw > 0){
-          nbw[1:gbw] = (4/3)^0.2
+        if (bws$ncon > 0){
+          nbw[1:bws$ncon] = (4/3)^0.2
           if(!bws$scaling)
-            nbw[1:gbw]=nbw[1:gbw]*EssDee(dcon)*nrow^(-1.0/(2.0*bws$ckerorder+gbw))
+            nbw[1:bws$ncon]=nbw[1:bws$ncon]*mysd*nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
       }
@@ -165,27 +169,25 @@ npudensbw.bandwidth <-
     
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
     
-    nfactor <- nrow^(-2.0/(2.0*tbw$ckerorder+tbw$ncon))
-
     if (tbw$nuno > 0){
       if(tbw$scaling){ 
-        tbw$bandwidth[tbw$xdati$iuno] <- tbw$bandwidth[tbw$xdati$iuno]*nfactor
+        tbw$bandwidth[tbw$xdati$iuno] <- tbw$bandwidth[tbw$xdati$iuno]*ncatfac
       } else {
-        tbw$sfactor[tbw$xdati$iuno] <- tbw$sfactor[tbw$xdati$iuno]/nfactor
+        tbw$sfactor[tbw$xdati$iuno] <- tbw$sfactor[tbw$xdati$iuno]/ncatfac
       }
     }
     
     if (tbw$nord > 0){
       if(tbw$scaling){
-        tbw$bandwidth[tbw$xdati$iord] <- tbw$bandwidth[tbw$xdati$iord]*nfactor
+        tbw$bandwidth[tbw$xdati$iord] <- tbw$bandwidth[tbw$xdati$iord]*ncatfac
       } else {
-        tbw$sfactor[tbw$xdati$iord] <- tbw$sfactor[tbw$xdati$iord]/nfactor
+        tbw$sfactor[tbw$xdati$iord] <- tbw$sfactor[tbw$xdati$iord]/ncatfac
       }
     }
 
 
     if (tbw$ncon > 0){
-      dfactor <- EssDee(dcon)*nrow^(-1.0/(2.0*tbw$ckerorder+tbw$ncon))
+      dfactor <- mysd*nconfac
 
       if (tbw$scaling) {
         tbw$bandwidth[tbw$xdati$icon] <- tbw$bandwidth[tbw$xdati$icon]*dfactor
@@ -210,7 +212,10 @@ npudensbw.bandwidth <-
                      sfactor = tbw$sfactor,
                      bandwidth = tbw$bandwidth,
                      rows.omit = rows.omit,
-                     bandwidth.compute)
+                     nconfac = nconfac,
+                     ncatfac = ncatfac,
+                     sdev = mysd,
+                     bandwidth.compute = bandwidth.compute)
     
     tbw
   }
