@@ -124,6 +124,7 @@ npudistbw.dbandwidth <-
 
     tbw <- bws
 
+    mysd <- EssDee(dcon)
     nconfac <- nrow^(-1.0/(1.0+bws$ckerorder))
     ncatfac <- nrow^(-2.0/(1.0+bws$ckerorder))
 
@@ -203,7 +204,7 @@ npudistbw.dbandwidth <-
       if (bws$method != "normal-reference"){
         myout=
           .C("np_distribution_bw", as.double(duno), as.double(dord), as.double(dcon),
-             as.double(guno), as.double(gord), as.double(gcon),
+             as.double(guno), as.double(gord), as.double(gcon), as.double(mysd),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
              fval = double(2),
@@ -214,7 +215,7 @@ npudistbw.dbandwidth <-
         if (gbw > 0){
           nbw[1:gbw] = 1.587
           if(!bws$scaling)
-            nbw[1:gbw]=nbw[1:gbw]*EssDee(dcon)*nconfac
+            nbw[1:gbw]=nbw[1:gbw]*mysd*nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
       }
@@ -248,7 +249,7 @@ npudistbw.dbandwidth <-
 
 
     if (tbw$ncon > 0){
-      dfactor <- EssDee(dcon)*nconfac
+      dfactor <- mysd*nconfac
 
       if (tbw$scaling) {
         tbw$bandwidth[tbw$xdati$icon] <- tbw$bandwidth[tbw$xdati$icon]*dfactor
@@ -273,7 +274,10 @@ npudistbw.dbandwidth <-
                       sfactor = tbw$sfactor,
                       bandwidth = tbw$bandwidth,
                       rows.omit = rows.omit,
-                      bandwidth.compute)
+                      nconfac = nconfac,
+                      ncatfac = ncatfac,
+                      sdev = mysd,
+                      bandwidth.compute = bandwidth.compute)
     
     tbw
   }

@@ -692,7 +692,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 // We allow one to specify those points, passed in by mye{uno,ord,con}.
 
 void np_distribution_bw(double * myuno, double * myord, double * mycon, 
-                        double * myeuno, double * myeord, double * myecon, 
+                        double * myeuno, double * myeord, double * myecon, double * mysd,
                         int * myopti, double * myoptd, double * myans, double * fval){
   /* Likelihood bandwidth selection for density estimation */
 
@@ -894,14 +894,11 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   vector_continuous_stddev = alloc_vecd(num_reg_continuous_extern);
 
-  compute_continuous_stddev(
-                            int_LARGE_SF,
-                            num_obs_train_extern,
-                            0,
-                            num_reg_continuous_extern,
-                            matrix_Y_continuous_train_extern,
-                            matrix_X_continuous_train_extern,
-                            vector_continuous_stddev);
+  for (j = 0; j < num_reg_continuous_extern; j++)
+    vector_continuous_stddev[j] = mysd[j];
+
+  vector_continuous_stddev_extern = vector_continuous_stddev;
+
 
   /* Initialize scale factors and Directions for NR modules */
 
