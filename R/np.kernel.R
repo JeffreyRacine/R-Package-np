@@ -105,8 +105,9 @@ npksum.default <-
 
     if (!miss.ty && is.vector(tydat))
       tydat = as.matrix(tydat)
-    
-    bws = kbandwidth(bws)
+
+    if(class(bws) != "kbandwidth")
+        bws = kbandwidth(bws)
 
     if (!miss.ex){
       exdat = toFrame(exdat)

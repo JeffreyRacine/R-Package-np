@@ -1887,7 +1887,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                     double * u_uno, double * u_ord, double * u_con,
-                                    double * cg_uno, double * cg_ord, double * cg_con, 
+                                    double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
                                     int * myopti, double * myoptd, double * myans, double * fval){
 /* Likelihood bandwidth selection for density estimation */
 
@@ -2259,16 +2259,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                         matrix_categorical_vals_extern_X, matrix_categorical_vals_extern_Y, matrix_categorical_vals_extern_XY);
 
 
-  vector_continuous_stddev = alloc_vecd(num_var_continuous_extern + num_reg_continuous_extern);
+  vector_continuous_stddev = vector_continuous_stddev_extern = mysd;
 
-  compute_continuous_stddev(
-                            int_LARGE_SF,
-                            num_obs_train_extern,
-                            num_var_continuous_extern,
-                            num_reg_continuous_extern,
-                            matrix_Y_continuous_train_extern,
-                            matrix_X_continuous_train_extern,
-                            vector_continuous_stddev);
 
   /* Initialize scale factors and Directions for NR modules */
 
@@ -2548,8 +2540,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
   free_mat(matrix_categorical_vals_extern_XY, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
-
-  safe_free(vector_continuous_stddev);
 
   safe_free(ipt_X);
   safe_free(ipt_Y);
