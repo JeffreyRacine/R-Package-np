@@ -384,48 +384,28 @@ legend(1, .4,
 
 Sys.sleep(5)
 
-# EXAMPLE 2: For this example, we first obtain residuals from a parametric
-# regression model, then compute a vector of leave-one-out kernel
-# weighted sums of squared residuals where the kernel function is raised
-# to the power 2. We use a normal-reference rule-of-thumb obtained by
-# using the scaling factor 1.06 and bwscaling=TRUE. Note that this
-# returns a vector of kernel weighted sums, one for each element of the
-# error vector. Note also that you can specify the bandwidth type, 
-# kernel function, kernel order etc.
+# EXAMPLE 2: For this example, we first obtain residuals from a
+# parametric regression model, then compute a vector of leave-one-out
+# kernel weighted sums of squared residuals where the kernel function is
+# raised to the power 2. Note that this returns a vector of kernel
+# weighted sums, one for each element of the error vector. Note also
+# that you can specify the bandwidth type, kernel function, kernel order
+# etc.
 
 data("cps71")
 attach(cps71)
 
 error <- residuals(lm(logwage~age+I(age^2)))
 
+bw <- npreg(error~age)
+
 ksum <- npksum(txdat=age, 
                tydat=error^2, 
-               bws=1.06, 
+               bws=bw$bw 
                leave.one.out=TRUE, 
-               bwscaling=TRUE, 
                kernel.pow=2)
 
 ksum
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Note - npksum also can inherit properties from a bandwidth
-# object. To again specify a value for the bandwidth, you might do so in
-# the bandwidth object itself then pass this into npksum (e.g., 
-# below I use a regression bandwidth object but you could use, say, a
-# density bandwidth object instead).
-
-bw <- npregbw(xdat=age, ydat=logwage, bws=c(1.06),
-              bwscaling=TRUE, 
-              bandwidth.compute=FALSE)
-
-ksum <- npksum(txdat=age, 
-               tydat=error^2, 
-               bws=bw$bw, 
-               leave.one.out=TRUE, 
-               kernel.pow=2)
 
 # Obviously, if we wanted the sum of these weighted kernel sums then, 
 # trivially, 
