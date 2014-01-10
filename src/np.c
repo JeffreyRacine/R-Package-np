@@ -4742,6 +4742,7 @@ void np_quantile_conditional(double * tc_con,
                              double * quantile,
                              double * mybw, 
                              double * mcv, double *padnum,
+                             double * nconfac, double * ncatfac, double * mysd,
                              int * myopti, double * myoptd,
                              double * yq, double * yqerr, double *yg){
   /* Likelihood bandwidth selection for density estimation */
@@ -4808,6 +4809,9 @@ void np_quantile_conditional(double * tc_con,
   ncatfac_extern = myoptd[CQ_NCATFD];
 
   gamma_extern = *quantile;
+  nconfac_extern = *nconfac;
+  ncatfac_extern = *ncatfac;
+  vector_continuous_stddev_extern = mysd;
 
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
