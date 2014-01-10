@@ -216,6 +216,14 @@ npscoefbw.scbandwidth <-
     else
       dati <- bws$zdati
 
+    mysd <- EssDee(zdat[, dati$icon, drop = FALSE])
+    nconfac <- n^(-1.0/(2.0*bws$ckerorder+bws$ncon))
+    ncatfac <- n^(-2.0/(2.0*bws$ckerorder+bws$ncon))
+
+    bws$sdev <- mysd
+    bws$nconfac <- nconfac
+    bws$ncatfac <- ncatfac
+    
     if (bandwidth.compute){
       maxPenalty <- sqrt(.Machine$double.xmax)
       overall.cv.ls <- function(param) {
@@ -226,6 +234,12 @@ npscoefbw.scbandwidth <-
           return(maxPenalty)
         
         bws$bw <- param
+
+        if(bws$scaling)
+            bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+        else
+            bws$bandwidth[[1]] <- bws$bw
+        
         
         tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = bws,
                       leave.one.out = TRUE)$ksum
@@ -292,6 +306,11 @@ npscoefbw.scbandwidth <-
         } else {
           bws$bw <- param
 
+          if(bws$scaling)
+              bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+          else
+              bws$bandwidth[[1]] <- bws$bw
+
           tww <- npksum(txdat=zdat,
                         tydat=cbind(partial.orig * W[,partial.index],W[,partial.index]^2),
                         weights=cbind(partial.orig * W[,partial.index],1),
@@ -320,24 +339,16 @@ npscoefbw.scbandwidth <-
 
       x.scale <- sapply(1:bws$ndim, function(i){
         if (dati$icon[i]){
-          if(IQR(zdat[,i]) > 0) {
-            return((4/3)^0.2*(ifelse(bws$scaling, 1.0,
-                                     min(sd(zdat[,i]), IQR(zdat[,i])/(qnorm(.25,lower.tail=F)*2)) *
-                                     n^(-1.0/(2.0*bws$ckerorder+bws$ncon)))))
-          } else {
-            return((4/3)^0.2*(ifelse(bws$scaling, 1.0,
-                                     sd(zdat[,i]) *
-                                     n^(-1.0/(2.0*bws$ckerorder+bws$ncon)))))
-          }
+            return((4/3)^0.2*(ifelse(bws$scaling, 1.0, mysd[sum(dati$icon[1:i])]*nconfac)))
         }
         
         if (dati$iord[i])
           return(0.5*oMaxL(dati$all.nlev[[i]], kertype = bws$okertype)*
-                 ifelse(bws$scaling,n^(2.0/(2.0*bws$ckerorder+bws$ncon)),1.0))
+                 ifelse(bws$scaling,ncatfac,1.0))
         
         if (dati$iuno[i])
           return(0.5*uMaxL(dati$all.nlev[[i]], kertype = bws$ukertype)*
-                 ifelse(bws$scaling,n^(2.0/(2.0*bws$ckerorder+bws$ncon)),1.0))       
+                 ifelse(bws$scaling,ncatfac,1.0))       
       })
 
       console <- newLineConsole()
@@ -439,6 +450,11 @@ npscoefbw.scbandwidth <-
             } else {
               bws$bw <- bws$bw.fitted[,j]
               ## estimate new beta.hats
+
+              if(bws$scaling)
+                  bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+              else
+                  bws$bandwidth[[1]] <- bws$bw
 
               tww <- npksum(txdat=zdat,
                             tydat=cbind(partial.orig * W[,j],W[,j]^2),

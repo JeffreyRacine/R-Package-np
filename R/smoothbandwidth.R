@@ -20,6 +20,9 @@ scbandwidth <-
            znames = NULL,
            sfactor = NA, bandwidth = NA,
            rows.omit = NA,
+           nconfac = NA,
+           ncatfac = NA,
+           sdev = NA,
            bandwidth.compute = TRUE,
            optim.method = "NA",...){
 
