@@ -401,7 +401,7 @@ bw <- npreg(error~age)
 
 ksum <- npksum(txdat=age, 
                tydat=error^2, 
-               bws=bw$bw 
+               bws=bw$bw,
                leave.one.out=TRUE, 
                kernel.pow=2)
 
