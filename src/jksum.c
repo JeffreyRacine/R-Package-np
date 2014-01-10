@@ -3135,9 +3135,9 @@ int *num_categories){
 
     double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
 
-    double * PXC[MIN(1,num_reg_continuous)]; 
-    double * PXU[MIN(1,num_reg_unordered)];
-    double * PXO[MIN(1,num_reg_ordered)];
+    double * PXC[MAX(1,num_reg_continuous)]; 
+    double * PXU[MAX(1,num_reg_unordered)];
+    double * PXO[MAX(1,num_reg_ordered)];
 
     PXC[0] = NULL;
     PXU[0] = NULL;
@@ -5683,9 +5683,9 @@ double *SIGN){
 
     double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc3];
 
-    double * PXC[MIN(1,num_reg_continuous)]; 
-    double * PXU[MIN(1,num_reg_unordered)];
-    double * PXO[MIN(1,num_reg_ordered)];
+    double * PXC[MAX(1,num_reg_continuous)]; 
+    double * PXU[MAX(1,num_reg_unordered)];
+    double * PXO[MAX(1,num_reg_ordered)];
 
     PXC[0] = NULL;
     PXU[0] = NULL;
