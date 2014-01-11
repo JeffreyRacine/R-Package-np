@@ -886,8 +886,10 @@ npregiv <- function(y,
           W[i,, drop = FALSE] %*% chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc)))) %*% t(W[i,, drop = FALSE])
         }))
   
-        if (!any(ghat == maxPenalty)){
-          fv <- log(mean((ydat-ghat)^2)) + (1+trH/n)/(1-(trH+2)/n)
+        aic.penalty <- (1+trH/n)/(1-(trH+2)/n)
+  
+        if (!any(ghat == maxPenalty) & (aic.penalty > 0)){
+          fv <- log(mean((ydat-ghat)^2)) + aic.penalty
         } else {
           fv <- maxPenalty
         }
