@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.85 2013/12/22 00:00:59 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.86 2014/01/22 00:04:33 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -395,7 +395,7 @@ num.res <- 100
 n.sub <- 100
 
 bw.mat <- matrix(NA,nrow=num.res,ncol=2)
-options(np.messages=F)
+options(np.messages=FALSE)
 for(i in 1:num.res) {
   bw <- npcdensbw(y ~ x,subset=sample(n,n.sub))
   bw.mat[i,] <- c(bw$sfactor$y,bw$sfactor$x)
@@ -1547,6 +1547,24 @@ without the adjustment and see whether it matters or not. But it is
 sometimes surprising that such things can in fact make a
 difference. See \texttt{?scale} for a function whose default method
 centers and/or scales the columns of a numeric matrix.
+
+\subsection{How can I turn off all console I/O?}
+
+To disable all console I/O, set \texttt{options(np.messages=FALSE)}
+and wrap the function call in \texttt{suppressWarnings()} to disable any
+warnings printed to the console. For instance
+\begin{verbatim}
+library(np)
+options(np.messages=FALSE)
+set.seed(42)
+n <- 100
+x <- sort(rnorm(n))
+z <- factor(rbinom(n,1,.5))
+y <- x^3 + rnorm(n)
+model.np <- suppressWarnings(npreg(y~x+z))
+\end{verbatim}
+ought to produce no console I/O whatsoever in the call to
+\texttt{npreg}.
 
 \bibliographystyle{plain} 
 
