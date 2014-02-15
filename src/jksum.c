@@ -6889,7 +6889,7 @@ double * log_likelihood
 #endif
 
   int * kernel_cXY = NULL, * kernel_uXY = NULL, * kernel_oXY = NULL;
-  int * operator = NULL;
+  int * operator_XY = NULL, * operator_X = NULL;
 
   double * vsf_XY = NULL, * vsf_X = NULL;
 
@@ -6909,7 +6909,8 @@ double * log_likelihood
     K_INT_KERNEL_P = 1.0;
   }
 
-  operator = (int *)malloc(sizeof(int)*num_XY);
+  operator_XY = (int *)malloc(sizeof(int)*num_XY);
+  operator_X = (int *)malloc(sizeof(int)*num_X);
 
   kernel_cXY = (int *)malloc(sizeof(int)*num_cXY);
   kernel_uXY = (int *)malloc(sizeof(int)*num_uXY);
@@ -6972,7 +6973,7 @@ double * log_likelihood
 		 num_X_unordered, num_X_ordered, num_X_continuous,
 		 NULL, NULL, NULL, NULL, NULL, NULL,
 		 kernel_cXY, kernel_uXY, kernel_oXY,
-		 NULL, NULL, operator);
+		 operator_X, NULL, operator_XY);
 
 
   // put the correct bws in vsf_x, and vsf_xy
@@ -7007,7 +7008,7 @@ double * log_likelihood
                          0, // gather-scatter sum
                          0, // drop train
                          0, // drop which train
-                         operator, 
+                         operator_XY, 
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
@@ -7056,7 +7057,7 @@ double * log_likelihood
                          0, // gather-scatter sum
                          0, // do not drop train
                          0, // do not drop train
-                         operator, // no convolution
+                         operator_X, // no convolution
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
@@ -7115,7 +7116,8 @@ double * log_likelihood
 
   }
 
-  free(operator);
+  free(operator_XY);
+  free(operator_X);
 
   free(kernel_cXY);
   free(kernel_uXY);
@@ -7393,10 +7395,22 @@ void np_kernelop_xy(const int kernel_var_continuous,
   }
 
   if(operator_xy != NULL){
-    for(i = 0; i < num_reg; i++)
+    for(i = 0; i < num_reg_continuous; i++)
       operator_xy[i] = operator_reg;
 
-    for(i = num_reg; i < num_all; i++)
+    for(; i < num_cvar; i++)
+      operator_xy[i] = operator_var;
+
+    for(; i < num_cvar+num_reg_unordered; i++)
+      operator_xy[i] = operator_reg;
+
+    for(; i < num_cvar+num_uvar; i++)
+      operator_xy[i] = operator_var;
+
+    for(; i < num_cvar+num_uvar+num_reg_ordered; i++)
+      operator_xy[i] = operator_reg;
+
+    for(; i < num_all; i++)
       operator_xy[i] = operator_var;
   }
 
