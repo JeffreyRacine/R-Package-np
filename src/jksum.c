@@ -136,13 +136,6 @@ extern KDT * kdt_extern_X;
 extern KDT * kdt_extern_Y;
 extern KDT * kdt_extern_XY;
 
-extern double **matrix_XY_continuous_train_extern_alt;
-extern double **matrix_XY_unordered_train_extern_alt;
-extern double **matrix_XY_ordered_train_extern_alt;
-extern double **matrix_XY_continuous_eval_extern_alt;
-extern double **matrix_XY_unordered_eval_extern_alt;
-extern double **matrix_XY_ordered_eval_extern_alt;
-
 extern int * ipt_extern_X;
 extern int * ipt_extern_Y;
 extern int * ipt_extern_XY;
@@ -6463,7 +6456,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
   }
 
   matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
-	lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
+  lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
   if(kernel_bandwidth_mean(KERNEL_den,
                            BANDWIDTH_den,
@@ -6825,6 +6818,324 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
 
 }
 
+void np_kernel_estimate_con_dens_dist_categorical(
+int KERNEL_Y,
+int KERNEL_unordered_Y,
+int KERNEL_ordered_Y,
+int KERNEL_X,
+int KERNEL_unordered_X,
+int KERNEL_ordered_X,
+int BANDWIDTH_den,
+int yop,
+int num_obs_train,
+int num_obs_eval,
+int num_Y_unordered,
+int num_Y_ordered,
+int num_Y_continuous,
+int num_X_unordered,
+int num_X_ordered,
+int num_X_continuous,
+double **matrix_XY_unordered_train, 
+double **matrix_XY_ordered_train, 
+double **matrix_XY_continuous_train, 
+double **matrix_XY_unordered_eval, 
+double **matrix_XY_ordered_eval, 
+double **matrix_XY_continuous_eval, 
+double *vector_scale_factor,
+int *num_categories,
+int *num_categories_XY,
+double ** matrix_categorical_vals,
+double ** matrix_categorical_vals_XY,
+double * kdf,
+double * kdf_stderr,
+double ** kdf_deriv,
+double ** kdf_deriv_stderr,
+double * log_likelihood
+){
+
+
+  const int num_X = num_X_continuous+num_X_unordered+num_X_ordered;
+  const int num_Y = num_Y_continuous+num_Y_unordered+num_Y_ordered;
+  const int num_cXY = num_X_continuous + num_Y_continuous;
+  const int num_uXY = num_X_unordered + num_Y_unordered;
+  const int num_oXY = num_X_ordered + num_Y_ordered;
+  const int num_XY = num_X + num_Y;
+
+  const int is_cpdf = (yop == OP_NORMAL);
+
+  int i,l;
+  
+  double INT_KERNEL_P;					 /* Integral of K(z)^2 */
+  double K_INT_KERNEL_P;				 /*  K^p */
+  /* Integral of K(z-0.5)*K(z+0.5) */
+
+  double ** matrix_bandwidth = NULL, * lambda = NULL;
+
+  const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:
+    ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
+
+  double pnh;
+
+  const double log_DBL_MIN = log(DBL_MIN);
+
+  int num_obs_eval_alloc;
+
+#ifdef MPI2
+  int stride_t = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  
+  num_obs_eval_alloc = stride_t*iNum_Processors;
+#else
+  num_obs_eval_alloc = num_obs_eval;
+#endif
+
+  int * kernel_cXY = NULL, * kernel_uXY = NULL, * kernel_oXY = NULL;
+  int * operator = NULL;
+
+  double * vsf_XY = NULL, * vsf_X = NULL;
+
+  // used for partial node search
+  int * icX = NULL;
+  NL nls = {.node = NULL, .n = 0, .nalloc = 0};
+
+  double * ksd = NULL, * ksn = NULL;
+
+  if(num_Y_continuous != 0) {
+    initialize_kernel_density_asymptotic_constants(KERNEL_Y,
+                                                   num_cXY,
+                                                   &INT_KERNEL_P,
+                                                   &K_INT_KERNEL_P);
+  } else {
+    INT_KERNEL_P = 1.0;
+    K_INT_KERNEL_P = 1.0;
+  }
+
+  operator = (int *)malloc(sizeof(int)*num_XY);
+
+  kernel_cXY = (int *)malloc(sizeof(int)*num_cXY);
+  kernel_uXY = (int *)malloc(sizeof(int)*num_uXY);
+  kernel_oXY = (int *)malloc(sizeof(int)*num_oXY);
+
+  vsf_XY = (double *)malloc(num_XY*sizeof(double));
+  vsf_X = (double *)malloc(num_X*sizeof(double));
+
+  ksd = (double *)malloc(num_obs_eval_alloc*sizeof(double));
+  ksn = (double *)malloc(num_obs_eval_alloc*sizeof(double));
+
+  icX = (int *)malloc(sizeof(int)*num_X_continuous);
+
+  if(is_cpdf){
+    matrix_bandwidth = alloc_matd(bwmdim,num_Y_continuous);
+    lambda = alloc_vecd(num_Y_unordered+num_Y_ordered);
+
+    if(kernel_bandwidth_mean(KERNEL_Y,
+			     BANDWIDTH_den,
+			     num_obs_train,
+			     num_obs_eval,
+			     num_Y_continuous,
+			     num_Y_unordered,
+			     num_Y_ordered,
+			     0,0,0,
+			     0,
+			     vector_scale_factor,
+			     matrix_XY_continuous_train + num_X_continuous,
+			     matrix_XY_continuous_eval + num_X_continuous,
+			     NULL, NULL,
+			     matrix_bandwidth,
+			     NULL,
+			     lambda)==1){
+#ifdef MPI2
+      MPI_Barrier(comm[1]);
+      MPI_Finalize();
+#endif
+      error("\n** Error: invalid bandwidth.");
+    }
+  }
+
+  // relevant dimensions for partial tree search
+  for(i = 0; i < num_X_continuous; i++)
+    icX[i] = i;
+
+  // nodes for pts
+  nls.node = (int *)malloc(sizeof(int));
+  nls.nalloc = 1;
+
+  nls.node[0] = 0;
+  nls.n = 1;
+
+  // merge the kernels and operators
+
+  np_kernelop_xy(KERNEL_Y, KERNEL_unordered_Y, KERNEL_ordered_Y,
+		 KERNEL_X, KERNEL_unordered_X, KERNEL_ordered_X,
+		 yop, // y operator
+		 OP_NORMAL, // x operator
+		 num_Y_unordered, num_Y_ordered, num_Y_continuous,
+		 num_X_unordered, num_X_ordered, num_X_continuous,
+		 NULL, NULL, NULL, NULL, NULL, NULL,
+		 kernel_cXY, kernel_uXY, kernel_oXY,
+		 NULL, NULL, operator);
+
+
+  // put the correct bws in vsf_x, and vsf_xy
+
+  np_splitxy_vsf_mcv_nc(num_Y_unordered, num_Y_ordered, num_Y_continuous,
+                        num_X_unordered, num_X_ordered, num_X_continuous,
+                        vector_scale_factor,
+                        NULL,
+                        NULL,
+                        vsf_X,
+                        NULL,
+                        vsf_XY,
+                        NULL, NULL, NULL,
+                        NULL, NULL, NULL);
+
+  // xy
+  kernel_weighted_sum_np(kernel_cXY,
+                         kernel_uXY,
+                         kernel_oXY,
+                         BANDWIDTH_den,
+                         num_obs_train,
+                         num_obs_eval,
+                         num_uXY,
+                         num_oXY,
+                         num_cXY,
+                         0, // leave one out 
+                         0, // '' offset
+                         1, // kernel_pow = 1
+                         1, // bandwidth_divide 
+                         0, // '' weights
+                         0, // symmetric
+                         0, // gather-scatter sum
+                         0, // drop train
+                         0, // drop which train
+                         operator, 
+                         OP_NOOP, // no permutations
+                         0, // no score
+                         0, // no ocg
+                         0, // do not explicity suppress parallel
+                         0, // ncol y
+                         0, // ncol w
+                         int_TREE_XY, // do tree
+                         0, // do partial tree
+                         kdt_extern_XY, // which tree
+                         NULL, NULL, NULL, // partial tree data
+                         matrix_XY_unordered_train,
+                         matrix_XY_ordered_train,
+                         matrix_XY_continuous_train,
+                         matrix_XY_unordered_eval,
+                         matrix_XY_ordered_eval,
+                         matrix_XY_continuous_eval,
+                         NULL, // matrix y
+                         NULL, // matrix w
+                         NULL, // sgn
+                         vsf_XY, 
+                         num_categories_XY,
+                         matrix_categorical_vals_XY,
+                         NULL, // moo
+                         ksn,  // weighted sum
+                         NULL, // no permutations
+                         NULL); // do not return kernel weights
+
+  //x - we assume x is in xy tree order
+  //  - we also reuse kernels and operators because we can
+
+  kernel_weighted_sum_np(kernel_cXY,
+                         kernel_uXY,
+                         kernel_oXY,
+                         BANDWIDTH_den,
+                         num_obs_train,
+                         num_obs_eval,
+                         num_X_unordered,
+                         num_X_ordered,
+                         num_X_continuous,
+                         0, // leave one out 
+                         0,
+                         1, // kernel_pow = 1
+                         1, // bandwidth_divide 
+                         0, 
+                         0, // symmetric
+                         0, // gather-scatter sum
+                         0, // do not drop train
+                         0, // do not drop train
+                         operator, // no convolution
+                         OP_NOOP, // no permutations
+                         0, // no score
+                         0, // no ocg
+                         0, //  do not explicity suppress parallel
+                         0,
+                         0,
+                         int_TREE_XY,
+                         1, // in this case we do want a partial tree
+                         kdt_extern_XY,
+                         &nls, icX, NULL,
+                         matrix_XY_unordered_train,
+                         matrix_XY_ordered_train,
+                         matrix_XY_continuous_train,
+                         matrix_XY_unordered_eval,
+                         matrix_XY_ordered_eval,
+                         matrix_XY_continuous_eval,
+                         NULL,
+                         NULL,
+                         NULL,
+                         vsf_X,
+                         num_categories,
+                         matrix_categorical_vals,
+                         NULL, // moo
+                         ksd,  // weighted sum
+                         NULL, // no permutations
+                         NULL); // do not return kernel weights
+
+  
+  if (is_cpdf) {
+    if(BANDWIDTH_den == BW_FIXED){
+      for(l = 0, pnh = num_obs_train; l < num_Y_continuous; l++){      
+        pnh *= matrix_bandwidth[l][0];
+      }
+    }
+
+    for(i = 0; i < num_obs_eval; i++){
+      const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
+      kdf[i] = ksn[i]/sk;
+      *log_likelihood += (kdf[i] < DBL_MIN) ? log_DBL_MIN : log(kdf[i]);
+
+      if(BANDWIDTH_den == BW_GEN_NN){
+        for(l = 0, pnh = num_obs_train; l < num_Y_continuous; l++){
+          pnh *= matrix_bandwidth[l][i];
+        }
+      }
+
+      kdf_stderr[i] = sqrt(kdf[i]*K_INT_KERNEL_P/pnh);
+   
+    }
+  } else {
+    for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
+      const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
+      kdf[i] = ksn[i]/sk;
+      kdf_stderr[i] = sqrt(kdf[i]*(1.0-kdf[i])/(double)num_obs_train);
+    }
+
+  }
+
+  free(operator);
+
+  free(kernel_cXY);
+  free(kernel_uXY);
+  free(kernel_oXY);
+
+  free(ksn);
+  free(ksd);
+
+  free(vsf_XY);
+  free(vsf_X);
+
+  free(icX);
+  clean_nl(&nls);
+
+  if(is_cpdf){
+    free(lambda);
+    free_mat(matrix_bandwidth, num_Y_continuous);
+  }
+}
+
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered,
                            const int num_var_ordered,
                            const int num_var_continuous,
@@ -6982,27 +7293,36 @@ void np_splitxy_vsf_mcv_nc(const int num_var_unordered,
   }
 }
 
-void np_kernelxy(const int kernel_var_continuous,
-                 const int kernel_var_unordered,
-                 const int kernel_var_ordered,
-                 const int kernel_reg_continuous,
-                 const int kernel_reg_unordered,
-                 const int kernel_reg_ordered,
-                 const int num_var_unordered,
-                 const int num_var_ordered,
-                 const int num_var_continuous,
-                 const int num_reg_unordered,
-                 const int num_reg_ordered,
-                 const int num_reg_continuous,
-                 double * kernel_cx,
-                 double * kernel_ux,
-                 double * kernel_ox,
-                 double * kernel_cy,
-                 double * kernel_uy,
-                 double * kernel_oy,
-                 double * kernel_cxy,
-                 double * kernel_uxy,
-                 double * kernel_oxy){
+void np_kernelop_xy(const int kernel_var_continuous,
+		    const int kernel_var_unordered,
+		    const int kernel_var_ordered,
+		    const int kernel_reg_continuous,
+		    const int kernel_reg_unordered,
+		    const int kernel_reg_ordered,
+		    const int operator_var,
+		    const int operator_reg,
+		    const int num_var_unordered,
+		    const int num_var_ordered,
+		    const int num_var_continuous,
+		    const int num_reg_unordered,
+		    const int num_reg_ordered,
+		    const int num_reg_continuous,
+		    int * kernel_cx,
+		    int * kernel_ux,
+		    int * kernel_ox,
+		    int * kernel_cy,
+		    int * kernel_uy,
+		    int * kernel_oy,
+		    int * kernel_cxy,
+		    int * kernel_uxy,
+		    int * kernel_oxy,
+		    int * operator_x,
+		    int * operator_y,
+		    int * operator_xy){
+
+  const int num_reg = num_reg_continuous + num_reg_unordered + num_reg_ordered;
+  const int num_var = num_var_continuous + num_var_unordered + num_var_ordered;
+  const int num_all = num_reg+num_var;
 
   const int num_cvar = num_var_continuous + num_reg_continuous;
   const int num_uvar = num_var_unordered + num_reg_unordered;
@@ -7060,4 +7380,24 @@ void np_kernelxy(const int kernel_var_continuous,
     for(i = num_reg_ordered; i < num_ovar; i++)
       kernel_oxy[i] = kernel_var_ordered;
   }
+
+  // operators
+  if(operator_x != NULL){
+    for(i = 0; i < num_reg; i++)
+      operator_x[i] = operator_reg;
+  }
+
+  if(operator_y != NULL){
+    for(i = 0; i < num_var; i++)
+      operator_y[i] = operator_var;
+  }
+
+  if(operator_xy != NULL){
+    for(i = 0; i < num_reg; i++)
+      operator_xy[i] = operator_reg;
+
+    for(i = num_reg; i < num_all; i++)
+      operator_xy[i] = operator_var;
+  }
+
 }
