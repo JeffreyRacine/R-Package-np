@@ -233,9 +233,13 @@ int np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(int KERN
 int np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv(int KERNEL_var,int KERNEL_unordered_var,int KERNEL_ordered_var,int KERNEL_reg,int KERNEL_unordered_reg,int KERNEL_ordered_reg,int BANDWIDTH_den,int64_t num_obs_train,int num_var_unordered,int num_var_ordered,int num_var_continuous,int num_reg_unordered,int num_reg_ordered,int num_reg_continuous,double memfac,double **matrix_Y_unordered_train,double **matrix_Y_ordered_train,double **matrix_Y_continuous_train,double **matrix_X_unordered_train,double **matrix_X_ordered_train,double **matrix_X_continuous_train,double **matrix_XY_unordered_train,double **matrix_XY_ordered_train,double **matrix_XY_continuous_train,double *vector_scale_factor,int *num_categories,double **matrix_categorical_vals,double *cv);
 
 
+void np_kernel_estimate_con_dens_dist_categorical(int KERNEL_Y,int KERNEL_unordered_Y,int KERNEL_ordered_Y,int KERNEL_X,int KERNEL_unordered_X,int KERNEL_ordered_X,int BANDWIDTH_den,int yop,int num_obs_train,int num_obs_eval,int num_Y_unordered,int num_Y_ordered,int num_Y_continuous,int num_X_unordered,int num_X_ordered,int num_X_continuous,double **matrix_XY_unordered_train, double **matrix_XY_ordered_train, double **matrix_XY_continuous_train, double **matrix_XY_unordered_eval, double **matrix_XY_ordered_eval, double **matrix_XY_continuous_eval, double *vector_scale_factor,int *num_categories,int *num_categories_XY, double ** matrix_categorical_vals, double ** matrix_categorical_vals_XY, double * kdf,double * kdf_stderr,double ** kdf_deriv,double ** kdf_deriv_stderr,double * log_likelihood);
+
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, const double * const vector_scale_factor, const int * const num_categories, double ** matrix_categorical_vals, double * vsf_x, double * vsf_y, double * vsf_xy, int * nc_x, int * nc_y, int * nc_xy, double ** mcv_x, double ** mcv_y, double ** mcv_xy);
 
-void np_kernelxy(const int kernel_var_continuous, const int kernel_var_unordered, const int kernel_var_ordered, const int kernel_reg_continuous, const int kernel_reg_unordered, const int kernel_reg_ordered, const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, double * kernel_cx, double * kernel_ux, double * kernel_ox, double * kernel_cy, double * kernel_uy, double * kernel_oy, double * kernel_cxy, double * kernel_uxy, double * kernel_oxy);
+
+void np_kernelop_xy(const int kernel_var_continuous, const int kernel_var_unordered, const int kernel_var_ordered, const int kernel_reg_continuous, const int kernel_reg_unordered, const int kernel_reg_ordered, const int operator_var, const int operator_reg, const int num_var_unordered, const int num_var_ordered, const int num_var_continuous, const int num_reg_unordered, const int num_reg_ordered, const int num_reg_continuous, int * kernel_cx, int * kernel_ux, int * kernel_ox, int * kernel_cy, int * kernel_uy, int * kernel_oy, int * kernel_cxy, int * kernel_uxy, int * kernel_oxy, int * operator_x, int * operator_y, int * operator_xy);
+
 
 int is_valid_unordered_bw(double lambda,
                           int num_categories,
@@ -509,6 +513,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CD_YMLEVI 19
 #define CD_XMLEVI 20
 #define CD_DODENI 21
+#define CD_TREEI 22
 
 #define DEN_TNOBSI   0
 #define DEN_ENOBSI   1

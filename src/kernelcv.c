@@ -101,12 +101,12 @@ extern double y_min_extern;
 extern double y_max_extern;
 
 // cdens + trees extern
-extern double **matrix_XY_continuous_train_extern_alt;
-extern double **matrix_XY_unordered_train_extern_alt;
-extern double **matrix_XY_ordered_train_extern_alt;
-extern double **matrix_XY_continuous_eval_extern_alt;
-extern double **matrix_XY_unordered_eval_extern_alt;
-extern double **matrix_XY_ordered_eval_extern_alt;
+extern double **matrix_XY_continuous_train_extern;
+extern double **matrix_XY_unordered_train_extern;
+extern double **matrix_XY_ordered_train_extern;
+extern double **matrix_XY_continuous_eval_extern;
+extern double **matrix_XY_unordered_eval_extern;
+extern double **matrix_XY_ordered_eval_extern;
 
 // cdf extern
 extern int int_fast_dls_extern;
@@ -413,9 +413,9 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
                                                                            matrix_X_unordered_train_extern,
                                                                            matrix_X_ordered_train_extern,
                                                                            matrix_X_continuous_train_extern,
-                                                                           matrix_XY_unordered_train_extern_alt, 
-                                                                           matrix_XY_ordered_train_extern_alt, 
-                                                                           matrix_XY_continuous_train_extern_alt,
+                                                                           matrix_XY_unordered_train_extern, 
+                                                                           matrix_XY_ordered_train_extern, 
+                                                                           matrix_XY_continuous_train_extern,
                                                                            matrix_Y_unordered_eval_extern,
                                                                            matrix_Y_ordered_eval_extern,
                                                                            matrix_Y_continuous_eval_extern,
@@ -557,9 +557,9 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
         matrix_X_unordered_train_extern,
         matrix_X_ordered_train_extern,
         matrix_X_continuous_train_extern,
-        matrix_XY_unordered_train_extern_alt,
-        matrix_XY_ordered_train_extern_alt,
-        matrix_XY_continuous_train_extern_alt,
+        matrix_XY_unordered_train_extern,
+        matrix_XY_ordered_train_extern,
+        matrix_XY_continuous_train_extern,
         &vector_scale_factor[1],
         num_categories_extern,
         &cv)==1)
@@ -691,9 +691,9 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
                                                                       matrix_X_unordered_train_extern,
                                                                       matrix_X_ordered_train_extern,
                                                                       matrix_X_continuous_train_extern,
-                                                                      matrix_XY_unordered_train_extern_alt, 
-                                                                      matrix_XY_ordered_train_extern_alt, 
-                                                                      matrix_XY_continuous_train_extern_alt,
+                                                                      matrix_XY_unordered_train_extern, 
+                                                                      matrix_XY_ordered_train_extern, 
+                                                                      matrix_XY_continuous_train_extern,
                                                                       &vector_scale_factor[1],
                                                                       num_categories_extern,
                                                                       matrix_categorical_vals_extern,
