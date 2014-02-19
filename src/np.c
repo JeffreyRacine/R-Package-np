@@ -4741,6 +4741,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       p_operator,
                                       do_score,
                                       do_ocg, // no ocg (for now)
+                                      NULL,
                                       0, // don't explicity suppress parallel
                                       ncol_Y,
                                       ncol_W,
