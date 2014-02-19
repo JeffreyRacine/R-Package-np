@@ -1815,8 +1815,9 @@ const int drop_one_train,
 const int drop_which_train,
 const int * const operator,
 const int permutation_operator,
-const int do_score,
-const int do_ocg,
+int do_score,
+int do_ocg,
+int * bpso,
 const int suppress_parallel,
 const int ncol_Y,
 const int ncol_W,
@@ -1850,14 +1851,51 @@ double * const kw){
 
   /* Declarations */
 
-  int i, ii, j,l, mstep, js, je, num_obs_eval_alloc, sum_element_length, ip;
+  int i, ii, j, kk, k, l, mstep, js, je, num_obs_eval_alloc, sum_element_length, ip;
   int do_psum, swap_xxt;
 
   // USED TO default to -1
   int * permutation_kernel = NULL;
-  const int doscoreocg = do_score || do_ocg;
-  const int do_perm = permutation_operator != OP_NOOP; 
-  int p_nvar = (do_perm ? num_reg_continuous : 0) + (doscoreocg ? num_reg_unordered + num_reg_ordered : 0);
+  int doscoreocg = do_score || do_ocg;
+  int do_perm = permutation_operator != OP_NOOP; 
+
+  const int no_bpso = (NULL == bpso);
+
+  int p_nvar;
+
+  if(no_bpso){
+    bpso = (int *)malloc((num_reg_unordered + num_reg_ordered + num_reg_continuous)*sizeof(int));
+
+    for(i = 0; i < num_reg_continuous; i++)
+      bpso[i] = do_perm;
+
+    for(i = num_reg_continuous; i < num_reg_continuous+num_reg_unordered+num_reg_ordered; i++)
+      bpso[i] = doscoreocg;
+
+    p_nvar = (do_perm ? num_reg_continuous : 0) + (doscoreocg ? num_reg_unordered + num_reg_ordered : 0);
+
+  } else {
+    // it's possible that do_perm and do_ocg could be set, but no continuous or categorical
+    // variables are enabled via bpso, e.g. conditional density gradients
+
+    for(i = 0, ii = 0, l = 0; i < num_reg_continuous; i++){
+      ii |= bpso[i];
+      l += bpso[i];
+    }
+
+    do_perm &= ii;
+
+    for(i = num_reg_continuous, ii = 0; i < num_reg_continuous + num_reg_unordered + num_reg_ordered; i++){
+      ii |= bpso[i];
+      l += bpso[i];
+    }
+
+    do_ocg &= ii;
+
+    doscoreocg = do_score || do_ocg;
+    p_nvar = l;
+  }
+
   int * ps_ukernel = NULL, * ps_okernel = NULL;
 
   int ps_ok_nli = (num_reg_ordered != 0) && (KERNEL_ordered_reg[0] != 1);
@@ -2260,43 +2298,49 @@ double * const kw){
         }
       }
 
-      if(permutation_operator == OP_INTEGRAL){
-        for(ii = 0; ii < num_reg_continuous; ii++){
-          // reset the interaction node list
-          p_pxl[ii].n = 0;
+      if(do_perm && (permutation_operator == OP_INTEGRAL)){
+        for(ii = 0, k = 0; ii < num_reg_continuous; ii++){
+          if(bpso[ii]){
+            // reset the interaction node list
+            p_pxl[k].n = 0;
 
-          if(!do_partial_tree){
-            for(i = 0; i < num_reg_continuous; i++){
-              const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
-              bb[2*i] = -cksup[knp][1];
-              bb[2*i+1] = -cksup[knp][0];
+            if(!do_partial_tree){
+              for(i = 0; i < num_reg_continuous; i++){
+                const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
+                bb[2*i] = -cksup[knp][1];
+                bb[2*i+1] = -cksup[knp][0];
 
-              const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
-              bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
-              bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
+                const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+                bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
+                bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
+              }
+
+              boxSearchNL(kdt, &nls, bb, NULL, p_pxl + k);
+            } else {
+              for(i = 0; i < num_reg_continuous; i++){
+                const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
+                bb[2*nld[i]] = -cksup[knp][1];
+                bb[2*nld[i]+1] = -cksup[knp][0];
+
+                const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+                bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
+                bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
+              }
+              if(idx == NULL)
+                boxSearchNLPartial(kdt, inl, bb, NULL, p_pxl + k, nld, num_reg_continuous);
+              else{
+                boxSearchNLPartialIdx(kdt, inl, bb, NULL, p_pxl + k, nld, num_reg_continuous, idx);
+              }
             }
 
-            boxSearchNL(kdt, &nls, bb, NULL, p_pxl + ii);
-          } else {
-            for(i = 0; i < num_reg_continuous; i++){
-              const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
-              bb[2*nld[i]] = -cksup[knp][1];
-              bb[2*nld[i]+1] = -cksup[knp][0];
-
-              const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
-              bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
-              bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
-            }
-            if(idx == NULL)
-              boxSearchNLPartial(kdt, inl, bb, NULL, p_pxl + ii, nld, num_reg_continuous);
-            else{
-              boxSearchNLPartialIdx(kdt, inl, bb, NULL, p_pxl + ii, nld, num_reg_continuous, idx);
-            }
+            k++;
           }
         }
-        for(ii = num_reg_continuous; ii < p_nvar; ii++){
+        
+        for(ii = k; ii < p_nvar; ii++){
           p_pxl[ii] = pxl[0];
         }
+                  
       } else {
         for(ii = 0; ii < p_nvar; ii++){
           p_pxl[ii] = pxl[0];
@@ -2308,12 +2352,12 @@ double * const kw){
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
-    for(i = 0, l = 0, ip = 0; i < num_reg_continuous; i++, l++, m += mstep, ip += do_perm){
+    for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, m += mstep, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
           np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+ip, swap_xxt, do_perm, do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
         }
       }
       else
@@ -2322,21 +2366,25 @@ double * const kw){
       dband *= ipow(*m, bpow[i]);
 
       if(do_perm){
-        for(ii = 0; ii < num_reg_continuous; ii++){
-          if(i != ii) {
-            p_dband[ii] *= ipow(*m, bpow[i]);
-          } else {
-            p_dband[ii] *= ipow(*m, p_ipow);
-            if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
-              p_dband[ii] *= vector_scale_factor[ii]/(*m);
+        for(ii = 0, kk = 0; ii < num_reg_continuous; ii++){
+          if(bpso[ii]){
+            if (i != ii){
+              p_dband[kk] *= ipow(*m, bpow[i]);              
+            } else {
+              p_dband[kk] *= ipow(*m, p_ipow);
+              if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
+                p_dband[kk] *= vector_scale_factor[ii]/(*m);
+              }
             }
+            kk++;
           }
         }
       }
+      k += bpso[l];
     }
 
 
-    for(ii = num_reg_continuous; ii < p_nvar; ii++){
+    for(ii = k; ii < p_nvar; ii++){
       p_dband[ii] = dband;
     }
 
@@ -2345,11 +2393,12 @@ double * const kw){
     for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
       if(doscoreocg){
         np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], ip, p_nvar, xtu[i], num_xt, l, xu[i][j], 
-                      lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + ip, swap_xxt, do_ocg);
+                      lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0));
       } else {
         np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
                     lambda[i], num_categories[i], tprod, pxl);
       }
+      k += bpso[l];
     }
 
     /* ordered third */
@@ -2373,8 +2422,9 @@ double * const kw){
                       xo[i][j], lambda[num_reg_unordered+i], 
                       (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                       (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                      tprod, tprod_mp, pxl, p_pxl + ip, swap_xxt, do_ocg, matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
+                      tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0), matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
       }
+      k += bpso[l];
     }
 
     /* expand matrix outer product, multiply by kernel weights, etc, do sum */
@@ -2482,8 +2532,12 @@ double * const kw){
 
     if(np_ks_tree_use){
       if(permutation_operator == OP_INTEGRAL){
-        for(l = 0; l < num_reg_continuous; l++)
-          clean_xl(p_pxl+l);
+        for(l = 0, k = 0; l < num_reg_continuous; l++){
+          if(bpso[l]){
+            clean_xl(p_pxl+k);
+            k++;
+          }
+        }
       }
       free(p_pxl);
     }
@@ -2491,6 +2545,8 @@ double * const kw){
     free(p_dband);
   }
 
+  if(no_bpso)
+    free(bpso);
   
   return(0);
 }
@@ -2988,6 +3044,7 @@ int *num_categories){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
+                           NULL,
                            1, // explicitly suppress parallel
                            0, // no Y
                            0, // no weights
@@ -3055,6 +3112,7 @@ int *num_categories){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
+                           NULL,
                            0, // don't explicitly suppress parallel
                            2, // 2 cols in Y
                            0, // 0 cols in W
@@ -3231,6 +3289,7 @@ int *num_categories){
                                    OP_NOOP, // no permutations
                                    0, // no score
                                    0, // no ocg
+                                   NULL,
                                    1, // explicitly suppress parallel
                                    nrc2, // nrc2 cols in Y
                                    nrc2, // nrc2 cols in W
@@ -3317,6 +3376,7 @@ int *num_categories){
                                    OP_NOOP, // no permutations
                                    0, // no score
                                    0, // no ocg
+                                   NULL,
                                    1, // explicitly suppress parallel
                                    nrc2, // cols in Y
                                    nrc2, // cols in W
@@ -3405,6 +3465,7 @@ int *num_categories){
                                OP_NOOP, // no permutations
                                0, // no score
                                0, // no ocg
+                               NULL,
                                0, // don't explicity suppress parallel
                                nrc2,
                                nrc2,
@@ -3482,6 +3543,7 @@ int *num_categories){
                                  OP_NOOP, // no permutations
                                  0, // no score
                                  0, // no ocg
+                                 NULL,
                                  0, // don't explicity suppress parallel
                                  nrc2,
                                  nrc2,
@@ -3709,6 +3771,7 @@ double * cv){
                            OP_NOOP, // no permutations
                            0, // no score
                            0, // no ocg
+                           NULL,
                            0, // don't explicity suppress parallel
                            0,
                            0,
@@ -3783,6 +3846,7 @@ double * cv){
                              OP_NOOP, // no permutations
                              0, // no score
                              0, // no ocg
+                             NULL,
                              0, // don't explicity suppress parallel
                              0,
                              0,
@@ -4099,6 +4163,7 @@ double *cv){
                              OP_NOOP, // no permutations
                              0, // no score
                              0, // no ocg
+                             NULL,
                              0, // don't explicity suppress parallel
                              0,
                              0,
@@ -4160,6 +4225,7 @@ double *cv){
                                OP_NOOP, // no permutations
                                0, // no score
                                0, // no ocg
+                               NULL,
                                0, // don't explicity suppress parallel
                                0,
                                0,
@@ -4304,6 +4370,7 @@ double *cv){
                              OP_NOOP, // no permutations
                              0, // no score
                              0, // no ocg
+                             NULL,
                              0, // don't explicity suppress parallel
                              0,
                              0,
@@ -4364,6 +4431,7 @@ double *cv){
                                OP_NOOP, // no permutations
                                0, // no score
                                0, // no ocg
+                               NULL,
                                0, // don't explicity suppress parallel
                                0,
                                0,
@@ -4835,6 +4903,7 @@ double *cv){
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, // don't explicity suppress parallel
                          0,
                          0,
@@ -4882,6 +4951,7 @@ double *cv){
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, // don't explicity suppress parallel
                          0,
                          0,
@@ -4999,6 +5069,7 @@ double *cv){
                              OP_NOOP, // no permutations
                              0, // no score
                              0, // no ocg
+                             NULL,
                              0, // don't explicity suppress parallel
                              0,
                              0,
@@ -5078,6 +5149,7 @@ double *cv){
                                  OP_NOOP, // no permutations
                                  0, // no score
                                  0, // no ocg
+                                 NULL,
                                  0, // don't explicity suppress parallel
                                  0,
                                  0,
@@ -5131,6 +5203,7 @@ double *cv){
                                OP_NOOP, // no permutations
                                0, // no score
                                0, // no ocg
+                               NULL,
                                0, // don't explicity suppress parallel
                                0,
                                0,
@@ -5547,6 +5620,7 @@ double *SIGN){
                            pop, // permutations used for gradients
                            0, // no score
                            do_grad, // ocg if grad 
+                           NULL,
                            0, // don't explicity suppress parallel
                            NCOL_Y,
                            0,
@@ -5798,6 +5872,7 @@ double *SIGN){
                                  OP_NOOP, // no permutations
                                  0, // no score
                                  do_ocg, // ocg
+                                 NULL,
                                  1, // explicity suppress parallel
                                  nrc3,
                                  nrc3,
@@ -5868,6 +5943,7 @@ double *SIGN){
                              OP_NOOP, // no permutations
                              0, // no score
                              do_ocg, // no ocg
+                             NULL,
                              1, //  explicity suppress parallel
                              nrc3,
                              nrc3,
@@ -6158,6 +6234,7 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, //  explicity suppress parallel
                          0,
                          0,
@@ -6280,6 +6357,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, //  explicity suppress parallel
                          0,
                          0,
@@ -6336,6 +6414,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, //  explicity suppress parallel
                          0,
                          0,
@@ -6503,6 +6582,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, //  explicity suppress parallel
                          0,
                          0,
@@ -6721,6 +6801,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, //  do not explicity suppress parallel
                          0,
                          0,
@@ -6768,6 +6849,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          OP_NOOP, // no permutations
                          0, // no score
                          0, // no ocg
+                         NULL,
                          0, //  do not explicity suppress parallel
                          0,
                          0,
@@ -6868,8 +6950,18 @@ double * log_likelihood
   double INT_KERNEL_P;					 /* Integral of K(z)^2 */
   double K_INT_KERNEL_P;				 /*  K^p */
   /* Integral of K(z-0.5)*K(z+0.5) */
+	double INT_KERNEL_PM_HALF = 0.0;
+	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
+
 
   double ** matrix_bandwidth = NULL, * lambda = NULL;
+
+  const int do_grad = (kdf_deriv != NULL); 
+  const int do_gerr = (kdf_deriv_stderr != NULL);
+
+  struct th_table * otabs = NULL;
+  struct th_entry * ret = NULL;
+  int ** matrix_ordered_indices = NULL;
 
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
@@ -6899,15 +6991,67 @@ double * log_likelihood
 
   double * ksd = NULL, * ksn = NULL;
 
+  double * permn = NULL, * permd = NULL;
+
+  int * bpso = NULL;
+
   if(num_Y_continuous != 0) {
-    initialize_kernel_density_asymptotic_constants(KERNEL_Y,
-                                                   num_cXY,
-                                                   &INT_KERNEL_P,
-                                                   &K_INT_KERNEL_P);
+    initialize_kernel_regression_asymptotic_constants(KERNEL_Y,
+                                                      num_cXY,
+                                                      &INT_KERNEL_P,
+                                                      &K_INT_KERNEL_P,
+                                                      &INT_KERNEL_PM_HALF,
+                                                      &DIFF_KER_PPM);
   } else {
     INT_KERNEL_P = 1.0;
     K_INT_KERNEL_P = 1.0;
   }
+
+  const double gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
+
+  if(do_grad && (num_X_ordered > 0)){
+    otabs = (struct th_table *)malloc(num_X_ordered*sizeof(struct th_table));
+    matrix_ordered_indices = (int **)malloc(num_oXY*sizeof(int *));
+    int * tc = (int *)malloc(num_X_ordered*num_obs_eval*sizeof(int));
+    for(l = 0; l < num_X_ordered; l++)
+      matrix_ordered_indices[l] = tc + l*num_obs_eval;
+
+    //  pad out the moo with some fake entries at the end to stop kernel_weighted_sum_np from
+    //  doing anything undefined
+    
+    for(; l < num_uXY; l++)
+      matrix_ordered_indices[l] = tc;
+
+    for(l = 0; l < num_X_ordered; l++){
+      if(thcreate_r((size_t)ceil(1.6*num_categories[l+num_X_unordered]), otabs + l) == TH_ERROR)
+        error("hash table creation failed");
+
+      for(i = 0; i < num_categories[l+num_X_unordered]; i++){
+        struct th_entry centry;
+        centry.key.dkey = matrix_categorical_vals[l+num_X_unordered][i];
+        centry.data = i;
+
+        if(thsearch_r(&centry, TH_ENTER, &ret, otabs+l) == TH_FAILURE)
+          error("insertion into hash table failed");
+      }
+
+      // now do lookups
+      struct th_entry te;
+      te.key.dkey = ret->key.dkey;
+      te.data = ret->data;
+
+      for(i = 0; i < num_obs_eval; i++){
+        if(ret->key.dkey != matrix_XY_ordered_eval[l][i]){
+          te.key.dkey = matrix_XY_ordered_eval[l][i];
+          if(thsearch_r(&te, TH_SEARCH, &ret, otabs+l) == TH_FAILURE)
+            error("hash table lookup failed (which should be impossible)");
+        } 
+
+        matrix_ordered_indices[l][i] = ret->data;
+      }
+    }
+  }
+
 
   operator_XY = (int *)malloc(sizeof(int)*num_XY);
   operator_X = (int *)malloc(sizeof(int)*num_X);
@@ -6923,6 +7067,32 @@ double * log_likelihood
   ksn = (double *)malloc(num_obs_eval_alloc*sizeof(double));
 
   icX = (int *)malloc(sizeof(int)*num_X_continuous);
+
+  if(do_grad){
+    permn = (double *)malloc(num_X*num_obs_eval_alloc*sizeof(double));
+    permd = (double *)malloc(num_X*num_obs_eval_alloc*sizeof(double));
+    bpso = (int *)malloc(num_XY*sizeof(int));
+
+    // only enable gradients for 'X' variables
+    for(i = 0; i < num_X_continuous; i++)
+      bpso[i] = 1;
+
+    for(; i < num_cXY; i++)
+      bpso[i] = 0;
+
+    for(; i < num_cXY + num_X_unordered; i++)
+      bpso[i] = 1;
+
+    for(; i < num_cXY + num_uXY; i++)
+      bpso[i] = 0;
+
+    for(; i < num_cXY + num_uXY + num_X_ordered; i++)
+      bpso[i] = 1;
+
+    for(; i < num_XY; i++)
+      bpso[i] = 0;
+
+  }
 
   if(is_cpdf){
     matrix_bandwidth = alloc_matd(bwmdim,num_Y_continuous);
@@ -7009,9 +7179,10 @@ double * log_likelihood
                          0, // drop train
                          0, // drop which train
                          operator_XY, 
-                         OP_NOOP, // no permutations
+                         do_grad ? OP_DERIVATIVE : OP_NOOP, // no permutations
                          0, // no score
-                         0, // no ocg
+                         do_grad, // no ocg
+                         bpso,
                          0, // do not explicity suppress parallel
                          0, // ncol y
                          0, // ncol w
@@ -7031,9 +7202,9 @@ double * log_likelihood
                          vsf_XY, 
                          num_categories_XY,
                          matrix_categorical_vals_XY,
-                         NULL, // moo
+                         matrix_ordered_indices, 
                          ksn,  // weighted sum
-                         NULL, // no permutations
+                         permn, // permutations
                          NULL); // do not return kernel weights
 
   //x - we assume x is in xy tree order
@@ -7058,9 +7229,10 @@ double * log_likelihood
                          0, // do not drop train
                          0, // do not drop train
                          operator_X, // no convolution
-                         OP_NOOP, // no permutations
+                         do_grad ? OP_DERIVATIVE : OP_NOOP, // no permutations
                          0, // no score
-                         0, // no ocg
+                         do_grad, // no ocg
+                         bpso,
                          0, //  do not explicity suppress parallel
                          0,
                          0,
@@ -7080,9 +7252,9 @@ double * log_likelihood
                          vsf_X,
                          num_categories,
                          matrix_categorical_vals,
-                         NULL, // moo
+                         matrix_ordered_indices, // moo
                          ksd,  // weighted sum
-                         NULL, // no permutations
+                         permd, // no permutations
                          NULL); // do not return kernel weights
 
   
@@ -7116,6 +7288,42 @@ double * log_likelihood
 
   }
 
+  if(do_grad) {
+    for(l = 0; l < num_X_continuous; l++){
+      for(i = 0; i < num_obs_eval; i++){
+        const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
+        kdf_deriv[l][i] = (permn[l*num_obs_eval + i]-kdf[i]*permd[l*num_obs_eval + i])/sk;
+
+        if(do_gerr)
+          kdf_deriv_stderr[l][i] = gfac*kdf_stderr[i]/((BANDWIDTH_den == BW_ADAP_NN) ? 1.0 : ((BANDWIDTH_den == BW_GEN_NN) ? matrix_bandwidth[l][i]:matrix_bandwidth[l][0]));
+      }
+    }
+
+    for(; l < num_X_continuous + num_X_unordered; l++){
+      for(i = 0; i < num_obs_eval; i++){
+        const int li = l*num_obs_eval + i;
+        const double sk = copysign(DBL_MIN, permd[li]) + permd[li];
+        const double s1 = permn[li]/sk;
+
+        kdf_deriv[l][i] = kdf[i] - s1;
+        kdf_deriv_stderr[l][i] = 0.0;
+      }
+    }
+
+    for(; l < num_X; l++){
+      for(i = 0; i < num_obs_eval; i++){
+        const int li = l*num_obs_eval + i;
+        const double sk = copysign(DBL_MIN, permd[li]) + permd[li];
+        const double s1 = permn[li]/sk;
+
+        kdf_deriv[l][i] = (kdf[i] - s1)*((matrix_ordered_indices[l - num_X_continuous - num_X_unordered][i] != 0) ? 1.0 : -1.0);
+        kdf_deriv_stderr[l][i] = 0.0;
+      }
+    }
+
+
+  }
+
   free(operator_XY);
   free(operator_X);
 
@@ -7131,6 +7339,22 @@ double * log_likelihood
 
   free(icX);
   clean_nl(&nls);
+
+  if(do_grad){
+    free(permn);
+    free(permd);
+    free(bpso);
+  }
+
+
+  // clean up hash stuff
+  if(do_grad && (num_X_ordered > 0)){
+    for(l = 0; l < num_X_ordered; l++)
+      thdestroy_r(otabs+l);
+    free(otabs);
+    free(matrix_ordered_indices[0]);
+    free(matrix_ordered_indices);
+  }
 
   if(is_cpdf){
     free(lambda);
