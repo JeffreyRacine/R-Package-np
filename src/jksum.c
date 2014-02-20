@@ -6945,7 +6945,7 @@ double * log_likelihood
 
   const int is_cpdf = (yop == OP_NORMAL);
 
-  int i,l;
+  int i,l,k;
   
   double INT_KERNEL_P;					 /* Integral of K(z)^2 */
   double K_INT_KERNEL_P;				 /*  K^p */
@@ -6954,7 +6954,8 @@ double * log_likelihood
 	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
 
 
-  double ** matrix_bandwidth = NULL, * lambda = NULL;
+  double ** matrix_bandwidth_Y = NULL, * lambda = NULL;
+  double ** matrix_bandwidth_X = NULL;
 
   const int do_grad = (kdf_deriv != NULL); 
   const int do_gerr = (kdf_deriv_stderr != NULL);
@@ -6966,7 +6967,7 @@ double * log_likelihood
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
 
-  double pnh;
+  double pnh = num_obs_train;
 
   const double log_DBL_MIN = log(DBL_MIN);
 
@@ -7007,7 +7008,7 @@ double * log_likelihood
     K_INT_KERNEL_P = 1.0;
   }
 
-  const double gfac = sqrt(DIFF_KER_PPM/K_INT_KERNEL_P);
+  const double gfac = is_cpdf ? sqrt(DIFF_KER_PPM/INT_KERNEL_P) : sqrt(DIFF_KER_PPM);
 
   if(do_grad && (num_X_ordered > 0)){
     otabs = (struct th_table *)malloc(num_X_ordered*sizeof(struct th_table));
@@ -7094,33 +7095,36 @@ double * log_likelihood
 
   }
 
-  if(is_cpdf){
-    matrix_bandwidth = alloc_matd(bwmdim,num_Y_continuous);
-    lambda = alloc_vecd(num_Y_unordered+num_Y_ordered);
+  matrix_bandwidth_Y = alloc_matd(bwmdim,num_Y_continuous);
+  matrix_bandwidth_X = alloc_matd(bwmdim,num_X_continuous);
+  lambda = alloc_vecd(num_uXY + num_oXY);
 
-    if(kernel_bandwidth_mean(KERNEL_Y,
-			     BANDWIDTH_den,
-			     num_obs_train,
-			     num_obs_eval,
-			     num_Y_continuous,
-			     num_Y_unordered,
-			     num_Y_ordered,
-			     0,0,0,
-			     0,
-			     vector_scale_factor,
-			     matrix_XY_continuous_train + num_X_continuous,
-			     matrix_XY_continuous_eval + num_X_continuous,
-			     NULL, NULL,
-			     matrix_bandwidth,
-			     NULL,
-			     lambda)==1){
+  if(kernel_bandwidth_mean(KERNEL_Y,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           num_obs_eval,
+                           num_Y_continuous,
+                           num_Y_unordered,
+                           num_Y_ordered,
+                           num_X_continuous,
+                           num_X_unordered,
+                           num_X_ordered,
+                           0,
+                           vector_scale_factor,
+                           matrix_XY_continuous_train + num_X_continuous,
+                           matrix_XY_continuous_eval + num_X_continuous,
+                           matrix_XY_continuous_train,
+                           matrix_XY_continuous_eval,
+                           matrix_bandwidth_Y,
+                           matrix_bandwidth_X,
+                           lambda)==1){
 #ifdef MPI2
-      MPI_Barrier(comm[1]);
-      MPI_Finalize();
+    MPI_Barrier(comm[1]);
+    MPI_Finalize();
 #endif
-      error("\n** Error: invalid bandwidth.");
-    }
+    error("\n** Error: invalid bandwidth.");
   }
+
 
   // relevant dimensions for partial tree search
   for(i = 0; i < num_X_continuous; i++)
@@ -7261,7 +7265,7 @@ double * log_likelihood
   if (is_cpdf) {
     if(BANDWIDTH_den == BW_FIXED){
       for(l = 0, pnh = num_obs_train; l < num_Y_continuous; l++){      
-        pnh *= matrix_bandwidth[l][0];
+        pnh *= matrix_bandwidth_Y[l][0];
       }
     }
 
@@ -7272,7 +7276,7 @@ double * log_likelihood
 
       if(BANDWIDTH_den == BW_GEN_NN){
         for(l = 0, pnh = num_obs_train; l < num_Y_continuous; l++){
-          pnh *= matrix_bandwidth[l][i];
+          pnh *= matrix_bandwidth_Y[l][i];
         }
       }
 
@@ -7292,10 +7296,14 @@ double * log_likelihood
     for(l = 0; l < num_X_continuous; l++){
       for(i = 0; i < num_obs_eval; i++){
         const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
+
         kdf_deriv[l][i] = (permn[l*num_obs_eval + i]-kdf[i]*permd[l*num_obs_eval + i])/sk;
 
-        if(do_gerr)
-          kdf_deriv_stderr[l][i] = gfac*kdf_stderr[i]/((BANDWIDTH_den == BW_ADAP_NN) ? 1.0 : ((BANDWIDTH_den == BW_GEN_NN) ? matrix_bandwidth[l][i]:matrix_bandwidth[l][0]));
+        if(do_gerr){
+          const double hfac = ((BANDWIDTH_den == BW_ADAP_NN) ? 1.0 : ((BANDWIDTH_den == BW_GEN_NN) ? matrix_bandwidth_X[l][i]:matrix_bandwidth_X[l][0]));
+          if(
+          kdf_deriv_stderr[l][i] = gfac*kdf_stderr[i]/hfac;
+        }
       }
     }
 
@@ -7306,7 +7314,21 @@ double * log_likelihood
         const double s1 = permn[li]/sk;
 
         kdf_deriv[l][i] = kdf[i] - s1;
-        kdf_deriv_stderr[l][i] = 0.0;
+        
+        // covariance is missing
+        if(do_gerr){
+          if(is_cpdf){
+            if(BANDWIDTH_den == BW_GEN_NN){
+              for(k = 0, pnh = num_obs_train; k < num_Y_continuous; k++){
+                pnh *= matrix_bandwidth_Y[k][i];
+              }
+            }
+
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*K_INT_KERNEL_P/pnh);
+          }
+          else
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*(1.0-s1)/((double)num_obs_train));
+        }
       }
     }
 
@@ -7317,7 +7339,21 @@ double * log_likelihood
         const double s1 = permn[li]/sk;
 
         kdf_deriv[l][i] = (kdf[i] - s1)*((matrix_ordered_indices[l - num_X_continuous - num_X_unordered][i] != 0) ? 1.0 : -1.0);
-        kdf_deriv_stderr[l][i] = 0.0;
+
+        // covariance is missing
+        if(do_gerr){
+          if(is_cpdf){
+            if(BANDWIDTH_den == BW_GEN_NN){
+              for(k = 0, pnh = num_obs_train; k < num_Y_continuous; k++){
+                pnh *= matrix_bandwidth_Y[k][i];
+              }
+            }
+
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*K_INT_KERNEL_P/pnh);
+          } else
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*(1.0-s1)/((double)num_obs_train));
+
+        }
       }
     }
 
@@ -7356,10 +7392,9 @@ double * log_likelihood
     free(matrix_ordered_indices);
   }
 
-  if(is_cpdf){
-    free(lambda);
-    free_mat(matrix_bandwidth, num_Y_continuous);
-  }
+  free(lambda);
+  free_mat(matrix_bandwidth_Y, num_Y_continuous);
+  free_mat(matrix_bandwidth_X, num_X_continuous);
 }
 
 void np_splitxy_vsf_mcv_nc(const int num_var_unordered,
