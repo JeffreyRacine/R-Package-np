@@ -7301,7 +7301,6 @@ double * log_likelihood
 
         if(do_gerr){
           const double hfac = ((BANDWIDTH_den == BW_ADAP_NN) ? 1.0 : ((BANDWIDTH_den == BW_GEN_NN) ? matrix_bandwidth_X[l][i]:matrix_bandwidth_X[l][0]));
-          if(
           kdf_deriv_stderr[l][i] = gfac*kdf_stderr[i]/hfac;
         }
       }
