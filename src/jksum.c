@@ -6967,7 +6967,7 @@ double * log_likelihood
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
 
-  double pnh = num_obs_train;
+  double pnh = 1.0;
 
   const double log_DBL_MIN = log(DBL_MIN);
 
@@ -6996,9 +6996,11 @@ double * log_likelihood
 
   int * bpso = NULL;
 
-  if(num_Y_continuous != 0) {
+  const int p = is_cpdf ? num_cXY : num_X_continuous;
+
+  if(p != 0) {
     initialize_kernel_regression_asymptotic_constants(KERNEL_Y,
-                                                      num_cXY,
+                                                      p,
                                                       &INT_KERNEL_P,
                                                       &K_INT_KERNEL_P,
                                                       &INT_KERNEL_PM_HALF,
@@ -7008,7 +7010,8 @@ double * log_likelihood
     K_INT_KERNEL_P = 1.0;
   }
 
-  const double gfac = is_cpdf ? sqrt(DIFF_KER_PPM/INT_KERNEL_P) : sqrt(DIFF_KER_PPM);
+
+  const double gfac = sqrt(DIFF_KER_PPM/INT_KERNEL_P);
 
   if(do_grad && (num_X_ordered > 0)){
     otabs = (struct th_table *)malloc(num_X_ordered*sizeof(struct th_table));
@@ -7264,7 +7267,11 @@ double * log_likelihood
   
   if (is_cpdf) {
     if(BANDWIDTH_den == BW_FIXED){
-      for(l = 0, pnh = num_obs_train; l < num_Y_continuous; l++){      
+      for(l = 0, pnh = 1.0; l < num_X_continuous; l++){      
+        pnh *= matrix_bandwidth_X[l][0];
+      }
+
+      for(l = 0; l < num_Y_continuous; l++){      
         pnh *= matrix_bandwidth_Y[l][0];
       }
     }
@@ -7275,19 +7282,37 @@ double * log_likelihood
       *log_likelihood += (kdf[i] < DBL_MIN) ? log_DBL_MIN : log(kdf[i]);
 
       if(BANDWIDTH_den == BW_GEN_NN){
-        for(l = 0, pnh = num_obs_train; l < num_Y_continuous; l++){
+        for(l = 0, pnh = 1.0; l < num_X_continuous; l++){      
+          pnh *= matrix_bandwidth_X[l][i];
+        }
+
+        for(l = 0; l < num_Y_continuous; l++){
           pnh *= matrix_bandwidth_Y[l][i];
         }
       }
 
-      kdf_stderr[i] = sqrt(kdf[i]*K_INT_KERNEL_P/pnh);
+      kdf_stderr[i] = sqrt(kdf[i]*K_INT_KERNEL_P/(pnh*sk));
    
     }
   } else {
+
+    if(BANDWIDTH_den == BW_FIXED){
+      for(l = 0, pnh = 1.0; l < num_X_continuous; l++){      
+        pnh *= matrix_bandwidth_X[l][0];
+      }
+    }
+
     for(i = 0, *log_likelihood = 0.0; i < num_obs_eval; i++){
       const double sk = copysign(DBL_MIN, ksd[i]) + ksd[i];
       kdf[i] = ksn[i]/sk;
-      kdf_stderr[i] = sqrt(kdf[i]*(1.0-kdf[i])/(double)num_obs_train);
+
+      if(BANDWIDTH_den == BW_GEN_NN){
+        for(l = 0, pnh = 1.0; l < num_X_continuous; l++){
+          pnh *= matrix_bandwidth_X[l][i];
+        }
+      }
+
+      kdf_stderr[i] = sqrt(kdf[i]*(1.0-kdf[i])*K_INT_KERNEL_P/(pnh*sk));
     }
 
   }
@@ -7318,15 +7343,26 @@ double * log_likelihood
         if(do_gerr){
           if(is_cpdf){
             if(BANDWIDTH_den == BW_GEN_NN){
-              for(k = 0, pnh = num_obs_train; k < num_Y_continuous; k++){
+             for(k = 0, pnh = 1.0; k < num_X_continuous; k++){
+                pnh *= matrix_bandwidth_X[k][i];
+              }
+
+              for(k = 0; k < num_Y_continuous; k++){
                 pnh *= matrix_bandwidth_Y[k][i];
               }
             }
 
-            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*K_INT_KERNEL_P/pnh);
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*K_INT_KERNEL_P/(pnh*sk));
           }
-          else
-            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*(1.0-s1)/((double)num_obs_train));
+          else {
+            if(BANDWIDTH_den == BW_GEN_NN){
+             for(k = 0, pnh = 1.0; k < num_X_continuous; k++){
+                pnh *= matrix_bandwidth_X[k][i];
+              }
+            }
+
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*(1.0-s1)*K_INT_KERNEL_P/(pnh*sk));
+          }
         }
       }
     }
@@ -7343,15 +7379,25 @@ double * log_likelihood
         if(do_gerr){
           if(is_cpdf){
             if(BANDWIDTH_den == BW_GEN_NN){
-              for(k = 0, pnh = num_obs_train; k < num_Y_continuous; k++){
+             for(k = 0, pnh = 1.0; k < num_X_continuous; k++){
+                pnh *= matrix_bandwidth_X[k][i];
+              }
+
+              for(k = 0; k < num_Y_continuous; k++){
                 pnh *= matrix_bandwidth_Y[k][i];
               }
             }
 
-            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*K_INT_KERNEL_P/pnh);
-          } else
-            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*(1.0-s1)/((double)num_obs_train));
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*K_INT_KERNEL_P/(pnh*sk));
+          } else {
+            if(BANDWIDTH_den == BW_GEN_NN){
+             for(k = 0, pnh = 1.0; k < num_X_continuous; k++){
+                pnh *= matrix_bandwidth_X[k][i];
+              }
+            }
 
+            kdf_deriv_stderr[l][i] = sqrt(kdf_stderr[i]*kdf_stderr[i] + s1*(1.0-s1)*K_INT_KERNEL_P/(pnh*sk));
+          }
         }
       }
     }
