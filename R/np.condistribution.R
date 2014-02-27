@@ -217,7 +217,7 @@ npcdist.condbandwidth <-
             liracine = UKER_LR),
         oxkerneval = switch(bws$oxkertype,
             wangvanryzin = OKER_WANG,
-            liracine = OKER_LR),
+            liracine = OKER_NLR),
         oykerneval = switch(bws$oykertype,
             wangvanryzin = OKER_WANG,
             liracine = OKER_NLR),
