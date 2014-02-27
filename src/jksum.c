@@ -2357,7 +2357,7 @@ double * const kw){
         if(p_nvar == 0){
           np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), ip, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
         }
       }
       else
@@ -2392,7 +2392,7 @@ double * const kw){
 
     for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
       if(doscoreocg){
-        np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], ip, p_nvar, xtu[i], num_xt, l, xu[i][j], 
+        np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
                       lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0));
       } else {
         np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
@@ -2418,7 +2418,7 @@ double * const kw){
                              tprod, swap_xxt);
         }
       } else {
-        np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel[i], ip, p_nvar, xto[i], num_xt, l,
+        np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel[i], k, p_nvar, xto[i], num_xt, l,
                       xo[i][j], lambda[num_reg_unordered+i], 
                       (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                       (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
@@ -4151,39 +4151,39 @@ double *cv){
                              num_reg_ordered,
                              num_reg_continuous,
                              0, // (do not) compute the leave-one-out marginals
-                             0,
-                             1,
-                             0,
-                             0, 
-                             0,
-                             0,
-                             0,
-                             0,
+                             0, // '' offset
+                             1, // kernel power
+                             0, // bandwidth_divide
+                             0, // '' weights
+                             0, // symmetric
+                             0, // gather_scatter sum
+                             0, // drop train
+                             0, // drop which train
                              x_operator,
                              OP_NOOP, // no permutations
                              0, // no score
                              0, // no ocg
-                             NULL,
+                             NULL, // explicit bpso
                              0, // don't explicity suppress parallel
-                             0,
-                             0,
-                             int_TREE_X,
-                             0,
-                             kdt_extern_X,
-                             NULL, NULL, NULL,
-                             matrix_X_unordered_train,
+                             0, // ncol y 
+                             0, // ncol w
+                             int_TREE_X, // do tree
+                             0, // do partial tree 
+                             kdt_extern_X, // which tree
+                             NULL, NULL, NULL, // partial tree data
+                             matrix_X_unordered_train, 
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
                              matrix_wX_unordered_train,
                              matrix_wX_ordered_train,
                              matrix_wX_continuous_train,
-                             NULL,
-                             NULL,
-                             NULL,
+                             NULL, // matrix y
+                             NULL, // matrix w
+                             NULL, // sgn
                              vsfx,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
-                             NULL,
+                             NULL, // moo
                              mean,
                              NULL, // no permutations
                              kwx);
@@ -7239,7 +7239,7 @@ double * log_likelihood
                          do_grad ? OP_DERIVATIVE : OP_NOOP, // no permutations
                          0, // no score
                          do_grad, // no ocg
-                         bpso,
+                         NULL, // bpso = TRUE for all xi
                          0, //  do not explicity suppress parallel
                          0,
                          0,
