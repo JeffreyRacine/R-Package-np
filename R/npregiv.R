@@ -469,7 +469,7 @@ npregiv <- function(y,
       xdat.numeric <- as.data.frame(xdat[,xdat.col.numeric])
     }
   
-    if(length(degree) != ncol(xdat.numeric)) stop(" degree vector and number of numeric predictors incompatible")
+    if(length(degree) != k) stop(" degree vector and number of numeric predictors incompatible")
   
     if(all(degree == 0) | k == 0) {
   
