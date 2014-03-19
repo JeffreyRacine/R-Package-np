@@ -385,13 +385,13 @@ npregivderiv <- function(y,
       xdat.numeric <- as.data.frame(xdat[,xdat.col.numeric])
     }
 
-    if(length(degree) != ncol(xdat.numeric)) stop(" degree vector and number of numeric predictors incompatible")
+    if(length(degree) != k) stop(" degree vector and number of numeric predictors incompatible")
 
     if(all(degree == 0) | k == 0) {
 
       ## Local constant OR no continuous variables
 
-      return(matrix(1,nrow=nrow(xdat.numeric),ncol=1))
+      return(matrix(1,nrow=nrow(xdat),ncol=1))
 
     } else {
 
@@ -411,7 +411,7 @@ npregivderiv <- function(y,
           }
         }
       }
-      res <- rep.int(1,nrow(xdat.numeric))
+      res <- rep.int(1,nrow(xdat))
       if(degree[1] > 0) res <- cbind(1, mypoly(xdat.numeric[,1], degree[1]))[, 1 + z[, 1]]
       if(k > 1) for (i in 2:k) if(degree[i] > 0) res <- res * cbind(1, mypoly(xdat.numeric[,i], degree[i]))[, 1 + z[, i]]
       res <- as.matrix(res)

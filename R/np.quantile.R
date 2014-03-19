@@ -22,8 +22,8 @@ npquantile <- function(x=NULL,
   ## grid.
 
   x.er <- extendrange(x,f=f)
-  x.eval <- sort(c(seq(x.er[1],x.er[2],length=num.eval),
-                     quantile(x,tau)))
+  x.eval <- na.omit(sort(c(seq(x.er[1],x.er[2],length=num.eval),
+                           quantile(x,tau,na.rm=TRUE))))
 
   F <- fitted(npudist(tdat=x,
                       edat=x.eval,
