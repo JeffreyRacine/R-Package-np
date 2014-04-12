@@ -35,7 +35,7 @@ mydat <- data.frame(x=data[,2],y=data[,1])
 
 mpi.bcast.Robj2slave(mydat)
 
-## A conditional density estimation example. 
+## A conditional distribution estimation example. 
 
 t <- system.time(mpi.bcast.cmd(bw <- npcdistbw(y~x,
                                                bwmethod="cv.ls",

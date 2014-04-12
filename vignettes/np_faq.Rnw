@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.86 2014/01/22 00:04:33 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.88 2014/03/18 18:03:25 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{npRmpi}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -581,6 +581,54 @@ plot(n.seq.aug,time.fcst/3600,type="b",
      "hours"))
 \end{verbatim}
   \end{singlespacing}
+
+\subsection{I need to apply a boundary correction for a univariate
+  density estimate - how can I do this?}
+
+You could do this using `data-reflection' (see the description in
+\cite[Page 30]{SILVERMAN:1986}, as the following illustration
+demonstrates.
+
+\begin{verbatim}
+## Use trees to speed up estimation 
+options(np.tree=TRUE)
+
+## Generate data where there is an asymptote at the left boundary
+
+set.seed(42)
+n <- 10000
+x <- sort(rexp(n))
+
+## Compute the bandwidth for the original data
+
+bw <- npudensbw(~x,ckertype="epanechnikov")
+
+## Construct the standard (i.e. no boundary correction) kernel estimate
+
+f.hat <- fitted(npudens(~x,bws=bw$bw,ckertype="epanechnikov"))
+
+## Reflect the data, compute the reflected density then take the estimator which
+## is 2 times the reflected density estimate for x >= 0 (see Silverman (1986,
+## page 30))
+
+x.reflect <- c(x,-x)
+f.reflect <- npudens(~x.reflect,bws=bw$bw,ckertype="epanechnikov")
+f.boundary <- 2*predict(f.reflect,newdata=data.frame(x.reflect=x))
+
+## Plot the nonsmooth histogram, the standard estimator, then the
+## boundary-corrected estimator
+
+hist(x,breaks=100,lty=3,freq=FALSE,ylim=c(0,1),main="")
+rug(x)
+lines(x,f.hat,col=1,lwd=2,lty=1)
+lines(x,f.boundary,col=2,lwd=2,lty=2)
+legend("topright",
+       c("Standard Kernel Estimator (no boundary correction)",
+         "Data-reflected Kernel Estimator (boundary correction)"),
+       lty=1:2,
+       col=1:2,
+       bty="n")
+\end{verbatim}
 
 \subsection{I notice your density estimator supports manual bandwidths,
     the normal-reference rule-of-thumb, likelihood cross-validation
@@ -1548,6 +1596,41 @@ sometimes surprising that such things can in fact make a
 difference. See \texttt{?scale} for a function whose default method
 centers and/or scales the columns of a numeric matrix.
 
+\subsection{The local linear gradient estimates appear to be somewhat
+  `off' in that they do not correspond to the first derivative of the
+  estimated regression function.}
+
+It is perhaps not a widely known fact that the local linear partial
+derivatives obtained from the coefficients of the Taylor
+approximation, $\hat b(x)$, are not the analytical derivative of the
+estimated regression $\hat g(x)$ with respect to $x$.  The local
+linear estimator is obtained by minimizing (consider the one-predictor
+case to fix ideas)
+\begin{equation*}
+\sum_i(Y_i - a - b (x-X_i))^2 K\left(\frac{x-X_i}{h}\right)
+\end{equation*}
+and the estimated regression function $\hat g(x)$ is given by
+\begin{equation*}
+\hat g(x) =\hat a 
+\end{equation*}
+while the gradient is given by
+\begin{equation*}
+\hat \beta(x)=\hat b.
+\end{equation*}
+But the analytical gradient (i.e.\ the partial derivative of $\hat
+g(x)=\hat a$ with respect to $x$) is \textsl{not} $\hat b$ (if you compute
+the partial algebraically you will see they are not the same), unless
+the bandwidth is very large (i.e.\ $h=\infty$).
+
+So, the derivative estimates arising directly from the local linear
+estimator will differ from the analytical derivatives, even though
+they are asymptotically equivalent under standard conditions required
+for consistency. Thus, if economic constraints are imposed on the
+direct derivatives, this may produce an estimated surface which is not
+consistent with the constraints.  This can be avoided by imposing the
+constraints on the analytical derivatives of the local polynomial
+estimator being used.
+
 \subsection{How can I turn off all console I/O?}
 
 To disable all console I/O, set \texttt{options(np.messages=FALSE)}
@@ -1623,7 +1706,7 @@ ought to produce no console I/O whatsoever in the call to
   npksum(txdat=data.frame(x1,x2),operator=c("derivative","normal"),bws=c(1,1))
 \end{verbatim}
   will use the derivative kernel for x1 (i.e. the derivative of the
-  Gaussian kernel) and the default kernel for x2 (i.e. a standard
+  gaussian kernel) and the default kernel for x2 (i.e. a standard
   kernel such as the gaussian) thereby allowing the user to program a
   number of estimators such as conditional CDFs etc. that were
   previously not available via \texttt{npksum()}

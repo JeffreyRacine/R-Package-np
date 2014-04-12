@@ -14,7 +14,7 @@ n <- 100000
 
 mydat <- data.frame(x=rnorm(n))
 
-## A simple example with likelihood cross-validation
+## A simple example with cross-validation
 
 t <- system.time(bw <- npudistbw(~x,
                                  bwmethod="cv.cdf",

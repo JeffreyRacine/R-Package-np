@@ -28,7 +28,7 @@ n <- 100000
 mydat <- data.frame(x=rnorm(n))
 mpi.bcast.Robj2slave(mydat)
 
-## A simple example with likelihood cross-validation
+## A simple example with cross-validation
 
 t <- system.time(mpi.bcast.cmd(bw <- npudistbw(~x,
                                                bwmethod="cv.cdf",
