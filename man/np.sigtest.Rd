@@ -31,7 +31,7 @@ npsigtest(bws, \dots)
           xdat = stop("data xdat missing"),
           ydat = stop("data ydat missing"),
           boot.num = 399,
-          boot.method = c("pairwise","iid","wild","wild-rademacher"),
+          boot.method = c("iid","wild","wild-rademacher","pairwise"),
           boot.type = c("I","II"),
           pivot=TRUE,
           joint=FALSE,
@@ -80,7 +80,7 @@ npsigtest(bws, \dots)
     procedure.  \code{iid} will generate independent identically
     distributed draws. \code{wild} will use a wild
     bootstrap. \code{wild-rademacher} will use a wild bootstrap with
-    Rademacher variables. Defaults to \code{pairwise}.
+    Rademacher variables. Defaults to \code{iid}.
   }
 
   \item{boot.num}{
