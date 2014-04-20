@@ -153,8 +153,11 @@ npsigtest(bws, \dots)
   neighborhood (i.e.\ slightly smaller) of any classical level
   (e.g. 0.05) and you only have a modest amount of data, it might be
   prudent to re-run the test using the more computationally intensive
-  \code{boot.type="II"} setting to confirm the original result.
-
+  \code{boot.type="II"} setting to confirm the original result. Note
+  also that \code{boot.method="pairwise"} is not recommended for the
+  multivariate local linear estimator due to substantial size
+  distortions that may arise in certain cases.
+  
 }  
 
 \value{
