@@ -179,15 +179,21 @@ npsigtest.rbandwidth <- function(bws,
 
     if(boot.method != "pairwise") {
 
+      ## Compute scale and mean of unrestricted residuals
+
+      ei.unres <- scale(residuals(npreg(bws=bws)))
+      ei.unres.scale <- attr(ei.unres,"scaled:scale")
+      ei.unres.center <- attr(ei.unres,"scaled:center")      
+
       ## We now construct mhat.xi holding constant the variable whose
       ## significance is being tested at its median. First, make a copy
       ## of the data frame xdat
       
       xdat.eval <- xdat
       
-      ## Impose the null by evaluating the conditional holding xdat[,i]
-      ## constant at its median (numeric) or mode (factor/ordered) using
-      ## uocquantile()
+      ## Impose the null by evaluating the conditional mean holding
+      ## xdat[,i] constant at its median (numeric) or mode
+      ## (factor/ordered) using uocquantile()
 
       for(i in index) xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
       
@@ -196,12 +202,15 @@ npsigtest.rbandwidth <- function(bws,
                         exdat = xdat.eval,
                         bws = bws,
                         ...)$mean
+
+      ## Rescale and recenter the residuals under the null to those
+      ## under the alternative
       
-      ## Recenter the residuals
+      ei <- as.numeric(scale(ydat-mhat.xi)*ei.unres.scale+ei.unres.center)
       
-      delta.bar <- mean(ydat-mhat.xi)
-      
-      ei <- ydat - mhat.xi - delta.bar
+      ## Recenter the residuals to have mean zero
+
+      ei <- ei - mean(ei)
       
     }
     
@@ -371,16 +380,22 @@ npsigtest.rbandwidth <- function(bws,
       }
       
       if(boot.method != "pairwise") {
-        
+
+        ## Compute scale and mean of unrestricted residuals
+
+        ei.unres <- scale(residuals(npreg(bws=bws)))
+        ei.unres.scale <- attr(ei.unres,"scaled:scale")
+        ei.unres.center <- attr(ei.unres,"scaled:center")      
+
         ## We now construct mhat.xi holding constant the variable whose
         ## significance is being tested at its median. First, make a copy
         ## of the data frame xdat
         
         xdat.eval <- xdat
         
-        ## Impose the null by evaluating the conditional holding xdat[,i]
-        ## constant at its median (numeric) or mode (factor/ordered) using
-        ## uocquantile()
+        ## Impose the null by evaluating the conditional mean holding
+        ## xdat[,i] constant at its median (numeric) or mode
+        ## (factor/ordered) using uocquantile()
         
         xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
         
@@ -390,11 +405,14 @@ npsigtest.rbandwidth <- function(bws,
                           bws = bws,
                           ...)$mean
         
-        ## Recenter the residuals
+        ## Rescale and recenter the residuals under the null to those
+        ## under the alternative
         
-        delta.bar <- mean(ydat-mhat.xi)
+        ei <- as.numeric(scale(ydat-mhat.xi)*ei.unres.scale+ei.unres.center)
         
-        ei <- ydat - mhat.xi - delta.bar
+        ## Recenter the residuals to have mean zero
+        
+        ei <- ei - mean(ei)
         
       }
       
