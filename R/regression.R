@@ -1,55 +1,55 @@
-npregression = 
-  function(bws, eval, mean, merr = NA, grad = NA, gerr = NA,
-           resid = NA,
-           ntrain, trainiseval = FALSE, gradients = FALSE, residuals = FALSE,
-           xtra = rep(NA, 6),
-           rows.omit = NA){
+npregression <- 
+    function(bws, eval, mean, merr = NA, grad = NA, gerr = NA,
+             resid = NA,
+             ntrain, trainiseval = FALSE, gradients = FALSE, residuals = FALSE,
+             xtra = rep(NA, 6),
+             rows.omit = NA){
 
-    if (missing(bws) | missing(eval) | missing(ntrain))
-      stop("improper invocation of npregression constructor")
+        if (missing(bws) | missing(eval) | missing(ntrain))
+            stop("improper invocation of npregression constructor")
 
-    if (length(rows.omit) == 0)
-      rows.omit <- NA
+        if (length(rows.omit) == 0)
+            rows.omit <- NA
 
-    d = list(
-      bw = bws$bw,
-      bws = bws,
-      pregtype = bws$pregtype,
-      xnames = bws$xnames,
-      ynames = bws$ynames,
-      nobs = dim(eval)[1],
-      ndim = bws$ndim,
-      nord = bws$nord,
-      nuno = bws$nuno,
-      ncon = bws$ncon,
-      pscaling = bws$pscaling,
-      ptype = bws$ptype,
-      pckertype = bws$pckertype,
-      pukertype = bws$pukertype,
-      pokertype = bws$pokertype,
-      eval = eval,
-      mean = mean,
-      merr = merr,
-      grad = grad,
-      gerr = gerr,
-      resid = resid,
-      ntrain = ntrain,
-      trainiseval = trainiseval,
-      gradients = gradients,
-      residuals = residuals,
-      R2 = xtra[1],
-      MSE = xtra[2],
-      MAE = xtra[3],
-      MAPE = xtra[4],
-      CORR = xtra[5],
-      SIGN = xtra[6],
-      rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+        d <- list(
+            bw = bws$bw,
+            bws = bws,
+            pregtype = bws$pregtype,
+            xnames = bws$xnames,
+            ynames = bws$ynames,
+            nobs = dim(eval)[1],
+            ndim = bws$ndim,
+            nord = bws$nord,
+            nuno = bws$nuno,
+            ncon = bws$ncon,
+            pscaling = bws$pscaling,
+            ptype = bws$ptype,
+            pckertype = bws$pckertype,
+            pukertype = bws$pukertype,
+            pokertype = bws$pokertype,
+            eval = eval,
+            mean = mean,
+            merr = merr,
+            grad = grad,
+            gerr = gerr,
+            resid = resid,
+            ntrain = ntrain,
+            trainiseval = trainiseval,
+            gradients = gradients,
+            residuals = residuals,
+            R2 = xtra[1],
+            MSE = xtra[2],
+            MAE = xtra[3],
+            MAPE = xtra[4],
+            CORR = xtra[5],
+            SIGN = xtra[6],
+            rows.omit = rows.omit,
+            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
 
-    class(d) = "npregression"
+        class(d) <- "npregression"
 
-    d
-  }
+        return(d)
+    }
 
 print.npregression <- function(x, digits=NULL, ...){
   cat("\nRegression Data: ", x$ntrain, " training points,",

@@ -51,8 +51,22 @@ npreg.formula <-
                        "bws = bws, ...)")))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
-    ev$rows.omit <- as.vector(attr(umf,"na.action"))
+
+    ev$omit <- attr(umf,"na.action")
+    ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
+
+    ev$mean <- napredict(ev$omit, ev$mean)
+    ev$merr <- napredict(ev$omit, ev$merr)
+
+    if(ev$gradients){
+        ev$grad <- napredict(ev$omit, ev$grad)
+        ev$gerr <- napredict(ev$omit, ev$gerr)
+    }
+
+    if(ev$residuals){
+        ev$resid <- naresid(ev$omit, ev$resid)
+    }    
     return(ev)
   }
 
@@ -281,16 +295,17 @@ npreg.rbandwidth <-
 
 
     ev <- eval(parse(text = paste("npregression(bws = bws,",
-                       "eval = teval,",
-                       "mean = myout$mean, merr = myout$merr,",
-                       ifelse(gradients,
-                              "grad = myout$g, gerr = myout$gerr,",""),
-                       ifelse(residuals, "resid = resid,", ""),
-                       "ntrain = tnrow,",
-                       "trainiseval = no.ex,",
-                       "gradients = gradients,",
-                       "residuals = residuals,",
-                       "xtra = myout$xtra, rows.omit = rows.omit)")))
+                         "eval = teval,",
+                         "mean = myout$mean, merr = myout$merr,",
+                         ifelse(gradients,
+                                "grad = myout$g, gerr = myout$gerr,",""),
+                         ifelse(residuals, "resid = resid,", ""),
+                         "ntrain = tnrow,",
+                         "trainiseval = no.ex,",
+                         "gradients = gradients,",
+                         "residuals = residuals,",
+                         "xtra = myout$xtra, rows.omit = rows.omit)")))
+
 
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()

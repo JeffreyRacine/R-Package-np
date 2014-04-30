@@ -1,44 +1,44 @@
-npdensity =
-  function(bws, eval, dens,
-           derr = NA, ll = NA,
-           ntrain, trainiseval = FALSE,
-           rows.omit = NA){
+npdensity <- 
+    function(bws, eval, dens,
+             derr = NA, ll = NA,
+             ntrain, trainiseval = FALSE,
+             rows.omit = NA){
 
-    if (missing(bws) | missing(eval) | missing(dens) | missing(ntrain))
-      stop("improper invocation of density constructor")
+        if (missing(bws) | missing(eval) | missing(dens) | missing(ntrain))
+            stop("improper invocation of density constructor")
 
-    if (length(rows.omit) == 0)
-      rows.omit <- NA
-
-
-    d = list(
-      bw = bws$bw,
-      bws = bws,
-      xnames = bws$xnames,
-      nobs = nrow(eval),
-      ndim = bws$ndim,
-      nord = bws$nord,
-      nuno = bws$nuno,
-      ncon = bws$ncon,
-      pscaling = bws$pscaling,
-      ptype = bws$ptype,
-      pckertype = bws$pckertype,
-      pukertype = bws$pukertype,
-      pokertype = bws$pokertype,
-      eval = eval,
-      dens = dens,
-      derr = derr,
-      log_likelihood = ll,
-      ntrain = ntrain,
-      trainiseval = trainiseval,
-      rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+        if (length(rows.omit) == 0)
+            rows.omit <- NA
 
 
-    class(d) = "npdensity"
+        d <- list(
+            bw = bws$bw,
+            bws = bws,
+            xnames = bws$xnames,
+            nobs = nrow(eval),
+            ndim = bws$ndim,
+            nord = bws$nord,
+            nuno = bws$nuno,
+            ncon = bws$ncon,
+            pscaling = bws$pscaling,
+            ptype = bws$ptype,
+            pckertype = bws$pckertype,
+            pukertype = bws$pukertype,
+            pokertype = bws$pokertype,
+            eval = eval,
+            dens = dens,
+            derr = derr,
+            log_likelihood = ll,
+            ntrain = ntrain,
+            trainiseval = trainiseval,
+            rows.omit = rows.omit,
+            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
 
-    d
-  }
+
+        class(d) <- "npdensity"
+
+        return(d)
+    }
 
 print.npdensity <- function(x, digits=NULL, ...){
   cat("\nDensity Data: ", x$ntrain, " training points,",
