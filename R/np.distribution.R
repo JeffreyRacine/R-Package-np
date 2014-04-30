@@ -42,9 +42,15 @@ npudist.formula <-
     
     ev <- eval(parse(text=paste("npudist(tdat = tdat,",
                  ifelse(has.eval,"edat = edat,",""), "bws = bws, ...)")))
-    ev$rows.omit <- as.vector(attr(umf,"na.action"))
+
+    ev$omit <- attr(umf,"na.action")
+    ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
-    ev
+
+    ev$dist <- napredict(ev$omit, ev$dist)
+    ev$derr <- napredict(ev$omit, ev$derr)
+
+    return(ev)
   }
 
 npudist.call <-
