@@ -86,9 +86,18 @@ npplreg.formula <-
                    ifelse(has.eval,paste("exdat = exdat, ezdat = ezdat,",
                                          ifelse(has.ey,"eydat = eydat,","")),""),
                    "bws = bws, ...)")))
-    ev$rows.omit <- as.vector(attr(umf,"na.action"))
+
+    ev$omit <- attr(umf,"na.action")
+    ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
-    ev
+
+    ev$mean <- napredict(ev$omit, ev$mean)
+    ev$merr <- napredict(ev$omit, ev$merr)
+
+    if(ev$residuals){
+        ev$resid <- naresid(ev$omit, ev$resid)
+    }    
+    return(ev)
   }
 
 npplreg.call <-

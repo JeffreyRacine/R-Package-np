@@ -51,8 +51,15 @@ npconmode.formula <-
       eval(parse(text=paste("npconmode(txdat = txdat, tydat = tydat,",
                    ifelse(has.eval,paste("exdat = exdat,",ifelse(has.ey,"eydat = eydat,","")),""),
                    "bws = bws, ...)")))
-    ev$rows.omit <- as.vector(attr(umf,"na.action"))
+
+    ev$omit <- attr(umf,"na.action")
+    ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
+
+    ev$conmode <- napredict(ev$omit, ev$conmode)
+    ev$condens <- napredict(ev$omit, ev$condens)
+    ev$conderr <- napredict(ev$omit, ev$conderr)
+
     return(ev)
   }
 

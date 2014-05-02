@@ -1,41 +1,40 @@
-npdistribution =
-  function(bws, eval, dist, derr = NA,
-           ntrain, trainiseval = FALSE,
-           rows.omit = NA){
+npdistribution <- 
+    function(bws, eval, dist, derr = NA,
+             ntrain, trainiseval = FALSE,
+             rows.omit = NA){
 
-    if (missing(bws) | missing(eval) | missing(dist) | missing(ntrain))
-      stop("improper invocation of distribution constructor")
+        if (missing(bws) | missing(eval) | missing(dist) | missing(ntrain))
+            stop("improper invocation of distribution constructor")
 
-    if (length(rows.omit) == 0)
-      rows.omit <- NA
+        if (length(rows.omit) == 0)
+            rows.omit <- NA
 
-    d = list(
-      bw = bws$bw,
-      bws = bws,
-      xnames = bws$xnames,
-      nobs = nrow(eval),
-      ndim = bws$ndim,
-      nord = bws$nord,
-      nuno = bws$nuno,
-      ncon = bws$ncon,
-      pscaling = bws$pscaling,
-      ptype = bws$ptype,
-      pckertype = bws$pckertype,
-      pukertype = bws$pukertype,
-      pokertype = bws$pokertype,
-      eval = eval,
-      dist = dist,
-      derr = derr,
-      ntrain = ntrain,
-      trainiseval = trainiseval,
-      rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+        d <- list(
+            bw = bws$bw,
+            bws = bws,
+            xnames = bws$xnames,
+            nobs = nrow(eval),
+            ndim = bws$ndim,
+            nord = bws$nord,
+            nuno = bws$nuno,
+            ncon = bws$ncon,
+            pscaling = bws$pscaling,
+            ptype = bws$ptype,
+            pckertype = bws$pckertype,
+            pukertype = bws$pukertype,
+            pokertype = bws$pokertype,
+            eval = eval,
+            dist = dist,
+            derr = derr,
+            ntrain = ntrain,
+            trainiseval = trainiseval,
+            rows.omit = rows.omit,
+            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
 
+        class(d) <- "npdistribution"
 
-    class(d) = "npdistribution"
-
-    d
-  }
+        return(d)
+    }
 
 print.npdistribution <- function(x, digits=NULL, ...){
   cat("\nDistribution Data: ", x$ntrain, " training points,",

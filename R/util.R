@@ -457,8 +457,8 @@ genOmitStr <- function(x){
   t.str <- ''
   if(!is.null(x$rows.omit) & !identical(x$rows.omit, NA))
     t.str <- paste("\nNo. Complete Observations: ", x$nobs,
-                   "No. NA Observations: ", x$nobs.omit,
-                   "\nObservations omitted: ", paste(x$rows.omit, collapse=" "),
+                   "\nNo. Incomplete (NA) Observations: ", x$nobs.omit,
+                   "\nObservations omitted or excluded: ", paste(x$rows.omit, collapse=" "),
                    "\n")
   return(t.str)
 }

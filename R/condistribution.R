@@ -1,54 +1,55 @@
-condistribution =
-  function(bws, xeval, yeval, condist, conderr = NA,
-           congrad = NA, congerr = NA,           
-           ntrain, trainiseval = FALSE,
-           rows.omit = NA){
+condistribution <- 
+    function(bws, xeval, yeval, condist, conderr = NA,
+             congrad = NA, congerr = NA,           
+             ntrain, trainiseval = FALSE, gradients = FALSE,
+             rows.omit = NA){
 
-    if (missing(bws) | missing(xeval) | missing(yeval) | missing(condist) | missing(ntrain))
-      stop("improper invocation of condistribution constructor")
+        if (missing(bws) | missing(xeval) | missing(yeval) | missing(condist) | missing(ntrain))
+            stop("improper invocation of condistribution constructor")
 
-    if (length(rows.omit) == 0)
-      rows.omit <- NA
+        if (length(rows.omit) == 0)
+            rows.omit <- NA
 
-    d = list(
-      xbw = bws$xbw,
-      ybw = bws$ybw,
-      bws = bws,
-      xnames = bws$xnames,
-      ynames = bws$ynames,
-      nobs = dim(xeval)[1],
-      xndim = bws$xndim,
-      yndim = bws$yndim,
-      xnord = bws$xnord,
-      xnuno = bws$xnuno,
-      xncon = bws$xncon,
-      ynord = bws$ynord,
-      ynuno = bws$ynuno,
-      yncon = bws$yncon,
-      pscaling = bws$pscaling,
-      ptype = bws$ptype,
-      pcxkertype = bws$pcxkertype,
-      puxkertype = bws$puxkertype,
-      poxkertype = bws$poxkertype,
-      pcykertype = bws$pcykertype,
-      puykertype = bws$puykertype,
-      poykertype = bws$poykertype,
-      xeval = xeval,
-      yeval = yeval,
-      condist = condist,
-      conderr = conderr,
-      congrad = congrad,
-      congerr = congerr,
-      ntrain = ntrain,
-      trainiseval = trainiseval,
-      rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+        d <- list(
+            xbw = bws$xbw,
+            ybw = bws$ybw,
+            bws = bws,
+            xnames = bws$xnames,
+            ynames = bws$ynames,
+            nobs = dim(xeval)[1],
+            xndim = bws$xndim,
+            yndim = bws$yndim,
+            xnord = bws$xnord,
+            xnuno = bws$xnuno,
+            xncon = bws$xncon,
+            ynord = bws$ynord,
+            ynuno = bws$ynuno,
+            yncon = bws$yncon,
+            pscaling = bws$pscaling,
+            ptype = bws$ptype,
+            pcxkertype = bws$pcxkertype,
+            puxkertype = bws$puxkertype,
+            poxkertype = bws$poxkertype,
+            pcykertype = bws$pcykertype,
+            puykertype = bws$puykertype,
+            poykertype = bws$poykertype,
+            xeval = xeval,
+            yeval = yeval,
+            condist = condist,
+            conderr = conderr,
+            congrad = congrad,
+            congerr = congerr,
+            ntrain = ntrain,
+            trainiseval = trainiseval,
+            gradients = gradients, 
+            rows.omit = rows.omit,
+            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
 
 
-    class(d) = "condistribution"
+        class(d) <- "condistribution"
 
-    d
-  }
+        return(d)
+    }
 
 print.condistribution <- function(x, digits=NULL, ...){
   cat("\nConditional distribution data: ", x$ntrain, " training points,",

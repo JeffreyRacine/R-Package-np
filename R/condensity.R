@@ -1,57 +1,56 @@
-condensity =
-  function(bws, xeval, yeval,
-           condens, conderr = NA,
-           congrad = NA, congerr = NA,
-           ll = NA, ntrain, trainiseval = FALSE,
-           rows.omit = NA){
+condensity <- 
+    function(bws, xeval, yeval,
+             condens, conderr = NA,
+             congrad = NA, congerr = NA,
+             ll = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
+             rows.omit = NA){
 
-    if (missing(bws) | missing(xeval) | missing(yeval) | missing(condens) | missing(ntrain))
-      stop("improper invocation of condensity constructor")
+        if (missing(bws) | missing(xeval) | missing(yeval) | missing(condens) | missing(ntrain))
+            stop("improper invocation of condensity constructor")
 
-    if (length(rows.omit) == 0)
-      rows.omit <- NA
+        if (length(rows.omit) == 0)
+            rows.omit <- NA
 
+        d <- list(
+            xbw = bws$xbw,
+            ybw = bws$ybw,
+            bws = bws,
+            xnames = bws$xnames,
+            ynames = bws$ynames,
+            nobs = nrow(xeval),
+            xndim = bws$xndim,
+            yndim = bws$yndim,
+            xnord = bws$xnord,
+            xnuno = bws$xnuno,
+            xncon = bws$xncon,
+            ynord = bws$ynord,
+            ynuno = bws$ynuno,
+            yncon = bws$yncon,
+            pscaling = bws$pscaling,
+            ptype = bws$ptype,
+            pcxkertype = bws$pcxkertype,
+            puxkertype = bws$puxkertype,
+            poxkertype = bws$poxkertype,
+            pcykertype = bws$pcykertype,
+            puykertype = bws$puykertype,
+            poykertype = bws$poykertype,
+            xeval = xeval,
+            yeval = yeval,
+            condens = condens,
+            conderr = conderr,
+            congrad = congrad,
+            congerr = congerr,
+            log_likelihood = ll,
+            ntrain = ntrain,
+            trainiseval = trainiseval,
+            gradients = gradients,
+            rows.omit = rows.omit,
+            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+        
+        class(d) <- "condensity"
 
-    d = list(
-      xbw = bws$xbw,
-      ybw = bws$ybw,
-      bws = bws,
-      xnames = bws$xnames,
-      ynames = bws$ynames,
-      nobs = nrow(xeval),
-      xndim = bws$xndim,
-      yndim = bws$yndim,
-      xnord = bws$xnord,
-      xnuno = bws$xnuno,
-      xncon = bws$xncon,
-      ynord = bws$ynord,
-      ynuno = bws$ynuno,
-      yncon = bws$yncon,
-      pscaling = bws$pscaling,
-      ptype = bws$ptype,
-      pcxkertype = bws$pcxkertype,
-      puxkertype = bws$puxkertype,
-      poxkertype = bws$poxkertype,
-      pcykertype = bws$pcykertype,
-      puykertype = bws$puykertype,
-      poykertype = bws$poykertype,
-      xeval = xeval,
-      yeval = yeval,
-      condens = condens,
-      conderr = conderr,
-      congrad = congrad,
-      congerr = congerr,
-      log_likelihood = ll,
-      ntrain = ntrain,
-      trainiseval = trainiseval,
-      rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
-
-
-    class(d) = "condensity"
-
-    d
-  }
+        return(d)
+    }
 
 print.condensity <- function(x, digits=NULL, ...){
   cat("\nConditional Density Data: ", x$ntrain, " training points,",

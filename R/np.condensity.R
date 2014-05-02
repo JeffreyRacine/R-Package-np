@@ -44,8 +44,19 @@ npcdens.formula <-
     ev <-
       eval(parse(text=paste("npcdens(txdat = txdat, tydat = tydat,",
                    ifelse(has.eval,"exdat = exdat, eydat = eydat,",""), "bws = bws, ...)")))
-    ev$rows.omit <- as.vector(attr(umf,"na.action"))
+
+    ev$omit <- attr(umf,"na.action")
+    ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
+
+    ev$condens <- napredict(ev$omit, ev$condens)
+    ev$conderr <- napredict(ev$omit, ev$conderr)
+
+    if(ev$gradients){
+        ev$congrad <- napredict(ev$omit, ev$congrad)
+        ev$congerr <- napredict(ev$omit, ev$congerr)
+    }
+
     return(ev)
   }
 
@@ -274,7 +285,7 @@ npcdens.conbandwidth <- function(bws,
                      condens = myout$condens, conderr = myout$conderr,
                      congrad = myout$congrad, congerr = myout$congerr,
                      ll = myout$log_likelihood,
-                     ntrain = tnrow, trainiseval = no.exy,
+                     ntrain = tnrow, trainiseval = no.exy, gradients = gradients,
                      rows.omit = rows.omit) )
 
 }

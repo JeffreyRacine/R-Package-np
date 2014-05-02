@@ -43,9 +43,19 @@ npqreg.formula <-
     tbw <-
     eval(parse(text=paste("npqreg(txdat = txdat, tydat = tydat,",
                  ifelse(has.eval,"exdat = exdat,",""), "bws = bws, ...)")))
-    tbw$rows.omit <- as.vector(attr(umf,"na.action"))
+
+    tbw$omit <- attr(umf,"na.action")
+    tbw$rows.omit <- as.vector(tbw$omit)
     tbw$nobs.omit <- length(tbw$rows.omit)
-    tbw
+
+    tbw$quantile <- napredict(tbw$omit, tbw$quantile)
+    tbw$quanterr <- napredict(tbw$omit, tbw$quanterr)
+
+    if(tbw$gradients){
+        tbw$quantgrad <- napredict(tbw$omit, tbw$quantgrad)
+    }
+
+    return(tbw)
   }
 
 npqreg.call <-
@@ -244,7 +254,8 @@ npqreg.condbandwidth <-
                 quanterr = myout$yqerr,
                 quantgrad = myout$yqgrad,
                 ntrain = tnrow,
-                trainiseval = no.ex)
+                trainiseval = no.ex,
+                gradients = gradients)
   }
 
 

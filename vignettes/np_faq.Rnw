@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.88 2014/03/18 18:03:25 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.89 2014/04/17 05:36:22 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{npRmpi}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -1407,12 +1407,30 @@ plot(model.sub,gradients=TRUE)
   to. How can I create the $l$th lag of a numeric variable in R to be
   fed to functions in the \texttt{np} package?}
 
-You can use the \texttt{embed} function to accomplish this task. Here
-is a simple function that might work more along the lines that you
-expect. By default we `pad' the vector with NAs but you can switch
-this to \texttt{FALSE} if you prefer. The function will return a
-vector of the same length as the original vector with NA's padded for
-the missing values.
+Try the function \texttt{ts.intersect}, which can exploit R's lag
+function but return a suitable data frame, as per the following
+illustration:
+\begin{verbatim}
+data(lynx)
+loglynx <- log(lynx)
+lynxdata <- ts.intersect(loglynx,
+                         loglynxlag1=lag(loglynx,-1),
+                         dframe=TRUE)
+model <- npregbw(loglynx~loglynxlag1,
+                 data=lynxdata)
+plot(model)
+\end{verbatim}
+Note that in order for the above to work, the common argument fed to
+\texttt{ts.intersect} must be a \texttt{ts} object, so first cast it
+as such if it is not already (\texttt{log(lynx)} is a \texttt{ts}
+object since \texttt{lynx} was itself a \texttt{ts} object).
+
+Or, you can use the \texttt{embed} function to accomplish
+this task. Here is a simple function that might work more along the
+lines that you expect. By default we `pad' the vector with NAs but you
+can switch this to \texttt{FALSE} if you prefer. The function will
+return a vector of the same length as the original vector with NA's
+padded for the missing values.
 
 \begin{verbatim}
 lag.numeric <- function(x,l=1,pad.NA=TRUE) {
@@ -1604,8 +1622,8 @@ It is perhaps not a widely known fact that the local linear partial
 derivatives obtained from the coefficients of the Taylor
 approximation, $\hat b(x)$, are not the analytical derivative of the
 estimated regression $\hat g(x)$ with respect to $x$.  The local
-linear estimator is obtained by minimizing (consider the one-predictor
-case to fix ideas)
+linear estimator is obtained by minimizing the following weighted
+least squares function (consider the one-predictor case to fix ideas)
 \begin{equation*}
 \sum_i(Y_i - a - b (x-X_i))^2 K\left(\frac{x-X_i}{h}\right)
 \end{equation*}
@@ -1618,9 +1636,11 @@ while the gradient is given by
 \hat \beta(x)=\hat b.
 \end{equation*}
 But the analytical gradient (i.e.\ the partial derivative of $\hat
-g(x)=\hat a$ with respect to $x$) is \textsl{not} $\hat b$ (if you compute
-the partial algebraically you will see they are not the same), unless
-the bandwidth is very large (i.e.\ $h=\infty$).
+g(x)=\hat a$ with respect to $x$) is \textsl{not} $\hat b$ unless the
+bandwidth is very large (i.e.\ $h=\infty$) in which case
+$K((x-X_i)/h)=K(0)$ and one gets the standard linear least squares
+estimates for $\hat g(x)$ and $\hat\beta(x)$ (if you compute the
+partial algebraically you will see they are not the same).
 
 So, the derivative estimates arising directly from the local linear
 estimator will differ from the analytical derivatives, even though

@@ -1,44 +1,45 @@
-qregression =
-  function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, ntrain, trainiseval = FALSE){
+qregression <- 
+    function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, ntrain, trainiseval = FALSE, gradients = FALSE){
 
-    if (missing(bws) | missing(xeval) | missing(tau) | missing(quantile) | missing(ntrain))
-      stop("improper invocation of qregression constructor")
+        if (missing(bws) | missing(xeval) | missing(tau) | missing(quantile) | missing(ntrain))
+            stop("improper invocation of qregression constructor")
 
-    d = list(
-      xbw = bws$xbw,
-      ybw = bws$ybw,
-      bws = bws,
-      xnames = bws$xnames,
-      ynames = bws$ynames,
-      nobs = nrow(xeval),
-      xndim = bws$xndim,
-      yndim = bws$yndim,
-      xnord = bws$xnord,
-      xnuno = bws$xnuno,
-      xncon = bws$xncon,
-      ynord = bws$ynord,
-      ynuno = bws$ynuno,
-      yncon = bws$yncon,
-      pscaling = bws$pscaling,
-      ptype = bws$ptype,
-      pcxkertype = bws$pcxkertype,
-      puxkertype = bws$puxkertype,
-      poxkertype = bws$poxkertype,
-      pcykertype = bws$pcykertype,
-      puykertype = bws$puykertype,
-      poykertype = bws$poykertype,
-      xeval = xeval,
-      tau = tau,
-      quantile = quantile,
-      quanterr = quanterr,
-      quantgrad = quantgrad,
-      ntrain = ntrain,
-      trainiseval = trainiseval)
+        d <- list(
+            xbw = bws$xbw,
+            ybw = bws$ybw,
+            bws = bws,
+            xnames = bws$xnames,
+            ynames = bws$ynames,
+            nobs = nrow(xeval),
+            xndim = bws$xndim,
+            yndim = bws$yndim,
+            xnord = bws$xnord,
+            xnuno = bws$xnuno,
+            xncon = bws$xncon,
+            ynord = bws$ynord,
+            ynuno = bws$ynuno,
+            yncon = bws$yncon,
+            pscaling = bws$pscaling,
+            ptype = bws$ptype,
+            pcxkertype = bws$pcxkertype,
+            puxkertype = bws$puxkertype,
+            poxkertype = bws$poxkertype,
+            pcykertype = bws$pcykertype,
+            puykertype = bws$puykertype,
+            poykertype = bws$poykertype,
+            xeval = xeval,
+            tau = tau,
+            quantile = quantile,
+            quanterr = quanterr,
+            quantgrad = quantgrad,
+            ntrain = ntrain,
+            trainiseval = trainiseval,
+            gradients = gradients)
 
-    class(d) = "qregression"
+        class(d) <- "qregression"
 
-    d
-  }
+        return(d)
+    }
 
 print.qregression <- function(x, digits=NULL, ...){
   cat("\nQuantile regression data: ", x$ntrain, " training points,",

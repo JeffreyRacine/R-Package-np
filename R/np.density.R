@@ -44,8 +44,14 @@ npudens.formula <-
     ev <- 
       eval(parse(text=paste("npudens(tdat = tdat,",
                    ifelse(has.eval,"edat = edat,",""), "bws = bws, ...)")))
-    ev$rows.omit <- as.vector(attr(umf,"na.action"))
+
+    ev$omit <- attr(umf,"na.action")
+    ev$rows.omit <- as.vector(ev$omit)
     ev$nobs.omit <- length(ev$rows.omit)
+
+    ev$dens <- napredict(ev$omit, ev$dens)
+    ev$derr <- napredict(ev$omit, ev$derr)
+
     return(ev)
   }
 

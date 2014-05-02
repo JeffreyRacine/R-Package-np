@@ -31,7 +31,7 @@ npsigtest(bws, \dots)
           xdat = stop("data xdat missing"),
           ydat = stop("data ydat missing"),
           boot.num = 399,
-          boot.method = c("pairwise","iid","wild","wild-rademacher"),
+          boot.method = c("iid","wild","wild-rademacher","pairwise"),
           boot.type = c("I","II"),
           pivot=TRUE,
           joint=FALSE,
@@ -80,7 +80,7 @@ npsigtest(bws, \dots)
     procedure.  \code{iid} will generate independent identically
     distributed draws. \code{wild} will use a wild
     bootstrap. \code{wild-rademacher} will use a wild bootstrap with
-    Rademacher variables. Defaults to \code{pairwise}.
+    Rademacher variables. Defaults to \code{iid}.
   }
 
   \item{boot.num}{
@@ -153,8 +153,11 @@ npsigtest(bws, \dots)
   neighborhood (i.e.\ slightly smaller) of any classical level
   (e.g. 0.05) and you only have a modest amount of data, it might be
   prudent to re-run the test using the more computationally intensive
-  \code{boot.type="II"} setting to confirm the original result.
-
+  \code{boot.type="II"} setting to confirm the original result. Note
+  also that \code{boot.method="pairwise"} is not recommended for the
+  multivariate local linear estimator due to substantial size
+  distortions that may arise in certain cases.
+  
 }  
 
 \value{
