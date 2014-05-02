@@ -36,39 +36,53 @@ npindex <-
   }
 
 npindex.formula <-
-  function(bws, data = NULL, newdata = NULL, ...){
+    function(bws, data = NULL, newdata = NULL, ...){
 
-    tt <- terms(bws)
-    m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-    tmf <- bws$call[c(1,m)]
-    tmf[[1]] <- as.name("model.frame")
-    tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf, envir = environment(tt))
+        tt <- terms(bws)
+        m <- match(c("formula", "data", "subset", "na.action"),
+                   names(bws$call), nomatch = 0)
+        tmf <- bws$call[c(1,m)]
+        tmf[[1]] <- as.name("model.frame")
+        tmf[["formula"]] <- tt
+        umf <- tmf <- eval(tmf, envir = environment(tt))
 
-    tydat <- model.response(tmf)
-    txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
+        tydat <- model.response(tmf)
+        txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
 
-    if ((has.eval <- !is.null(newdata))) {
-      if (!(has.ey <- succeedWithResponse(tt, newdata)))
-        tt <- delete.response(tt)
+        if ((has.eval <- !is.null(newdata))) {
+            if (!(has.ey <- succeedWithResponse(tt, newdata)))
+                tt <- delete.response(tt)
 
-      umf <- emf <- model.frame(tt, data = newdata)
+            umf <- emf <- model.frame(tt, data = newdata)
 
-      if (has.ey)
-        eydat <- model.response(emf)
+            if (has.ey)
+                eydat <- model.response(emf)
 
-      exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+            exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+        }
+
+        ev <-
+            eval(parse(text=paste("npindex(txdat = txdat, tydat = tydat,",
+                           ifelse(has.eval,paste("exdat = exdat,",ifelse(has.ey,"eydat = eydat,","")),""),
+                           "bws = bws, ...)")))
+
+        ev$omit <- attr(umf,"na.action")
+        ev$rows.omit <- as.vector(ev$omit)
+        ev$nobs.omit <- length(ev$rows.omit)
+
+        ev$mean <- napredict(ev$omit, ev$mean)
+        ev$merr <- napredict(ev$omit, ev$merr)
+
+        if(ev$gradients){
+            ev$grad <- napredict(ev$omit, ev$grad)
+            ev$gerr <- napredict(ev$omit, ev$gerr)
+        }
+
+        if(ev$residuals){
+            ev$resid <- naresid(ev$omit, ev$resid)
+        }    
+        return(ev)
     }
-
-    ev <-
-    eval(parse(text=paste("npindex(txdat = txdat, tydat = tydat,",
-                 ifelse(has.eval,paste("exdat = exdat,",ifelse(has.ey,"eydat = eydat,","")),""),
-                 "bws = bws, ...)")))
-    ev$rows.omit <- as.vector(attr(umf,"na.action"))
-    ev$nobs.omit <- length(ev$rows.omit)
-    ev
-  }
 
 npindex.call <-
   function(bws, ...) {
