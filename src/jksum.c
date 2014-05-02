@@ -7023,16 +7023,16 @@ double * log_likelihood
     //  pad out the moo with some fake entries at the end to stop kernel_weighted_sum_np from
     //  doing anything undefined
     
-    for(; l < num_uXY; l++)
+    for(; l < num_oXY; l++)
       matrix_ordered_indices[l] = tc;
 
     for(l = 0; l < num_X_ordered; l++){
-      if(thcreate_r((size_t)ceil(1.6*num_categories[l+num_X_unordered]), otabs + l) == TH_ERROR)
+      if(thcreate_r((size_t)ceil(1.6*num_categories[l+num_X_unordered+num_Y_unordered+num_Y_ordered]), otabs + l) == TH_ERROR)
         error("hash table creation failed");
 
-      for(i = 0; i < num_categories[l+num_X_unordered]; i++){
+      for(i = 0; i < num_categories[l+num_X_unordered+num_Y_unordered+num_Y_ordered]; i++){
         struct th_entry centry;
-        centry.key.dkey = matrix_categorical_vals[l+num_X_unordered][i];
+        centry.key.dkey = matrix_categorical_vals[l+num_X_unordered+num_Y_unordered+num_Y_ordered][i];
         centry.data = i;
 
         if(thsearch_r(&centry, TH_ENTER, &ret, otabs+l) == TH_FAILURE)
@@ -7257,8 +7257,8 @@ double * log_likelihood
                          NULL,
                          NULL,
                          vsf_X,
-                         num_categories,
-                         matrix_categorical_vals,
+                         num_categories + num_Y_unordered + num_Y_ordered,
+                         matrix_categorical_vals + num_Y_unordered + num_Y_ordered,
                          matrix_ordered_indices, // moo
                          ksd,  // weighted sum
                          permd, // no permutations
