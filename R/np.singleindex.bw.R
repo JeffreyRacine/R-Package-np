@@ -332,12 +332,12 @@ npindexbw.sibandwidth <-
 
       if(bws$method == "ichimura"){
         optim.fn <- if(only.optimize.beta) ichimura.nobw else ichimura
-        optim.control <- c(abstol=optim.abstol,
-                           reltol=optim.reltol,
-                           maxit=optim.maxit)
+        optim.control <- list(abstol=optim.abstol,
+                              reltol=optim.reltol,
+                              maxit=optim.maxit)
       } else if(bws$method == "kleinspady"){
         optim.fn <- if(only.optimize.beta) kleinspady.nobw else  kleinspady
-        optim.control <- c(reltol=optim.reltol,maxit=optim.maxit)
+        optim.control <- list(reltol=optim.reltol,maxit=optim.maxit)
       }
 
       for(i in 1:nmulti) {
@@ -403,7 +403,20 @@ npindexbw.sibandwidth <-
               h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
             }
           }
-          optim.control <- lapply(optim.control,'*',10.0)
+
+          if(optim.return$convergence == 1){
+              if(optim.control$maxit < (2^32/10))
+                  optim.control$maxit <- 10*optim.control$maxit
+              else
+                  stop(paste("optim failed to converge after optim.maxattempts = ", optim.maxattempts, " iterations."))
+          }
+
+          if(optim.return$convergence == 10){
+              optim.control$reltol <-  10.0*optim.control$reltol
+              if(!is.null(optim.control$abstol))
+                  optim.control$abstol <-  10.0*optim.control$abstol
+          }
+          
           suppressWarnings(optim.return <- eval(topt))
         }
 
