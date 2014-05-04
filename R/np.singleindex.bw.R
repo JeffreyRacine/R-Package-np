@@ -367,7 +367,7 @@ npindexbw.sibandwidth <-
 
           if (bws$bw == 0)
             if(IQR(fit) > 0) {
-              h <- (4/3)^0.2*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
+              h <- (4/3)^0.2*min(sd(fit),IQR(fit)/1.34898)*n^(-1/5)
             } else {
              h <- (4/3)^0.2*sd(fit)*n^(-1/5)
             }
@@ -380,7 +380,7 @@ npindexbw.sibandwidth <-
           beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
           if(!only.optimize.beta){
             if(IQR(fit) > 0) {
-              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
+              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/1.34898)*n^(-1/5)
             } else {
               h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
             }
@@ -398,7 +398,7 @@ npindexbw.sibandwidth <-
           beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
           if(!only.optimize.beta){
             if(IQR(fit) > 0) {
-              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
+              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/1.34898)*n^(-1/5)
             } else {
               h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
             }
