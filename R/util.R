@@ -747,12 +747,12 @@ SIGNfunc <- function(y,y.fit) {
 EssDee <- function(y){
   if(any(dim(as.matrix(y)) == 0))
       return(0)
-  
   sd.vec <- apply(as.matrix(y),2,sd)
   IQR.vec <- apply(as.matrix(y),2,IQR)/QFAC
   mad.vec <- apply(as.matrix(y),2,mad)
   a <- apply(cbind(sd.vec,IQR.vec,mad.vec),1, function(x) min(x))
   if(any(a<=0)) warning(paste("variable ",which(a<=0)," appears to be constant",sep=""))
+  a <- apply(cbind(sd.vec,IQR.vec,mad.vec),1, function(x) min(x[x>0]))  
   return(a)
 }
 
