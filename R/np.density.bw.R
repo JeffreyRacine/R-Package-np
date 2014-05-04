@@ -151,7 +151,7 @@ npudensbw.bandwidth <-
       } else {
         nbw = double(ncol)
         if (bws$ncon > 0){
-          nbw[1:bws$ncon] = (4/3)^0.2
+          nbw[1:bws$ncon] = 1.059224
           if(!bws$scaling)
             nbw[1:bws$ncon]=nbw[1:bws$ncon]*mysd*nconfac
         }
