@@ -334,6 +334,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define RBW_NCONI 15
 #define RBW_LL 16
 #define RBW_DOTREEI 17
+#define RBW_SCATI 18
 
 #define RBW_FTOLD  0
 #define RBW_TOLD   1
@@ -365,6 +366,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define BW_NCONI 15
 #define BW_OLDBW 16
 #define BW_DOTREEI 17
+#define BW_SCATI 18
 
 #define BW_FTOLD  0
 #define BW_TOLD   1
@@ -396,6 +398,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define DBW_NCONI 17
 #define DBW_FASTI 18
 #define DBW_DOTREEI 19
+#define DBW_SCATI 20
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1
@@ -478,6 +481,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CDBW_UNCONI 22
 #define CDBW_CDFONTRAIN 23
 #define CDBW_TREEI 24
+#define CDBW_SCATI 25
 
 #define CDBW_FTOLD  0
 #define CDBW_TOLD   1
