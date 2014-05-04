@@ -181,7 +181,7 @@ int pgplot_xy_errorbars(int int_GENERATE, char *output, int num_obs, int num_var
 
 int compute_continuous_stddev(int int_LARGE, int num_obs, int num_var_continuous, int num_reg_continuous, double **matrix_Y_continuous, double **matrix_X_continuous, double *vector_continuous_stddev);
 
-void initialize_nr_vector_scale_factor(int BANDWIDTH, int RANDOM, int seed, int int_large, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int kernel_yu, int kernel_xu, int int_use_starting_values, double init_continuous, double nconfac, double ncatfac, int *num_categories, double *vector_continuous_stddev, double *vector_scale_factor);
+void initialize_nr_vector_scale_factor(int BANDWIDTH, int RANDOM, int seed, int int_large, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int kernel_yu, int kernel_xu, int int_use_starting_values, int scale_cat, double init_continuous, double nconfac, double ncatfac, int *num_categories, double *vector_continuous_stddev, double *vector_scale_factor);
 
 int kernel_weights_conditional_convolution_cv(int int_WEIGHTS, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_Y_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *lambda, double **matrix_bandwidth_var, double **matrix_bandwidth_reg, int *num_categories, double **matrix_categorical_vals, double **matrix_weights_K_x, double **matrix_weights_K_xy, double **matrix_weights_K_convol_y);
 
@@ -432,6 +432,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CBW_FASTI 22
 #define CBW_OLDI 23
 #define CBW_TREEI 24
+#define CBW_SCATI 25
 
 #define CBW_FTOLD  0
 #define CBW_TOLD   1

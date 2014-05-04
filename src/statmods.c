@@ -742,6 +742,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
                                        int kernel_yu,
                                        int kernel_xu,
                                        int int_use_starting_values,
+                                       int scale_cat,
                                        double init_continuous,
                                        double nconfac, double ncatfac,
                                        int *num_categories,
@@ -778,7 +779,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   }
 
   for(i = 0; i < num_var_unordered; i++,l++){
-    const double bwi = (int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_yu);
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac)*(int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_yu);
 
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
@@ -791,7 +792,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   }
 
   for(i = 0; i < num_var_ordered; i++,l++){
-    const double bwi = (int_large ? ncatfac : 1.0)* 0.5;
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0)* 0.5;
 
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
@@ -804,7 +805,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   }
 
   for(i = 0; i < num_reg_unordered; i++,l++){
-    const double bwi = (int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_xu);
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_xu);
 
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
@@ -817,7 +818,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   }
 
   for(i = 0; i < num_reg_ordered; i++,l++){
-    const double bwi = (int_large ? ncatfac : 1.0)* 0.5;
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0)* 0.5;
 
     if(!int_use_starting_values){
       vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
