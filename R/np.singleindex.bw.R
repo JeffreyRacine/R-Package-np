@@ -366,7 +366,7 @@ npindexbw.sibandwidth <-
           } else { beta = numeric(0) }
 
           if (bws$bw == 0)
-            h <- (4/3)^0.2*EssDee(fit)*n^(-1/5)
+            h <- 1.059224*EssDee(fit)*n^(-1/5)
           else
             h <- bws$bw
         } else {

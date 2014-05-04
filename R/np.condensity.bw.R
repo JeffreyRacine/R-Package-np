@@ -203,7 +203,7 @@ npcdensbw.conbandwidth <-
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
         if (gbw > 0){
-          nbw[1:gbw] = (4/3)^0.2
+          nbw[1:gbw] = 1.059224
           if(!bws$scaling)
             nbw[1:gbw]=nbw[1:gbw]*mysd*nconfac
         }
