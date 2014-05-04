@@ -629,6 +629,7 @@ npregiv <- function(y,
       coef.mat <- matrix(maxPenalty,ncol(W),n.eval)
       epsilon <- 1.0/n.eval
       ridge <- double(n.eval)
+      ridge.lc <- double(n.eval)      
       doridge <- !logical(n.eval)
       
       nc <- ncol(tww[,,1])
@@ -638,9 +639,8 @@ npregiv <- function(y,
       
       ridger <- function(i) {
         doridge[i] <<- FALSE
-        ridge.val <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
-        tryCatch(solve(tww[,,i]+diag(rep(ridge[i],nc)),
-                       tyw[,i]+c(ridge.val,rep(0,nc-1))),
+        ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+        tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
                  error = function(e){
                    ridge[i] <<- ridge[i]+epsilon
                    doridge[i] <<- TRUE
@@ -654,7 +654,7 @@ npregiv <- function(y,
       }
       
       mhat <- sapply(1:n.eval, function(i) {
-        W.eval[i,, drop = FALSE] %*% coef.mat[,i]
+        (1-ridge[i])*W.eval[i,, drop = FALSE] %*% coef.mat[,i] + ridge.lc[i]
       })
       
       return(list(mean = mhat,grad = t(coef.mat[-1,])))
@@ -735,6 +735,7 @@ npregiv <- function(y,
         mean.loo <- rep(maxPenalty,n)
         epsilon <- 1.0/n
         ridge <- double(n)
+        ridge.lc <- double(n)        
         doridge <- !logical(n)
   
         nc <- ncol(tww[,,1])
@@ -744,9 +745,8 @@ npregiv <- function(y,
   
         ridger <- function(i) {
           doridge[i] <<- FALSE
-          ridge.val <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
-          W[i,, drop = FALSE] %*% tryCatch(solve(tww[,,i]+diag(rep(ridge[i],nc)),
-                  tyw[,i]+c(ridge.val,rep(0,nc-1))),
+          ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+          W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
                   error = function(e){
                     ridge[i] <<- ridge[i]+epsilon
                     doridge[i] <<- TRUE
@@ -756,7 +756,7 @@ npregiv <- function(y,
   
         while(any(doridge)){
           iloo <- (1:n)[doridge]
-          mean.loo[iloo] <- sapply(iloo, ridger)
+          mean.loo[iloo] <- (1-ridge[iloo])*sapply(iloo, ridger) + ridge.lc[iloo]
         }
   
         if (!any(mean.loo == maxPenalty)){
@@ -858,6 +858,7 @@ npregiv <- function(y,
         ghat <- rep(maxPenalty,n)
         epsilon <- 1.0/n
         ridge <- double(n)
+        ridge.lc <- double(n)        
         doridge <- !logical(n)
   
         nc <- ncol(tww[,,1])
@@ -867,9 +868,8 @@ npregiv <- function(y,
   
         ridger <- function(i) {
           doridge[i] <<- FALSE
-          ridge.val <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
-          W[i,, drop = FALSE] %*% tryCatch(solve(tww[,,i]+diag(rep(ridge[i],nc)),
-                  tyw[,i]+c(ridge.val,rep(0,nc-1))),
+          ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+          W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
                   error = function(e){
                     ridge[i] <<- ridge[i]+epsilon
                     doridge[i] <<- TRUE
@@ -879,11 +879,11 @@ npregiv <- function(y,
   
         while(any(doridge)){
           ii <- (1:n)[doridge]
-          ghat[ii] <- sapply(ii, ridger)
+          ghat[ii] <- (1-ridge[ii])*sapply(ii, ridger) + ridge.lc[ii]
         }
   
         trH <- kernel.i.eq.j*sum(sapply(1:n,function(i){
-          W[i,, drop = FALSE] %*% chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc)))) %*% t(W[i,, drop = FALSE])
+          (1-ridge[i])*W[i,, drop = FALSE] %*% chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc)))) %*% t(W[i,, drop = FALSE]) + ridge[i]/NZD(tww[,,i][1,1])
         }))
   
         aic.penalty <- (1+trH/n)/(1-(trH+2)/n)
@@ -1013,7 +1013,7 @@ npregiv <- function(y,
   
       for(i in 1:ncol(xdat)) {
         if(xdat.numeric[i]==TRUE) {
-          init.search.vals[i] <- runif(1,.5,1.5)*(IQR(xdat[,i])/1.349)*nrow(xdat)^{-1/(4+num.numeric)}
+          init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
         }
       }
   
@@ -1040,7 +1040,7 @@ npregiv <- function(y,
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
           init.search.vals <- runif(ncol(xdat),0,1)
           if(xdat.numeric[i]==TRUE) {
-            init.search.vals[i] <- runif(1,.5,1.5)*(IQR(xdat[,i])/1.349)*nrow(xdat)^{-1/(4+num.numeric)}
+            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
           }
           attempts <- attempts + 1
           optim.control$abstol <- optim.control$abstol * 10.0
@@ -1069,7 +1069,7 @@ npregiv <- function(y,
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
           init.search.vals <- runif(ncol(xdat),0,1)
           if(xdat.numeric[i]==TRUE) {
-            init.search.vals[i] <- runif(1,.5,1.5)*(IQR(xdat[,i])/1.349)*nrow(xdat)^{-1/(4+num.numeric)}
+            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
           }
           attempts <- attempts + 1
           optim.control$abstol <- optim.control$abstol * 10.0

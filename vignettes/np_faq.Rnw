@@ -1531,69 +1531,39 @@ legend(min(year),max(gdp.tau,gdp),
        lwd=2)
 \end{verbatim}
 
-\subsection{How can I generate nonparametric resamples from the
-  unknown distribution of a set of data?}
+\subsection{How can I generate resamples from the unknown distribution
+  of a set of data based on my smooth kernel density estimate?}
 
-This can be accomplished using the standard method of generating
-random deviates based on inverting a CDF at random draws from the
-uniform distribution (the distribution of a CDF is uniform). The
-following code demonstrates this approach.
+This can be accomplished by picking a sample realization, uniformly at
+random, then drawing from the kernel distribution centered on that
+training point with scale equal to the bandwidth. Below is a
+demonstration for the `Old Faithful' data where we draw a random
+sample of size $n=1,000$ where a Gaussian kernel was used for the
+density estimator.
 
 \begin{verbatim}
-## Simulate data `x' drawn from a mixture of normals. Suppose you wish
-## to resample from the distribution of x but in a nonparametric
-## manner (i.e. do not make use of knowledge of the underlying
-## distribution).
+data(faithful)
+n <- nrow(faithful)
 
-x <- c(rnorm(100,mean=-2,sd=1),rnorm(100,mean=3,sd=0.5))
+x1 <- faithful$eruptions
+x2 <- faithful$waiting
 
-## We first estimate the CDF of x nonparametrically using an ad-hoc
-## normal reference rule that is optimal for kernel estimation of
-## CDFs.  In practice you would first compute the CDF-optimal
-## bandwidth using e.g. npudistbw().
+## First compute the bandwidth vector
 
-bw <- npudensbw(~x,bws=1.587*sd(x)*length(x)^{-1/3},cv="none")
+bw <- npudensbw(~x1+x2,ckertype="gaussian")
 
-## Let nobs be the number of observations you wish for your resample.
+## Next generate draws from the kernel density (Gaussian)
 
-nobs <- 1000
+n.boot <- 1000
 
-## Now create a set of points used to construct the pseudo-inverse
-## given a draw from the uniform (we invert these draws from the
-## uniform using the pseudo-inverse).
+i.boot <- sample(1:n,n.boot,replace=TRUE)
+x1.boot <- rnorm(n.boot,x1[i.boot],bw$bw[1])
+x2.boot <- rnorm(n.boot,x2[i.boot],bw$bw[2])  
 
-n.eval <- 2*nobs
-x.er <- extendrange(x,f=2)
-x.eval <- data.frame(x=sort(c(seq(x.er[1],x.er[2],length=n.eval),
-                       quantile(x,seq(0,1,length=n.eval)))))
-
-## Compute F for this set of points.
-
-F <- predict(npudist(bws=bw),newdata=x.eval)
-
-## Take a draw from the uniform of length nobs
-
-u <- runif(nobs)
-x.resample <- numeric(nobs)
-
-## Compute the pseudo-inverse of F, and add some `jitter' as x.eval is
-## unchanging (only needed if repeated resamples are needed)
-
-for(i in 1:nobs) {
-  x.resample[i] <- jitter(ifelse(u[i]>=0.5, max(x.eval$x[F<=u[i]]),
-                                            min(x.eval$x[F>=u[i]])))
-}
-
-## Now plot the histogram of the resample along with the true DGP
-## (i.e. the true mixture of normals)
-
-hist(x.resample,prob=TRUE,br=50,ylim=c(0,.5),
-     main="Resample Histogram & True DGP",
-     xlab="X")
-rug(x.resample)
-x.resample <- sort(x.resample)
-lines(x.resample,0.5*dnorm(x.resample,mean=-2,sd=1))
-lines(x.resample,0.5*dnorm(x.resample,mean=3,sd=0.5))
+## Plot the density for the bootstrap sample using the original 
+## bandwidths
+  
+plot(npudens(~x1.boot+x2.boot,bws=bw$bw),view="fixed",xtrim=-.2,neval=100)
 \end{verbatim}
 
 \subsection{Some of my variables are measured with an unusually large

@@ -82,6 +82,7 @@ npcdistbw.condbandwidth <-
            do.full.integral = FALSE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
            memfac = 500.0, lbc = 0.5, hbc = 0.5, cfac = 1.0,
+           scale.init.categorical.sample=FALSE,
            ...){
 
     ydat = toFrame(ydat)
@@ -245,7 +246,8 @@ npcdistbw.condbandwidth <-
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
         cdf_on_train = cdf_on_train,
-        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
+        scale.init.categorical.sample=scale.init.categorical.sample)
       
       myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac, lbc = lbc, hbc = hbc, cfac = cfac, nconfac = nconfac, ncatfac = ncatfac)
 
@@ -405,6 +407,7 @@ npcdistbw.default <-
            nmulti, remin, itmax,
            do.full.integral, ngrid,
            ftol, tol, small, memfac, lbc, hbc, cfac,
+           scale.init.categorical.sample,
            ## dummy arguments for condbandwidth() function call
            bwmethod, bwscaling, bwtype,
            cxkertype, cxkerorder,
@@ -447,7 +450,7 @@ npcdistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gydat", "bandwidth.compute", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
-               "tol", "small", "memfac", "lbc", "hbc", "cfac")
+               "tol", "small", "memfac", "lbc", "hbc", "cfac", "scale.init.categorical.sample")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

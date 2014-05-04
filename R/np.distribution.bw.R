@@ -80,7 +80,7 @@ npudistbw.dbandwidth <-
            bws, gdat = NULL, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
            fast.cdf = TRUE, do.full.integral = TRUE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           lbc = 0.5, hbc = 1.5, cfac = 1.0, ...){
+           lbc = 0.5, hbc = 1.5, cfac = 1.0, scale.init.categorical.sample=FALSE, ...){
 
     dat = toFrame(dat)
 
@@ -197,7 +197,8 @@ npudistbw.dbandwidth <-
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],
         fast.cdf = fast.cdf,
-        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
+        scale.init.categorical.sample = scale.init.categorical.sample)
       
       myoptd = list(ftol=ftol, tol=tol, small=small, lbc = lbc, hbc = hbc, cfac = cfac, nconfac = nconfac, ncatfac = ncatfac)
 
@@ -287,7 +288,7 @@ npudistbw.default <-
            bws, gdat, bandwidth.compute = TRUE,
            ## dummy arguments for later passing into npudistbw.bandwidth
            nmulti, remin, itmax, fast.cdf, do.full.integral, ngrid, ftol, tol, small,
-           lbc, hbc, cfac,
+           lbc, hbc, cfac, scale.init.categorical.sample,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, okertype,
@@ -325,7 +326,7 @@ npudistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gdat","bandwidth.compute", "nmulti", "remin", "itmax", "fast.cdf", "do.full.integral", "ngrid", "ftol", "tol",
-               "small", "lbc", "hbc", "cfac")
+               "small", "lbc", "hbc", "cfac", "scale.init.categorical.sample")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

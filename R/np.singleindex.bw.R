@@ -332,12 +332,12 @@ npindexbw.sibandwidth <-
 
       if(bws$method == "ichimura"){
         optim.fn <- if(only.optimize.beta) ichimura.nobw else ichimura
-        optim.control <- c(abstol=optim.abstol,
-                           reltol=optim.reltol,
-                           maxit=optim.maxit)
+        optim.control <- list(abstol=optim.abstol,
+                              reltol=optim.reltol,
+                              maxit=optim.maxit)
       } else if(bws$method == "kleinspady"){
         optim.fn <- if(only.optimize.beta) kleinspady.nobw else  kleinspady
-        optim.control <- c(reltol=optim.reltol,maxit=optim.maxit)
+        optim.control <- list(reltol=optim.reltol,maxit=optim.maxit)
       }
 
       for(i in 1:nmulti) {
@@ -366,11 +366,7 @@ npindexbw.sibandwidth <-
           } else { beta = numeric(0) }
 
           if (bws$bw == 0)
-            if(IQR(fit) > 0) {
-              h <- (4/3)^0.2*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
-            } else {
-             h <- (4/3)^0.2*sd(fit)*n^(-1/5)
-            }
+            h <- 1.059224*EssDee(fit)*n^(-1/5)
           else
             h <- bws$bw
         } else {
@@ -378,13 +374,8 @@ npindexbw.sibandwidth <-
 
           beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
           beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
-          if(!only.optimize.beta){
-            if(IQR(fit) > 0) {
-              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
-            } else {
-              h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
-            }
-          }
+          if (!only.optimize.beta)
+              h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*n^(-1/5)
         }
 
         optim.parm <- if(only.optimize.beta) beta else c(beta,h)
@@ -396,14 +387,22 @@ npindexbw.sibandwidth <-
           attempts <- attempts + 1
           beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
           beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
-          if(!only.optimize.beta){
-            if(IQR(fit) > 0) {
-              h <- runif(1,min=0.5,max=1.5)*min(sd(fit),IQR(fit)/(qnorm(.25,lower.tail=F)*2))*n^(-1/5)
-            } else {
-              h <- runif(1,min=0.5,max=1.5)*sd(fit)*n^(-1/5)
-            }
+          if(!only.optimize.beta)
+              h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*n^(-1/5)
+
+          if(optim.return$convergence == 1){
+              if(optim.control$maxit < (2^32/10))
+                  optim.control$maxit <- 10*optim.control$maxit
+              else
+                  stop(paste("optim failed to converge after optim.maxattempts = ", optim.maxattempts, " iterations."))
           }
-          optim.control <- lapply(optim.control,'*',10.0)
+
+          if(optim.return$convergence == 10){
+              optim.control$reltol <-  10.0*optim.control$reltol
+              if(!is.null(optim.control$abstol))
+                  optim.control$abstol <-  10.0*optim.control$abstol
+          }
+          
           suppressWarnings(optim.return <- eval(topt))
         }
 

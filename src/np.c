@@ -269,6 +269,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int itmax, iter;
   int int_use_starting_values;
+  int scale_cat;
 
   int * ipt = NULL;  // point permutation, see tree.c
   int old_bw;
@@ -297,6 +298,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   itmax=myopti[BW_ITMAXI];
   old_bw=myopti[BW_OLDBW];
   int_TREE_X = myopti[BW_DOTREEI];
+  scale_cat = myopti[BW_SCATI];
 
   ftol=myoptd[BW_FTOLD];
   tol=myoptd[BW_TOLD];
@@ -413,6 +415,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     0, 
                                     KERNEL_den_unordered_extern,                                    
                                     int_use_starting_values,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -433,6 +436,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     0, 
                                     KERNEL_den_unordered_extern,                                    
                                     0,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -557,6 +561,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                         0, 
                                         KERNEL_den_unordered_extern,                                    
                                         0,
+                                        scale_cat,
                                         pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
@@ -713,6 +718,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int itmax, iter;
   int int_use_starting_values, cdfontrain;
 
+  int scale_cat;
+
   int * ipt = NULL, * ipe = NULL;
 
   cdfontrain =  myopti[DBW_CDFONTRAIN];
@@ -744,6 +751,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   int_fast_dls_extern = myopti[DBW_FASTI];
   int_TREE_X = myopti[DBW_DOTREEI];
+  scale_cat = myopti[DBW_SCATI];
 
   ftol=myoptd[DBW_FTOLD];
   tol=myoptd[DBW_TOLD];
@@ -916,6 +924,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     0,
                                     KERNEL_den_unordered_extern,
                                     int_use_starting_values,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -936,6 +945,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     0,
                                     KERNEL_den_unordered_extern,
                                     0,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -1048,6 +1058,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                         0,
                                         KERNEL_den_unordered_extern,
                                         0,
+                                        scale_cat,
                                         pow((double)4.0/(double)3.0,0.2),     /* Init for continuous vars */
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
@@ -1205,7 +1216,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int itmax, iter;
-  int int_use_starting_values, ibwmfunc, old_cdens;
+  int int_use_starting_values, ibwmfunc, old_cdens, scale_cat;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
 
@@ -1246,8 +1257,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   itmax=myopti[CBW_ITMAXI];
   int_WEIGHTS = myopti[CBW_FASTI];
   old_cdens = myopti[CBW_OLDI];
-  int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
-
+  int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
+  scale_cat = myopti[CBW_SCATI];
+  
   ibwmfunc = myopti[CBW_MI];
 
   ftol=myoptd[CBW_FTOLD];
@@ -1575,6 +1587,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     KERNEL_den_unordered_extern,
                                     KERNEL_reg_unordered_extern,
                                     int_use_starting_values,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -1595,6 +1608,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     KERNEL_den_unordered_extern,
                                     KERNEL_reg_unordered_extern,
                                     0,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -1721,6 +1735,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                         KERNEL_den_unordered_extern,
                                         KERNEL_reg_unordered_extern,
                                         0,
+                                        scale_cat,
                                         pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
@@ -1908,6 +1923,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int itmax, iter;
   int int_use_starting_values, ibwmfunc;
   int cdfontrain;
+  int scale_cat;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
 
@@ -1952,6 +1968,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   itmax=myopti[CDBW_ITMAXI];
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
+
+  scale_cat = myopti[CDBW_SCATI];
 
   ftol=myoptd[CDBW_FTOLD];
   tol=myoptd[CDBW_TOLD];
@@ -2278,6 +2296,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     KERNEL_den_unordered_extern,
                                     KERNEL_reg_unordered_extern,
                                     int_use_starting_values,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -2298,6 +2317,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     KERNEL_den_unordered_extern,
                                     KERNEL_reg_unordered_extern,
                                     0,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -2411,6 +2431,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                         KERNEL_den_unordered_extern,
                                         KERNEL_reg_unordered_extern,
                                         0,
+                                        scale_cat,
                                         pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
@@ -3333,6 +3354,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   int itmax, iter;
   int int_use_starting_values;
 
+  int scale_cat;
+
   num_reg_continuous_extern = myopti[RBW_NCONI];
   num_reg_unordered_extern = myopti[RBW_NUNOI];
   num_reg_ordered_extern = myopti[RBW_NORDI];
@@ -3360,6 +3383,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   int_ll_extern = myopti[RBW_LL];
 
   int_TREE_X = myopti[RBW_DOTREEI];
+  scale_cat = myopti[RBW_SCATI];
 
   ftol=myoptd[RBW_FTOLD];
   tol=myoptd[RBW_TOLD];
@@ -3491,6 +3515,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     0,
                                     KERNEL_reg_unordered_extern,
                                     int_use_starting_values,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -3511,6 +3536,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     0,
                                     KERNEL_reg_unordered_extern,
                                     0,
+                                    scale_cat,
                                     pow((double)4.0/(double)3.0,0.2),             /* Init for continuous vars */
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
@@ -3623,6 +3649,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                         0,
                                         KERNEL_reg_unordered_extern,
                                         int_use_starting_values,
+                                        scale_cat,
                                         pow((double)4.0/(double)3.0,0.2),     /* Init for continuous vars */
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,

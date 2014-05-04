@@ -71,7 +71,7 @@ npregbw.rbandwidth <-
            bws, bandwidth.compute = TRUE,
            nmulti, remin = TRUE, itmax = 10000,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           lbc = 0.5, hbc = 1.5, cfac = 1.0, ...){
+           lbc = 0.5, hbc = 1.5, cfac = 1.0, scale.init.categorical.sample = FALSE,...){
 
     xdat <- toFrame(xdat)
 
@@ -162,7 +162,8 @@ npregbw.rbandwidth <-
         regtype = switch(bws$regtype,
           lc = REGTYPE_LC,
           ll = REGTYPE_LL),
-        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
+        scale.init.categorical.sample = scale.init.categorical.sample)
       
       myoptd = list(ftol=ftol, tol=tol, small=small, lbc = lbc, hbc = hbc, cfac = cfac, nconfac = nconfac, ncatfac = ncatfac)
 
@@ -246,7 +247,7 @@ npregbw.default <-
            bws,
            bandwidth.compute = TRUE, nmulti,
            remin, itmax, ftol, tol, small,
-           lbc, hbc, cfac,
+           lbc, hbc, cfac, scale.init.categorical.sample,
            ## dummy arguments for later passing into rbandwidth()
            regtype, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ukertype, okertype,
@@ -279,7 +280,7 @@ npregbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
-               "small", "lbc", "hbc", "cfac")
+               "small", "lbc", "hbc", "cfac", "scale.init.categorical.sample")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

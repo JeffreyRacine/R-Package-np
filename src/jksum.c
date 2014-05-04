@@ -6677,6 +6677,8 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   const int num_ovar = num_reg_ordered + num_var_ordered;
   const int num_all_var = num_reg + num_var_continuous + num_var_unordered + num_var_ordered;
 
+	const double log_DBL_MIN = log(DBL_MIN);
+
   int i; 
   int ret = 0;
 
@@ -6878,8 +6880,10 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
     if((rhon[i] == 0.0) || (rhod[i] == 0.0)){
       ret = 1;
       break;
-    }
+      //*cv -= log_DBL_MIN;
+    } else {
     *cv -= log(rhon[i]) - log(rhod[i]);
+    }
   }
 
   free(operator);

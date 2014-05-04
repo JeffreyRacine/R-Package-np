@@ -744,14 +744,26 @@ SIGNfunc <- function(y,y.fit) {
   sum(sign(y) == sign(y.fit))/length(y)
 }
 
-
 EssDee <- function(y){
-
-  sd.vec <- apply(as.matrix(y),2,sd)
-  IQR.vec <- apply(as.matrix(y),2,IQR)/(qnorm(.25,lower.tail=F)*2)
-  return(ifelse(sd.vec<IQR.vec|IQR.vec==0,sd.vec,IQR.vec))
+  if(any(dim(as.matrix(y)) == 0))
+      return(0)
   
+  sd.vec <- apply(as.matrix(y),2,sd)
+  IQR.vec <- apply(as.matrix(y),2,IQR)/QFAC
+  mad.vec <- apply(as.matrix(y),2,mad)
+  a <- apply(cbind(sd.vec,IQR.vec,mad.vec),1, function(x) min(x))
+  if(any(a<=0)) warning(paste("variable ",which(a<=0)," appears to be constant",sep=""))
+  return(a)
 }
+
+
+##EssDee <- function(y){
+##
+##  sd.vec <- apply(as.matrix(y),2,sd)
+##  IQR.vec <- apply(as.matrix(y),2,IQR)/QFAC
+##  return(ifelse(sd.vec<IQR.vec|IQR.vec==0,sd.vec,IQR.vec))
+##  
+##}
 
 ## consolidating various bits of code related to converting internal settings
 ## to printable strings
@@ -895,3 +907,5 @@ names(PERMUTATION_OPERATORS) <- c("none", "normal", "derivative", "integral")
 int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.62396943688265038571, 0.74785078617543927990,
                  0.26832815729997476357, 0.55901699437494742410, 0.84658823667359826246, 1.1329342579014329689,
                  0.5, 2.90113075268188e-01)
+
+QFAC <- qnorm(.25,lower.tail=F)*2
