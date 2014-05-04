@@ -1013,7 +1013,7 @@ npregiv <- function(y,
   
       for(i in 1:ncol(xdat)) {
         if(xdat.numeric[i]==TRUE) {
-          init.search.vals[i] <- runif(1,.5,1.5)*(IQR(xdat[,i])/1.349)*nrow(xdat)^{-1/(4+num.numeric)}
+          init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
         }
       }
   
@@ -1040,7 +1040,7 @@ npregiv <- function(y,
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
           init.search.vals <- runif(ncol(xdat),0,1)
           if(xdat.numeric[i]==TRUE) {
-            init.search.vals[i] <- runif(1,.5,1.5)*(IQR(xdat[,i])/1.349)*nrow(xdat)^{-1/(4+num.numeric)}
+            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
           }
           attempts <- attempts + 1
           optim.control$abstol <- optim.control$abstol * 10.0
@@ -1069,7 +1069,7 @@ npregiv <- function(y,
         while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
           init.search.vals <- runif(ncol(xdat),0,1)
           if(xdat.numeric[i]==TRUE) {
-            init.search.vals[i] <- runif(1,.5,1.5)*(IQR(xdat[,i])/1.349)*nrow(xdat)^{-1/(4+num.numeric)}
+            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
           }
           attempts <- attempts + 1
           optim.control$abstol <- optim.control$abstol * 10.0
