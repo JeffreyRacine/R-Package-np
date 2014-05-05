@@ -131,7 +131,7 @@ npcopula(bws,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 ## Example 1: Bivariate Mixed Data
 
 require(MASS)
@@ -259,7 +259,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
       xlab="u1",
       ylab="u2",
       zlab="Copula Density")
-} % enddontrun
+% } % enddontrun
 }
 
 \keyword{ nonparametric }
