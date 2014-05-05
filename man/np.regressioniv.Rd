@@ -297,7 +297,7 @@ This function should be considered to be in `beta test' status until further not
 \code{\link{npregivderiv},\link{npreg}}
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
 
@@ -384,6 +384,6 @@ legend(quantile(z,trim),quantile(y,1-trim),
        col=c("black","blue","red"),
        lwd=c(2,2,2))
        
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ instrument }
