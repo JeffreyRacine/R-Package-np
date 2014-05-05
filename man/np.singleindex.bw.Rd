@@ -317,7 +317,7 @@ npindexbw(\dots)
   large datasets.  }
 
 \examples{
-% \dontrun{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): Generate a simple linear model then
 # compute coefficients and the bandwidth using Ichimura's nonlinear
 # least squares approach.
@@ -411,6 +411,6 @@ X <- cbind(x1, x2)
 bw <- npindexbw(xdat=X, ydat=y, method="kleinspady")
 
 summary(bw)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}
