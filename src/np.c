@@ -1946,7 +1946,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   num_all_var = num_var+num_var_var;
 
   num_obs_train_extern = myopti[CDBW_NOBSI];
-  num_obs_eval_extern  = myopti[CDBW_NEVALI];
+  num_obs_eval_extern  = cdfontrain ? num_obs_train_extern : myopti[CDBW_NEVALI];
+
   iMultistart = myopti[CDBW_IMULTII];
   iNum_Multistart = myopti[CDBW_NMULTII];
 
