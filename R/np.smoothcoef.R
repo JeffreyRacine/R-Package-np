@@ -80,7 +80,8 @@ npscoef.call <-
   }
 
 npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
-  sc.names <- names(sys.call())
+  sc <- sys.call()
+  sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
@@ -107,43 +108,24 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   if(tydat.named)
     tzdat <- toFrame(tzdat)
 
-  mc <- match.call()
+  sc.bw <- sc
+  
+  sc.bw[[1]] <- quote(npscoefbw)
 
-  tx.str <- ifelse(txdat.named, "xdat = txdat,",
-                   ifelse(no.txdat, "", "txdat,"))
-  ty.str <- ifelse(tydat.named, "ydat = tydat,",
-                   ifelse(no.tydat, "", "tydat,"))
-  tz.str <- ifelse(tzdat.named, "zdat = tzdat,",
-                   ifelse(no.tzdat, "", "tzdat,"))
-
-  tbw <- eval(parse(text = paste("npscoefbw(",
-                      ifelse(bws.named,
-                             paste(tx.str, ty.str, tz.str,
-                                   "bws = bws, bandwidth.compute = FALSE,"),
-                             paste(ifelse(no.bws, "", "bws,"),
-                                   tx.str, ty.str, tz.str)),
-                      "call = mc, ...",")",sep="")))
-
-  ## need to do some surgery on the call to allow it to work with the
-  ## formula interface
-
-  repair.args <- c("data", "subset", "na.action")
-
-  m.par <- match(repair.args, names(mc), nomatch = 0)
-  m.child <- match(repair.args, names(tbw$call), nomatch = 0)
-
-  if(any(m.child > 0)) {
-    tbw$call[m.child] <- mc[m.par]
+  if(bws.named){
+    sc.bw$bandwidth.compute <- FALSE
   }
 
-  ## next we repair arguments portion of the call
-  m.bws.par <- match(c("bws","txdat","tydat","tzdat"), names(mc), nomatch = 0)
-  m.bws.child <- match(c("bws","txdat","tydat","tzdat"), as.character(tbw$call), nomatch = 0)
-  m.bws.union <- (m.bws.par > 0) & (m.bws.child > 0)
+  ostxy <- c('txdat','tydat','tzdat')
+  nstxy <- c('xdat','ydat','zdat')
+  
+  m.txy <- match(ostxy, names(sc.bw), nomatch = 0)
 
-  tbw$call[m.bws.child[m.bws.union]] <- mc[m.bws.par[m.bws.union]]
-
-  environment(tbw$call) <- parent.frame()
+  if(any(m.txy > 0)) {
+    names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
+  }
+    
+  tbw <- eval.parent(sc.bw)
 
   ## because of some ambiguities in how the function might be called
   ## we only drop up to two unnamed arguments, when sometimes dropping

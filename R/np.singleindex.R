@@ -92,7 +92,8 @@ npindex.call <-
   }
 
 npindex.default <- function(bws, txdat, tydat, ...){
-  sc.names <- names(sys.call())
+  sc <- sys.call()
+  sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat =
   ## if it was, we need to catch that and map it to dat =
@@ -111,41 +112,24 @@ npindex.default <- function(bws, txdat, tydat, ...){
   if(txdat.named)
     txdat <- toFrame(txdat)
 
-  mc <- match.call()
+  sc.bw <- sc
+  
+  sc.bw[[1]] <- quote(npindexbw)
 
-  tx.str <- ifelse(txdat.named, "xdat = txdat,",
-                   ifelse(no.txdat, "", "txdat,"))
-  ty.str <- ifelse(tydat.named, "ydat = tydat,",
-                   ifelse(no.tydat, "", "tydat,"))
-
-  tbw <- eval(parse(text = paste("npindexbw(",
-                      ifelse(bws.named,
-                             paste(tx.str, ty.str,
-                                   "bws = bws, bandwidth.compute = FALSE,"),
-                             paste(ifelse(no.bws, "", "bws,"), tx.str, ty.str)),
-                      "call = mc, ...",")",sep="")))
-
-  ##tbw <- updateBwNameMetadata(nameList =
-  ##                            list(ynames = deparse(substitute(tydat))),
-  ##                            bws = tbw)
-
-  repair.args <- c("data", "subset", "na.action")
-
-  m.par <- match(repair.args, names(mc), nomatch = 0)
-  m.child <- match(repair.args, names(tbw$call), nomatch = 0)
-
-  if(any(m.child > 0)) {
-    tbw$call[m.child] <- mc[m.par]
+  if(bws.named){
+    sc.bw$bandwidth.compute <- FALSE
   }
 
-  ## next we repair arguments portion of the call
-  m.bws.par <- match(c("bws","txdat","tydat"), names(mc), nomatch = 0)
-  m.bws.child <- match(c("bws","txdat","tydat"), as.character(tbw$call), nomatch = 0)
-  m.bws.union <- (m.bws.par > 0) & (m.bws.child > 0)
+  ostxy <- c('txdat','tydat')
+  nstxy <- c('xdat','ydat')
+  
+  m.txy <- match(ostxy, names(sc.bw), nomatch = 0)
 
-  tbw$call[m.bws.child[m.bws.union]] <- mc[m.bws.par[m.bws.union]]
-
-  environment(tbw$call) <- parent.frame()
+  if(any(m.txy > 0)) {
+    names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
+  }
+    
+  tbw <- eval.parent(sc.bw)
 
   ## convention: drop 'bws' and up to two unnamed arguments (including bws)
   if(no.bws){

@@ -576,7 +576,8 @@ npsigtest.rbandwidth <- function(bws,
 }
 
 npsigtest.default <- function(bws, xdat, ydat, ...){
-  sc.names <- names(sys.call())
+  sc <- sys.call()
+  sc.names <- names(sc)
 
   ## here we check to see if the function was called with tdat = if it
   ## was, we need to catch that and map it to dat = otherwise the call
@@ -595,38 +596,16 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   if(xdat.named)
     xdat <- toFrame(xdat)
 
-  mc <- match.call()
+  sc.bw <- sc
+  
+  sc.bw[[1]] <- quote(npregbw)
 
-  tx.str <- ifelse(xdat.named, "xdat = xdat,",
-                   ifelse(no.xdat, "", "xdat,"))
-  ty.str <- ifelse(ydat.named, "ydat = ydat,",
-                   ifelse(no.ydat, "", "ydat,"))
-
-  tbw <- eval(parse(text = paste("npregbw(",
-                      ifelse(bws.named,
-                             paste(tx.str, ty.str,
-                                   "bws = bws, bandwidth.compute = FALSE,"),
-                             paste(ifelse(no.bws, "", "bws,"), tx.str, ty.str)),
-                      "call = mc, ...",")",sep="")))
-
-  repair.args <- c("data", "subset", "na.action")
-
-  m.par <- match(repair.args, names(mc), nomatch = 0)
-  m.child <- match(repair.args, names(tbw$call), nomatch = 0)
-
-  if(any(m.child > 0)) {
-    tbw$call[m.child] <- mc[m.par]
+  if(bws.named){
+    sc.bw$bandwidth.compute <- FALSE
   }
 
-  ## next we repair arguments portion of the call
-  m.bws.par <- match(c("bws","xdat","ydat"), names(mc), nomatch = 0)
-  m.bws.child <- match(c("bws","xdat","ydat"), as.character(tbw$call), nomatch = 0)
-  m.bws.union <- (m.bws.par > 0) & (m.bws.child > 0)
-
-  tbw$call[m.bws.child[m.bws.union]] <- mc[m.bws.par[m.bws.union]]
-
-  environment(tbw$call) <- parent.frame()
-
+  tbw <- eval.parent(sc.bw)
+  
   ## convention: drop 'bws' and up to two unnamed arguments (including bws)
   if(no.bws){
     tx.str <- ",xdat = xdat"
