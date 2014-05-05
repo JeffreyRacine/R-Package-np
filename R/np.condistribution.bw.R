@@ -117,8 +117,8 @@ npcdistbw.condbandwidth <-
                                class(factor(0)))))
       stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
 
-    if (bws$type != 'fixed')
-      stop("only fixed bandwidths currently supported with ccdf bandwidth selection")
+    ##if (bws$type != 'fixed')
+    ##stop("only fixed bandwidths currently supported with ccdf bandwidth selection")
 
     ## catch and destroy NA's
     goodrows <- 1:dim(xdat)[1]
