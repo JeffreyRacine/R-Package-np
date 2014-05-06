@@ -1276,8 +1276,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
 /* Allocate memory for objects */
 
-  if((BANDWIDTH_den_extern != BW_FIXED) && (ibwmfunc == CBWM_CVLS))
-    old_cdens = 1;
+  //if((BANDWIDTH_den_extern != BW_FIXED) && (ibwmfunc == CBWM_CVLS))
+  //old_cdens = 1;
 
   matrix_Y_unordered_train_extern = alloc_matd(num_obs_train_extern, num_var_unordered_extern);
   matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, num_var_ordered_extern);
@@ -1414,11 +1414,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   ipt_extern_XY = ipt_XY;
   ipt_lookup_extern_XY = ipt_lookup_XY;
 
-  int_TREE_XY = int_TREE_XY && (((num_all_cvar) != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_XY = int_TREE_XY && (((num_all_cvar) != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
-  int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
-  int_TREE_Y = int_TREE_Y && (ibwmfunc == CBWM_CVLS) && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_Y = int_TREE_Y && (ibwmfunc == CBWM_CVLS) && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
 
   if(int_TREE_X == NP_TREE_TRUE){
