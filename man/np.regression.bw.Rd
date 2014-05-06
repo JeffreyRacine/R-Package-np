@@ -135,9 +135,9 @@ npregbw(\dots)
   }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
-    supplied bandwidths are interpreted as `scale factors'
+    supplied bandwidths are interpreted as \sQuote{scale factors}
     (\eqn{c_j}{c[j]}), otherwise when the value is \code{FALSE} they are
-    interpreted as `raw bandwidths' (\eqn{h_j}{h[j]} for continuous data
+    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for continuous data
     types, \eqn{\lambda_j}{lambda[j]} for discrete data types). For
     continuous data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
@@ -295,9 +295,9 @@ npregbw(\dots)
   bandwidths during cross-validation can lead to numerical problems for
   the local linear estimator when computing the locally weighted least
   squares solution. To overcome this problem we rely on a form or
-  `ridging' proposed by Cheng, Hall, and Titterington (1997), modified
-  so that we solve the problem pointwise rather than globally (i.e.\
-  only when it is needed).
+  \sQuote{ridging} proposed by Cheng, Hall, and Titterington (1997),
+  modified so that we solve the problem pointwise rather than globally
+  (i.e. only when it is needed).
 
 }
 \value{

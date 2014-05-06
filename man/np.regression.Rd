@@ -162,10 +162,10 @@ npreg(bws, \dots)
   The use of compactly supported kernels or the occurrence of small
   bandwidths can lead to numerical problems for the local linear
   estimator when computing the locally weighted least squares
-  solution. To overcome this problem we rely on a form or `ridging'
-  proposed by Cheng, Hall, and Titterington (1997), modified so that we
-  solve the problem pointwise rather than globally (i.e.\ only when it
-  is needed).
+  solution. To overcome this problem we rely on a form or
+  \sQuote{ridging} proposed by Cheng, Hall, and Titterington (1997),
+  modified so that we solve the problem pointwise rather than globally
+  (i.e. only when it is needed).
 
 }
 
