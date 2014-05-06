@@ -4324,16 +4324,19 @@ double *cv){
               for(l = 0; l < num_obs_train; l++)
                 xyj += kwy[jo*num_obs_train+l]*kwx[io*num_obs_train+l];
               xyj -= kwy[jo*num_obs_train+i]*kwx[io*num_obs_train+i];
+
+              const double tvd = (indy - xyj/(mean[io] - kwx[io*num_obs_train+i] + DBL_MIN));
+              *cv += tvd*tvd;
             } else {
               // leave-one-out joint density
 
               for(l = 0; l < num_obs_train; l++)
-                xyj += kwy[l*num_obs_eval+jo]*kwx[l*num_obs_train+io];
-              xyj -= kwy[io*num_obs_eval+jo]*kwx[io*num_obs_train+io];
-            }
+                xyj += kwy[l*dwy+jo]*kwx[l*dwx+io];
+              xyj -= kwy[i*dwy+jo]*kwx[i*dwx+io];
 
-            const double tvd = (indy - xyj/(mean[io] - kwx[io*num_obs_train+i] + DBL_MIN));
-            *cv += tvd*tvd;
+              const double tvd = (indy - xyj/(mean[io] - kwx[i*dwx + io] + DBL_MIN));
+              *cv += tvd*tvd;
+            }
           }
         }
       }
