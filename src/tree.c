@@ -251,7 +251,12 @@ void boxSearchNLPartial(KDT * restrict kdt, NL * restrict search, double * restr
   while (nls.n > 0){
     const int node = nls.node[nls.n - 1];
 
-    int res = boxIntersectPartial(bb, kdt->kdn[node].bb, idim, nidim);
+    int res;
+
+    if(nidim > 0)
+      res = boxIntersectPartial(bb, kdt->kdn[node].bb, idim, nidim);
+    else
+      res = KD_HITDONE;
 
     if(res == KD_MISS) {
       nls.n--;
@@ -303,8 +308,11 @@ void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * re
     tt[2] = (ih < idx[0]);
     tt[3] = (ih <= idx[1]);
 
-    if(!((tt[0] == tt[1]) && (tt[2] == tt[3])))
-      res = boxIntersectPartial(bb, kdt->kdn[node].bb, idim, nidim);
+    if(!((tt[0] == tt[1]) && (tt[2] == tt[3]) && (tt[0] != tt[2])))
+      if(nidim > 0)
+        res = boxIntersectPartial(bb, kdt->kdn[node].bb, idim, nidim);
+      else
+        res = KD_HITDONE;
     else
       res = KD_MISS;
 
@@ -420,7 +428,7 @@ void merge_end_xl_idx(XL * restrict xl, KDN * restrict kdn, int * restrict idx){
   const int xln = xl->n;
   if((xln != 0) && ((kdn->istart - idx[0]) == (xl->istart[xln-1] + xl->nlev[xln-1]))){
     xl->nlev[xln-1] += kdn->nlev;
-    xl->nlev[xln-1] = MIN(idx[1], xl->istart[xln-1] + xl->nlev[xln-1] - 1) - xl->istart[xln-1] + 1;
+    xl->nlev[xln-1] = MIN(idx[1]-idx[0], xl->istart[xln-1] + xl->nlev[xln-1] - 1) - xl->istart[xln-1] + 1;
   } else {
     xl->istart[xln] = MAX(0, kdn->istart-idx[0]);
     xl->nlev[xln] = MIN(idx[1], kdn->istart + kdn->nlev - 1) - idx[0] - xl->istart[xln] + 1;

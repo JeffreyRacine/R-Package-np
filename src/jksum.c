@@ -1144,7 +1144,7 @@ void np_convol_ckernelv(const int KERNEL,
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       if(xw[j] == 0.0) continue;
       result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
-                                      (xt[i]-x)/xt_h[i], h, xt_h[i]);
+                                      (xt[i]-x)/h, xt_h[i], h);
     }
   }
 
@@ -5295,24 +5295,47 @@ double *cv){
 
         if(!int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN)){
           const int64_t ie_dwi = MIN(ie,dwi);
-          for(i = is+wio; i < (wio+ie_dwi); i++){
-            for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
-              tcvk = 0.0;
-              if(j == i){
-                continue;
-              }
+          if(BANDWIDTH_den != BW_ADAP_NN){
+            for(i = is+wio; i < (wio+ie_dwi); i++){
+              for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
+                tcvk = 0.0;
+                if(j == i){
+                  continue;
+                }
 
-              const double tkxij = kx_ij[(i-wio)*wj + j-wjo];
+                const double tkxij = kx_ij[(i-wio)*dwj + j-wjo];
 
-              if (tkxij != 0.0) {
-                for(k = wko; k < (wko + dwk); k++){
-                  if(k == i) continue;
-                  tcvk += kx_ik[(i-wio)*wk + k-wko]*ky_jk[(j-wjo)*wk + k-wko];
-                }               
-                tcvj += tkxij*tcvk;
+                if (tkxij != 0.0) {
+                  for(k = wko; k < (wko + dwk); k++){
+                    if(k == i) continue;
+                    tcvk += kx_ik[(i-wio)*dwk + k-wko]*ky_jk[(j-wjo)*dwk + k-wko];
+                  }               
+                  tcvj += tkxij*tcvk;
+                }
               }
+              *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
             }
-            *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
+          } else {
+            for(i = is+wio; i < (wio+ie_dwi); i++){
+              for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
+                tcvk = 0.0;
+                if(j == i){
+                  continue;
+                }
+
+                const double tkxij = kx_ij[(j-wjo)*dwi + i-wio];
+
+                if (tkxij != 0.0) {
+                  for(k = wko; k < (wko + dwk); k++){
+                    if(k == i) continue;
+                    tcvk += kx_ik[(k-wko)*dwi + i-wio]*ky_jk[(j-wjo)*dwk + k-wko];
+                  }               
+                  tcvj += tkxij*tcvk;
+                }
+              }
+              *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
+              //              Rprintf("i, cv: %d, %3.15g \n",i, *cv);
+            }
           }
         } else {
           const int64_t ie_dwi = MIN(ie,dwi);
@@ -5329,8 +5352,8 @@ double *cv){
               bb[2*l] = -cksup[KERNEL_XY[l]][1];
               bb[2*l+1] = -cksup[KERNEL_XY[l]][0];
 
-              bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_Xi_continuous_train[l][i] + bb[2*l]*tbw);
-              bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Xi_continuous_train[l][i] + bb[2*l+1]*tbw);
+              bb[2*l] = (fabs(bb[2*l]) == DBL_MAX) ? bb[2*l] : (matrix_Xi_continuous_train[l][i-wio] + bb[2*l]*tbw);
+              bb[2*l+1] = (fabs(bb[2*l+1]) == DBL_MAX) ? bb[2*l+1] : (matrix_Xi_continuous_train[l][i-wio] + bb[2*l+1]*tbw);
             }
 
             boxSearchNLPartialIdx(kdt_extern_XY, &nls, bb, NULL, &xl_xij, xyd, num_reg_continuous, idxj);
@@ -5353,7 +5376,7 @@ double *cv){
                   continue;
                 }
 
-                const double tkxij = kx_ij[(i-wio)*wj + j];
+                const double tkxij = kx_ij[(i-wio)*dwj + j];
                 if (tkxij != 0.0) {
                   for (m_ik = 0; m_ik < xl_xik.n; m_ik++){
                     const int64_t kstart = xl_xik.istart[m_ik];
@@ -5361,7 +5384,7 @@ double *cv){
 
                     for(k = kstart; k < (kstart + knlev); k++){
                       if((k+wko) == i) continue;
-                      tcvk += kx_ik[(i-wio)*wk + k]*ky_jk[j*wk + k];
+                      tcvk += kx_ik[(i-wio)*dwk + k]*ky_jk[j*dwk + k];
                     }
                   }
                   tcvj += tkxij*tcvk;
