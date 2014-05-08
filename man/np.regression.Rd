@@ -159,6 +159,14 @@ npreg(bws, \dots)
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
 
+  The use of compactly supported kernels or the occurrence of small
+  bandwidths can lead to numerical problems for the local linear
+  estimator when computing the locally weighted least squares
+  solution. To overcome this problem we rely on a form or
+  \sQuote{ridging} proposed by Cheng, Hall, and Titterington (1997),
+  modified so that we solve the problem pointwise rather than globally
+  (i.e. only when it is needed).
+
 }
 
 \value{
@@ -197,6 +205,10 @@ npreg(bws, \dots)
 
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
   discrimination by the kernel method,} Biometrika, 63, 413-420.
+
+  Cheng, M.-Y. and P. Hall and D.M. Titterington (1997), \dQuote{On the
+  shrinkage of local linear curve estimators,} Statistics and Computing,
+  7, 11-17.
 
   Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric Estimation of
   Global Functionals and a Measure of the Explanatory Power of

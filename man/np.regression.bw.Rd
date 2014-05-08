@@ -135,9 +135,9 @@ npregbw(\dots)
   }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
-    supplied bandwidths are interpreted as `scale factors'
+    supplied bandwidths are interpreted as \sQuote{scale factors}
     (\eqn{c_j}{c[j]}), otherwise when the value is \code{FALSE} they are
-    interpreted as `raw bandwidths' (\eqn{h_j}{h[j]} for continuous data
+    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for continuous data
     types, \eqn{\lambda_j}{lambda[j]} for discrete data types). For
     continuous data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
@@ -284,13 +284,20 @@ npregbw(\dots)
   nonparametric regressors \code{x1} and \code{x2} are to be estimated.
   See below for further examples. 
 
-
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
   order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  The use of compactly supported kernels or the occurrence of small
+  bandwidths during cross-validation can lead to numerical problems for
+  the local linear estimator when computing the locally weighted least
+  squares solution. To overcome this problem we rely on a form or
+  \sQuote{ridging} proposed by Cheng, Hall, and Titterington (1997),
+  modified so that we solve the problem pointwise rather than globally
+  (i.e. only when it is needed).
 
 }
 \value{
@@ -317,6 +324,10 @@ npregbw(\dots)
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
+
+  Cheng, M.-Y. and P. Hall and D.M. Titterington (1997), \dQuote{On the
+  shrinkage of local linear curve estimators,} Statistics and Computing,
+  7, 11-17.
 
   Hall, P. and Q. Li and J.S. Racine (2007), \dQuote{Nonparametric
   estimation of regression functions in the presence of irrelevant
