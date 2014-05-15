@@ -80,7 +80,7 @@ npudistbw.dbandwidth <-
            bws, gdat = NULL, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
            fast.cdf = TRUE, do.full.integral = TRUE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           lbc = 0.5, hbc = 1.5, cfac = 1.0, scale.init.categorical.sample=FALSE, ...){
+           lbc = 0.5, hbc = 10.0, cfac = 1.0, scale.init.categorical.sample=FALSE, ...){
 
     dat = toFrame(dat)
 

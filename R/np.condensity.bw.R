@@ -64,7 +64,7 @@ npcdensbw.conbandwidth <-
            bws, bandwidth.compute = TRUE,
            nmulti, remin = TRUE, itmax = 10000, 
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           memfac = 500.0, lbc = 0.5, hbc = 1.5, cfac = 1.0,
+           memfac = 500.0, lbc = 0.5, hbc = 10.0, cfac = 1.0,
            scale.init.categorical.sample=FALSE,
            ...){
 

@@ -17583,7 +17583,7 @@ double zero)
                           vector_scale_factor,
                           NULL,
                           matrix_y,
-                          0, seed, 0.0, 0.0, 1.0);
+                          0, seed, 0.5, 10.0, 1.0);
 
 		powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17604,7 +17604,7 @@ double zero)
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed, 0.0, 0.0, 1.0);
+                              0, seed, 0.5, 10.0, 1.0);
 
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
@@ -17663,7 +17663,7 @@ double zero)
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed, 0.0, 0.0, 1.0);
+                              0, seed, 0.5, 10.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17682,7 +17682,7 @@ double zero)
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed, 0.0, 0.0, 1.0);
+                                  0, seed, 0.5, 10.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17729,7 +17729,7 @@ double zero)
                               vector_scale_factor,
                               NULL,
                               matrix_y, 
-                              0, seed, 0.0, 0.0, 1.0);
+                              0, seed, 0.5, 10.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17748,7 +17748,7 @@ double zero)
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed, 0.0, 0.0, 1.0);
+                                  0, seed, 0.5, 10.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17843,7 +17843,7 @@ double zero)
                           vector_scale_factor,
                           NULL,
                           matrix_y,
-                          0, seed, 0.0, 0.0, 1.0);
+                          0, seed, 0.5, 10.0, 1.0);
 
 		powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17862,7 +17862,7 @@ double zero)
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed, 0.0, 0.0, 1.0);
+                              0, seed, 0.5, 10.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17919,7 +17919,7 @@ double zero)
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed, 0.0, 0.0, 1.0);
+                              0, seed, 0.5, 10.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17938,7 +17938,7 @@ double zero)
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed, 0.0, 0.0, 1.0);
+                                  0, seed, 0.5, 10.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17990,7 +17990,7 @@ double zero)
                               vector_scale_factor,
                               NULL,
                               matrix_y,
-                              0, seed, 0.0, 0.0, 1.0);
+                              0, seed, 0.5, 10.0, 1.0);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -18009,7 +18009,7 @@ double zero)
                                   vector_scale_factor,
                                   NULL,
                                   matrix_y,
-                                  0, seed, 0.0, 0.0, 1.0);
+                                  0, seed, 0.5, 10.0, 1.0);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
