@@ -1635,8 +1635,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   /* assign the function to be optimized */
 
-  /* 7/2/2010 */
-  
+  /* 7/2/2010 */  
   if(old_cdens){
     switch(ibwmfunc){
     case CBWM_CVML : bwmfunc = cv_func_con_density_categorical_ml; break;
@@ -4571,6 +4570,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       matrix_Y_ordered_train_extern,
                                       NULL,
                                       &vector_scale_factor[1],
+                                      NULL,NULL,NULL,
                                       num_categories_extern,
                                       matrix_categorical_vals_extern,
                                       matrix_ordered_indices,

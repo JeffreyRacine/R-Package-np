@@ -1837,6 +1837,9 @@ double **matrix_Y,
 double **matrix_W,
 double * sgn,
 double *vector_scale_factor,
+double ** matrix_bw_train,
+double ** matrix_bw_eval,
+double * lambda_pre,
 int *num_categories,
 double **matrix_categorical_vals,
 int ** matrix_ordered_indices,
@@ -1858,6 +1861,8 @@ double * const kw){
   int * permutation_kernel = NULL;
   int doscoreocg = do_score || do_ocg;
   int do_perm = permutation_operator != OP_NOOP; 
+
+  int bw_provided = 1;
 
   const int no_bpso = (NULL == bpso);
 
@@ -1973,7 +1978,7 @@ double * const kw){
   const int ws_step = (BANDWIDTH_reg == BW_ADAP_NN)? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
-  double *lambda, **matrix_bandwidth, **matrix_eval_bandwidth = NULL, *m = NULL;
+  double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, *m = NULL;
   double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
 
   double * const * const xtc = (BANDWIDTH_reg == BW_ADAP_NN)?
@@ -2001,8 +2006,31 @@ double * const kw){
   mstep = (BANDWIDTH_reg==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_train:1);
 
-  lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
-  matrix_bandwidth = alloc_tmatd(mstep, num_reg_continuous);  
+  if(lambda_pre != NULL)
+    lambda = lambda_pre;
+  else {
+    lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
+    bw_provided = 0;
+  }
+
+  if(bw_provided){
+    if((BANDWIDTH_reg == BW_GEN_NN) && (matrix_bw_eval != NULL)){
+      matrix_bandwidth = matrix_bw_eval;
+    } else if ((BANDWIDTH_reg == BW_ADAP_NN) && (matrix_bw_train != NULL)){
+      if (any_convolution){
+        if(matrix_bw_eval != NULL){
+          matrix_alt_bandwidth = matrix_bw_eval;        
+        }else{
+          assert(0);
+        }
+      } 
+      matrix_bandwidth = matrix_bw_train;
+    } else {
+      assert(0);
+    }
+  } else {
+    matrix_bandwidth = alloc_tmatd(mstep, num_reg_continuous);  
+  } 
 
   tprod = alloc_vecd((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train);
 
@@ -2056,36 +2084,37 @@ double * const kw){
 
   }
 
-  // this is a bug
-  if(kernel_bandwidth_mean((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
-                           BANDWIDTH_reg,
-                           num_obs_train,
-                           num_obs_eval,
-                           0,
-                           0,
-                           0,
-                           num_reg_continuous,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           suppress_parallel, // suppress_parallel if requested
-                           vector_scale_factor,
-                           matrix_X_continuous_train,				 /* Not used */
-                           matrix_X_continuous_eval,				 /* Not used */
-                           matrix_X_continuous_train,
-                           matrix_X_continuous_eval,
-                           matrix_bandwidth,						 /* Not used */
-                           matrix_bandwidth,
-                           lambda)==1){
+  if(!bw_provided){
+    if(kernel_bandwidth_mean((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
+                             BANDWIDTH_reg,
+                             num_obs_train,
+                             num_obs_eval,
+                             0,
+                             0,
+                             0,
+                             num_reg_continuous,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             suppress_parallel, // suppress_parallel if requested
+                             vector_scale_factor,
+                             matrix_X_continuous_train,				 /* Not used */
+                             matrix_X_continuous_eval,				 /* Not used */
+                             matrix_X_continuous_train,
+                             matrix_X_continuous_eval,
+                             matrix_bandwidth,						 /* Not used */
+                             matrix_bandwidth,
+                             lambda)==1){
 
-    free(lambda);
-    free_tmat(matrix_bandwidth);
-    free(tprod);
+      free(lambda);
+      free_tmat(matrix_bandwidth);
+      free(tprod);
 
-    return(KWSNP_ERR_BADBW);
+      return(KWSNP_ERR_BADBW);
+    }
   }
 
-  if((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution){ // need additional bandwidths 
-    matrix_eval_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
+  if(!bw_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution)){ // need additional bandwidths 
+    matrix_alt_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
 
     // this is a bug
     if(kernel_bandwidth_mean((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
@@ -2105,12 +2134,12 @@ double * const kw){
                              matrix_X_continuous_train,
                              matrix_X_continuous_eval,
                              NULL,						 /* Not used */
-                             matrix_eval_bandwidth,
+                             matrix_alt_bandwidth,
                              lambda)==1){
 
       free(lambda);
       free_tmat(matrix_bandwidth);
-      free_tmat(matrix_eval_bandwidth);
+      free_tmat(matrix_alt_bandwidth);
       free(tprod);
 
       return(KWSNP_ERR_BADBW);
@@ -2362,7 +2391,7 @@ double * const kw){
       }
       else
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j], 
-                           matrix_eval_bandwidth[i], *m, tprod, swap_xxt);
+                           matrix_alt_bandwidth[i], *m, tprod, swap_xxt);
       dband *= ipow(*m, bpow[i]);
 
       if(do_perm){
@@ -2507,11 +2536,14 @@ double * const kw){
   free(KERNEL_reg_np);
   free(KERNEL_unordered_reg_np);
   free(KERNEL_ordered_reg_np);
-  free(lambda);
-  free_tmat(matrix_bandwidth);
+  
+  if(!bw_provided){
+    free(lambda);
+    free_tmat(matrix_bandwidth);
+  }
 
-  if((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution)
-    free_tmat(matrix_eval_bandwidth);
+  if(!bw_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution))
+    free_tmat(matrix_alt_bandwidth);
 
   free(tprod);
   free(bpow);
@@ -3020,8 +3052,6 @@ int *num_categories){
 
     int_LARGE_SF = 1;
 
-
-
     kernel_weighted_sum_np(kernel_c,
                            kernel_u,
                            kernel_o,
@@ -3064,6 +3094,7 @@ int *num_categories){
                            NULL,
                            NULL,
                            vector_scale_factor,
+                           NULL,NULL,NULL,
                            num_categories,
                            NULL,
                            NULL,
@@ -3132,6 +3163,7 @@ int *num_categories){
                            NULL,
                            NULL,
                            vector_scale_factor,
+                           NULL,NULL,NULL,
                            num_categories,
                            NULL,
                            NULL,
@@ -3309,6 +3341,7 @@ int *num_categories){
                                    XTKX,
                                    NULL,
                                    vsf,
+                                   NULL,NULL,NULL,
                                    num_categories,
                                    NULL,
                                    NULL,
@@ -3393,6 +3426,7 @@ int *num_categories){
                                    XTKX,
                                    sgn,
                                    vsf,
+                                   NULL,NULL,NULL,
                                    num_categories,
                                    NULL,
                                    NULL,
@@ -3483,6 +3517,7 @@ int *num_categories){
                                XTKX,
                                NULL,
                                vsf,
+                               NULL,NULL,NULL,
                                num_categories,
                                NULL,
                                NULL,
@@ -3560,6 +3595,7 @@ int *num_categories){
                                  XTKX,
                                  sgn,
                                  vsf,
+                                 NULL,NULL,NULL,
                                  num_categories,
                                  NULL,
                                  NULL,
@@ -3789,6 +3825,7 @@ double * cv){
                            NULL,
                            NULL,
                            vsf,
+                           NULL,NULL,NULL,
                            num_categories,
                            matrix_categorical_vals,
                            NULL,
@@ -3864,6 +3901,7 @@ double * cv){
                              NULL,
                              NULL,
                              vsf,
+                             NULL,NULL,NULL,
                              num_categories,
                              matrix_categorical_vals,
                              NULL,
@@ -4233,6 +4271,7 @@ double *cv){
                              NULL, // matrix w
                              NULL, // sgn
                              vsfx,
+                             NULL,NULL,NULL,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
                              NULL, // moo
@@ -4295,6 +4334,7 @@ double *cv){
                                NULL,
                                NULL,
                                vsfy,
+                               NULL,NULL,NULL,
                                num_categories_extern_Y,
                                matrix_categorical_vals_extern_Y,
                                NULL,
@@ -4443,6 +4483,7 @@ double *cv){
                              NULL,
                              NULL,
                              vsfx,
+                             NULL,NULL,NULL,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
                              NULL,
@@ -4504,6 +4545,7 @@ double *cv){
                                NULL,
                                NULL,
                                vsfy,
+                               NULL,NULL,NULL,
                                num_categories_extern_Y,
                                matrix_categorical_vals_extern_Y,
                                NULL,
@@ -4984,6 +5026,7 @@ double *cv){
                          NULL,
                          NULL,
                          vsfxy,
+                         NULL,NULL,NULL,
                          num_categories_extern_XY,
                          matrix_categorical_vals_extern_XY,
                          NULL,
@@ -5032,6 +5075,7 @@ double *cv){
                          NULL,
                          NULL,
                          vsfx,
+                         NULL,NULL,NULL,
                          num_categories_extern_X,
                          matrix_categorical_vals_extern_X,
                          NULL,
@@ -5152,6 +5196,7 @@ double *cv){
                              NULL,
                              NULL,
                              vsfx,
+                             NULL,NULL,NULL,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
                              NULL,
@@ -5232,6 +5277,7 @@ double *cv){
                                  NULL,
                                  NULL,
                                  vsfx,
+                                 NULL,NULL,NULL,
                                  num_categories_extern_X,
                                  matrix_categorical_vals_extern_X,
                                  NULL,
@@ -5286,6 +5332,7 @@ double *cv){
                                NULL,
                                NULL,
                                vsfy,
+                               NULL,NULL,NULL,
                                num_categories_extern_Y,
                                matrix_categorical_vals_extern_Y,
                                NULL,
@@ -5724,6 +5771,7 @@ double *SIGN){
                            NULL, // no W matrix
                            NULL, // no sgn 
                            vector_scale_factor,
+                           NULL,NULL,NULL,
                            num_categories,
                            matrix_categorical_vals,
                            matrix_ordered_indices, 
@@ -5976,6 +6024,7 @@ double *SIGN){
                                  XTKX,
                                  NULL,
                                  vsf,
+                                 NULL,NULL,NULL,
                                  num_categories,
                                  matrix_categorical_vals,
                                  moo,
@@ -6047,6 +6096,7 @@ double *SIGN){
                              XTKX,
                              NULL,
                              vsf,
+                             NULL,NULL,NULL,
                              num_categories,
                              matrix_categorical_vals,
                              moo,
@@ -6338,6 +6388,7 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          NULL,
                          vector_scale_factor,
+                         NULL,NULL,NULL,
                          num_categories,
                          NULL,
                          NULL,
@@ -6461,6 +6512,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          NULL, // no weights
                          NULL, // no sgn
                          vector_scale_factor,
+                         NULL,NULL,NULL,
                          num_categories,
                          matrix_categorical_vals,
                          NULL, // no ocg
@@ -6518,6 +6570,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          NULL, // no weights
                          NULL, // no sgn
                          vector_scale_factor,
+                         NULL,NULL,NULL,
                          num_categories,
                          NULL,
                          NULL, // no ocg
@@ -6686,6 +6739,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          NULL, // no weights
                          NULL, // no sgn
                          vector_scale_factor,
+                         NULL,NULL,NULL,
                          num_categories,
                          matrix_categorical_vals, // if dist mcv (possibly) necessary
                          NULL, // no ocg
@@ -6907,6 +6961,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          NULL,
                          vsf_xy,
+                         NULL,NULL,NULL,
                          num_categories_extern_XY,
                          matrix_categorical_vals_extern_XY,
                          NULL,
@@ -6955,6 +7010,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          NULL,
                          vsf_x,
+                         NULL,NULL,NULL,
                          num_categories_extern_X,
                          matrix_categorical_vals_extern_X,
                          NULL,
@@ -7296,7 +7352,8 @@ double * log_likelihood
                          NULL, // matrix y
                          NULL, // matrix w
                          NULL, // sgn
-                         vsf_XY, 
+                         vsf_XY,
+                         NULL,NULL,NULL, 
                          num_categories_XY,
                          matrix_categorical_vals_XY,
                          matrix_ordered_indices, 
@@ -7347,6 +7404,7 @@ double * log_likelihood
                          NULL,
                          NULL,
                          vsf_X,
+                         NULL,NULL,NULL,
                          num_categories + num_Y_unordered + num_Y_ordered,
                          matrix_categorical_vals + num_Y_unordered + num_Y_ordered,
                          matrix_ordered_indices, // moo
