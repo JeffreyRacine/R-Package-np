@@ -705,7 +705,7 @@ int initialize_nr_directions(int num_reg_continuous,
   li =  num_reg_continuous + num_var_continuous;
 
   for(i = 1; i <= li; i++)
-    matrix_y[i][i] = vector_scale_factor[i]*(random ? (hbc_dir-lbc_dir)*ran3(&seed) + lbc_dir: hbc_dir)*csfac*c_dir;
+    matrix_y[i][i] = vector_scale_factor[i]*(random ? (hbc_dir-lbc_dir)*chidev(&seed,3)  + lbc_dir: hbc_dir)*csfac*c_dir;
 
   if(num_categories == NULL) return(0);
 
