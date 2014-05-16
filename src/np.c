@@ -4683,6 +4683,7 @@ void np_quantile_conditional(double * tc_con,
   int itmax;
 
   int iNum_Multistart;
+  double lbc, hbc, cfac;
 
   iNum_Multistart = myopti[CQ_NMULTII];
   imsnum = 0;
@@ -4733,6 +4734,10 @@ void np_quantile_conditional(double * tc_con,
 
   nconfac_extern = myoptd[CQ_NCONFD];
   ncatfac_extern = myoptd[CQ_NCATFD];
+
+  lbc = myoptd[CQ_LBCD];
+  hbc = myoptd[CQ_HBCD];
+  cfac = myoptd[CQ_CFACD];
 
   gamma_extern = *quantile;
   nconfac_extern = *nconfac;
@@ -4878,8 +4883,10 @@ void np_quantile_conditional(double * tc_con,
                            small,
                            itmax,
                            iNum_Multistart,            /* Maximum number of multistarts */
-                           1.0e-10);         /* Zero for all intents and purposes */
-
+                           1.0e-10,         /* Zero for all intents and purposes */
+                           lbc,
+                           hbc,
+                           cfac);
 
   /* return data to R */
 

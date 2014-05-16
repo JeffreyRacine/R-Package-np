@@ -75,6 +75,7 @@ npqreg.condbandwidth <-
            gradients = FALSE,
            ftol = 1.490116e-07, tol = 1.490116e-04,
            small = 1.490116e-05, itmax = 10000,
+           lbc = 0.5, hbc = 1.5, cfac = 1.0,
            ...){
 
     no.ex = missing(exdat)
@@ -213,7 +214,10 @@ npqreg.condbandwidth <-
     myoptd = list(
       ftol = ftol,
       tol = tol,
-      small = small
+      small = small,
+      lbc = lbc,
+      hbc = hbc,
+      cfac = cfac
       )
     
     myout=
