@@ -83,6 +83,9 @@ double kernel_deriv(int KERNEL, double z);
 double meand(int n, double *vector);
 
 double ran3(int *idum);
+double gasdev(int *idum);
+double chidev(int *idum, int df);
+
 double standerrd(int n, double *vector);
 
 int compute_nn_distance(int num_obs, int suppress_parallel, double *vector_data, int int_k_nn, double *nn_distance);

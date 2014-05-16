@@ -563,3 +563,51 @@ double ran3(int *idum)
 #undef MSEED
 #undef MZ
 #undef FAC
+
+/* This program generates normal random variates and is machine
+independent thus generates the same sequence on any machine. First it
+generates uniform deviates _much_ better than the native generator on
+most machines, then uses a Box-Mueller transformation. */
+
+double gasdev(int *idum)
+{
+    static int iset=0;
+    static double gset;
+    double fac;
+    double r;
+    double v1;
+    double v2;
+
+    if (iset == 0)
+    {
+        do
+        {
+            v1=2.0*ran3(idum)-1.0;
+            v2=2.0*ran3(idum)-1.0;
+            r=v1*v1+v2*v2;
+        } while (r >= 1.0 || r == 0.0);
+        fac= (double) sqrt(-2.0*log(r)/r);
+        gset=v1*fac;
+        iset=1;
+        return v2*fac;
+    }
+    else
+    {
+        iset=0;
+        return gset;
+    }
+}
+
+/* Poor man's chi-square jracine 15/5/2014 */
+
+double chidev(int *idum, int df)
+{
+    double chisq = 0.0;
+    int i;
+
+    for (i=1;i<=df;i++) chisq += ipow(gasdev(idum),2);
+
+    return chisq;
+
+}
+
