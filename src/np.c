@@ -4732,9 +4732,6 @@ void np_quantile_conditional(double * tc_con,
   tol = myoptd[CQ_TOLD];
   small = myoptd[CQ_SMALLD];
 
-  nconfac_extern = myoptd[CQ_NCONFD];
-  ncatfac_extern = myoptd[CQ_NCATFD];
-
   lbc = myoptd[CQ_LBCD];
   hbc = myoptd[CQ_HBCD];
   cfac = myoptd[CQ_CFACD];

@@ -608,11 +608,9 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CQ_FTOLD  0
 #define CQ_TOLD   1
 #define CQ_SMALLD 2
-#define CQ_NCONFD 3
-#define CQ_NCATFD 4
-#define CQ_LBCD 5
-#define CQ_HBCD 6
-#define CQ_CFACD 7
+#define CQ_LBCD 3
+#define CQ_HBCD 4
+#define CQ_CFACD 5
 
 
 #define TG2_B     0
