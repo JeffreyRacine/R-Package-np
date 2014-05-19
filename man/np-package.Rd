@@ -240,13 +240,18 @@
   So, if you had two variables, \eqn{x_{i1}}{x1[i]} and
   \eqn{x_{i2}}{x2[i]}, and \eqn{x_{i1}}{x1[i]} was continuous while
   \eqn{x_{i2}}{x2[i]} was, say, binary (0/1), and you created a data
-  frame of the form \code{X <- data.frame(x1,factor(x2))}, then the
+  frame of the form \code{X <- data.frame(x1,x2=factor(x2))}, then the
   kernel function used by \code{np} would be
   \eqn{K(\cdot)=k(\cdot)\times l(\cdot)}{K(.)=k(.)*l(.)} where the
   particular kernel functions \eqn{k(\cdot)}{k(.)} and
   \eqn{l(\cdot)}{l(.)} would be, say, the second order Gaussian
   (\code{ckertype="gaussian"}) and Aitchison and Aitken
-  (\code{ukertype="aitchisonaitken"}) kernels by default, respectively.
+  (\code{ukertype="aitchisonaitken"}) kernels by default, respectively
+  (note that for conditional density and distribution objects we can
+  specify kernels for the left-hand side and right-hand side variables
+  in this manner using \code{cykertype="gaussian"},
+  \code{cxkertype="gaussian"} and \code{uykertype="aitchisonaitken"},
+  \code{uxkertype="aitchisonaitken"}).
 
   Note that higher order continuous kernels (i.e., fourth, sixth, and
   eighth order) are derived from the second order kernels given above
