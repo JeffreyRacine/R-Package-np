@@ -113,15 +113,15 @@ npcdensbw(\dots)
   \item{bws}{
     a bandwidth specification. This can be set as a \code{conbandwidth}
     object returned from a previous invocation, or as a \eqn{p+q}-vector
-    of bandwidths, with each element \eqn{i} up to \eqn{i=p}
-    corresponding to the bandwidth for column \eqn{i} in \code{xdat}, 
-    and each element \eqn{i} from \eqn{i=p+1} to \eqn{i=p+q} corresponding to the
-    bandwidth for column \eqn{i-p} in \code{ydat}. In either case, the
-    bandwidth supplied will serve as a starting point in the numerical
-    search for optimal bandwidths. If specified as a vector, then
-    additional arguments will need to be supplied as necessary to
-    specify the bandwidth type, kernel types, selection methods, and so
-    on. This can be left unset.
+    of bandwidths, with each element \eqn{i} up to \eqn{i=q}
+    corresponding to the bandwidth for column \eqn{i} in \code{ydat},
+    and each element \eqn{i} from \eqn{i=q+1} to \eqn{i=p+q}
+    corresponding to the bandwidth for column \eqn{i-q} in
+    \code{xdat}. In either case, the bandwidth supplied will serve as a
+    starting point in the numerical search for optimal bandwidths. If
+    specified as a vector, then additional arguments will need to be
+    supplied as necessary to specify the bandwidth type, kernel types,
+    selection methods, and so on. This can be left unset.
   }
 
   \item{\dots}{
@@ -283,6 +283,7 @@ npcdensbw(\dots)
 }
 
 \details{
+
   \code{npcdensbw} implements a variety of methods for choosing
   bandwidths for multivariate distributions (\eqn{p+q}-variate) defined
   over a set of possibly continuous and/or discrete (unordered, ordered)

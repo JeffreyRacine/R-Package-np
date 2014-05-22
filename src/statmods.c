@@ -674,6 +674,7 @@ int initialize_nr_directions(int num_reg_continuous,
                              double c_dir){
 
   int i, j, li;
+  int df = 3;
 
   double lbd_dir = 0.0;
   double hbd_dir = 1.0;
@@ -705,7 +706,7 @@ int initialize_nr_directions(int num_reg_continuous,
   li =  num_reg_continuous + num_var_continuous;
 
   for(i = 1; i <= li; i++)
-    matrix_y[i][i] = vector_scale_factor[i]*(random ? (hbc_dir-lbc_dir)*chidev(&seed,3)  + lbc_dir: hbc_dir)*csfac*c_dir;
+    matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed,df)  + lbc_dir: (double) df + lbc_dir)*csfac*c_dir;
 
   if(num_categories == NULL) return(0);
 
@@ -779,7 +780,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   double d_init = 0.375;
   double lbc_init = 0.1;
   double hbc_init = 2.0;
-  double c_init = 0.5; 
+  double c_init = 1.0; 
 
   const int fixed_bw = (BANDWIDTH == BW_FIXED);
   const double bw_nf = MAX(1.0,ceil(sqrt((double)num_obs)));
