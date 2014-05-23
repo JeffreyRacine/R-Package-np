@@ -175,7 +175,7 @@ npqreg(bws, \dots)
 
 \details{
 
-    The optimizer invoked for search is Powell's conjugate direction
+  The optimizer invoked for search is Powell's conjugate direction
   method which requires the setting of (non-random) initial values and
   search directions for bandwidths, and, when restarting, random values
   for successive invocations. Bandwidths for \code{numeric} variables
