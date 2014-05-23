@@ -41,10 +41,10 @@ npcdist(bws, \dots)
     a bandwidth specification. This can be set as a \code{condbandwidth}
     object returned from a previous invocation of
     \code{\link{npcdistbw}}, or as a \eqn{p+q}-vector of bandwidths,
-    with each element \eqn{i} up to \eqn{i=p} corresponding to the
-    bandwidth for column \eqn{i} in \code{txdat}, and each element
-    \eqn{i} from \eqn{i=p+1} to \eqn{i=p+q} corresponding to the
-    bandwidth for column \eqn{i-p} in \code{tydat}. If specified as a
+    with each element \eqn{i} up to \eqn{i=q} corresponding to the
+    bandwidth for column \eqn{i} in \code{tydat}, and each element
+    \eqn{i} from \eqn{i=q+1} to \eqn{i=p+q} corresponding to the
+    bandwidth for column \eqn{i-q} in \code{txdat}. If specified as a
     vector, then additional arguments will need to be supplied as
     necessary to specify the bandwidth type, kernel types, training
     data, and so on.
