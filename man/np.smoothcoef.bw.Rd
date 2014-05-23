@@ -170,13 +170,14 @@ npscoefbw(\dots)
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
     c[j]*sigma[j]*n^(-1/(2*P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
     adaptive measure of spread of continuous variable \eqn{j} defined as
-    min(standard deviation, interquartile range/1.349), \eqn{n} the
-    number of observations, \eqn{P}{P} the order of the kernel, and
-    \eqn{l}{l} the number of continuous variables. For discrete data
-    types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related by the
-    formula \eqn{h_j = c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))},
-    where here \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.
-    Defaults to \code{FALSE}.  }
+    min(standard deviation, mean absolute deviation, interquartile
+    range/1.349), \eqn{n} the number of observations, \eqn{P}{P} the
+    order of the kernel, and \eqn{l}{l} the number of continuous
+    variables. For discrete data types, \eqn{c_j}{c[j]} and
+    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j =
+    c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))}, where here
+    \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.  Defaults to
+    \code{FALSE}.  }
 
   \item{bwtype}{
     character string used for the continuous variable bandwidth type,

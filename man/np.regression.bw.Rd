@@ -137,13 +137,14 @@ npregbw(\dots)
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
     supplied bandwidths are interpreted as \sQuote{scale factors}
     (\eqn{c_j}{c[j]}), otherwise when the value is \code{FALSE} they are
-    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for continuous data
-    types, \eqn{\lambda_j}{lambda[j]} for discrete data types). For
-    continuous data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are
-    related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
-    c[j]*sigma[j]*n^(-1/(2*P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
-    adaptive measure of spread of continuous variable \eqn{j} defined as
-    min(standard deviation, interquartile range/1.349), \eqn{n} the
+    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for
+    continuous data types, \eqn{\lambda_j}{lambda[j]} for discrete data
+    types). For continuous data types, \eqn{c_j}{c[j]} and
+    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j = c_j \sigma_j
+    n^{-1/(2P+l)}}{h[j] = c[j]*sigma[j]*n^(-1/(2*P+l))}, where
+    \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
+    continuous variable \eqn{j} defined as min(standard deviation, mean
+    absolute deviation/1.4826, interquartile range/1.349), \eqn{n} the
     number of observations, \eqn{P}{P} the order of the kernel, and
     \eqn{l}{l} the number of continuous variables. For discrete data
     types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related by the

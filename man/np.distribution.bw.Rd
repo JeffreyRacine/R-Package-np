@@ -129,21 +129,19 @@ npudistbw(\dots)
     kernel types, selection methods, and so on, detailed below.
   }
   
-  \item{bwmethod}{
-    a character string specifying the bandwidth selection method.
-    \code{cv.cdf} specifies least-squares cross-validation for
+  \item{bwmethod}{ a character string specifying the bandwidth selection
+    method.  \code{cv.cdf} specifies least-squares cross-validation for
     cumulative distribution functions (Li and Racine (2013)), and
     \code{normal-reference} just computes the \sQuote{rule-of-thumb}
     bandwidth \eqn{h_j}{h[j]} using the standard formula \eqn{h_j =
     1.587 \sigma_j n^{-1/(P+l)}}{h[j] = 1.587*sigma[j]*n^(-1.0/(P+l))},
     where \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
     the \eqn{j}th continuous variable defined as min(standard deviation,
-    interquartile range/1.349), \eqn{n} the number of observations,
-    \eqn{P} the order of the kernel, and \eqn{l} the number of
-    continuous variables. Note that when there exist factors and the
-    normal-reference rule is used, there is zero smoothing of the
-    factors. Defaults to \code{cv.cdf}.
-  }
+    mean absolute deviation/1.4826, interquartile range/1.349), \eqn{n}
+    the number of observations, \eqn{P} the order of the kernel, and
+    \eqn{l} the number of continuous variables. Note that when there
+    exist factors and the normal-reference rule is used, there is zero
+    smoothing of the factors. Defaults to \code{cv.cdf}.  }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
     supplied bandwidths are interpreted as `scale factors'
@@ -154,13 +152,13 @@ npudistbw(\dots)
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(P+l)}}{h[j] =
     c[j]*sigma[j]*n^(-1/(P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
     adaptive measure of spread of the \eqn{j}th continuous variable
-    defined as min(standard deviation, interquartile range/1.349),
-    \eqn{n} the number of observations, \eqn{P}{P} the order of the
-    kernel, and \eqn{l}{l} the number of continuous variables. For
-    discrete data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related
-    by the formula \eqn{h_j = c_jn^{-2/(P+l)}}{h[j] =
-    c[j]*n^(-2/(P+l))}, where here \eqn{j}{[j]} denotes discrete
-    variable \eqn{j}{j}.  Defaults to \code{FALSE}.  }
+    defined as min(standard deviation, mean absolute deviation/1.4826,
+    interquartile range/1.349), \eqn{n} the number of observations,
+    \eqn{P}{P} the order of the kernel, and \eqn{l}{l} the number of
+    continuous variables. For discrete data types, \eqn{c_j}{c[j]} and
+    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j =
+    c_jn^{-2/(P+l)}}{h[j] = c[j]*n^(-2/(P+l))}, where here \eqn{j}{[j]}
+    denotes discrete variable \eqn{j}{j}.  Defaults to \code{FALSE}.  }
 
   \item{bwtype}{
     character string used for the continuous variable bandwidth type,
