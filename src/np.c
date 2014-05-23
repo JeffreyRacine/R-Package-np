@@ -262,7 +262,12 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
-  double small, lbc, hbc, cfac;
+  double small, lbc_dir, c_dir;
+  double initc_dir;
+  double lbd_dir, hbd_dir, d_dir, initd_dir;
+  double lbc_init, hbc_init, c_init; 
+  double lbd_init, hbd_init, d_init;
+  int dfc_dir;
   
   int i,j;
   int num_var;
@@ -304,9 +309,23 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   tol=myoptd[BW_TOLD];
   small=myoptd[BW_SMALLD];
 
-  lbc=myoptd[BW_LBCD];
-  hbc=myoptd[BW_HBCD];
-  cfac=myoptd[BW_CD];
+  dfc_dir = myopti[BW_DFC_DIRI];
+
+  lbc_dir = myoptd[BW_LBC_DIRD];
+  c_dir = myoptd[BW_C_DIRD];
+  initc_dir = myoptd[BW_INITC_DIRD]; 
+  lbd_dir = myoptd[BW_LBD_DIRD]; 
+  hbd_dir = myoptd[BW_HBD_DIRD]; 
+  d_dir = myoptd[BW_D_DIRD]; 
+  initd_dir = myoptd[BW_INITD_DIRD]; 
+
+  lbc_init = myoptd[BW_LBC_INITD]; 
+  hbc_init = myoptd[BW_HBC_INITD]; 
+  c_init = myoptd[BW_C_INITD]; 
+
+  lbd_init = myoptd[BW_LBD_INITD]; 
+  hbd_init = myoptd[BW_HBD_INITD]; 
+  d_init = myoptd[BW_D_INITD]; 
 
   nconfac_extern = myoptd[BW_NCONFD];
   ncatfac_extern = myoptd[BW_NCATFD];
@@ -420,7 +439,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vector_scale_factor);
+                                    vector_scale_factor,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -441,7 +462,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vsfh);
+                                    vsfh,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -452,7 +475,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                            vsfh,
                            num_categories_extern,
                            matrix_y,
-                           0, int_RANDOM_SEED, lbc, hbc, cfac);
+                           0, int_RANDOM_SEED, 
+                           lbc_dir, dfc_dir, c_dir,initc_dir,
+                           lbd_dir, hbd_dir, d_dir, initd_dir);
 
   /* When multistarting, set counter */
 
@@ -512,7 +537,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                              vsfh,
                              num_categories_extern,
                              matrix_y,
-                             0, int_RANDOM_SEED, lbc, hbc, cfac);
+                             0, int_RANDOM_SEED, 
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
 
@@ -566,7 +593,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
-                                        vector_scale_factor);
+                                        vector_scale_factor,
+                                        lbc_init, hbc_init, c_init, 
+                                        lbd_init, hbd_init, d_init);
 
 
       initialize_nr_directions(num_reg_continuous_extern,
@@ -578,7 +607,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                vsfh,
                                num_categories_extern,
                                matrix_y,
-                               1, int_RANDOM_SEED, lbc, hbc, cfac);
+                               1, int_RANDOM_SEED, 
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
 
@@ -608,7 +639,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                  vsfh,
                                  num_categories_extern,
                                  matrix_y,
-                                 0, int_RANDOM_SEED, lbc, hbc, cfac);
+                                 0, int_RANDOM_SEED, 
+                                 lbc_dir, dfc_dir, c_dir, initc_dir,
+                                 lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
 
@@ -710,7 +743,12 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
-  double small, lbc, hbc, cfac;
+  double small, lbc_dir, c_dir;
+  double initc_dir;
+  double lbd_dir, hbd_dir, d_dir, initd_dir;
+  double lbc_init, hbc_init, c_init; 
+  double lbd_init, hbd_init, d_init;
+  int dfc_dir;
   
   int i,j;
   int num_var;
@@ -757,9 +795,23 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   tol=myoptd[DBW_TOLD];
   small=myoptd[DBW_SMALLD];
 
-  lbc=myoptd[DBW_LBCD];
-  hbc=myoptd[DBW_HBCD];
-  cfac=myoptd[DBW_CD];
+  dfc_dir = myopti[DBW_DFC_DIRI];
+  lbc_dir = myoptd[DBW_LBC_DIRD];
+  c_dir = myoptd[DBW_C_DIRD];
+  initc_dir = myoptd[DBW_INITC_DIRD]; 
+
+  lbd_dir = myoptd[DBW_LBD_DIRD]; 
+  hbd_dir = myoptd[DBW_HBD_DIRD]; 
+  d_dir = myoptd[DBW_D_DIRD]; 
+  initd_dir = myoptd[DBW_INITD_DIRD]; 
+
+  lbc_init = myoptd[DBW_LBC_INITD]; 
+  hbc_init = myoptd[DBW_HBC_INITD]; 
+  c_init = myoptd[DBW_C_INITD]; 
+
+  lbd_init = myoptd[DBW_LBD_INITD]; 
+  hbd_init = myoptd[DBW_HBD_INITD]; 
+  d_init = myoptd[DBW_D_INITD]; 
 
   nconfac_extern = myoptd[DBW_NCONFD];
   ncatfac_extern = myoptd[DBW_NCATFD];
@@ -929,7 +981,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vector_scale_factor);
+                                    vector_scale_factor,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -950,7 +1004,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vsfh);
+                                    vsfh,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -961,7 +1017,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                            vsfh,
                            num_categories_extern,
                            matrix_y,
-                           0, int_RANDOM_SEED, lbc, hbc, cfac);
+                           0, int_RANDOM_SEED, 
+                           lbc_dir, dfc_dir, c_dir, initc_dir,
+                           lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
   /* When multistarting, set counter */
@@ -1009,7 +1067,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                              vsfh,
                              num_categories_extern,
                              matrix_y,
-                             0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                             0, int_RANDOM_SEED,  
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
 
@@ -1063,7 +1123,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
-                                        vector_scale_factor);
+                                        vector_scale_factor,
+                                        lbc_init, hbc_init, c_init, 
+                                        lbd_init, hbd_init, d_init);
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
@@ -1074,7 +1136,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                vsfh,
                                num_categories_extern,
                                matrix_y,
-                               1, int_RANDOM_SEED,  lbc, hbc, cfac);
+                               1, int_RANDOM_SEED,  
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir);
 
       /* Conduct direction set search */
 
@@ -1103,7 +1167,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                  vsfh,
                                  num_categories_extern,
                                  matrix_y,
-                                 0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                                 0, int_RANDOM_SEED,  
+                                 lbc_dir, dfc_dir, c_dir, initc_dir,
+                                 lbd_dir, hbd_dir, d_dir, initd_dir);
 
         powell(0,
                0,
@@ -1210,7 +1276,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
-  double small, lbc, hbc, cfac;
+  double small, lbc_dir, c_dir;
+  double initc_dir;
+  double lbd_dir, hbd_dir, d_dir, initd_dir;
+  double lbc_init, hbc_init, c_init; 
+  double lbd_init, hbd_init, d_init;
+  int dfc_dir;
   
   int i,j;
   int num_var;
@@ -1267,17 +1338,31 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   small=myoptd[CBW_SMALLD];
   dbl_memfac_ccdf_extern = myoptd[CBW_MEMFACD];
 
-  lbc=myoptd[CBW_LBCD];
-  hbc=myoptd[CBW_HBCD];
-  cfac=myoptd[CBW_CD];
+  dfc_dir = myopti[CBW_DFC_DIRI];
+  lbc_dir = myoptd[CBW_LBC_DIRD];
+  c_dir = myoptd[CBW_C_DIRD];
+  initc_dir = myoptd[CBW_INITC_DIRD]; 
+
+  lbd_dir = myoptd[CBW_LBD_DIRD]; 
+  hbd_dir = myoptd[CBW_HBD_DIRD]; 
+  d_dir = myoptd[CBW_D_DIRD]; 
+  initd_dir = myoptd[CBW_INITD_DIRD]; 
+
+  lbc_init = myoptd[CBW_LBC_INITD]; 
+  hbc_init = myoptd[CBW_HBC_INITD]; 
+  c_init = myoptd[CBW_C_INITD]; 
+
+  lbd_init = myoptd[CBW_LBD_INITD]; 
+  hbd_init = myoptd[CBW_HBD_INITD]; 
+  d_init = myoptd[CBW_D_INITD]; 
 
   nconfac_extern = myoptd[CBW_NCONFD];
   ncatfac_extern = myoptd[CBW_NCATFD];
 
 /* Allocate memory for objects */
 
-  if((BANDWIDTH_den_extern != BW_FIXED) && (ibwmfunc == CBWM_CVLS))
-    old_cdens = 1;
+  //if((BANDWIDTH_den_extern != BW_FIXED) && (ibwmfunc == CBWM_CVLS))
+  //old_cdens = 1;
 
   matrix_Y_unordered_train_extern = alloc_matd(num_obs_train_extern, num_var_unordered_extern);
   matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, num_var_ordered_extern);
@@ -1414,11 +1499,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   ipt_extern_XY = ipt_XY;
   ipt_lookup_extern_XY = ipt_lookup_XY;
 
-  int_TREE_XY = int_TREE_XY && (((num_all_cvar) != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_XY = int_TREE_XY && (((num_all_cvar) != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
-  int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
-  int_TREE_Y = int_TREE_Y && (ibwmfunc == CBWM_CVLS) && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_Y = int_TREE_Y && (ibwmfunc == CBWM_CVLS) && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
 
   if(int_TREE_X == NP_TREE_TRUE){
@@ -1592,7 +1677,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vector_scale_factor);
+                                    vector_scale_factor,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -1613,7 +1700,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vsfh);
+                                    vsfh,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -1624,7 +1713,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                            vsfh,
                            num_categories_extern,
                            matrix_y,
-                           0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                           0, int_RANDOM_SEED,  
+                           lbc_dir, dfc_dir, c_dir, initc_dir,
+                           lbd_dir, hbd_dir, d_dir, initd_dir);
 
   /* When multistarting, set counter */
 
@@ -1635,8 +1726,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   /* assign the function to be optimized */
 
-  /* 7/2/2010 */
-  
+  /* 7/2/2010 */  
   if(old_cdens){
     switch(ibwmfunc){
     case CBWM_CVML : bwmfunc = cv_func_con_density_categorical_ml; break;
@@ -1685,7 +1775,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                              vsfh,
                              num_categories_extern,
                              matrix_y,
-                             0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                             0, int_RANDOM_SEED,  
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
     powell(0,
@@ -1740,7 +1832,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
-                                        vector_scale_factor);
+                                        vector_scale_factor,
+                                        lbc_init, hbc_init, c_init, 
+                                        lbd_init, hbd_init, d_init);
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
@@ -1751,7 +1845,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                vsfh,
                                num_categories_extern,
                                matrix_y,
-                               1, int_RANDOM_SEED,  lbc, hbc, cfac);
+                               1, int_RANDOM_SEED,  
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir);
 
       /* Conduct direction set search */
       
@@ -1780,7 +1876,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                  vsfh,
                                  num_categories_extern,
                                  matrix_y,
-                                 0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                                 0, int_RANDOM_SEED,  
+                                 lbc_dir, dfc_dir, c_dir, initc_dir,
+                                 lbd_dir, hbd_dir, d_dir, initd_dir);
 
         powell(0,
                0,
@@ -1915,7 +2013,12 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   double ftol, tol;
   double (* bwmfunc)(double *) = NULL;
 
-  double small, lbc, hbc, cfac;
+  double small, lbc_dir, c_dir;
+  double initc_dir;
+  double lbd_dir, hbd_dir, d_dir, initd_dir;
+  double lbc_init, hbc_init, c_init; 
+  double lbd_init, hbd_init, d_init;
+  int dfc_dir;
   
   int i,j;
   int num_var;
@@ -1977,9 +2080,23 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   small=myoptd[CDBW_SMALLD];
   dbl_memfac_ccdf_extern = myoptd[CDBW_MEMFACD];
 
-  lbc=myoptd[CDBW_LBCD];
-  hbc=myoptd[CDBW_HBCD];
-  cfac=myoptd[CDBW_CD];
+  dfc_dir = myopti[CDBW_DFC_DIRI];
+  lbc_dir = myoptd[CDBW_LBC_DIRD];
+  c_dir = myoptd[CDBW_C_DIRD];
+  initc_dir = myoptd[CDBW_INITC_DIRD]; 
+
+  lbd_dir = myoptd[CDBW_LBD_DIRD]; 
+  hbd_dir = myoptd[CDBW_HBD_DIRD]; 
+  d_dir = myoptd[CDBW_D_DIRD]; 
+  initd_dir = myoptd[CDBW_INITD_DIRD]; 
+
+  lbc_init = myoptd[CDBW_LBC_INITD]; 
+  hbc_init = myoptd[CDBW_HBC_INITD]; 
+  c_init = myoptd[CDBW_C_INITD]; 
+
+  lbd_init = myoptd[CDBW_LBD_INITD]; 
+  hbd_init = myoptd[CDBW_HBD_INITD]; 
+  d_init = myoptd[CDBW_D_INITD]; 
 
   nconfac_extern = myoptd[CDBW_NCONFD];
   ncatfac_extern = myoptd[CDBW_NCATFD];
@@ -2302,7 +2419,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vector_scale_factor);
+                                    vector_scale_factor,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -2323,7 +2442,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vsfh);
+                                    vsfh,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -2334,7 +2455,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                            vsfh,
                            num_categories_extern,
                            matrix_y,
-                           0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                           0, int_RANDOM_SEED,  
+                           lbc_dir, dfc_dir, c_dir, initc_dir,
+                           lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
   /* When multistarting, set counter */
@@ -2383,7 +2506,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                              vsfh,
                              num_categories_extern,
                              matrix_y,
-                             0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                             0, int_RANDOM_SEED,  
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir);
 
     powell(0,
            0,
@@ -2437,7 +2562,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
-                                        vector_scale_factor);
+                                        vector_scale_factor,
+                                        lbc_init, hbc_init, c_init, 
+                                        lbd_init, hbd_init, d_init);
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
@@ -2448,7 +2575,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                vsfh,
                                num_categories_extern,
                                matrix_y,
-                               1, int_RANDOM_SEED,  lbc, hbc, cfac);
+                               1, int_RANDOM_SEED,  
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
       /* Conduct direction set search */
@@ -2478,7 +2607,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                  vsfh,
                                  num_categories_extern,
                                  matrix_y, 
-                                 0, int_RANDOM_SEED,  lbc, hbc, cfac);
+                                 0, int_RANDOM_SEED,  
+                                 lbc_dir, dfc_dir, c_dir, initc_dir,
+                                 lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
         powell(0,
@@ -3347,7 +3478,12 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   double ftol, tol, small;
   double (* bwmfunc)(double *) = NULL;
 
-  double lbc, hbc, cfac;
+  double lbc_dir, c_dir;
+  double initc_dir;
+  double lbd_dir, hbd_dir, d_dir, initd_dir;
+  double lbc_init, hbc_init, c_init; 
+  double lbd_init, hbd_init, d_init;
+  int dfc_dir;
 
   int i,j;
   int num_var;
@@ -3390,9 +3526,23 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   tol=myoptd[RBW_TOLD];
   small=myoptd[RBW_SMALLD];
 
-  lbc=myoptd[RBW_LBCD];
-  hbc=myoptd[RBW_HBCD];
-  cfac=myoptd[RBW_CD];
+  dfc_dir = myopti[RBW_DFC_DIRI];
+  lbc_dir = myoptd[RBW_LBC_DIRD];
+  c_dir = myoptd[RBW_C_DIRD];
+  initc_dir = myoptd[RBW_INITC_DIRD]; 
+
+  lbd_dir = myoptd[RBW_LBD_DIRD]; 
+  hbd_dir = myoptd[RBW_HBD_DIRD]; 
+  d_dir = myoptd[RBW_D_DIRD]; 
+  initd_dir = myoptd[RBW_INITD_DIRD]; 
+
+  lbc_init = myoptd[RBW_LBC_INITD]; 
+  hbc_init = myoptd[RBW_HBC_INITD]; 
+  c_init = myoptd[RBW_C_INITD]; 
+
+  lbd_init = myoptd[RBW_LBD_INITD]; 
+  hbd_init = myoptd[RBW_HBD_INITD]; 
+  d_init = myoptd[RBW_D_INITD]; 
 
   nconfac_extern = myoptd[RBW_NCONFD];
   ncatfac_extern = myoptd[RBW_NCATFD];
@@ -3521,7 +3671,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vector_scale_factor);
+                                    vector_scale_factor,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -3542,18 +3694,22 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     nconfac_extern, ncatfac_extern,
                                     num_categories_extern,
                                     vector_continuous_stddev,
-                                    vsfh);
+                                    vsfh,
+                                    lbc_init, hbc_init, c_init, 
+                                    lbd_init, hbd_init, d_init);
 
   initialize_nr_directions(num_reg_continuous_extern,
-                        num_reg_unordered_extern,
-                        num_reg_ordered_extern,
-                        0,
-                        0,
-                        0,
-                        vsfh,
-                        num_categories_extern,
-                        matrix_y,
-                        0, int_RANDOM_SEED, lbc, hbc, cfac);
+                           num_reg_unordered_extern,
+                           num_reg_ordered_extern,
+                           0,
+                           0,
+                           0,
+                           vsfh,
+                           num_categories_extern,
+                           matrix_y,
+                           0, int_RANDOM_SEED, 
+                           lbc_dir, dfc_dir, c_dir, initc_dir,
+                           lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
   /* When multistarting, set counter */
@@ -3591,15 +3747,17 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
     initialize_nr_directions(num_reg_continuous_extern,
-                          num_reg_unordered_extern,
-                          num_reg_ordered_extern,
-                          0,
-                          0,
-                          0,
-                          vsfh,
-                          num_categories_extern,
-                          matrix_y,
-                          0, int_RANDOM_SEED, lbc, hbc, cfac);
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             0,
+                             0,
+                             0,
+                             vsfh,
+                             num_categories_extern,
+                             matrix_y,
+                             0, int_RANDOM_SEED, 
+                             lbc_dir, dfc_dir, c_dir, initc_dir,
+                             lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
     powell(0,
@@ -3655,18 +3813,22 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                         nconfac_extern, ncatfac_extern,
                                         num_categories_extern,
                                         vector_continuous_stddev,
-                                        vector_scale_factor);
+                                        vector_scale_factor,
+                                        lbc_init, hbc_init, c_init, 
+                                        lbd_init, hbd_init, d_init);
 
       initialize_nr_directions(num_reg_continuous_extern,
-                            num_reg_unordered_extern,
-                            num_reg_ordered_extern,
-                            0,
-                            0,
-                            0,
-                            vsfh,
-                            num_categories_extern,
-                            matrix_y,
-                            1, int_RANDOM_SEED, lbc, hbc, cfac);
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               0,
+                               0,
+                               0,
+                               vsfh,
+                               num_categories_extern,
+                               matrix_y,
+                               1, int_RANDOM_SEED, 
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir);
 
 
       /* Conduct direction set search */
@@ -3688,15 +3850,17 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE)	{
 						
         initialize_nr_directions(num_reg_continuous_extern,
-                              num_reg_unordered_extern,
-                              num_reg_ordered_extern,
-                              0,
-                              0,
-                              0,
-                              vsfh,
-                              num_categories_extern,
-                              matrix_y,
-                              0, int_RANDOM_SEED, lbc, hbc, cfac);
+                                 num_reg_unordered_extern,
+                                 num_reg_ordered_extern,
+                                 0,
+                                 0,
+                                 0,
+                                 vsfh,
+                                 num_categories_extern,
+                                 matrix_y,
+                                 0, int_RANDOM_SEED, 
+                                 lbc_dir, dfc_dir, c_dir, initc_dir,
+                                 lbd_dir, hbd_dir, d_dir, initd_dir);
 
 						
         powell(0,
@@ -4571,6 +4735,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       matrix_Y_ordered_train_extern,
                                       NULL,
                                       &vector_scale_factor[1],
+                                      NULL,NULL,NULL,
                                       num_categories_extern,
                                       matrix_categorical_vals_extern,
                                       matrix_ordered_indices,
@@ -4684,6 +4849,11 @@ void np_quantile_conditional(double * tc_con,
 
   int iNum_Multistart;
 
+  double lbc_dir, c_dir;
+  double initc_dir;
+  double lbd_dir, hbd_dir, d_dir, initd_dir;
+  int dfc_dir;
+
   iNum_Multistart = myopti[CQ_NMULTII];
   imsnum = 0;
   imstot = myopti[CQ_NMULTII]; /* iNum_Multistart */
@@ -4731,8 +4901,15 @@ void np_quantile_conditional(double * tc_con,
   tol = myoptd[CQ_TOLD];
   small = myoptd[CQ_SMALLD];
 
-  nconfac_extern = myoptd[CQ_NCONFD];
-  ncatfac_extern = myoptd[CQ_NCATFD];
+  dfc_dir = myopti[CQ_DFC_DIRI];
+  lbc_dir = myoptd[CQ_LBC_DIRD];
+  c_dir = myoptd[CQ_C_DIRD];
+  initc_dir = myoptd[CQ_INITC_DIRD]; 
+
+  lbd_dir = myoptd[CQ_LBD_DIRD]; 
+  hbd_dir = myoptd[CQ_HBD_DIRD]; 
+  d_dir = myoptd[CQ_D_DIRD]; 
+  initd_dir = myoptd[CQ_INITD_DIRD]; 
 
   gamma_extern = *quantile;
   nconfac_extern = *nconfac;
@@ -4878,8 +5055,9 @@ void np_quantile_conditional(double * tc_con,
                            small,
                            itmax,
                            iNum_Multistart,            /* Maximum number of multistarts */
-                           1.0e-10);         /* Zero for all intents and purposes */
-
+                           1.0e-10,         /* Zero for all intents and purposes */
+                           lbc_dir, dfc_dir, c_dir, initc_dir,
+                           lbd_dir, hbd_dir, d_dir, initd_dir);
 
   /* return data to R */
 

@@ -9,7 +9,7 @@
 #include "matrix.h"
 
 #ifdef RCSID
-static char rcsid[] = "$Id: statmods.c,v 1.7 2006/11/02 16:56:49 tristen Exp $";
+static char rcsid[] = "$Id: statmods_Rprintf_all_random.c,v 1.4 2014/05/13 17:02:42 jracine Exp jracine $";
 #endif
 
 #ifdef MPI2
@@ -659,24 +659,36 @@ int compute_nn_distance_train_eval(int num_obs_train,
 }
 
 
-int initialize_nr_directions(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
-                             int num_var_continuous, int num_var_unordered, int num_var_ordered, 
-                             double * vector_scale_factor, int * num_categories, 
-                             double **matrix_y, int random, int seed, double lbc, double hbc, double c){
-  int i, j;
-  int li;
+int initialize_nr_directions(int num_reg_continuous, 
+                             int num_reg_unordered, 
+                             int num_reg_ordered, 
+                             int num_var_continuous, 
+                             int num_var_unordered, int num_var_ordered, 
+                             double * vector_scale_factor, 
+                             int * num_categories, 
+                             double **matrix_y, 
+                             int random, 
+                             int seed, 
+                             double lbc_dir, 
+                             int dfc_dir, 
+                             double c_dir,
+                             double initc_dir,
+                             double lbd_dir, 
+                             double hbd_dir, 
+                             double d_dir,
+                             double initd_dir){
 
-  const double sfac = 0.25*(3.0-sqrt(5));
-  const double csfac = 2.5*(3.0-sqrt(5))*c;
+  int i, j, li;
 
-  double rsfac = 1.0;
-  double rcsfac = 1.0;
+  // sfac ought to be smaller than lbd_dir, 1-hbd_dir in
+  // initialize_nr_vector_scale_factor() and sfac constant here in
+  // order to keep from going out of bounds (so e.g. lbd_dir=.2,hbd_dir=.8,
+  // sfac constant .25 would work, or .3,.7,.375, etc.). Note the
+  // 3-sqrt(5) is related to golden section search, golden ratios, and
+  // golden means
 
-  if(random){
-    rcsfac = rsfac = ran3(&seed);
-
-    rcsfac = (hbc-lbc)*rcsfac + lbc;
-  }
+  const double sfac = 0.25*(3.0-sqrt(5)); 
+  const double csfac = 2.5*(3.0-sqrt(5));
 
   li =  num_reg_continuous + num_reg_unordered + num_reg_ordered + 
     num_var_continuous + num_var_unordered + num_var_ordered;
@@ -690,39 +702,38 @@ int initialize_nr_directions(int num_reg_continuous, int num_reg_unordered, int 
   // nvc + nrc
   // this is only to ensure that initial cv function probes don't
   // go outside of the allowed ranges for bws
+
   li =  num_reg_continuous + num_var_continuous;
 
-  for(i = 1; i <= li; i++){
-    matrix_y[i][i] = rcsfac*csfac * vector_scale_factor[i];
-  }
+  for(i = 1; i <= li; i++)
+    matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed, dfc_dir)  + lbc_dir: initc_dir)*csfac*c_dir;
 
   if(num_categories == NULL) return(0);
 
   // nvu
   li = num_reg_continuous + num_var_continuous;
   
-  for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*rsfac*sfac;
+  for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++) 
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   // nvo
   li += num_var_unordered;
 
-  for(; i <= (li + num_var_ordered); i++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * rsfac*sfac;
+  for(; i <= (li + num_var_ordered); i++) 
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   //nru
   j += num_var_ordered;
   li += num_var_ordered;
 
   for(; i <= (li + num_reg_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*rsfac*sfac;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   // nro
   li += num_reg_unordered;
 
   for(; i <= (li + num_reg_ordered); i++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i])) * rsfac*sfac;
-
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   return(0);
 
@@ -744,11 +755,32 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
                                        int int_use_starting_values,
                                        int scale_cat,
                                        double init_continuous,
-                                       double nconfac, double ncatfac,
+                                       double nconfac, 
+                                       double ncatfac,
                                        int *num_categories,
                                        double *vector_continuous_stddev,
-                                       double *vector_scale_factor){
+                                       double *vector_scale_factor,  
+                                       double lbd_init,
+                                       double hbd_init,
+                                       double d_init,
+                                       double lbc_init,
+                                       double hbc_init,
+                                       double c_init){
   int i, l = 0;
+
+  // lbc and hbc and init_continuous [fed in] play a similar role to
+  // lbd, jbd, and initd - provide a range of sfs and point of
+  // reference for first (always non-random) attempt. If calling
+  // program uses init_continuous of 0.25, this starts at
+  // 0.25*EssDee()*n^(-1/(2*p+q)) for e.g. regression. If you then
+  // want to vary from quite small bws to larger ones, you want hbc to
+  // be, say, 2 hence restarting we get both small and large
+  // bws. init_continuous=0.5 and hbc=2.0 means search will start from
+  // initial bws that are 50% smaller than the previous defaults of
+  // 1.06 and (implicitly) 1.0. Also, by now setting a lower bound > 0
+  // (e.g. 0.1) we can avoid any start with impossibly small starting
+  // values.
+
 
   const int fixed_bw = (BANDWIDTH == BW_FIXED);
   const double bw_nf = MAX(1.0,ceil(sqrt((double)num_obs)));
@@ -759,30 +791,31 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   int_use_starting_values = int_use_starting_values && (!RANDOM);
 
   for(i = 0; i < ncon; i++,l++){
-    const double bwi = fixed_bw ? init_continuous*(int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
+    const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
     if(!int_use_starting_values){
-      vector_scale_factor[l+1] = bwi;
       if(RANDOM){
         if(fixed_bw){
-          vector_scale_factor[l+1] *= ran3(&seed);
+          vector_scale_factor[l+1] = bwi*((hbc_init-lbc_init)*ran3(&seed)+lbc_init);
         } else {
           vector_scale_factor[l+1] = ceil(sqrt(((double)num_obs)*ran3(&seed)+1.0));
         }
+      } else {
+        vector_scale_factor[l+1] = bwi*c_init;
       }
     } else {
       if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_cmax)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
-        vector_scale_factor[l+1] = bwi;
+        vector_scale_factor[l+1] = bwi*c_init;
       }
     }
   }
 
   for(i = 0; i < num_var_unordered; i++,l++){
-    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac)*(int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_yu);
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac)*(int_large ? ncatfac : 1.0)*max_unordered_bw(num_categories[l-ncon], kernel_yu);
 
     if(!int_use_starting_values){
-      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+      vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
       if(!is_valid_unordered_bw(vector_scale_factor[l+1], num_categories[l-ncon], kernel_yu)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
@@ -792,10 +825,10 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   }
 
   for(i = 0; i < num_var_ordered; i++,l++){
-    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0)* 0.5;
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0);
 
     if(!int_use_starting_values){
-      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+      vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
       if((vector_scale_factor[l+1] < 0.0) || (vector_scale_factor[l+1] > 1.0)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
@@ -805,10 +838,10 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   }
 
   for(i = 0; i < num_reg_unordered; i++,l++){
-    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0)* 0.5 * max_unordered_bw(num_categories[l-ncon], kernel_xu);
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0)*max_unordered_bw(num_categories[l-ncon], kernel_xu);
 
     if(!int_use_starting_values){
-      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+      vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
       if(!is_valid_unordered_bw(vector_scale_factor[l+1], num_categories[l-ncon], kernel_xu)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
@@ -818,10 +851,10 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   }
 
   for(i = 0; i < num_reg_ordered; i++,l++){
-    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0)* 0.5;
+    const double bwi = (scale_cat ? 1.0 : 1.0/ncatfac) * (int_large ? ncatfac : 1.0);
 
     if(!int_use_starting_values){
-      vector_scale_factor[l+1] = bwi*(RANDOM ? ran3(&seed) : 1.0);
+      vector_scale_factor[l+1] = bwi*(RANDOM ? (hbd_init-lbd_init)*ran3(&seed)+lbd_init : d_init);
     } else {
       if((vector_scale_factor[l+1] < 0.0) || (vector_scale_factor[l+1] > 1.0)){
         REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
@@ -829,6 +862,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
       }
     }
   }
+
 }
 
 double fGoodness_of_Fit(int iNum_Obs, double *fvector_Y, double *fkernel_fit)

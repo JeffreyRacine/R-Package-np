@@ -81,7 +81,10 @@ npcdistbw.condbandwidth <-
            nmulti, remin = TRUE, itmax = 10000,
            do.full.integral = FALSE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
-           memfac = 500.0, lbc = 0.5, hbc = 0.5, cfac = 1.0,
+           memfac = 500.0, lbc.dir = 0.5, dfc.dir = 4, cfac.dir = 1.0,initc.dir = 1.0, 
+           lbd.dir = 0, hbd.dir = 1, dfac.dir = 1, initd.dir = 1.0, 
+           lbc.init = 0.1, hbc.init = 2.0, cfac.init = 0.5, 
+           lbd.init = 0.1, hbd.init = 0.9, dfac.init = 0.375, 
            scale.init.categorical.sample=FALSE,
            ...){
 
@@ -247,9 +250,15 @@ npcdistbw.condbandwidth <-
         xncon = dim(xcon)[2],
         cdf_on_train = cdf_on_train,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
-        scale.init.categorical.sample=scale.init.categorical.sample)
+        scale.init.categorical.sample=scale.init.categorical.sample,
+        dfc.dir = dfc.dir)
       
-      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac, lbc = lbc, hbc = hbc, cfac = cfac, nconfac = nconfac, ncatfac = ncatfac)
+      myoptd = list(ftol=ftol, tol=tol, small=small, memfac = memfac,
+        lbc.dir = lbc.dir, cfac.dir = cfac.dir, initc.dir = initc.dir, 
+        lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
+        lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
+        lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
+        nconfac = nconfac, ncatfac = ncatfac)
 
       if (bws$method != "normal-reference"){
         myout=
@@ -406,7 +415,11 @@ npcdistbw.default <-
            bandwidth.compute = TRUE,
            nmulti, remin, itmax,
            do.full.integral, ngrid,
-           ftol, tol, small, memfac, lbc, hbc, cfac,
+           ftol, tol, small, memfac,
+           lbc.dir, dfc.dir, cfac.dir,initc.dir, 
+           lbd.dir, hbd.dir, dfac.dir, initd.dir, 
+           lbc.init, hbc.init, cfac.init, 
+           lbd.init, hbd.init, dfac.init, 
            scale.init.categorical.sample,
            ## dummy arguments for condbandwidth() function call
            bwmethod, bwscaling, bwtype,
@@ -450,7 +463,12 @@ npcdistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gydat", "bandwidth.compute", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
-               "tol", "small", "memfac", "lbc", "hbc", "cfac", "scale.init.categorical.sample")
+               "tol", "small", "memfac",
+               "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
+               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
+               "lbc.init", "hbc.init", "cfac.init", 
+               "lbd.init", "hbd.init", "dfac.init", 
+               "scale.init.categorical.sample")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
