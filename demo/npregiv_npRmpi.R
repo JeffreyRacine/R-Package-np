@@ -25,7 +25,7 @@ mpi.bcast.cmd(set.seed(42),
 
 ## Generate some data
 
-n <- 500
+n <- 2500
 
 ## The DGP is as follows:
 
