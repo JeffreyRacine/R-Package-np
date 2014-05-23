@@ -75,7 +75,8 @@ npqreg.condbandwidth <-
            gradients = FALSE,
            ftol = 1.490116e-07, tol = 1.490116e-04,
            small = 1.490116e-05, itmax = 10000,
-           lbc = 0.5, hbc = 1.5, cfac = 1.0,
+           lbc.dir = 0.5, dfc.dir = 4, cfac.dir = 1.0,initc.dir = 1.0, 
+           lbd.dir = 0, hbd.dir = 1, dfac.dir = 1, initd.dir = 1.0, 
            ...){
 
     no.ex = missing(exdat)
@@ -208,17 +209,15 @@ npqreg.condbandwidth <-
       gradients = gradients,
       itmax = itmax,
       xmcv.numRow = attr(bws$xmcv, "num.row"),
-      nmulti = itmax
-      )
+      nmulti = itmax,
+      dfc.dir = dfc.dir)
 
     myoptd = list(
       ftol = ftol,
       tol = tol,
       small = small,
-      lbc = lbc,
-      hbc = hbc,
-      cfac = cfac
-      )
+      lbc.dir = lbc.dir, cfac.dir = cfac.dir,initc.dir = initc.dir, 
+      lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir)
     
     myout=
       .C("np_quantile_conditional",

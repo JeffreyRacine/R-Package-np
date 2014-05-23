@@ -98,13 +98,7 @@ int np_fround(double x);
 int initialize_kernel_density_asymptotic_constants(int KERNEL, int num_var_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P);  
 int initialize_kernel_regression_asymptotic_constants(int KERNEL, int num_reg_continuous, double *INT_KERNEL_P, double *K_INT_KERNEL_P, double *INT_KERNEL_PM_HALF, double *DIFF_KER_PPM); 
 
-
-int initialize_nr_directions(int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, 
-                             int num_var_continuous, int num_var_unordered, int num_var_ordered, 
-                             double * vector_scale_factor, int * num_categories, 
-                             double **matrix_y, int random, int seed,
-                             double lbc, double hbc, double c);
-
+int initialize_nr_directions(int num_reg_continuous,int num_reg_unordered,int num_reg_ordered,int num_var_continuous,int num_var_unordered,int num_var_ordered,double * vector_scale_factor,int * num_categories,double **matrix_y,int random,int seed,double lbc_dir,int dfc_dir,double c_dir,double initc_dir,double lbd_dir,double hbd_dir,double d_dir, double initd_dir);
 
 int kernel_bandwidth(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda, double **matrix_bandwidth_deriv);
 int kernel_bandwidth_mean(int KERNEL, int BANDWIDTH, int num_obs_train, int num_obs_eval, int num_var_cont, int num_var_un, int num_var_or, int num_reg_cont, int num_reg_un, int num_reg_or, int suppress_parallel, double *vector_scale_factor, double **matrix_Y_train, double **matrix_Y_eval, double **matrix_X_train, double **matrix_X_eval, double **matrix_bandwidth_Y, double **matrix_bandwidth_X, double *vector_lambda);
@@ -184,7 +178,7 @@ int pgplot_xy_errorbars(int int_GENERATE, char *output, int num_obs, int num_var
 
 int compute_continuous_stddev(int int_LARGE, int num_obs, int num_var_continuous, int num_reg_continuous, double **matrix_Y_continuous, double **matrix_X_continuous, double *vector_continuous_stddev);
 
-void initialize_nr_vector_scale_factor(int BANDWIDTH, int RANDOM, int seed, int int_large, int num_obs, int num_var_continuous, int num_var_unordered, int num_var_ordered, int num_reg_continuous, int num_reg_unordered, int num_reg_ordered, int kernel_yu, int kernel_xu, int int_use_starting_values, int scale_cat, double init_continuous, double nconfac, double ncatfac, int *num_categories, double *vector_continuous_stddev, double *vector_scale_factor);
+void initialize_nr_vector_scale_factor(int BANDWIDTH,int RANDOM,int seed,int int_large,int num_obs,int num_var_continuous,int num_var_unordered,int num_var_ordered,int num_reg_continuous,int num_reg_unordered,int num_reg_ordered,int kernel_yu,int kernel_xu,int int_use_starting_values,int scale_cat,double init_continuous,double nconfac,double ncatfac,int *num_categories,double *vector_continuous_stddev,double *vector_scale_factor,double lbd_init,double hbd_init,double d_init,double lbc_init,double hbc_init,double c_init);
 
 int kernel_weights_conditional_convolution_cv(int int_WEIGHTS, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_den, int num_obs, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered, double **matrix_Y_ordered, double **matrix_Y_continuous, double **matrix_X_unordered, double **matrix_X_ordered, double **matrix_X_continuous, double *lambda, double **matrix_bandwidth_var, double **matrix_bandwidth_reg, int *num_categories, double **matrix_categorical_vals, double **matrix_weights_K_x, double **matrix_weights_K_xy, double **matrix_weights_K_convol_y);
 
@@ -196,7 +190,7 @@ int kernel_estimate_regression_categorical_tree_np(int int_ll,int KERNEL_reg,int
 
 double func_con_density_quantile(double *quantile);
 
-int kernel_estimate_quantile(int gradient_compute, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered_train, double **matrix_Y_ordered_train, double **matrix_Y_continuous_train, double **matrix_Y_unordered_eval, double **matrix_Y_ordered_eval, double **matrix_Y_continuous_eval, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, double *quan, double *quan_stderr, double **quan_gradient, int seed, double ftol, double tol, double small, int itmax, int iMax_Num_Multistart, double zero, double lbc, double hbc, double cfac);
+int kernel_estimate_quantile(int gradient_compute, int KERNEL_den, int KERNEL_unordered_den, int KERNEL_ordered_den, int BANDWIDTH_den, int num_obs_train, int num_obs_eval, int num_var_unordered, int num_var_ordered, int num_var_continuous, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_Y_unordered_train, double **matrix_Y_ordered_train, double **matrix_Y_continuous_train, double **matrix_Y_unordered_eval, double **matrix_Y_ordered_eval, double **matrix_Y_continuous_eval, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double *vector_scale_factor, double *quan, double *quan_stderr, double **quan_gradient, int seed, double ftol, double tol, double small, int itmax, int iMax_Num_Multistart, double zero, double lbc_dir, int dfc_dir, double c_dir,double initc_dir,double lbd_dir,double  hbd_dir,double  d_dir,double  initd_dir);
 
 double ipow(double x, int n);
 
@@ -338,15 +332,26 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define RBW_LL 16
 #define RBW_DOTREEI 17
 #define RBW_SCATI 18
+#define RBW_DFC_DIRI 19
 
 #define RBW_FTOLD  0
 #define RBW_TOLD   1
 #define RBW_SMALLD 2
-#define RBW_LBCD   3
-#define RBW_HBCD   4
-#define RBW_CD     5
-#define RBW_NCONFD   6
-#define RBW_NCATFD   7
+#define RBW_LBC_DIRD 3
+#define RBW_C_DIRD 4
+#define RBW_INITC_DIRD 5
+#define RBW_LBD_DIRD 6
+#define RBW_HBD_DIRD 7
+#define RBW_D_DIRD 8
+#define RBW_INITD_DIRD 9
+#define RBW_LBC_INITD 10
+#define RBW_HBC_INITD 11
+#define RBW_C_INITD 12
+#define RBW_LBD_INITD 13
+#define RBW_HBD_INITD 14
+#define RBW_D_INITD 15
+#define RBW_NCONFD   16
+#define RBW_NCATFD   17
 
 #define MPI_RANKI 0
 #define MPI_NUMPI 1
@@ -370,15 +375,26 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define BW_OLDBW 16
 #define BW_DOTREEI 17
 #define BW_SCATI 18
+#define BW_DFC_DIRI 19
 
 #define BW_FTOLD  0
 #define BW_TOLD   1
 #define BW_SMALLD 2
-#define BW_LBCD   3
-#define BW_HBCD   4
-#define BW_CD     5
-#define BW_NCONFD     6
-#define BW_NCATFD     7
+#define BW_LBC_DIRD 3
+#define BW_C_DIRD 4
+#define BW_INITC_DIRD 5
+#define BW_LBD_DIRD 6
+#define BW_HBD_DIRD 7
+#define BW_D_DIRD 8
+#define BW_INITD_DIRD 9
+#define BW_LBC_INITD 10
+#define BW_HBC_INITD 11
+#define BW_C_INITD 12
+#define BW_LBD_INITD 13
+#define BW_HBD_INITD 14
+#define BW_D_INITD 15
+#define BW_NCONFD     16
+#define BW_NCATFD     17
 
 // distribution defines
 #define DBW_NOBSI   0
@@ -402,15 +418,26 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define DBW_FASTI 18
 #define DBW_DOTREEI 19
 #define DBW_SCATI 20
+#define DBW_DFC_DIRI 21
 
 #define DBW_FTOLD  0
 #define DBW_TOLD   1
 #define DBW_SMALLD 2
-#define DBW_LBCD   3
-#define DBW_HBCD   4
-#define DBW_CD     5
-#define DBW_NCONFD     6
-#define DBW_NCATFD     7
+#define DBW_LBC_DIRD 3
+#define DBW_C_DIRD 4
+#define DBW_INITC_DIRD 5
+#define DBW_LBD_DIRD 6
+#define DBW_HBD_DIRD 7
+#define DBW_D_DIRD 8
+#define DBW_INITD_DIRD 9
+#define DBW_LBC_INITD 10
+#define DBW_HBC_INITD 11
+#define DBW_C_INITD 12
+#define DBW_LBD_INITD 13
+#define DBW_HBD_INITD 14
+#define DBW_D_INITD 15
+#define DBW_NCONFD     16
+#define DBW_NCATFD     17
 
 
 #define CBW_NOBSI   0
@@ -439,16 +466,27 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CBW_OLDI 23
 #define CBW_TREEI 24
 #define CBW_SCATI 25
+#define CBW_DFC_DIRI 26
 
 #define CBW_FTOLD  0
 #define CBW_TOLD   1
 #define CBW_SMALLD 2
 #define CBW_MEMFACD 3
-#define CBW_LBCD   4
-#define CBW_HBCD   5
-#define CBW_CD     6
-#define CBW_NCONFD     7
-#define CBW_NCATFD     8
+#define CBW_LBC_DIRD 4
+#define CBW_C_DIRD 5
+#define CBW_INITC_DIRD 6
+#define CBW_LBD_DIRD 7
+#define CBW_HBD_DIRD 8
+#define CBW_D_DIRD 9
+#define CBW_INITD_DIRD 10
+#define CBW_LBC_INITD 11
+#define CBW_HBC_INITD 12
+#define CBW_C_INITD 13
+#define CBW_LBD_INITD 14
+#define CBW_HBD_INITD 15
+#define CBW_D_INITD 16
+#define CBW_NCONFD     17
+#define CBW_NCATFD     18
 
 
 #define CBWM_CVML 0
@@ -485,16 +523,27 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CDBW_CDFONTRAIN 23
 #define CDBW_TREEI 24
 #define CDBW_SCATI 25
+#define CDBW_DFC_DIRI 26
 
 #define CDBW_FTOLD  0
 #define CDBW_TOLD   1
 #define CDBW_SMALLD 2
 #define CDBW_MEMFACD 3
-#define CDBW_LBCD   4
-#define CDBW_HBCD   5
-#define CDBW_CD     6
-#define CDBW_NCONFD     7
-#define CDBW_NCATFD     8
+#define CDBW_LBC_DIRD 4
+#define CDBW_C_DIRD 5
+#define CDBW_INITC_DIRD 6
+#define CDBW_LBD_DIRD 7
+#define CDBW_HBD_DIRD 8
+#define CDBW_D_DIRD 9
+#define CDBW_INITD_DIRD 10
+#define CDBW_LBC_INITD 11
+#define CDBW_HBC_INITD 12
+#define CDBW_C_INITD 13
+#define CDBW_LBD_INITD 14
+#define CDBW_HBD_INITD 15
+#define CDBW_D_INITD 16
+#define CDBW_NCONFD     17
+#define CDBW_NCATFD     18
 
 #define CDBWM_CVLS 0
 
@@ -604,14 +653,18 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
 #define CQ_ITMAXI 19
 #define CQ_MLEVI 20
 #define CQ_NMULTII 21
+#define CQ_DFC_DIRI 22
 
 #define CQ_FTOLD  0
 #define CQ_TOLD   1
 #define CQ_SMALLD 2
-#define CQ_LBCD 3
-#define CQ_HBCD 4
-#define CQ_CFACD 5
-
+#define CQ_LBC_DIRD 3
+#define CQ_C_DIRD 4
+#define CQ_INITC_DIRD 5
+#define CQ_LBD_DIRD 6
+#define CQ_HBD_DIRD 7
+#define CQ_D_DIRD 8
+#define CQ_INITD_DIRD 9
 
 #define TG2_B     0
 #define TG2_ALPHA 1

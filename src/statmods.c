@@ -670,14 +670,15 @@ int initialize_nr_directions(int num_reg_continuous,
                              int random, 
                              int seed, 
                              double lbc_dir, 
-                             double hbc_dir, 
-                             double c_dir){
+                             int dfc_dir, 
+                             double c_dir,
+                             double initc_dir,
+                             double lbd_dir, 
+                             double hbd_dir, 
+                             double d_dir,
+                             double initd_dir){
 
   int i, j, li;
-
-  double lbd_dir = 0.0;
-  double hbd_dir = 1.0;
-  double d_dir = 1.0;
 
   // sfac ought to be smaller than lbd_dir, 1-hbd_dir in
   // initialize_nr_vector_scale_factor() and sfac constant here in
@@ -705,7 +706,7 @@ int initialize_nr_directions(int num_reg_continuous,
   li =  num_reg_continuous + num_var_continuous;
 
   for(i = 1; i <= li; i++)
-    matrix_y[i][i] = vector_scale_factor[i]*(random ? (hbc_dir-lbc_dir)*chidev(&seed,3)  + lbc_dir: hbc_dir)*csfac*c_dir;
+    matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed, dfc_dir)  + lbc_dir: initc_dir)*csfac*c_dir;
 
   if(num_categories == NULL) return(0);
 
@@ -713,26 +714,26 @@ int initialize_nr_directions(int num_reg_continuous,
   li = num_reg_continuous + num_var_continuous;
   
   for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++) 
-    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: 1.0)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   // nvo
   li += num_var_unordered;
 
   for(; i <= (li + num_var_ordered); i++) 
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: 1.0)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   //nru
   j += num_var_ordered;
   li += num_var_ordered;
 
   for(; i <= (li + num_reg_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: 1.0)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   // nro
   li += num_reg_unordered;
 
   for(; i <= (li + num_reg_ordered); i++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: 1.0)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
 
   return(0);
 
@@ -758,7 +759,13 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
                                        double ncatfac,
                                        int *num_categories,
                                        double *vector_continuous_stddev,
-                                       double *vector_scale_factor){
+                                       double *vector_scale_factor,  
+                                       double lbd_init,
+                                       double hbd_init,
+                                       double d_init,
+                                       double lbc_init,
+                                       double hbc_init,
+                                       double c_init){
   int i, l = 0;
 
   // lbc and hbc and init_continuous [fed in] play a similar role to
@@ -774,12 +781,6 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // (e.g. 0.1) we can avoid any start with impossibly small starting
   // values.
 
-  double lbd_init = 0.1;
-  double hbd_init = 0.9;
-  double d_init = 0.375;
-  double lbc_init = 0.1;
-  double hbc_init = 2.0;
-  double c_init = 0.5; 
 
   const int fixed_bw = (BANDWIDTH == BW_FIXED);
   const double bw_nf = MAX(1.0,ceil(sqrt((double)num_obs)));
