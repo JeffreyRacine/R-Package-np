@@ -36,6 +36,21 @@ npregbw(\dots)
         ftol,
         tol,
         small,
+        lbc.dir,
+        dfc.dir,
+        cfac.dir,
+        initc.dir,
+        lbd.dir,
+        hbd.dir,
+        dfac.dir,
+        initd.dir,
+        lbc.init,
+        hbc.init,
+        cfac.init,
+        lbd.init,
+        hbd.init,
+        dfac.init,
+        scale.init.categorical.sample,
         regtype,
         bwmethod,
         bwscaling,
@@ -56,6 +71,21 @@ npregbw(\dots)
         ftol = 1.490116e-07,
         tol = 1.490116e-04,
         small = 1.490116e-05,
+        lbc.dir = 0.5,
+        dfc.dir = 4,
+        cfac.dir = 1.0,
+        initc.dir = 1.0,
+        lbd.dir = 0,
+        hbd.dir = 1,
+        dfac.dir = 1,
+        initd.dir = 1.0,
+        lbc.init = 0.1,
+        hbc.init = 2.0,
+        cfac.init = 0.5,
+        lbd.init = 0.1,
+        hbd.init = 0.9,
+        dfac.init = 0.375, 
+        scale.init.categorical.sample = FALSE,
         \dots)
 }
 \arguments{
@@ -235,12 +265,39 @@ npregbw(\dots)
     precision) or 3x10-8 (double prevision)). Defaults to \code{small
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
+
+  \item{lbc.dir,dfc.dir,cfac.dir,initc.dir}{ lower bound, chi-square
+    degrees of freedom, stretch factor, and initial non-random values
+    for direction set search for Powell's algorithm for \code{numeric}
+    variables. See Details}
+
+  \item{lbd.dir,hbd.dir,dfac.dir,initd.dir}{ lower bound, upper bound,
+    stretch factor, and initial non-random values for direction set
+    search for Powell's algorithm for categorical variables. See
+    Details}
+
+  \item{lbc.init, hbc.init, cfac.init}{ lower bound, upper bound, and
+    non-random initial values for scale factors for \code{numeric}
+    variables for Powell's algorithm. See Details}
+
+  \item{lbd.init, hbd.init, dfac.init}{ lower bound, upper bound, and
+    non-random initial values for scale factors for categorical
+    variables for Powell's algorithm. See Details}
+
+  \item{scale.init.categorical.sample}{ a logical value that when set
+    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
+    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
+    \eqn{n} the number of observations, \eqn{P}{P} the order of the
+    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
+    Details}
+
 }
 \details{
-  \code{npregbw} implements a variety of methods for choosing
-  bandwidths for multivariate (\eqn{p}-variate) regression data defined
-  over a set of possibly continuous and/or discrete (unordered, ordered)
-  data. The approach is based on Li and Racine (2003) who employ
+
+  \code{npregbw} implements a variety of methods for choosing bandwidths
+  for multivariate (\eqn{p}-variate) regression data defined over a set
+  of possibly continuous and/or discrete (unordered, ordered) data. The
+  approach is based on Li and Racine (2003) who employ
   \sQuote{generalized product kernels} that admit a mix of continuous
   and discrete data types.
 
@@ -253,16 +310,15 @@ npregbw(\dots)
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
-  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating the
-  density at the point \eqn{x}. Generalized nearest-neighbor bandwidths change
-  with the point at which the density is estimated, \eqn{x}. Fixed bandwidths
-  are constant over the support of \eqn{x}.
+  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating
+  the density at the point \eqn{x}. Generalized nearest-neighbor
+  bandwidths change with the point at which the density is estimated,
+  \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
   \code{npregbw} may be invoked \emph{either} with a formula-like
-  symbolic 
-  description of variables on which bandwidth selection is to be
-  performed \emph{or} through a simpler interface whereby data is passed
-  directly to the function via the \code{xdat} and \code{ydat}
+  symbolic description of variables on which bandwidth selection is to
+  be performed \emph{or} through a simpler interface whereby data is
+  passed directly to the function via the \code{xdat} and \code{ydat}
   parameters. Use of these two interfaces is \bold{mutually exclusive}.
 
   Data contained in the data frame \code{xdat} may be a mix of
@@ -275,15 +331,13 @@ npregbw(\dots)
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data
-    ~ explanatory data},
-  where \code{dependent data} is a univariate response, and
-  \code{explanatory data} is a
-  series of variables specified by name, separated by 
-  the separation character '+'. For example, \code{ y1 ~ x1 + x2 }
-  specifies that the bandwidths for the regression of response \code{y1}
-  and 
-  nonparametric regressors \code{x1} and \code{x2} are to be estimated.
-  See below for further examples. 
+  ~ explanatory data}, where \code{dependent data} is a univariate
+  response, and \code{explanatory data} is a series of variables
+  specified by name, separated by the separation character '+'. For
+  example, \code{ y1 ~ x1 + x2 } specifies that the bandwidths for the
+  regression of response \code{y1} and nonparametric regressors
+  \code{x1} and \code{x2} are to be estimated.  See below for further
+  examples.
 
 
   A variety of kernels may be specified by the user. Kernels implemented
@@ -293,6 +347,23 @@ npregbw(\dots)
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
 
+  The optimizer invoked for search is Powell's conjugate direction
+  method which requires the setting of (non-random) initial values and
+  search directions for bandwidths, and, when restarting, random values
+  for successive invocations. Bandwidths for \code{numeric} variables
+  are scaled by robust measures of spread, the sample size, and the
+  number of \code{numeric} variables where appropriate. Two sets of
+  parameters for bandwidths for \code{numeric} can be modified, those
+  for initial values for the parameters themselves, and those for the
+  directions taken (Powell's algorithm does not involve explicit
+  computation of the function's gradient). The default values are set by
+  considering search performance for a variety of difficult test cases
+  and simulated cases. We highly recommend restarting search a large
+  number of times to avoid the presence of local minima (achieved by
+  modifying \code{nmulti}). Further refinement for difficult cases can
+  be achieved by modifying these sets of parameters. However, these
+  parameters are intended more for the authors of the package to enable
+  \sQuote{tuning} for various methods rather than for the user themself.
 }
 \value{
   \code{npregbw} returns a \code{rbandwidth} object, with the
