@@ -143,13 +143,16 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
         num_categories_extern,
         vector_scale_factor) == 1)
     {
-      //Rprintf("toasty!\n");
-      //for(int ii = 1; ii <= num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern; ii++)
-      //  Rprintf("%3.15g ", vector_scale_factor[ii]);
-      //Rprintf("\n");
+      Rprintf("toasty!\n");
+      for(int ii = 1; ii <= num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern; ii++)
+        Rprintf("%3.15g ", vector_scale_factor[ii]);
+      Rprintf("\n");
 
         return(DBL_MAX);
     }
+      for(int ii = 1; ii <= num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern; ii++)
+        Rprintf("%3.15g ", vector_scale_factor[ii]);
+      Rprintf("\n");
 
     return(np_kernel_estimate_regression_categorical_ls_aic(
                                                             int_ll_extern,
