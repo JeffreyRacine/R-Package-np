@@ -9,7 +9,7 @@ options(np.messages=FALSE)
 ## Generate some data
 
 set.seed(42)
-n <- 500
+n <- 2500
 
 ## The DGP is as follows:
 

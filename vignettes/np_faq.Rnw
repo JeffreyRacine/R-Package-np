@@ -1,8 +1,8 @@
 %% $Id: np_faq.tex,v 1.89 2014/04/17 05:36:22 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
-%\VignetteDepends{npRmpi}
+%\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
-%\VignettePackage{npRmpi}
+%\VignettePackage{np}
 
 \documentclass[12pt]{amsart}
 
