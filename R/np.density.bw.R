@@ -176,7 +176,7 @@ npudensbw.bandwidth <-
 
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
-      tbw$fval.history <- myout$fval.historyt
+      tbw$fval.history <- myout$fval.history
     }
     
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
