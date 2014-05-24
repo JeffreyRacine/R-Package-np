@@ -760,12 +760,12 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
                                        int *num_categories,
                                        double *vector_continuous_stddev,
                                        double *vector_scale_factor,  
-                                       double lbd_init,
-                                       double hbd_init,
-                                       double d_init,
                                        double lbc_init,
                                        double hbc_init,
-                                       double c_init){
+                                       double c_init,
+                                       double lbd_init,
+                                       double hbd_init,
+                                       double d_init){
   int i, l = 0;
 
   // lbc and hbc and init_continuous [fed in] play a similar role to
