@@ -270,8 +270,8 @@ npcdistbw.condbandwidth <-
              bw = c(bws$xbw[bws$ixcon],bws$ybw[bws$iycon],
                bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
                bws$xbw[bws$ixuno],bws$xbw[bws$ixord]),
-             fval = double(2),
-             PACKAGE="np" )[c("bw","fval")]
+             fval = double(2),fval.history = double(max(1,nmulti)),
+             PACKAGE="np" )[c("bw","fval","fval.history")]
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
@@ -308,6 +308,7 @@ npcdistbw.condbandwidth <-
 
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
+      tbw$fval.history <- myout$fval.history
     }
     
     ## bandwidth metadata
@@ -352,32 +353,33 @@ npcdistbw.condbandwidth <-
     }
   
     tbw <- condbandwidth(xbw = tbw$xbw,
-                        ybw = tbw$ybw,
-                        bwmethod = tbw$method,
-                        bwscaling = tbw$scaling,
-                        bwtype = tbw$type,
-                        cxkertype = tbw$cxkertype,
-                        cxkerorder = tbw$cxkerorder,
-                        uxkertype = tbw$uxkertype,
-                        oxkertype = tbw$oxkertype,
-                        cykertype = tbw$cykertype,
-                        cykerorder = tbw$cykerorder,
-                        uykertype = tbw$uykertype,
-                        oykertype = tbw$oykertype,
-                        fval = tbw$fval,
-                        ifval = tbw$ifval,
-                        nobs = tbw$nobs,
-                        xdati = tbw$xdati,
-                        ydati = tbw$ydati,      
-                        xnames = tbw$xnames,
-                        ynames = tbw$ynames,
-                        sfactor = tbw$sfactor,
-                        bandwidth = tbw$bandwidth,
-                        rows.omit = rows.omit,
-                        nconfac = nconfac,
-                        ncatfac = ncatfac,
-                        sdev = mysd,
-                        bandwidth.compute = bandwidth.compute)
+                         ybw = tbw$ybw,
+                         bwmethod = tbw$method,
+                         bwscaling = tbw$scaling,
+                         bwtype = tbw$type,
+                         cxkertype = tbw$cxkertype,
+                         cxkerorder = tbw$cxkerorder,
+                         uxkertype = tbw$uxkertype,
+                         oxkertype = tbw$oxkertype,
+                         cykertype = tbw$cykertype,
+                         cykerorder = tbw$cykerorder,
+                         uykertype = tbw$uykertype,
+                         oykertype = tbw$oykertype,
+                         fval = tbw$fval,
+                         ifval = tbw$ifval,
+                         fval.history = tbw$fval.history,
+                         nobs = tbw$nobs,
+                         xdati = tbw$xdati,
+                         ydati = tbw$ydati,      
+                         xnames = tbw$xnames,
+                         ynames = tbw$ynames,
+                         sfactor = tbw$sfactor,
+                         bandwidth = tbw$bandwidth,
+                         rows.omit = rows.omit,
+                         nconfac = nconfac,
+                         ncatfac = ncatfac,
+                         sdev = mysd,
+                         bandwidth.compute = bandwidth.compute)
            
     tbw
   }
