@@ -37,6 +37,21 @@ npudistbw(\dots)
           ftol = 1.490116e-07,
           tol = 1.490116e-04,
           small = 1.490116e-05,
+          lbc.dir = 0.5,
+          dfc.dir = 4,
+          cfac.dir = 1.0,
+          initc.dir = 1.0,
+          lbd.dir = 0,
+          hbd.dir = 1,
+          dfac.dir = 1,
+          initd.dir = 1.0,
+          lbc.init = 0.1,
+          hbc.init = 2.0,
+          cfac.init = 0.5,
+          lbd.init = 0.1,
+          hbd.init = 0.9,
+          dfac.init = 0.375, 
+          scale.init.categorical.sample = FALSE,
           \dots)
 
 \method{npudistbw}{default}(dat = stop("invoked without input data 'dat'"),
@@ -52,6 +67,21 @@ npudistbw(\dots)
           ftol,
           tol,
           small,
+          lbc.dir,
+          dfc.dir,
+          cfac.dir,
+          initc.dir,
+          lbd.dir,
+          hbd.dir,
+          dfac.dir,
+          initd.dir,
+          lbc.init,
+          hbc.init,
+          cfac.init,
+          lbd.init,
+          hbd.init,
+          dfac.init,
+          scale.init.categorical.sample,
           bwmethod,
           bwscaling,
           bwtype,
@@ -129,21 +159,19 @@ npudistbw(\dots)
     kernel types, selection methods, and so on, detailed below.
   }
   
-  \item{bwmethod}{
-    a character string specifying the bandwidth selection method.
-    \code{cv.cdf} specifies least-squares cross-validation for
+  \item{bwmethod}{ a character string specifying the bandwidth selection
+    method.  \code{cv.cdf} specifies least-squares cross-validation for
     cumulative distribution functions (Li and Racine (2013)), and
     \code{normal-reference} just computes the \sQuote{rule-of-thumb}
     bandwidth \eqn{h_j}{h[j]} using the standard formula \eqn{h_j =
     1.587 \sigma_j n^{-1/(P+l)}}{h[j] = 1.587*sigma[j]*n^(-1.0/(P+l))},
     where \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
     the \eqn{j}th continuous variable defined as min(standard deviation,
-    interquartile range/1.349), \eqn{n} the number of observations,
-    \eqn{P} the order of the kernel, and \eqn{l} the number of
-    continuous variables. Note that when there exist factors and the
-    normal-reference rule is used, there is zero smoothing of the
-    factors. Defaults to \code{cv.cdf}.
-  }
+    mean absolute deviation/1.4826, interquartile range/1.349), \eqn{n}
+    the number of observations, \eqn{P} the order of the kernel, and
+    \eqn{l} the number of continuous variables. Note that when there
+    exist factors and the normal-reference rule is used, there is zero
+    smoothing of the factors. Defaults to \code{cv.cdf}.  }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
     supplied bandwidths are interpreted as `scale factors'
@@ -154,13 +182,13 @@ npudistbw(\dots)
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(P+l)}}{h[j] =
     c[j]*sigma[j]*n^(-1/(P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
     adaptive measure of spread of the \eqn{j}th continuous variable
-    defined as min(standard deviation, interquartile range/1.349),
-    \eqn{n} the number of observations, \eqn{P}{P} the order of the
-    kernel, and \eqn{l}{l} the number of continuous variables. For
-    discrete data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related
-    by the formula \eqn{h_j = c_jn^{-2/(P+l)}}{h[j] =
-    c[j]*n^(-2/(P+l))}, where here \eqn{j}{[j]} denotes discrete
-    variable \eqn{j}{j}.  Defaults to \code{FALSE}.  }
+    defined as min(standard deviation, mean absolute deviation/1.4826,
+    interquartile range/1.349), \eqn{n} the number of observations,
+    \eqn{P}{P} the order of the kernel, and \eqn{l}{l} the number of
+    continuous variables. For discrete data types, \eqn{c_j}{c[j]} and
+    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j =
+    c_jn^{-2/(P+l)}}{h[j] = c[j]*n^(-2/(P+l))}, where here \eqn{j}{[j]}
+    denotes discrete variable \eqn{j}{j}.  Defaults to \code{FALSE}.  }
 
   \item{bwtype}{
     character string used for the continuous variable bandwidth type,
@@ -252,6 +280,31 @@ npudistbw(\dots)
     precision) or 3x10-8 (double prevision)). Defaults to \code{small
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
+
+  \item{lbc.dir,dfc.dir,cfac.dir,initc.dir}{ lower bound, chi-square
+    degrees of freedom, stretch factor, and initial non-random values
+    for direction set search for Powell's algorithm for \code{numeric}
+    variables. See Details}
+
+  \item{lbd.dir,hbd.dir,dfac.dir,initd.dir}{ lower bound, upper bound,
+    stretch factor, and initial non-random values for direction set
+    search for Powell's algorithm for categorical variables. See
+    Details}
+
+  \item{lbc.init, hbc.init, cfac.init}{ lower bound, upper bound, and
+    non-random initial values for scale factors for \code{numeric}
+    variables for Powell's algorithm. See Details}
+
+  \item{lbd.init, hbd.init, dfac.init}{ lower bound, upper bound, and
+    non-random initial values for scale factors for categorical
+    variables for Powell's algorithm. See Details}
+
+  \item{scale.init.categorical.sample}{ a logical value that when set
+    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
+    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
+    \eqn{n} the number of observations, \eqn{P}{P} the order of the
+    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
+    Details}
 }
 
 \details{
@@ -317,6 +370,25 @@ npudistbw(\dots)
   eighth order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Ordered data types use a variation of the Wang and van Ryzin
   (1981) kernel.
+
+  The optimizer invoked for search is Powell's conjugate direction
+  method which requires the setting of (non-random) initial values and
+  search directions for bandwidths, and, when restarting, random values
+  for successive invocations. Bandwidths for \code{numeric} variables
+  are scaled by robust measures of spread, the sample size, and the
+  number of \code{numeric} variables where appropriate. Two sets of
+  parameters for bandwidths for \code{numeric} can be modified, those
+  for initial values for the parameters themselves, and those for the
+  directions taken (Powell's algorithm does not involve explicit
+  computation of the function's gradient). The default values are set by
+  considering search performance for a variety of difficult test cases
+  and simulated cases. We highly recommend restarting search a large
+  number of times to avoid the presence of local minima (achieved by
+  modifying \code{nmulti}). Further refinement for difficult cases can
+  be achieved by modifying these sets of parameters. However, these
+  parameters are intended more for the authors of the package to enable
+  \sQuote{tuning} for various methods rather than for the user them
+  self.
 
 }
 \value{
