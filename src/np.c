@@ -250,7 +250,7 @@ void np_mpi_init(int * mpi_status){
 
 
 void np_density_bw(double * myuno, double * myord, double * mycon, 
-                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval){
+                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -561,6 +561,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   iImproved = (fret < fret_best);
 
   /* When multistarting save initial minimum of objective function and scale factors */
+  objective_function_values[0]=-fret;
 
   if(iMultistart == IMULTI_TRUE){
     fret_best = fret;
@@ -664,12 +665,12 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
        		
       if(fret < fret_best){
         fret_best = fret;
-        iImproved = iMs_counter;
+        iImproved = iMs_counter+1;
        
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-
+      objective_function_values[iMs_counter]=-fret;
     }
 
     /* Save best for estimation */
@@ -731,7 +732,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
 void np_distribution_bw(double * myuno, double * myord, double * mycon, 
                         double * myeuno, double * myeord, double * myecon, double * mysd,
-                        int * myopti, double * myoptd, double * myans, double * fval){
+                        int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -1089,7 +1090,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   iImproved = (fret < fret_best);
-
+  objective_function_values[0]=-fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
   if(iMultistart == IMULTI_TRUE){
@@ -1190,12 +1191,12 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
        		
       if(fret < fret_best){
         fret_best = fret;
-        iImproved = iMs_counter;
+        iImproved = iMs_counter+1;
        
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-
+      objective_function_values[iMs_counter]=-fret;
     }
 
     /* Save best for estimation */
@@ -1264,7 +1265,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                double * u_uno, double * u_ord, double * u_con,
                                double * mysd,
-                               int * myopti, double * myoptd, double * myans, double * fval){
+                               int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y = NULL;
@@ -1797,7 +1798,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   }
 
   iImproved = (fret < fret_best);
-
+  objective_function_values[0]=-fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -1904,7 +1905,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
         for(i = 1; i <= num_all_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-      
+      objective_function_values[iMs_counter]=-fret;
     }
 
     /* Save best for estimation */
@@ -2001,7 +2002,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
-                                    int * myopti, double * myoptd, double * myans, double * fval){
+                                    int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -2527,7 +2528,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   }
 
   iImproved = (fret < fret_best);
-
+  objective_function_values[0]=-fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -2636,7 +2637,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
         for(i = 1; i <= num_all_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-      
+      objective_function_values[iMs_counter]=-fret;
     }
 
     /* Save best for estimation */
@@ -3463,7 +3464,7 @@ void np_density(double * tuno, double * tord, double * tcon,
 
 
 void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval){
+                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval, double * objective_function_values){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -3777,7 +3778,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   }
 
   iImproved = (fret < fret_best);
-
+  objective_function_values[0]=-fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -3888,7 +3889,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-
+      objective_function_values[iMs_counter]=-fret;
 
     }
 

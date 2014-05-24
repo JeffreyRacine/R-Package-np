@@ -218,8 +218,8 @@ npudistbw.dbandwidth <-
              as.double(guno), as.double(gord), as.double(gcon), as.double(mysd),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
-             fval = double(2),
-             PACKAGE="npRmpi" )[c("bw","fval")]
+             fval = double(2), fval.history = double(max(1,nmulti)),
+             PACKAGE="npRmpi" )[c("bw","fval","fval.history")]
       } else {
         nbw = double(ncol)
         gbw = bws$ncon
@@ -238,6 +238,7 @@ npudistbw.dbandwidth <-
 
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
+      tbw$fval.history <- myout$fval.historyt
     }
     
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
@@ -279,6 +280,7 @@ npudistbw.dbandwidth <-
                       okertype = tbw$okertype,
                       fval = tbw$fval,
                       ifval = tbw$ifval,
+                      fval.history = tbw$fval.history,
                       nobs = tbw$nobs,
                       xdati = tbw$xdati,
                       xnames = tbw$xnames,
