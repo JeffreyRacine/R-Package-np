@@ -687,8 +687,8 @@ int initialize_nr_directions(int num_reg_continuous,
   // 3-sqrt(5) is related to golden section search, golden ratios, and
   // golden means
 
-  const double sfac = 0.25*(3.0-sqrt(5)); 
-  const double csfac = 2.5*(3.0-sqrt(5));
+  //const double sfac = 0.25*(3.0-sqrt(5)); 
+  //const double csfac = 2.5*(3.0-sqrt(5));
 
   li =  num_reg_continuous + num_reg_unordered + num_reg_ordered + 
     num_var_continuous + num_var_unordered + num_var_ordered;
@@ -706,7 +706,7 @@ int initialize_nr_directions(int num_reg_continuous,
   li =  num_reg_continuous + num_var_continuous;
 
   for(i = 1; i <= li; i++)
-    matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed, dfc_dir)  + lbc_dir: initc_dir)*csfac*c_dir;
+    matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed, dfc_dir)  + lbc_dir: initc_dir)*c_dir;
 
   if(num_categories == NULL) return(0);
 
@@ -714,26 +714,26 @@ int initialize_nr_directions(int num_reg_continuous,
   li = num_reg_continuous + num_var_continuous;
   
   for(i = li + 1, j = 0; i <= (li + num_var_unordered); i++, j++) 
-    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*d_dir;
 
   // nvo
   li += num_var_unordered;
 
   for(; i <= (li + num_var_ordered); i++) 
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*d_dir;
 
   //nru
   j += num_var_ordered;
   li += num_var_ordered;
 
   for(; i <= (li + num_reg_unordered); i++, j++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], 1.0 - vector_scale_factor[i])*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*d_dir;
 
   // nro
   li += num_reg_unordered;
 
   for(; i <= (li + num_reg_ordered); i++)
-    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*sfac*d_dir;
+    matrix_y[i][i] = MIN(vector_scale_factor[i], (1.0 - vector_scale_factor[i]))*(random ? (hbd_dir-lbd_dir)*ran3(&seed) + lbd_dir: initd_dir)*d_dir;
 
   return(0);
 
