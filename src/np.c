@@ -1090,7 +1090,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   iImproved = (fret < fret_best);
-  objective_function_values[0]=-fret;
+  objective_function_values[0]=fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
   if(iMultistart == IMULTI_TRUE){
@@ -1196,7 +1196,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-      objective_function_values[iMs_counter]=-fret;
+      objective_function_values[iMs_counter]=fret;
     }
 
     /* Save best for estimation */
@@ -2528,7 +2528,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   }
 
   iImproved = (fret < fret_best);
-  objective_function_values[0]=-fret;
+  objective_function_values[0]=fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -2637,7 +2637,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
         for(i = 1; i <= num_all_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-      objective_function_values[iMs_counter]=-fret;
+      objective_function_values[iMs_counter]=fret;
     }
 
     /* Save best for estimation */
@@ -3778,7 +3778,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   }
 
   iImproved = (fret < fret_best);
-  objective_function_values[0]=-fret;
+  objective_function_values[0]=fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -3889,7 +3889,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
-      objective_function_values[iMs_counter]=-fret;
+      objective_function_values[iMs_counter]=fret;
 
     }
 
