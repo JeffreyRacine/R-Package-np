@@ -4720,8 +4720,24 @@ double *cv){
   double vsfy[num_var_tot];
   double vsfxy[num_var_tot+num_reg_tot];
 
+  // we need the various bandwidth matrices to make sure that the correct bandwidths are used
+  // when adaptive and/or generalized nearest neighbor bandwidths are selected
+  // in combination with the blocking algorithm 
+
   double lambdax[num_reg_unordered+num_reg_ordered];
-  double **matrix_bandwidth_x;
+  double lambday[num_var_unordered+num_var_ordered];
+  double lambdaxy[num_all_ovar + num_all_uvar];
+
+  double **matrix_bandwidth_x = NULL;
+  double **matrix_bandwidth_xy = NULL;
+  double **matrix_bandwidth_y = NULL;
+
+  double **matrix_bandwidth_xi = NULL;
+  double **matrix_bandwidth_xj = NULL;
+  double **matrix_bandwidth_xk = NULL;
+
+  double **matrix_bandwidth_yj = NULL;
+  double **matrix_bandwidth_yk = NULL;
 
   double **matrix_Yk_unordered_train;
   double **matrix_Yk_ordered_train;
@@ -4946,7 +4962,7 @@ double *cv){
     xy_operator[i] = OP_NORMAL;
 
   // special bandwidths
-  if(BANDWIDTH_den == BW_GEN_NN){
+  if(BANDWIDTH_den != BW_FIXED){
     matrix_bandwidth_x = alloc_matd(num_obs_train, num_reg_continuous);
 
     kernel_bandwidth_mean(KERNEL_reg,
@@ -4968,6 +4984,65 @@ double *cv){
                           NULL,					 // Not used 
                           matrix_bandwidth_x,
                           lambdax);
+
+
+
+    matrix_bandwidth_y = alloc_matd(num_obs_train, num_var_continuous);
+
+    kernel_bandwidth_mean(KERNEL_var,
+                          BANDWIDTH_den,
+                          num_obs_train,
+                          num_obs_train,
+                          0,
+                          0,
+                          0,
+                          num_var_continuous,
+                          num_var_unordered,
+                          num_var_ordered,
+                          0, // do not suppress_parallel
+                          vsfy,
+                          NULL,
+                          NULL,
+                          matrix_Y_continuous_train,
+                          matrix_Y_continuous_train,
+                          NULL,					 // Not used 
+                          matrix_bandwidth_y,
+                          lambday);
+
+    matrix_bandwidth_xy = alloc_matd(num_obs_train, num_var_continuous);
+
+    kernel_bandwidth_mean(KERNEL_reg,
+                          BANDWIDTH_den,
+                          num_obs_train,
+                          num_obs_train,
+                          0,
+                          0,
+                          0,
+                          num_all_cvar,
+                          num_all_uvar,
+                          num_all_ovar,
+                          0, // do not suppress_parallel
+                          vsfxy,
+                          NULL,
+                          NULL,
+                          matrix_XY_continuous_train,
+                          matrix_XY_continuous_train,
+                          NULL,					 // Not used 
+                          matrix_bandwidth_xy,
+                          lambdaxy);
+
+    matrix_bandwidth_yj = (double **)malloc(sizeof(double *)*num_var_continuous);
+    matrix_bandwidth_yk = (double **)malloc(sizeof(double *)*num_var_continuous);
+
+    if(BANDWIDTH_den == BW_ADAP_NN){
+      matrix_bandwidth_xi = (double **)malloc(sizeof(double *)*num_reg_continuous);
+    }else{
+      matrix_bandwidth_xj = (double **)malloc(sizeof(double *)*num_reg_continuous);
+      matrix_bandwidth_xk = (double **)malloc(sizeof(double *)*num_reg_continuous);
+    }
+
+
+
   } else if (BANDWIDTH_den == BW_FIXED) {
     matrix_bandwidth_x = (double **)malloc(sizeof(double*));
     matrix_bandwidth_x[0] = vsfx;
@@ -5026,7 +5101,9 @@ double *cv){
                          NULL,
                          NULL,
                          vsfxy,
-                         NULL,NULL,NULL,
+                         matrix_bandwidth_xy,
+                         matrix_bandwidth_xy,
+                         lambdaxy,
                          num_categories_extern_XY,
                          matrix_categorical_vals_extern_XY,
                          NULL,
@@ -5075,7 +5152,9 @@ double *cv){
                          NULL,
                          NULL,
                          vsfx,
-                         NULL,NULL,NULL,
+                         matrix_bandwidth_x,
+                         matrix_bandwidth_x,
+                         lambdax,
                          num_categories_extern_X,
                          matrix_categorical_vals_extern_X,
                          NULL,
@@ -5124,6 +5203,12 @@ double *cv){
     for(l = 0; l < num_reg_ordered; l++)
       matrix_Xi_ordered_train[l] = matrix_XY_ordered_train[l] + wio;
 
+    // offset the appropriate bandwidths
+    if(BANDWIDTH_den == BW_ADAP_NN){
+      for(l = 0; l < num_reg_continuous; l++)
+        matrix_bandwidth_xi[l] = matrix_bandwidth_x[l] + wio;
+    }
+
     for(iwj = 0; iwj < nwj; iwj++){
       const int64_t wjo = iwj*wj;
       const int64_t dwj = (iwj != (nwj - 1)) ? wj : num_obs_train - (nwj - 1)*wj;
@@ -5150,6 +5235,15 @@ double *cv){
       for(l = 0; l < num_var_ordered; l++)
         matrix_Yj_ordered_train[l] = matrix_XY_ordered_train[l+num_reg_ordered] + wjo;
 
+        // offset the appropriate bandwidths
+      if(BANDWIDTH_den != BW_FIXED){
+        for(l = 0; l < num_var_continuous; l++)
+          matrix_bandwidth_yj[l] = matrix_bandwidth_y[l] + wjo;
+
+        if(BANDWIDTH_den == BW_GEN_NN)
+          for(l = 0; l < num_reg_continuous; l++)
+            matrix_bandwidth_xj[l] = matrix_bandwidth_x[l] + wjo;
+      }
 
       // compute block kx_ij
       // i is eval, j is train
@@ -5196,7 +5290,9 @@ double *cv){
                              NULL,
                              NULL,
                              vsfx,
-                             NULL,NULL,NULL,
+                             matrix_bandwidth_xi,
+                             matrix_bandwidth_xj,
+                             lambdax,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
                              NULL,
@@ -5232,6 +5328,15 @@ double *cv){
         for(l = 0; l < num_var_ordered; l++)
           matrix_Yk_ordered_train[l] = matrix_XY_ordered_train[l+num_reg_ordered] + wko;
 
+        // offset the appropriate bandwidths
+        if(BANDWIDTH_den != BW_FIXED){
+          for(l = 0; l < num_var_continuous; l++)
+            matrix_bandwidth_yk[l] = matrix_bandwidth_y[l] + wko;
+
+          if(BANDWIDTH_den == BW_GEN_NN)
+            for(l = 0; l < num_reg_continuous; l++)
+              matrix_bandwidth_xk[l] = matrix_bandwidth_x[l] + wko;
+        }
         // compute block kx_ik
 
         if (iwk != iwj) {
@@ -5277,7 +5382,9 @@ double *cv){
                                  NULL,
                                  NULL,
                                  vsfx,
-                                 NULL,NULL,NULL,
+                                 matrix_bandwidth_xi,
+                                 matrix_bandwidth_xk,
+                                 lambdax,
                                  num_categories_extern_X,
                                  matrix_categorical_vals_extern_X,
                                  NULL,
@@ -5332,7 +5439,9 @@ double *cv){
                                NULL,
                                NULL,
                                vsfy,
-                               NULL,NULL,NULL,
+                               matrix_bandwidth_yj,
+                               matrix_bandwidth_yk,
+                               lambday,
                                num_categories_extern_Y,
                                matrix_categorical_vals_extern_Y,
                                NULL,
@@ -5476,10 +5585,25 @@ double *cv){
   free(kernel_uy);
   free(kernel_uxy);
 
-  if(BANDWIDTH_den == BW_GEN_NN)
-    free_mat(matrix_bandwidth_x, num_reg_continuous);
-  else if (BANDWIDTH_den == BW_FIXED)
+
+
+  if(BANDWIDTH_den != BW_FIXED){
+    if(BANDWIDTH_den == BW_ADAP_NN){
+      free(matrix_bandwidth_xi);
+    }else{
+      free(matrix_bandwidth_xj);      
+      free(matrix_bandwidth_xk);      
+    }
+
+      free(matrix_bandwidth_yj);
+      free(matrix_bandwidth_yk);
+
+      free_mat(matrix_bandwidth_x, num_reg_continuous);
+      free_mat(matrix_bandwidth_xy, num_all_cvar);
+      free_mat(matrix_bandwidth_y, num_var_continuous);
+  }else{
     free(matrix_bandwidth_x);
+  }
 
   free(matrix_Xi_continuous_train);
   free(matrix_Xi_unordered_train);
