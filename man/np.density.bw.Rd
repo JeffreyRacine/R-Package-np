@@ -37,7 +37,7 @@ npudensbw(\dots)
           tol = 1.490116e-04,
           small = 1.490116e-05,
           lbc.dir = 0.5,
-          dfc.dir = 4,
+          dfc.dir = 3,
           cfac.dir = 2.5*(3.0-sqrt(5)),
           initc.dir = 1.0,
           lbd.dir = 0,
