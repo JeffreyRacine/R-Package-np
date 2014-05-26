@@ -928,6 +928,41 @@ double np_aconvol_gauss2(const double x, const double y,const double hx,const do
 
   return(0.3989422803*hx*hy*exp(-0.5*z2)/sqrt(h2));
 }
+
+double np_aconvol_epan2_total(const double x, const double y,const double hx,const double hy){
+  const double a = 3.0*sqrt(5.0);
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+  return((-a*y*y + 2*a*x*y - a*x*x + 5*a*hl*hl - a*hs*hs)*hs/(100*hl*hl));
+}
+
+double np_aconvol_epan2_indefinite(const double l, const double x, const double y,const double hx,const double hy){
+  const double hxs = hx*hx;
+  const double hys = hy*hy;
+  const double xs = x*x;
+  const double ys = y*y;
+  const double a = 3/(20000*hxs*hys);
+    
+  return(a*l*(((30*xs - 150*hxs)*ys + hys*(-150*xs + 750*hxs)) +
+              l*(((150*hxs - 30*xs)*y + (150*hys - 30*ys)*x) +
+                 l*((10*ys + 40*x*y + 10*xs - 50*hys - 50*hxs) +
+                    l*((-15*y - 15*x) + 6*l)))));
+
+}
+
+double np_aconvol_epan2(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_epan2_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_epan2_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan2_total(x,y,hx,hy));
+  }
+}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -1141,7 +1176,10 @@ void np_convol_ckernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double (* const k[])(double,double,double,double) = { np_aconvol_gauss2 };
+  double (* const k[])(double,double,double,double) = { 
+    np_aconvol_gauss2, NULL, NULL, NULL,
+    np_aconvol_epan2, NULL, NULL, NULL 
+  };
 
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
     if(xw[j] == 0.0) continue;
