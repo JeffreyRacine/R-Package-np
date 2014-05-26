@@ -921,6 +921,13 @@ double np_onull(const double x, const double y, const double lambda, const doubl
   return(0.0);
 }
 
+// adaptive convolution kernels
+double np_aconvol_gauss2(const double x, const double y,const double hx,const double hy){
+  const double h2 = hx*hx + hy*hy;
+  const double z2 = (x-y)*(x-y)/h2;
+
+  return(0.3989422803*hx*hy*exp(-0.5*z2)/sqrt(h2));
+}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -1126,7 +1133,7 @@ void np_convol_ckernelv(const int KERNEL,
                         double * xt_h, 
                         const double h, 
                         double * const result,
-                        const int swap_xxt){
+                        const int power){
 
   int i,j; 
   const int bin_do_xw = do_xw > 0;
@@ -1134,20 +1141,12 @@ void np_convol_ckernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  if(!swap_xxt){
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
-                                      (x-xt[i])/xt_h[i], xt_h[i], h);
-    }
-  } else {
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
-                                      (xt[i]-x)/h, xt_h[i], h);
-    }
-  }
+  double (* const k[])(double,double,double,double) = { np_aconvol_gauss2 };
 
+  for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+    if(xw[j] == 0.0) continue;
+    result[i] = xw[j]*k[KERNEL](x,xt[i],h,xt_h[i])/ipow(xt_h[i], power);
+  }
 }
 
 
@@ -2013,24 +2012,26 @@ double * const kw){
     bw_provided = 0;
   }
 
-  if(bw_provided){
-    if((BANDWIDTH_reg == BW_GEN_NN) && (matrix_bw_eval != NULL)){
-      matrix_bandwidth = matrix_bw_eval;
-    } else if ((BANDWIDTH_reg == BW_ADAP_NN) && (matrix_bw_train != NULL)){
-      if (any_convolution){
-        if(matrix_bw_eval != NULL){
-          matrix_alt_bandwidth = matrix_bw_eval;        
-        }else{
-          assert(0);
-        }
-      } 
-      matrix_bandwidth = matrix_bw_train;
+  if(num_reg_continuous > 0){
+    if(bw_provided){
+      if((BANDWIDTH_reg == BW_GEN_NN) && (matrix_bw_eval != NULL)){
+        matrix_bandwidth = matrix_bw_eval;
+      } else if ((BANDWIDTH_reg == BW_ADAP_NN) && (matrix_bw_train != NULL)){
+        if (any_convolution){
+          if(matrix_bw_eval != NULL){
+            matrix_alt_bandwidth = matrix_bw_eval;        
+          }else{
+            assert(0);
+          }
+        } 
+        matrix_bandwidth = matrix_bw_train;
+      } else {
+        assert(0);
+      }
     } else {
-      assert(0);
-    }
-  } else {
-    matrix_bandwidth = alloc_tmatd(mstep, num_reg_continuous);  
-  } 
+      matrix_bandwidth = alloc_tmatd(mstep, num_reg_continuous);  
+    } 
+  }
 
   tprod = alloc_vecd((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train);
 
@@ -2391,7 +2392,7 @@ double * const kw){
       }
       else
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j], 
-                           matrix_alt_bandwidth[i], *m, tprod, swap_xxt);
+                           matrix_alt_bandwidth[i], *m, tprod, bpow[i]);
       dband *= ipow(*m, bpow[i]);
 
       if(do_perm){
@@ -5009,7 +5010,7 @@ double *cv){
                           matrix_bandwidth_y,
                           lambday);
 
-    matrix_bandwidth_xy = alloc_matd(num_obs_train, num_var_continuous);
+    matrix_bandwidth_xy = alloc_matd(num_obs_train, num_all_cvar);
 
     kernel_bandwidth_mean(KERNEL_reg,
                           BANDWIDTH_den,
@@ -5040,8 +5041,6 @@ double *cv){
       matrix_bandwidth_xj = (double **)malloc(sizeof(double *)*num_reg_continuous);
       matrix_bandwidth_xk = (double **)malloc(sizeof(double *)*num_reg_continuous);
     }
-
-
 
   } else if (BANDWIDTH_den == BW_FIXED) {
     matrix_bandwidth_x = (double **)malloc(sizeof(double*));
