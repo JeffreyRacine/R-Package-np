@@ -42,13 +42,6 @@ npqreg(bws, \dots)
        hbd.dir = 1,
        dfac.dir = 0.25*(3.0-sqrt(5)),
        initd.dir = 1.0,
-       lbc.init = 0.1,
-       hbc.init = 2.0,
-       cfac.init = 0.5,
-       lbd.init = 0.1,
-       hbd.init = 0.9,
-       dfac.init = 0.375, 
-       scale.init.categorical.sample = FALSE,
        \dots)
 
 \method{npqreg}{default}(bws, txdat, tydat, \dots)
@@ -157,20 +150,6 @@ npqreg(bws, \dots)
     search for Powell's algorithm for categorical variables. See
     Details}
 
-  \item{lbc.init, hbc.init, cfac.init}{ lower bound, upper bound, and
-    non-random initial values for scale factors for \code{numeric}
-    variables for Powell's algorithm. See Details}
-
-  \item{lbd.init, hbd.init, dfac.init}{ lower bound, upper bound, and
-    non-random initial values for scale factors for categorical
-    variables for Powell's algorithm. See Details}
-
-  \item{scale.init.categorical.sample}{ a logical value that when set
-    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
-    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
-    \eqn{n} the number of observations, \eqn{P}{P} the order of the
-    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
-    Details}
 }
 
 \details{
