@@ -933,7 +933,7 @@ double np_aconvol_epan2_total(const double x, const double y,const double hx,con
   const double a = 3.0*sqrt(5.0);
   const double hl = MAX(hx,hy);
   const double hs = MIN(hx,hy);
-  return((-a*y*y + 2*a*x*y - a*x*x + 5*a*hl*hl - a*hs*hs)*hs/(100*hl*hl));
+  return((-a*y*y + 2.0*a*x*y - a*x*x + 5.0*a*hl*hl - a*hs*hs)*hs/(100.0*hl*hl));
 }
 
 double np_aconvol_epan2_indefinite(const double l, const double x, const double y,const double hx,const double hy){
@@ -941,12 +941,12 @@ double np_aconvol_epan2_indefinite(const double l, const double x, const double 
   const double hys = hy*hy;
   const double xs = x*x;
   const double ys = y*y;
-  const double a = 3/(20000*hxs*hys);
+  const double a = 3.0/(20000.0*hxs*hys);
     
-  return(a*l*(((30*xs - 150*hxs)*ys + hys*(-150*xs + 750*hxs)) +
-              l*(((150*hxs - 30*xs)*y + (150*hys - 30*ys)*x) +
-                 l*((10*ys + 40*x*y + 10*xs - 50*hys - 50*hxs) +
-                    l*((-15*y - 15*x) + 6*l)))));
+  return(a*l*(((30.0*xs - 150.0*hxs)*ys + hys*(-150.0*xs + 750.0*hxs)) +
+              l*(((150.0*hxs - 30.0*xs)*y + (150.0*hys - 30.0*ys)*x) +
+                 l*(10.0*(ys + 4.0*x*y + xs - 5.0*hys - 5.0*hxs) +
+                    l*((y + x)*(-15.0) + 6.0*l)))));
 
 }
 
