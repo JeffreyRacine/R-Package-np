@@ -1349,6 +1349,215 @@ double np_aconvol_epan4(const double x, const double y,const double hx,const dou
     return (np_aconvol_epan4_total(x,y,hx,hy));
   }
 }
+
+double np_aconvol_epan6_total(const double x, const double y,const double hx,const double hy){
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+
+  const double hl2 = hl*hl;
+  const double hl4 = hl2*hl2;
+  const double hl6 = hl4*hl2;
+
+  const double hs2 = hs*hs;
+  const double hs4 = hs2*hs2;
+  const double hs6 = hs4*hs2;
+
+  return(-21*hs
+         *(429*y6-2574*x*y5+6435*x2*y4-4095*hl2*y4-8580*x3*y3
+           +16380*hl2*x*y3+6435*x4*y2-24570*hl2*x2*y2+11375*hl4*y2
+           -2574*x5*y+16380*hl2*x3*y-22750*hl4*x*y+429*x6-4095*hl2*x4
+           +11375*hl4*x2-8125*hl6+625*hs6)
+         /(3328*sqrt(5)*25*hl6));
+
+}
+
+double np_aconvol_epan6_indefinite(const double u, const double x, const double y,const double hx,const double hy){
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+  const double hx6 = hx4*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+  const double hy6 = hy4*hy2;
+
+  const double u2 = u*u;
+  const double u3 = u2*u;
+  const double u4 = u3*u;
+  const double u5 = u4*u;
+  const double u6 = u5*u;
+  const double u7 = u6*u;
+  const double u8 = u7*u;
+  const double u9 = u8*u;
+  const double u10 = u9*u;
+  const double u11 = u10*u;
+  const double u12 = u11*u;
+
+  return(21*u
+         *(1189188*x6*y6-3567564*u*x5*y6+5945940*u2*x4*y6
+           -11351340*hx2*x4*y6-5945940*u3*x3*y6
+           +22702680*hx2*u*x3*y6+3567564*u4*x2*y6
+           -22702680*hx2*u2*x2*y6+31531500*hx4*x2*y6
+           -1189188*u5*x*y6+11351340*hx2*u3*x*y6
+           -31531500*hx4*u*x*y6+169884*u6*y6-2270268*hx2*u4*y6
+           +10510500*hx4*u2*y6-22522500*hx6*y6-3567564*u*x6*y5
+           +14270256*u2*x5*y5-26756730*u3*x4*y5
+           +34054020*hx2*u*x4*y5+28540512*u4*x3*y5
+           -90810720*hx2*u2*x3*y5-17837820*u5*x2*y5
+           +102162060*hx2*u3*x2*y5-94594500*hx4*u*x2*y5
+           +6115824*u6*x*y5-54486432*hx2*u4*x*y5
+           +126126000*hx4*u2*x*y5-891891*u7*y5
+           +11351340*hx2*u5*y5-47297250*hx4*u3*y5
+           +67567500*hx6*u*y5+5945940*u2*x6*y4
+           -11351340*hy2*x6*y4-26756730*u3*x5*y4
+           +34054020*hy2*u*x5*y4+53513460*u4*x4*y4
+           -56756700*hy2*u2*x4*y4-56756700*hx2*u2*x4*y4
+           +108353700*hx2*hy2*x4*y4-59459400*u5*x3*y4
+           +56756700*hy2*u3*x3*y4+170270100*hx2*u3*x3*y4
+           -216707400*hx2*hy2*u*x3*y4+38223900*u6*x2*y4
+           -34054020*hy2*u4*x2*y4-204324120*hx2*u4*x2*y4
+           +216707400*hx2*hy2*u2*x2*y4+157657500*hx4*u2*x2*y4
+           -300982500*hx4*hy2*x2*y4-13378365*u7*x*y4
+           +11351340*hy2*u5*x*y4+113513400*hx2*u5*x*y4
+           -108353700*hx2*hy2*u3*x*y4-236486250*hx4*u3*x*y4
+           +300982500*hx4*hy2*u*x*y4+1981980*u8*y4
+           -1621620*hy2*u6*y4-24324300*hx2*u6*y4
+           +21670740*hx2*hy2*u4*y4+94594500*hx4*u4*y4
+           -100327500*hx4*hy2*u2*y4-112612500*hx6*u2*y4
+           +214987500*hx6*hy2*y4-5945940*u3*x6*y3
+           +22702680*hy2*u*x6*y3+28540512*u4*x5*y3
+           -90810720*hy2*u2*x5*y3-59459400*u5*x4*y3
+           +170270100*hy2*u3*x4*y3+56756700*hx2*u3*x4*y3
+           -216707400*hx2*hy2*u*x4*y3+67953600*u6*x3*y3
+           -181621440*hy2*u4*x3*y3-181621440*hx2*u4*x3*y3
+           +577886400*hx2*hy2*u2*x3*y3-44594550*u7*x2*y3
+           +113513400*hy2*u5*x2*y3+227026800*hx2*u5*x2*y3
+           -650122200*hx2*hy2*u3*x2*y3-157657500*hx4*u3*x2*y3
+           +601965000*hx4*hy2*u*x2*y3+15855840*u8*x*y3
+           -38918880*hy2*u6*x*y3-129729600*hx2*u6*x*y3
+           +346731840*hx2*hy2*u4*x*y3+252252000*hx4*u4*x*y3
+           -802620000*hx4*hy2*u2*x*y3-2378376*u9*y3
+           +5675670*hy2*u7*y3+28378350*hx2*u7*y3
+           -72235800*hx2*hy2*u5*y3-105105000*hx4*u5*y3
+           +300982500*hx4*hy2*u3*y3+112612500*hx6*u3*y3
+           -429975000*hx6*hy2*u*y3+3567564*u4*x6*y2
+           -22702680*hy2*u2*x6*y2+31531500*hy4*x6*y2
+           -17837820*u5*x5*y2+102162060*hy2*u3*x5*y2
+           -94594500*hy4*u*x5*y2+38223900*u6*x4*y2
+           -204324120*hy2*u4*x4*y2-34054020*hx2*u4*x4*y2
+           +157657500*hy4*u2*x4*y2+216707400*hx2*hy2*u2*x4*y2
+           -300982500*hx2*hy4*x4*y2-44594550*u7*x3*y2
+           +227026800*hy2*u5*x3*y2+113513400*hx2*u5*x3*y2
+           -157657500*hy4*u3*x3*y2-650122200*hx2*hy2*u3*x3*y2
+           +601965000*hx2*hy4*u*x3*y2+29729700*u8*x2*y2
+           -145945800*hy2*u6*x2*y2-145945800*hx2*u6*x2*y2
+           +94594500*hy4*u4*x2*y2+780146640*hx2*hy2*u4*x2*y2
+           +94594500*hx4*u4*x2*y2-601965000*hx2*hy4*u2*x2*y2
+           -601965000*hx4*hy2*u2*x2*y2
+           +836062500*hx4*hy4*x2*y2-10702692*u9*x*y2
+           +51081030*hy2*u7*x*y2+85135050*hx2*u7*x*y2
+           -31531500*hy4*u5*x*y2-433414800*hx2*hy2*u5*x*y2
+           -157657500*hx4*u5*x*y2+300982500*hx2*hy4*u3*x*y2
+           +902947500*hx4*hy2*u3*x*y2-836062500*hx4*hy4*u*x*y2
+           +1621620*u10*y2-7567560*hy2*u8*y2
+           -18918900*hx2*u8*y2+4504500*hy4*u6*y2
+           +92874600*hx2*hy2*u6*y2+67567500*hx4*u6*y2
+           -60196500*hx2*hy4*u4*y2-361179000*hx4*hy2*u4*y2
+           -67567500*hx6*u4*y2+278687500*hx4*hy4*u2*y2
+           +429975000*hx6*hy2*u2*y2-597187500*hx6*hy4*y2
+           -1189188*u5*x6*y+11351340*hy2*u3*x6*y
+           -31531500*hy4*u*x6*y+6115824*u6*x5*y
+           -54486432*hy2*u4*x5*y+126126000*hy4*u2*x5*y
+           -13378365*u7*x4*y+113513400*hy2*u5*x4*y
+           +11351340*hx2*u5*x4*y-236486250*hy4*u3*x4*y
+           -108353700*hx2*hy2*u3*x4*y+300982500*hx2*hy4*u*x4*y
+           +15855840*u8*x3*y-129729600*hy2*u6*x3*y
+           -38918880*hx2*u6*x3*y+252252000*hy4*u4*x3*y
+           +346731840*hx2*hy2*u4*x3*y
+           -802620000*hx2*hy4*u2*x3*y-10702692*u9*x2*y
+           +85135050*hy2*u7*x2*y+51081030*hx2*u7*x2*y
+           -157657500*hy4*u5*x2*y-433414800*hx2*hy2*u5*x2*y
+           -31531500*hx4*u5*x2*y+902947500*hx2*hy4*u3*x2*y
+           +300982500*hx4*hy2*u3*x2*y-836062500*hx4*hy4*u*x2*y
+           +3891888*u10*x*y-30270240*hy2*u8*x*y
+           -30270240*hx2*u8*x*y+54054000*hy4*u6*x*y
+           +247665600*hx2*hy2*u6*x*y+54054000*hx4*u6*x*y
+           -481572000*hx2*hy4*u4*x*y-481572000*hx4*hy2*u4*x*y
+           +1114750000*hx4*hy4*u2*x*y-594594*u11*y
+           +4540536*hy2*u9*y+6810804*hx2*u9*y-7882875*hy4*u7*y
+           -54176850*hx2*hy2*u7*y-23648625*hx4*u7*y
+           +100327500*hx2*hy4*u5*y+200655000*hx4*hy2*u5*y
+           +22522500*hx6*u5*y-418031250*hx4*hy4*u3*y
+           -214987500*hx6*hy2*u3*y+597187500*hx6*hy4*u*y
+           +169884*u6*x6-2270268*hy2*u4*x6+10510500*hy4*u2*x6
+           -22522500*hy6*x6-891891*u7*x5+11351340*hy2*u5*x5
+           -47297250*hy4*u3*x5+67567500*hy6*u*x5+1981980*u8*x4
+           -24324300*hy2*u6*x4-1621620*hx2*u6*x4
+           +94594500*hy4*u4*x4+21670740*hx2*hy2*u4*x4
+           -112612500*hy6*u2*x4-100327500*hx2*hy4*u2*x4
+           +214987500*hx2*hy6*x4-2378376*u9*x3
+           +28378350*hy2*u7*x3+5675670*hx2*u7*x3
+           -105105000*hy4*u5*x3-72235800*hx2*hy2*u5*x3
+           +112612500*hy6*u3*x3+300982500*hx2*hy4*u3*x3
+           -429975000*hx2*hy6*u*x3+1621620*u10*x2
+           -18918900*hy2*u8*x2-7567560*hx2*u8*x2
+           +67567500*hy4*u6*x2+92874600*hx2*hy2*u6*x2
+           +4504500*hx4*u6*x2-67567500*hy6*u4*x2
+           -361179000*hx2*hy4*u4*x2-60196500*hx4*hy2*u4*x2
+           +429975000*hx2*hy6*u2*x2+278687500*hx4*hy4*u2*x2
+           -597187500*hx4*hy6*x2-594594*u11*x+6810804*hy2*u9*x
+           +4540536*hx2*u9*x-23648625*hy4*u7*x
+           -54176850*hx2*hy2*u7*x-7882875*hx4*u7*x
+           +22522500*hy6*u5*x+200655000*hx2*hy4*u5*x
+           +100327500*hx4*hy2*u5*x-214987500*hx2*hy6*u3*x
+           -418031250*hx4*hy4*u3*x+597187500*hx4*hy6*u*x
+           +91476*u12-1031940*hy2*u10-1031940*hx2*u10
+           +3503500*hy4*u8+12039300*hx2*hy2*u8+3503500*hx4*u8
+           -3217500*hy6*u6-42997500*hx2*hy4*u6
+           -42997500*hx4*hy2*u6-3217500*hx6*u6
+           +42997500*hx2*hy6*u4+167212500*hx4*hy4*u4
+           +42997500*hx6*hy2*u4-199062500*hx4*hy6*u2
+           -199062500*hx6*hy4*u2+426562500*hx6*hy6)
+         /(10649600000*hx6*hy6));
+}
+
+double np_aconvol_epan6(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_epan6_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_epan6_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan6_total(x,y,hx,hy));
+  }
+}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -1564,7 +1773,7 @@ void np_convol_ckernelv(const int KERNEL,
 
   double (* const k[])(double,double,double,double) = { 
     np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
-    np_aconvol_epan2, np_aconvol_epan4, NULL, NULL 
+    np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, NULL 
   };
 
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
