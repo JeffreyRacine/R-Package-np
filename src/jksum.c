@@ -929,6 +929,302 @@ double np_aconvol_gauss2(const double x, const double y,const double hx,const do
   return(0.3989422803*hx*hy*exp(-0.5*z2)/sqrt(h2));
 }
 
+double np_aconvol_gauss4(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(2);
+  const double hx2 = hx*hx;
+  const double hy2 = hy*hy;
+  const double hxy2 = hx2+hy2;
+  const double x2 = x*x;
+  const double y2 = y*x;
+  const double hx3 = hx2*hx;
+  const double hy3 = hy2*hy;
+  const double hx5 = hx3*hx2;
+  const double hy5 = hy3*hy2;
+  const double hx7 = hx5*hx2;
+  const double hy7 = hy5*hy2;
+  const double hx9 = hx7*hx2;
+  const double hy9 = hy7*hy2;
+  
+  return((hx3*hy3*(y2*y2 - 4*x*y*y2 + x2*x2)
+                     + (6*hx3*hy3*x2 - 2*hx*hy7 - 6*hx3*hy5 - 12*hx5*hy3 - 2*hx7*hy)*y2
+                     + ((4*hx*hy7 + 24*hx3*hy5 + 24*hx5*hy3 + 4*hx7*hy)*x - 4*hx3*hy3*x2*x)*y
+                     + ( - 2*hx*hy7 - 12*hx3*hy5 - 12*hx5*hy3 - 2*hx7*hy)*x2
+                     + 6*hx*hy9 + 27*hx3*hy7 + 42*hx5*hy5 + 27*hx7*hy3 + 6*hx9*hy)*
+         exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/(sqrt(hy2 + hx2)*4*hxy2*hxy2*hxy2*hxy2));
+}
+
+double np_aconvol_gauss6(const double x, const double y,const double hx,const double hy){
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+  const double hx6 = hx4*hx2;
+  const double hx8 = hx4*hx4;
+  const double hx10 = hx8*hx2;
+  const double hx12 = hx10*hx2;
+  const double hx14 = hx12*hx2;
+  const double hx16 = hx8*hx8;
+
+  const double x2 = x*x;
+  const double x3 = x*x2;
+  const double x4 = x2*x2;
+  const double x5 = x*x4;
+  const double x6 = x3*x3;
+  const double x7 = x*x6;
+  const double x8 = x4*x4;
+
+  
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+  const double hy6 = hy4*hy2;
+  const double hy8 = hy4*hy4;
+  const double hy10 = hy8*hy2;
+  const double hy12 = hy10*hy2;
+  const double hy14 = hy12*hy2;
+  const double hy16 = hy8*hy8;
+
+  const double y2 = y*y;
+  const double y3 = y*y2;
+  const double y4 = y2*y2;
+  const double y5 = y*y4;
+  const double y6 = y3*y3;
+  const double y7 = y*y6;
+  const double y8 = y4*y4;
+  
+  const double hxy2 = hx2+hy2;
+  const double hxy4 = hxy2*hxy2;
+  const double hxy8 = hxy4*hxy4;
+    
+  return(hx*hy*(hx4*hy4*y8-8*hx4*hy4*x*y7+28*hx4*hy4*x2*y6-4*hx2*hy8*y6
+                -40*hx4*hy6*y6-40*hx6*hy4*y6-4*hx8*hy2*y6
+                -56*hx4*hy4*x3*y5+24*hx2*hy8*x*y5+240*hx4*hy6*x*y5
+                +240*hx6*hy4*x*y5+24*hx8*hy2*x*y5+70*hx4*hy4*x4*y4
+                -60*hx2*hy8*x2*y4-600*hx4*hy6*x2*y4
+                -600*hx6*hy4*x2*y4-60*hx8*hy2*x2*y4+8*hy12*y4
+                +108*hx2*hy10*y4+570*hx4*hy8*y4+940*hx6*hy6*y4
+                +570*hx8*hy4*y4+108*hx10*hy2*y4+8*hx12*y4
+                -56*hx4*hy4*x5*y3+80*hx2*hy8*x3*y3
+                +800*hx4*hy6*x3*y3+800*hx6*hy4*x3*y3
+                +80*hx8*hy2*x3*y3-32*hy12*x*y3-432*hx2*hy10*x*y3
+                -2280*hx4*hy8*x*y3-3760*hx6*hy6*x*y3
+                -2280*hx8*hy4*x*y3-432*hx10*hy2*x*y3-32*hx12*x*y3
+                +28*hx4*hy4*x6*y2-60*hx2*hy8*x4*y2
+                -600*hx4*hy6*x4*y2-600*hx6*hy4*x4*y2
+                -60*hx8*hy2*x4*y2+48*hy12*x2*y2+648*hx2*hy10*x2*y2
+                +3420*hx4*hy8*x2*y2+5640*hx6*hy6*x2*y2
+                +3420*hx8*hy4*x2*y2+648*hx10*hy2*x2*y2
+                +48*hx12*x2*y2-80*hy14*y2-740*hx2*hy12*y2
+                -3000*hx4*hy10*y2-5860*hx6*hy8*y2-5860*hx8*hy6*y2
+                -3000*hx10*hy4*y2-740*hx12*hy2*y2-80*hx14*y2
+                -8*hx4*hy4*x7*y+24*hx2*hy8*x5*y+240*hx4*hy6*x5*y
+                +240*hx6*hy4*x5*y+24*hx8*hy2*x5*y-32*hy12*x3*y
+                -432*hx2*hy10*x3*y-2280*hx4*hy8*x3*y
+                -3760*hx6*hy6*x3*y-2280*hx8*hy4*x3*y
+                -432*hx10*hy2*x3*y-32*hx12*x3*y+160*hy14*x*y
+                +1480*hx2*hy12*x*y+6000*hx4*hy10*x*y+11720*hx6*hy8*x*y
+                +11720*hx8*hy6*x*y+6000*hx10*hy4*x*y+1480*hx12*hy2*x*y
+                +160*hx14*x*y+hx4*hy4*x8-4*hx2*hy8*x6-40*hx4*hy6*x6
+                -40*hx6*hy4*x6-4*hx8*hy2*x6+8*hy12*x4
+                +108*hx2*hy10*x4+570*hx4*hy8*x4+940*hx6*hy6*x4
+                +570*hx8*hy4*x4+108*hx10*hy2*x4+8*hx12*x4
+                -80*hy14*x2-740*hx2*hy12*x2-3000*hx4*hy10*x2
+                -5860*hx6*hy8*x2-5860*hx8*hy6*x2-3000*hx10*hy4*x2
+                -740*hx12*hy2*x2-80*hx14*x2+120*hy16+1020*hx2*hy14
+                +3825*hx4*hy12+8040*hx6*hy10+10230*hx8*hy8
+                +8040*hx10*hy6+3825*hx12*hy4+1020*hx14*hy2+120*hx16)*
+         exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/(sqrt(hxy2)*64*hxy8));
+}
+
+double np_aconvol_gauss8(const double x, const double y,const double hx,const double hy){
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+  const double hx6 = hx4*hx2;
+  const double hx8 = hx6*hx2;
+  const double hx10 = hx8*hx2;
+  const double hx12 = hx10*hx2;
+  const double hx14 = hx12*hx2;
+  const double hx16 = hx14*hx2;
+  const double hx18 = hx16*hx2;
+  const double hx20 = hx18*hx2;
+  const double hx22 = hx20*hx2;
+  const double hx24 = hx22*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+  const double hy6 = hy4*hy2;
+  const double hy8 = hy6*hy2;
+  const double hy10 = hy8*hy2;
+  const double hy12 = hy10*hy2;
+  const double hy14 = hy12*hy2;
+  const double hy16 = hy14*hy2;
+  const double hy18 = hy16*hy2;
+  const double hy20 = hy18*hy2;
+  const double hy22 = hy20*hy2;
+  const double hy24 = hy22*hy2;
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x3*x;
+  const double x5 = x4*x;
+  const double x6 = x5*x;
+  const double x7 = x6*x;
+  const double x8 = x7*x;
+  const double x9 = x8*x;
+  const double x10 = x9*x;
+  const double x11 = x10*x;
+  const double x12 = x11*x;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y3*y;
+  const double y5 = y4*y;
+  const double y6 = y5*y;
+  const double y7 = y6*y;
+  const double y8 = y7*y;
+  const double y9 = y8*y;
+  const double y10 = y9*y;
+  const double y11 = y10*y;
+  const double y12 = y11*y;
+
+  const double hxy2 = hx2+hy2;
+
+  const double s1 = ONE_OVER_SQRT_TWO_PI*hx*hy*exp(-0.5*(x-y)*(x-y)/hxy2)/(9*256*sqrt(hxy2)*ipow(hxy2,12));
+  
+  const double s2 = (hx6*hy6*y12-12*hx6*hy6*x*y11+66*hx6*hy6*x2*y10-6*hx4*hy10*y10
+                     -84*hx6*hy8*y10-84*hx8*hy6*y10-6*hx10*hy4*y10
+                     -220*hx6*hy6*x3*y9+60*hx4*hy10*x*y9
+                     +840*hx6*hy8*x*y9+840*hx8*hy6*x*y9+60*hx10*hy4*x*y9
+                     +495*hx6*hy6*x4*y8-270*hx4*hy10*x2*y8
+                     -3780*hx6*hy8*x2*y8-3780*hx8*hy6*x2*y8
+                     -270*hx10*hy4*x2*y8+24*hx2*hy14*y8+402*hx4*hy12*y8
+                     +2877*hx6*hy10*y8+4998*hx8*hy8*y8+2877*hx10*hy6*y8
+                     +402*hx12*hy4*y8+24*hx14*hy2*y8-792*hx6*hy6*x5*y7
+                     +720*hx4*hy10*x3*y7+10080*hx6*hy8*x3*y7
+                     +10080*hx8*hy6*x3*y7+720*hx10*hy4*x3*y7
+                     -192*hx2*hy14*x*y7-3216*hx4*hy12*x*y7
+                     -23016*hx6*hy10*x*y7-39984*hx8*hy8*x*y7
+                     -23016*hx10*hy6*x*y7-3216*hx12*hy4*x*y7
+                     -192*hx14*hy2*x*y7+924*hx6*hy6*x6*y6
+                     -1260*hx4*hy10*x4*y6-17640*hx6*hy8*x4*y6
+                     -17640*hx8*hy6*x4*y6-1260*hx10*hy4*x4*y6
+                     +672*hx2*hy14*x2*y6+11256*hx4*hy12*x2*y6
+                     +80556*hx6*hy10*x2*y6+139944*hx8*hy8*x2*y6
+                     +80556*hx10*hy6*x2*y6+11256*hx12*hy4*x2*y6
+                     +672*hx14*hy2*x2*y6-48*hy18*y6-1104*hx2*hy16*y6
+                     -9876*hx4*hy14*y6-49224*hx6*hy12*y6
+                     -105588*hx8*hy10*y6-105588*hx10*hy8*y6
+                     -49224*hx12*hy6*y6-9876*hx14*hy4*y6
+                     -1104*hx16*hy2*y6-48*hx18*y6-792*hx6*hy6*x7*y5
+                     +1512*hx4*hy10*x5*y5+21168*hx6*hy8*x5*y5
+                     +21168*hx8*hy6*x5*y5+1512*hx10*hy4*x5*y5
+                     -1344*hx2*hy14*x3*y5-22512*hx4*hy12*x3*y5
+                     -161112*hx6*hy10*x3*y5-279888*hx8*hy8*x3*y5
+                     -161112*hx10*hy6*x3*y5-22512*hx12*hy4*x3*y5
+                     -1344*hx14*hy2*x3*y5+288*hy18*x*y5
+                     +6624*hx2*hy16*x*y5+59256*hx4*hy14*x*y5
+                     +295344*hx6*hy12*x*y5+633528*hx8*hy10*x*y5
+                     +633528*hx10*hy8*x*y5+295344*hx12*hy6*x*y5
+                     +59256*hx14*hy4*x*y5+6624*hx16*hy2*x*y5
+                     +288*hx18*x*y5+495*hx6*hy6*x8*y4
+                     -1260*hx4*hy10*x6*y4-17640*hx6*hy8*x6*y4
+                     -17640*hx8*hy6*x6*y4-1260*hx10*hy4*x6*y4
+                     +1680*hx2*hy14*x4*y4+28140*hx4*hy12*x4*y4
+                     +201390*hx6*hy10*x4*y4+349860*hx8*hy8*x4*y4
+                     +201390*hx10*hy6*x4*y4+28140*hx12*hy4*x4*y4
+                     +1680*hx14*hy2*x4*y4-720*hy18*x2*y4
+                     -16560*hx2*hy16*x2*y4-148140*hx4*hy14*x2*y4
+                     -738360*hx6*hy12*x2*y4-1583820*hx8*hy10*x2*y4
+                     -1583820*hx10*hy8*x2*y4-738360*hx12*hy6*x2*y4
+                     -148140*hx14*hy4*x2*y4-16560*hx16*hy2*x2*y4);
+
+    const double s3 = (-720*hx18*x2*y4+1008*hy20*y4+15120*hx2*hy18*y4
+                       +102060*hx4*hy16*y4+412335*hx6*hy14*y4
+                       +947520*hx8*hy12*y4+1246266*hx10*hy10*y4
+                       +947520*hx12*hy8*y4+412335*hx14*hy6*y4
+                       +102060*hx16*hy4*y4+15120*hx18*hy2*y4+1008*hx20*y4
+                       -220*hx6*hy6*x9*y3+720*hx4*hy10*x7*y3
+                       +10080*hx6*hy8*x7*y3+10080*hx8*hy6*x7*y3
+                       +720*hx10*hy4*x7*y3-1344*hx2*hy14*x5*y3
+                       -22512*hx4*hy12*x5*y3-161112*hx6*hy10*x5*y3
+                       -279888*hx8*hy8*x5*y3-161112*hx10*hy6*x5*y3
+                       -22512*hx12*hy4*x5*y3-1344*hx14*hy2*x5*y3
+                       +960*hy18*x3*y3+22080*hx2*hy16*x3*y3
+                       +197520*hx4*hy14*x3*y3+984480*hx6*hy12*x3*y3
+                       +2111760*hx8*hy10*x3*y3+2111760*hx10*hy8*x3*y3
+                       +984480*hx12*hy6*x3*y3+197520*hx14*hy4*x3*y3
+                       +22080*hx16*hy2*x3*y3+960*hx18*x3*y3-4032*hy20*x*y3
+                       -60480*hx2*hy18*x*y3-408240*hx4*hy16*x*y3
+                       -1649340*hx6*hy14*x*y3-3790080*hx8*hy12*x*y3
+                       -4985064*hx10*hy10*x*y3-3790080*hx12*hy8*x*y3
+                       -1649340*hx14*hy6*x*y3-408240*hx16*hy4*x*y3
+                       -60480*hx18*hy2*x*y3-4032*hx20*x*y3
+                       +66*hx6*hy6*x10*y2-270*hx4*hy10*x8*y2
+                       -3780*hx6*hy8*x8*y2-3780*hx8*hy6*x8*y2
+                       -270*hx10*hy4*x8*y2+672*hx2*hy14*x6*y2
+                       +11256*hx4*hy12*x6*y2+80556*hx6*hy10*x6*y2
+                       +139944*hx8*hy8*x6*y2+80556*hx10*hy6*x6*y2
+                       +11256*hx12*hy4*x6*y2+672*hx14*hy2*x6*y2
+                       -720*hy18*x4*y2-16560*hx2*hy16*x4*y2
+                       -148140*hx4*hy14*x4*y2-738360*hx6*hy12*x4*y2
+                       -1583820*hx8*hy10*x4*y2-1583820*hx10*hy8*x4*y2
+                       -738360*hx12*hy6*x4*y2-148140*hx14*hy4*x4*y2
+                       -16560*hx16*hy2*x4*y2-720*hx18*x4*y2
+                       +6048*hy20*x2*y2+90720*hx2*hy18*x2*y2
+                       +612360*hx4*hy16*x2*y2+2474010*hx6*hy14*x2*y2
+                       +5685120*hx8*hy12*x2*y2+7477596*hx10*hy10*x2*y2
+                       +5685120*hx12*hy8*x2*y2+2474010*hx14*hy6*x2*y2
+                       +612360*hx16*hy4*x2*y2+90720*hx18*hy2*x2*y2
+                       +6048*hx20*x2*y2-5040*hy22*y2-65520*hx2*hy20*y2
+                       -391230*hx4*hy18*y2-1420020*hx6*hy16*y2
+                       -3311280*hx8*hy14*y2-5038110*hx10*hy12*y2
+                       -5038110*hx12*hy10*y2-3311280*hx14*hy8*y2
+                       -1420020*hx16*hy6*y2-391230*hx18*hy4*y2
+                       -65520*hx20*hy2*y2-5040*hx22*y2-12*hx6*hy6*x11*y
+                       +60*hx4*hy10*x9*y+840*hx6*hy8*x9*y+840*hx8*hy6*x9*y
+                       +60*hx10*hy4*x9*y-192*hx2*hy14*x7*y);
+
+  const double s4 = (-3216*hx4*hy12*x7*y-23016*hx6*hy10*x7*y
+                     -39984*hx8*hy8*x7*y-23016*hx10*hy6*x7*y
+                     -3216*hx12*hy4*x7*y-192*hx14*hy2*x7*y+288*hy18*x5*y
+                     +6624*hx2*hy16*x5*y+59256*hx4*hy14*x5*y
+                     +295344*hx6*hy12*x5*y+633528*hx8*hy10*x5*y
+                     +633528*hx10*hy8*x5*y+295344*hx12*hy6*x5*y
+                     +59256*hx14*hy4*x5*y+6624*hx16*hy2*x5*y
+                     +288*hx18*x5*y-4032*hy20*x3*y-60480*hx2*hy18*x3*y
+                     -408240*hx4*hy16*x3*y-1649340*hx6*hy14*x3*y
+                     -3790080*hx8*hy12*x3*y-4985064*hx10*hy10*x3*y
+                     -3790080*hx12*hy8*x3*y-1649340*hx14*hy6*x3*y
+                     -408240*hx16*hy4*x3*y-60480*hx18*hy2*x3*y
+                     -4032*hx20*x3*y+10080*hy22*x*y+131040*hx2*hy20*x*y
+                     +782460*hx4*hy18*x*y+2840040*hx6*hy16*x*y
+                     +6622560*hx8*hy14*x*y+10076220*hx10*hy12*x*y
+                     +10076220*hx12*hy10*x*y+6622560*hx14*hy8*x*y
+                     +2840040*hx16*hy6*x*y+782460*hx18*hy4*x*y
+                     +131040*hx20*hy2*x*y+10080*hx22*x*y+hx6*hy6*x12
+                     -6*hx4*hy10*x10-84*hx6*hy8*x10-84*hx8*hy6*x10
+                     -6*hx10*hy4*x10+24*hx2*hy14*x8+402*hx4*hy12*x8
+                     +2877*hx6*hy10*x8+4998*hx8*hy8*x8+2877*hx10*hy6*x8
+                     +402*hx12*hy4*x8+24*hx14*hy2*x8-48*hy18*x6
+                     -1104*hx2*hy16*x6-9876*hx4*hy14*x6
+                     -49224*hx6*hy12*x6-105588*hx8*hy10*x6
+                     -105588*hx10*hy8*x6-49224*hx12*hy6*x6
+                     -9876*hx14*hy4*x6-1104*hx16*hy2*x6-48*hx18*x6
+                     +1008*hy20*x4+15120*hx2*hy18*x4+102060*hx4*hy16*x4
+                     +412335*hx6*hy14*x4+947520*hx8*hy12*x4
+                     +1246266*hx10*hy10*x4+947520*hx12*hy8*x4
+                     +412335*hx14*hy6*x4+102060*hx16*hy4*x4
+                     +15120*hx18*hy2*x4+1008*hx20*x4-5040*hy22*x2
+                     -65520*hx2*hy20*x2-391230*hx4*hy18*x2
+                     -1420020*hx6*hy16*x2-3311280*hx8*hy14*x2
+                     -5038110*hx10*hy12*x2-5038110*hx12*hy10*x2
+                     -3311280*hx14*hy8*x2-1420020*hx16*hy6*x2
+                     -391230*hx18*hy4*x2-65520*hx20*hy2*x2-5040*hx22*x2
+                     +5040*hy24+63000*hx2*hy22+362250*hx4*hy20
+                     +1267875*hx6*hy18+2983050*hx8*hy16+4923765*hx10*hy14
+                     +5808600*hx12*hy12+4923765*hx14*hy10+2983050*hx16*hy8
+                     +1267875*hx18*hy6+362250*hx20*hy4+63000*hx22*hy2
+                     +5040*hx24);
+  return(s1*(s2+s3+s4));
+}
+
 double np_aconvol_epan2_total(const double x, const double y,const double hx,const double hy){
   const double a = 3.0*sqrt(5.0);
   const double hl = MAX(hx,hy);
@@ -1177,7 +1473,7 @@ void np_convol_ckernelv(const int KERNEL,
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
   double (* const k[])(double,double,double,double) = { 
-    np_aconvol_gauss2, NULL, NULL, NULL,
+    np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
     np_aconvol_epan2, NULL, NULL, NULL 
   };
 
