@@ -1259,6 +1259,96 @@ double np_aconvol_epan2(const double x, const double y,const double hx,const dou
     return (np_aconvol_epan2_total(x,y,hx,hy));
   }
 }
+
+double np_aconvol_epan4_total(const double x, const double y,const double hx,const double hy){
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+
+  const double hl2 = hl*hl;
+  const double hl4 = hl2*hl2;
+
+  const double hs2 = hs*hs;
+  const double hs4 = hs2*hs2;
+
+  return(hs*(21*y4-84*x*y3+126*x2*y2-150*hl2*y2-84*x3*y+300*hl2*x*y+21*x4
+             -150*hl2*x2+225*hl4-25*hs4)/(32*5*sqrt(5)*hl4));
+}
+
+double np_aconvol_epan4_indefinite(const double l,const double x, const double y,const double hx,const double hy){
+  const double l2 = l*l;
+  const double l3 = l2*l;
+  const double l4 = l3*l;
+  const double l5 = l4*l;
+  const double l6 = l5*l;
+  const double l7 = l6*l;
+  const double l8 = l7*l;
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x3*x;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y3*y;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+
+  return(l*(4410*x4*y4-8820*l*x3*y4+8820*l2*x2*y4-31500*hx2*x2*y4
+            -4410*l3*x*y4+31500*hx2*l*x*y4+882*l4*y4
+            -10500*hx2*l2*y4+47250*hx4*y4-8820*l*x4*y3
+            +23520*l2*x3*y3-26460*l3*x2*y3+63000*hx2*l*x2*y3
+            +14112*l4*x*y3-84000*hx2*l2*x*y3-2940*l5*y3
+            +31500*hx2*l3*y3-94500*hx4*l*y3+8820*l2*x4*y2
+            -31500*hy2*x4*y2-26460*l3*x3*y2+63000*hy2*l*x3*y2
+            +31752*l4*x2*y2-63000*hy2*l2*x2*y2
+            -63000*hx2*l2*x2*y2+225000*hx2*hy2*x2*y2
+            -17640*l5*x*y2+31500*hy2*l3*x*y2+94500*hx2*l3*x*y2
+            -225000*hx2*hy2*l*x*y2+3780*l6*y2-6300*hy2*l4*y2
+            -37800*hx2*l4*y2+75000*hx2*hy2*l2*y2+94500*hx4*l2*y2
+            -337500*hx4*hy2*y2-4410*l3*x4*y+31500*hy2*l*x4*y
+            +14112*l4*x3*y-84000*hy2*l2*x3*y-17640*l5*x2*y
+            +94500*hy2*l3*x2*y+31500*hx2*l3*x2*y
+            -225000*hx2*hy2*l*x2*y+10080*l6*x*y-50400*hy2*l4*x*y
+            -50400*hx2*l4*x*y+300000*hx2*hy2*l2*x*y-2205*l7*y
+            +10500*hy2*l5*y+21000*hx2*l5*y-112500*hx2*hy2*l3*y
+            -47250*hx4*l3*y+337500*hx4*hy2*l*y+882*l4*x4
+            -10500*hy2*l2*x4+47250*hy4*x4-2940*l5*x3
+            +31500*hy2*l3*x3-94500*hy4*l*x3+3780*l6*x2
+            -37800*hy2*l4*x2-6300*hx2*l4*x2+94500*hy4*l2*x2
+            +75000*hx2*hy2*l2*x2-337500*hx2*hy4*x2-2205*l7*x
+            +21000*hy2*l5*x+10500*hx2*l5*x-47250*hy4*l3*x
+            -112500*hx2*hy2*l3*x+337500*hx2*hy4*l*x+490*l8
+            -4500*hy2*l6-4500*hx2*l6+9450*hy4*l4+45000*hx2*hy2*l4
+            +9450*hx4*l4-112500*hx2*hy4*l2-112500*hx4*hy2*l2
+            +506250*hx4*hy4)
+         /(1280000*hx4*hy4));
+}
+
+double np_aconvol_epan4(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_epan4_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_epan4_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan4_total(x,y,hx,hy));
+  }
+}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -1474,7 +1564,7 @@ void np_convol_ckernelv(const int KERNEL,
 
   double (* const k[])(double,double,double,double) = { 
     np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
-    np_aconvol_epan2, NULL, NULL, NULL 
+    np_aconvol_epan2, np_aconvol_epan4, NULL, NULL 
   };
 
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
