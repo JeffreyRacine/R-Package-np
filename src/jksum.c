@@ -1558,6 +1558,578 @@ double np_aconvol_epan6(const double x, const double y,const double hx,const dou
     return (np_aconvol_epan6_total(x,y,hx,hy));
   }
 }
+
+double np_aconvol_epan8_total(const double x, const double y,const double hx,const double hy){
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+  const double x7 = x4*x3;
+  const double x8 = x4*x4;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+  const double y7 = y4*y3;
+  const double y8 = y4*y4;
+
+  const double hl2 = hl*hl;
+  const double hl4 = hl2*hl2;
+  const double hl6 = hl4*hl2;
+  const double hl8 = hl4*hl4;
+
+  const double hs2 = hs*hs;
+  const double hs4 = hs2*hs2;
+  const double hs6 = hs4*hs2;
+  const double hs8 = hs4*hs4;
+
+  return(63*hs
+         *(2431*y8-19448*x*y7+68068*x2*y6-29172*hl2*y6-136136*x3*y5
+           +175032*hl2*x*y5+170170*x4*y4-437580*hl2*x2*y4
+           +117810*hl4*y4-136136*x5*y3+583440*hl2*x3*y3
+           -471240*hl4*x*y3+68068*x6*y2-437580*hl2*x4*y2
+           +706860*hl4*x2*y2-178500*hl6*y2-19448*x7*y+175032*hl2*x5*y
+           -471240*hl4*x3*y+357000*hl6*x*y+2431*x8-29172*hl2*x6
+           +117810*hl4*x4-178500*hl6*x2+74375*hl8-4375*hs8)
+         /(69632*sqrt(5)*25*hl8));
+}
+
+double np_aconvol_epan8_xlessy(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5);
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+  const double y7 = y4*y3;
+  const double y8 = y4*y4;
+  const double y9 = y5*y4;
+  const double y10 = y6*y4;
+  const double y11 = y7*y4;
+  const double y12 = y8*y4;
+  const double y13 = y9*y4;
+  const double y14 = y10*y4;
+  const double y15 = y11*y4;
+  const double y16 = y12*y4;
+  const double y17 = y13*y4;
+ 
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+  const double x7 = x4*x3;
+  const double x8 = x4*x4;
+  const double x9 = x5*x4;
+  const double x10 = x6*x4;
+  const double x11 = x7*x4;
+  const double x12 = x8*x4;
+  const double x13 = x9*x4;
+  const double x14 = x10*x4;
+  const double x15 = x11*x4;
+  const double x16 = x12*x4;
+  const double x17 = x13*x4;
+
+  const double hx2 = hx*hx;
+  const double hx3 = hx2*hx;
+  const double hx4 = hx2*hx2;
+  const double hx5 = hx3*hx2;
+  const double hx6 = hx3*hx3;
+  const double hx7 = hx4*hx3;
+  const double hx8 = hx4*hx4;
+  const double hx9 = hx5*hx4;
+  const double hx10 = hx6*hx4;
+  const double hx11 = hx7*hx4;
+  const double hx12 = hx8*hx4;
+  const double hx13 = hx9*hx4;
+  const double hx14 = hx10*hx4;
+  const double hx15 = hx11*hx4;
+  const double hx16 = hx12*hx4;
+  const double hx17 = hx13*hx4;
+
+  const double hy2 = hy*hy;
+  const double hy3 = hy2*hy;
+  const double hy4 = hy2*hy2;
+  const double hy5 = hy3*hy2;
+  const double hy6 = hy3*hy3;
+  const double hy7 = hy4*hy3;
+  const double hy8 = hy4*hy4;
+  const double hy9 = hy5*hy4;
+  const double hy10 = hy6*hy4;
+  const double hy11 = hy7*hy4;
+  const double hy12 = hy8*hy4;
+  const double hy13 = hy9*hy4;
+  const double hy14 = hy10*hy4;
+  const double hy15 = hy11*hy4;
+  const double hy16 = hy12*hy4;
+  const double hy17 = hy13*hy4;
+
+
+  return(-63*(1001*y17-17017*x*y16+136136*x2*y15-58344*hy2*y15-58344*hx2*y15
+              -680680*x3*y14+875160*hy2*x*y14+875160*hx2*x*y14
+              +2382380*x4*y13-6126120*hy2*x2*y13-6126120*hx2*x2*y13
+              +1649340*hy4*y13+2625480*hx2*hy2*y13+1649340*hx4*y13
+              -6194188*x5*y12+26546520*hy2*x3*y12+26546520*hx2*x3*y12
+              -21441420*hy4*x*y12-34131240*hx2*hy2*x*y12
+              -21441420*hx4*x*y12+12388376*x6*y11-79639560*hy2*x4*y11
+              -79639560*hx2*x4*y11+128648520*hy4*x2*y11
+              +204787440*hx2*hy2*x2*y11+128648520*hx4*x2*y11
+              -32487000*hy6*y11-55135080*hx2*hy4*y11
+              -55135080*hx4*hy2*y11-32487000*hx6*y11-19467448*x7*y10
+              +175207032*hy2*x5*y10+175207032*hx2*x5*y10
+              -471711240*hy4*x3*y10-750887280*hx2*hy2*x3*y10
+              -471711240*hx4*x3*y10+357357000*hy6*x*y10
+              +606485880*hx2*hy4*x*y10+606485880*hx4*hy2*x*y10
+              +357357000*hx6*x*y10+24334310*x8*y9-292011720*hy2*x6*y9
+              -292011720*hx2*x6*y9+1179278100*hy4*x4*y9
+              +1877218200*hx2*hy2*x4*y9+1179278100*hx4*x4*y9
+              -1786785000*hy6*x2*y9-3032429400*hx2*hy4*x2*y9
+              -3032429400*hx4*hy2*x2*y9-1786785000*hx6*x2*y9
+              +744493750*hy8*y9+765765000*hx2*hy6*y9
+              +816423300*hx4*hy4*y9+765765000*hx6*hy2*y9
+              +744493750*hx8*y9-24334310*x9*y8+375443640*hy2*x7*y8
+              +375443640*hx2*x7*y8-2122700580*hy4*x5*y8
+              -3378992760*hx2*hy2*x5*y8-2122700580*hx4*x5*y8
+              +5360355000*hy6*x3*y8+9097288200*hx2*hy4*x3*y8
+              +9097288200*hx4*hy2*x3*y8+5360355000*hx6*x3*y8
+              -6700443750*hy8*x*y8-6891885000*hx2*hy6*x*y8
+              -7347809700*hx4*hy4*x*y8-6891885000*hx6*hy2*x*y8
+              -6700443750*hx8*x*y8-9957376*a*125*hy9*y8
+              -9957376*a*125*hx9*y8+19467448*x10*y7
+              -375443640*hy2*x8*y7-375443640*hx2*x8*y7
+              +2830267440*hy4*x6*y7+4505323680*hx2*hy2*x6*y7
+              +2830267440*hx4*x6*y7-10720710000*hy6*x4*y7
+              -18194576400*hx2*hy4*x4*y7-18194576400*hx4*hy2*x4*y7
+              -10720710000*hx6*x4*y7+26801775000*hy8*x2*y7
+              +27567540000*hx2*hy6*x2*y7+29391238800*hx4*hy4*x2*y7
+              +27567540000*hx6*hy2*x2*y7+26801775000*hx8*x2*y7
+              +79659008*a*125*hy9*x*y7+79659008*a*125*hx9*x*y7
+              +3828825000*hy10*y7-11486475000*hx2*hy8*y7
+              -7422030000*hx4*hy6*y7-7422030000*hx6*hy4*y7
+              -11486475000*hx8*hy2*y7+3828825000*hx10*y7
+              -12388376*x11*y6+292011720*hy2*x9*y6+292011720*hx2*x9*y6
+              -2830267440*hy4*x7*y6-4505323680*hx2*hy2*x7*y6
+              -2830267440*hx4*x7*y6+15008994000*hy6*x5*y6
+              +25472406960*hx2*hy4*x5*y6+25472406960*hx4*hy2*x5*y6
+              +15008994000*hx6*x5*y6-62537475000*hy8*x3*y6
+              -64324260000*hx2*hy6*x3*y6-68579557200*hx4*hy4*x3*y6
+              -64324260000*hx6*hy2*x3*y6-62537475000*hx8*x3*y6
+              -278806528*a*125*hy9*x2*y6-278806528*a*125*hx9*x2*y6
+              -26801775000*hy10*x*y6+80405325000*hx2*hy8*x*y6
+              +51954210000*hx4*hy6*x*y6+51954210000*hx6*hy4*x*y6
+              +80405325000*hx8*hy2*x*y6-26801775000*hx10*x*y6
+              +119488512*a*125*hx2*hy9*y6+119488512*a*125*hx9*hy2*y6
+              +6194188*x12*y5-175207032*hy2*x10*y5
+              -175207032*hx2*x10*y5+2122700580*hy4*x8*y5
+              +3378992760*hx2*hy2*x8*y5+2122700580*hx4*x8*y5
+              -15008994000*hy6*x6*y5-25472406960*hx2*hy4*x6*y5
+              -25472406960*hx4*hy2*x6*y5-15008994000*hx6*x6*y5
+              +93806212500*hy8*x4*y5+96486390000*hx2*hy6*x4*y5
+              +102869335800*hx4*hy4*x4*y5+96486390000*hx6*hy2*x4*y5
+              +93806212500*hx8*x4*y5+557613056*a*125*hy9*x3*y5
+              +557613056*a*125*hx9*x3*y5+80405325000*hy10*x2*y5
+              -241215975000*hx2*hy8*x2*y5-155862630000*hx4*hy6*x2*y5
+              -155862630000*hx6*hy4*x2*y5-241215975000*hx8*hy2*x2*y5
+              +80405325000*hx10*x2*y5-716931072*a*125*hx2*hy9*x*y5
+              -716931072*a*125*hx9*hy2*x*y5-4466962500*hy12*y5
+              -34459425000*hx2*hy10*y5+64942762500*hx4*hy8*y5
+              +39359250000*hx6*hy6*y5+64942762500*hx8*hy4*y5
+              -34459425000*hx10*hy2*y5-4466962500*hx12*y5
+              -2382380*x13*y4+79639560*hy2*x11*y4+79639560*hx2*x11*y4
+              -1179278100*hy4*x9*y4-1877218200*hx2*hy2*x9*y4
+              -1179278100*hx4*x9*y4+10720710000*hy6*x7*y4
+              +18194576400*hx2*hy4*x7*y4+18194576400*hx4*hy2*x7*y4
+              +10720710000*hx6*x7*y4-93806212500*hy8*x5*y4
+              -96486390000*hx2*hy6*x5*y4-102869335800*hx4*hy4*x5*y4
+              -96486390000*hx6*hy2*x5*y4-93806212500*hx8*x5*y4
+              -139403264*a*625*hy9*x4*y4-139403264*a*625*hx9*x4*y4
+              -134008875000*hy10*x3*y4+402026625000*hx2*hy8*x3*y4
+              +259771050000*hx4*hy6*x3*y4+259771050000*hx6*hy4*x3*y4
+              +402026625000*hx8*hy2*x3*y4-134008875000*hx10*x3*y4
+              +358465536*a*625*hx2*hy9*x2*y4
+              +358465536*a*625*hx9*hy2*x2*y4+22334812500*hy12*x*y4
+              +172297125000*hx2*hy10*x*y4-324713812500*hx4*hy8*x*y4
+              -196796250000*hx6*hy6*x*y4-324713812500*hx8*hy4*x*y4
+              +172297125000*hx10*hy2*x*y4+22334812500*hx12*x*y4
+              -96509952*a*625*hx4*hy9*y4-96509952*a*625*hx9*hy4*y4
+              +680680*x14*y3-26546520*hy2*x12*y3-26546520*hx2*x12*y3
+              +471711240*hy4*x10*y3+750887280*hx2*hy2*x10*y3
+              +471711240*hx4*x10*y3-5360355000*hy6*x8*y3
+              -9097288200*hx2*hy4*x8*y3-9097288200*hx4*hy2*x8*y3
+              -5360355000*hx6*x8*y3+62537475000*hy8*x6*y3
+              +64324260000*hx2*hy6*x6*y3+68579557200*hx4*hy4*x6*y3
+              +64324260000*hx6*hy2*x6*y3+62537475000*hx8*x6*y3
+              +557613056*a*125*hy9*x5*y3+557613056*a*125*hx9*x5*y3
+              +134008875000*hy10*x4*y3-402026625000*hx2*hy8*x4*y3
+              -259771050000*hx4*hy6*x4*y3-259771050000*hx6*hy4*x4*y3
+              -402026625000*hx8*hy2*x4*y3+134008875000*hx10*x4*y3
+              -477954048*a*625*hx2*hy9*x3*y3
+              -477954048*a*625*hx9*hy2*x3*y3-44669625000*hy12*x2*y3
+              -344594250000*hx2*hy10*x2*y3+649427625000*hx4*hy8*x2*y3
+              +393592500000*hx6*hy6*x2*y3+649427625000*hx8*hy4*x2*y3
+              -344594250000*hx10*hy2*x2*y3-44669625000*hx12*x2*y3
+              +386039808*a*625*hx4*hy9*x*y3
+              +386039808*a*625*hx9*hy4*x*y3+6381375000*hy14*y3
+              +19144125000*hx2*hy12*y3+92775375000*hx4*hy10*y3
+              -163996875000*hx6*hy8*y3-163996875000*hx8*hy6*y3
+              +92775375000*hx10*hy4*y3+19144125000*hx12*hy2*y3
+              +6381375000*hx14*y3-136136*x15*y2+6126120*hy2*x13*y2
+              +6126120*hx2*x13*y2-128648520*hy4*x11*y2
+              -204787440*hx2*hy2*x11*y2-128648520*hx4*x11*y2
+              +1786785000*hy6*x9*y2+3032429400*hx2*hy4*x9*y2
+              +3032429400*hx4*hy2*x9*y2+1786785000*hx6*x9*y2
+              -26801775000*hy8*x7*y2-27567540000*hx2*hy6*x7*y2
+              -29391238800*hx4*hy4*x7*y2-27567540000*hx6*hy2*x7*y2
+              -26801775000*hx8*x7*y2-278806528*a*125*hy9*x6*y2
+              -278806528*a*125*hx9*x6*y2-80405325000*hy10*x5*y2
+              +241215975000*hx2*hy8*x5*y2+155862630000*hx4*hy6*x5*y2
+              +155862630000*hx6*hy4*x5*y2+241215975000*hx8*hy2*x5*y2
+              -80405325000*hx10*x5*y2+358465536*a*625*hx2*hy9*x4*y2
+              +358465536*a*625*hx9*hy2*x4*y2+44669625000*hy12*x3*y2
+              +344594250000*hx2*hy10*x3*y2-649427625000*hx4*hy8*x3*y2
+              -393592500000*hx6*hy6*x3*y2-649427625000*hx8*hy4*x3*y2
+              +344594250000*hx10*hy2*x3*y2+44669625000*hx12*x3*y2
+              -579059712*a*625*hx4*hy9*x2*y2
+              -579059712*a*625*hx9*hy4*x2*y2-19144125000*hy14*x*y2
+              -57432375000*hx2*hy12*x*y2-278326125000*hx4*hy10*x*y2
+              +491990625000*hx6*hy8*x*y2+491990625000*hx8*hy6*x*y2
+              -278326125000*hx10*hy4*x*y2-57432375000*hx12*hy2*x*y2
+              -19144125000*hx14*x*y2+5849088*a*125*125*hx6*hy9*y2
+              +5849088*a*125*125*hx9*hy6*y2+17017*x16*y-875160*hy2*x14*y
+              -875160*hx2*x14*y+21441420*hy4*x12*y
+              +34131240*hx2*hy2*x12*y+21441420*hx4*x12*y
+              -357357000*hy6*x10*y-606485880*hx2*hy4*x10*y
+              -606485880*hx4*hy2*x10*y-357357000*hx6*x10*y
+              +6700443750*hy8*x8*y+6891885000*hx2*hy6*x8*y
+              +7347809700*hx4*hy4*x8*y+6891885000*hx6*hy2*x8*y
+              +6700443750*hx8*x8*y+79659008*a*125*hy9*x7*y
+              +79659008*a*125*hx9*x7*y+26801775000*hy10*x6*y
+              -80405325000*hx2*hy8*x6*y-51954210000*hx4*hy6*x6*y
+              -51954210000*hx6*hy4*x6*y-80405325000*hx8*hy2*x6*y
+              +26801775000*hx10*x6*y-716931072*a*125*hx2*hy9*x5*y
+              -716931072*a*125*hx9*hy2*x5*y-22334812500*hy12*x4*y
+              -172297125000*hx2*hy10*x4*y+324713812500*hx4*hy8*x4*y
+              +196796250000*hx6*hy6*x4*y+324713812500*hx8*hy4*x4*y
+              -172297125000*hx10*hy2*x4*y-22334812500*hx12*x4*y
+              +386039808*a*625*hx4*hy9*x3*y
+              +386039808*a*625*hx9*hy4*x3*y+19144125000*hy14*x2*y
+              +57432375000*hx2*hy12*x2*y+278326125000*hx4*hy10*x2*y
+              -491990625000*hx6*hy8*x2*y-491990625000*hx8*hy6*x2*y
+              +278326125000*hx10*hy4*x2*y+57432375000*hx12*hy2*x2*y
+              +19144125000*hx14*x2*y-11698176*a*125*125*hx6*hy9*x*y
+              -11698176*a*125*125*hx9*hy6*x*y-8546484375*hy16*y
+              -8204625000*hx2*hy14*y-15462562500*hx4*hy12*y
+              -70284375000*hx6*hy10*y+204996093750*hx8*hy8*y
+              -70284375000*hx10*hy6*y-15462562500*hx12*hy4*y
+              -8204625000*hx14*hy2*y-8546484375*hx16*y-1001*x17
+              +58344*hy2*x15+58344*hx2*x15-1649340*hy4*x13
+              -2625480*hx2*hy2*x13-1649340*hx4*x13+32487000*hy6*x11
+              +55135080*hx2*hy4*x11+55135080*hx4*hy2*x11
+              +32487000*hx6*x11-744493750*hy8*x9-765765000*hx2*hy6*x9
+              -816423300*hx4*hy4*x9-765765000*hx6*hy2*x9
+              -744493750*hx8*x9-9957376*a*125*hy9*x8
+              -9957376*a*125*hx9*x8-3828825000*hy10*x7
+              +11486475000*hx2*hy8*x7+7422030000*hx4*hy6*x7
+              +7422030000*hx6*hy4*x7+11486475000*hx8*hy2*x7
+              -3828825000*hx10*x7+119488512*a*125*hx2*hy9*x6
+              +119488512*a*125*hx9*hy2*x6+4466962500*hy12*x5
+              +34459425000*hx2*hy10*x5-64942762500*hx4*hy8*x5
+              -39359250000*hx6*hy6*x5-64942762500*hx8*hy4*x5
+              +34459425000*hx10*hy2*x5+4466962500*hx12*x5
+              -96509952*a*625*hx4*hy9*x4-96509952*a*625*hx9*hy4*x4
+              -6381375000*hy14*x3-19144125000*hx2*hy12*x3
+              -92775375000*hx4*hy10*x3+163996875000*hx6*hy8*x3
+              +163996875000*hx8*hy6*x3-92775375000*hx10*hy4*x3
+              -19144125000*hx12*hy2*x3-6381375000*hx14*x3
+              +5849088*a*125*125*hx6*hy9*x2+5849088*a*125*125*hx9*hy6*x2
+              +8546484375*hy16*x+8204625000*hx2*hy14*x
+              +15462562500*hx4*hy12*x+70284375000*hx6*hy10*x
+              -204996093750*hx8*hy8*x+70284375000*hx10*hy6*x
+              +15462562500*hx12*hy4*x+8204625000*hx14*hy2*x
+              +8546484375*hx16*x+28672*a*125*625*hy17
+              -487424*a*125*625*hx8*hy9-487424*a*125*625*hx9*hy8
+              +28672*a*125*625*hx17)
+         /(8912896000000*hx8*hy8));
+}
+
+double np_aconvol_epan8_ylessx(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5);
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+  const double y7 = y4*y3;
+  const double y8 = y4*y4;
+  const double y9 = y5*y4;
+  const double y10 = y6*y4;
+  const double y11 = y7*y4;
+  const double y12 = y8*y4;
+  const double y13 = y9*y4;
+  const double y14 = y10*y4;
+  const double y15 = y11*y4;
+  const double y16 = y12*y4;
+  const double y17 = y13*y4;
+ 
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+  const double x7 = x4*x3;
+  const double x8 = x4*x4;
+  const double x9 = x5*x4;
+  const double x10 = x6*x4;
+  const double x11 = x7*x4;
+  const double x12 = x8*x4;
+  const double x13 = x9*x4;
+  const double x14 = x10*x4;
+  const double x15 = x11*x4;
+  const double x16 = x12*x4;
+  const double x17 = x13*x4;
+
+  const double hx2 = hx*hx;
+  const double hx3 = hx2*hx;
+  const double hx4 = hx2*hx2;
+  const double hx5 = hx3*hx2;
+  const double hx6 = hx3*hx3;
+  const double hx7 = hx4*hx3;
+  const double hx8 = hx4*hx4;
+  const double hx9 = hx5*hx4;
+  const double hx10 = hx6*hx4;
+  const double hx11 = hx7*hx4;
+  const double hx12 = hx8*hx4;
+  const double hx13 = hx9*hx4;
+  const double hx14 = hx10*hx4;
+  const double hx15 = hx11*hx4;
+  const double hx16 = hx12*hx4;
+  const double hx17 = hx13*hx4;
+
+  const double hy2 = hy*hy;
+  const double hy3 = hy2*hy;
+  const double hy4 = hy2*hy2;
+  const double hy5 = hy3*hy2;
+  const double hy6 = hy3*hy3;
+  const double hy7 = hy4*hy3;
+  const double hy8 = hy4*hy4;
+  const double hy9 = hy5*hy4;
+  const double hy10 = hy6*hy4;
+  const double hy11 = hy7*hy4;
+  const double hy12 = hy8*hy4;
+  const double hy13 = hy9*hy4;
+  const double hy14 = hy10*hy4;
+  const double hy15 = hy11*hy4;
+  const double hy16 = hy12*hy4;
+  const double hy17 = hy13*hy4;
+
+  return(63*(1001*y17-17017*x*y16+136136*x2*y15-58344*hy2*y15-58344*hx2*y15
+             -680680*x3*y14+875160*hy2*x*y14+875160*hx2*x*y14
+             +2382380*x4*y13-6126120*hy2*x2*y13-6126120*hx2*x2*y13
+             +1649340*hy4*y13+2625480*hx2*hy2*y13+1649340*hx4*y13
+             -6194188*x5*y12+26546520*hy2*x3*y12+26546520*hx2*x3*y12
+             -21441420*hy4*x*y12-34131240*hx2*hy2*x*y12
+             -21441420*hx4*x*y12+12388376*x6*y11-79639560*hy2*x4*y11
+             -79639560*hx2*x4*y11+128648520*hy4*x2*y11
+             +204787440*hx2*hy2*x2*y11+128648520*hx4*x2*y11
+             -32487000*hy6*y11-55135080*hx2*hy4*y11
+             -55135080*hx4*hy2*y11-32487000*hx6*y11-19467448*x7*y10
+             +175207032*hy2*x5*y10+175207032*hx2*x5*y10
+             -471711240*hy4*x3*y10-750887280*hx2*hy2*x3*y10
+             -471711240*hx4*x3*y10+357357000*hy6*x*y10
+             +606485880*hx2*hy4*x*y10+606485880*hx4*hy2*x*y10
+             +357357000*hx6*x*y10+24334310*x8*y9-292011720*hy2*x6*y9
+             -292011720*hx2*x6*y9+1179278100*hy4*x4*y9
+             +1877218200*hx2*hy2*x4*y9+1179278100*hx4*x4*y9
+             -1786785000*hy6*x2*y9-3032429400*hx2*hy4*x2*y9
+             -3032429400*hx4*hy2*x2*y9-1786785000*hx6*x2*y9
+             +744493750*hy8*y9+765765000*hx2*hy6*y9
+             +816423300*hx4*hy4*y9+765765000*hx6*hy2*y9
+             +744493750*hx8*y9-24334310*x9*y8+375443640*hy2*x7*y8
+             +375443640*hx2*x7*y8-2122700580*hy4*x5*y8
+             -3378992760*hx2*hy2*x5*y8-2122700580*hx4*x5*y8
+             +5360355000*hy6*x3*y8+9097288200*hx2*hy4*x3*y8
+             +9097288200*hx4*hy2*x3*y8+5360355000*hx6*x3*y8
+             -6700443750*hy8*x*y8-6891885000*hx2*hy6*x*y8
+             -7347809700*hx4*hy4*x*y8-6891885000*hx6*hy2*x*y8
+             -6700443750*hx8*x*y8+9957376*a*125*hy9*y8
+             +9957376*a*125*hx9*y8+19467448*x10*y7
+             -375443640*hy2*x8*y7-375443640*hx2*x8*y7
+             +2830267440*hy4*x6*y7+4505323680*hx2*hy2*x6*y7
+             +2830267440*hx4*x6*y7-10720710000*hy6*x4*y7
+             -18194576400*hx2*hy4*x4*y7-18194576400*hx4*hy2*x4*y7
+             -10720710000*hx6*x4*y7+26801775000*hy8*x2*y7
+             +27567540000*hx2*hy6*x2*y7+29391238800*hx4*hy4*x2*y7
+             +27567540000*hx6*hy2*x2*y7+26801775000*hx8*x2*y7
+             -79659008*a*125*hy9*x*y7-79659008*a*125*hx9*x*y7
+             +3828825000*hy10*y7-11486475000*hx2*hy8*y7
+             -7422030000*hx4*hy6*y7-7422030000*hx6*hy4*y7
+             -11486475000*hx8*hy2*y7+3828825000*hx10*y7-12388376*x11*y6
+             +292011720*hy2*x9*y6+292011720*hx2*x9*y6
+             -2830267440*hy4*x7*y6-4505323680*hx2*hy2*x7*y6
+             -2830267440*hx4*x7*y6+15008994000*hy6*x5*y6
+             +25472406960*hx2*hy4*x5*y6+25472406960*hx4*hy2*x5*y6
+             +15008994000*hx6*x5*y6-62537475000*hy8*x3*y6
+             -64324260000*hx2*hy6*x3*y6-68579557200*hx4*hy4*x3*y6
+             -64324260000*hx6*hy2*x3*y6-62537475000*hx8*x3*y6
+             +278806528*a*125*hy9*x2*y6+278806528*a*125*hx9*x2*y6
+             -26801775000*hy10*x*y6+80405325000*hx2*hy8*x*y6
+             +51954210000*hx4*hy6*x*y6+51954210000*hx6*hy4*x*y6
+             +80405325000*hx8*hy2*x*y6-26801775000*hx10*x*y6
+             -119488512*a*125*hx2*hy9*y6-119488512*a*125*hx9*hy2*y6
+             +6194188*x12*y5-175207032*hy2*x10*y5-175207032*hx2*x10*y5
+             +2122700580*hy4*x8*y5+3378992760*hx2*hy2*x8*y5
+             +2122700580*hx4*x8*y5-15008994000*hy6*x6*y5
+             -25472406960*hx2*hy4*x6*y5-25472406960*hx4*hy2*x6*y5
+             -15008994000*hx6*x6*y5+93806212500*hy8*x4*y5
+             +96486390000*hx2*hy6*x4*y5+102869335800*hx4*hy4*x4*y5
+             +96486390000*hx6*hy2*x4*y5+93806212500*hx8*x4*y5
+             -557613056*a*125*hy9*x3*y5-557613056*a*125*hx9*x3*y5
+             +80405325000*hy10*x2*y5-241215975000*hx2*hy8*x2*y5
+             -155862630000*hx4*hy6*x2*y5-155862630000*hx6*hy4*x2*y5
+             -241215975000*hx8*hy2*x2*y5+80405325000*hx10*x2*y5
+             +716931072*a*125*hx2*hy9*x*y5
+             +716931072*a*125*hx9*hy2*x*y5-4466962500*hy12*y5
+             -34459425000*hx2*hy10*y5+64942762500*hx4*hy8*y5
+             +39359250000*hx6*hy6*y5+64942762500*hx8*hy4*y5
+             -34459425000*hx10*hy2*y5-4466962500*hx12*y5-2382380*x13*y4
+             +79639560*hy2*x11*y4+79639560*hx2*x11*y4
+             -1179278100*hy4*x9*y4-1877218200*hx2*hy2*x9*y4
+             -1179278100*hx4*x9*y4+10720710000*hy6*x7*y4
+             +18194576400*hx2*hy4*x7*y4+18194576400*hx4*hy2*x7*y4
+             +10720710000*hx6*x7*y4-93806212500*hy8*x5*y4
+             -96486390000*hx2*hy6*x5*y4-102869335800*hx4*hy4*x5*y4
+             -96486390000*hx6*hy2*x5*y4-93806212500*hx8*x5*y4
+             +139403264*a*625*hy9*x4*y4+139403264*a*625*hx9*x4*y4
+             -134008875000*hy10*x3*y4+402026625000*hx2*hy8*x3*y4
+             +259771050000*hx4*hy6*x3*y4+259771050000*hx6*hy4*x3*y4
+             +402026625000*hx8*hy2*x3*y4-134008875000*hx10*x3*y4
+             -358465536*a*625*hx2*hy9*x2*y4
+             -358465536*a*625*hx9*hy2*x2*y4+22334812500*hy12*x*y4
+             +172297125000*hx2*hy10*x*y4-324713812500*hx4*hy8*x*y4
+             -196796250000*hx6*hy6*x*y4-324713812500*hx8*hy4*x*y4
+             +172297125000*hx10*hy2*x*y4+22334812500*hx12*x*y4
+             +96509952*a*625*hx4*hy9*y4+96509952*a*625*hx9*hy4*y4
+             +680680*x14*y3-26546520*hy2*x12*y3-26546520*hx2*x12*y3
+             +471711240*hy4*x10*y3+750887280*hx2*hy2*x10*y3
+             +471711240*hx4*x10*y3-5360355000*hy6*x8*y3
+             -9097288200*hx2*hy4*x8*y3-9097288200*hx4*hy2*x8*y3
+             -5360355000*hx6*x8*y3+62537475000*hy8*x6*y3
+             +64324260000*hx2*hy6*x6*y3+68579557200*hx4*hy4*x6*y3
+             +64324260000*hx6*hy2*x6*y3+62537475000*hx8*x6*y3
+             -557613056*a*125*hy9*x5*y3-557613056*a*125*hx9*x5*y3
+             +134008875000*hy10*x4*y3-402026625000*hx2*hy8*x4*y3
+             -259771050000*hx4*hy6*x4*y3-259771050000*hx6*hy4*x4*y3
+             -402026625000*hx8*hy2*x4*y3+134008875000*hx10*x4*y3
+             +477954048*a*625*hx2*hy9*x3*y3
+             +477954048*a*625*hx9*hy2*x3*y3-44669625000*hy12*x2*y3
+             -344594250000*hx2*hy10*x2*y3+649427625000*hx4*hy8*x2*y3
+             +393592500000*hx6*hy6*x2*y3+649427625000*hx8*hy4*x2*y3
+             -344594250000*hx10*hy2*x2*y3-44669625000*hx12*x2*y3
+             -386039808*a*625*hx4*hy9*x*y3
+             -386039808*a*625*hx9*hy4*x*y3+6381375000*hy14*y3
+             +19144125000*hx2*hy12*y3+92775375000*hx4*hy10*y3
+             -163996875000*hx6*hy8*y3-163996875000*hx8*hy6*y3
+             +92775375000*hx10*hy4*y3+19144125000*hx12*hy2*y3
+             +6381375000*hx14*y3-136136*x15*y2+6126120*hy2*x13*y2
+             +6126120*hx2*x13*y2-128648520*hy4*x11*y2
+             -204787440*hx2*hy2*x11*y2-128648520*hx4*x11*y2
+             +1786785000*hy6*x9*y2+3032429400*hx2*hy4*x9*y2
+             +3032429400*hx4*hy2*x9*y2+1786785000*hx6*x9*y2
+             -26801775000*hy8*x7*y2-27567540000*hx2*hy6*x7*y2
+             -29391238800*hx4*hy4*x7*y2-27567540000*hx6*hy2*x7*y2
+             -26801775000*hx8*x7*y2+278806528*a*125*hy9*x6*y2
+             +278806528*a*125*hx9*x6*y2-80405325000*hy10*x5*y2
+             +241215975000*hx2*hy8*x5*y2+155862630000*hx4*hy6*x5*y2
+             +155862630000*hx6*hy4*x5*y2+241215975000*hx8*hy2*x5*y2
+             -80405325000*hx10*x5*y2-358465536*a*625*hx2*hy9*x4*y2
+             -358465536*a*625*hx9*hy2*x4*y2+44669625000*hy12*x3*y2
+             +344594250000*hx2*hy10*x3*y2-649427625000*hx4*hy8*x3*y2
+             -393592500000*hx6*hy6*x3*y2-649427625000*hx8*hy4*x3*y2
+             +344594250000*hx10*hy2*x3*y2+44669625000*hx12*x3*y2
+             +579059712*a*625*hx4*hy9*x2*y2
+             +579059712*a*625*hx9*hy4*x2*y2-19144125000*hy14*x*y2
+             -57432375000*hx2*hy12*x*y2-278326125000*hx4*hy10*x*y2
+             +491990625000*hx6*hy8*x*y2+491990625000*hx8*hy6*x*y2
+             -278326125000*hx10*hy4*x*y2-57432375000*hx12*hy2*x*y2
+             -19144125000*hx14*x*y2-5849088*a*125*125*hx6*hy9*y2
+             -5849088*a*125*125*hx9*hy6*y2+17017*x16*y-875160*hy2*x14*y
+             -875160*hx2*x14*y+21441420*hy4*x12*y
+             +34131240*hx2*hy2*x12*y+21441420*hx4*x12*y
+             -357357000*hy6*x10*y-606485880*hx2*hy4*x10*y
+             -606485880*hx4*hy2*x10*y-357357000*hx6*x10*y
+             +6700443750*hy8*x8*y+6891885000*hx2*hy6*x8*y
+             +7347809700*hx4*hy4*x8*y+6891885000*hx6*hy2*x8*y
+             +6700443750*hx8*x8*y-79659008*a*125*hy9*x7*y
+             -79659008*a*125*hx9*x7*y+26801775000*hy10*x6*y
+             -80405325000*hx2*hy8*x6*y-51954210000*hx4*hy6*x6*y
+             -51954210000*hx6*hy4*x6*y-80405325000*hx8*hy2*x6*y
+             +26801775000*hx10*x6*y+716931072*a*125*hx2*hy9*x5*y
+             +716931072*a*125*hx9*hy2*x5*y-22334812500*hy12*x4*y
+             -172297125000*hx2*hy10*x4*y+324713812500*hx4*hy8*x4*y
+             +196796250000*hx6*hy6*x4*y+324713812500*hx8*hy4*x4*y
+             -172297125000*hx10*hy2*x4*y-22334812500*hx12*x4*y
+             -386039808*a*625*hx4*hy9*x3*y
+             -386039808*a*625*hx9*hy4*x3*y+19144125000*hy14*x2*y
+             +57432375000*hx2*hy12*x2*y+278326125000*hx4*hy10*x2*y
+             -491990625000*hx6*hy8*x2*y-491990625000*hx8*hy6*x2*y
+             +278326125000*hx10*hy4*x2*y+57432375000*hx12*hy2*x2*y
+             +19144125000*hx14*x2*y+11698176*a*125*125*hx6*hy9*x*y
+             +11698176*a*125*125*hx9*hy6*x*y-8546484375*hy16*y
+             -8204625000*hx2*hy14*y-15462562500*hx4*hy12*y
+             -70284375000*hx6*hy10*y+204996093750*hx8*hy8*y
+             -70284375000*hx10*hy6*y-15462562500*hx12*hy4*y
+             -8204625000*hx14*hy2*y-8546484375*hx16*y-1001*x17
+             +58344*hy2*x15+58344*hx2*x15-1649340*hy4*x13
+             -2625480*hx2*hy2*x13-1649340*hx4*x13+32487000*hy6*x11
+             +55135080*hx2*hy4*x11+55135080*hx4*hy2*x11
+             +32487000*hx6*x11-744493750*hy8*x9-765765000*hx2*hy6*x9
+             -816423300*hx4*hy4*x9-765765000*hx6*hy2*x9
+             -744493750*hx8*x9+9957376*a*125*hy9*x8
+             +9957376*a*125*hx9*x8-3828825000*hy10*x7
+             +11486475000*hx2*hy8*x7+7422030000*hx4*hy6*x7
+             +7422030000*hx6*hy4*x7+11486475000*hx8*hy2*x7
+             -3828825000*hx10*x7-119488512*a*125*hx2*hy9*x6
+             -119488512*a*125*hx9*hy2*x6+4466962500*hy12*x5
+             +34459425000*hx2*hy10*x5-64942762500*hx4*hy8*x5
+             -39359250000*hx6*hy6*x5-64942762500*hx8*hy4*x5
+             +34459425000*hx10*hy2*x5+4466962500*hx12*x5
+             +96509952*a*625*hx4*hy9*x4+96509952*a*625*hx9*hy4*x4
+             -6381375000*hy14*x3-19144125000*hx2*hy12*x3
+             -92775375000*hx4*hy10*x3+163996875000*hx6*hy8*x3
+             +163996875000*hx8*hy6*x3-92775375000*hx10*hy4*x3
+             -19144125000*hx12*hy2*x3-6381375000*hx14*x3
+             -5849088*a*125*125*hx6*hy9*x2-5849088*a*125*125*hx9*hy6*x2
+             +8546484375*hy16*x+8204625000*hx2*hy14*x
+             +15462562500*hx4*hy12*x+70284375000*hx6*hy10*x
+             -204996093750*hx8*hy8*x+70284375000*hx10*hy6*x
+             +15462562500*hx12*hy4*x+8204625000*hx14*hy2*x
+             +8546484375*hx16*x-28672*a*625*125*hy17
+             +487424*a*625*125*hx8*hy9+487424*a*625*125*hx9*hy8
+             -28672*a*625*125*hx17)
+         /(8912896000000*hx8*hy8));
+}
+
+double np_aconvol_epan8(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    if(x<y)
+      return (np_aconvol_epan8_xlessy(x,y,hx,hy));
+    else
+      return (np_aconvol_epan8_ylessx(x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan8_total(x,y,hx,hy));
+  }
+}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -1773,7 +2345,7 @@ void np_convol_ckernelv(const int KERNEL,
 
   double (* const k[])(double,double,double,double) = { 
     np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
-    np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, NULL 
+    np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, np_aconvol_epan8
   };
 
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
