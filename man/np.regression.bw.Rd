@@ -75,7 +75,7 @@ npregbw(\dots)
         dfc.dir = 3,
         cfac.dir = 2.5*(3.0-sqrt(5)),
         initc.dir = 1.0,
-        lbd.dir = 0,
+        lbd.dir = 0.1,
         hbd.dir = 1,
         dfac.dir = 0.25*(3.0-sqrt(5)),
         initd.dir = 1.0,
