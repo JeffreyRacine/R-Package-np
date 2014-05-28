@@ -2130,6 +2130,11 @@ double np_aconvol_epan8(const double x, const double y,const double hx,const dou
     return (np_aconvol_epan8_total(x,y,hx,hy));
   }
 }
+
+double np_aconvol_rect(const double x, const double y,const double hx,const double hy){
+  return (fabs(x-y) >= (hx+hy)) ? 0.0 : 0.25/(hx*hy)*(MIN(x+hx,y+hy) - MAX(x-hx,y-hy));
+}
+
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -2345,7 +2350,8 @@ void np_convol_ckernelv(const int KERNEL,
 
   double (* const k[])(double,double,double,double) = { 
     np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
-    np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, np_aconvol_epan8
+    np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, np_aconvol_epan8,
+    np_aconvol_rect
   };
 
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
