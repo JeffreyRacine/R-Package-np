@@ -2135,6 +2135,102 @@ double np_aconvol_rect(const double x, const double y,const double hx,const doub
   return (fabs(x-y) >= (hx+hy)) ? 0.0 : 0.25/(hx*hy)*(MIN(x+hx,y+hy) - MAX(x-hx,y-hy));
 }
 
+double np_aconvol_tgauss2_total(const double x, const double y,const double hx,const double hy){
+  const double x2 = x*x;
+  const double y2 = y*y;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+
+  const double a = sqrt(2);
+  const double b = sqrt(M_PI);
+  const double c = sqrt(hy2+hx2);
+
+  return(exp(-y2/(2*hy2)-x2/(2*hx2)-9)*
+         (b*hx*hy
+          *exp(hx2*y2/(2*hy4+2*hx2*hy2)
+               +x*y/(hy2+hx2)
+               +hy2*x2/(2*hx2*hy2+2*hx4)
+               +9)
+          *erfun((hx*y-hx*x+(hy2+hx2)*np_tgauss2_b)
+                 /(a*hy*c))
+          -b*hx*hy
+          *exp(hx2*y2/(2*hy4+2*hx2*hy2)
+               +x*y/(hy2+hx2)
+               +hy2*x2/(2*hx2*hy2+2*hx4)
+               +9)
+          *erfun((hx*y-hx*x+(-hy2-hx2)*np_tgauss2_b)
+                 /(a*hy*c))
+          -b*hy*c
+          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
+          *erfun((y-x+hx*np_tgauss2_b)/(a*hy))
+          +b*hy*c
+          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
+          *erfun((y-x-hx*np_tgauss2_b)/(a*hy))
+          -2*b*hx*c
+          *erfun(np_tgauss2_b/a)
+          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
+          +a*2*hx*c*np_tgauss2_b
+          *exp(y2/(2*hy2)+x2/(2*hx2)))
+         /(a*2*M_PI*c*np_tgauss2_alpha*np_tgauss2_alpha));
+}
+
+double np_aconvol_tgauss2_indefinite(const double u, const double x, const double y,const double hx,const double hy){
+  const double x2 = x*x;
+  const double y2 = y*y;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+
+  const double a = sqrt(2);
+  const double b = sqrt(M_PI);
+  const double c = sqrt(hy2+hx2);
+
+  return(-exp(-y2/(2*hy2)-x2/(2*hx2)-19/2)*
+         (b*hx*hy
+          *exp(hx2*y2
+            /(2*hy4+2*hx2*hy2)
+            +x*y/(hy2+hx2)
+            +hy2*x2
+            /(2*hx2*hy2+2*hx4)+19/2)
+          *erfun(
+               (hx2*y+hy2*x
+                +(-hy2-hx2)*u)
+               /(a*hx*hy
+                 *c))
+          -b*hy*c
+          *exp(y2/(2*hy2)+x2/(2*hx2)
+            +5)
+          *erfun((y-u)/(a*hy))
+          -b*hx*c
+          *erfun((x-u)/(a*hx))
+          *exp(y2/(2*hy2)+x2/(2*hx2)
+            +5)
+          -a*c*u
+          *exp(y2/(2*hy2)+x2/(2*hx2)
+            +1/2))
+         /(a*2*M_PI*c*np_tgauss2_alpha*np_tgauss2_alpha));
+}
+
+double np_aconvol_tgauss2(const double x, const double y,const double hx,const double hy){
+  const double a = np_tgauss2_b;
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_tgauss2_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_tgauss2_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_tgauss2_total(x,y,hx,hy));
+  }
+}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -2351,7 +2447,7 @@ void np_convol_ckernelv(const int KERNEL,
   double (* const k[])(double,double,double,double) = { 
     np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
     np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, np_aconvol_epan8,
-    np_aconvol_rect
+    np_aconvol_rect, np_aconvol_tgauss2
   };
 
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
