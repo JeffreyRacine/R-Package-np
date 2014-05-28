@@ -111,6 +111,8 @@ extern double **matrix_XY_ordered_eval_extern;
 // cdf extern
 extern int int_fast_dls_extern;
 extern double dbl_memfac_ccdf_extern;
+extern double dbl_memfac_dls_extern;
+
 #ifdef RCSID
 static char rcsid[] = "$Id: kernelcv.c,v 1.9 2006/11/02 16:56:49 tristen Exp $";
 #endif
@@ -1005,25 +1007,26 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor)
 /* Compute the cross-validation function */
 
     if(np_kernel_estimate_distribution_ls_cv(KERNEL_den_extern,
-        KERNEL_den_unordered_extern,
-        KERNEL_den_ordered_extern,
-        BANDWIDTH_den_extern,
-        num_obs_train_extern,
-        num_obs_eval_extern,
-        num_reg_unordered_extern,
-        num_reg_ordered_extern,
-        num_reg_continuous_extern,
-        int_fast_dls_extern,
-        matrix_X_unordered_train_extern,
-        matrix_X_ordered_train_extern,
-        matrix_X_continuous_train_extern,
-        matrix_X_unordered_eval_extern,
-        matrix_X_ordered_eval_extern,
-        matrix_X_continuous_eval_extern,
-        &vector_scale_factor[1],
-        num_categories_extern,
-        matrix_categorical_vals_extern,
-        &cv)==1)
+                                             KERNEL_den_unordered_extern,
+                                             KERNEL_den_ordered_extern,
+                                             BANDWIDTH_den_extern,
+                                             num_obs_train_extern,
+                                             num_obs_eval_extern,
+                                             num_reg_unordered_extern,
+                                             num_reg_ordered_extern,
+                                             num_reg_continuous_extern,
+                                             int_fast_dls_extern,
+                                             dbl_memfac_dls_extern,
+                                             matrix_X_unordered_train_extern,
+                                             matrix_X_ordered_train_extern,
+                                             matrix_X_continuous_train_extern,
+                                             matrix_X_unordered_eval_extern,
+                                             matrix_X_ordered_eval_extern,
+                                             matrix_X_continuous_eval_extern,
+                                             &vector_scale_factor[1],
+                                             num_categories_extern,
+                                             matrix_categorical_vals_extern,
+                                             &cv)==1)
     {
         return(DBL_MAX);
     }

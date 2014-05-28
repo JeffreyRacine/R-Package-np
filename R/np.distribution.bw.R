@@ -84,7 +84,7 @@ npudistbw.dbandwidth <-
            lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
            lbc.init = 0.1, hbc.init = 2.0, cfac.init = 0.5, 
            lbd.init = 0.1, hbd.init = 0.9, dfac.init = 0.375, 
-           scale.init.categorical.sample=FALSE, ...){
+           scale.init.categorical.sample=FALSE, memfac = 500.0, ...){
 
     dat = toFrame(dat)
 
@@ -210,7 +210,7 @@ npudistbw.dbandwidth <-
         lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir, 
         lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
-        nconfac = nconfac, ncatfac = ncatfac)
+        nconfac = nconfac, ncatfac = ncatfac, memfac = memfac)
 
       if (bws$method != "normal-reference"){
         myout=
@@ -304,7 +304,7 @@ npudistbw.default <-
            lbd.dir, hbd.dir, dfac.dir, initd.dir, 
            lbc.init, hbc.init, cfac.init, 
            lbd.init, hbd.init, dfac.init, 
-           scale.init.categorical.sample,
+           scale.init.categorical.sample, memfac,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, okertype,
@@ -347,7 +347,7 @@ npudistbw.default <-
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
                "lbc.init", "hbc.init", "cfac.init", 
                "lbd.init", "hbd.init", "dfac.init", 
-               "scale.init.categorical.sample")
+               "scale.init.categorical.sample", "memfac")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

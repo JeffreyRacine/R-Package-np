@@ -152,6 +152,7 @@ int BANDWIDTH_den_extern;
 // cdf algorithm extern
 int int_fast_dls_extern = 1;
 double dbl_memfac_ccdf_extern = 1.0;
+double dbl_memfac_dls_extern = 1.0;
 
 /* Statics for dependence metric */
 
@@ -816,6 +817,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   nconfac_extern = myoptd[DBW_NCONFD];
   ncatfac_extern = myoptd[DBW_NCATFD];
+
+  dbl_memfac_dls_extern = myoptd[DBW_MEMORYD];
 
 /* Allocate memory for objects */
 
