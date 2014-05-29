@@ -28,7 +28,6 @@ npcdensbw(\dots)
           ydat = stop("data 'ydat' missing"),
           bws,
           bandwidth.compute = TRUE,
-          auto = TRUE,
           nmulti,
           remin = TRUE,
           itmax = 10000,
@@ -57,7 +56,6 @@ npcdensbw(\dots)
           ydat = stop("data 'ydat' missing"),
           bws,
           bandwidth.compute = TRUE,
-          auto,
           nmulti,
           remin,
           itmax,
@@ -157,13 +155,6 @@ npcdensbw(\dots)
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
-  }
-
-  \item{auto}{
-    a logical value specifying whether to allow the code to
-    attempt to automatically select the fastest routine, using a
-    heuristic, to compute the least-squares cross-validation function.
-    Defaults to \code{TRUE}.
   }
 
     

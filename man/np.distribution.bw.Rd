@@ -31,7 +31,6 @@ npudistbw(\dots)
           nmulti,
           remin = TRUE,
           itmax = 10000,
-          fast.cdf = TRUE,
           do.full.integral = TRUE,
           ngrid = 100,
           ftol = 1.490116e-07,
@@ -52,6 +51,7 @@ npudistbw(\dots)
           hbd.init = 0.9,
           dfac.init = 0.375, 
           scale.init.categorical.sample = FALSE,
+          memfac = 500.0,
           \dots)
 
 \method{npudistbw}{default}(dat = stop("invoked without input data 'dat'"),
@@ -61,7 +61,6 @@ npudistbw(\dots)
           nmulti,
           remin,
           itmax,
-          fast.cdf,
           do.full.integral,
           ngrid,
           ftol,
@@ -82,6 +81,7 @@ npudistbw(\dots)
           hbd.init,
           dfac.init,
           scale.init.categorical.sample,
+          memfac,
           bwmethod,
           bwscaling,
           bwtype,
@@ -243,11 +243,6 @@ npudistbw(\dots)
     optimization routine. Defaults to \code{10000}.
   }
 
-  \item{fast.cdf}{
-    a logical value which when set as \code{TRUE} uses a computationally
-    efficient but potentially memory intensive computational algorithm.
-  }
-
   \item{do.full.integral}{
     a logical value which when set as \code{TRUE} evaluates the
     moment-based integral on the entire sample.
@@ -305,6 +300,18 @@ npudistbw(\dots)
     \eqn{n} the number of observations, \eqn{P}{P} the order of the
     kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
     Details}
+
+  \item{memfac}{
+    The algorithm to compute the least-squares objective function uses
+    a block-based algorithm to eliminate or minimize redundant kernel
+    evaluations. Due to memory, hardware and software constraints, a
+    maximum block size must be imposed by the algorithm. This block size
+    is roughly equal to memfac*10^5 elements. Empirical tests on
+    modern hardware find that a memfac of 500 performs well. If
+    you experience out of memory errors, or strange behaviour for
+    large data sets (>100k elements) setting memfac to a lower value may
+    fix the problem.
+  }
 }
 
 \details{

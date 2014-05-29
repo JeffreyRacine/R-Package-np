@@ -150,7 +150,6 @@ int BANDWIDTH_reg_extern;
 int BANDWIDTH_den_extern;
 
 // cdf algorithm extern
-int int_fast_dls_extern = 1;
 double dbl_memfac_ccdf_extern = 1.0;
 double dbl_memfac_dls_extern = 1.0;
 
@@ -789,7 +788,6 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   itmax=myopti[DBW_ITMAXI];
 
-  int_fast_dls_extern = myopti[DBW_FASTI];
   int_TREE_X = myopti[DBW_DOTREEI];
   scale_cat = myopti[DBW_SCATI];
 

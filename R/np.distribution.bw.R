@@ -78,7 +78,7 @@ npudistbw.NULL <-
 npudistbw.dbandwidth <- 
   function(dat = stop("invoked without input data 'dat'"),
            bws, gdat = NULL, bandwidth.compute = TRUE, nmulti, remin = TRUE, itmax = 10000,
-           fast.cdf = TRUE, do.full.integral = TRUE, ngrid = 100,
+           do.full.integral = TRUE, ngrid = 100,
            ftol = 1.490116e-07, tol = 1.490116e-04, small = 1.490116e-05,
            lbc.dir = 0.5, dfc.dir = 3, cfac.dir = 2.5*(3.0-sqrt(5)), initc.dir = 1.0, 
            lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
@@ -200,7 +200,6 @@ npudistbw.dbandwidth <-
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],
-        fast.cdf = fast.cdf,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir)
@@ -299,7 +298,7 @@ npudistbw.default <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, gdat, bandwidth.compute = TRUE,
            ## dummy arguments for later passing into npudistbw.bandwidth
-           nmulti, remin, itmax, fast.cdf, do.full.integral, ngrid, ftol, tol, small,
+           nmulti, remin, itmax, do.full.integral, ngrid, ftol, tol, small,
            lbc.dir, dfc.dir, cfac.dir, initc.dir, 
            lbd.dir, hbd.dir, dfac.dir, initd.dir, 
            lbc.init, hbc.init, cfac.init, 
@@ -342,7 +341,7 @@ npudistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("gdat","bandwidth.compute", "nmulti", "remin", "itmax",
-               "fast.cdf", "do.full.integral", "ngrid", "ftol", "tol",
+               "do.full.integral", "ngrid", "ftol", "tol",
                "small", "lbc.dir", "dfc.dir", "cfac.dir", "initc.dir", 
                "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
                "lbc.init", "hbc.init", "cfac.init", 
