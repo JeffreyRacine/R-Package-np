@@ -1,13 +1,21 @@
 # -*- Makefile -*-  vim : ft = make
 
-ifeq "$(WIN)" "64" 
-PKG_CFLAGS   = -Ic:/progra~1/mpich2/include -DMPI2 -DWin32
-PKG_LIBS     = -Lc:/progra~1/mpich2/lib -lmpi
-else
-PKG_CFLAGS   = -Ic:/progra~2/mpich2/include -DMPI2 -DWin32
-PKG_LIBS     = -Lc:/progra~2/mpich2/lib -lmpi
+ifeq "$(MPI_HOME)" ""
+MPI_HOME = c:/Program Files/Microsoft MPI
 endif
 
-#PKG_CFLAGS   = -Ic:/progra~2/DeinoMPI/include -DMPI2 -DWin32
-#PKG_LIBS     = -Lc:/progra~2/DeinoMPI/lib -lmpi
+PKG_CPPFLAGS = -I"$(MPI_HOME)/Inc" -DMPI2 -DWin32
 
+all: $(SHLIB)
+
+ifeq "$(WIN)" "64" 
+PKG_LIBS     = -L. -lmsmpi64
+$(SHLIB): libmsmpi64.a
+else
+PKG_LIBS     = "$(MPI_HOME)/Lib/i386/msmpi.lib"
+endif
+
+##msmpi.def:
+##	gendef -r c:/Windows/System32/msmpi.dll
+libmsmpi64.a: msmpi.def
+	$(DLLTOOL) -k -d msmpi.def -l libmsmpi64.a -D msmpi.dll $(DT_ARCH)

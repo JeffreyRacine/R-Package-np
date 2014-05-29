@@ -56,7 +56,7 @@ Hao Yu
   \code{\link{mpi.scatter}}, \code{\link{mpi.scatterv}}.
 }
 \examples{
-\dontrun{
+\donttest{
 #Need 3 slaves to run properly
 #Or use mpi.spawn.Rslaves(nslaves=3)
  mpi.bcast.cmd(id <-mpi.comm.rank(.comm), comm=1)

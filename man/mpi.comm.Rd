@@ -29,7 +29,7 @@ Hao Yu
   \url{http://www-unix.mcs.anl.gov/mpi/www/www3/}
 }
 \examples{
-\dontrun{
+\donttest{
 #Assume that there are some slaves running
 mpi.comm.size(comm=1)
 mpi.comm.size(comm=0)

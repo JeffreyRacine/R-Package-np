@@ -31,7 +31,7 @@ Alek Hunchak and Hao Yu
   \url{http://www-unix.mcs.anl.gov/mpi/www/www3/}
 }
 \examples{
-\dontrun{
+\donttest{
 #Need at least 9 slaves
 mpi.bcast.cmd(mpi.cart.create(1,c(3,3),c(F,T)))
 mpi.cart.create(1,c(3,3),c(F,T))

@@ -75,7 +75,8 @@ mpi.universe.size <- function(){
 		#out<-.mpi.universe.size
 	    #else {
 			if (.Platform$OS=="windows") {
-		    	out <- length(mpichhosts())-1
+				require(parallel)
+		    	out <- detectCores()
 			}
 	    #}		
 	}

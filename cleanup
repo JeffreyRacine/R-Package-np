@@ -1,5 +1,7 @@
 #! /bin/sh
 /bin/rm -rf ./chm
 /bin/rm -rf ./config.*
+/bin/rm -rf ./autom4te.cache
 /bin/rm -rf src/Makevars
-/bin/rm -rf src/*.so src/*.o src/*.d src/*.dll src/*.a src/*.rc src/Makedeps
+/bin/rm -rf src/*.so src/*.o src/*.d src/*.dll src/*.a src/*.rc src/*.rds src/Makedeps
+/bin/rm -rf src-*

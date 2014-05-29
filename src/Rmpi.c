@@ -21,7 +21,7 @@
 #include <dlfcn.h>
 #endif
 
- MPI_Comm	*comm;
+static MPI_Comm	*comm;
 static MPI_Status *status;
 static MPI_Datatype *datatype;
 static MPI_Info *info;
@@ -29,6 +29,11 @@ static MPI_Request *request;
 static int COMM_MAXSIZE=10;
 static int STATUS_MAXSIZE=2000;
 static int REQUEST_MAXSIZE=2000;
+static MPI_Datatype *xdouble;
+
+#ifndef XLENGTH
+#define XLENGTH LENGTH
+#endif
 
 SEXP mpidist(){
 	int i=0;
@@ -45,7 +50,7 @@ SEXP mpidist(){
 	i=3;
 #endif
 
-#ifdef MPICH2
+#if defined(MPICH2) || defined(INTELMPI)
 	i=4;
 #endif
 
@@ -69,10 +74,11 @@ if (flag)
 
 #ifndef __APPLE__
 #ifdef OPENMPI
-    if (!dlopen("libmpi.so.0", RTLD_GLOBAL | RTLD_LAZY)
-        && !dlopen("libmpi.so", RTLD_GLOBAL | RTLD_LAZY)){
-      Rprintf("%s\n",dlerror());
-      return AsInt(0);
+    if (!dlopen("libmpi.so.1", RTLD_GLOBAL | RTLD_LAZY) 
+	&& !dlopen("libmpi.so.0", RTLD_GLOBAL | RTLD_LAZY)
+	&& !dlopen("libmpi.so", RTLD_GLOBAL | RTLD_LAZY)) {
+        Rprintf("%s\n",dlerror());
+        return AsInt(0);
     }
 #endif
 #endif
@@ -84,11 +90,12 @@ if (flag)
 	MPI_Init((void *)0,(void *)0);
 #endif 
 
-		MPI_Errhandler_set(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
-		MPI_Errhandler_set(MPI_COMM_SELF, MPI_ERRORS_RETURN);
+		MPI_Comm_set_errhandler(MPI_COMM_WORLD, MPI_ERRORS_RETURN);
+		MPI_Comm_set_errhandler(MPI_COMM_SELF, MPI_ERRORS_RETURN);
 		comm=(MPI_Comm *)Calloc(COMM_MAXSIZE, MPI_Comm); 
 		status=(MPI_Status *)Calloc(STATUS_MAXSIZE, MPI_Status); 
 		datatype=(MPI_Datatype *)Calloc(1, MPI_Datatype); 
+		xdouble=(MPI_Datatype *)Calloc(1, MPI_Datatype); 
 		info=(MPI_Info *)Calloc(1, MPI_Info);
 		info[0]=MPI_INFO_NULL;
 		request=(MPI_Request *)Calloc(REQUEST_MAXSIZE, MPI_Request);
@@ -106,6 +113,7 @@ SEXP mpi_finalize(){
 	Free(status);
 	Free(request);
 	Free(datatype);
+	Free(xdouble);
 	Free(info);
 	return AsInt(1);
 }
@@ -585,14 +593,17 @@ SEXP mpi_allgatherv(SEXP sexp_sdata,
 SEXP mpi_bcast(SEXP sexp_data,
 			   SEXP sexp_type,
 			   SEXP	sexp_rank,
-			   SEXP sexp_comm){
+			   SEXP sexp_comm,
+			   SEXP sexp_buffunit){
 
 	int len=LENGTH(sexp_data), type=INTEGER(sexp_type)[0];
 	int rank=INTEGER(sexp_rank)[0], root,  commn=INTEGER(sexp_comm)[0],slen;
-	int errcode=0;
+	int buffunit=INTEGER(sexp_buffunit)[0],errcode=0;
 	char *rdata;
 	SEXP sexp_data2 = NULL;
-
+	//MPI_Datatype xdouble;
+	R_xlen_t xlen=XLENGTH(sexp_data);
+	
 	switch (type){
 	case 1:
 		errcode=MPI_Bcast(INTEGER(sexp_data), len, MPI_INT, rank, comm[commn]);
@@ -618,7 +629,13 @@ SEXP mpi_bcast(SEXP sexp_data,
 	case 4:
                 errcode=MPI_Bcast(RAW(sexp_data), len, MPI_BYTE, rank, comm[commn]);
                 break;
-
+	case 5:
+		MPI_Type_contiguous(buffunit, MPI_DOUBLE, xdouble);
+		MPI_Type_commit(xdouble);
+		if ((xlen % buffunit) > 0) len=1+(xlen/buffunit); else len=xlen/buffunit;
+        mpi_errhandler(MPI_Bcast(REAL(sexp_data), len, xdouble[0], rank, comm[commn]));
+		MPI_Type_free(xdouble);
+		break;
 	default:
 		PROTECT(sexp_data=AS_NUMERIC(sexp_data));
 		mpi_errhandler(MPI_Bcast(REAL(sexp_data), 1, datatype[0], rank, comm[commn]));
@@ -996,7 +1013,7 @@ SEXP mpi_abort(SEXP sexp_comm){
 
 /********************Intercomm********************************************/
 SEXP mpi_comm_set_errhandler(SEXP sexp_comm){
-	return AsInt(erreturn(MPI_Errhandler_set(comm[INTEGER(sexp_comm)[0]], 
+	return AsInt(erreturn(MPI_Comm_set_errhandler(comm[INTEGER(sexp_comm)[0]], 
 		MPI_ERRORS_RETURN)));
 }
 

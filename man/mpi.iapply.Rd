@@ -12,28 +12,28 @@
 (Load balancing) parallel\code{lapply} and related functions. 
 }
 \usage{
-mpi.iapplyLB(x, fun, ..., apply.seq=NULL, comm=1, sleep=0.01)
-mpi.iparApply(x, MARGIN, fun, ..., job.num = mpi.comm.size(comm)-1,
+mpi.iapplyLB(X, FUN, ..., apply.seq=NULL, comm=1, sleep=0.01)
+mpi.iparApply(X, MARGIN, FUN, ..., job.num = mpi.comm.size(comm)-1,
                     apply.seq=NULL, comm=1, sleep=0.01)
-mpi.iparLapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.iparLapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		    comm=1,sleep=0.01)  
-mpi.iparSapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.iparSapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		simplify=TRUE, USE.NAMES = TRUE, comm=1, sleep=0.01)  
-mpi.iparRapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.iparRapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		comm=1, sleep=0.01)  
-mpi.iparCapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.iparCapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		comm=1,sleep=0.01)  
 mpi.iparReplicate(n, expr, job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		simplify = TRUE, comm=1,sleep=0.01)
 mpi.iparMM(A, B, comm=1, sleep=0.01)
 }
 \arguments{
-  \item{x}{an array or matrix.}
+  \item{X}{an array or matrix.}
   \item{MARGIN}{vector specifying the dimensions to use.}
-  \item{fun}{a function.}
+  \item{FUN}{a function.}
   \item{simplify}{logical; should the result be simplified to a vector or
           matrix if possible?}
-  \item{USE.NAMES}{logical; if \code{TRUE} and if \code{x} is character, use \code{x} as
+  \item{USE.NAMES}{logical; if \code{TRUE} and if \code{X} is character, use \code{X} as
           \code{names} for the result unless it had names already.}
   \item{n}{number of replications.}
   \item{A}{a matrix}
@@ -43,7 +43,7 @@ mpi.iparMM(A, B, comm=1, sleep=0.01)
 value), a load balancing approach is used.}
   \item{apply.seq}{if reproducing the same computation (simulation) is desirable, set it 
 to the integer vector .mpi.applyLB generated in previous computation (simulation).}
-  \item{...}{optional arguments to \code{fun}}
+  \item{...}{optional arguments to \code{Fun}}
   \item{comm}{a communicator number}
   \item{sleep}{a sleep interval on master node (in sec)}
 }

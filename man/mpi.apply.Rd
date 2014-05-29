@@ -1,26 +1,26 @@
 \name{mpi.apply}
 \alias{mpi.apply}
 \alias{mpi.iapply}
-\title{Scatter an array to slaves and then apply a fun}
+\title{Scatter an array to slaves and then apply a FUN}
 \description{
 An array (length <= total number of slaves) is scattered to slaves so that the first 
-slave calls \code{fun} with arguments \code{x[[1]]} and \code{...}, the second one 
+slave calls \code{FUN} with arguments \code{x[[1]]} and \code{...}, the second one 
 calls with arguments \code{x[[2]]} and \code{...}, and so on. \code{mpi.iapply} is a 
 nonblocking version of \code{mpi.apply} so that it will not consume CPU on master node.} 
 \usage{
-mpi.apply(x, fun, ..., comm=1)  
-mpi.iapply(x, fun, ..., comm=1, sleep=0.01)  
+mpi.apply(X, FUN, ..., comm=1)  
+mpi.iapply(X, FUN, ..., comm=1, sleep=0.01)  
 }
 \arguments{
-  \item{x}{an array}
-  \item{fun}{a function}
-  \item{...}{optional arguments to \code{fun}}
+  \item{X}{an array}
+  \item{FUN}{a function}
+  \item{...}{optional arguments to \code{FUN}}
   \item{comm}{a communicator number}
   \item{sleep}{a sleep interval on master node (in sec)}
 }
 \value{
 A list of the results is returned. Its length is the same as that of \code{x}. In 
-case the call \code{fun} with arguments \code{x[[i]]} and \code{...} fails on ith 
+case the call \code{FUN} with arguments \code{x[[i]]} and \code{...} fails on ith 
 slave, corresponding error message will be returned in the returning list.  }
 
 %\seealso{
@@ -32,7 +32,7 @@ slave, corresponding error message will be returned in the returning list.  }
 Hao Yu
 }
 \examples{
-\dontrun{
+\donttest{
 #Assume that there are at least 5 slaves running
 #Otherwise run mpi.spawn.Rslaves(nslaves=5)
 x=c(10,20)

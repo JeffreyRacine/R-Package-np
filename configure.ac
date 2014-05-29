@@ -46,7 +46,7 @@ MPITYPE="UNKNOWN"
 
 AC_ARG_WITH([Rmpi-type],
             AC_HELP_STRING([--with-Rmpi-type=MPI_TYPE],
-                           [the type of MPI: OPENMPI, LAM or MPICH]),
+                           [the type of MPI: OPENMPI,LAM,MPICH,MPICH2, or CRAY]),
             [mpi_type=$withval])
 if test -n "${mpi_type}" ; then
    MPITYPE="${mpi_type}"
@@ -262,11 +262,12 @@ fi dnl end of 'paths not specified'
 AC_CHECK_LIB(util, openpty, [ MPI_LIBS="$MPI_LIBS -lutil" ])
 AC_CHECK_LIB(pthread, main, [ MPI_LIBS="$MPI_LIBS -lpthread" ])
 
-if test "$MPITYPE" = "OPENMPI" -o "$MPITYPE" = "LAM" -o "$MPITYPE" = "MPICH2"; then
+if test "$MPITYPE" = "OPENMPI" -o "$MPITYPE" = "LAM" -o "$MPITYPE" = "MPICH2" -o "$MPITYPE" = "INTELMPI" -o "$MPITYPE" = "CRAY"; then
   MPI_DEFS="-DMPI2"
 fi
 
 PKG_CPPFLAGS="-I${MPI_INCLUDE_PATH} ${MPI_INCL2} ${MPI_DEFS} -D${MPITYPE}"
+
 case "$MPITYPE" in
   OPENMPI)
     PKG_LIBS="-L${MPI_LIBPATH} -lmpi ${MPI_LIBS}"
@@ -279,6 +280,12 @@ case "$MPITYPE" in
     ;;
   MPICH2)
     PKG_LIBS="-L${MPI_LIBPATH} -lmpich -lmpl -lopa ${MPI_LIBS}"
+    ;;
+  INTELMPI)
+    PKG_LIBS="-Wl,-rpath,${MPI_LIBPATH} -L${MPI_LIBPATH} -lmpich -lmpigf -lmpigi ${MPI_LIBS}" 
+    ;;
+  CRAY)
+    PKG_LIBS="-L${MPI_LIBPATH} -lmpich_cray_default64 -lmpl -lopa ${MPI_LIBS}"
     ;;
   *)
     AC_MSG_ERROR([Unknown type of mpi: use --with-Rmpi-type or RMPI_TYPE to specify it])

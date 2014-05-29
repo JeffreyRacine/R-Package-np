@@ -91,7 +91,7 @@ Notice that this is LAM-MPI specific.
 Hao Yu
 }
 \examples{
-\dontrun{
+\donttest{
 mpi.spawn.Rslaves(nslaves=2)
 tailslave.log()
 mpi.remote.exec(rnorm(10))

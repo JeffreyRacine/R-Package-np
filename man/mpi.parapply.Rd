@@ -12,28 +12,28 @@
 (Load balancing) parallel\code{lapply} and related functions. 
 }
 \usage{
-mpi.applyLB(x, fun, ..., apply.seq=NULL, comm=1)
-mpi.parApply(x, MARGIN, fun, ..., job.num = mpi.comm.size(comm)-1,
+mpi.applyLB(X, FUN, ..., apply.seq=NULL, comm=1)
+mpi.parApply(X, MARGIN, FUN, ..., job.num = mpi.comm.size(comm)-1,
                     apply.seq=NULL, comm=1)
-mpi.parLapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.parLapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		comm=1)  
-mpi.parSapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.parSapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		simplify=TRUE, USE.NAMES = TRUE, comm=1)  
-mpi.parRapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.parRapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		comm=1)  
-mpi.parCapply(x, fun, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
+mpi.parCapply(X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		comm=1)  
 mpi.parReplicate(n, expr, job.num=mpi.comm.size(comm)-1, apply.seq=NULL, 
 		simplify = TRUE, comm=1)
 mpi.parMM (A, B, job.num=mpi.comm.size(comm)-1, comm=1)
 }
 \arguments{
-  \item{x}{an array or matrix.}
+  \item{X}{an array or matrix.}
   \item{MARGIN}{vector specifying the dimensions to use.}
-  \item{fun}{a function.}
+  \item{FUN}{a function.}
   \item{simplify}{logical; should the result be simplified to a vector or
           matrix if possible?}
-  \item{USE.NAMES}{logical; if \code{TRUE} and if \code{x} is character, use \code{x} as
+  \item{USE.NAMES}{logical; if \code{TRUE} and if \code{X} is character, use \code{X} as
           \code{names} for the result unless it had names already.}
   \item{n}{number of replications.}
   \item{A}{a matrix}
@@ -43,11 +43,11 @@ mpi.parMM (A, B, job.num=mpi.comm.size(comm)-1, comm=1)
 value), a load balancing approach is used.}
   \item{apply.seq}{if reproducing the same computation (simulation) is desirable, set it 
 to the integer vector .mpi.applyLB generated in previous computation (simulation).}
-  \item{...}{optional arguments to \code{fun}}
+  \item{...}{optional arguments to \code{FUN}}
   \item{comm}{a communicator number}
 }
 \details{
-Unless length of \code{x} is no more than total slave numbers (slave.num) and in this case 
+Unless length of \code{X} is no more than total slave numbers (slave.num) and in this case 
 \code{mpi.applyLB} is the same as \code{mpi.apply}, \code{mpi.applyLB} sends a next job to a 
 slave who just delivered a finished job. The sequence of slaves who deliver results to master are 
 saved into \code{.mpi.applyLB}. It keeps track which part of results done by which slaves. 
@@ -69,7 +69,7 @@ Notice that \code{apply.seq} is useful only if \code{job.num} is bigger than sla
 \code{\link{mpi.apply}}
 }
 \examples{
-\dontrun{
+\donttest{
 #Assume that there are some slaves running
 
 #mpi.applyLB
@@ -85,7 +85,7 @@ mpi.applyLB(x,rnorm,mean=2,sd=4,apply.seq=.mpi.applyLB)
 #mpi.parApply
 x=1:24
 dim(x)=c(2,3,4)
-mpi.parApply(x, MARGIN=c(1,2), fun=mean,job.num = 5)
+mpi.parApply(x, MARGIN=c(1,2), FUN=mean,job.num = 5)
 
 #mpi.parLapply
 mdat <- matrix(c(1,2,3, 7,8,9), nrow = 2, ncol=3, byrow=TRUE,

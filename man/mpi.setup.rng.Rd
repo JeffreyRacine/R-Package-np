@@ -2,7 +2,7 @@
 \alias{mpi.setup.rngstream}
 \title{Setup parallel RNG on all slaves}
 \description{
-  \code{mpi.setup.rngstream} setups RNGstream) on all slaves. 
+  \code{mpi.setup.rngstream} setups RNGstream on all slaves. 
 }
 \usage{
 mpi.setup.rngstream(iseed=NULL, comm = 1)

@@ -43,7 +43,7 @@ Hao Yu and Wei Xia
   \code{\link{mpi.gather}}, \code{\link{mpi.allgatherv}}.
 }
 \examples{
-\dontrun{
+\donttest{
 #Assume that there are some slaves running
 mpi.bcast.cmd(id<-mpi.comm.rank())
 mpi.bcast.cmd(x<-rnorm(id))

@@ -60,6 +60,7 @@ mpi.scatter.Robj <- function(obj=NULL, root=0, comm=1){
         outobj<-unserialize(mpi.scatterv(raw(strnum),scounts=0, type=4,
                 rdata=raw(strnum), root=root, comm=comm))
     }
+	gc()
     return(outobj)
 }
 
@@ -89,11 +90,15 @@ mpi.gather.Robj <- function(obj=NULL, root=0, comm=1, ...){
     cutobj=list()
     for(i in 1:size)
         cutobj[[i]]=allbiobj[(pos[i]+1):pos[i+1]]
-         sapply(cutobj,unserialize, ...)
+		out <- sapply(cutobj,unserialize, ...)
+		gc()
+		out
     }
     else {
          mpi.gather(bilen,type=1,rdata=integer(1),root=root,comm=comm)
-         mpi.gatherv(biobj,type=4,rdata=raw(1),rcounts=0,root=root,comm=comm)
+         out <- mpi.gatherv(biobj,type=4,rdata=raw(1),rcounts=0,root=root,comm=comm)
+		 gc()
+		 out
    }
 }
 
@@ -108,8 +113,9 @@ mpi.allgather.Robj <- function(obj=NULL, comm=1){
     cutobj=list()
     for(i in 1:size)
           cutobj[[i]]=allbiobj[(pos[i]+1):pos[i+1]]
-    sapply(cutobj,unserialize)
-
+    out <- sapply(cutobj,unserialize)
+	gc()
+	out
    # bistrcut<-sapply(rcounts,string)
    # bistr<-string.cut(allbiobj,bistrcut)
    # lapply(bistr,unserialize)
@@ -127,9 +133,9 @@ mpi.allgatherv <- function(x, type, rdata, rcounts, comm=1){
     as.integer(rcounts), as.integer(comm),PACKAGE = "npRmpi")
 }
 
-mpi.bcast <- function (x, type, rank = 0, comm = 1) {
+mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
     .Call("mpi_bcast", .force.type(x,type), as.integer(type), as.integer(rank), 
-        as.integer(comm),PACKAGE = "npRmpi")
+        as.integer(comm), as.integer(buffunit), PACKAGE = "npRmpi")
 }
 
 #bin.nchar <- function(x){
@@ -200,11 +206,14 @@ mpi.bcast.Robj <- function(obj=NULL, rank=0, comm=1){
     if (mpi.comm.rank(comm) == rank){
     tmp <- serialize(obj, NULL)
     mpi.bcast(as.integer(length(tmp)), 1, rank, comm)
-    invisible(mpi.bcast(tmp, 4, rank, comm))
+    mpi.bcast(tmp, 4, rank, comm)
+	invisible(gc())
     }
     else {
     charlen <- mpi.bcast(integer(1), 1, rank, comm)
-    unserialize(mpi.bcast(raw(charlen), 4, rank, comm))
+    out <- unserialize(mpi.bcast(raw(charlen), 4, rank, comm))
+	gc()
+	out
     }
 }
 
@@ -246,6 +255,49 @@ mpi.bcast.Rfun2slave <- function(comm=1){
 		}
 }
 
+mpi.bcast.data2slave <- function(obj, comm=1, buffunit=100){
+	if (!is.numeric(obj) || (!is.vector(obj) && !is.matrix(obj)))
+		return (mpi.bcast.Robj2slave(obj, comm=comm))
+		#stop ("Please use mpi.bcast.Robj2slave")
+		
+	objname <- serialize(deparse(substitute(obj),width.cutoff=500),NULL)
+	obj.info = integer(4)
+	obj.info[1]=length(objname)
+	if (is.vector(obj)){
+		if (buffunit < 1 || buffunit >=2^31)
+			stop("buffunit must be an integer between 1 and 2^31-1")
+		obj.info[2]=buffunit
+		obj.info[3]=length(obj)%/%buffunit
+		obj.info[4]=length(obj)%%buffunit
+	}
+	if (is.matrix(obj)){
+		obj.dim <-dim(obj)
+		obj.info[2]=obj.dim[1]
+		obj.info[3]=obj.dim[2]
+		obj.info[4]=0
+	}
+	
+	mpi.bcast.cmd(.tinfo <- mpi.bcast(integer(4),type=1),rank=0,comm=1)
+	mpi.bcast(obj.info,type=1,rank=0,comm=comm)
+	
+	mpi.bcast.cmd(.tname<-unserialize(mpi.bcast(raw(.tinfo[1]),type=4)), rank=0, comm=comm)
+	mpi.bcast(objname, type=4, rank=0, comm=comm)
+	
+	if (is.vector(obj)){
+		mpi.bcast.cmd(.tmp.obj <- mpi.bcast(double(.tinfo[2]*(.tinfo[3]+(.tinfo[4]>0))),type=5, buffunit=.tinfo[2]),rank=0,comm=comm)
+		mpi.bcast(obj,type=5,rank=0,comm=comm,buffunit=buffunit)
+		mpi.bcast.cmd(assign(.tname,.tmp.obj[1:(.tinfo[2]*.tinfo[3]+.tinfo[4])]), rank=0, comm=comm)
+		mpi.bcast.cmd(rm(".tmp.obj"))
+		mpi.bcast.cmd(gc())
+	}
+	if (is.matrix(obj)){
+		mpi.bcast.cmd(.tmp.obj <- mpi.bcast(matrix(double(.tinfo[2]*.tinfo[3]), nrow=.tinfo[2]),type=5, buffunit=.tinfo[2]),rank=0,comm=comm)
+		mpi.bcast(obj,type=5,rank=0,comm=comm,buffunit=obj.info[2])	
+		mpi.bcast.cmd(assign(.tname,.tmp.obj), rank=0, comm=comm)
+		mpi.bcast.cmd(gc())
+	}
+}
+
 mpi.send <- function (x, type,  dest, tag, comm=1){
     .Call("mpi_send", .force.type(x,type), as.integer(type), as.integer(dest), 
     as.integer(tag), as.integer(comm),PACKAGE = "npRmpi")
@@ -259,13 +311,16 @@ mpi.recv <- function (x, type, source, tag, comm=1, status=0){
 
 mpi.send.Robj <- function(obj, dest, tag, comm=1){
     mpi.send(x=serialize(obj, NULL), type=4, dest=dest, tag=tag, comm=comm)
+	invisible(gc())
 }
 
 mpi.recv.Robj <- function(source, tag, comm=1, status=0){
     mpi.probe(source, tag, comm, status)
     srctag <- mpi.get.sourcetag(status)
     charlen <- mpi.get.count(type=4, status)
-    unserialize(mpi.recv(x=raw(charlen), type=4,srctag[1],srctag[2], comm, status))
+    out<-unserialize(mpi.recv(x=raw(charlen), type=4,srctag[1],srctag[2], comm, status))
+	#gc()
+	out
 }
 
 mpi.reduce <- function(x, type=2, 
@@ -327,9 +382,11 @@ mpi.irecv <- function (x, type, source, tag, comm=1, request=0){
     PACKAGE = "npRmpi"))
 }
 
-mpi.isend.Robj <- function(obj, dest, tag, comm=1,request=0)
+mpi.isend.Robj <- function(obj, dest, tag, comm=1,request=0){
     mpi.isend(x=serialize(obj, NULL), type=4, dest=dest, tag=tag, 
         comm=comm,request=request)
+	#invisible(gc())
+}
 
 mpi.wait <- function(request, status=0)
     invisible(.Call("mpi_wait",  as.integer(request), as.integer(status), PACKAGE = "npRmpi"))
@@ -421,7 +478,8 @@ mpi.request.maxsize <- function()
         as.integer(x),
         as.double(x),
         as.character(x),
-    as.raw(x))
+		as.raw(x),
+		as.double(x))
 }
 #.mpi.serialize<- function(obj){
 #    trans_obj=serialize(obj,NULL)
