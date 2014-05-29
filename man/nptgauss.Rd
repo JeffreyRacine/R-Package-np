@@ -42,7 +42,7 @@ where \eqn{a_0}{a0} is determined by the normalisation condition on H,
 \eqn{z = 0} and \eqn{a_1}{a1} is determined by the requirement that \eqn{H = 0} at \eqn{[-2b,2b]}.
 }
 \author{
-    Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine
+    Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine
     \email{racinej@mcmaster.ca}
 }
 
