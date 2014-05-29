@@ -1,9 +1,61 @@
 Changes from Version 0.50-1 to 0.50-2 [XXX]
 
-* Fixed regression in npindex with bootstrapped standard errors
+* The entire C backend has been rewritten and improved in almost every
+  regard
 
-* Code making use on one call to npksum in npindex and npscoef where
+* Glitch in adaptive convolution kernels corrected
+
+* Added truncated gaussian kernel (see ntpgauss for modifying the
+  truncation radius)
+
+* Support for trees complete (use options(np.tree=TRUE)) which when used in
+  conjunction with bounded kernels (i.e. "epanechnikov"/"truncated
+  gaussian") can reduce the computational burden for certain problems
+
+* Optimizers that make use of Powell's direction set method now accept
+  additional arguments that can be used to potentially improve
+  default settings
+
+* Default search settings for optimizers that make use of Powell's
+  direction set method should better scale to the range of variables
+
+* Added mean absolute deviation/1.4826 to mix of robust scale elements
+
+* Corrected error in order of conditional density/distribution manual
+  bandwidths pointed out by Decet Romain
+
+* Figure in vignette not displaying properly, needed png=TRUE reported by
+  Christophe Bontemps
+
+*  Using chol2inv/chol rather than solve throughout R routines that rely
+   on inversion
+
+* Fixed glitch in npindexbw to stop maxit from blowing up every time
+  convergence fails
+
+* Fixed issue with summary reporting incorrect value of objective function
+  in certain bandwidth objects
+
+* When nmulti > 1,  the full multi- starting search history is now
+  returned in a vector named fval.history
+
+* Added na.action for consistency with other R functions such as lm()
+
+* New function npquantile() that returns smooth univariate quantiles
+
+* npksum explicity only uses raw bandwidths now (and will emit an error
+  if passed numeric scale factors, bandwidth objects are still ok)
+
+* Fixed regression in npindex() with bootstrapped standard errors
+
+* Code making use on one call to npksum() in npindex() and npscoef where
   possible rather than two separate calls
+
+* Updated npsigtest() for addition of power and added joint test to
+  the mix
+
+* Changed ceiling() to max(1,round()) in BstarCB per Dimitris Politis's
+  suggestion
 
 * Reworked the interface for npcopula() to avoid two bandwidths and
   density=TRUE but exploiting passing of either npudistbw (copula) or
