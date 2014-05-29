@@ -23,7 +23,7 @@ mpi.bcast.cmd(options(np.messages=FALSE),
 mpi.bcast.cmd(set.seed(42),
               caller.execute=TRUE)
 
-n <- 100000
+n <- 10000
 
 mydat <- data.frame(x=rnorm(n))
 mpi.bcast.Robj2slave(mydat)
