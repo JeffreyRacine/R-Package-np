@@ -25,6 +25,8 @@ export(b.star
        ,mpi.bcast
        ,mpi.bcast.Robj
        ,mpi.bcast.Robj2slave
+       ,mpi.bcast.Rfun2slave
+       ,mpi.bcast.data2slave
        ,mpi.bcast.cmd
        ,mpi.cancel
        ,mpi.cart.coords
@@ -115,7 +117,6 @@ export(b.star
        ,mpi.waitall
        ,mpi.waitany
        ,mpi.waitsome
-       ,mpichhosts
        ,slave.hostinfo
        ,string
        ,tailslave.log
