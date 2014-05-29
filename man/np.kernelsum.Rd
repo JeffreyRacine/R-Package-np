@@ -28,7 +28,6 @@ npksum(\dots)
        permutation.operator = names(PERMUTATION_OPERATORS),
        compute.score = FALSE,
        compute.ocg = FALSE,
-       smooth.coefficient = FALSE,
        return.kernel.weights = FALSE,
        \dots)
 
@@ -44,7 +43,6 @@ npksum(\dots)
        permutation.operator,
        compute.score,
        compute.ocg,
-       smooth.coefficient,
        return.kernel.weights,
        \dots)
 }
@@ -158,12 +156,6 @@ npksum(\dots)
     kernel term for that dimension is evaluation at an appropriate
     reference category. This is used primarily in \code{np} to compute ordered and
     unordered categorical gradients. See details.
-  }
-
-  \item{smooth.coefficient}{
-    a logical specifying whether or not to use certain optimisations if
-    the smooth coefficient estimator is being computed. Currently does
-    nothing. Defaults to \code{FALSE}.
   }
 
   \item{return.kernel.weights}{

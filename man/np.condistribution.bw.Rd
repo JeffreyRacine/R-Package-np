@@ -32,7 +32,6 @@ npcdistbw(\dots)
           gydat = NULL,
           bws,
           bandwidth.compute = TRUE,
-          auto = TRUE,
           nmulti,
           remin = TRUE,
           itmax = 10000,
@@ -64,10 +63,15 @@ npcdistbw(\dots)
           gydat,
           bws,
           bandwidth.compute = TRUE,
-          auto,
           nmulti,
           remin,
           itmax,
+          do.full.integral,
+          ngrid,
+          ftol,
+          tol,
+          small,
+          memfac,
           lbc.dir,
           dfc.dir,
           cfac.dir,
@@ -83,12 +87,6 @@ npcdistbw(\dots)
           hbd.init,
           dfac.init,
           scale.init.categorical.sample,
-          do.full.integral,
-          ngrid,
-          ftol,
-          tol,
-          small,
-          memfac,
           bwmethod,
           bwscaling,
           bwtype,
@@ -176,13 +174,6 @@ npcdistbw(\dots)
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.
-  }
-
-  \item{auto}{
-    a logical value specifying whether to allow the code to
-    attempt to automatically select the fastest routine, using a
-    heuristic, to compute the least-squares cross-validation function.
-    Defaults to \code{TRUE}.
   }
 
     
