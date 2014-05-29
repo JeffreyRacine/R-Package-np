@@ -43,7 +43,7 @@ npseed(seed)
       Theory and Practice,} Princeton University Press.
 }
 
-\author{ Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey
+\author{ Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey
   S. Racine \email{racinej@mcmaster.ca}
 }
 

@@ -269,7 +269,7 @@ npplregbw(\dots)
 
 }
 \author{
-    Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine
+    Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine
     \email{racinej@mcmaster.ca}
 }
 

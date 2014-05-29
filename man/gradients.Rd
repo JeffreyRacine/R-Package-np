@@ -50,7 +50,7 @@ gradients(x, \dots)
   references in \code{\link{npreg}}
 }
 \author{
-  Tristen Hayfield \email{hayfield@mpia.de}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
+  Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
 \section{Note}{ This method currently only supports objects from the

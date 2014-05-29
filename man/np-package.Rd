@@ -258,7 +258,7 @@
 }
 
 \author{
-  Tristen Hayfield <hayfield@mpia.de>, Jeffrey S. Racine
+  Tristen Hayfield <tristen.hayfield@gmail.com>, Jeffrey S. Racine
   <racinej@mcmaster.ca>
 
   Maintainer: Jeffrey S. Racine <racinej@mcmaster.ca>
