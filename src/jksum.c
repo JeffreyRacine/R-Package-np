@@ -921,6 +921,1316 @@ double np_onull(const double x, const double y, const double lambda, const doubl
   return(0.0);
 }
 
+// adaptive convolution kernels
+double np_aconvol_gauss2(const double x, const double y,const double hx,const double hy){
+  const double h2 = hx*hx + hy*hy;
+  const double z2 = (x-y)*(x-y)/h2;
+
+  return(0.3989422803*hx*hy*exp(-0.5*z2)/sqrt(h2));
+}
+
+double np_aconvol_gauss4(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(2);
+  const double hx2 = hx*hx;
+  const double hy2 = hy*hy;
+  const double hxy2 = hx2+hy2;
+  const double x2 = x*x;
+  const double y2 = y*x;
+  const double hx3 = hx2*hx;
+  const double hy3 = hy2*hy;
+  const double hx5 = hx3*hx2;
+  const double hy5 = hy3*hy2;
+  const double hx7 = hx5*hx2;
+  const double hy7 = hy5*hy2;
+  const double hx9 = hx7*hx2;
+  const double hy9 = hy7*hy2;
+  
+  return((hx3*hy3*(y2*y2 - 4*x*y*y2 + x2*x2)
+                     + (6*hx3*hy3*x2 - 2*hx*hy7 - 6*hx3*hy5 - 12*hx5*hy3 - 2*hx7*hy)*y2
+                     + ((4*hx*hy7 + 24*hx3*hy5 + 24*hx5*hy3 + 4*hx7*hy)*x - 4*hx3*hy3*x2*x)*y
+                     + ( - 2*hx*hy7 - 12*hx3*hy5 - 12*hx5*hy3 - 2*hx7*hy)*x2
+                     + 6*hx*hy9 + 27*hx3*hy7 + 42*hx5*hy5 + 27*hx7*hy3 + 6*hx9*hy)*
+         exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/(sqrt(hy2 + hx2)*4*hxy2*hxy2*hxy2*hxy2));
+}
+
+double np_aconvol_gauss6(const double x, const double y,const double hx,const double hy){
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+  const double hx6 = hx4*hx2;
+  const double hx8 = hx4*hx4;
+  const double hx10 = hx8*hx2;
+  const double hx12 = hx10*hx2;
+  const double hx14 = hx12*hx2;
+  const double hx16 = hx8*hx8;
+
+  const double x2 = x*x;
+  const double x3 = x*x2;
+  const double x4 = x2*x2;
+  const double x5 = x*x4;
+  const double x6 = x3*x3;
+  const double x7 = x*x6;
+  const double x8 = x4*x4;
+
+  
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+  const double hy6 = hy4*hy2;
+  const double hy8 = hy4*hy4;
+  const double hy10 = hy8*hy2;
+  const double hy12 = hy10*hy2;
+  const double hy14 = hy12*hy2;
+  const double hy16 = hy8*hy8;
+
+  const double y2 = y*y;
+  const double y3 = y*y2;
+  const double y4 = y2*y2;
+  const double y5 = y*y4;
+  const double y6 = y3*y3;
+  const double y7 = y*y6;
+  const double y8 = y4*y4;
+  
+  const double hxy2 = hx2+hy2;
+  const double hxy4 = hxy2*hxy2;
+  const double hxy8 = hxy4*hxy4;
+    
+  return(hx*hy*(hx4*hy4*y8-8*hx4*hy4*x*y7+28*hx4*hy4*x2*y6-4*hx2*hy8*y6
+                -40*hx4*hy6*y6-40*hx6*hy4*y6-4*hx8*hy2*y6
+                -56*hx4*hy4*x3*y5+24*hx2*hy8*x*y5+240*hx4*hy6*x*y5
+                +240*hx6*hy4*x*y5+24*hx8*hy2*x*y5+70*hx4*hy4*x4*y4
+                -60*hx2*hy8*x2*y4-600*hx4*hy6*x2*y4
+                -600*hx6*hy4*x2*y4-60*hx8*hy2*x2*y4+8*hy12*y4
+                +108*hx2*hy10*y4+570*hx4*hy8*y4+940*hx6*hy6*y4
+                +570*hx8*hy4*y4+108*hx10*hy2*y4+8*hx12*y4
+                -56*hx4*hy4*x5*y3+80*hx2*hy8*x3*y3
+                +800*hx4*hy6*x3*y3+800*hx6*hy4*x3*y3
+                +80*hx8*hy2*x3*y3-32*hy12*x*y3-432*hx2*hy10*x*y3
+                -2280*hx4*hy8*x*y3-3760*hx6*hy6*x*y3
+                -2280*hx8*hy4*x*y3-432*hx10*hy2*x*y3-32*hx12*x*y3
+                +28*hx4*hy4*x6*y2-60*hx2*hy8*x4*y2
+                -600*hx4*hy6*x4*y2-600*hx6*hy4*x4*y2
+                -60*hx8*hy2*x4*y2+48*hy12*x2*y2+648*hx2*hy10*x2*y2
+                +3420*hx4*hy8*x2*y2+5640*hx6*hy6*x2*y2
+                +3420*hx8*hy4*x2*y2+648*hx10*hy2*x2*y2
+                +48*hx12*x2*y2-80*hy14*y2-740*hx2*hy12*y2
+                -3000*hx4*hy10*y2-5860*hx6*hy8*y2-5860*hx8*hy6*y2
+                -3000*hx10*hy4*y2-740*hx12*hy2*y2-80*hx14*y2
+                -8*hx4*hy4*x7*y+24*hx2*hy8*x5*y+240*hx4*hy6*x5*y
+                +240*hx6*hy4*x5*y+24*hx8*hy2*x5*y-32*hy12*x3*y
+                -432*hx2*hy10*x3*y-2280*hx4*hy8*x3*y
+                -3760*hx6*hy6*x3*y-2280*hx8*hy4*x3*y
+                -432*hx10*hy2*x3*y-32*hx12*x3*y+160*hy14*x*y
+                +1480*hx2*hy12*x*y+6000*hx4*hy10*x*y+11720*hx6*hy8*x*y
+                +11720*hx8*hy6*x*y+6000*hx10*hy4*x*y+1480*hx12*hy2*x*y
+                +160*hx14*x*y+hx4*hy4*x8-4*hx2*hy8*x6-40*hx4*hy6*x6
+                -40*hx6*hy4*x6-4*hx8*hy2*x6+8*hy12*x4
+                +108*hx2*hy10*x4+570*hx4*hy8*x4+940*hx6*hy6*x4
+                +570*hx8*hy4*x4+108*hx10*hy2*x4+8*hx12*x4
+                -80*hy14*x2-740*hx2*hy12*x2-3000*hx4*hy10*x2
+                -5860*hx6*hy8*x2-5860*hx8*hy6*x2-3000*hx10*hy4*x2
+                -740*hx12*hy2*x2-80*hx14*x2+120*hy16+1020*hx2*hy14
+                +3825*hx4*hy12+8040*hx6*hy10+10230*hx8*hy8
+                +8040*hx10*hy6+3825*hx12*hy4+1020*hx14*hy2+120*hx16)*
+         exp(-0.5*(x-y)*(x-y)/hxy2)*ONE_OVER_SQRT_TWO_PI/(sqrt(hxy2)*64*hxy8));
+}
+
+double np_aconvol_gauss8(const double x, const double y,const double hx,const double hy){
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+  const double hx6 = hx4*hx2;
+  const double hx8 = hx6*hx2;
+  const double hx10 = hx8*hx2;
+  const double hx12 = hx10*hx2;
+  const double hx14 = hx12*hx2;
+  const double hx16 = hx14*hx2;
+  const double hx18 = hx16*hx2;
+  const double hx20 = hx18*hx2;
+  const double hx22 = hx20*hx2;
+  const double hx24 = hx22*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+  const double hy6 = hy4*hy2;
+  const double hy8 = hy6*hy2;
+  const double hy10 = hy8*hy2;
+  const double hy12 = hy10*hy2;
+  const double hy14 = hy12*hy2;
+  const double hy16 = hy14*hy2;
+  const double hy18 = hy16*hy2;
+  const double hy20 = hy18*hy2;
+  const double hy22 = hy20*hy2;
+  const double hy24 = hy22*hy2;
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x3*x;
+  const double x5 = x4*x;
+  const double x6 = x5*x;
+  const double x7 = x6*x;
+  const double x8 = x7*x;
+  const double x9 = x8*x;
+  const double x10 = x9*x;
+  const double x11 = x10*x;
+  const double x12 = x11*x;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y3*y;
+  const double y5 = y4*y;
+  const double y6 = y5*y;
+  const double y7 = y6*y;
+  const double y8 = y7*y;
+  const double y9 = y8*y;
+  const double y10 = y9*y;
+  const double y11 = y10*y;
+  const double y12 = y11*y;
+
+  const double hxy2 = hx2+hy2;
+
+  const double s1 = ONE_OVER_SQRT_TWO_PI*hx*hy*exp(-0.5*(x-y)*(x-y)/hxy2)/(9*256*sqrt(hxy2)*ipow(hxy2,12));
+  
+  const double s2 = (hx6*hy6*y12-12*hx6*hy6*x*y11+66*hx6*hy6*x2*y10-6*hx4*hy10*y10
+                     -84*hx6*hy8*y10-84*hx8*hy6*y10-6*hx10*hy4*y10
+                     -220*hx6*hy6*x3*y9+60*hx4*hy10*x*y9
+                     +840*hx6*hy8*x*y9+840*hx8*hy6*x*y9+60*hx10*hy4*x*y9
+                     +495*hx6*hy6*x4*y8-270*hx4*hy10*x2*y8
+                     -3780*hx6*hy8*x2*y8-3780*hx8*hy6*x2*y8
+                     -270*hx10*hy4*x2*y8+24*hx2*hy14*y8+402*hx4*hy12*y8
+                     +2877*hx6*hy10*y8+4998*hx8*hy8*y8+2877*hx10*hy6*y8
+                     +402*hx12*hy4*y8+24*hx14*hy2*y8-792*hx6*hy6*x5*y7
+                     +720*hx4*hy10*x3*y7+10080*hx6*hy8*x3*y7
+                     +10080*hx8*hy6*x3*y7+720*hx10*hy4*x3*y7
+                     -192*hx2*hy14*x*y7-3216*hx4*hy12*x*y7
+                     -23016*hx6*hy10*x*y7-39984*hx8*hy8*x*y7
+                     -23016*hx10*hy6*x*y7-3216*hx12*hy4*x*y7
+                     -192*hx14*hy2*x*y7+924*hx6*hy6*x6*y6
+                     -1260*hx4*hy10*x4*y6-17640*hx6*hy8*x4*y6
+                     -17640*hx8*hy6*x4*y6-1260*hx10*hy4*x4*y6
+                     +672*hx2*hy14*x2*y6+11256*hx4*hy12*x2*y6
+                     +80556*hx6*hy10*x2*y6+139944*hx8*hy8*x2*y6
+                     +80556*hx10*hy6*x2*y6+11256*hx12*hy4*x2*y6
+                     +672*hx14*hy2*x2*y6-48*hy18*y6-1104*hx2*hy16*y6
+                     -9876*hx4*hy14*y6-49224*hx6*hy12*y6
+                     -105588*hx8*hy10*y6-105588*hx10*hy8*y6
+                     -49224*hx12*hy6*y6-9876*hx14*hy4*y6
+                     -1104*hx16*hy2*y6-48*hx18*y6-792*hx6*hy6*x7*y5
+                     +1512*hx4*hy10*x5*y5+21168*hx6*hy8*x5*y5
+                     +21168*hx8*hy6*x5*y5+1512*hx10*hy4*x5*y5
+                     -1344*hx2*hy14*x3*y5-22512*hx4*hy12*x3*y5
+                     -161112*hx6*hy10*x3*y5-279888*hx8*hy8*x3*y5
+                     -161112*hx10*hy6*x3*y5-22512*hx12*hy4*x3*y5
+                     -1344*hx14*hy2*x3*y5+288*hy18*x*y5
+                     +6624*hx2*hy16*x*y5+59256*hx4*hy14*x*y5
+                     +295344*hx6*hy12*x*y5+633528*hx8*hy10*x*y5
+                     +633528*hx10*hy8*x*y5+295344*hx12*hy6*x*y5
+                     +59256*hx14*hy4*x*y5+6624*hx16*hy2*x*y5
+                     +288*hx18*x*y5+495*hx6*hy6*x8*y4
+                     -1260*hx4*hy10*x6*y4-17640*hx6*hy8*x6*y4
+                     -17640*hx8*hy6*x6*y4-1260*hx10*hy4*x6*y4
+                     +1680*hx2*hy14*x4*y4+28140*hx4*hy12*x4*y4
+                     +201390*hx6*hy10*x4*y4+349860*hx8*hy8*x4*y4
+                     +201390*hx10*hy6*x4*y4+28140*hx12*hy4*x4*y4
+                     +1680*hx14*hy2*x4*y4-720*hy18*x2*y4
+                     -16560*hx2*hy16*x2*y4-148140*hx4*hy14*x2*y4
+                     -738360*hx6*hy12*x2*y4-1583820*hx8*hy10*x2*y4
+                     -1583820*hx10*hy8*x2*y4-738360*hx12*hy6*x2*y4
+                     -148140*hx14*hy4*x2*y4-16560*hx16*hy2*x2*y4);
+
+    const double s3 = (-720*hx18*x2*y4+1008*hy20*y4+15120*hx2*hy18*y4
+                       +102060*hx4*hy16*y4+412335*hx6*hy14*y4
+                       +947520*hx8*hy12*y4+1246266*hx10*hy10*y4
+                       +947520*hx12*hy8*y4+412335*hx14*hy6*y4
+                       +102060*hx16*hy4*y4+15120*hx18*hy2*y4+1008*hx20*y4
+                       -220*hx6*hy6*x9*y3+720*hx4*hy10*x7*y3
+                       +10080*hx6*hy8*x7*y3+10080*hx8*hy6*x7*y3
+                       +720*hx10*hy4*x7*y3-1344*hx2*hy14*x5*y3
+                       -22512*hx4*hy12*x5*y3-161112*hx6*hy10*x5*y3
+                       -279888*hx8*hy8*x5*y3-161112*hx10*hy6*x5*y3
+                       -22512*hx12*hy4*x5*y3-1344*hx14*hy2*x5*y3
+                       +960*hy18*x3*y3+22080*hx2*hy16*x3*y3
+                       +197520*hx4*hy14*x3*y3+984480*hx6*hy12*x3*y3
+                       +2111760*hx8*hy10*x3*y3+2111760*hx10*hy8*x3*y3
+                       +984480*hx12*hy6*x3*y3+197520*hx14*hy4*x3*y3
+                       +22080*hx16*hy2*x3*y3+960*hx18*x3*y3-4032*hy20*x*y3
+                       -60480*hx2*hy18*x*y3-408240*hx4*hy16*x*y3
+                       -1649340*hx6*hy14*x*y3-3790080*hx8*hy12*x*y3
+                       -4985064*hx10*hy10*x*y3-3790080*hx12*hy8*x*y3
+                       -1649340*hx14*hy6*x*y3-408240*hx16*hy4*x*y3
+                       -60480*hx18*hy2*x*y3-4032*hx20*x*y3
+                       +66*hx6*hy6*x10*y2-270*hx4*hy10*x8*y2
+                       -3780*hx6*hy8*x8*y2-3780*hx8*hy6*x8*y2
+                       -270*hx10*hy4*x8*y2+672*hx2*hy14*x6*y2
+                       +11256*hx4*hy12*x6*y2+80556*hx6*hy10*x6*y2
+                       +139944*hx8*hy8*x6*y2+80556*hx10*hy6*x6*y2
+                       +11256*hx12*hy4*x6*y2+672*hx14*hy2*x6*y2
+                       -720*hy18*x4*y2-16560*hx2*hy16*x4*y2
+                       -148140*hx4*hy14*x4*y2-738360*hx6*hy12*x4*y2
+                       -1583820*hx8*hy10*x4*y2-1583820*hx10*hy8*x4*y2
+                       -738360*hx12*hy6*x4*y2-148140*hx14*hy4*x4*y2
+                       -16560*hx16*hy2*x4*y2-720*hx18*x4*y2
+                       +6048*hy20*x2*y2+90720*hx2*hy18*x2*y2
+                       +612360*hx4*hy16*x2*y2+2474010*hx6*hy14*x2*y2
+                       +5685120*hx8*hy12*x2*y2+7477596*hx10*hy10*x2*y2
+                       +5685120*hx12*hy8*x2*y2+2474010*hx14*hy6*x2*y2
+                       +612360*hx16*hy4*x2*y2+90720*hx18*hy2*x2*y2
+                       +6048*hx20*x2*y2-5040*hy22*y2-65520*hx2*hy20*y2
+                       -391230*hx4*hy18*y2-1420020*hx6*hy16*y2
+                       -3311280*hx8*hy14*y2-5038110*hx10*hy12*y2
+                       -5038110*hx12*hy10*y2-3311280*hx14*hy8*y2
+                       -1420020*hx16*hy6*y2-391230*hx18*hy4*y2
+                       -65520*hx20*hy2*y2-5040*hx22*y2-12*hx6*hy6*x11*y
+                       +60*hx4*hy10*x9*y+840*hx6*hy8*x9*y+840*hx8*hy6*x9*y
+                       +60*hx10*hy4*x9*y-192*hx2*hy14*x7*y);
+
+  const double s4 = (-3216*hx4*hy12*x7*y-23016*hx6*hy10*x7*y
+                     -39984*hx8*hy8*x7*y-23016*hx10*hy6*x7*y
+                     -3216*hx12*hy4*x7*y-192*hx14*hy2*x7*y+288*hy18*x5*y
+                     +6624*hx2*hy16*x5*y+59256*hx4*hy14*x5*y
+                     +295344*hx6*hy12*x5*y+633528*hx8*hy10*x5*y
+                     +633528*hx10*hy8*x5*y+295344*hx12*hy6*x5*y
+                     +59256*hx14*hy4*x5*y+6624*hx16*hy2*x5*y
+                     +288*hx18*x5*y-4032*hy20*x3*y-60480*hx2*hy18*x3*y
+                     -408240*hx4*hy16*x3*y-1649340*hx6*hy14*x3*y
+                     -3790080*hx8*hy12*x3*y-4985064*hx10*hy10*x3*y
+                     -3790080*hx12*hy8*x3*y-1649340*hx14*hy6*x3*y
+                     -408240*hx16*hy4*x3*y-60480*hx18*hy2*x3*y
+                     -4032*hx20*x3*y+10080*hy22*x*y+131040*hx2*hy20*x*y
+                     +782460*hx4*hy18*x*y+2840040*hx6*hy16*x*y
+                     +6622560*hx8*hy14*x*y+10076220*hx10*hy12*x*y
+                     +10076220*hx12*hy10*x*y+6622560*hx14*hy8*x*y
+                     +2840040*hx16*hy6*x*y+782460*hx18*hy4*x*y
+                     +131040*hx20*hy2*x*y+10080*hx22*x*y+hx6*hy6*x12
+                     -6*hx4*hy10*x10-84*hx6*hy8*x10-84*hx8*hy6*x10
+                     -6*hx10*hy4*x10+24*hx2*hy14*x8+402*hx4*hy12*x8
+                     +2877*hx6*hy10*x8+4998*hx8*hy8*x8+2877*hx10*hy6*x8
+                     +402*hx12*hy4*x8+24*hx14*hy2*x8-48*hy18*x6
+                     -1104*hx2*hy16*x6-9876*hx4*hy14*x6
+                     -49224*hx6*hy12*x6-105588*hx8*hy10*x6
+                     -105588*hx10*hy8*x6-49224*hx12*hy6*x6
+                     -9876*hx14*hy4*x6-1104*hx16*hy2*x6-48*hx18*x6
+                     +1008*hy20*x4+15120*hx2*hy18*x4+102060*hx4*hy16*x4
+                     +412335*hx6*hy14*x4+947520*hx8*hy12*x4
+                     +1246266*hx10*hy10*x4+947520*hx12*hy8*x4
+                     +412335*hx14*hy6*x4+102060*hx16*hy4*x4
+                     +15120*hx18*hy2*x4+1008*hx20*x4-5040*hy22*x2
+                     -65520*hx2*hy20*x2-391230*hx4*hy18*x2
+                     -1420020*hx6*hy16*x2-3311280*hx8*hy14*x2
+                     -5038110*hx10*hy12*x2-5038110*hx12*hy10*x2
+                     -3311280*hx14*hy8*x2-1420020*hx16*hy6*x2
+                     -391230*hx18*hy4*x2-65520*hx20*hy2*x2-5040*hx22*x2
+                     +5040*hy24+63000*hx2*hy22+362250*hx4*hy20
+                     +1267875*hx6*hy18+2983050*hx8*hy16+4923765*hx10*hy14
+                     +5808600*hx12*hy12+4923765*hx14*hy10+2983050*hx16*hy8
+                     +1267875*hx18*hy6+362250*hx20*hy4+63000*hx22*hy2
+                     +5040*hx24);
+  return(s1*(s2+s3+s4));
+}
+
+double np_aconvol_epan2_total(const double x, const double y,const double hx,const double hy){
+  const double a = 3.0*sqrt(5.0);
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+  return((-a*y*y + 2.0*a*x*y - a*x*x + 5.0*a*hl*hl - a*hs*hs)*hs/(100.0*hl*hl));
+}
+
+double np_aconvol_epan2_indefinite(const double l, const double x, const double y,const double hx,const double hy){
+  const double hxs = hx*hx;
+  const double hys = hy*hy;
+  const double xs = x*x;
+  const double ys = y*y;
+  const double a = 3.0/(20000.0*hxs*hys);
+    
+  return(a*l*(((30.0*xs - 150.0*hxs)*ys + hys*(-150.0*xs + 750.0*hxs)) +
+              l*(((150.0*hxs - 30.0*xs)*y + (150.0*hys - 30.0*ys)*x) +
+                 l*(10.0*(ys + 4.0*x*y + xs - 5.0*hys - 5.0*hxs) +
+                    l*((y + x)*(-15.0) + 6.0*l)))));
+
+}
+
+double np_aconvol_epan2(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_epan2_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_epan2_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan2_total(x,y,hx,hy));
+  }
+}
+
+double np_aconvol_epan4_total(const double x, const double y,const double hx,const double hy){
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+
+  const double hl2 = hl*hl;
+  const double hl4 = hl2*hl2;
+
+  const double hs2 = hs*hs;
+  const double hs4 = hs2*hs2;
+
+  return(hs*(21*y4-84*x*y3+126*x2*y2-150*hl2*y2-84*x3*y+300*hl2*x*y+21*x4
+             -150*hl2*x2+225*hl4-25*hs4)/(32*5*sqrt(5)*hl4));
+}
+
+double np_aconvol_epan4_indefinite(const double l,const double x, const double y,const double hx,const double hy){
+  const double l2 = l*l;
+  const double l3 = l2*l;
+  const double l4 = l3*l;
+  const double l5 = l4*l;
+  const double l6 = l5*l;
+  const double l7 = l6*l;
+  const double l8 = l7*l;
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x3*x;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y3*y;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+
+  return(l*(4410*x4*y4-8820*l*x3*y4+8820*l2*x2*y4-31500*hx2*x2*y4
+            -4410*l3*x*y4+31500*hx2*l*x*y4+882*l4*y4
+            -10500*hx2*l2*y4+47250*hx4*y4-8820*l*x4*y3
+            +23520*l2*x3*y3-26460*l3*x2*y3+63000*hx2*l*x2*y3
+            +14112*l4*x*y3-84000*hx2*l2*x*y3-2940*l5*y3
+            +31500*hx2*l3*y3-94500*hx4*l*y3+8820*l2*x4*y2
+            -31500*hy2*x4*y2-26460*l3*x3*y2+63000*hy2*l*x3*y2
+            +31752*l4*x2*y2-63000*hy2*l2*x2*y2
+            -63000*hx2*l2*x2*y2+225000*hx2*hy2*x2*y2
+            -17640*l5*x*y2+31500*hy2*l3*x*y2+94500*hx2*l3*x*y2
+            -225000*hx2*hy2*l*x*y2+3780*l6*y2-6300*hy2*l4*y2
+            -37800*hx2*l4*y2+75000*hx2*hy2*l2*y2+94500*hx4*l2*y2
+            -337500*hx4*hy2*y2-4410*l3*x4*y+31500*hy2*l*x4*y
+            +14112*l4*x3*y-84000*hy2*l2*x3*y-17640*l5*x2*y
+            +94500*hy2*l3*x2*y+31500*hx2*l3*x2*y
+            -225000*hx2*hy2*l*x2*y+10080*l6*x*y-50400*hy2*l4*x*y
+            -50400*hx2*l4*x*y+300000*hx2*hy2*l2*x*y-2205*l7*y
+            +10500*hy2*l5*y+21000*hx2*l5*y-112500*hx2*hy2*l3*y
+            -47250*hx4*l3*y+337500*hx4*hy2*l*y+882*l4*x4
+            -10500*hy2*l2*x4+47250*hy4*x4-2940*l5*x3
+            +31500*hy2*l3*x3-94500*hy4*l*x3+3780*l6*x2
+            -37800*hy2*l4*x2-6300*hx2*l4*x2+94500*hy4*l2*x2
+            +75000*hx2*hy2*l2*x2-337500*hx2*hy4*x2-2205*l7*x
+            +21000*hy2*l5*x+10500*hx2*l5*x-47250*hy4*l3*x
+            -112500*hx2*hy2*l3*x+337500*hx2*hy4*l*x+490*l8
+            -4500*hy2*l6-4500*hx2*l6+9450*hy4*l4+45000*hx2*hy2*l4
+            +9450*hx4*l4-112500*hx2*hy4*l2-112500*hx4*hy2*l2
+            +506250*hx4*hy4)
+         /(1280000*hx4*hy4));
+}
+
+double np_aconvol_epan4(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_epan4_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_epan4_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan4_total(x,y,hx,hy));
+  }
+}
+
+double np_aconvol_epan6_total(const double x, const double y,const double hx,const double hy){
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+
+  const double hl2 = hl*hl;
+  const double hl4 = hl2*hl2;
+  const double hl6 = hl4*hl2;
+
+  const double hs2 = hs*hs;
+  const double hs4 = hs2*hs2;
+  const double hs6 = hs4*hs2;
+
+  return(-21*hs
+         *(429*y6-2574*x*y5+6435*x2*y4-4095*hl2*y4-8580*x3*y3
+           +16380*hl2*x*y3+6435*x4*y2-24570*hl2*x2*y2+11375*hl4*y2
+           -2574*x5*y+16380*hl2*x3*y-22750*hl4*x*y+429*x6-4095*hl2*x4
+           +11375*hl4*x2-8125*hl6+625*hs6)
+         /(3328*sqrt(5)*25*hl6));
+
+}
+
+double np_aconvol_epan6_indefinite(const double u, const double x, const double y,const double hx,const double hy){
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+  const double hx6 = hx4*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+  const double hy6 = hy4*hy2;
+
+  const double u2 = u*u;
+  const double u3 = u2*u;
+  const double u4 = u3*u;
+  const double u5 = u4*u;
+  const double u6 = u5*u;
+  const double u7 = u6*u;
+  const double u8 = u7*u;
+  const double u9 = u8*u;
+  const double u10 = u9*u;
+  const double u11 = u10*u;
+  const double u12 = u11*u;
+
+  return(21*u
+         *(1189188*x6*y6-3567564*u*x5*y6+5945940*u2*x4*y6
+           -11351340*hx2*x4*y6-5945940*u3*x3*y6
+           +22702680*hx2*u*x3*y6+3567564*u4*x2*y6
+           -22702680*hx2*u2*x2*y6+31531500*hx4*x2*y6
+           -1189188*u5*x*y6+11351340*hx2*u3*x*y6
+           -31531500*hx4*u*x*y6+169884*u6*y6-2270268*hx2*u4*y6
+           +10510500*hx4*u2*y6-22522500*hx6*y6-3567564*u*x6*y5
+           +14270256*u2*x5*y5-26756730*u3*x4*y5
+           +34054020*hx2*u*x4*y5+28540512*u4*x3*y5
+           -90810720*hx2*u2*x3*y5-17837820*u5*x2*y5
+           +102162060*hx2*u3*x2*y5-94594500*hx4*u*x2*y5
+           +6115824*u6*x*y5-54486432*hx2*u4*x*y5
+           +126126000*hx4*u2*x*y5-891891*u7*y5
+           +11351340*hx2*u5*y5-47297250*hx4*u3*y5
+           +67567500*hx6*u*y5+5945940*u2*x6*y4
+           -11351340*hy2*x6*y4-26756730*u3*x5*y4
+           +34054020*hy2*u*x5*y4+53513460*u4*x4*y4
+           -56756700*hy2*u2*x4*y4-56756700*hx2*u2*x4*y4
+           +108353700*hx2*hy2*x4*y4-59459400*u5*x3*y4
+           +56756700*hy2*u3*x3*y4+170270100*hx2*u3*x3*y4
+           -216707400*hx2*hy2*u*x3*y4+38223900*u6*x2*y4
+           -34054020*hy2*u4*x2*y4-204324120*hx2*u4*x2*y4
+           +216707400*hx2*hy2*u2*x2*y4+157657500*hx4*u2*x2*y4
+           -300982500*hx4*hy2*x2*y4-13378365*u7*x*y4
+           +11351340*hy2*u5*x*y4+113513400*hx2*u5*x*y4
+           -108353700*hx2*hy2*u3*x*y4-236486250*hx4*u3*x*y4
+           +300982500*hx4*hy2*u*x*y4+1981980*u8*y4
+           -1621620*hy2*u6*y4-24324300*hx2*u6*y4
+           +21670740*hx2*hy2*u4*y4+94594500*hx4*u4*y4
+           -100327500*hx4*hy2*u2*y4-112612500*hx6*u2*y4
+           +214987500*hx6*hy2*y4-5945940*u3*x6*y3
+           +22702680*hy2*u*x6*y3+28540512*u4*x5*y3
+           -90810720*hy2*u2*x5*y3-59459400*u5*x4*y3
+           +170270100*hy2*u3*x4*y3+56756700*hx2*u3*x4*y3
+           -216707400*hx2*hy2*u*x4*y3+67953600*u6*x3*y3
+           -181621440*hy2*u4*x3*y3-181621440*hx2*u4*x3*y3
+           +577886400*hx2*hy2*u2*x3*y3-44594550*u7*x2*y3
+           +113513400*hy2*u5*x2*y3+227026800*hx2*u5*x2*y3
+           -650122200*hx2*hy2*u3*x2*y3-157657500*hx4*u3*x2*y3
+           +601965000*hx4*hy2*u*x2*y3+15855840*u8*x*y3
+           -38918880*hy2*u6*x*y3-129729600*hx2*u6*x*y3
+           +346731840*hx2*hy2*u4*x*y3+252252000*hx4*u4*x*y3
+           -802620000*hx4*hy2*u2*x*y3-2378376*u9*y3
+           +5675670*hy2*u7*y3+28378350*hx2*u7*y3
+           -72235800*hx2*hy2*u5*y3-105105000*hx4*u5*y3
+           +300982500*hx4*hy2*u3*y3+112612500*hx6*u3*y3
+           -429975000*hx6*hy2*u*y3+3567564*u4*x6*y2
+           -22702680*hy2*u2*x6*y2+31531500*hy4*x6*y2
+           -17837820*u5*x5*y2+102162060*hy2*u3*x5*y2
+           -94594500*hy4*u*x5*y2+38223900*u6*x4*y2
+           -204324120*hy2*u4*x4*y2-34054020*hx2*u4*x4*y2
+           +157657500*hy4*u2*x4*y2+216707400*hx2*hy2*u2*x4*y2
+           -300982500*hx2*hy4*x4*y2-44594550*u7*x3*y2
+           +227026800*hy2*u5*x3*y2+113513400*hx2*u5*x3*y2
+           -157657500*hy4*u3*x3*y2-650122200*hx2*hy2*u3*x3*y2
+           +601965000*hx2*hy4*u*x3*y2+29729700*u8*x2*y2
+           -145945800*hy2*u6*x2*y2-145945800*hx2*u6*x2*y2
+           +94594500*hy4*u4*x2*y2+780146640*hx2*hy2*u4*x2*y2
+           +94594500*hx4*u4*x2*y2-601965000*hx2*hy4*u2*x2*y2
+           -601965000*hx4*hy2*u2*x2*y2
+           +836062500*hx4*hy4*x2*y2-10702692*u9*x*y2
+           +51081030*hy2*u7*x*y2+85135050*hx2*u7*x*y2
+           -31531500*hy4*u5*x*y2-433414800*hx2*hy2*u5*x*y2
+           -157657500*hx4*u5*x*y2+300982500*hx2*hy4*u3*x*y2
+           +902947500*hx4*hy2*u3*x*y2-836062500*hx4*hy4*u*x*y2
+           +1621620*u10*y2-7567560*hy2*u8*y2
+           -18918900*hx2*u8*y2+4504500*hy4*u6*y2
+           +92874600*hx2*hy2*u6*y2+67567500*hx4*u6*y2
+           -60196500*hx2*hy4*u4*y2-361179000*hx4*hy2*u4*y2
+           -67567500*hx6*u4*y2+278687500*hx4*hy4*u2*y2
+           +429975000*hx6*hy2*u2*y2-597187500*hx6*hy4*y2
+           -1189188*u5*x6*y+11351340*hy2*u3*x6*y
+           -31531500*hy4*u*x6*y+6115824*u6*x5*y
+           -54486432*hy2*u4*x5*y+126126000*hy4*u2*x5*y
+           -13378365*u7*x4*y+113513400*hy2*u5*x4*y
+           +11351340*hx2*u5*x4*y-236486250*hy4*u3*x4*y
+           -108353700*hx2*hy2*u3*x4*y+300982500*hx2*hy4*u*x4*y
+           +15855840*u8*x3*y-129729600*hy2*u6*x3*y
+           -38918880*hx2*u6*x3*y+252252000*hy4*u4*x3*y
+           +346731840*hx2*hy2*u4*x3*y
+           -802620000*hx2*hy4*u2*x3*y-10702692*u9*x2*y
+           +85135050*hy2*u7*x2*y+51081030*hx2*u7*x2*y
+           -157657500*hy4*u5*x2*y-433414800*hx2*hy2*u5*x2*y
+           -31531500*hx4*u5*x2*y+902947500*hx2*hy4*u3*x2*y
+           +300982500*hx4*hy2*u3*x2*y-836062500*hx4*hy4*u*x2*y
+           +3891888*u10*x*y-30270240*hy2*u8*x*y
+           -30270240*hx2*u8*x*y+54054000*hy4*u6*x*y
+           +247665600*hx2*hy2*u6*x*y+54054000*hx4*u6*x*y
+           -481572000*hx2*hy4*u4*x*y-481572000*hx4*hy2*u4*x*y
+           +1114750000*hx4*hy4*u2*x*y-594594*u11*y
+           +4540536*hy2*u9*y+6810804*hx2*u9*y-7882875*hy4*u7*y
+           -54176850*hx2*hy2*u7*y-23648625*hx4*u7*y
+           +100327500*hx2*hy4*u5*y+200655000*hx4*hy2*u5*y
+           +22522500*hx6*u5*y-418031250*hx4*hy4*u3*y
+           -214987500*hx6*hy2*u3*y+597187500*hx6*hy4*u*y
+           +169884*u6*x6-2270268*hy2*u4*x6+10510500*hy4*u2*x6
+           -22522500*hy6*x6-891891*u7*x5+11351340*hy2*u5*x5
+           -47297250*hy4*u3*x5+67567500*hy6*u*x5+1981980*u8*x4
+           -24324300*hy2*u6*x4-1621620*hx2*u6*x4
+           +94594500*hy4*u4*x4+21670740*hx2*hy2*u4*x4
+           -112612500*hy6*u2*x4-100327500*hx2*hy4*u2*x4
+           +214987500*hx2*hy6*x4-2378376*u9*x3
+           +28378350*hy2*u7*x3+5675670*hx2*u7*x3
+           -105105000*hy4*u5*x3-72235800*hx2*hy2*u5*x3
+           +112612500*hy6*u3*x3+300982500*hx2*hy4*u3*x3
+           -429975000*hx2*hy6*u*x3+1621620*u10*x2
+           -18918900*hy2*u8*x2-7567560*hx2*u8*x2
+           +67567500*hy4*u6*x2+92874600*hx2*hy2*u6*x2
+           +4504500*hx4*u6*x2-67567500*hy6*u4*x2
+           -361179000*hx2*hy4*u4*x2-60196500*hx4*hy2*u4*x2
+           +429975000*hx2*hy6*u2*x2+278687500*hx4*hy4*u2*x2
+           -597187500*hx4*hy6*x2-594594*u11*x+6810804*hy2*u9*x
+           +4540536*hx2*u9*x-23648625*hy4*u7*x
+           -54176850*hx2*hy2*u7*x-7882875*hx4*u7*x
+           +22522500*hy6*u5*x+200655000*hx2*hy4*u5*x
+           +100327500*hx4*hy2*u5*x-214987500*hx2*hy6*u3*x
+           -418031250*hx4*hy4*u3*x+597187500*hx4*hy6*u*x
+           +91476*u12-1031940*hy2*u10-1031940*hx2*u10
+           +3503500*hy4*u8+12039300*hx2*hy2*u8+3503500*hx4*u8
+           -3217500*hy6*u6-42997500*hx2*hy4*u6
+           -42997500*hx4*hy2*u6-3217500*hx6*u6
+           +42997500*hx2*hy6*u4+167212500*hx4*hy4*u4
+           +42997500*hx6*hy2*u4-199062500*hx4*hy6*u2
+           -199062500*hx6*hy4*u2+426562500*hx6*hy6)
+         /(10649600000*hx6*hy6));
+}
+
+double np_aconvol_epan6(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_epan6_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_epan6_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan6_total(x,y,hx,hy));
+  }
+}
+
+double np_aconvol_epan8_total(const double x, const double y,const double hx,const double hy){
+  const double hl = MAX(hx,hy);
+  const double hs = MIN(hx,hy);
+
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+  const double x7 = x4*x3;
+  const double x8 = x4*x4;
+
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+  const double y7 = y4*y3;
+  const double y8 = y4*y4;
+
+  const double hl2 = hl*hl;
+  const double hl4 = hl2*hl2;
+  const double hl6 = hl4*hl2;
+  const double hl8 = hl4*hl4;
+
+  const double hs2 = hs*hs;
+  const double hs4 = hs2*hs2;
+  const double hs6 = hs4*hs2;
+  const double hs8 = hs4*hs4;
+
+  return(63*hs
+         *(2431*y8-19448*x*y7+68068*x2*y6-29172*hl2*y6-136136*x3*y5
+           +175032*hl2*x*y5+170170*x4*y4-437580*hl2*x2*y4
+           +117810*hl4*y4-136136*x5*y3+583440*hl2*x3*y3
+           -471240*hl4*x*y3+68068*x6*y2-437580*hl2*x4*y2
+           +706860*hl4*x2*y2-178500*hl6*y2-19448*x7*y+175032*hl2*x5*y
+           -471240*hl4*x3*y+357000*hl6*x*y+2431*x8-29172*hl2*x6
+           +117810*hl4*x4-178500*hl6*x2+74375*hl8-4375*hs8)
+         /(69632*sqrt(5)*25*hl8));
+}
+
+double np_aconvol_epan8_xlessy(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5);
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+  const double y7 = y4*y3;
+  const double y8 = y4*y4;
+  const double y9 = y5*y4;
+  const double y10 = y6*y4;
+  const double y11 = y7*y4;
+  const double y12 = y8*y4;
+  const double y13 = y9*y4;
+  const double y14 = y10*y4;
+  const double y15 = y11*y4;
+  const double y16 = y12*y4;
+  const double y17 = y13*y4;
+ 
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+  const double x7 = x4*x3;
+  const double x8 = x4*x4;
+  const double x9 = x5*x4;
+  const double x10 = x6*x4;
+  const double x11 = x7*x4;
+  const double x12 = x8*x4;
+  const double x13 = x9*x4;
+  const double x14 = x10*x4;
+  const double x15 = x11*x4;
+  const double x16 = x12*x4;
+  const double x17 = x13*x4;
+
+  const double hx2 = hx*hx;
+  const double hx3 = hx2*hx;
+  const double hx4 = hx2*hx2;
+  const double hx5 = hx3*hx2;
+  const double hx6 = hx3*hx3;
+  const double hx7 = hx4*hx3;
+  const double hx8 = hx4*hx4;
+  const double hx9 = hx5*hx4;
+  const double hx10 = hx6*hx4;
+  const double hx11 = hx7*hx4;
+  const double hx12 = hx8*hx4;
+  const double hx13 = hx9*hx4;
+  const double hx14 = hx10*hx4;
+  const double hx15 = hx11*hx4;
+  const double hx16 = hx12*hx4;
+  const double hx17 = hx13*hx4;
+
+  const double hy2 = hy*hy;
+  const double hy3 = hy2*hy;
+  const double hy4 = hy2*hy2;
+  const double hy5 = hy3*hy2;
+  const double hy6 = hy3*hy3;
+  const double hy7 = hy4*hy3;
+  const double hy8 = hy4*hy4;
+  const double hy9 = hy5*hy4;
+  const double hy10 = hy6*hy4;
+  const double hy11 = hy7*hy4;
+  const double hy12 = hy8*hy4;
+  const double hy13 = hy9*hy4;
+  const double hy14 = hy10*hy4;
+  const double hy15 = hy11*hy4;
+  const double hy16 = hy12*hy4;
+  const double hy17 = hy13*hy4;
+
+
+  return(-63*(1001*y17-17017*x*y16+136136*x2*y15-58344*hy2*y15-58344*hx2*y15
+              -680680*x3*y14+875160*hy2*x*y14+875160*hx2*x*y14
+              +2382380*x4*y13-6126120*hy2*x2*y13-6126120*hx2*x2*y13
+              +1649340*hy4*y13+2625480*hx2*hy2*y13+1649340*hx4*y13
+              -6194188*x5*y12+26546520*hy2*x3*y12+26546520*hx2*x3*y12
+              -21441420*hy4*x*y12-34131240*hx2*hy2*x*y12
+              -21441420*hx4*x*y12+12388376*x6*y11-79639560*hy2*x4*y11
+              -79639560*hx2*x4*y11+128648520*hy4*x2*y11
+              +204787440*hx2*hy2*x2*y11+128648520*hx4*x2*y11
+              -32487000*hy6*y11-55135080*hx2*hy4*y11
+              -55135080*hx4*hy2*y11-32487000*hx6*y11-19467448*x7*y10
+              +175207032*hy2*x5*y10+175207032*hx2*x5*y10
+              -471711240*hy4*x3*y10-750887280*hx2*hy2*x3*y10
+              -471711240*hx4*x3*y10+357357000*hy6*x*y10
+              +606485880*hx2*hy4*x*y10+606485880*hx4*hy2*x*y10
+              +357357000*hx6*x*y10+24334310*x8*y9-292011720*hy2*x6*y9
+              -292011720*hx2*x6*y9+1179278100*hy4*x4*y9
+              +1877218200*hx2*hy2*x4*y9+1179278100*hx4*x4*y9
+              -1786785000*hy6*x2*y9-3032429400*hx2*hy4*x2*y9
+              -3032429400*hx4*hy2*x2*y9-1786785000*hx6*x2*y9
+              +744493750*hy8*y9+765765000*hx2*hy6*y9
+              +816423300*hx4*hy4*y9+765765000*hx6*hy2*y9
+              +744493750*hx8*y9-24334310*x9*y8+375443640*hy2*x7*y8
+              +375443640*hx2*x7*y8-2122700580*hy4*x5*y8
+              -3378992760*hx2*hy2*x5*y8-2122700580*hx4*x5*y8
+              +5360355000*hy6*x3*y8+9097288200*hx2*hy4*x3*y8
+              +9097288200*hx4*hy2*x3*y8+5360355000*hx6*x3*y8
+              -6700443750*hy8*x*y8-6891885000*hx2*hy6*x*y8
+              -7347809700*hx4*hy4*x*y8-6891885000*hx6*hy2*x*y8
+              -6700443750*hx8*x*y8-9957376*a*125*hy9*y8
+              -9957376*a*125*hx9*y8+19467448*x10*y7
+              -375443640*hy2*x8*y7-375443640*hx2*x8*y7
+              +2830267440*hy4*x6*y7+4505323680*hx2*hy2*x6*y7
+              +2830267440*hx4*x6*y7-10720710000*hy6*x4*y7
+              -18194576400*hx2*hy4*x4*y7-18194576400*hx4*hy2*x4*y7
+              -10720710000*hx6*x4*y7+26801775000*hy8*x2*y7
+              +27567540000*hx2*hy6*x2*y7+29391238800*hx4*hy4*x2*y7
+              +27567540000*hx6*hy2*x2*y7+26801775000*hx8*x2*y7
+              +79659008*a*125*hy9*x*y7+79659008*a*125*hx9*x*y7
+              +3828825000*hy10*y7-11486475000*hx2*hy8*y7
+              -7422030000*hx4*hy6*y7-7422030000*hx6*hy4*y7
+              -11486475000*hx8*hy2*y7+3828825000*hx10*y7
+              -12388376*x11*y6+292011720*hy2*x9*y6+292011720*hx2*x9*y6
+              -2830267440*hy4*x7*y6-4505323680*hx2*hy2*x7*y6
+              -2830267440*hx4*x7*y6+15008994000*hy6*x5*y6
+              +25472406960*hx2*hy4*x5*y6+25472406960*hx4*hy2*x5*y6
+              +15008994000*hx6*x5*y6-62537475000*hy8*x3*y6
+              -64324260000*hx2*hy6*x3*y6-68579557200*hx4*hy4*x3*y6
+              -64324260000*hx6*hy2*x3*y6-62537475000*hx8*x3*y6
+              -278806528*a*125*hy9*x2*y6-278806528*a*125*hx9*x2*y6
+              -26801775000*hy10*x*y6+80405325000*hx2*hy8*x*y6
+              +51954210000*hx4*hy6*x*y6+51954210000*hx6*hy4*x*y6
+              +80405325000*hx8*hy2*x*y6-26801775000*hx10*x*y6
+              +119488512*a*125*hx2*hy9*y6+119488512*a*125*hx9*hy2*y6
+              +6194188*x12*y5-175207032*hy2*x10*y5
+              -175207032*hx2*x10*y5+2122700580*hy4*x8*y5
+              +3378992760*hx2*hy2*x8*y5+2122700580*hx4*x8*y5
+              -15008994000*hy6*x6*y5-25472406960*hx2*hy4*x6*y5
+              -25472406960*hx4*hy2*x6*y5-15008994000*hx6*x6*y5
+              +93806212500*hy8*x4*y5+96486390000*hx2*hy6*x4*y5
+              +102869335800*hx4*hy4*x4*y5+96486390000*hx6*hy2*x4*y5
+              +93806212500*hx8*x4*y5+557613056*a*125*hy9*x3*y5
+              +557613056*a*125*hx9*x3*y5+80405325000*hy10*x2*y5
+              -241215975000*hx2*hy8*x2*y5-155862630000*hx4*hy6*x2*y5
+              -155862630000*hx6*hy4*x2*y5-241215975000*hx8*hy2*x2*y5
+              +80405325000*hx10*x2*y5-716931072*a*125*hx2*hy9*x*y5
+              -716931072*a*125*hx9*hy2*x*y5-4466962500*hy12*y5
+              -34459425000*hx2*hy10*y5+64942762500*hx4*hy8*y5
+              +39359250000*hx6*hy6*y5+64942762500*hx8*hy4*y5
+              -34459425000*hx10*hy2*y5-4466962500*hx12*y5
+              -2382380*x13*y4+79639560*hy2*x11*y4+79639560*hx2*x11*y4
+              -1179278100*hy4*x9*y4-1877218200*hx2*hy2*x9*y4
+              -1179278100*hx4*x9*y4+10720710000*hy6*x7*y4
+              +18194576400*hx2*hy4*x7*y4+18194576400*hx4*hy2*x7*y4
+              +10720710000*hx6*x7*y4-93806212500*hy8*x5*y4
+              -96486390000*hx2*hy6*x5*y4-102869335800*hx4*hy4*x5*y4
+              -96486390000*hx6*hy2*x5*y4-93806212500*hx8*x5*y4
+              -139403264*a*625*hy9*x4*y4-139403264*a*625*hx9*x4*y4
+              -134008875000*hy10*x3*y4+402026625000*hx2*hy8*x3*y4
+              +259771050000*hx4*hy6*x3*y4+259771050000*hx6*hy4*x3*y4
+              +402026625000*hx8*hy2*x3*y4-134008875000*hx10*x3*y4
+              +358465536*a*625*hx2*hy9*x2*y4
+              +358465536*a*625*hx9*hy2*x2*y4+22334812500*hy12*x*y4
+              +172297125000*hx2*hy10*x*y4-324713812500*hx4*hy8*x*y4
+              -196796250000*hx6*hy6*x*y4-324713812500*hx8*hy4*x*y4
+              +172297125000*hx10*hy2*x*y4+22334812500*hx12*x*y4
+              -96509952*a*625*hx4*hy9*y4-96509952*a*625*hx9*hy4*y4
+              +680680*x14*y3-26546520*hy2*x12*y3-26546520*hx2*x12*y3
+              +471711240*hy4*x10*y3+750887280*hx2*hy2*x10*y3
+              +471711240*hx4*x10*y3-5360355000*hy6*x8*y3
+              -9097288200*hx2*hy4*x8*y3-9097288200*hx4*hy2*x8*y3
+              -5360355000*hx6*x8*y3+62537475000*hy8*x6*y3
+              +64324260000*hx2*hy6*x6*y3+68579557200*hx4*hy4*x6*y3
+              +64324260000*hx6*hy2*x6*y3+62537475000*hx8*x6*y3
+              +557613056*a*125*hy9*x5*y3+557613056*a*125*hx9*x5*y3
+              +134008875000*hy10*x4*y3-402026625000*hx2*hy8*x4*y3
+              -259771050000*hx4*hy6*x4*y3-259771050000*hx6*hy4*x4*y3
+              -402026625000*hx8*hy2*x4*y3+134008875000*hx10*x4*y3
+              -477954048*a*625*hx2*hy9*x3*y3
+              -477954048*a*625*hx9*hy2*x3*y3-44669625000*hy12*x2*y3
+              -344594250000*hx2*hy10*x2*y3+649427625000*hx4*hy8*x2*y3
+              +393592500000*hx6*hy6*x2*y3+649427625000*hx8*hy4*x2*y3
+              -344594250000*hx10*hy2*x2*y3-44669625000*hx12*x2*y3
+              +386039808*a*625*hx4*hy9*x*y3
+              +386039808*a*625*hx9*hy4*x*y3+6381375000*hy14*y3
+              +19144125000*hx2*hy12*y3+92775375000*hx4*hy10*y3
+              -163996875000*hx6*hy8*y3-163996875000*hx8*hy6*y3
+              +92775375000*hx10*hy4*y3+19144125000*hx12*hy2*y3
+              +6381375000*hx14*y3-136136*x15*y2+6126120*hy2*x13*y2
+              +6126120*hx2*x13*y2-128648520*hy4*x11*y2
+              -204787440*hx2*hy2*x11*y2-128648520*hx4*x11*y2
+              +1786785000*hy6*x9*y2+3032429400*hx2*hy4*x9*y2
+              +3032429400*hx4*hy2*x9*y2+1786785000*hx6*x9*y2
+              -26801775000*hy8*x7*y2-27567540000*hx2*hy6*x7*y2
+              -29391238800*hx4*hy4*x7*y2-27567540000*hx6*hy2*x7*y2
+              -26801775000*hx8*x7*y2-278806528*a*125*hy9*x6*y2
+              -278806528*a*125*hx9*x6*y2-80405325000*hy10*x5*y2
+              +241215975000*hx2*hy8*x5*y2+155862630000*hx4*hy6*x5*y2
+              +155862630000*hx6*hy4*x5*y2+241215975000*hx8*hy2*x5*y2
+              -80405325000*hx10*x5*y2+358465536*a*625*hx2*hy9*x4*y2
+              +358465536*a*625*hx9*hy2*x4*y2+44669625000*hy12*x3*y2
+              +344594250000*hx2*hy10*x3*y2-649427625000*hx4*hy8*x3*y2
+              -393592500000*hx6*hy6*x3*y2-649427625000*hx8*hy4*x3*y2
+              +344594250000*hx10*hy2*x3*y2+44669625000*hx12*x3*y2
+              -579059712*a*625*hx4*hy9*x2*y2
+              -579059712*a*625*hx9*hy4*x2*y2-19144125000*hy14*x*y2
+              -57432375000*hx2*hy12*x*y2-278326125000*hx4*hy10*x*y2
+              +491990625000*hx6*hy8*x*y2+491990625000*hx8*hy6*x*y2
+              -278326125000*hx10*hy4*x*y2-57432375000*hx12*hy2*x*y2
+              -19144125000*hx14*x*y2+5849088*a*125*125*hx6*hy9*y2
+              +5849088*a*125*125*hx9*hy6*y2+17017*x16*y-875160*hy2*x14*y
+              -875160*hx2*x14*y+21441420*hy4*x12*y
+              +34131240*hx2*hy2*x12*y+21441420*hx4*x12*y
+              -357357000*hy6*x10*y-606485880*hx2*hy4*x10*y
+              -606485880*hx4*hy2*x10*y-357357000*hx6*x10*y
+              +6700443750*hy8*x8*y+6891885000*hx2*hy6*x8*y
+              +7347809700*hx4*hy4*x8*y+6891885000*hx6*hy2*x8*y
+              +6700443750*hx8*x8*y+79659008*a*125*hy9*x7*y
+              +79659008*a*125*hx9*x7*y+26801775000*hy10*x6*y
+              -80405325000*hx2*hy8*x6*y-51954210000*hx4*hy6*x6*y
+              -51954210000*hx6*hy4*x6*y-80405325000*hx8*hy2*x6*y
+              +26801775000*hx10*x6*y-716931072*a*125*hx2*hy9*x5*y
+              -716931072*a*125*hx9*hy2*x5*y-22334812500*hy12*x4*y
+              -172297125000*hx2*hy10*x4*y+324713812500*hx4*hy8*x4*y
+              +196796250000*hx6*hy6*x4*y+324713812500*hx8*hy4*x4*y
+              -172297125000*hx10*hy2*x4*y-22334812500*hx12*x4*y
+              +386039808*a*625*hx4*hy9*x3*y
+              +386039808*a*625*hx9*hy4*x3*y+19144125000*hy14*x2*y
+              +57432375000*hx2*hy12*x2*y+278326125000*hx4*hy10*x2*y
+              -491990625000*hx6*hy8*x2*y-491990625000*hx8*hy6*x2*y
+              +278326125000*hx10*hy4*x2*y+57432375000*hx12*hy2*x2*y
+              +19144125000*hx14*x2*y-11698176*a*125*125*hx6*hy9*x*y
+              -11698176*a*125*125*hx9*hy6*x*y-8546484375*hy16*y
+              -8204625000*hx2*hy14*y-15462562500*hx4*hy12*y
+              -70284375000*hx6*hy10*y+204996093750*hx8*hy8*y
+              -70284375000*hx10*hy6*y-15462562500*hx12*hy4*y
+              -8204625000*hx14*hy2*y-8546484375*hx16*y-1001*x17
+              +58344*hy2*x15+58344*hx2*x15-1649340*hy4*x13
+              -2625480*hx2*hy2*x13-1649340*hx4*x13+32487000*hy6*x11
+              +55135080*hx2*hy4*x11+55135080*hx4*hy2*x11
+              +32487000*hx6*x11-744493750*hy8*x9-765765000*hx2*hy6*x9
+              -816423300*hx4*hy4*x9-765765000*hx6*hy2*x9
+              -744493750*hx8*x9-9957376*a*125*hy9*x8
+              -9957376*a*125*hx9*x8-3828825000*hy10*x7
+              +11486475000*hx2*hy8*x7+7422030000*hx4*hy6*x7
+              +7422030000*hx6*hy4*x7+11486475000*hx8*hy2*x7
+              -3828825000*hx10*x7+119488512*a*125*hx2*hy9*x6
+              +119488512*a*125*hx9*hy2*x6+4466962500*hy12*x5
+              +34459425000*hx2*hy10*x5-64942762500*hx4*hy8*x5
+              -39359250000*hx6*hy6*x5-64942762500*hx8*hy4*x5
+              +34459425000*hx10*hy2*x5+4466962500*hx12*x5
+              -96509952*a*625*hx4*hy9*x4-96509952*a*625*hx9*hy4*x4
+              -6381375000*hy14*x3-19144125000*hx2*hy12*x3
+              -92775375000*hx4*hy10*x3+163996875000*hx6*hy8*x3
+              +163996875000*hx8*hy6*x3-92775375000*hx10*hy4*x3
+              -19144125000*hx12*hy2*x3-6381375000*hx14*x3
+              +5849088*a*125*125*hx6*hy9*x2+5849088*a*125*125*hx9*hy6*x2
+              +8546484375*hy16*x+8204625000*hx2*hy14*x
+              +15462562500*hx4*hy12*x+70284375000*hx6*hy10*x
+              -204996093750*hx8*hy8*x+70284375000*hx10*hy6*x
+              +15462562500*hx12*hy4*x+8204625000*hx14*hy2*x
+              +8546484375*hx16*x+28672*a*125*625*hy17
+              -487424*a*125*625*hx8*hy9-487424*a*125*625*hx9*hy8
+              +28672*a*125*625*hx17)
+         /(8912896000000*hx8*hy8));
+}
+
+double np_aconvol_epan8_ylessx(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5);
+  const double y2 = y*y;
+  const double y3 = y2*y;
+  const double y4 = y2*y2;
+  const double y5 = y3*y2;
+  const double y6 = y3*y3;
+  const double y7 = y4*y3;
+  const double y8 = y4*y4;
+  const double y9 = y5*y4;
+  const double y10 = y6*y4;
+  const double y11 = y7*y4;
+  const double y12 = y8*y4;
+  const double y13 = y9*y4;
+  const double y14 = y10*y4;
+  const double y15 = y11*y4;
+  const double y16 = y12*y4;
+  const double y17 = y13*y4;
+ 
+  const double x2 = x*x;
+  const double x3 = x2*x;
+  const double x4 = x2*x2;
+  const double x5 = x3*x2;
+  const double x6 = x3*x3;
+  const double x7 = x4*x3;
+  const double x8 = x4*x4;
+  const double x9 = x5*x4;
+  const double x10 = x6*x4;
+  const double x11 = x7*x4;
+  const double x12 = x8*x4;
+  const double x13 = x9*x4;
+  const double x14 = x10*x4;
+  const double x15 = x11*x4;
+  const double x16 = x12*x4;
+  const double x17 = x13*x4;
+
+  const double hx2 = hx*hx;
+  const double hx3 = hx2*hx;
+  const double hx4 = hx2*hx2;
+  const double hx5 = hx3*hx2;
+  const double hx6 = hx3*hx3;
+  const double hx7 = hx4*hx3;
+  const double hx8 = hx4*hx4;
+  const double hx9 = hx5*hx4;
+  const double hx10 = hx6*hx4;
+  const double hx11 = hx7*hx4;
+  const double hx12 = hx8*hx4;
+  const double hx13 = hx9*hx4;
+  const double hx14 = hx10*hx4;
+  const double hx15 = hx11*hx4;
+  const double hx16 = hx12*hx4;
+  const double hx17 = hx13*hx4;
+
+  const double hy2 = hy*hy;
+  const double hy3 = hy2*hy;
+  const double hy4 = hy2*hy2;
+  const double hy5 = hy3*hy2;
+  const double hy6 = hy3*hy3;
+  const double hy7 = hy4*hy3;
+  const double hy8 = hy4*hy4;
+  const double hy9 = hy5*hy4;
+  const double hy10 = hy6*hy4;
+  const double hy11 = hy7*hy4;
+  const double hy12 = hy8*hy4;
+  const double hy13 = hy9*hy4;
+  const double hy14 = hy10*hy4;
+  const double hy15 = hy11*hy4;
+  const double hy16 = hy12*hy4;
+  const double hy17 = hy13*hy4;
+
+  return(63*(1001*y17-17017*x*y16+136136*x2*y15-58344*hy2*y15-58344*hx2*y15
+             -680680*x3*y14+875160*hy2*x*y14+875160*hx2*x*y14
+             +2382380*x4*y13-6126120*hy2*x2*y13-6126120*hx2*x2*y13
+             +1649340*hy4*y13+2625480*hx2*hy2*y13+1649340*hx4*y13
+             -6194188*x5*y12+26546520*hy2*x3*y12+26546520*hx2*x3*y12
+             -21441420*hy4*x*y12-34131240*hx2*hy2*x*y12
+             -21441420*hx4*x*y12+12388376*x6*y11-79639560*hy2*x4*y11
+             -79639560*hx2*x4*y11+128648520*hy4*x2*y11
+             +204787440*hx2*hy2*x2*y11+128648520*hx4*x2*y11
+             -32487000*hy6*y11-55135080*hx2*hy4*y11
+             -55135080*hx4*hy2*y11-32487000*hx6*y11-19467448*x7*y10
+             +175207032*hy2*x5*y10+175207032*hx2*x5*y10
+             -471711240*hy4*x3*y10-750887280*hx2*hy2*x3*y10
+             -471711240*hx4*x3*y10+357357000*hy6*x*y10
+             +606485880*hx2*hy4*x*y10+606485880*hx4*hy2*x*y10
+             +357357000*hx6*x*y10+24334310*x8*y9-292011720*hy2*x6*y9
+             -292011720*hx2*x6*y9+1179278100*hy4*x4*y9
+             +1877218200*hx2*hy2*x4*y9+1179278100*hx4*x4*y9
+             -1786785000*hy6*x2*y9-3032429400*hx2*hy4*x2*y9
+             -3032429400*hx4*hy2*x2*y9-1786785000*hx6*x2*y9
+             +744493750*hy8*y9+765765000*hx2*hy6*y9
+             +816423300*hx4*hy4*y9+765765000*hx6*hy2*y9
+             +744493750*hx8*y9-24334310*x9*y8+375443640*hy2*x7*y8
+             +375443640*hx2*x7*y8-2122700580*hy4*x5*y8
+             -3378992760*hx2*hy2*x5*y8-2122700580*hx4*x5*y8
+             +5360355000*hy6*x3*y8+9097288200*hx2*hy4*x3*y8
+             +9097288200*hx4*hy2*x3*y8+5360355000*hx6*x3*y8
+             -6700443750*hy8*x*y8-6891885000*hx2*hy6*x*y8
+             -7347809700*hx4*hy4*x*y8-6891885000*hx6*hy2*x*y8
+             -6700443750*hx8*x*y8+9957376*a*125*hy9*y8
+             +9957376*a*125*hx9*y8+19467448*x10*y7
+             -375443640*hy2*x8*y7-375443640*hx2*x8*y7
+             +2830267440*hy4*x6*y7+4505323680*hx2*hy2*x6*y7
+             +2830267440*hx4*x6*y7-10720710000*hy6*x4*y7
+             -18194576400*hx2*hy4*x4*y7-18194576400*hx4*hy2*x4*y7
+             -10720710000*hx6*x4*y7+26801775000*hy8*x2*y7
+             +27567540000*hx2*hy6*x2*y7+29391238800*hx4*hy4*x2*y7
+             +27567540000*hx6*hy2*x2*y7+26801775000*hx8*x2*y7
+             -79659008*a*125*hy9*x*y7-79659008*a*125*hx9*x*y7
+             +3828825000*hy10*y7-11486475000*hx2*hy8*y7
+             -7422030000*hx4*hy6*y7-7422030000*hx6*hy4*y7
+             -11486475000*hx8*hy2*y7+3828825000*hx10*y7-12388376*x11*y6
+             +292011720*hy2*x9*y6+292011720*hx2*x9*y6
+             -2830267440*hy4*x7*y6-4505323680*hx2*hy2*x7*y6
+             -2830267440*hx4*x7*y6+15008994000*hy6*x5*y6
+             +25472406960*hx2*hy4*x5*y6+25472406960*hx4*hy2*x5*y6
+             +15008994000*hx6*x5*y6-62537475000*hy8*x3*y6
+             -64324260000*hx2*hy6*x3*y6-68579557200*hx4*hy4*x3*y6
+             -64324260000*hx6*hy2*x3*y6-62537475000*hx8*x3*y6
+             +278806528*a*125*hy9*x2*y6+278806528*a*125*hx9*x2*y6
+             -26801775000*hy10*x*y6+80405325000*hx2*hy8*x*y6
+             +51954210000*hx4*hy6*x*y6+51954210000*hx6*hy4*x*y6
+             +80405325000*hx8*hy2*x*y6-26801775000*hx10*x*y6
+             -119488512*a*125*hx2*hy9*y6-119488512*a*125*hx9*hy2*y6
+             +6194188*x12*y5-175207032*hy2*x10*y5-175207032*hx2*x10*y5
+             +2122700580*hy4*x8*y5+3378992760*hx2*hy2*x8*y5
+             +2122700580*hx4*x8*y5-15008994000*hy6*x6*y5
+             -25472406960*hx2*hy4*x6*y5-25472406960*hx4*hy2*x6*y5
+             -15008994000*hx6*x6*y5+93806212500*hy8*x4*y5
+             +96486390000*hx2*hy6*x4*y5+102869335800*hx4*hy4*x4*y5
+             +96486390000*hx6*hy2*x4*y5+93806212500*hx8*x4*y5
+             -557613056*a*125*hy9*x3*y5-557613056*a*125*hx9*x3*y5
+             +80405325000*hy10*x2*y5-241215975000*hx2*hy8*x2*y5
+             -155862630000*hx4*hy6*x2*y5-155862630000*hx6*hy4*x2*y5
+             -241215975000*hx8*hy2*x2*y5+80405325000*hx10*x2*y5
+             +716931072*a*125*hx2*hy9*x*y5
+             +716931072*a*125*hx9*hy2*x*y5-4466962500*hy12*y5
+             -34459425000*hx2*hy10*y5+64942762500*hx4*hy8*y5
+             +39359250000*hx6*hy6*y5+64942762500*hx8*hy4*y5
+             -34459425000*hx10*hy2*y5-4466962500*hx12*y5-2382380*x13*y4
+             +79639560*hy2*x11*y4+79639560*hx2*x11*y4
+             -1179278100*hy4*x9*y4-1877218200*hx2*hy2*x9*y4
+             -1179278100*hx4*x9*y4+10720710000*hy6*x7*y4
+             +18194576400*hx2*hy4*x7*y4+18194576400*hx4*hy2*x7*y4
+             +10720710000*hx6*x7*y4-93806212500*hy8*x5*y4
+             -96486390000*hx2*hy6*x5*y4-102869335800*hx4*hy4*x5*y4
+             -96486390000*hx6*hy2*x5*y4-93806212500*hx8*x5*y4
+             +139403264*a*625*hy9*x4*y4+139403264*a*625*hx9*x4*y4
+             -134008875000*hy10*x3*y4+402026625000*hx2*hy8*x3*y4
+             +259771050000*hx4*hy6*x3*y4+259771050000*hx6*hy4*x3*y4
+             +402026625000*hx8*hy2*x3*y4-134008875000*hx10*x3*y4
+             -358465536*a*625*hx2*hy9*x2*y4
+             -358465536*a*625*hx9*hy2*x2*y4+22334812500*hy12*x*y4
+             +172297125000*hx2*hy10*x*y4-324713812500*hx4*hy8*x*y4
+             -196796250000*hx6*hy6*x*y4-324713812500*hx8*hy4*x*y4
+             +172297125000*hx10*hy2*x*y4+22334812500*hx12*x*y4
+             +96509952*a*625*hx4*hy9*y4+96509952*a*625*hx9*hy4*y4
+             +680680*x14*y3-26546520*hy2*x12*y3-26546520*hx2*x12*y3
+             +471711240*hy4*x10*y3+750887280*hx2*hy2*x10*y3
+             +471711240*hx4*x10*y3-5360355000*hy6*x8*y3
+             -9097288200*hx2*hy4*x8*y3-9097288200*hx4*hy2*x8*y3
+             -5360355000*hx6*x8*y3+62537475000*hy8*x6*y3
+             +64324260000*hx2*hy6*x6*y3+68579557200*hx4*hy4*x6*y3
+             +64324260000*hx6*hy2*x6*y3+62537475000*hx8*x6*y3
+             -557613056*a*125*hy9*x5*y3-557613056*a*125*hx9*x5*y3
+             +134008875000*hy10*x4*y3-402026625000*hx2*hy8*x4*y3
+             -259771050000*hx4*hy6*x4*y3-259771050000*hx6*hy4*x4*y3
+             -402026625000*hx8*hy2*x4*y3+134008875000*hx10*x4*y3
+             +477954048*a*625*hx2*hy9*x3*y3
+             +477954048*a*625*hx9*hy2*x3*y3-44669625000*hy12*x2*y3
+             -344594250000*hx2*hy10*x2*y3+649427625000*hx4*hy8*x2*y3
+             +393592500000*hx6*hy6*x2*y3+649427625000*hx8*hy4*x2*y3
+             -344594250000*hx10*hy2*x2*y3-44669625000*hx12*x2*y3
+             -386039808*a*625*hx4*hy9*x*y3
+             -386039808*a*625*hx9*hy4*x*y3+6381375000*hy14*y3
+             +19144125000*hx2*hy12*y3+92775375000*hx4*hy10*y3
+             -163996875000*hx6*hy8*y3-163996875000*hx8*hy6*y3
+             +92775375000*hx10*hy4*y3+19144125000*hx12*hy2*y3
+             +6381375000*hx14*y3-136136*x15*y2+6126120*hy2*x13*y2
+             +6126120*hx2*x13*y2-128648520*hy4*x11*y2
+             -204787440*hx2*hy2*x11*y2-128648520*hx4*x11*y2
+             +1786785000*hy6*x9*y2+3032429400*hx2*hy4*x9*y2
+             +3032429400*hx4*hy2*x9*y2+1786785000*hx6*x9*y2
+             -26801775000*hy8*x7*y2-27567540000*hx2*hy6*x7*y2
+             -29391238800*hx4*hy4*x7*y2-27567540000*hx6*hy2*x7*y2
+             -26801775000*hx8*x7*y2+278806528*a*125*hy9*x6*y2
+             +278806528*a*125*hx9*x6*y2-80405325000*hy10*x5*y2
+             +241215975000*hx2*hy8*x5*y2+155862630000*hx4*hy6*x5*y2
+             +155862630000*hx6*hy4*x5*y2+241215975000*hx8*hy2*x5*y2
+             -80405325000*hx10*x5*y2-358465536*a*625*hx2*hy9*x4*y2
+             -358465536*a*625*hx9*hy2*x4*y2+44669625000*hy12*x3*y2
+             +344594250000*hx2*hy10*x3*y2-649427625000*hx4*hy8*x3*y2
+             -393592500000*hx6*hy6*x3*y2-649427625000*hx8*hy4*x3*y2
+             +344594250000*hx10*hy2*x3*y2+44669625000*hx12*x3*y2
+             +579059712*a*625*hx4*hy9*x2*y2
+             +579059712*a*625*hx9*hy4*x2*y2-19144125000*hy14*x*y2
+             -57432375000*hx2*hy12*x*y2-278326125000*hx4*hy10*x*y2
+             +491990625000*hx6*hy8*x*y2+491990625000*hx8*hy6*x*y2
+             -278326125000*hx10*hy4*x*y2-57432375000*hx12*hy2*x*y2
+             -19144125000*hx14*x*y2-5849088*a*125*125*hx6*hy9*y2
+             -5849088*a*125*125*hx9*hy6*y2+17017*x16*y-875160*hy2*x14*y
+             -875160*hx2*x14*y+21441420*hy4*x12*y
+             +34131240*hx2*hy2*x12*y+21441420*hx4*x12*y
+             -357357000*hy6*x10*y-606485880*hx2*hy4*x10*y
+             -606485880*hx4*hy2*x10*y-357357000*hx6*x10*y
+             +6700443750*hy8*x8*y+6891885000*hx2*hy6*x8*y
+             +7347809700*hx4*hy4*x8*y+6891885000*hx6*hy2*x8*y
+             +6700443750*hx8*x8*y-79659008*a*125*hy9*x7*y
+             -79659008*a*125*hx9*x7*y+26801775000*hy10*x6*y
+             -80405325000*hx2*hy8*x6*y-51954210000*hx4*hy6*x6*y
+             -51954210000*hx6*hy4*x6*y-80405325000*hx8*hy2*x6*y
+             +26801775000*hx10*x6*y+716931072*a*125*hx2*hy9*x5*y
+             +716931072*a*125*hx9*hy2*x5*y-22334812500*hy12*x4*y
+             -172297125000*hx2*hy10*x4*y+324713812500*hx4*hy8*x4*y
+             +196796250000*hx6*hy6*x4*y+324713812500*hx8*hy4*x4*y
+             -172297125000*hx10*hy2*x4*y-22334812500*hx12*x4*y
+             -386039808*a*625*hx4*hy9*x3*y
+             -386039808*a*625*hx9*hy4*x3*y+19144125000*hy14*x2*y
+             +57432375000*hx2*hy12*x2*y+278326125000*hx4*hy10*x2*y
+             -491990625000*hx6*hy8*x2*y-491990625000*hx8*hy6*x2*y
+             +278326125000*hx10*hy4*x2*y+57432375000*hx12*hy2*x2*y
+             +19144125000*hx14*x2*y+11698176*a*125*125*hx6*hy9*x*y
+             +11698176*a*125*125*hx9*hy6*x*y-8546484375*hy16*y
+             -8204625000*hx2*hy14*y-15462562500*hx4*hy12*y
+             -70284375000*hx6*hy10*y+204996093750*hx8*hy8*y
+             -70284375000*hx10*hy6*y-15462562500*hx12*hy4*y
+             -8204625000*hx14*hy2*y-8546484375*hx16*y-1001*x17
+             +58344*hy2*x15+58344*hx2*x15-1649340*hy4*x13
+             -2625480*hx2*hy2*x13-1649340*hx4*x13+32487000*hy6*x11
+             +55135080*hx2*hy4*x11+55135080*hx4*hy2*x11
+             +32487000*hx6*x11-744493750*hy8*x9-765765000*hx2*hy6*x9
+             -816423300*hx4*hy4*x9-765765000*hx6*hy2*x9
+             -744493750*hx8*x9+9957376*a*125*hy9*x8
+             +9957376*a*125*hx9*x8-3828825000*hy10*x7
+             +11486475000*hx2*hy8*x7+7422030000*hx4*hy6*x7
+             +7422030000*hx6*hy4*x7+11486475000*hx8*hy2*x7
+             -3828825000*hx10*x7-119488512*a*125*hx2*hy9*x6
+             -119488512*a*125*hx9*hy2*x6+4466962500*hy12*x5
+             +34459425000*hx2*hy10*x5-64942762500*hx4*hy8*x5
+             -39359250000*hx6*hy6*x5-64942762500*hx8*hy4*x5
+             +34459425000*hx10*hy2*x5+4466962500*hx12*x5
+             +96509952*a*625*hx4*hy9*x4+96509952*a*625*hx9*hy4*x4
+             -6381375000*hy14*x3-19144125000*hx2*hy12*x3
+             -92775375000*hx4*hy10*x3+163996875000*hx6*hy8*x3
+             +163996875000*hx8*hy6*x3-92775375000*hx10*hy4*x3
+             -19144125000*hx12*hy2*x3-6381375000*hx14*x3
+             -5849088*a*125*125*hx6*hy9*x2-5849088*a*125*125*hx9*hy6*x2
+             +8546484375*hy16*x+8204625000*hx2*hy14*x
+             +15462562500*hx4*hy12*x+70284375000*hx6*hy10*x
+             -204996093750*hx8*hy8*x+70284375000*hx10*hy6*x
+             +15462562500*hx12*hy4*x+8204625000*hx14*hy2*x
+             +8546484375*hx16*x-28672*a*625*125*hy17
+             +487424*a*625*125*hx8*hy9+487424*a*625*125*hx9*hy8
+             -28672*a*625*125*hx17)
+         /(8912896000000*hx8*hy8));
+}
+
+double np_aconvol_epan8(const double x, const double y,const double hx,const double hy){
+  const double a = sqrt(5.0);
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    if(x<y)
+      return (np_aconvol_epan8_xlessy(x,y,hx,hy));
+    else
+      return (np_aconvol_epan8_ylessx(x,y,hx,hy));
+  } else {
+    return (np_aconvol_epan8_total(x,y,hx,hy));
+  }
+}
+
+double np_aconvol_rect(const double x, const double y,const double hx,const double hy){
+  return (fabs(x-y) >= (hx+hy)) ? 0.0 : 0.25/(hx*hy)*(MIN(x+hx,y+hy) - MAX(x-hx,y-hy));
+}
+
+double np_aconvol_tgauss2_total(const double x, const double y,const double hx,const double hy){
+  const double x2 = x*x;
+  const double y2 = y*y;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+
+  const double a = sqrt(2);
+  const double b = sqrt(M_PI);
+  const double c = sqrt(hy2+hx2);
+
+  return(exp(-y2/(2*hy2)-x2/(2*hx2)-9)*
+         (b*hx*hy
+          *exp(hx2*y2/(2*hy4+2*hx2*hy2)
+               +x*y/(hy2+hx2)
+               +hy2*x2/(2*hx2*hy2+2*hx4)
+               +9)
+          *erfun((hx*y-hx*x+(hy2+hx2)*np_tgauss2_b)
+                 /(a*hy*c))
+          -b*hx*hy
+          *exp(hx2*y2/(2*hy4+2*hx2*hy2)
+               +x*y/(hy2+hx2)
+               +hy2*x2/(2*hx2*hy2+2*hx4)
+               +9)
+          *erfun((hx*y-hx*x+(-hy2-hx2)*np_tgauss2_b)
+                 /(a*hy*c))
+          -b*hy*c
+          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
+          *erfun((y-x+hx*np_tgauss2_b)/(a*hy))
+          +b*hy*c
+          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
+          *erfun((y-x-hx*np_tgauss2_b)/(a*hy))
+          -2*b*hx*c
+          *erfun(np_tgauss2_b/a)
+          *exp(y2/(2*hy2)+x2/(2*hx2)+9/2)
+          +a*2*hx*c*np_tgauss2_b
+          *exp(y2/(2*hy2)+x2/(2*hx2)))
+         /(a*2*M_PI*c*np_tgauss2_alpha*np_tgauss2_alpha));
+}
+
+double np_aconvol_tgauss2_indefinite(const double u, const double x, const double y,const double hx,const double hy){
+  const double x2 = x*x;
+  const double y2 = y*y;
+
+  const double hx2 = hx*hx;
+  const double hx4 = hx2*hx2;
+
+  const double hy2 = hy*hy;
+  const double hy4 = hy2*hy2;
+
+  const double a = sqrt(2);
+  const double b = sqrt(M_PI);
+  const double c = sqrt(hy2+hx2);
+
+  return(-exp(-y2/(2*hy2)-x2/(2*hx2)-19/2)*
+         (b*hx*hy
+          *exp(hx2*y2
+            /(2*hy4+2*hx2*hy2)
+            +x*y/(hy2+hx2)
+            +hy2*x2
+            /(2*hx2*hy2+2*hx4)+19/2)
+          *erfun(
+               (hx2*y+hy2*x
+                +(-hy2-hx2)*u)
+               /(a*hx*hy
+                 *c))
+          -b*hy*c
+          *exp(y2/(2*hy2)+x2/(2*hx2)
+            +5)
+          *erfun((y-u)/(a*hy))
+          -b*hx*c
+          *erfun((x-u)/(a*hx))
+          *exp(y2/(2*hy2)+x2/(2*hx2)
+            +5)
+          -a*c*u
+          *exp(y2/(2*hy2)+x2/(2*hx2)
+            +1/2))
+         /(a*2*M_PI*c*np_tgauss2_alpha*np_tgauss2_alpha));
+}
+
+double np_aconvol_tgauss2(const double x, const double y,const double hx,const double hy){
+  const double a = np_tgauss2_b;
+  const double dxy = fabs(x-y);
+
+  if(dxy >= a*(hx+hy)){
+    return 0;
+  } else if(dxy > a*fabs(hx-hy)){
+    return (np_aconvol_tgauss2_indefinite(MIN(x+a*hx,y+a*hy),x,y,hx,hy) - 
+            np_aconvol_tgauss2_indefinite(MAX(x-a*hx,y-a*hy),x,y,hx,hy));
+  } else {
+    return (np_aconvol_tgauss2_total(x,y,hx,hy));
+  }
+}
 // end kernels
 
 double (* const allck[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, 
@@ -1126,7 +2436,7 @@ void np_convol_ckernelv(const int KERNEL,
                         double * xt_h, 
                         const double h, 
                         double * const result,
-                        const int swap_xxt){
+                        const int power){
 
   int i,j; 
   const int bin_do_xw = do_xw > 0;
@@ -1134,20 +2444,16 @@ void np_convol_ckernelv(const int KERNEL,
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  if(!swap_xxt){
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
-                                      (x-xt[i])/xt_h[i], xt_h[i], h);
-    }
-  } else {
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_convol(KERNEL, BW_ADAP_NN, 
-                                      (xt[i]-x)/h, xt_h[i], h);
-    }
-  }
+  double (* const k[])(double,double,double,double) = { 
+    np_aconvol_gauss2, np_aconvol_gauss4, np_aconvol_gauss6, np_aconvol_gauss8,
+    np_aconvol_epan2, np_aconvol_epan4, np_aconvol_epan6, np_aconvol_epan8,
+    np_aconvol_rect, np_aconvol_tgauss2
+  };
 
+  for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+    if(xw[j] == 0.0) continue;
+    result[i] = xw[j]*k[KERNEL](x,xt[i],h,xt_h[i])/ipow(xt_h[i], power);
+  }
 }
 
 
@@ -1837,6 +3143,7 @@ double **matrix_Y,
 double **matrix_W,
 double * sgn,
 double *vector_scale_factor,
+int bandwidth_provided,
 double ** matrix_bw_train,
 double ** matrix_bw_eval,
 double * lambda_pre,
@@ -1862,8 +3169,7 @@ double * const kw){
   int doscoreocg = do_score || do_ocg;
   int do_perm = permutation_operator != OP_NOOP; 
 
-  int bw_provided = 1;
-
+  
   const int no_bpso = (NULL == bpso);
 
   int p_nvar;
@@ -2006,31 +3312,24 @@ double * const kw){
   mstep = (BANDWIDTH_reg==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_train:1);
 
-  if(lambda_pre != NULL)
-    lambda = lambda_pre;
-  else {
-    lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
-    bw_provided = 0;
-  }
 
-  if(bw_provided){
-    if((BANDWIDTH_reg == BW_GEN_NN) && (matrix_bw_eval != NULL)){
+  if(bandwidth_provided){
+    if(BANDWIDTH_reg == BW_GEN_NN)
       matrix_bandwidth = matrix_bw_eval;
-    } else if ((BANDWIDTH_reg == BW_ADAP_NN) && (matrix_bw_train != NULL)){
+    else if (BANDWIDTH_reg == BW_ADAP_NN){
       if (any_convolution){
-        if(matrix_bw_eval != NULL){
-          matrix_alt_bandwidth = matrix_bw_eval;        
-        }else{
-          assert(0);
-        }
+        matrix_alt_bandwidth = matrix_bw_eval;        
       } 
       matrix_bandwidth = matrix_bw_train;
     } else {
       assert(0);
     }
+    lambda = lambda_pre;
   } else {
     matrix_bandwidth = alloc_tmatd(mstep, num_reg_continuous);  
+    lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
   } 
+
 
   tprod = alloc_vecd((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train);
 
@@ -2084,7 +3383,7 @@ double * const kw){
 
   }
 
-  if(!bw_provided){
+  if(!bandwidth_provided){
     if(kernel_bandwidth_mean((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
                              BANDWIDTH_reg,
                              num_obs_train,
@@ -2113,7 +3412,7 @@ double * const kw){
     }
   }
 
-  if(!bw_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution)){ // need additional bandwidths 
+  if(!bandwidth_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution)){ // need additional bandwidths 
     matrix_alt_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
 
     // this is a bug
@@ -2391,7 +3690,7 @@ double * const kw){
       }
       else
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j], 
-                           matrix_alt_bandwidth[i], *m, tprod, swap_xxt);
+                           matrix_alt_bandwidth[i], *m, tprod, bpow[i]);
       dband *= ipow(*m, bpow[i]);
 
       if(do_perm){
@@ -2537,12 +3836,12 @@ double * const kw){
   free(KERNEL_unordered_reg_np);
   free(KERNEL_ordered_reg_np);
   
-  if(!bw_provided){
+  if(!bandwidth_provided){
     free(lambda);
     free_tmat(matrix_bandwidth);
   }
 
-  if(!bw_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution))
+  if(!bandwidth_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution))
     free_tmat(matrix_alt_bandwidth);
 
   free(tprod);
@@ -3094,7 +4393,7 @@ int *num_categories){
                            NULL,
                            NULL,
                            vector_scale_factor,
-                           NULL,NULL,NULL,
+                           0,NULL,NULL,NULL,
                            num_categories,
                            NULL,
                            NULL,
@@ -3163,7 +4462,7 @@ int *num_categories){
                            NULL,
                            NULL,
                            vector_scale_factor,
-                           NULL,NULL,NULL,
+                           0,NULL,NULL,NULL,
                            num_categories,
                            NULL,
                            NULL,
@@ -3341,7 +4640,7 @@ int *num_categories){
                                    XTKX,
                                    NULL,
                                    vsf,
-                                   NULL,NULL,NULL,
+                                   0,NULL,NULL,NULL,
                                    num_categories,
                                    NULL,
                                    NULL,
@@ -3426,7 +4725,7 @@ int *num_categories){
                                    XTKX,
                                    sgn,
                                    vsf,
-                                   NULL,NULL,NULL,
+                                   0,NULL,NULL,NULL,
                                    num_categories,
                                    NULL,
                                    NULL,
@@ -3517,7 +4816,7 @@ int *num_categories){
                                XTKX,
                                NULL,
                                vsf,
-                               NULL,NULL,NULL,
+                               0,NULL,NULL,NULL,
                                num_categories,
                                NULL,
                                NULL,
@@ -3595,7 +4894,7 @@ int *num_categories){
                                  XTKX,
                                  sgn,
                                  vsf,
-                                 NULL,NULL,NULL,
+                                 0,NULL,NULL,NULL,
                                  num_categories,
                                  NULL,
                                  NULL,
@@ -3709,6 +5008,7 @@ int num_reg_unordered,
 int num_reg_ordered,
 int num_reg_continuous,
 int fast,
+double memfac,
 double ** matrix_X_unordered_train,
 double ** matrix_X_ordered_train,
 double ** matrix_X_continuous_train,
@@ -3719,19 +5019,29 @@ double * vsf,
 int * num_categories,
 double ** matrix_categorical_vals,
 double * cv){
-  int i,j,l, indy;
+  int indy;
+
+  int64_t i,j,l,iwx;
 
   int * operator = NULL;
 
-  int is,ie;
+  double **matrix_wX_unordered_eval=NULL;
+  double **matrix_wX_ordered_eval=NULL;
+  double **matrix_wX_continuous_eval=NULL;
 
-  int num_obs_eval_alloc, num_obs_train_alloc;
+  int64_t is,ie;
+
+  int64_t N, num_obs_eval_alloc, num_obs_train_alloc, num_obs_wx_alloc;
+  int64_t wx, nwx;
+
+  size_t Nm = MIN((size_t)ceil(memfac*300000.0), (size_t)SIZE_MAX/10);
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
+  int64_t stride_t = MAX((int64_t)ceil((double) num_obs_train / (double) iNum_Processors),1);
+
   is = stride_t * my_rank;
   ie = MIN(num_obs_train - 1, is + stride_t - 1);
-  int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
+  int64_t stride_e = MAX((int64_t)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   
   num_obs_train_alloc = stride_t*iNum_Processors;
   num_obs_eval_alloc = stride_e*iNum_Processors;
@@ -3743,8 +5053,37 @@ double * cv){
   num_obs_eval_alloc = num_obs_eval;
 #endif
 
+  // blocking algo calculations
+  N = num_obs_eval_alloc*(num_obs_train_alloc+1);
+  
+  const int64_t sa = num_obs_eval_alloc*num_obs_train_alloc*sizeof(double);
 
-  double * mean = (double *)malloc(num_obs_eval_alloc*sizeof(double));
+  if((N > Nm) || (sa > (((int64_t)1<<31)-1))){
+    const int64_t wx0 = Nm/(1+num_obs_train_alloc);
+    wx = (wx0 > num_obs_eval_alloc) ? num_obs_eval_alloc : wx0;
+    nwx = num_obs_eval_alloc/wx + (((num_obs_eval_alloc % wx) > 0) ? 1 : 0);
+  } else {
+    wx = num_obs_eval_alloc;
+    nwx = 1;
+  }
+
+#ifdef MPI2
+  int64_t stride_wx = MAX((int64_t)ceil((double)wx / (double) iNum_Processors),1);
+
+  num_obs_wx_alloc = stride_wx*iNum_Processors;
+#else
+  num_obs_wx_alloc = wx;
+#endif
+
+#ifdef MPI2
+#endif
+
+  // allocate some pointers
+  matrix_wX_continuous_eval = (double **)malloc(num_reg_continuous*sizeof(double *));
+  matrix_wX_unordered_eval = (double **)malloc(num_reg_unordered*sizeof(double *));
+  matrix_wX_ordered_eval = (double **)malloc(num_reg_ordered*sizeof(double *));
+ 
+  double * mean = (double *)malloc(num_obs_wx_alloc*sizeof(double));
   
   if(mean == NULL)
     error("failed to allocate mean");
@@ -3780,93 +5119,31 @@ double * cv){
   *cv = 0;
 
   if(fast){
-    double * kw = (double *)malloc(num_obs_train_alloc*num_obs_eval_alloc*sizeof(double));
+    double * kwx = (double *)malloc(num_obs_train_alloc*num_obs_wx_alloc*sizeof(double));
 
-    if(kw == NULL)
-      error("failed to allocate kw, try reducing num_obs_eval");
+    if(kwx == NULL)
+      error("failed to allocate kwx, try reducing num_obs_eval");
 
-    kernel_weighted_sum_np(kernel_c,
-                           kernel_u,
-                           kernel_o,
-                           BANDWIDTH_den,
-                           num_obs_train,
-                           num_obs_eval,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           num_reg_continuous,
-                           0,
-                           0,
-                           1,
-                           1,
-                           0, 
-                           0,
-                           0,
-                           0,
-                           0,
-                           operator,
-                           OP_NOOP, // no permutations
-                           0, // no score
-                           0, // no ocg
-                           NULL,
-                           0, // don't explicity suppress parallel
-                           0,
-                           0,
-                           int_TREE_X,
-                           0,
-                           kdt_extern_X, 
-                           NULL, NULL, NULL,
-                           matrix_X_unordered_train,
-                           matrix_X_ordered_train,
-                           matrix_X_continuous_train,
-                           matrix_X_unordered_eval,
-                           matrix_X_ordered_eval,
-                           matrix_X_continuous_eval,
-                           NULL,
-                           NULL,
-                           NULL,
-                           vsf,
-                           NULL,NULL,NULL,
-                           num_categories,
-                           matrix_categorical_vals,
-                           NULL,
-                           mean,
-                           NULL, // no permutations
-                           kw);
+    for(iwx = 0; iwx < nwx; iwx++){
+      const int64_t wxo = iwx*wx;
+      const int64_t dwx = (iwx != (nwx - 1)) ? wx : num_obs_eval - (nwx - 1)*wx;
 
-    for(i = is; i <= ie; i++){
-      for(j = 0; j < num_obs_eval; j++){
-        indy = 1;
-        for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
-          indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
-        }
-        for(l = 0; (l < num_reg_continuous) && (indy != 0); l++){
-          indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
-        }
-        if(BANDWIDTH_den != BW_ADAP_NN){
-          const double tvd = (indy - mean[j]/ofac + kw[j*num_obs_train + i]/ofac);
-          *cv += tvd*tvd;
-        } else {
-          const double tvd = (indy - mean[j]/ofac + kw[i*num_obs_eval + j]/ofac);
-          *cv += tvd*tvd;
-        }
+      for(l = 0; l < num_reg_continuous; l++)
+        matrix_wX_continuous_eval[l] = matrix_X_continuous_eval[l] + wxo;
 
-      }
-    }
-#ifdef MPI2
-    MPI_Allreduce(MPI_IN_PLACE, cv, 1, MPI_DOUBLE, MPI_SUM, comm[1]);
-#endif
+      for(l = 0; l < num_reg_unordered; l++)
+        matrix_wX_unordered_eval[l] = matrix_X_unordered_eval[l] + wxo;
 
-    *cv /= (double) num_obs_train*num_obs_eval;
+      for(l = 0; l < num_reg_ordered; l++)
+        matrix_wX_ordered_eval[l] = matrix_X_ordered_eval[l] + wxo;
 
-    free(kw);
-  } else {
-    for(i = is; i <= ie; i++){
+
       kernel_weighted_sum_np(kernel_c,
                              kernel_u,
                              kernel_o,
                              BANDWIDTH_den,
                              num_obs_train,
-                             num_obs_eval,
+                             dwx,
                              num_reg_unordered,
                              num_reg_ordered,
                              num_reg_continuous,
@@ -3877,8 +5154,8 @@ double * cv){
                              0, 
                              0,
                              0,
-                             1,
-                             i,
+                             0,
+                             0,
                              operator,
                              OP_NOOP, // no permutations
                              0, // no score
@@ -3889,34 +5166,45 @@ double * cv){
                              0,
                              int_TREE_X,
                              0,
-                             kdt_extern_X,
+                             kdt_extern_X, 
                              NULL, NULL, NULL,
                              matrix_X_unordered_train,
                              matrix_X_ordered_train,
                              matrix_X_continuous_train,
-                             matrix_X_unordered_eval,
-                             matrix_X_ordered_eval,
-                             matrix_X_continuous_eval,
+                             matrix_wX_unordered_eval,
+                             matrix_wX_ordered_eval,
+                             matrix_wX_continuous_eval,
                              NULL,
                              NULL,
                              NULL,
                              vsf,
-                             NULL,NULL,NULL,
+                             0,NULL,NULL,NULL,
                              num_categories,
                              matrix_categorical_vals,
                              NULL,
                              mean,
                              NULL, // no permutations
-                             NULL);
-      for(j = 0; j < num_obs_eval; j++){
-        indy = 1;
-        for(l = 0; l < num_reg_ordered; l++){
-          indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+                             kwx);
+    
+      for(i = is; i <= ie; i++){
+        for(j = wxo; j < (wxo + dwx); j++){             
+          const int64_t jo = j - wxo;
+          indy = 1;
+          for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){
+            indy *= (matrix_X_ordered_train[l][i] <= matrix_X_ordered_eval[l][j]);
+          }
+          for(l = 0; (l < num_reg_continuous) && (indy != 0); l++){
+            indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
+          }
+          if(BANDWIDTH_den != BW_ADAP_NN){
+            const double tvd = (indy - mean[jo]/ofac + kwx[jo*num_obs_train + i]/ofac);
+            *cv += tvd*tvd;
+          } else {
+            const double tvd = (indy - mean[jo]/ofac + kwx[i*dwx + jo]/ofac);
+            *cv += tvd*tvd;
+          }
+
         }
-        for(l = 0; l < num_reg_continuous; l++){
-          indy *= (matrix_X_continuous_train[l][i] <= matrix_X_continuous_eval[l][j]);
-        }
-        *cv += (indy - mean[j]/ofac)*(indy - mean[j]/ofac);
       }
     }
 #ifdef MPI2
@@ -3924,13 +5212,20 @@ double * cv){
 #endif
 
     *cv /= (double) num_obs_train*num_obs_eval;
-  }
+
+    free(kwx);
+  } 
 
   free(operator);
   free(kernel_c);
   free(kernel_u);
   free(kernel_o);
   free(mean);
+
+  free(matrix_wX_continuous_eval);
+  free(matrix_wX_unordered_eval);
+  free(matrix_wX_ordered_eval);
+
   return(0);
 }
 
@@ -4271,7 +5566,7 @@ double *cv){
                              NULL, // matrix w
                              NULL, // sgn
                              vsfx,
-                             NULL,NULL,NULL,
+                             0,NULL,NULL,NULL,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
                              NULL, // moo
@@ -4334,7 +5629,7 @@ double *cv){
                                NULL,
                                NULL,
                                vsfy,
-                               NULL,NULL,NULL,
+                               0,NULL,NULL,NULL,
                                num_categories_extern_Y,
                                matrix_categorical_vals_extern_Y,
                                NULL,
@@ -4483,7 +5778,7 @@ double *cv){
                              NULL,
                              NULL,
                              vsfx,
-                             NULL,NULL,NULL,
+                             0,NULL,NULL,NULL,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
                              NULL,
@@ -4545,7 +5840,7 @@ double *cv){
                                NULL,
                                NULL,
                                vsfy,
-                               NULL,NULL,NULL,
+                               0,NULL,NULL,NULL,
                                num_categories_extern_Y,
                                matrix_categorical_vals_extern_Y,
                                NULL,
@@ -4715,13 +6010,30 @@ double *cv){
   int64_t wi, wk, wj, nwi, nwk, nwj;
 
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
+  int bandwidth_provided = BANDWIDTH_den != BW_FIXED;
 
   double vsfx[num_reg_tot];
   double vsfy[num_var_tot];
   double vsfxy[num_var_tot+num_reg_tot];
 
-  double lambdax[num_reg_unordered+num_reg_ordered];
-  double **matrix_bandwidth_x;
+  // we need the various bandwidth matrices to make sure that the correct bandwidths are used
+  // when adaptive and/or generalized nearest neighbor bandwidths are selected
+  // in combination with the blocking algorithm 
+
+  double * lambdax = NULL;
+  double * lambday = NULL;
+  double * lambdaxy = NULL;
+
+  double **matrix_bandwidth_x = NULL;
+  double **matrix_bandwidth_xy = NULL;
+  double **matrix_bandwidth_y = NULL;
+
+  double **matrix_bandwidth_xi = NULL;
+  double **matrix_bandwidth_xj = NULL;
+  double **matrix_bandwidth_xk = NULL;
+
+  double **matrix_bandwidth_yj = NULL;
+  double **matrix_bandwidth_yk = NULL;
 
   double **matrix_Yk_unordered_train;
   double **matrix_Yk_ordered_train;
@@ -4946,8 +6258,9 @@ double *cv){
     xy_operator[i] = OP_NORMAL;
 
   // special bandwidths
-  if(BANDWIDTH_den == BW_GEN_NN){
+  if(BANDWIDTH_den != BW_FIXED){
     matrix_bandwidth_x = alloc_matd(num_obs_train, num_reg_continuous);
+    lambdax = alloc_vecd(num_reg_unordered+num_reg_ordered);
 
     kernel_bandwidth_mean(KERNEL_reg,
                           BANDWIDTH_den,
@@ -4968,6 +6281,65 @@ double *cv){
                           NULL,					 // Not used 
                           matrix_bandwidth_x,
                           lambdax);
+
+
+
+    matrix_bandwidth_y = alloc_matd(num_obs_train, num_var_continuous);
+    lambday = alloc_vecd(num_var_unordered+num_var_ordered);
+
+    kernel_bandwidth_mean(KERNEL_var,
+                          BANDWIDTH_den,
+                          num_obs_train,
+                          num_obs_train,
+                          0,
+                          0,
+                          0,
+                          num_var_continuous,
+                          num_var_unordered,
+                          num_var_ordered,
+                          0, // do not suppress_parallel
+                          vsfy,
+                          NULL,
+                          NULL,
+                          matrix_Y_continuous_train,
+                          matrix_Y_continuous_train,
+                          NULL,					 // Not used 
+                          matrix_bandwidth_y,
+                          lambday);
+
+    matrix_bandwidth_xy = alloc_matd(num_obs_train, num_all_cvar);
+    lambdaxy = alloc_vecd(num_all_ovar+num_all_uvar);
+
+    kernel_bandwidth_mean(KERNEL_reg,
+                          BANDWIDTH_den,
+                          num_obs_train,
+                          num_obs_train,
+                          0,
+                          0,
+                          0,
+                          num_all_cvar,
+                          num_all_uvar,
+                          num_all_ovar,
+                          0, // do not suppress_parallel
+                          vsfxy,
+                          NULL,
+                          NULL,
+                          matrix_XY_continuous_train,
+                          matrix_XY_continuous_train,
+                          NULL,					 // Not used 
+                          matrix_bandwidth_xy,
+                          lambdaxy);
+
+    matrix_bandwidth_yj = (double **)malloc(sizeof(double *)*num_var_continuous);
+    matrix_bandwidth_yk = (double **)malloc(sizeof(double *)*num_var_continuous);
+
+    if(BANDWIDTH_den == BW_ADAP_NN){
+      matrix_bandwidth_xi = (double **)malloc(sizeof(double *)*num_reg_continuous);
+    }else{
+      matrix_bandwidth_xj = (double **)malloc(sizeof(double *)*num_reg_continuous);
+      matrix_bandwidth_xk = (double **)malloc(sizeof(double *)*num_reg_continuous);
+    }
+
   } else if (BANDWIDTH_den == BW_FIXED) {
     matrix_bandwidth_x = (double **)malloc(sizeof(double*));
     matrix_bandwidth_x[0] = vsfx;
@@ -5026,7 +6398,10 @@ double *cv){
                          NULL,
                          NULL,
                          vsfxy,
-                         NULL,NULL,NULL,
+                         bandwidth_provided,
+                         matrix_bandwidth_xy,
+                         matrix_bandwidth_xy,
+                         lambdaxy,
                          num_categories_extern_XY,
                          matrix_categorical_vals_extern_XY,
                          NULL,
@@ -5075,7 +6450,10 @@ double *cv){
                          NULL,
                          NULL,
                          vsfx,
-                         NULL,NULL,NULL,
+                         bandwidth_provided,
+                         matrix_bandwidth_x,
+                         matrix_bandwidth_x,
+                         lambdax,
                          num_categories_extern_X,
                          matrix_categorical_vals_extern_X,
                          NULL,
@@ -5124,6 +6502,12 @@ double *cv){
     for(l = 0; l < num_reg_ordered; l++)
       matrix_Xi_ordered_train[l] = matrix_XY_ordered_train[l] + wio;
 
+    // offset the appropriate bandwidths
+    if(BANDWIDTH_den == BW_ADAP_NN){
+      for(l = 0; l < num_reg_continuous; l++)
+        matrix_bandwidth_xi[l] = matrix_bandwidth_x[l] + wio;
+    }
+
     for(iwj = 0; iwj < nwj; iwj++){
       const int64_t wjo = iwj*wj;
       const int64_t dwj = (iwj != (nwj - 1)) ? wj : num_obs_train - (nwj - 1)*wj;
@@ -5150,6 +6534,15 @@ double *cv){
       for(l = 0; l < num_var_ordered; l++)
         matrix_Yj_ordered_train[l] = matrix_XY_ordered_train[l+num_reg_ordered] + wjo;
 
+        // offset the appropriate bandwidths
+      if(BANDWIDTH_den != BW_FIXED){
+        for(l = 0; l < num_var_continuous; l++)
+          matrix_bandwidth_yj[l] = matrix_bandwidth_y[l] + wjo;
+
+        if(BANDWIDTH_den == BW_GEN_NN)
+          for(l = 0; l < num_reg_continuous; l++)
+            matrix_bandwidth_xj[l] = matrix_bandwidth_x[l] + wjo;
+      }
 
       // compute block kx_ij
       // i is eval, j is train
@@ -5196,7 +6589,10 @@ double *cv){
                              NULL,
                              NULL,
                              vsfx,
-                             NULL,NULL,NULL,
+                             bandwidth_provided,
+                             matrix_bandwidth_xi,
+                             matrix_bandwidth_xj,
+                             lambdax,
                              num_categories_extern_X,
                              matrix_categorical_vals_extern_X,
                              NULL,
@@ -5232,6 +6628,15 @@ double *cv){
         for(l = 0; l < num_var_ordered; l++)
           matrix_Yk_ordered_train[l] = matrix_XY_ordered_train[l+num_reg_ordered] + wko;
 
+        // offset the appropriate bandwidths
+        if(BANDWIDTH_den != BW_FIXED){
+          for(l = 0; l < num_var_continuous; l++)
+            matrix_bandwidth_yk[l] = matrix_bandwidth_y[l] + wko;
+
+          if(BANDWIDTH_den == BW_GEN_NN)
+            for(l = 0; l < num_reg_continuous; l++)
+              matrix_bandwidth_xk[l] = matrix_bandwidth_x[l] + wko;
+        }
         // compute block kx_ik
 
         if (iwk != iwj) {
@@ -5277,7 +6682,10 @@ double *cv){
                                  NULL,
                                  NULL,
                                  vsfx,
-                                 NULL,NULL,NULL,
+                                 bandwidth_provided,
+                                 matrix_bandwidth_xi,
+                                 matrix_bandwidth_xk,
+                                 lambdax,
                                  num_categories_extern_X,
                                  matrix_categorical_vals_extern_X,
                                  NULL,
@@ -5332,7 +6740,10 @@ double *cv){
                                NULL,
                                NULL,
                                vsfy,
-                               NULL,NULL,NULL,
+                               bandwidth_provided,
+                               matrix_bandwidth_yj,
+                               matrix_bandwidth_yk,
+                               lambday,
                                num_categories_extern_Y,
                                matrix_categorical_vals_extern_Y,
                                NULL,
@@ -5476,10 +6887,26 @@ double *cv){
   free(kernel_uy);
   free(kernel_uxy);
 
-  if(BANDWIDTH_den == BW_GEN_NN)
-    free_mat(matrix_bandwidth_x, num_reg_continuous);
-  else if (BANDWIDTH_den == BW_FIXED)
+  if(BANDWIDTH_den != BW_FIXED){
+    if(BANDWIDTH_den == BW_ADAP_NN){
+      free(matrix_bandwidth_xi);
+    }else{
+      free(matrix_bandwidth_xj);      
+      free(matrix_bandwidth_xk);      
+    }
+
+      free(matrix_bandwidth_yj);
+      free(matrix_bandwidth_yk);
+
+      free_mat(matrix_bandwidth_x, num_reg_continuous);
+      free_mat(matrix_bandwidth_xy, num_all_cvar);
+      free_mat(matrix_bandwidth_y, num_var_continuous);
+      free(lambdax);
+      free(lambday);
+      free(lambdaxy);
+  }else{
     free(matrix_bandwidth_x);
+  }
 
   free(matrix_Xi_continuous_train);
   free(matrix_Xi_unordered_train);
@@ -5771,7 +7198,7 @@ double *SIGN){
                            NULL, // no W matrix
                            NULL, // no sgn 
                            vector_scale_factor,
-                           NULL,NULL,NULL,
+                           0,NULL,NULL,NULL,
                            num_categories,
                            matrix_categorical_vals,
                            matrix_ordered_indices, 
@@ -6024,7 +7451,7 @@ double *SIGN){
                                  XTKX,
                                  NULL,
                                  vsf,
-                                 NULL,NULL,NULL,
+                                 0,NULL,NULL,NULL,
                                  num_categories,
                                  matrix_categorical_vals,
                                  moo,
@@ -6096,7 +7523,7 @@ double *SIGN){
                              XTKX,
                              NULL,
                              vsf,
-                             NULL,NULL,NULL,
+                             0,NULL,NULL,NULL,
                              num_categories,
                              matrix_categorical_vals,
                              moo,
@@ -6388,7 +7815,7 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          NULL,
                          vector_scale_factor,
-                         NULL,NULL,NULL,
+                         0,NULL,NULL,NULL,
                          num_categories,
                          NULL,
                          NULL,
@@ -6512,7 +7939,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          NULL, // no weights
                          NULL, // no sgn
                          vector_scale_factor,
-                         NULL,NULL,NULL,
+                         0,NULL,NULL,NULL,
                          num_categories,
                          matrix_categorical_vals,
                          NULL, // no ocg
@@ -6570,7 +7997,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          NULL, // no weights
                          NULL, // no sgn
                          vector_scale_factor,
-                         NULL,NULL,NULL,
+                         0,NULL,NULL,NULL,
                          num_categories,
                          NULL,
                          NULL, // no ocg
@@ -6739,7 +8166,7 @@ void kernel_estimate_dens_dist_categorical_np(int KERNEL_den,
                          NULL, // no weights
                          NULL, // no sgn
                          vector_scale_factor,
-                         NULL,NULL,NULL,
+                         0,NULL,NULL,NULL,
                          num_categories,
                          matrix_categorical_vals, // if dist mcv (possibly) necessary
                          NULL, // no ocg
@@ -6961,7 +8388,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          NULL,
                          vsf_xy,
-                         NULL,NULL,NULL,
+                         0,NULL,NULL,NULL,
                          num_categories_extern_XY,
                          matrix_categorical_vals_extern_XY,
                          NULL,
@@ -7010,7 +8437,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          NULL,
                          vsf_x,
-                         NULL,NULL,NULL,
+                         0,NULL,NULL,NULL,
                          num_categories_extern_X,
                          matrix_categorical_vals_extern_X,
                          NULL,
@@ -7353,7 +8780,7 @@ double * log_likelihood
                          NULL, // matrix w
                          NULL, // sgn
                          vsf_XY,
-                         NULL,NULL,NULL, 
+                         0,NULL,NULL,NULL, 
                          num_categories_XY,
                          matrix_categorical_vals_XY,
                          matrix_ordered_indices, 
@@ -7404,7 +8831,7 @@ double * log_likelihood
                          NULL,
                          NULL,
                          vsf_X,
-                         NULL,NULL,NULL,
+                         0,NULL,NULL,NULL,
                          num_categories + num_Y_unordered + num_Y_ordered,
                          matrix_categorical_vals + num_Y_unordered + num_Y_ordered,
                          matrix_ordered_indices, // moo

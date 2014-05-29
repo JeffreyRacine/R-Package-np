@@ -75,8 +75,8 @@ npqreg.condbandwidth <-
            gradients = FALSE,
            ftol = 1.490116e-07, tol = 1.490116e-04,
            small = 1.490116e-05, itmax = 10000,
-           lbc.dir = 0.5, dfc.dir = 4, cfac.dir = 2.5*(3.0-sqrt(5)),initc.dir = 1.0, 
-           lbd.dir = 0, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
+           lbc.dir = 0.5, dfc.dir = 3, cfac.dir = 2.5*(3.0-sqrt(5)),initc.dir = 1.0, 
+           lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
            ...){
 
     no.ex = missing(exdat)
