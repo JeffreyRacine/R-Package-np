@@ -5,7 +5,7 @@ Imports: boot, cubature, stats
 Suggests: quantreg, MASS, parallel
 Title: Parallel nonparametric kernel smoothing methods for mixed data types
 Authors@R: c(person(given = "Jeffrey S.", family = "Racine", role = c("aut","cre"), email = "racinej@mcmaster.ca"),
-             person(given = "Tristen", family = "Hayfield", role = c("aut"), email = "hayfield@mpia.de"))
+             person(given = "Tristen", family = "Hayfield", role = c("aut"), email = "tristen.hayfield@gmail.com"))
 Author: Jeffrey S. Racine and Tristen Hayfield
 Maintainer: Jeffrey S. Racine <racinej@mcmaster.ca>
 Description: This package provides a variety of nonparametric (and semiparametric) kernel methods that seamlessly handle a mix of continuous, unordered, and ordered factor data types. This package is a parallel implementation of the np package based on the MPI specification that incorporates the Rmpi package (Hao Yu <hyu@stats.uwo.ca>) with minor modifications and we are extremely grateful to Hao Yu for his contributions to the R community. We would like to gratefully acknowledge support from  the Natural Sciences and Engineering Research Council of Canada (NSERC:www.nserc.ca), the Social Sciences and Humanities Research Council of Canada (SSHRC:www.sshrc.ca), and the Shared Hierarchical Academic Research Computing Network (SHARCNET:www.sharcnet.ca).

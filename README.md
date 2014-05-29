@@ -1,6 +1,6 @@
 # npRmpi
 
-This is the R package `npRmpi' (NonpRmpiarametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield <hayfield@mpia.de>
+This is the R package `npRmpi' (NonpRmpiarametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield (tristen.hayfield@gmail.com)
 
 ## Installation
 
