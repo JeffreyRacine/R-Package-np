@@ -1,4 +1,15 @@
-Changes from Version 0.50-1 to 0.50-2 [XXX]
+Changes from Version 0.50-1 to 0.60-0 [XXX]
+
+* Ordered kernel types now default to liracine/liracine (normalized) for
+  conditional/unconditional objects, respectively (the previous default,
+  i.e. the Wang van Ryzin kernel, is poorly behaved when smoothing out of
+  ordered predictors is appropriate)
+
+* Added analytical ordered CDF kernels, resulting in significant
+  speedups for cross validation with ordered variables
+
+* Added analytical ordered convolution kernels, resulting in significant
+  speedups for least-squares cross validation with ordered variables
 
 * Rmpi backend updated to 0.6-5
 
@@ -51,7 +62,7 @@ Changes from Version 0.50-1 to 0.50-2 [XXX]
 
 * New function npquantile() that returns smooth univariate quantiles
 
-* npksum explicity only uses raw bandwidths now (and will emit an error
+* npksum explicitly only uses raw bandwidths now (and will emit an error
   if passed numeric scale factors, bandwidth objects are still ok)
 
 * Fixed regression in npindex() with bootstrapped standard errors
@@ -62,7 +73,7 @@ Changes from Version 0.50-1 to 0.50-2 [XXX]
 * Updated npsigtest() for addition of power and added joint test to
   the mix
 
-* Changed ceiling() to max(1,round()) in BstarCB per Dimitris Politis's
+* Changed ceiling() to max(1,round()) in b.star per Dimitris Politis's
   suggestion
 
 * Reworked the interface for npcopula() to avoid two bandwidths and
