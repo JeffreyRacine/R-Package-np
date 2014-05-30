@@ -2245,6 +2245,7 @@ double (* const alluk[])(int, double, int) = { np_uaa, np_unli_racine };
 // when constructing the search box, in 1D the size of the box is
 // x_eval + [-RIGHT_SUPPORT,-LEFT_SUPPORT], the interval is reversed and negated because you want to know if 
 // the evaluation point is in the support of other points, not vice versa :)
+// of course in the case of adaptive bandwidths the situation is opposite: x_train + [LEFT_SUPPORT,RIGHT_SUPPORT]
 
 // as it stands, CDF's are only partially accelerated by the tree, but that is fixable
 #define SQRT5 2.23606797749979
@@ -3214,19 +3215,20 @@ double * const kw){
   /* Trees are currently not compatible with all operations */
   int np_ks_tree_use = (int_TREE == NP_TREE_TRUE);
   int any_convolution = 0;
+  int is_adaptive = (BANDWIDTH_reg == BW_ADAP_NN);
 
   int lod = 0;
 
   const int nws = (weighted_sum == NULL);
   
   assert(!(do_score && do_ocg));
-  assert(!(gather_scatter && (BANDWIDTH_reg == BW_ADAP_NN)));
+  assert(!(gather_scatter && is_adaptive));
 
   for(i = 0; (i < (num_reg_unordered + num_reg_ordered + num_reg_continuous)); i++){
     any_convolution |= (operator[i] == OP_CONVOLUTION);
   }
 
-  if(any_convolution && (BANDWIDTH_reg == BW_ADAP_NN)) np_ks_tree_use = 0;
+  if(any_convolution && is_adaptive) np_ks_tree_use = 0;
 
   np_ks_tree_use &= (num_reg_continuous != 0);
 
@@ -3280,25 +3282,25 @@ double * const kw){
   for(l = (num_reg_continuous+num_reg_unordered); l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++)
     KERNEL_ordered_reg_np[l - (num_reg_continuous + num_reg_unordered)] = KERNEL_ordered_reg[l - (num_reg_continuous + num_reg_unordered)] + OP_OFUN_OFFSETS[operator[l]];
 
-  const int num_xt = (BANDWIDTH_reg == BW_ADAP_NN)?num_obs_eval:num_obs_train;
-  const int ws_step = (BANDWIDTH_reg == BW_ADAP_NN)? 0 :
+  const int num_xt = is_adaptive?num_obs_eval:num_obs_train;
+  const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
   double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, *m = NULL;
   double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
 
-  double * const * const xtc = (BANDWIDTH_reg == BW_ADAP_NN)?
+  double * const * const xtc = is_adaptive?
     matrix_X_continuous_eval:matrix_X_continuous_train;
-  double * const * const xtu = (BANDWIDTH_reg == BW_ADAP_NN)?
+  double * const * const xtu = is_adaptive?
     matrix_X_unordered_eval:matrix_X_unordered_train;
-  double * const * const xto = (BANDWIDTH_reg == BW_ADAP_NN)?
+  double * const * const xto = is_adaptive?
     matrix_X_ordered_eval:matrix_X_ordered_train;
 
-  double * const * const xc = (BANDWIDTH_reg == BW_ADAP_NN)?
+  double * const * const xc = is_adaptive?
     matrix_X_continuous_train:matrix_X_continuous_eval;
-  double * const * const xu = (BANDWIDTH_reg == BW_ADAP_NN)?
+  double * const * const xu = is_adaptive?
     matrix_X_unordered_train:matrix_X_unordered_eval;
-  double * const * const xo = (BANDWIDTH_reg == BW_ADAP_NN)?
+  double * const * const xo = is_adaptive?
     matrix_X_ordered_train:matrix_X_ordered_eval;
 
   if (num_obs_eval == 0) {
@@ -3316,7 +3318,7 @@ double * const kw){
   if(bandwidth_provided){
     if(BANDWIDTH_reg == BW_GEN_NN)
       matrix_bandwidth = matrix_bw_eval;
-    else if (BANDWIDTH_reg == BW_ADAP_NN){
+    else if (is_adaptive){
       if (any_convolution){
         matrix_alt_bandwidth = matrix_bw_eval;        
       } 
@@ -3412,7 +3414,7 @@ double * const kw){
     }
   }
 
-  if(!bandwidth_provided && ((BANDWIDTH_reg == BW_ADAP_NN) && any_convolution)){ // need additional bandwidths 
+  if(!bandwidth_provided && (is_adaptive && any_convolution)){ // need additional bandwidths 
     matrix_alt_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
 
     // this is a bug
@@ -3601,20 +3603,28 @@ double * const kw){
       if(!do_partial_tree){
         for(i = 0; i < num_reg_continuous; i++){
           const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
-          bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
-          bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
-
+          if(!is_adaptive){
+            bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
+            bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
+          }else{
+            bb[2*i] = cksup[KERNEL_reg_np[i]][0];
+            bb[2*i+1] = cksup[KERNEL_reg_np[i]][1];
+          }
           bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
           bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
         }
 
         boxSearchNL(kdt, &nls, bb, NULL, pxl);
       } else {
-
         for(i = 0; i < num_reg_continuous; i++){
           const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
-          bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
-          bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
+          if(!is_adaptive){
+            bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
+            bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
+          }else{
+            bb[2*nld[i]] = cksup[KERNEL_reg_np[i]][0];
+            bb[2*nld[i]+1] = cksup[KERNEL_reg_np[i]][1];
+          }
 
           bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
           bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
@@ -3635,9 +3645,13 @@ double * const kw){
             if(!do_partial_tree){
               for(i = 0; i < num_reg_continuous; i++){
                 const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
-                bb[2*i] = -cksup[knp][1];
-                bb[2*i+1] = -cksup[knp][0];
-
+                if(!is_adaptive){
+                  bb[2*i] = -cksup[knp][1];
+                  bb[2*i+1] = -cksup[knp][0];
+                }else{
+                  bb[2*i] = cksup[knp][0];
+                  bb[2*i+1] = cksup[knp][1];
+                }
                 const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
                 bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
                 bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
@@ -3647,9 +3661,13 @@ double * const kw){
             } else {
               for(i = 0; i < num_reg_continuous; i++){
                 const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
-                bb[2*nld[i]] = -cksup[knp][1];
-                bb[2*nld[i]+1] = -cksup[knp][0];
-
+                if(!is_adaptive){
+                  bb[2*nld[i]] = -cksup[knp][1];
+                  bb[2*nld[i]+1] = -cksup[knp][0];
+                }else{
+                  bb[2*nld[i]] = cksup[knp][0];
+                  bb[2*nld[i]+1] = cksup[knp][1];
+                }
                 const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
                 bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
                 bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);

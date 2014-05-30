@@ -29,5 +29,8 @@ ref='npRmpi' to the install_github call above presuming that your
 system has the required MPI subsystem installed (see my homepage for
 further details).
 
+If you wish a fast install without the building of vignettes, add the
+option build_vignettes=FALSE to the install_github call.
+
 For more information on this project please visit the maintainer's website (http://www.economics.mcmaster.ca/faculty/racinej).
 
