@@ -1,5 +1,11 @@
 Changes from Version 0.50-1 to 0.50-2 [XXX]
 
+* Added analytical ordered CDF kernels, resulting in significant
+  speedups for cross validation with ordered variables
+
+* Added analytical ordered convolution kernels, resulting in significant
+  speedups for least-squares cross validation with ordered variables
+
 * The entire C backend has been rewritten and improved in almost every
   regard
 
