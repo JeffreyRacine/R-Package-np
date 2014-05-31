@@ -1665,6 +1665,8 @@ ought to produce no console I/O whatsoever in the call to
 \item The entire C backend has been rewritten and improved in almost every
   regard
 
+\item The Rmpi backend has been updated to Rmpi version 0.6-5
+
 \item Glitch in adaptive convolution kernels corrected
 
 \item Added truncated gaussian kernel (see \texttt{ntpgauss()} for
@@ -1715,7 +1717,7 @@ ought to produce no console I/O whatsoever in the call to
 \item Fixed regression in \texttt{npindex()} with bootstrapped
   standard errors
 
-\item Code making use on one call to \texttt{npksum()} in
+\item Code makes use of one call to \texttt{npksum()} in
   \texttt{npindex()} and \texttt{npscoef()} where possible rather than
   two separate calls
 
