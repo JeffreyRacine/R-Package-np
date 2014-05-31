@@ -59,11 +59,11 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.50-1. Kindly update your version should you not be using the most
-current (from within R, \texttt{update.packages()} ought to do it, though
-also see \ref{update} below.). See the appendix in this file for
-cumulative changes between this and previous versions of the \texttt{np}
-package.
+is 0.60-0. Kindly update your version should you not be using the most
+current (from within R, \texttt{update.packages()} ought to do it,
+though also see \ref{update} below.). See the appendix in this file
+for cumulative changes between this and previous versions of the
+\texttt{np} package.
 
 \section{Frequently Asked Questions}
 
@@ -1646,6 +1646,91 @@ ought to produce no console I/O whatsoever in the call to
 \clearpage
 
 \appendix
+
+\section*{Changes from Version 0.50-1 to 0.60-0 [1-Jun-2014]}
+
+\begin{itemize}
+
+\item Ordered kernel types now default to liracine/liracine
+  (normalized) for conditional/unconditional objects, respectively
+  (the previous default, i.e.\ the Wang van Ryzin kernel, is poorly
+  behaved when smoothing out of ordered predictors is appropriate)
+
+\item Added analytical ordered CDF kernels, resulting in significant
+  speedups for cross validation with ordered variables
+
+\item Added analytical ordered convolution kernels, resulting in significant
+  speedups for least-squares cross validation with ordered variables
+
+\item The entire C backend has been rewritten and improved in almost every
+  regard
+
+\item Glitch in adaptive convolution kernels corrected
+
+\item Added truncated gaussian kernel (see \texttt{ntpgauss()} for
+  modifying the truncation radius)
+
+\item Support for trees complete (use \texttt{options(np.tree=TRUE)})
+  which when used in conjunction with bounded kernels (i.e.\
+  \texttt{"epanechnikov"}/\texttt{"truncated gaussian"}) can reduce
+  the computational burden for certain problems
+
+\item Optimizers that make use of Powell's direction set method now accept
+  additional arguments that can be used to potentially improve
+  default settings
+
+\item Default search settings for optimizers that make use of Powell's
+  direction set method should better scale to the range of variables
+
+\item Added mean absolute deviation/1.4826 to mix of robust scale elements
+
+\item Corrected error in order of conditional density/distribution manual
+  bandwidths pointed out by Decet Romain
+
+\item Figure in vignette not displaying properly, needed
+  \texttt{png=TRUE} reported by Christophe Bontemps
+
+\item Using \texttt{chol2inv}/\texttt{chol} rather than solve
+  throughout R routines that rely on inversion
+
+\item Fixed glitch in \texttt{npindexbw()} to stop maxit from blowing
+  up every time convergence fails
+
+\item Fixed issue with summary reporting incorrect value of objective function
+  in certain bandwidth objects
+
+\item When \texttt{nmulti} $>$ 1, the full multi-starting search
+  history is now returned in a vector named fval.history
+
+\item Added \texttt{na.action} for consistency with other R functions
+  such as \texttt{lm()}
+
+\item New function \texttt{npquantile()} that returns smooth
+  univariate quantiles
+
+\item \texttt{npksum()} explicitly only uses raw bandwidths now (and
+  will emit an error if passed numeric scale factors, bandwidth
+  objects are still OK)
+
+\item Fixed regression in \texttt{npindex()} with bootstrapped
+  standard errors
+
+\item Code making use on one call to \texttt{npksum()} in
+  \texttt{npindex()} and \texttt{npscoef()} where possible rather than
+  two separate calls
+
+\item Updated \texttt{npsigtest()} for addition of power and added
+  joint test to the mix
+
+\item Changed \texttt{ceiling()} to \texttt{max(1,round())} in
+  \texttt{b.star()} per Dimitris Politis's suggestion
+
+\item Reworked the interface for \texttt{npcopula()} to avoid two
+  bandwidths and \texttt{density=TRUE} but exploiting passing of
+  either \texttt{npudistbw()} (copula) or \texttt{npudensbw} (copula
+  density)
+
+\end{itemize}
 
 \section*{Changes from Version 0.40-13 to 0.50-1 [13-Mar-2013]}
 
