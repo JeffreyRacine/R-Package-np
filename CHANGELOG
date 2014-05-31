@@ -57,6 +57,7 @@ Changes from Version 0.50-1 to 0.60-0 [XXX]
 * New function npquantile() that returns smooth univariate quantiles
 
 * npksum explicitly only uses raw bandwidths now (and will emit an error
+
   if passed numeric scale factors, bandwidth objects are still OK)
 
 * Fixed regression in npindex() with bootstrapped standard errors

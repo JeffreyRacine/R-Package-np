@@ -22,7 +22,7 @@ mpi.bcast.cmd(options(np.messages=FALSE),
 
 set.seed(42)
 
-n <- 2000
+n <- 5000
 
 x <- runif(n)
 z1 <- rbinom(n,1,.5)
