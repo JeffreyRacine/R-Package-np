@@ -59,6 +59,26 @@ int np_fround(double x)
 #include <limits.h>
 #include <float.h>
 
+
+int simple_unique(int n, double * vector){
+  int i, m;
+
+  double * v=NULL;
+
+  v=(double *)malloc(sizeof(double)*n);
+
+  for(i=0; i<n; i++)
+    v[i]=vector[i];
+
+  sort(n,v);
+
+  for(i=0, m=1; i < (n - 1); i++)
+    m += v[i]!=v[i+1];
+  free(v);
+
+  return(m);
+}
+
 /* 7/24/95: Added pointer arithmetic for efficiency */
 
 /* This will generate the mean of a vector */
@@ -765,7 +785,9 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
                                        double c_init,
                                        double lbd_init,
                                        double hbd_init,
-                                       double d_init){
+                                       double d_init,
+                                       double ** matrix_x_continuous,
+                                       double ** matrix_y_continuous){
   int i, l = 0;
 
   // lbc and hbc and init_continuous [fed in] play a similar role to
@@ -783,14 +805,18 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
 
 
   const int fixed_bw = (BANDWIDTH == BW_FIXED);
-  const double bw_nf = MAX(1.0,ceil(sqrt((double)num_obs)));
+  double bw_nf = 0;
   const double bw_cmin = fixed_bw ? 0.0 : 1.0;
   const double bw_cmax = fixed_bw ? DBL_MAX : num_obs-1;
   const int ncon = num_reg_continuous + num_var_continuous;
 
   int_use_starting_values = int_use_starting_values && (!RANDOM);
 
-  for(i = 0; i < ncon; i++,l++){
+  // x continuous
+  for(i = 0; i < num_reg_continuous; i++,l++){
+    if(!fixed_bw){
+      bw_nf = MAX(1.0,sqrt(simple_unique(num_obs,matrix_x_continuous[i])));
+    }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
     if(!int_use_starting_values){
@@ -798,7 +824,32 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
         if(fixed_bw){
           vector_scale_factor[l+1] = bwi*((hbc_init-lbc_init)*ran3(&seed)+lbc_init);
         } else {
-          vector_scale_factor[l+1] = ceil(sqrt(((double)num_obs)*ran3(&seed)+1.0));
+          vector_scale_factor[l+1] = ceil(bwi*ran3(&seed)+1.0);
+        }
+      } else {
+        vector_scale_factor[l+1] = bwi*c_init;
+      }
+    } else {
+      if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_cmax)){
+        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+        vector_scale_factor[l+1] = bwi*c_init;
+      }
+    }
+  }
+
+  // y continuous
+  for(i = 0; i < num_var_continuous; i++,l++){
+    if(!fixed_bw){
+      bw_nf = MAX(1.0,sqrt(simple_unique(num_obs,matrix_y_continuous[i])));
+    }
+    const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
+
+    if(!int_use_starting_values){
+      if(RANDOM){
+        if(fixed_bw){
+          vector_scale_factor[l+1] = bwi*((hbc_init-lbc_init)*ran3(&seed)+lbc_init);
+        } else {
+          vector_scale_factor[l+1] = ceil(bwi*ran3(&seed)+1.0);
         }
       } else {
         vector_scale_factor[l+1] = bwi*c_init;
