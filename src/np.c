@@ -441,7 +441,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vector_scale_factor,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -464,7 +466,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vsfh,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -596,7 +600,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                         vector_continuous_stddev,
                                         vector_scale_factor,
                                         lbc_init, hbc_init, c_init, 
-                                        lbd_init, hbd_init, d_init);
+                                        lbd_init, hbd_init, d_init,
+                                        matrix_X_continuous_train_extern,
+                                        matrix_Y_continuous_train_extern);
 
 
       initialize_nr_directions(num_reg_continuous_extern,
@@ -985,7 +991,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vector_scale_factor,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_eval_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -1008,7 +1016,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     vector_continuous_stddev,
                                     vsfh,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_eval_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -1127,7 +1137,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                         vector_continuous_stddev,
                                         vector_scale_factor,
                                         lbc_init, hbc_init, c_init, 
-                                        lbd_init, hbd_init, d_init);
+                                        lbd_init, hbd_init, d_init,
+                                        matrix_X_continuous_eval_extern,
+                                        matrix_Y_continuous_train_extern);
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
@@ -1681,7 +1693,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     vector_continuous_stddev,
                                     vector_scale_factor,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -1704,7 +1718,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     vector_continuous_stddev,
                                     vsfh,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -1836,7 +1852,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                         vector_continuous_stddev,
                                         vector_scale_factor,
                                         lbc_init, hbc_init, c_init, 
-                                        lbd_init, hbd_init, d_init);
+                                        lbd_init, hbd_init, d_init,
+                                        matrix_X_continuous_train_extern,
+                                        matrix_Y_continuous_train_extern);
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
@@ -2423,7 +2441,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     vector_continuous_stddev,
                                     vector_scale_factor,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -2446,7 +2466,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     vector_continuous_stddev,
                                     vsfh,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -2566,7 +2588,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                         vector_continuous_stddev,
                                         vector_scale_factor,
                                         lbc_init, hbc_init, c_init, 
-                                        lbd_init, hbd_init, d_init);
+                                        lbd_init, hbd_init, d_init,
+                                        matrix_X_continuous_train_extern,
+                                        matrix_Y_continuous_train_extern);
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
@@ -3675,7 +3699,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     vector_continuous_stddev,
                                     vector_scale_factor,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                     0,                /* Not Random (0) Random (1) */
@@ -3698,7 +3724,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     vector_continuous_stddev,
                                     vsfh,
                                     lbc_init, hbc_init, c_init, 
-                                    lbd_init, hbd_init, d_init);
+                                    lbd_init, hbd_init, d_init,
+                                    matrix_X_continuous_train_extern,
+                                    matrix_Y_continuous_train_extern);
 
   initialize_nr_directions(num_reg_continuous_extern,
                            num_reg_unordered_extern,
@@ -3817,7 +3845,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                         vector_continuous_stddev,
                                         vector_scale_factor,
                                         lbc_init, hbc_init, c_init, 
-                                        lbd_init, hbd_init, d_init);
+                                        lbd_init, hbd_init, d_init,
+                                        matrix_X_continuous_train_extern,
+                                        matrix_Y_continuous_train_extern);
 
       initialize_nr_directions(num_reg_continuous_extern,
                                num_reg_unordered_extern,
