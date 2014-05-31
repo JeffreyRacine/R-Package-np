@@ -903,7 +903,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE);
 
   if(int_TREE_X == NP_TREE_TRUE){
-    if((BANDWIDTH_reg_extern != BW_ADAP_NN) || ((BANDWIDTH_reg_extern == BW_ADAP_NN) && cdfontrain)){
+    if((BANDWIDTH_den_extern != BW_ADAP_NN) || ((BANDWIDTH_den_extern == BW_ADAP_NN) && cdfontrain)){
       build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
                    4*num_reg_continuous_extern, ipt, &kdt_extern_X);
 
@@ -2235,7 +2235,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   ipt_extern_Y = ipt_Y;
   ipt_lookup_extern_Y = ipt_lookup_Y;
 
-  num_obs_alt = (BANDWIDTH_reg_extern != BW_ADAP_NN) ? num_obs_train_extern : num_obs_eval_extern;
+  num_obs_alt = (BANDWIDTH_den_extern != BW_ADAP_NN) ? num_obs_train_extern : num_obs_eval_extern;
 
   ipt_XY = (int *)malloc(num_obs_alt*sizeof(int));
   if(!(ipt_XY != NULL))
@@ -2252,11 +2252,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   ipt_extern_XY = ipt_XY;
   ipt_lookup_extern_XY = ipt_lookup_XY;
 
-  int_TREE_XY = int_TREE_XY && (((num_all_cvar) != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_XY = int_TREE_XY && (((num_all_cvar) != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
-  int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
-  int_TREE_Y = int_TREE_Y && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_reg_extern != BW_ADAP_NN);
+  int_TREE_Y = int_TREE_Y && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
   if(int_TREE_X == NP_TREE_TRUE){
     build_kdtree(matrix_X_continuous_train_extern, num_obs_train_extern, num_reg_continuous_extern, 
@@ -3654,7 +3654,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   /* Initialize scale factors and Directions for NR modules */
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
                                     int_LARGE_SF,
@@ -3677,7 +3677,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     lbc_init, hbc_init, c_init, 
                                     lbd_init, hbd_init, d_init);
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
                                     int_LARGE_SF,
@@ -3796,7 +3796,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
       /* Initialize scale factors and directions for NR modules */
 				
-      initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+      initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                         1,        /* Not Random (0) Random (1) */
                                         int_RANDOM_SEED,
                                         int_LARGE_SF,

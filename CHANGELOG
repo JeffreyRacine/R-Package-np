@@ -1,4 +1,9 @@
-Changes from Version 0.50-1 to 0.50-2 [XXX]
+Changes from Version 0.50-1 to 0.60-0 [XXX]
+
+* Ordered kernel types now default to liracine/liracine (normalized) for
+  conditional/unconditional objects, respectively (the previous default,
+  i.e. the Wang van Ryzin kernel, is poorly behaved when smoothing out of
+  ordered predictors is appropriate)
 
 * Rmpi backend updated to 0.6-5
 
@@ -38,7 +43,7 @@ Changes from Version 0.50-1 to 0.50-2 [XXX]
 *  Using chol2inv/chol rather than solve throughout R routines that rely
    on inversion
 
-* Fixed glitch in npindexbw to stop maxit from blowing up every time
+* Fixed glitch in npindexbw() to stop maxit from blowing up every time
   convergence fails
 
 * Fixed issue with summary reporting incorrect value of objective function
@@ -51,18 +56,18 @@ Changes from Version 0.50-1 to 0.50-2 [XXX]
 
 * New function npquantile() that returns smooth univariate quantiles
 
-* npksum explicity only uses raw bandwidths now (and will emit an error
-  if passed numeric scale factors, bandwidth objects are still ok)
+* npksum explicitly only uses raw bandwidths now (and will emit an error
+  if passed numeric scale factors, bandwidth objects are still OK)
 
 * Fixed regression in npindex() with bootstrapped standard errors
 
-* Code making use on one call to npksum() in npindex() and npscoef where
+* Code making use on one call to npksum() in npindex() and npscoef() where
   possible rather than two separate calls
 
 * Updated npsigtest() for addition of power and added joint test to
   the mix
 
-* Changed ceiling() to max(1,round()) in BstarCB per Dimitris Politis's
+* Changed ceiling() to max(1,round()) in b.star per Dimitris Politis's
   suggestion
 
 * Reworked the interface for npcopula() to avoid two bandwidths and
