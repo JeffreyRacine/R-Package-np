@@ -3654,7 +3654,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   /* Initialize scale factors and Directions for NR modules */
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
                                     int_LARGE_SF,
@@ -3677,7 +3677,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     lbc_init, hbc_init, c_init, 
                                     lbd_init, hbd_init, d_init);
 
-  initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+  initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                     0,                /* Not Random (0) Random (1) */
                                     int_RANDOM_SEED,
                                     int_LARGE_SF,
@@ -3796,7 +3796,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
       /* Initialize scale factors and directions for NR modules */
 				
-      initialize_nr_vector_scale_factor(BANDWIDTH_den_extern,
+      initialize_nr_vector_scale_factor(BANDWIDTH_reg_extern,
                                         1,        /* Not Random (0) Random (1) */
                                         int_RANDOM_SEED,
                                         int_LARGE_SF,
