@@ -663,7 +663,7 @@ plot(model.np, gradients = TRUE, plot.errors.method = "asymptotic")
 
 \begin{figure}[!ht]
 \begin{center}
-<<fig=TRUE, png=TRUE, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=8, width=8>>=
+<<fig=TRUE, png=TRUE, resolution=100, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=8, width=8>>=
 options(SweaveHooks = list(multifig = function() par(mfrow=c(2,2),mar=c(4,4,3,2))))
 
 # Plot 1
@@ -1146,7 +1146,7 @@ plot(F.faithful, xtrim = -0.2, view = "fixed", main = "")
 
 \begin{figure}[!ht]
 \begin{center}
-<<fig=TRUE, png=TRUE, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=4, width=8>>=
+<<fig=TRUE, png=TRUE, resolution=100, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=4, width=8>>=
 options(SweaveHooks = list(multifig = function() par(mfrow=c(1,2),mar=rep(1.5,4))))
 plot.output <- plot(f.faithful, xtrim=-0.2, view="fixed", main = "",plot.behavior="data")
 # Retrieve data from plot() to create multiple figures
@@ -1211,7 +1211,7 @@ plot(Fhat, view = "fixed", main = "", theta = 300, phi = 50)
 
 \begin{figure}[!ht]
 \begin{center}
-<<fig=TRUE, png=TRUE, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=4, width=8>>=
+<<fig=TRUE, png=TRUE, resolution=100, multifig=TRUE, eval=TRUE, echo=FALSE, keep.source=TRUE, height=4, width=8>>=
 options(SweaveHooks = list(multifig = function() par(mfrow=c(1,2),mar=rep(1.25,4))))
 plot.output <- plot(fhat, view="fixed", main="",plot.behavior="data")
 # Retrieve data from plot() to create multiple figures
