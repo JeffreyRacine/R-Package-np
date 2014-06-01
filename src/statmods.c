@@ -70,7 +70,7 @@ int simple_unique(int n, double * vector){
   for(i=0; i<n; i++)
     v[i]=vector[i];
 
-  sort(n,v);
+  sort(n,&v[-1]);
 
   for(i=0, m=1; i < (n - 1); i++)
     m += v[i]!=v[i+1];
