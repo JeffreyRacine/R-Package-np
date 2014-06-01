@@ -4615,7 +4615,7 @@ int *num_categories){
       }
 
 #ifdef MPI2
-      if(ks_tree_use){
+      if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
         if((j % iNum_Processors) == 0){
           if((j+my_rank) < (num_obs)){
             for(l = 0; l < num_reg_continuous; l++){
