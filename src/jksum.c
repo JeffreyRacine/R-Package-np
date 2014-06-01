@@ -7101,7 +7101,7 @@ double *SIGN){
   // Allocate memory for objects 
 
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
-  matrix_bandwidth = alloc_matd(bwmdim,num_reg_continuous);
+  matrix_bandwidth = alloc_tmatd(bwmdim,num_reg_continuous);
 
   matrix_bandwidth_deriv = alloc_matd(bwmdim,num_reg_continuous);
 
@@ -7264,7 +7264,10 @@ double *SIGN){
                            NULL, // no W matrix
                            NULL, // no sgn 
                            vector_scale_factor,
-                           0,NULL,NULL,NULL,
+                           1,
+                           matrix_bandwidth,
+                           matrix_bandwidth,
+                           lambda,
                            num_categories,
                            matrix_categorical_vals,
                            matrix_ordered_indices, 
@@ -7375,6 +7378,8 @@ double *SIGN){
     const int nrc1 = (num_reg_continuous+1);
     const int nrcc33 = nrc3*nrc3;
 
+    double ** matrix_bandwidth_eval = NULL;
+
     double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc3];
 
     double * PXC[MAX(1,num_reg_continuous)]; 
@@ -7431,6 +7436,12 @@ double *SIGN){
       XTKY[ii] = &kwm[ii+nrc3+2];
     }
 
+    matrix_bandwidth_eval = (double **)malloc(sizeof(double *)*num_reg_continuous);
+
+    for(int ii = 0; ii < (num_reg_continuous); ii++){
+      matrix_bandwidth_eval[ii] = matrix_bandwidth[ii];
+    }
+
     const double epsilon = 1.0/num_obs_train;
     double nepsilon;
 
@@ -7468,6 +7479,10 @@ double *SIGN){
               XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j+my_rank];
             }
             TCON[l][0] = matrix_X_continuous_eval[l][j+my_rank]; // temporary storage
+
+            if(BANDWIDTH_reg == BW_GEN_NN)
+              matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j+my_rank; // temporary storage
+
           }
 
 
@@ -7517,7 +7532,10 @@ double *SIGN){
                                  XTKX,
                                  NULL,
                                  vsf,
-                                 0,NULL,NULL,NULL,
+                                 1,
+                                 matrix_bandwidth,
+                                 matrix_bandwidth_eval,
+                                 lambda,
                                  num_categories,
                                  matrix_categorical_vals,
                                  moo,
@@ -7540,6 +7558,10 @@ double *SIGN){
           XTKX[l+3][i] = matrix_X_continuous_train[l][i]-matrix_X_continuous_eval[l][j];
         }
         TCON[l][0] = matrix_X_continuous_eval[l][j]; // temporary storage
+
+        if(BANDWIDTH_reg == BW_GEN_NN)
+          matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j; // temporary storage
+
       }
 
 
@@ -7589,7 +7611,10 @@ double *SIGN){
                              XTKX,
                              NULL,
                              vsf,
-                             0,NULL,NULL,NULL,
+                             1,
+                             matrix_bandwidth,
+                             matrix_bandwidth_eval,
+                             lambda,
                              num_categories,
                              matrix_categorical_vals,
                              moo,
@@ -7740,6 +7765,7 @@ double *SIGN){
       free(moo);
     }
 
+    free(matrix_bandwidth_eval);
   }
 
   // clean up hash stuff
@@ -7756,7 +7782,7 @@ double *SIGN){
   free(kernel_u);
   free(kernel_o);
   free(lambda);
-  free_mat(matrix_bandwidth,num_reg_continuous);
+  free_tmat(matrix_bandwidth);
   free_mat(matrix_bandwidth_deriv,num_reg_continuous);
 
 	if(vector_Y_eval != NULL)
