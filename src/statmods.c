@@ -726,7 +726,7 @@ int initialize_nr_directions(int num_reg_continuous,
   li =  num_reg_continuous + num_var_continuous;
 
   for(i = 1; i <= li; i++)
-    matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed, dfc_dir)  + lbc_dir: initc_dir)*c_dir;
+      matrix_y[i][i] = vector_scale_factor[i]*(random ? chidev(&seed, dfc_dir)  + lbc_dir: initc_dir)*c_dir;
 
   if(num_categories == NULL) return(0);
 
@@ -815,7 +815,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // x continuous
   for(i = 0; i < num_reg_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,sqrt(simple_unique(num_obs,matrix_x_continuous[i])));
+      bw_nf = MAX(1.0,ceil(sqrt(simple_unique(num_obs,matrix_x_continuous[i]))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -824,15 +824,26 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
         if(fixed_bw){
           vector_scale_factor[l+1] = bwi*((hbc_init-lbc_init)*ran3(&seed)+lbc_init);
         } else {
-          vector_scale_factor[l+1] = ceil(bwi*ran3(&seed)+1.0);
+          vector_scale_factor[l+1] = ceil(bwi*((hbc_init-lbc_init)*ran3(&seed)+lbc_init)+1.0);
         }
       } else {
-        vector_scale_factor[l+1] = bwi*c_init;
+        if(fixed_bw){
+          vector_scale_factor[l+1] = bwi*c_init;
+        } else {
+          vector_scale_factor[l+1] = ceil(bwi*c_init);
+        }
       }
     } else {
-      if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_cmax)){
-        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
-        vector_scale_factor[l+1] = bwi*c_init;
+      if(fixed_bw) {
+        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_cmax)){
+          REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+          vector_scale_factor[l+1] = bwi*c_init;
+        }
+      } else {
+        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > simple_unique(num_obs,matrix_x_continuous[i]))){
+          REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+          vector_scale_factor[l+1] = ceil(bwi*c_init);
+        }
       }
     }
   }
@@ -840,7 +851,7 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
   // y continuous
   for(i = 0; i < num_var_continuous; i++,l++){
     if(!fixed_bw){
-      bw_nf = MAX(1.0,sqrt(simple_unique(num_obs,matrix_y_continuous[i])));
+      bw_nf = MAX(1.0,ceil(sqrt(simple_unique(num_obs,matrix_y_continuous[i]))));
     }
     const double bwi = fixed_bw ? (int_large ? vector_continuous_stddev[l] * nconfac : 1.0) : bw_nf;
 
@@ -849,15 +860,26 @@ void initialize_nr_vector_scale_factor(int BANDWIDTH,
         if(fixed_bw){
           vector_scale_factor[l+1] = bwi*((hbc_init-lbc_init)*ran3(&seed)+lbc_init);
         } else {
-          vector_scale_factor[l+1] = ceil(bwi*ran3(&seed)+1.0);
+          vector_scale_factor[l+1] = ceil(bwi*((hbc_init-lbc_init)*ran3(&seed)+lbc_init)+1.0);
         }
       } else {
-        vector_scale_factor[l+1] = bwi*c_init;
+        if(fixed_bw){
+          vector_scale_factor[l+1] = bwi*c_init;
+        } else {
+          vector_scale_factor[l+1] = ceil(bwi*c_init);
+        }
       }
     } else {
-      if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_cmax)){
-        REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
-        vector_scale_factor[l+1] = bwi*c_init;
+      if(fixed_bw) {
+        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > bw_cmax)){
+          REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+          vector_scale_factor[l+1] = bwi*c_init;
+        }
+      } else {
+        if((vector_scale_factor[l+1] < bw_cmin) || (vector_scale_factor[l+1] > simple_unique(num_obs,matrix_x_continuous[i]))){
+          REprintf("\n** Warning: invalid sf in init_nr_sf() [%g]\n", vector_scale_factor[l+1]);
+          vector_scale_factor[l+1] = ceil(bwi*c_init);
+        }
       }
     }
   }

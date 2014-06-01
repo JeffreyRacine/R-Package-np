@@ -2,4 +2,4 @@
 /bin/rm -rf ./chm
 /bin/rm -rf ./config.*
 /bin/rm -rf src/*.so src/*.o src/*.d src/*.dll src/*.a src/*.rc src/Makedeps a.out.dSYM
-rm -f *~ */*~ */*/*~ */*bak
+rm -f *~ *bak *.pdf */*~ */*/*~ */*bak
