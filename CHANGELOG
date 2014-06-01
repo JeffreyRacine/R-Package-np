@@ -1,4 +1,4 @@
-Changes from Version 0.50-1 to 0.60-0 [XXX]
+Changes from Version 0.50-1 to 0.60-0 [1-Jun-2014]
 
 * Ordered kernel types now default to liracine/liracine (normalized) for
   conditional/unconditional objects, respectively (the previous default,

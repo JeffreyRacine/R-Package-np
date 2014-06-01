@@ -5,3 +5,6 @@
 /bin/rm -rf src/Makevars
 /bin/rm -rf src/*.so src/*.o src/*.d src/*.dll src/*.a src/*.rc src/*.rds src/Makedeps
 /bin/rm -rf src-*
+
+rm -f *~ *bak *.pdf */*~ */*/*~ */*bak
+
