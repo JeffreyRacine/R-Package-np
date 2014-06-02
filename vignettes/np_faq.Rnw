@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-0. Kindly update your version should you not be using the most
+is 0.60-1. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1646,6 +1646,19 @@ ought to produce no console I/O whatsoever in the call to
 \clearpage
 
 \appendix
+
+\section*{Changes from Version 0.60-0 to 0.60-1 [2-Jun-2014]}
+
+\begin{itemize}
+
+\item Fixed glitch in adaptive\_nn/generalized\_nn bandwidths that
+  affected all routines that rely on non-fixed bandwidths
+
+\item Tweaks to search for adaptive\_nn/generalized\_nn initial search values
+
+\item Fixed glitch in local linear estimation with adaptive\_nn bandwidths
+
+\end{itemize}
 
 \section*{Changes from Version 0.50-1 to 0.60-0 [1-Jun-2014]}
 
