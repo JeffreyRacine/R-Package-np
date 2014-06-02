@@ -24,8 +24,8 @@ with `x' as master variable, use mpi.bcast.cmd(cmd=myfun, x=x).}
   \item{comm}{a communicator number}
   \item{nonblock}{logical. If TRUE, a nonblock procedure is used on all receivers so that
 they will consume none or little CPUs while waiting.}
-  \item{sleep}{a sleep interval, used when nonblock=TRUE. Smaller sleep is, more response receivers are, 
-    more CPUs consume}
+  \item{sleep}{a sleep interval, used when nonblock=TRUE. The smaller sleep is, the more responsive slaves
+are, the more CPUs consume.}
   \item{caller.execute}{a logical value indicating whether the master
     node is additionally to execute the command}
 }
@@ -48,8 +48,9 @@ they will consume none or little CPUs while waiting.}
   slaves.
  }
 \section{Warning}{
-  Be caution to use \code{mpi.bcast.cmd} alone by master in the middle of comptuation. Only all slaves in idle 
-  states (waiting instructions from master) can it be used. Othewise it may result miscommunication
+  Be cautious of using \code{mpi.bcast.cmd} alone by master in the middle of comptuation. Only all slaves in idle 
+  states (waiting instructions from master) can be used. Othewise it may
+  result in miscommunication
   with other MPI calls.
 } 
 

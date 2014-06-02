@@ -153,7 +153,7 @@ npksum(\dots)
   \item{compute.ocg}{
     a logical specifying whether or not to return a separate
     result for each unordered and ordered dimension, where the product
-    kernel term for that dimension is evaluation at an appropriate
+    kernel term for that dimension is evaluated at an appropriate
     reference category. This is used primarily in \code{np} to compute ordered and
     unordered categorical gradients. See details.
   }
@@ -258,7 +258,7 @@ npksum(\dots)
   \code{operator = c("normal","derivative")}. This makes the computation
   of gradients much easier.
 
-  The option \code{compute.score=} can be used compute the gradients
+  The option \code{compute.score=} can be used to compute the gradients
   with respect to \eqn{h} in addition to the normal kernel sum. Like
   permutations, the additional results are returned in the
   \code{p.ksum}. This option does not work in conjunction with

@@ -26,7 +26,7 @@ mpi.bcast(x, type, rank = 0, comm = 1, buffunit=100)
   all members have to wait until everyone calls it. All members have to 
   prepare the same type of messages (buffers). Hence it is relatively 
   difficult to use in R environment since the receivers may not know what 
-  types of data to receive, not mention the length of data. Users should 
+  types of data to receive, not to mention the length of data. Users should 
   use various extensions of \code{mpi.bcast} in R. They are 
   \code{\link{mpi.bcast.Robj}}, \code{\link{mpi.bcast.cmd}}, and 
   \code{\link{mpi.bcast.Robj2slave}}.

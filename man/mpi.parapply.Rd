@@ -50,7 +50,7 @@ to the integer vector .mpi.applyLB generated in previous computation (simulation
 Unless length of \code{X} is no more than total slave numbers (slave.num) and in this case 
 \code{mpi.applyLB} is the same as \code{mpi.apply}, \code{mpi.applyLB} sends a next job to a 
 slave who just delivered a finished job. The sequence of slaves who deliver results to master are 
-saved into \code{.mpi.applyLB}. It keeps track which part of results done by which slaves. 
+saved into \code{.mpi.applyLB}. It keeps track of which slaves do which parts of the results. 
 \code{.mpi.applyLB} can be used to reproduce the same simulation result if the same seed is 
 used and the argument \code{apply.seq} is equal to \code{.mpi.applyLB}.
  

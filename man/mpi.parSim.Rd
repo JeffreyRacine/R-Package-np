@@ -60,7 +60,7 @@ The purpose of using \code{run} has two folds. It allows a tuneup
 of slave job size and total number of slave jobs to deal with two 
 different cluster environments. On a cluster of slaves with equal CPU 
 power, \code{run=1} is often enough. But if \code{nsim} is too big, one
-can set \code{run=2} and the slave jog size to be \code{nsim/2} so that  
+can set \code{run=2} and the slave job size to be \code{nsim/2} so that  
 TNS=slave.num*(nsim/2)*(2*run). This may improve R computation 
 efficiency slightly. On a cluster of slaves with different CPU power, one 
 can choose a big value of \code{run} and a small value of \code{nsim} 
@@ -69,7 +69,7 @@ others. This will keep all slaves busy so that load balancing is
 achieved. 
 
 The sequence of slaves who deliver results to master are saved into 
-\code{.mpi.parSim}. It keeps track which part of results done by which slaves. 
+\code{.mpi.parSim}. It keeps track of which slaves do which parts of the results. 
 \code{.mpi.parSim} can be used to reproduce the same simulation result if the same
 seed is used and the argument \code{sim.seq} is equal to \code{.mpi.parSim}.
  
