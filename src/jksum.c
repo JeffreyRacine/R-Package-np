@@ -3324,7 +3324,7 @@ double * const kw){
       } 
       matrix_bandwidth = matrix_bw_train;
     } else {
-      assert(0);
+      matrix_bandwidth = matrix_bw_train;
     }
     lambda = lambda_pre;
   } else {
@@ -4331,7 +4331,7 @@ int *num_categories){
   // Allocate memory for objects 
 
   lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
-  matrix_bandwidth = alloc_tmatd(num_obs, num_reg_continuous);  
+  matrix_bandwidth = alloc_tmatd(BANDWIDTH_reg==BW_FIXED?1:num_obs, num_reg_continuous);  
 
   if(kernel_bandwidth_mean(KERNEL_reg,
                            BANDWIDTH_reg,
