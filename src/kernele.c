@@ -17586,14 +17586,18 @@ double  initd_dir)
 
 		quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-    initialize_nr_directions(1, 0, 0,
+    initialize_nr_directions(BANDWIDTH_den,
+                             num_obs_train,
+                             1, 0, 0,
                              0, 0, 0,
                              vector_scale_factor,
                              NULL,
                              matrix_y,
                              0, seed, 
                              lbc_dir, c_dir, dfc_dir, initc_dir, 
-                             lbd_dir, hbd_dir, d_dir, initd_dir);
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train,
+                             matrix_Y_continuous_train);
 
 		powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17609,14 +17613,18 @@ double  initd_dir)
 
 				quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-        initialize_nr_directions(1, 0, 0,
+        initialize_nr_directions(BANDWIDTH_den,
+                                 num_obs_train,
+                                 1, 0, 0,
                                  0, 0, 0,
                                  vector_scale_factor,
                                  NULL,
                                  matrix_y,
                                  0, seed, 
                                  lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train,
+                                 matrix_Y_continuous_train);
 
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
@@ -17670,14 +17678,18 @@ double  initd_dir)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_directions(1, 0, 0,
+		    initialize_nr_directions(BANDWIDTH_den,
+                                 num_obs_train,
+                                 1, 0, 0,
                                  0, 0, 0,
                                  vector_scale_factor,
                                  NULL,
                                  matrix_y,
                                  0, seed, 
                                  lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train,
+                                 matrix_Y_continuous_train);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17691,14 +17703,18 @@ double  initd_dir)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_directions(1, 0, 0,
+				    initialize_nr_directions(BANDWIDTH_den,
+                                     num_obs_train,
+                                     1, 0, 0,
                                      0, 0, 0,
                                      vector_scale_factor,
                                      NULL,
                                      matrix_y,
                                      0, seed, 
                                      lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                     lbd_dir, hbd_dir, d_dir, initd_dir);
+                                     lbd_dir, hbd_dir, d_dir, initd_dir,
+                                     matrix_X_continuous_train,
+                                     matrix_Y_continuous_train);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17740,14 +17756,18 @@ double  initd_dir)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_directions(1, 0, 0,
+		    initialize_nr_directions(BANDWIDTH_den,
+                                 num_obs_train,
+                                 1, 0, 0,
                                  0, 0, 0,
                                  vector_scale_factor,
                                  NULL,
                                  matrix_y, 
                                  0, seed, 
                                  lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train,
+                                 matrix_Y_continuous_train);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17761,14 +17781,18 @@ double  initd_dir)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_directions(1, 0, 0,
+				    initialize_nr_directions(BANDWIDTH_den,
+                                     num_obs_train,
+                                     1, 0, 0,
                                      0, 0, 0,
                                      vector_scale_factor,
                                      NULL,
                                      matrix_y,
                                      0, seed, 
                                      lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                     lbd_dir, hbd_dir, d_dir, initd_dir);
+                                     lbd_dir, hbd_dir, d_dir, initd_dir,
+                                     matrix_X_continuous_train,
+                                     matrix_Y_continuous_train);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17858,14 +17882,18 @@ double  initd_dir)
 
 		quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-    initialize_nr_directions(1, 0, 0,
+    initialize_nr_directions(BANDWIDTH_den,
+                             num_obs_train,
+                             1, 0, 0,
                              0, 0, 0,
                              vector_scale_factor,
                              NULL,
                              matrix_y,
                              0, seed, 
                              lbc_dir, c_dir, dfc_dir, initc_dir, 
-                             lbd_dir, hbd_dir, d_dir, initd_dir);
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train,
+                             matrix_Y_continuous_train);
 
 		powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17879,14 +17907,18 @@ double  initd_dir)
 
 				quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-		    initialize_nr_directions(1, 0, 0,
+		    initialize_nr_directions(BANDWIDTH_den,
+                                 num_obs_train,
+                                 1, 0, 0,
                                  0, 0, 0,
                                  vector_scale_factor,
                                  NULL,
                                  matrix_y,
                                  0, seed, 
                                  lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train,
+                                 matrix_Y_continuous_train);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17938,14 +17970,18 @@ double  initd_dir)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_directions(1, 0, 0,
+		    initialize_nr_directions(BANDWIDTH_den,
+                                 num_obs_train,
+                                 1, 0, 0,
                                  0, 0, 0,
                                  vector_scale_factor,
                                  NULL,
                                  matrix_y,
                                  0, seed, 
                                  lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train,
+                                 matrix_Y_continuous_train);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -17959,14 +17995,18 @@ double  initd_dir)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_directions(1, 0, 0,
+				    initialize_nr_directions(BANDWIDTH_den,
+                                     num_obs_train,
+                                     1, 0, 0,
                                      0, 0, 0,
                                      vector_scale_factor,
                                      NULL,
                                      matrix_y,
                                      0, seed, 
                                      lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                     lbd_dir, hbd_dir, d_dir, initd_dir);
+                                     lbd_dir, hbd_dir, d_dir, initd_dir,
+                                     matrix_X_continuous_train,
+                                     matrix_Y_continuous_train);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -18013,14 +18053,18 @@ double  initd_dir)
 
 				quantile[1] = (y_max_extern-y_min_extern)/2.0;
 
-		    initialize_nr_directions(1, 0, 0,
+		    initialize_nr_directions(BANDWIDTH_den,
+                                 num_obs_train,
+                                 1, 0, 0,
                                  0, 0, 0,
                                  vector_scale_factor,
                                  NULL,
                                  matrix_y,
                                  0, seed, 
                                  lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train,
+                                 matrix_Y_continuous_train);
 
 				powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
@@ -18034,14 +18078,18 @@ double  initd_dir)
 
 						quantile[1] = y_min_extern + ran3(&seed)*(y_max_extern-y_min_extern);
 
-				    initialize_nr_directions(1, 0, 0,
+				    initialize_nr_directions(BANDWIDTH_den,
+                                     num_obs_train,
+                                     1, 0, 0,
                                      0, 0, 0,
                                      vector_scale_factor,
                                      NULL,
                                      matrix_y,
                                      0, seed, 
                                      lbc_dir, c_dir, dfc_dir, initc_dir, 
-                                     lbd_dir, hbd_dir, d_dir, initd_dir);
+                                     lbd_dir, hbd_dir, d_dir, initd_dir,
+                                     matrix_X_continuous_train,
+                                     matrix_Y_continuous_train);
 
 						powell(0, 0, quantile, quantile, matrix_y, 1, ftol, tol, small, itmax, &iter, &fret, func_con_density_quantile);
 
