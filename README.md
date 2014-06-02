@@ -12,25 +12,27 @@ install.packages('np', dependencies = TRUE)
 
 Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-np/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-np/tarball/master), decompress and run `R CMD INSTALL` on it, or install then use the **devtools** package to install the development version:
 
-```r
-library(devtools); install_github('R-Package-np', 'JeffreyRacine')
-```
-
-Note Windows users have to first install
+Note that in order to install the development version of the package,
+Windows users have to first install
 [Rtools](http://cran.r-project.org/bin/windows/Rtools), while OS X
 users have to first install
 [Xcode](https://itunes.apple.com/us/app/xcode/id497799835) and the
 command line tools (in OS X 10.9 or higher, once you have Xcode
 installed, open a terminal and run xcode-select --install).
 
+Note also that if you wish a fast install without the building of
+vignettes (or if you do not have TeX installed on your system), add
+the option build_vignettes=FALSE to the install_github() call below.
+
+```r
+library(devtools); install_github('R-Package-np', 'JeffreyRacine')
+```
+
 Note that if you wish to install the MPI-enabled development version
 of the package (i.e. the package `npRmpi'), you can add the option
 ref='npRmpi' to the install_github call above presuming that your
 system has the required MPI subsystem installed (see my homepage for
 further details).
-
-If you wish a fast install without the building of vignettes, add the
-option build_vignettes=FALSE to the install_github call.
 
 For more information on this project please visit the maintainer's website (http://www.economics.mcmaster.ca/faculty/racinej).
 
