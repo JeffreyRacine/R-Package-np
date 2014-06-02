@@ -301,7 +301,7 @@ npcdensbw(\dots)
     Details}
 
   \item{lbc.init, hbc.init, cfac.init}{ lower bound, upper bound, and
-    non-randqom initial values for scale factors for \code{numeric}
+    non-random initial values for scale factors for \code{numeric}
     variables for Powell's algorithm. See Details}
 
   \item{lbd.init, hbd.init, dfac.init}{ lower bound, upper bound, and
@@ -399,7 +399,7 @@ npcdensbw(\dots)
   modifying \code{nmulti}). Further refinement for difficult cases can
   be achieved by modifying these sets of parameters. However, these
   parameters are intended more for the authors of the package to enable
-  \sQuote{tuning} for various methods rather than for the user themself.
+  \sQuote{tuning} for various methods rather than for the user themselves.
 
 }
 \value{

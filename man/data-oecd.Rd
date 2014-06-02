@@ -41,7 +41,7 @@
     investment/GDP ratio for each 5-year period}
 
     \item{humancap}{ the seventh column, of type \code{numeric}:
-      average secondary school enrollment rate for each 5-year period}
+      average secondary school enrolment rate for each 5-year period}
 
     }
 
