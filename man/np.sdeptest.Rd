@@ -113,7 +113,7 @@ npsdeptest(data = NULL,
 
 \section{Usage Issues}{
   
-  The \code{integration} version of the statistic uses multdimensional
+  The \code{integration} version of the statistic uses multidimensional
   numerical methods from the \code{\link{cubature}} package. See
   \code{\link{adaptIntegrate}} for details. The \code{integration}
   version of the statistic will be substantially slower than the
