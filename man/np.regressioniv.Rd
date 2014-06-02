@@ -163,7 +163,7 @@ npregiv(y,
   }
 \item{alpha.tol}{
   the search tolerance for \code{optimize} when solving for
-  \eqn{\alpha}{alpha}, the Tikhonov regularization parameter, when using
+  \eqn{\alpha}{alpha}, the Tikhonov regularization parameter,
   when using \code{method="Tikhonov"}.
 }
 \item{iterate.max}{
