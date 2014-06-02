@@ -18,7 +18,10 @@ Windows users have to first install
 users have to first install
 [Xcode](https://itunes.apple.com/us/app/xcode/id497799835) and the
 command line tools (in OS X 10.9 or higher, once you have Xcode
-installed, open a terminal and run xcode-select --install).
+installed, open a terminal and run xcode-select --install). Note also
+that versions of e.g. Rtools are paired with versions of R so perhaps
+ensure you have the latest version of R installed prior to commencing
+this process.
 
 Note also that if you wish a fast install without the building of
 vignettes (or if you do not have TeX installed on your system), add
