@@ -28,7 +28,7 @@ dataset \code{"wage"} plus additional objects \code{"bw.all"} and
     \item{nonwhite}{column 5, of type \code{factor}, =\dQuote{Nonwhite} if nonwhite, \dQuote{White} otherwise}
     \item{female}{column 6, of type \code{factor}, =\dQuote{Female} if female, \dQuote{Male} otherwise}
     \item{married}{column 7, of type \code{factor}, =\dQuote{Married} if Married, \dQuote{Nonmarried} otherwise}
-    \item{numdep}{column 8, of type \code{numeric}, number of dependents}
+    \item{numdep}{column 8, of type \code{numeric}, number of dependants}
     \item{smsa}{column 9, of type \code{numeric}, =1 if live in SMSA}
     \item{northcen}{column 10, of type \code{numeric}, =1 if live in north central U.S}
     \item{south}{column 11, of type \code{numeric}, =1 if live in southern region}

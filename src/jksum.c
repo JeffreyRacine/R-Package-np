@@ -4381,7 +4381,7 @@ int *num_categories){
                            0, // do not leave out 
                            0,
                            1, // kernel_pow = 1
-                           (BANDWIDTH_reg == BW_ADAP_NN)?1:0, // bandwidth_divide = FALSE when not adaptive
+                           0, // bandwidth_divide = FALSE 
                            0, 
                            0, // not symmetric
                            0, // do not gather-scatter
@@ -4502,9 +4502,17 @@ int *num_categories){
       const double sk = copysign(DBL_MIN, mean[ii2+1]) + mean[ii2+1];
       const double dy = vector_Y[ii]-mean[ii2]/sk;
       cv += dy*dy;
-      if(bwm == RBWM_CVAIC)
-        traceH += aicc/sk;
-
+      if(bwm == RBWM_CVAIC){
+        if(BANDWIDTH_reg != BW_ADAP_NN){
+          traceH += aicc/sk;
+        }else{
+          double pnh = 1.0;
+          for(int jj = 0; jj < num_reg_continuous; jj++)
+            pnh /= matrix_bandwidth[jj][ii];
+          traceH += pnh*aicc/sk;
+        }
+        
+      }
       //fprintf(stderr,"mj: %e\n",mean[ii2]/(MAX(DBL_MIN, mean[ii2+1])));
     }
 
@@ -4985,12 +4993,17 @@ int *num_categories){
         }
       }
 #endif
-      
-      // need to manipulate KWM pointers and XTKY - done
+      double pnh = 1.0;
 
+      if((BANDWIDTH_reg == BW_ADAP_NN)&&(bwm == RBWM_CVAIC)){
+        for(int jj = 0; jj < num_reg_continuous; jj++)
+          pnh /= matrix_bandwidth[jj][j];
+      }
+
+      // need to manipulate KWM pointers and XTKY - done
       if(bwm == RBWM_CVAIC){
-        KWM[0][0] += aicc;
-        XTKY[0][0] += aicc*vector_Y[j];
+        KWM[0][0] += pnh*aicc;
+        XTKY[0][0] += pnh*aicc*vector_Y[j];
       }
 
       while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
@@ -5000,7 +5013,7 @@ int *num_categories){
       }
       
       if(bwm == RBWM_CVAIC)
-        traceH += XTKXINV[0][0]*aicc;
+        traceH += XTKXINV[0][0]*pnh*aicc;
    
       XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
