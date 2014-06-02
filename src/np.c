@@ -470,7 +470,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                     matrix_X_continuous_train_extern,
                                     matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(num_reg_continuous_extern,
+  initialize_nr_directions(BANDWIDTH_den_extern,
+                           num_obs_train_extern,
+                           num_reg_continuous_extern,
                            num_reg_unordered_extern,
                            num_reg_ordered_extern,
                            0,
@@ -481,7 +483,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                            matrix_y,
                            0, int_RANDOM_SEED, 
                            lbc_dir, dfc_dir, c_dir,initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir);
+                           lbd_dir, hbd_dir, d_dir, initd_dir,
+                           matrix_X_continuous_train_extern,
+                           matrix_Y_continuous_train_extern);
 
   /* When multistarting, set counter */
 
@@ -532,7 +536,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_directions(num_reg_continuous_extern,
+    initialize_nr_directions(BANDWIDTH_den_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
                              num_reg_unordered_extern,
                              num_reg_ordered_extern,
                              0,
@@ -543,7 +549,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                              matrix_y,
                              0, int_RANDOM_SEED, 
                              lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir);
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
 
 
 
@@ -605,7 +613,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                         matrix_Y_continuous_train_extern);
 
 
-      initialize_nr_directions(num_reg_continuous_extern,
+      initialize_nr_directions(BANDWIDTH_den_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
                                num_reg_unordered_extern,
                                num_reg_ordered_extern,
                                0,
@@ -616,7 +626,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                matrix_y,
                                1, int_RANDOM_SEED, 
                                lbc_dir, dfc_dir, c_dir, initc_dir,
-                               lbd_dir, hbd_dir, d_dir, initd_dir);
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
 
 
 
@@ -637,7 +649,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
              bwmfunc);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-        initialize_nr_directions(num_reg_continuous_extern,
+        initialize_nr_directions(BANDWIDTH_den_extern,
+                                 num_obs_train_extern,
+                                 num_reg_continuous_extern,
                                  num_reg_unordered_extern,
                                  num_reg_ordered_extern,
                                  0,
@@ -648,7 +662,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                                  matrix_y,
                                  0, int_RANDOM_SEED, 
                                  lbc_dir, dfc_dir, c_dir, initc_dir,
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train_extern,
+                                 matrix_Y_continuous_train_extern);
 
 
 
@@ -1020,7 +1036,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                     matrix_X_continuous_eval_extern,
                                     matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(num_reg_continuous_extern,
+  initialize_nr_directions(BANDWIDTH_den_extern,
+                           num_obs_train_extern,
+                           num_reg_continuous_extern,
                            num_reg_unordered_extern,
                            num_reg_ordered_extern,
                            0,
@@ -1031,7 +1049,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                            matrix_y,
                            0, int_RANDOM_SEED, 
                            lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir);
+                           lbd_dir, hbd_dir, d_dir, initd_dir,
+                           matrix_X_continuous_train_extern,
+                           matrix_Y_continuous_train_extern);
 
 
   /* When multistarting, set counter */
@@ -1070,7 +1090,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   /* int_RESTART_FROM_MIN needs to be set */
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-    initialize_nr_directions(num_reg_continuous_extern,
+    initialize_nr_directions(BANDWIDTH_den_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
                              num_reg_unordered_extern,
                              num_reg_ordered_extern,
                              0,
@@ -1081,7 +1103,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                              matrix_y,
                              0, int_RANDOM_SEED,  
                              lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir);
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
 
 
 
@@ -1141,7 +1165,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                         matrix_X_continuous_eval_extern,
                                         matrix_Y_continuous_train_extern);
 
-      initialize_nr_directions(num_reg_continuous_extern,
+      initialize_nr_directions(BANDWIDTH_den_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
                                num_reg_unordered_extern,
                                num_reg_ordered_extern,
                                0,
@@ -1152,7 +1178,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                matrix_y,
                                1, int_RANDOM_SEED,  
                                lbc_dir, dfc_dir, c_dir, initc_dir,
-                               lbd_dir, hbd_dir, d_dir, initd_dir);
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
 
       /* Conduct direction set search */
 
@@ -1172,7 +1200,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_directions(num_reg_continuous_extern,
+        initialize_nr_directions(BANDWIDTH_den_extern,
+                                 num_obs_train_extern,
+                                 num_reg_continuous_extern,
                                  num_reg_unordered_extern,
                                  num_reg_ordered_extern,
                                  0,
@@ -1183,7 +1213,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                                  matrix_y,
                                  0, int_RANDOM_SEED,  
                                  lbc_dir, dfc_dir, c_dir, initc_dir,
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train_extern,
+                                 matrix_Y_continuous_train_extern);
 
         powell(0,
                0,
@@ -1722,7 +1754,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                     matrix_X_continuous_train_extern,
                                     matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(num_reg_continuous_extern,
+  initialize_nr_directions(BANDWIDTH_den_extern,
+                           num_obs_train_extern,
+                           num_reg_continuous_extern,
                            num_reg_unordered_extern,
                            num_reg_ordered_extern,
                            num_var_continuous_extern,
@@ -1733,7 +1767,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                            matrix_y,
                            0, int_RANDOM_SEED,  
                            lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir);
+                           lbd_dir, hbd_dir, d_dir, initd_dir,
+                           matrix_X_continuous_train_extern,
+                           matrix_Y_continuous_train_extern);
 
   /* When multistarting, set counter */
 
@@ -1784,7 +1820,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_directions(num_reg_continuous_extern,
+    initialize_nr_directions(BANDWIDTH_den_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
                              num_reg_unordered_extern,
                              num_reg_ordered_extern,
                              num_var_continuous_extern,
@@ -1795,7 +1833,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                              matrix_y,
                              0, int_RANDOM_SEED,  
                              lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir);
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
 
 
     powell(0,
@@ -1856,7 +1896,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                         matrix_X_continuous_train_extern,
                                         matrix_Y_continuous_train_extern);
 
-      initialize_nr_directions(num_reg_continuous_extern,
+      initialize_nr_directions(BANDWIDTH_den_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
                                num_reg_unordered_extern,
                                num_reg_ordered_extern,
                                num_var_continuous_extern,
@@ -1867,7 +1909,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                matrix_y,
                                1, int_RANDOM_SEED,  
                                lbc_dir, dfc_dir, c_dir, initc_dir,
-                               lbd_dir, hbd_dir, d_dir, initd_dir);
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
 
       /* Conduct direction set search */
       
@@ -1887,7 +1931,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_directions(num_reg_continuous_extern,
+        initialize_nr_directions(BANDWIDTH_den_extern,
+                                 num_obs_train_extern,
+                                 num_reg_continuous_extern,
                                  num_reg_unordered_extern,
                                  num_reg_ordered_extern,
                                  num_var_continuous_extern,
@@ -1898,7 +1944,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                  matrix_y,
                                  0, int_RANDOM_SEED,  
                                  lbc_dir, dfc_dir, c_dir, initc_dir,
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train_extern,
+                                 matrix_Y_continuous_train_extern);
 
         powell(0,
                0,
@@ -2470,7 +2518,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     matrix_X_continuous_train_extern,
                                     matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(num_reg_continuous_extern,
+  initialize_nr_directions(BANDWIDTH_den_extern,
+                           num_obs_train_extern,
+                           num_reg_continuous_extern,
                            num_reg_unordered_extern,
                            num_reg_ordered_extern,
                            num_var_continuous_extern,
@@ -2481,7 +2531,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                            matrix_y,
                            0, int_RANDOM_SEED,  
                            lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir);
+                           lbd_dir, hbd_dir, d_dir, initd_dir,
+                           matrix_X_continuous_train_extern,
+                           matrix_Y_continuous_train_extern);
 
 
   /* When multistarting, set counter */
@@ -2521,7 +2573,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
          bwmfunc);
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-    initialize_nr_directions(num_reg_continuous_extern,
+    initialize_nr_directions(BANDWIDTH_den_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
                              num_reg_unordered_extern,
                              num_reg_ordered_extern,
                              num_var_continuous_extern,
@@ -2532,7 +2586,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                              matrix_y,
                              0, int_RANDOM_SEED,  
                              lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir);
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
 
     powell(0,
            0,
@@ -2592,7 +2648,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                         matrix_X_continuous_train_extern,
                                         matrix_Y_continuous_train_extern);
 
-      initialize_nr_directions(num_reg_continuous_extern,
+      initialize_nr_directions(BANDWIDTH_den_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
                                num_reg_unordered_extern,
                                num_reg_ordered_extern,
                                num_var_continuous_extern,
@@ -2603,7 +2661,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                matrix_y,
                                1, int_RANDOM_SEED,  
                                lbc_dir, dfc_dir, c_dir, initc_dir,
-                               lbd_dir, hbd_dir, d_dir, initd_dir);
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
 
 
       /* Conduct direction set search */
@@ -2624,7 +2684,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-        initialize_nr_directions(num_reg_continuous_extern,
+        initialize_nr_directions(BANDWIDTH_den_extern,
+                                 num_obs_train_extern,
+                                 num_reg_continuous_extern,
                                  num_reg_unordered_extern,
                                  num_reg_ordered_extern,
                                  num_var_continuous_extern,
@@ -2635,7 +2697,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                  matrix_y, 
                                  0, int_RANDOM_SEED,  
                                  lbc_dir, dfc_dir, c_dir, initc_dir,
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train_extern,
+                                 matrix_Y_continuous_train_extern);
 
 
         powell(0,
@@ -2771,12 +2835,10 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             double * ll){
   /* Likelihood bandwidth selection for density estimation */
 
-  double small = 1.0e-16;
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
   double ** pdf_deriv = NULL, ** pdf_deriv_stderr = NULL;
   double xpad_num, ypad_num;
 
-  int itmax = 10000;
   int i,j;
   int num_var;
 
@@ -3728,7 +3790,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                     matrix_X_continuous_train_extern,
                                     matrix_Y_continuous_train_extern);
 
-  initialize_nr_directions(num_reg_continuous_extern,
+  initialize_nr_directions(BANDWIDTH_reg_extern,
+                           num_obs_train_extern,
+                           num_reg_continuous_extern,
                            num_reg_unordered_extern,
                            num_reg_ordered_extern,
                            0,
@@ -3739,7 +3803,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                            matrix_y,
                            0, int_RANDOM_SEED, 
                            lbc_dir, dfc_dir, c_dir, initc_dir,
-                           lbd_dir, hbd_dir, d_dir, initd_dir);
+                           lbd_dir, hbd_dir, d_dir, initd_dir,
+                           matrix_X_continuous_train_extern,
+                           matrix_Y_continuous_train_extern);
 
 
   /* When multistarting, set counter */
@@ -3776,7 +3842,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
-    initialize_nr_directions(num_reg_continuous_extern,
+    initialize_nr_directions(BANDWIDTH_reg_extern,
+                             num_obs_train_extern,
+                             num_reg_continuous_extern,
                              num_reg_unordered_extern,
                              num_reg_ordered_extern,
                              0,
@@ -3787,7 +3855,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                              matrix_y,
                              0, int_RANDOM_SEED, 
                              lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir);
+                             lbd_dir, hbd_dir, d_dir, initd_dir,
+                             matrix_X_continuous_train_extern,
+                             matrix_Y_continuous_train_extern);
 
 
     powell(0,
@@ -3849,7 +3919,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                         matrix_X_continuous_train_extern,
                                         matrix_Y_continuous_train_extern);
 
-      initialize_nr_directions(num_reg_continuous_extern,
+      initialize_nr_directions(BANDWIDTH_reg_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
                                num_reg_unordered_extern,
                                num_reg_ordered_extern,
                                0,
@@ -3860,7 +3932,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                matrix_y,
                                1, int_RANDOM_SEED, 
                                lbc_dir, dfc_dir, c_dir, initc_dir,
-                               lbd_dir, hbd_dir, d_dir, initd_dir);
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
 
 
       /* Conduct direction set search */
@@ -3881,7 +3955,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE)	{
 						
-        initialize_nr_directions(num_reg_continuous_extern,
+        initialize_nr_directions(BANDWIDTH_reg_extern,
+                                 num_obs_train_extern,
+                                 num_reg_continuous_extern,
                                  num_reg_unordered_extern,
                                  num_reg_ordered_extern,
                                  0,
@@ -3892,7 +3968,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                  matrix_y,
                                  0, int_RANDOM_SEED, 
                                  lbc_dir, dfc_dir, c_dir, initc_dir,
-                                 lbd_dir, hbd_dir, d_dir, initd_dir);
+                                 lbd_dir, hbd_dir, d_dir, initd_dir,
+                                 matrix_X_continuous_train_extern,
+                                 matrix_Y_continuous_train_extern);
 
 						
         powell(0,
