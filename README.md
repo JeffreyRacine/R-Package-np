@@ -10,26 +10,34 @@ You can install the stable version on [CRAN](http://cran.r-project.org/package=n
 install.packages('np', dependencies = TRUE)
 ```
 
-Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-np/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-np/tarball/master), decompress and run `R CMD INSTALL` on it, or install then use the **devtools** package to install the development version:
+Or download the [zip
+ ball](https://github.com/JeffreyRacine/R-Package-np/zipball/master)
+ or [tar
+ ball](https://github.com/JeffreyRacine/R-Package-np/tarball/master),
+ decompress and run `R CMD INSTALL` on it.
 
-Note that in order to install the development version of the package,
-Windows users have to first install
+Alternatively, you can install the development version but before
+doing so Windows users have to first install
 [Rtools](http://cran.r-project.org/bin/windows/Rtools), while OS X
 users have to first install
 [Xcode](https://itunes.apple.com/us/app/xcode/id497799835) and the
 command line tools (in OS X 10.9 or higher, once you have Xcode
 installed, open a terminal and run xcode-select --install). Note also
-that versions of e.g. Rtools are paired with versions of R so perhaps
-ensure you have the latest version of R installed prior to commencing
-this process.
+that versions of e.g. Rtools are paired with versions of R so ensure
+you have the latest version of R installed prior to commencing this
+process.
 
-Note also that if you wish a fast install without the building of
-vignettes (or if you do not have TeX installed on your system), add
-the option build_vignettes=FALSE to the install_github() call below.
+After installing
+[Rtools](http://cran.r-project.org/bin/windows/Rtools)/[Xcode](https://itunes.apple.com/us/app/xcode/id497799835),
+install the development package using the following command:
 
 ```r
 library(devtools); install_github('R-Package-np', 'JeffreyRacine')
 ```
+
+Note also that if you wish a fast install without the building of
+vignettes (or if you do not have TeX installed on your system), add
+the option build_vignettes=FALSE to the install_github() call.
 
 Note that if you wish to install the MPI-enabled development version
 of the package (i.e. the package `npRmpi'), you can add the option
