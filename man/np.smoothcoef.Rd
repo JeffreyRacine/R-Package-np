@@ -101,7 +101,7 @@ npscoef(bws, \dots)
   }
 
   \item{tzdat}{
-    a optionally specified \eqn{q}-variate data frame of explanatory data
+    an optionally specified \eqn{q}-variate data frame of explanatory data
     (training data), which corresponds to \eqn{Z} in the model
     equation. Defaults to 
     the training data used to 

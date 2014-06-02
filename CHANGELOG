@@ -71,7 +71,7 @@ Changes from Version 0.50-1 to 0.60-0 [1-Jun-2014]
 
 * Fixed regression in npindex() with bootstrapped standard errors
 
-* Code makes use of one call to npksum() in npindex() and npscoef() where
+* Code making use on one call to npksum() in npindex() and npscoef() where
   possible rather than two separate calls
 
 * Updated npsigtest() for addition of power and added joint test to

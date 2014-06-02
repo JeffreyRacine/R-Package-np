@@ -38,7 +38,7 @@ tailslave.log(nlines = 3, comm = 1)
   \item{root}{the rank number of the member who spawns R slaves.}
   \item{intercomm}{an intercommunicator number}
   \item{comm}{a communicator number merged from an intercomm.}
-  \item{hosts}{NULL or LAM node numbers to specify where R slaves to be 
+  \item{hosts}{NULL or LAM node numbers to specify where R slaves are to be 
 spawned.}
   \item{needlog}{a logical. If TRUE, R BATCH outputs will be saved in log files.  
   If FALSE, the outputs will send to /dev/null.}
@@ -47,8 +47,8 @@ is attemped on remote nodes under windows platform.}
   \item{quiet}{a logical. If TRUE, do not print anything unless an error occurs.}
   \item{nonblock}{a logical. If TRUE, a nonblock procedure is used on all slaves so that
 they will consume none or little CPUs while waiting.}
-  \item{sleep}{a sleep interval, used when nonblock=TRUE. Smaller sleep is, more response slaves are, 
-  more CPUs consume.}
+  \item{sleep}{a sleep interval, used when nonblock=TRUE. The smaller sleep is, the more responsive slaves
+are, the more CPUs consume.}
   \item{dellog}{a logical specifying if R slave's log files are deleted or 
 not.}
   \item{nlines}{number of lines to view from tail in R slave's log files.}

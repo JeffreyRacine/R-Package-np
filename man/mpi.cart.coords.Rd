@@ -13,7 +13,7 @@
 }
 \value{
  \code{mpi.cart.coords} returns an integer array containing the Cartesian
- coordinates of specified process. 
+ coordinates of a specified process. 
 }
 \details{
  This function is the rank-to-coordinates translator.  It is the inverse map of

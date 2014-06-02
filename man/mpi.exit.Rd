@@ -22,7 +22,7 @@ mpi.quit(save = "no")
   Normally, \code{\link{mpi.finalize}} is used to clean all MPI states. 
   However, it will not detach the library Rmpi. To be more safe leaving MPI,  
   \code{mpi.exit} not only calls \code{mpi.finalize} but also detaches the 
-  library Rmpi. This will make reload the library Rmpi impossible.
+  library Rmpi. This will make reloading of the library Rmpi impossible.
 
  If leaving MPI and R altogether, one simply uses \code{mpi.quit}. 
 } 

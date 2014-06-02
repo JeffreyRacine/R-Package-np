@@ -133,7 +133,7 @@ npcdensbw(\dots)
   }
 
   \item{ydat}{
-    a \eqn{q}-variate data frame of dependent data which bandwidth selection will
+    a \eqn{q}-variate data frame of dependent data on which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
     and ordered factors), or some combination thereof.
   }

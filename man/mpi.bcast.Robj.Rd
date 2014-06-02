@@ -37,7 +37,7 @@ transmits a double vector or a matrix to slaves and returns no value.
   
   \code{mpi.bcast.data2slave} transfers data (a double vector or a matrix) 
   natively without (un)serilization. It should be used with a huge vector or matrix.
-  It results less memory usage and faster transmission. Notice that data with 
+  It results in less memory usage and faster transmission. Notice that data with 
   missing values (NA) are allowed.
 }
 \author{

@@ -31,7 +31,7 @@ with `x' as master variable, use mpi.remote.exec(cmd=myfun, x).}
 }
 
 \section{Warning}{
-  \code{mpi.remote.exec} may have difficult guessing invisible results 
+  \code{mpi.remote.exec} may have difficulty guessing invisible results 
   on R slaves. Use \code{ret = FALSE} instead. 
 } 
 \seealso{

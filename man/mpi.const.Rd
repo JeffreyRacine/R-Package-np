@@ -23,7 +23,7 @@ mpi.proc.null()
 \code{\link{mpi.probe}}. 
 Different implementation of MPI may use different 
   integers for MPI\_ANY\_SOURCE, MPI\_ANY\_TAG, and MPI\_PROC\_NULL. Hence one 
-  should use these functions instead  real integers for MPI communications.
+  should use these functions instead of real integers for MPI communications.
 } 
 \seealso{
   \code{\link{mpi.send}}, \code{\link{mpi.recv}}.
