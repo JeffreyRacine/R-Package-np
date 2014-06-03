@@ -3280,7 +3280,7 @@ double * const kw){
   const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
-  double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, *m = NULL;
+  double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, **m = NULL;
   double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
 
   double * const * const xtc = is_adaptive?
@@ -3560,6 +3560,8 @@ double * const kw){
   const int leave_or_drop = leave_one_out || (drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN));
   if(drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN)) lod = drop_which_train;
 
+  m = matrix_bandwidth;
+
     /* do sums */
   for(j=js; j <= je; j++, ws += ws_step, p_ws += ws_step){
     R_CheckUserInterrupt();
@@ -3573,12 +3575,6 @@ double * const kw){
     // we need to skip here
 
     if(leave_one_out) lod = j + leave_one_out_offset;
-
-    if (num_reg_continuous > 0){
-      m = matrix_bandwidth[0];
-      if (BANDWIDTH_reg != BW_FIXED)
-        m += j;
-    }
 
     // do a hail mary, then generate the interaction list
     // anything but a fixed bandwidth is not yet supported
@@ -3596,7 +3592,7 @@ double * const kw){
       xl.n = 0;
       if(!do_partial_tree){
         for(i = 0; i < num_reg_continuous; i++){
-          const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+          const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
           if(!is_adaptive){
             bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
             bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -3611,7 +3607,7 @@ double * const kw){
         boxSearchNL(kdt, &nls, bb, NULL, pxl);
       } else {
         for(i = 0; i < num_reg_continuous; i++){
-          const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+          const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
           if(!is_adaptive){
             bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
             bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -3646,7 +3642,7 @@ double * const kw){
                   bb[2*i] = cksup[knp][0];
                   bb[2*i+1] = cksup[knp][1];
                 }
-                const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+                const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
                 bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
                 bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
               }
@@ -3662,7 +3658,7 @@ double * const kw){
                   bb[2*nld[i]] = cksup[knp][0];
                   bb[2*nld[i]+1] = cksup[knp][1];
                 }
-                const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+                const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
                 bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
                 bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
               }
@@ -3692,28 +3688,28 @@ double * const kw){
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
-    for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, m += mstep, ip += do_perm){
+    for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pxl, swap_xxt);
+          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][j], tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][j], tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
         }
       }
       else
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j], 
-                           matrix_alt_bandwidth[i], *m, tprod, bpow[i]);
-      dband *= ipow(*m, bpow[i]);
+                           matrix_alt_bandwidth[i], m[i][j], tprod, bpow[i]);
+      dband *= ipow(m[i][j], bpow[i]);
 
       if(do_perm){
         for(ii = 0, kk = 0; ii < num_reg_continuous; ii++){
           if(bpso[ii]){
             if (i != ii){
-              p_dband[kk] *= ipow(*m, bpow[i]);              
+              p_dband[kk] *= ipow(m[i][j], bpow[i]);              
             } else {
-              p_dband[kk] *= ipow(*m, p_ipow);
+              p_dband[kk] *= ipow(m[i][j], p_ipow);
               if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
-                p_dband[kk] *= vector_scale_factor[ii]/(*m);
+                p_dband[kk] *= vector_scale_factor[ii]/(m[i][j]);
               }
             }
             kk++;
@@ -4541,7 +4537,6 @@ int *num_categories){
     const int nrc1 = (num_reg_continuous+1);
     const int nrcc22 = nrc2*nrc2;
 
-    double ** matrix_bandwidth_train = NULL;
     double ** matrix_bandwidth_eval = NULL;
 
     double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
@@ -4587,13 +4582,7 @@ int *num_categories){
 
     }
 
-    matrix_bandwidth_train = (double **)malloc(sizeof(double *)*num_reg_continuous);
-    matrix_bandwidth_eval = (double **)malloc(sizeof(double *)*num_reg_continuous);
-
-    for(int ii = 0; ii < (num_reg_continuous); ii++){
-      matrix_bandwidth_train[ii] = matrix_bandwidth[ii];
-      matrix_bandwidth_eval[ii] = matrix_bandwidth[ii];
-    }
+    matrix_bandwidth_eval = alloc_tmatd(1,num_reg_continuous);
 
     const double epsilon = 1.0/num_obs;
     double nepsilon;
@@ -4628,7 +4617,7 @@ int *num_categories){
               TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
 
               if(BANDWIDTH_reg == BW_GEN_NN)
-                matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j+my_rank; // temporary storage
+                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
             }
 
 
@@ -4681,7 +4670,7 @@ int *num_categories){
                                    NULL,
                                    vsf,
                                    1,
-                                   matrix_bandwidth_train,
+                                   matrix_bandwidth,
                                    matrix_bandwidth_eval,
                                    lambda,
                                    num_categories,
@@ -4723,10 +4712,7 @@ int *num_categories){
               TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
 
               if(BANDWIDTH_reg == BW_GEN_NN)
-                matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j+my_rank; // temporary storage
-              else if(BANDWIDTH_reg == BW_ADAP_NN){
-                matrix_bandwidth_train[l] = matrix_bandwidth[l] + j + my_rank + 1;
-              }
+                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
             }
 
             for(l = 0; l < num_reg_unordered; l++)
@@ -4775,7 +4761,7 @@ int *num_categories){
                                    sgn,
                                    vsf,
                                    1,
-                                   matrix_bandwidth_train,
+                                   matrix_bandwidth,
                                    matrix_bandwidth_eval,
                                    lambda,
                                    num_categories,
@@ -4821,7 +4807,7 @@ int *num_categories){
           TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
 
           if(BANDWIDTH_reg == BW_GEN_NN)
-            matrix_bandwidth_eval[l] = matrix_bandwidth[l] + j; // temporary storage
+            matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
         }
 
 
@@ -4872,7 +4858,7 @@ int *num_categories){
                                NULL,
                                vsf,
                                1,
-                               matrix_bandwidth_train,
+                               matrix_bandwidth,
                                matrix_bandwidth_eval,
                                lambda,
                                num_categories,
@@ -4906,11 +4892,7 @@ int *num_categories){
             TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
 
             if(BANDWIDTH_reg == BW_GEN_NN)
-              matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j; // temporary storage
-            else if(BANDWIDTH_reg == BW_ADAP_NN){
-              matrix_bandwidth_train[l] = matrix_bandwidth[l] + j + 1;
-            }
-
+              matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
           }
 
       
@@ -4960,7 +4942,7 @@ int *num_categories){
                                  sgn,
                                  vsf,
                                  1,
-                                 matrix_bandwidth_train,
+                                 matrix_bandwidth,
                                  matrix_bandwidth_eval,
                                  lambda,
                                  num_categories,
@@ -5043,8 +5025,7 @@ int *num_categories){
     free(kwm);
     free(sgn);
 
-    free(matrix_bandwidth_train);
-    free(matrix_bandwidth_eval);
+    free_tmat(matrix_bandwidth_eval);
   }
 
   free(operator);
@@ -7442,11 +7423,7 @@ double *SIGN){
       XTKY[ii] = &kwm[ii+nrc3+2];
     }
 
-    matrix_bandwidth_eval = (double **)malloc(sizeof(double *)*num_reg_continuous);
-
-    for(int ii = 0; ii < (num_reg_continuous); ii++){
-      matrix_bandwidth_eval[ii] = matrix_bandwidth[ii];
-    }
+    matrix_bandwidth_eval = alloc_tmatd(1,num_reg_continuous);
 
     const double epsilon = 1.0/num_obs_train;
     double nepsilon;
@@ -7467,6 +7444,7 @@ double *SIGN){
       }
     }
 
+    int Sentinel = 1;
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
 
@@ -7487,7 +7465,7 @@ double *SIGN){
             TCON[l][0] = matrix_X_continuous_eval[l][j+my_rank]; // temporary storage
 
             if(BANDWIDTH_reg == BW_GEN_NN)
-              matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j+my_rank; // temporary storage
+              matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
 
           }
 
@@ -7566,7 +7544,7 @@ double *SIGN){
         TCON[l][0] = matrix_X_continuous_eval[l][j]; // temporary storage
 
         if(BANDWIDTH_reg == BW_GEN_NN)
-          matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j; // temporary storage
+          matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
 
       }
 
@@ -7617,7 +7595,7 @@ double *SIGN){
                              XTKX,
                              NULL,
                              vsf,
-                             1,
+                             Sentinel,
                              matrix_bandwidth,
                              matrix_bandwidth_eval,
                              lambda,
@@ -7771,7 +7749,7 @@ double *SIGN){
       free(moo);
     }
 
-    free(matrix_bandwidth_eval);
+    free_tmat(matrix_bandwidth_eval);
   }
 
   // clean up hash stuff
