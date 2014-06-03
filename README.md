@@ -28,8 +28,9 @@ you have the latest version of R installed prior to commencing this
 process.
 
 After installing
-[Rtools](http://cran.r-project.org/bin/windows/Rtools)/[Xcode](https://itunes.apple.com/us/app/xcode/id497799835),
-install the development package using the following command:
+[Rtools](http://cran.r-project.org/bin/windows/Rtools)/[Xcode](https://itunes.apple.com/us/app/xcode/id497799835)
+and **devtools** (via install.packages("devtools")), install the
+development package using the following command:
 
 ```r
 library(devtools); install_github('R-Package-np', 'JeffreyRacine')
