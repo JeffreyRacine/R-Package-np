@@ -4541,7 +4541,6 @@ int *num_categories){
     const int nrc1 = (num_reg_continuous+1);
     const int nrcc22 = nrc2*nrc2;
 
-    double ** matrix_bandwidth_train = NULL;
     double ** matrix_bandwidth_eval = NULL;
 
     double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
@@ -4587,13 +4586,7 @@ int *num_categories){
 
     }
 
-    matrix_bandwidth_train = (double **)malloc(sizeof(double *)*num_reg_continuous);
-    matrix_bandwidth_eval = (double **)malloc(sizeof(double *)*num_reg_continuous);
-
-    for(int ii = 0; ii < (num_reg_continuous); ii++){
-      matrix_bandwidth_train[ii] = matrix_bandwidth[ii];
-      matrix_bandwidth_eval[ii] = matrix_bandwidth[ii];
-    }
+    matrix_bandwidth_eval = alloc_tmatd(1,num_reg_continuous);
 
     const double epsilon = 1.0/num_obs;
     double nepsilon;
@@ -4628,7 +4621,7 @@ int *num_categories){
               TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
 
               if(BANDWIDTH_reg == BW_GEN_NN)
-                matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j+my_rank; // temporary storage
+                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
             }
 
 
@@ -4681,7 +4674,7 @@ int *num_categories){
                                    NULL,
                                    vsf,
                                    1,
-                                   matrix_bandwidth_train,
+                                   matrix_bandwidth,
                                    matrix_bandwidth_eval,
                                    lambda,
                                    num_categories,
@@ -4723,10 +4716,7 @@ int *num_categories){
               TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
 
               if(BANDWIDTH_reg == BW_GEN_NN)
-                matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j+my_rank; // temporary storage
-              else if(BANDWIDTH_reg == BW_ADAP_NN){
-                matrix_bandwidth_train[l] = matrix_bandwidth[l] + j + my_rank + 1;
-              }
+                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
             }
 
             for(l = 0; l < num_reg_unordered; l++)
@@ -4775,7 +4765,7 @@ int *num_categories){
                                    sgn,
                                    vsf,
                                    1,
-                                   matrix_bandwidth_train,
+                                   matrix_bandwidth,
                                    matrix_bandwidth_eval,
                                    lambda,
                                    num_categories,
@@ -4821,7 +4811,7 @@ int *num_categories){
           TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
 
           if(BANDWIDTH_reg == BW_GEN_NN)
-            matrix_bandwidth_eval[l] = matrix_bandwidth[l] + j; // temporary storage
+            matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
         }
 
 
@@ -4872,7 +4862,7 @@ int *num_categories){
                                NULL,
                                vsf,
                                1,
-                               matrix_bandwidth_train,
+                               matrix_bandwidth,
                                matrix_bandwidth_eval,
                                lambda,
                                num_categories,
@@ -4906,11 +4896,7 @@ int *num_categories){
             TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
 
             if(BANDWIDTH_reg == BW_GEN_NN)
-              matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j; // temporary storage
-            else if(BANDWIDTH_reg == BW_ADAP_NN){
-              matrix_bandwidth_train[l] = matrix_bandwidth[l] + j + 1;
-            }
-
+              matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
           }
 
       
@@ -4960,7 +4946,7 @@ int *num_categories){
                                  sgn,
                                  vsf,
                                  1,
-                                 matrix_bandwidth_train,
+                                 matrix_bandwidth,
                                  matrix_bandwidth_eval,
                                  lambda,
                                  num_categories,
@@ -5043,8 +5029,7 @@ int *num_categories){
     free(kwm);
     free(sgn);
 
-    free(matrix_bandwidth_train);
-    free(matrix_bandwidth_eval);
+    free_tmat(matrix_bandwidth_eval);
   }
 
   free(operator);
@@ -7442,11 +7427,7 @@ double *SIGN){
       XTKY[ii] = &kwm[ii+nrc3+2];
     }
 
-    matrix_bandwidth_eval = (double **)malloc(sizeof(double *)*num_reg_continuous);
-
-    for(int ii = 0; ii < (num_reg_continuous); ii++){
-      matrix_bandwidth_eval[ii] = matrix_bandwidth[ii];
-    }
+    matrix_bandwidth_eval = alloc_tmatd(1,num_reg_continuous);
 
     const double epsilon = 1.0/num_obs_train;
     double nepsilon;
@@ -7467,6 +7448,7 @@ double *SIGN){
       }
     }
 
+    int Sentinel = 1;
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
 
@@ -7487,7 +7469,7 @@ double *SIGN){
             TCON[l][0] = matrix_X_continuous_eval[l][j+my_rank]; // temporary storage
 
             if(BANDWIDTH_reg == BW_GEN_NN)
-              matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j+my_rank; // temporary storage
+              matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
 
           }
 
@@ -7566,7 +7548,7 @@ double *SIGN){
         TCON[l][0] = matrix_X_continuous_eval[l][j]; // temporary storage
 
         if(BANDWIDTH_reg == BW_GEN_NN)
-          matrix_bandwidth_eval[l] = matrix_bandwidth[l]+j; // temporary storage
+          matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j]; // temporary storage
 
       }
 
@@ -7617,7 +7599,7 @@ double *SIGN){
                              XTKX,
                              NULL,
                              vsf,
-                             1,
+                             Sentinel,
                              matrix_bandwidth,
                              matrix_bandwidth_eval,
                              lambda,
@@ -7771,7 +7753,7 @@ double *SIGN){
       free(moo);
     }
 
-    free(matrix_bandwidth_eval);
+    free_tmat(matrix_bandwidth_eval);
   }
 
   // clean up hash stuff
