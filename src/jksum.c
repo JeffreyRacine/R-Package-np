@@ -5361,8 +5361,8 @@ double *cv){
   double vsfx[num_reg_tot];
   double vsfy[num_var_tot];
   double vsfxy[num_var_tot+num_reg_tot];
-  double lambdax[num_reg_unordered+num_reg_ordered];
-  double lambday[num_var_unordered+num_var_ordered];
+  double lambdax[MIN(1,num_reg_unordered+num_reg_ordered)];
+  double lambday[MIN(1,num_var_unordered+num_var_ordered)];
   double xyj;
 
   double **matrix_wY_unordered_train;
@@ -5769,11 +5769,11 @@ double *cv){
 
     XL xl = {.istart = NULL, .nlev = NULL, .n = 0, .nalloc = 0};
 
-    int icx[num_reg_continuous], icy[num_var_continuous];
+    int icx[MIN(num_reg_continuous,1)], icy[MIN(num_var_continuous,1)];
 
-    double bb[2*num_all_cvar];
+    double bb[MIN(1,2*num_all_cvar)];
 
-    int KERNEL_XY[num_all_cvar], m;
+    int KERNEL_XY[MIN(1,num_all_cvar)], m;
 
     for(l = 0; l < num_reg_continuous; l++)
       KERNEL_XY[l] = KERNEL_reg + OP_CFUN_OFFSETS[xy_operator[l]];
@@ -6154,7 +6154,7 @@ double *cv){
   nls.node[0] = 0;
   nls.n = 1;
   
-  int xyd[num_all_cvar];
+  int xyd[MIN(1,num_all_cvar)];
   int idxj[2], idxk[2];
 
   for(i = 0; i < num_all_cvar; i++)
@@ -6425,8 +6425,8 @@ double *cv){
   }
 
   // extra kernel bookkeeping for trees
-  int KERNEL_XY[num_all_cvar];
-  double bb[2*num_all_cvar];
+  int KERNEL_XY[MIN(1,num_all_cvar)];
+  double bb[MIN(1,2*num_all_cvar)];
 
   for(l = 0; l < num_reg_continuous; l++)
     KERNEL_XY[l] = KERNEL_reg + OP_CFUN_OFFSETS[x_operator[l]];
