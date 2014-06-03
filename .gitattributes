@@ -1,3 +1,4 @@
 R/zzz.R merge=ours
+README.md merge=ours
 DESCRIPTION merge=ours
 vignettes/np.Rnw merge=ours
