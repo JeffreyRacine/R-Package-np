@@ -3280,7 +3280,7 @@ double * const kw){
   const int ws_step = is_adaptive? 0 :
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
-  double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, *m = NULL;
+  double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, **m = NULL;
   double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
 
   double * const * const xtc = is_adaptive?
@@ -3560,6 +3560,8 @@ double * const kw){
   const int leave_or_drop = leave_one_out || (drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN));
   if(drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN)) lod = drop_which_train;
 
+  m = matrix_bandwidth;
+
     /* do sums */
   for(j=js; j <= je; j++, ws += ws_step, p_ws += ws_step){
     R_CheckUserInterrupt();
@@ -3573,12 +3575,6 @@ double * const kw){
     // we need to skip here
 
     if(leave_one_out) lod = j + leave_one_out_offset;
-
-    if (num_reg_continuous > 0){
-      m = matrix_bandwidth[0];
-      if (BANDWIDTH_reg != BW_FIXED)
-        m += j;
-    }
 
     // do a hail mary, then generate the interaction list
     // anything but a fixed bandwidth is not yet supported
@@ -3596,7 +3592,7 @@ double * const kw){
       xl.n = 0;
       if(!do_partial_tree){
         for(i = 0; i < num_reg_continuous; i++){
-          const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+          const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
           if(!is_adaptive){
             bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
             bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -3611,7 +3607,7 @@ double * const kw){
         boxSearchNL(kdt, &nls, bb, NULL, pxl);
       } else {
         for(i = 0; i < num_reg_continuous; i++){
-          const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+          const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
           if(!is_adaptive){
             bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
             bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -3646,7 +3642,7 @@ double * const kw){
                   bb[2*i] = cksup[knp][0];
                   bb[2*i+1] = cksup[knp][1];
                 }
-                const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+                const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
                 bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
                 bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
               }
@@ -3662,7 +3658,7 @@ double * const kw){
                   bb[2*nld[i]] = cksup[knp][0];
                   bb[2*nld[i]+1] = cksup[knp][1];
                 }
-                const double sf = (BANDWIDTH_reg != BW_FIXED) ? (*(m+i*mstep)):m[i];
+                const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
                 bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
                 bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
               }
@@ -3692,28 +3688,28 @@ double * const kw){
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
-    for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, m += mstep, ip += do_perm){
+    for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], *m, tprod, pxl, swap_xxt);
+          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][j], tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], *m, tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][j], tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
         }
       }
       else
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j], 
-                           matrix_alt_bandwidth[i], *m, tprod, bpow[i]);
-      dband *= ipow(*m, bpow[i]);
+                           matrix_alt_bandwidth[i], m[i][j], tprod, bpow[i]);
+      dband *= ipow(m[i][j], bpow[i]);
 
       if(do_perm){
         for(ii = 0, kk = 0; ii < num_reg_continuous; ii++){
           if(bpso[ii]){
             if (i != ii){
-              p_dband[kk] *= ipow(*m, bpow[i]);              
+              p_dband[kk] *= ipow(m[i][j], bpow[i]);              
             } else {
-              p_dband[kk] *= ipow(*m, p_ipow);
+              p_dband[kk] *= ipow(m[i][j], p_ipow);
               if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
-                p_dband[kk] *= vector_scale_factor[ii]/(*m);
+                p_dband[kk] *= vector_scale_factor[ii]/(m[i][j]);
               }
             }
             kk++;
