@@ -3567,6 +3567,7 @@ double * const kw){
     R_CheckUserInterrupt();
 
     dband = 1.0;
+    const int jbw = (BANDWIDTH_reg != BW_FIXED) ? j:0;
 
     for (ii = 0; ii < p_nvar; ii++)
       p_dband[ii] = 1.0;
@@ -3592,7 +3593,7 @@ double * const kw){
       xl.n = 0;
       if(!do_partial_tree){
         for(i = 0; i < num_reg_continuous; i++){
-          const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
+          const double sf = m[i][jbw];
           if(!is_adaptive){
             bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
             bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -3607,7 +3608,7 @@ double * const kw){
         boxSearchNL(kdt, &nls, bb, NULL, pxl);
       } else {
         for(i = 0; i < num_reg_continuous; i++){
-          const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
+          const double sf = m[i][jbw];
           if(!is_adaptive){
             bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
             bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
@@ -3642,7 +3643,7 @@ double * const kw){
                   bb[2*i] = cksup[knp][0];
                   bb[2*i+1] = cksup[knp][1];
                 }
-                const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
+                const double sf = m[i][jbw];
                 bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
                 bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
               }
@@ -3658,7 +3659,7 @@ double * const kw){
                   bb[2*nld[i]] = cksup[knp][0];
                   bb[2*nld[i]+1] = cksup[knp][1];
                 }
-                const double sf = (BANDWIDTH_reg != BW_FIXED) ? m[i][j]:m[i][0];
+                const double sf = m[i][jbw];
                 bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
                 bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
               }
@@ -3691,25 +3692,25 @@ double * const kw){
     for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][j], tprod, pxl, swap_xxt);
+          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][j], tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
         }
       }
       else
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j], 
-                           matrix_alt_bandwidth[i], m[i][j], tprod, bpow[i]);
-      dband *= ipow(m[i][j], bpow[i]);
+                           matrix_alt_bandwidth[i], m[i][jbw], tprod, bpow[i]);
+      dband *= ipow(m[i][jbw], bpow[i]);
 
       if(do_perm){
         for(ii = 0, kk = 0; ii < num_reg_continuous; ii++){
           if(bpso[ii]){
             if (i != ii){
-              p_dband[kk] *= ipow(m[i][j], bpow[i]);              
+              p_dband[kk] *= ipow(m[i][jbw], bpow[i]);              
             } else {
-              p_dband[kk] *= ipow(m[i][j], p_ipow);
+              p_dband[kk] *= ipow(m[i][jbw], p_ipow);
               if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
-                p_dband[kk] *= vector_scale_factor[ii]/(m[i][j]);
+                p_dband[kk] *= vector_scale_factor[ii]/(m[i][jbw]);
               }
             }
             kk++;
