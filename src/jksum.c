@@ -930,7 +930,6 @@ double np_aconvol_gauss2(const double x, const double y,const double hx,const do
 }
 
 double np_aconvol_gauss4(const double x, const double y,const double hx,const double hy){
-  const double a = sqrt(2);
   const double hx2 = hx*hx;
   const double hy2 = hy*hy;
   const double hxy2 = hx2+hy2;
@@ -1586,7 +1585,6 @@ double np_aconvol_epan8_total(const double x, const double y,const double hx,con
 
   const double hs2 = hs*hs;
   const double hs4 = hs2*hs2;
-  const double hs6 = hs4*hs2;
   const double hs8 = hs4*hs4;
 
   return(63*hs
@@ -1649,7 +1647,6 @@ double np_aconvol_epan8_xlessy(const double x, const double y,const double hx,co
   const double hx12 = hx8*hx4;
   const double hx13 = hx9*hx4;
   const double hx14 = hx10*hx4;
-  const double hx15 = hx11*hx4;
   const double hx16 = hx12*hx4;
   const double hx17 = hx13*hx4;
 
@@ -1666,7 +1663,6 @@ double np_aconvol_epan8_xlessy(const double x, const double y,const double hx,co
   const double hy12 = hy8*hy4;
   const double hy13 = hy9*hy4;
   const double hy14 = hy10*hy4;
-  const double hy15 = hy11*hy4;
   const double hy16 = hy12*hy4;
   const double hy17 = hy13*hy4;
 
@@ -1907,7 +1903,6 @@ double np_aconvol_epan8_ylessx(const double x, const double y,const double hx,co
   const double hx12 = hx8*hx4;
   const double hx13 = hx9*hx4;
   const double hx14 = hx10*hx4;
-  const double hx15 = hx11*hx4;
   const double hx16 = hx12*hx4;
   const double hx17 = hx13*hx4;
 
@@ -1924,7 +1919,6 @@ double np_aconvol_epan8_ylessx(const double x, const double y,const double hx,co
   const double hy12 = hy8*hy4;
   const double hy13 = hy9*hy4;
   const double hy14 = hy10*hy4;
-  const double hy15 = hy11*hy4;
   const double hy16 = hy12*hy4;
   const double hy17 = hy13*hy4;
 
@@ -7077,7 +7071,6 @@ double *SIGN){
   int num_obs_eval_alloc = stride_e*iNum_Processors;
 
 #else
-  int num_obs_train_alloc = num_obs_train;
   int num_obs_eval_alloc = num_obs_eval;
 #endif
 
@@ -8349,7 +8342,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   const int num_ovar = num_reg_ordered + num_var_ordered;
   const int num_all_var = num_reg + num_var_continuous + num_var_unordered + num_var_ordered;
 
-	const double log_DBL_MIN = log(DBL_MIN);
+	//const double log_DBL_MIN = log(DBL_MIN);
 
   int i; 
   int ret = 0;
