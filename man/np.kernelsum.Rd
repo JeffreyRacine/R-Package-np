@@ -196,13 +196,11 @@ npksum(\dots)
   with the point at which the sum is computed, \eqn{x}. Fixed bandwidths
   are constant over the support of \eqn{x}.
 
-  \code{npksum} computes
-  \eqn{\sum_{j=1}^{n}{W_j^\prime Y_j K(X_j)}}{sum(t(W[j]) \%*\% Y[j] *
-  K(X[j]))}, where \eqn{A_j}{A[j]} represents a row vector extracted
-  from \eqn{A}.
-  That is, it computes the kernel 
-  weighted sum of the outer product of the rows of \eqn{W} and \eqn{Y}. In the
-  examples, the uses of such sums are illustrated.
+  \code{npksum} computes \eqn{\sum_{j=1}^{n}{W_j^\prime Y_j
+  K(X_j)}}{sum(t(W[j]) \%*\% Y[j] * K(X[j]))}, where \eqn{W_j}{W[j]}
+  represents a row vector extracted from \eqn{W}.  That is, it computes
+  the kernel weighted sum of the outer product of the rows of \eqn{W}
+  and \eqn{Y}. In the examples, the uses of such sums are illustrated.
 
   \code{npksum} may be invoked \emph{either} with a formula-like
   symbolic 

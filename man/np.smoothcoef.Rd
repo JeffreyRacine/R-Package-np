@@ -211,9 +211,9 @@ npscoef(bws, \dots)
     models with serially correlated errors,} Journal of Econometrics,
   136, 163-188.
 
-  Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric Estimation of
-    Global Functionals and a Measure of the Explanatory Power of
-    Covariates in Regression,} The Annals of Statistics, 23 1443-1473.
+  Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric estimation of
+  global functionals and a measure of the explanatory power of
+  covariates in regression,} The Annals of Statistics, 23 1443-1473.
 
   Hastie, T. and R. Tibshirani (1993), \dQuote{Varying-coefficient
     models,} Journal of the Royal Statistical Society, B 55, 757-796.
