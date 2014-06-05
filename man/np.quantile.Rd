@@ -113,8 +113,8 @@ npquantile(x = NULL,
   Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
   Edition, Springer-Verlag.
 
-  Sheather, S. and J. S. Marron (1990), \dQuote{Kernel Quantile
-  Estimators,} Journal of the American Statistical Association,
+  Sheather, S. and J. S. Marron (1990), \dQuote{Kernel quantile
+  estimators,} Journal of the American Statistical Association,
   Vol. 85, No. 410, 410-416.
   
 }

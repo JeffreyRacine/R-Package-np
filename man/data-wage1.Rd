@@ -33,13 +33,13 @@ dataset \code{"wage"} plus additional objects \code{"bw.all"} and
     \item{northcen}{column 10, of type \code{numeric}, =1 if live in north central U.S}
     \item{south}{column 11, of type \code{numeric}, =1 if live in southern region}
     \item{west}{column 12, of type \code{numeric}, =1 if live in western region}
-    \item{construc}{column 13, of type \code{numeric}, =1 if work in construc. indus.}
-    \item{ndurman}{column 14, of type \code{numeric}, =1 if in nondur. manuf. indus.}
-    \item{trcommpu}{column 15, of type \code{numeric}, =1 if in trans, commun, pub ut}
+    \item{construc}{column 13, of type \code{numeric}, =1 if work in construction industry}
+    \item{ndurman}{column 14, of type \code{numeric}, =1 if in non-durable manufacturing industry}
+    \item{trcommpu}{column 15, of type \code{numeric}, =1 if in transportation, communications, public utility}
     \item{trade}{column 16, of type \code{numeric}, =1 if in wholesale or retail}
-    \item{services}{column 17, of type \code{numeric}, =1 if in services indus.}
-    \item{profserv}{column 18, of type \code{numeric}, =1 if in prof. serv. indus.}
-    \item{profocc}{column 19, of type \code{numeric}, =1 if in profess. occupation}
+    \item{services}{column 17, of type \code{numeric}, =1 if in services industry}
+    \item{profserv}{column 18, of type \code{numeric}, =1 if in professional services industry}
+    \item{profocc}{column 19, of type \code{numeric}, =1 if in professional occupation}
     \item{clerocc}{column 20, of type \code{numeric}, =1 if in clerical occupation}
     \item{servocc}{column 21, of type \code{numeric}, =1 if in service occupation}
     \item{lwage}{column 22, of type \code{numeric}, log(wage)}
