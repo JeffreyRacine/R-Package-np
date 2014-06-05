@@ -1,4 +1,4 @@
-Changes from Version 0.60-0 to 0.60-1 [2-Jun-2014]
+Changes from Version 0.60-0 to 0.60-1 [6-Jun-2014]
 
 * Fixed glitch in adaptive_nn/generalized_nn bandwidths that affected all
   routines that rely on non-fixed bandwidths
