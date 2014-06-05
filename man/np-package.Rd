@@ -281,9 +281,9 @@
   and the estimation of conditional probability densities,} Journal of
   the American Statistical Association, 99, 1015-1026.
 
-  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
-  Selection for Nonparametric Conditional Distribution and Quantile
-  Functions}, Journal of Business and Economic Statistics, 31, 57-65.
+  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal bandwidth
+  selection for nonparametric conditional distribution and quantile
+  functions}, Journal of Business and Economic Statistics, 31, 57-65.
 
   Li, Q. and D. Ouyang and J.S. Racine (2013), \dQuote{Categorical
   Semiparametric Varying-Coefficient Models,} Journal of Applied
@@ -314,7 +314,7 @@
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
 
-  Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
+  Scott, D.W. (1992), \emph{Multivariate Density Estimation: Theory,
   Practice and Visualization,} New York: Wiley.
 
   Silverman, B.W. (1986), \emph{Density Estimation,} London: Chapman and

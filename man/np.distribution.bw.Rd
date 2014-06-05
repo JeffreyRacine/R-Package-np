@@ -272,7 +272,7 @@ npudistbw(\dots)
     a small number used to bracket a minimum (it is hopeless to ask for
     a bracketing interval of width less than sqrt(epsilon) times its
     central value, a fractional width of only about 10-04 (single
-    precision) or 3x10-8 (double prevision)). Defaults to \code{small
+    precision) or 3x10-8 (double precision)). Defaults to \code{small
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
 
@@ -374,13 +374,13 @@ npudistbw(\dots)
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and
-  eighth order Gaussian and Epanechnikov kernels, and the uniform
+  eighth-order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Ordered data types use a variation of the Wang and van Ryzin
   (1981) kernel.
 
   The optimizer invoked for search is Powell's conjugate direction
   method which requires the setting of (non-random) initial values and
-  search directions for bandwidths, and, when restarting, random values
+  search directions for bandwidths, and when restarting, random values
   for successive invocations. Bandwidths for \code{numeric} variables
   are scaled by robust measures of spread, the sample size, and the
   number of \code{numeric} variables where appropriate. Two sets of
@@ -398,7 +398,7 @@ npudistbw(\dots)
 
 }
 \value{
-  \code{npudistbw} returns a \code{bandwidth} object, with the
+  \code{npudistbw} returns a \code{bandwidth} object with the
   following components:
 
   \item{bw}{ bandwidth(s), scale factor(s) or nearest neighbours for the
@@ -442,10 +442,10 @@ npudistbw(\dots)
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
 
-  Scott, D.W. (1992), \emph{Multivariate Cumulative Distribution Estimation. Theory,
-  Practice and Visualization,} New York: Wiley.
+  Scott, D.W. (1992), \emph{Multivariate Cumulative Distribution
+  Estimation: Theory, Practice and Visualization,} New York: Wiley.
 
-  Silverman, B.W. (1986), \emph{Cumulative Distribution Estimation,} London: Chapman and
+  Silverman, B.W. (1986), \emph{Density Estimation,} London: Chapman and
   Hall.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth estimators

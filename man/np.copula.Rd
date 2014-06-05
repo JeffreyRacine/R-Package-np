@@ -20,7 +20,7 @@ npcopula(bws,
     an unconditional joint distribution (\code{npudistbw}) or joint
     density (\code{npudensbw}) bandwidth object (if \code{bws} is
     delivered via \code{npudistbw} the copula distribution is estimated,
-    while if if \code{bws} is delivered via \code{npudensbw} the copula
+    while if \code{bws} is delivered via \code{npudensbw} the copula
     density is estimated)
   }
   \item{data}{
@@ -51,7 +51,7 @@ npcopula(bws,
 
   \item{copula}{
     the copula (bandwidth object obtained from \code{npudistbw}) or
-    copula density (bandwidth object obtained from \code{npudenstbw})
+    copula density (bandwidth object obtained from \code{npudensbw})
   }
 
   \item{u}{ the matrix of marginal u values associated with the sample
@@ -91,12 +91,12 @@ npcopula(bws,
   Note that if \code{u} is provided then \code{\link{expand.grid}} is
   called on \code{u}. As the dimension increases this can become
   unwieldy and potentially consume an enormous amount of memory unless
-  the number of grid points is kept very small. As the reason for
-  computing the copula on a grid is typically for graphical purposes,
-  then providing \code{u} is typically done for two-dimensional problems
-  only. Even here, however, providing a grid of length 100 will expand
-  into a matrix of dimension 10000 by 2 which, though not memory
-  intensive, may be computationally burdensome.
+  the number of grid points is kept very small. Given that computing the
+  copula on a grid is typically done for graphical purposes, providing
+  \code{u} is typically done for two-dimensional problems only. Even
+  here, however, providing a grid of length 100 will expand into a
+  matrix of dimension 10000 by 2 which, though not memory intensive, may
+  be computationally burdensome.
 
   The \sQuote{quasi-inverse} is computed via Definition 2.3.6 from
   Nelsen (2006). We compute an equi-quantile grid on the range of the

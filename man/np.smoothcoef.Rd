@@ -148,7 +148,7 @@ npscoef(bws, \dots)
 
   \item{maxiter}{
     integer specifying the maximum number of times to iterate the
-    backfitted estimates while attempting make the backfitted estimates
+    backfitted estimates while attempting to make the backfitted estimates
     converge to the desired tolerance. Defaults to \code{100}.
   }
 
@@ -229,7 +229,7 @@ npscoef(bws, \dots)
   Cambridge University Press.
 
  Li, Q. and D. Ouyang and J.S. Racine (2013), \dQuote{Categorical
- Semiparametric Varying-Coefficient Models,} Journal of Applied
+ semiparametric varying-coefficient models,} Journal of Applied
  Econometrics, 28, 551-589.
 
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth

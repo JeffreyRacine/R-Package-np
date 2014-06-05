@@ -151,10 +151,10 @@ npksum(\dots)
   }
 
   \item{compute.ocg}{
-    a logical specifying whether or not to return a separate
-    result for each unordered and ordered dimension, where the product
-    kernel term for that dimension is evaluated at an appropriate
-    reference category. This is used primarily in \code{np} to compute ordered and
+    a logical specifying whether or not to return a separate result for
+    each unordered and ordered dimension, where the product kernel term
+    for that dimension is evaluated at an appropriate reference
+    category. This is used primarily in \code{np} to compute ordered and
     unordered categorical gradients. See details.
   }
 

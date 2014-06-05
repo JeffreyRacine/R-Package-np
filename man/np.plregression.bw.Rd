@@ -105,11 +105,11 @@ npplregbw(\dots)
   \item{bws}{
     a bandwidth specification. This can be set as a \code{plbandwidth}
     object returned from an invocation of \code{npplregbw}, or as
-    a matrix of bandwidths, each row is a set of bandwidths for \eqn{Z},
+    a matrix of bandwidths, where each row is a set of bandwidths for \eqn{Z},
     with a column for each variable \eqn{Z_i}{Z[i]}. In the first row
-    are the bandwidths for the regression of \eqn{Y} on \eqn{Z}, the
+    are the bandwidths for the regression of \eqn{Y} on \eqn{Z}. The
     following rows contain the bandwidths for the regressions of the
-    columns of \eqn{X} on \eqn{Z}.  If specified as a matrix
+    columns of \eqn{X} on \eqn{Z}.  If specified as a matrix,
     additional arguments will need to be supplied as necessary to
     specify the bandwidth type, kernel types, and so on.
 
@@ -173,11 +173,12 @@ npplregbw(\dots)
 }
 
 \details{
- \code{npplregbw} implements a variety of methods for nonparametric regression on
- multivariate (\eqn{q}-variate) explanatory data defined over a set of possibly
- continuous and/or discrete (unordered, ordered) data. The approach is
- based on Li and Racine (2003) who employ \sQuote{generalized product kernels}
- that admit a mix of continuous and discrete data types.
+  \code{npplregbw} implements a variety of methods for nonparametric
+ regression on multivariate (\eqn{q}-variate) explanatory data defined
+ over a set of possibly continuous and/or discrete (unordered, ordered)
+ data. The approach is based on Li and Racine (2003), who employ
+ \sQuote{generalized product kernels} that admit a mix of continuous and
+ discrete data types.
 
  Three classes of kernel estimators for the continuous data types are
  available: fixed, adaptive nearest-neighbor, and generalized

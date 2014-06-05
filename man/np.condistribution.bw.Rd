@@ -14,7 +14,7 @@ Data Types}
   estimator defined over mixed continuous and discrete (unordered
   \code{xdat}, ordered \code{xdat} and \code{ydat}) data using either
   the normal-reference rule-of-thumb or least-squares cross validation
-  using the method of Li and Racine (2008) and Li, Lin and Racine
+  method of Li and Racine (2008) and Li, Lin and Racine
   (2013).
 }
 
@@ -263,7 +263,7 @@ npcdistbw(\dots)
   }
   \item{oykertype}{
     character string used to specify the ordered categorical
-    kernel type. Can be set as \code{wangvanryzin}.
+    kernel type. Can be set as \code{wangvanryzin} or \code{liracine}.
   }
 
   \item{nmulti}{
@@ -274,7 +274,7 @@ npcdistbw(\dots)
   \item{remin}{
     a logical value which when set as \code{TRUE} the search routine
     restarts from located minima for a minor gain in accuracy. Defaults
-    to \code{TRUE}. Defaults to \code{TRUE}.
+    to \code{TRUE}.
   }
 
   \item{itmax}{
@@ -311,7 +311,7 @@ npcdistbw(\dots)
     a small number used to bracket a minimum (it is hopeless to ask for
     a bracketing interval of width less than sqrt(epsilon) times its
     central value, a fractional width of only about 10-04 (single
-    precision) or 3x10-8 (double prevision)). Defaults to \code{small
+    precision) or 3x10-8 (double precision)). Defaults to \code{small
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
 
@@ -469,9 +469,9 @@ npcdistbw(\dots)
   continuous data,} Journal of Business and Economic Statistics, 26,
   423-434.
   
-  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
-  Selection for Nonparametric Conditional Distribution and Quantile
-  Functions}, Journal of Business and Economic Statistics, 31, 57-65.
+  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal bandwidth
+  selection for nonparametric conditional distribution and quantile
+  functions}, Journal of Business and Economic Statistics, 31, 57-65.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.

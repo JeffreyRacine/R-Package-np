@@ -146,11 +146,11 @@ npsigtest(bws, \dots)
   range of settings and this involves a trade-off between computational
   expense and finite-sample performance. However, the default
   \code{boot.type="I"}, though computationally expedient, can deliver a
-  test that can be slightly over-sized in small sample settings (e.g.\
+  test that can be slightly over-sized in small sample settings (e.g.
   at the 5\% level the test might reject 8\% of the time for samples of
   size \eqn{n=100} for some data generating processes).  If the default
   setting (\code{boot.type="I"}) delivers a P-value that is in the
-  neighborhood (i.e.\ slightly smaller) of any classical level
+  neighborhood (i.e. slightly smaller) of any classical level
   (e.g. 0.05) and you only have a modest amount of data, it might be
   prudent to re-run the test using the more computationally intensive
   \code{boot.type="II"} setting to confirm the original result. Note
@@ -213,7 +213,7 @@ npsigtest(bws, \dots)
   intensive}. This can be frustrating for users possessing large
   datasets. For exploratory purposes, you may wish to override the
   default number of bootstrap replications, say, setting them to
-  \code{boot.num=99} A version of this package using the \code{Rmpi}
+  \code{boot.num=99}. A version of this package using the \code{Rmpi}
   wrapper is under development that allows one to deploy this software
   in a clustered computing environment to facilitate computation
   involving large datasets.

@@ -183,9 +183,9 @@ npcdist(bws, \dots)
   continuous data,} Journal of Business and Economic Statistics, 26,
   423-434.
   
-  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
-  Selection for Nonparametric Conditional Distribution and Quantile
-  Functions}, Journal of Business and Economic Statistics, 31, 57-65.
+  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal bandwidth
+  selection for nonparametric conditional distribution and quantile
+  functions}, Journal of Business and Economic Statistics, 31, 57-65.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
   University Press. 

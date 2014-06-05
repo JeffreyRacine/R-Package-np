@@ -42,7 +42,7 @@ npudist(bws, \dots)
   }
 
   \item{\dots}{
-    additional arguments supplied to specify, the training data, the
+    additional arguments supplied to specify the training data, the
     bandwidth type, kernel types, and so on.  This is necessary if you
     specify bws as a \eqn{p}-vector and not a \code{dbandwidth} object,
     and you do not desire the default behaviours. To do this, you may
@@ -125,7 +125,7 @@ npudist(bws, \dots)
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and
-  eighth order Gaussian and Epanechnikov kernels, and the uniform
+  eighth-order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Ordered data types use a variation of the Wang and van Ryzin
   (1981) kernel.
 
@@ -133,7 +133,7 @@ npudist(bws, \dots)
 \value{
   
   \code{\link{npudist}} returns a \code{npdistribution} object. The
-  generic accessor functions \code{\link{fitted}}, and \code{\link{se}},
+  generic accessor functions \code{\link{fitted}} and \code{\link{se}}
   extract estimated values and asymptotic standard errors on estimates,
   respectively, from the returned object. Furthermore, the functions
   \code{\link{predict}}, \code{\link{summary}} and \code{\link{plot}}
@@ -141,7 +141,7 @@ npudist(bws, \dots)
   following components:
 
   \item{eval}{ the evaluation points. }
-  \item{dist}{ estimation of the cumulative distribution at the evaluation points }
+  \item{dist}{ estimate of the cumulative distribution at the evaluation points }
   \item{derr}{ standard errors of the cumulative distribution estimates }
   
 }

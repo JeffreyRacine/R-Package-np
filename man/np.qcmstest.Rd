@@ -2,7 +2,8 @@
 % $Id: np.qcmstest.Rd,v 1.41 2006/11/09 11:43:39 jracine Exp $
 \name{npqcmstest}
 \alias{npqcmstest}
-\title{ Kernel Consistent Quantile Regression Model Specification Test with Mixed Data Types }
+\title{ Kernel Consistent Quantile Regression Model Specification Test
+with Mixed Data Types }
 \description{
   \code{npqcmstest} implements a consistent test for correct
   specification of parametric quantile regression models (linear or
@@ -75,10 +76,10 @@ npqcmstest(formula,
   }
 
   \item{bwydat}{
-    a character string used to specify \code{ydat} used in bandwidth
-    selection. \code{varepsilon}
-    uses \eqn{1-\tau,-\tau}{1-tau,-tau} for \code{ydat} while
-    \code{y} will use \eqn{y}. Defaults to \code{y}.
+    a character string used to specify the left hand side variable used
+    in bandwidth selection. \code{"varepsilon"} uses
+    \eqn{1-\tau,-\tau}{1-tau,-tau} for \code{ydat} while \code{"y"} will
+    use \eqn{y}. Defaults to \code{"y"}.
   }
 
   \item{boot.method}{
@@ -97,7 +98,7 @@ npqcmstest(formula,
   \item{pivot}{
     a logical value specifying whether the statistic should be
     normalised such that it approaches \eqn{N(0,1)} in
-    distribution. data. Defaults to \code{TRUE}.
+    distribution. Defaults to \code{TRUE}.
   }
 
   \item{density.weighted}{
@@ -123,7 +124,7 @@ npqcmstest(formula,
 
 \value{
   \code{npqcmstest} returns an object of type \code{cmstest} with the
-  following components, components will contain information
+  following components. Components will contain information
   related to \code{Jn} or \code{In} depending on the value of \code{pivot}:
 
   \item{Jn}{ the statistic \code{Jn} }

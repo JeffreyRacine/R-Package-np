@@ -114,7 +114,7 @@ npindexbw(\dots)
 
   \item{method}{
     the single index model method, one of either \dQuote{ichimura}
-    (default) (Ichimura (1993)) or \dQuote{kleinspady} (Klein and Spady
+    (Ichimura (1993)) or \dQuote{kleinspady} (Klein and Spady
     (1993)). Defaults to
     \code{ichimura}.
   }

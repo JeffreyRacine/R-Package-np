@@ -216,7 +216,7 @@ npreg(bws, \dots)
   Cambridge University Press.
   
   Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of
-    regression functions with both categorical and continuous Data,}
+    regression functions with both categorical and continuous data,}
   Journal of Econometrics, 119, 99-130.
   
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
