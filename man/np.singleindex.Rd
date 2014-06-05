@@ -186,9 +186,9 @@ npindex(bws, \dots)
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
 
-  Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric Estimation of
-  Global Functionals and a Measure of the Explanatory Power of
-  Covariates in Regression,} The Annals of Statistics, 23 1443-1473.
+  Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric estimation of
+  global functionals and a measure of the explanatory power of
+  covariates  regression,} The Annals of Statistics, 23 1443-1473.
 
   Ichimura, H., (1993), \dQuote{Semiparametric least squares (SLS) and
   weighted SLS estimation of single-index models,} Journal of
@@ -212,7 +212,7 @@ npindex(bws, \dots)
     
 
 \author{
-  Tristen Hayfield \email{hayfield@phys.ethz.ch}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
+  Tristen Hayfield  \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
 \section{Usage Issues}{

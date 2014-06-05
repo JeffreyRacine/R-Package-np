@@ -13,11 +13,11 @@ uocquantile(x, prob)
 }
 \description{
   \code{uocquantile} is a function which computes quantiles of an
-  unordered, ordered, or continuous variable  \code{x}.
+  unordered, ordered or continuous variable  \code{x}.
 }
 \details{
   \code{uocquantile} is a function which computes quantiles of
-  unordered, ordered, or a continuous variable  \code{x}. If \code{x}
+  an unordered, ordered or continuous variable \code{x}. If \code{x}
   is unordered, the mode is returned. If \code{x} is ordered, the level
   for which the cumulative distribution is >= prob is returned. If
   \code{x} is continuous, \code{\link{quantile}} is invoked and the

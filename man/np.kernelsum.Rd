@@ -151,10 +151,10 @@ npksum(\dots)
   }
 
   \item{compute.ocg}{
-    a logical specifying whether or not to return a separate
-    result for each unordered and ordered dimension, where the product
-    kernel term for that dimension is evaluated at an appropriate
-    reference category. This is used primarily in \code{np} to compute ordered and
+    a logical specifying whether or not to return a separate result for
+    each unordered and ordered dimension, where the product kernel term
+    for that dimension is evaluated at an appropriate reference
+    category. This is used primarily in \code{np} to compute ordered and
     unordered categorical gradients. See details.
   }
 
@@ -198,8 +198,8 @@ npksum(\dots)
   \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
   \code{npksum} computes \eqn{\sum_{j=1}^{n}{W_j^\prime Y_j
-  K(X_j)}}{sum(t(W[j]) \%*\% Y[j] * K(X[j]))}, where \eqn{A_j}{A[j]}
-  represents a row vector extracted from \eqn{A}.  That is, it computes
+  K(X_j)}}{sum(t(W[j]) \%*\% Y[j] * K(X[j]))}, where \eqn{W_j}{W[j]}
+  represents a row vector extracted from \eqn{W}.  That is, it computes
   the kernel weighted sum of the outer product of the rows of \eqn{W}
   and \eqn{Y}. In the examples, the uses of such sums are illustrated.
 

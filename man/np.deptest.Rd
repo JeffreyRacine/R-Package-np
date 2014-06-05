@@ -159,7 +159,7 @@ y <- 1 + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
 
-npdeptest(x,y,boot.num=99,method="summation")
+npdeptest(y,y.fit,boot.num=99,method="summation")
 
 ## Test/measure lack of fit between y and its fitted value from a
 ## regression model when x is relevant using the `integration'
@@ -185,7 +185,7 @@ y <- 1 + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
 
-npdeptest(x,y,boot.num=99)
+npdeptest(y,y.fit,boot.num=99)
 } % enddontrun
 }
 \keyword{ univar }

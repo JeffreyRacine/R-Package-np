@@ -168,7 +168,7 @@ npudens(bws, \dots)
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
   University Press. 
 
-  Scott, D.W. (1992), \emph{Multivariate Density Estimation. Theory,
+  Scott, D.W. (1992), \emph{Multivariate Density Estimation: Theory,
   Practice and Visualization,} New York: Wiley.
 
   Silverman, B.W. (1986), \emph{Density Estimation,} London: Chapman and

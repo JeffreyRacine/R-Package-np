@@ -183,9 +183,9 @@ npcdist(bws, \dots)
   continuous data,} Journal of Business and Economic Statistics, 26,
   423-434.
   
-  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal Bandwidth
-  Selection for Nonparametric Conditional Distribution and Quantile
-  Functions}, Journal of Business and Economic Statistics, 31, 57-65.
+  Li, Q. and J. Lin and J.S. Racine (2013), \dQuote{Optimal bandwidth
+  selection for nonparametric conditional distribution and quantile
+  functions}, Journal of Business and Economic Statistics, 31, 57-65.
 
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,} Cambridge
   University Press. 
@@ -227,8 +227,7 @@ npcdist(bws, \dots)
 data("Italy")
 attach(Italy)
 
-# First, compute the bandwidths... note that this may take a minute or
-# two depending on the speed of your computer. 
+# First, compute the bandwidths.
 
 bw <- npcdistbw(formula=gdp~ordered(year))
 
@@ -258,8 +257,7 @@ detach(Italy)
 data("Italy")
 attach(Italy)
 
-# First, compute the bandwidths... note that this may take a minute or
-# two depending on the speed of your computer. 
+# First, compute the bandwidths.
 
 # Note - we cast `X' and `y' as data frames so that plot() can
 # automatically grab names (this looks like overkill, but in

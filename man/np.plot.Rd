@@ -653,7 +653,7 @@ plot(bw,
 
 # Note - make sure to include the graphicx package in your latex
 # document via adding \usepackage{graphicx} in your latex file. Also, 
-# you might was to use larger fonts, which can be achieved by adding the
+# you might want to use larger fonts, which can be achieved by adding the
 # pointsize= argument, e.g., postscript(file="graph.ps", pointsize=20)
 
 postscript(file="graph.ps")
@@ -661,7 +661,7 @@ plot(bw)
 dev.off()
 
 # The following latex file compiled in the same directory as graph.ps
-# ought to work (remove the #s and place in a file names, e.g., 
+# ought to work (remove the #s and place in a file named, e.g., 
 # test.tex).
 # \documentclass[]{article}
 # \usepackage{graphicx}

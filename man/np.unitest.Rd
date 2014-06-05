@@ -80,7 +80,7 @@ npunitest(data.x = NULL,
   Series Analysis, 25, 649-669.
 
   Maasoumi, E. and J.S. Racine (2002), \dQuote{Entropy and
-    Predictability of Stock Market Returns,} Journal of Econometrics,
+    predictability of stock market returns,} Journal of Econometrics,
     107, 2, pp 291-312.
 
 }

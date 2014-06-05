@@ -209,12 +209,12 @@ npudensbw(\dots)
 
   \item{ukertype}{
     character string used to specify the unordered categorical kernel type.
-    Can be set as \code{aitchisonaitken}.
+    Can be set as \code{aitchisonaitken} or \code{liracine}.
   }
 
   \item{okertype}{
     character string used to specify the ordered categorical kernel type.
-    Can be set as \code{wangvanryzin}.
+    Can be set as \code{wangvanryzin} or \code{liracine}.
   }
 
   \item{nmulti}{
@@ -252,7 +252,7 @@ npudensbw(\dots)
     a small number used to bracket a minimum (it is hopeless to ask for
     a bracketing interval of width less than sqrt(epsilon) times its
     central value, a fractional width of only about 10-04 (single
-    precision) or 3x10-8 (double prevision)). Defaults to \code{small
+    precision) or 3x10-8 (double precision)). Defaults to \code{small
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
 
@@ -471,7 +471,7 @@ attach(Italy)
 data <- data.frame(ordered(year), gdp)
 
 # We compute bandwidths for the kernel density estimator using the
-# normal-reference rule-of-thumb, otherwise, we use the defaults (second
+# normal-reference rule-of-thumb. Otherwise, we use the defaults (second
 # order Gaussian kernel, fixed bandwidths). Note that the bandwidth
 # object you compute inherits all properties of the estimator (kernel
 # type, kernel order, estimation method) and can be fed directly into
@@ -575,7 +575,7 @@ attach(Italy)
 data <- data.frame(ordered(year), gdp)
 
 # We compute bandwidths for the kernel density estimator using the
-# normal-reference rule-of-thumb, otherwise, we use the defaults (second
+# normal-reference rule-of-thumb. Otherwise, we use the defaults (second
 # order Gaussian kernel, fixed bandwidths). Note that the bandwidth
 # object you compute inherits all properties of the estimator (kernel
 # type, kernel order, estimation method) and can be fed directly into
@@ -620,7 +620,7 @@ Sys.sleep(5)
 
 # If you wished to use, say, an eighth order Epanechnikov kernel for the
 # continuous variables and specify your own bandwidths, you could do
-# that as follows.
+# that as follows:
 
 bw <- npudensbw(dat=data, bws=c(0.5, 1.0),
                 bandwidth.compute=FALSE, 

@@ -210,9 +210,9 @@ npreg(bws, \dots)
   shrinkage of local linear curve estimators,} Statistics and Computing,
   7, 11-17.
 
-  Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric Estimation of
-  Global Functionals and a Measure of the Explanatory Power of
-  Covariates in Regression,} The Annals of Statistics, 23 1443-1473.  
+  Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric estimation of
+  global functionals and a measure of the explanatory power of
+  covariates in regression,} The Annals of Statistics, 23 1443-1473.  
 
   Hall, P. and Q. Li and J.S. Racine (2007), \dQuote{Nonparametric
   estimation of regression functions in the presence of irrelevant
@@ -228,7 +228,7 @@ npreg(bws, \dots)
   Cambridge University Press.
   
   Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of
-    regression functions with both categorical and continuous Data,}
+    regression functions with both categorical and continuous data,}
   Journal of Econometrics, 119, 99-130.
   
   Wang, M.C. and J. van Ryzin (1981), \dQuote{A class of smooth
