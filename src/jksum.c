@@ -1639,7 +1639,6 @@ double np_aconvol_epan8_xlessy(const double x, const double y,const double hx,co
   const double hx4 = hx2*hx2;
   const double hx5 = hx3*hx2;
   const double hx6 = hx3*hx3;
-  const double hx7 = hx4*hx3;
   const double hx8 = hx4*hx4;
   const double hx9 = hx5*hx4;
   const double hx10 = hx6*hx4;
@@ -1654,7 +1653,6 @@ double np_aconvol_epan8_xlessy(const double x, const double y,const double hx,co
   const double hy4 = hy2*hy2;
   const double hy5 = hy3*hy2;
   const double hy6 = hy3*hy3;
-  const double hy7 = hy4*hy3;
   const double hy8 = hy4*hy4;
   const double hy9 = hy5*hy4;
   const double hy10 = hy6*hy4;
@@ -1893,7 +1891,6 @@ double np_aconvol_epan8_ylessx(const double x, const double y,const double hx,co
   const double hx4 = hx2*hx2;
   const double hx5 = hx3*hx2;
   const double hx6 = hx3*hx3;
-  const double hx7 = hx4*hx3;
   const double hx8 = hx4*hx4;
   const double hx9 = hx5*hx4;
   const double hx10 = hx6*hx4;
@@ -1908,7 +1905,6 @@ double np_aconvol_epan8_ylessx(const double x, const double y,const double hx,co
   const double hy4 = hy2*hy2;
   const double hy5 = hy3*hy2;
   const double hy6 = hy3*hy3;
-  const double hy7 = hy4*hy3;
   const double hy8 = hy4*hy4;
   const double hy9 = hy5*hy4;
   const double hy10 = hy6*hy4;
