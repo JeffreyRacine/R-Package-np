@@ -1647,7 +1647,7 @@ ought to produce no console I/O whatsoever in the call to
 
 \appendix
 
-\section*{Changes from Version 0.60-0 to 0.60-1 [2-Jun-2014]}
+\section*{Changes from Version 0.60-0 to 0.60-1 [6-Jun-2014]}
 
 \begin{itemize}
 
