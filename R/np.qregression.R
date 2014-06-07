@@ -65,6 +65,10 @@ npqreg.call <-
            bws = bws, ...)
   }
 
+npqreg.conbandwidth <-
+  function(bws, ...){
+    stop("incorrect bandwidth type: expected conditional distribution bandwidths instead of conditional density bandwidths")
+  }
 
 npqreg.condbandwidth <-
   function(bws,
@@ -94,6 +98,9 @@ npqreg.condbandwidth <-
         stop("'txdat' and 'exdat' are not similar data frames!")
     }
 
+    if(gradients)
+      stop("gradients not currently supported for this object")
+    
     if (length(bws$xbw) != length(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
