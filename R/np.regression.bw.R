@@ -11,17 +11,39 @@ npregbw <-
 
 npregbw.formula <-
   function(formula, data, subset, na.action, call, ...){
+    browser()
+    orig.class <- if (missing(data))
+      class(eval(attr(terms(formula), "variables")[[2]], parent.frame()))
+    else class(eval(attr(terms(formula), "variables")[[2]], data, parent.frame()))
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
-    
+
+    if(any(orig.class == "ts")){
+      stopifnot(require("zoo"))
+      
+      args <- as.list(attr(terms(formula), "variables"))[-1]
+      args$retclass <- "list"
+      args$all <- FALSE
+
+      formula <- terms(formula)
+      attr(formula, "predvars") <- as.call(append(merge.zoo, args))
+      attr(formula, "predvars")[[1]] <- as.name("merge.zoo")
+      mf[["formula"]] <- formula
+    }
+   
     mf[[1]] <- as.name("model.frame")
     mf <- eval(mf, parent.frame())
-    
-    ydat <- model.response(mf)
-    xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
+
+    if(any(orig.class == "ts")){
+      ydat <- coredata(model.response(mf))
+      xdat <- coredata(zoo(mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]))
+    }else{
+      ydat <- model.response(mf)
+      xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
+    }
     
     tbw <- npregbw(xdat = xdat, ydat = ydat, ...)
 
