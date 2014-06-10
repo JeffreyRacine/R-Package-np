@@ -13,37 +13,34 @@ npregbw.formula <-
   function(formula, data, subset, na.action, call, ...){
 
     orig.class <- if (missing(data))
-      class(eval(attr(terms(formula), "variables")[[2]], parent.frame()))
-    else class(eval(attr(terms(formula), "variables")[[2]], data, parent.frame()))
+      sapply(eval(attr(terms(formula), "variables"), parent.frame()),class)
+    else sapply(eval(attr(terms(formula), "variables"), data, parent.frame()),class)
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
 
-    if(any(orig.class == "ts")){
-      stopifnot(require("zoo"))
-      
-      args <- as.list(attr(terms(formula), "variables"))[-1]
-      args$retclass <- "list"
-      args$all <- FALSE
+    if(all(orig.class == "ts")){
+      args <- (as.list(attr(terms(formula), "variables"))[-1])
+      formula <- terms(formula)
+      attr(formula, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
+      mf[["formula"]] <- formula
+    }else if(any(orig.class == "ts")){
+      arguments <- (as.list(attr(terms(formula), "variables"))[-1])
+      arguments.normal <- arguments[which(orig.class != "ts")]
+      arguments.timeseries <- arguments[which(orig.class == "ts")]
 
       formula <- terms(formula)
-      attr(formula, "predvars") <- as.call(append(merge.zoo, args))
-      attr(formula, "predvars")[[1]] <- as.name("merge.zoo")
+      attr(formula, "predvars") <- as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal))
       mf[["formula"]] <- formula
     }
-   
+      
     mf[[1]] <- as.name("model.frame")
     mf <- eval(mf, parent.frame())
 
-    if(any(orig.class == "ts")){
-      ydat <- coredata(model.response(mf))
-      xdat <- coredata(zoo(mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]))
-    }else{
-      ydat <- model.response(mf)
-      xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
-    }
+    ydat <- model.response(mf)
+    xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
     
     tbw <- npregbw(xdat = xdat, ydat = ydat, ...)
 
