@@ -11,7 +11,7 @@ npregbw <-
 
 npregbw.formula <-
   function(formula, data, subset, na.action, call, ...){
-    browser()
+
     orig.class <- if (missing(data))
       class(eval(attr(terms(formula), "variables")[[2]], parent.frame()))
     else class(eval(attr(terms(formula), "variables")[[2]], data, parent.frame()))
