@@ -31,18 +31,15 @@ npregbw.formula <-
       arguments.normal <- arguments[which(orig.class != "ts")]
       arguments.timeseries <- arguments[which(orig.class == "ts")]
 
+      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
       formula <- terms(formula)
-      attr(formula, "predvars") <- as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal))
+      attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal)))[,.(ix)])
       mf[["formula"]] <- formula
     }
       
     mf[[1]] <- as.name("model.frame")
     mf <- eval(mf, parent.frame())
 
-    if((any(orig.class == "ts")) && (!all(orig.class == "ts"))){
-      mf[c(which(orig.class == "ts"),which(orig.class != "ts"))] <- mf
-    }
-      
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
     
