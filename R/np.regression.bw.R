@@ -39,6 +39,10 @@ npregbw.formula <-
     mf[[1]] <- as.name("model.frame")
     mf <- eval(mf, parent.frame())
 
+    if((any(orig.class == "ts")) && (!all(orig.class == "ts"))){
+      mf[c(which(orig.class == "ts"),which(orig.class != "ts"))] <- mf
+    }
+      
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
     
