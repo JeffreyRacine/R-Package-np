@@ -13,8 +13,8 @@ npregbw.formula <-
   function(formula, data, subset, na.action, call, ...){
 
     orig.class <- if (missing(data))
-      sapply(eval(attr(terms(formula), "variables"), parent.frame()),class)
-    else sapply(eval(attr(terms(formula), "variables"), data, parent.frame()),class)
+      sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
+    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)),class)
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
