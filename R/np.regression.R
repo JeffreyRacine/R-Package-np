@@ -51,7 +51,9 @@ npreg.formula <-
           arguments.timeseries <- arguments[which(orig.class == "ts")]
 
           ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
-          attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal)))[,.(ix)])
+          attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
+        }else{
+          attr(tt, "predvars") <- attr(tt, "variables")
         }
       }
       
