@@ -21,7 +21,7 @@ npreg <-
   }
 
 npreg.formula <-
-  function(bws, data = NULL, newdata = NULL, ...){
+  function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
     tt <- terms(bws)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -33,21 +33,40 @@ npreg.formula <-
 
     tydat <- model.response(tmf)
     txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
-
     if ((has.eval <- !is.null(newdata))) {
-      if (!(has.ey <- succeedWithResponse(tt, newdata)))
+      if (!y.eval){
         tt <- delete.response(tt)
+
+        orig.class <- sapply(eval(attr(tt, "variables"), newdata, environment(tt)),class)
+        
+        ## delete.response clobbers predvars, which is used for timeseries objects
+        ## so we need to reconstruct it
+
+        if(all(orig.class == "ts")){
+          args <- (as.list(attr(tt, "variables"))[-1])
+          attr(tt, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
+        }else if(any(orig.class == "ts")){
+          arguments <- (as.list(attr(tt, "variables"))[-1])
+          arguments.normal <- arguments[which(orig.class != "ts")]
+          arguments.timeseries <- arguments[which(orig.class == "ts")]
+
+          ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+          attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
+        }else{
+          attr(tt, "predvars") <- attr(tt, "variables")
+        }
+      }
       
       umf <- emf <- model.frame(tt, data = newdata)
 
-      if (has.ey)
+      if (y.eval)
         eydat <- model.response(emf)
       
       exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
     }
 
     ev <- eval(parse(text=paste("npreg(txdat = txdat, tydat = tydat,",
-                       ifelse(has.eval,paste("exdat = exdat,",ifelse(has.ey,"eydat = eydat,","")),""),
+                       ifelse(has.eval,paste("exdat = exdat,",ifelse(y.eval,"eydat = eydat,","")),""),
                        "bws = bws, ...)")))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()

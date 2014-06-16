@@ -11,12 +11,15 @@ npcdensbw <-
 
 npcdensbw.formula <-
   function(formula, data, subset, na.action, call, ...){
+    orig.class <- if (missing(data))
+      sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
+    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)),class)
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
-
+    
     if(!missing(call) && is.call(call)){
       ## rummage about in the call for the original formula
       for(i in 1:length(call)){
@@ -38,6 +41,18 @@ npcdensbw.formula <-
     mf[["formula"]] <- as.formula(paste(" ~ ", varsPlus[[1]]," + ",
                                         varsPlus[[2]]),
                                   env = environment(formula))
+    mf[["formula"]] <- terms(mf[["formula"]])
+    if(all(orig.class == "ts")){
+      args <- (as.list(attr(mf[["formula"]], "variables"))[-1])
+      attr(mf[["formula"]], "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
+    }else if(any(orig.class == "ts")){
+      arguments <- (as.list(attr(mf[["formula"]], "variables"))[-1])
+      arguments.normal <- arguments[which(orig.class != "ts")]
+      arguments.timeseries <- arguments[which(orig.class == "ts")]
+
+      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
+    }
 
     mf <- eval(mf, parent.frame())
 

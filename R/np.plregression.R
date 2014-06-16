@@ -21,70 +21,74 @@ npplreg <-
   }
 
 npplreg.formula <-
-  function(bws, data = NULL, newdata = NULL, ...){
+  function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
     
     tt <- terms(bws)
+    tt.xf <- bws$xterms
+    
     m <- match(c("formula", "data", "subset", "na.action"),
                names(bws$call), nomatch = 0)
-    tmf.xf <- tmf.x <- tmf <- bws$call[c(1,m)]
+    tmf.xf <- tmf <- bws$call[c(1,m)]
     
     tmf[[1]] <- as.name("model.frame")
     tmf.xf[[1]] <- as.name("model.frame")
-    tmf.x[[1]] <- as.name("model.matrix")
 
-    bronze <- lapply(bws$chromoly, paste, collapse = " + ")
-
-    tmf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                  env = environment(tt))
-
-    tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                  env = environment(tt))
-
+    tmf.xf[["formula"]] <- tt.xf
     tmf[["formula"]] <- tt
+
     umf <- tmf <- eval(tmf, envir = environment(tt))
-    tmf.x <- eval(tmf.x, envir = environment(tt))
-    tmf.xf <- eval(tmf.xf, envir = environment(tt))
+    tmf.xf <- eval(tmf.xf, envir = environment(tt.xf))
     
     tydat <- model.response(tmf)
-    txdat <- as.data.frame(tmf.x[, -1, drop = FALSE])
-
-    cc <- attr(tmf.x,'assign')[-1]
-    
-    for(i in 1:length(cc))
-      txdat[,i] <- cast(txdat[,i], tmf.xf[,cc[i]], same.levels = FALSE)
-
+    txdat <- tmf.xf
     tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
 
     if ((has.eval <- !is.null(newdata))) {
-      if (!(has.ey <- succeedWithResponse(tt, newdata)))
+      if (!y.eval){
         tt <- delete.response(tt)
+        
+        bronze <- lapply(bws$chromoly, paste, collapse = " + ")
+        formula.xz <- terms(as.formula(paste(" ~ ",bronze[[2]], " + ",bronze[[3]]),
+                                       env = environment(bws$formula)))
+
+        orig.class <- sapply(eval(attr(formula.xz, "variables"), newdata, environment(formula.xz)),class)
+
+        arguments.mfx <- bws$chromoly[[2]]
+        arguments.mf <- bws$chromoly[[3]]
+
+        if(all(orig.class == "ts")){
+          arguments <- (as.list(attr(formula.xz, "variables"))[-1])
+          attr(tt, "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mf,arguments)),drop = FALSE])
+          attr(tt.xf, "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mfx,arguments)),drop = FALSE])
+        }else if(any(orig.class == "ts")){
+          arguments <- (as.list(attr(formula.xz, "variables"))[-1])
+          arguments.normal <- arguments[which(orig.class != "ts")]
+          arguments.timeseries <- arguments[which(orig.class == "ts")]
+
+          ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+          attr(tt, "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mf,arguments)),drop = FALSE])
+          attr(tt.xf, "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
+        }else{
+          attr(tt, "predvars") <- attr(tt, "variables")
+          attr(tt.xf, "predvars") <- attr(tt.xf, "variables")
+        }
+          
+      }
       
       umf <- emf <- model.frame(tt, data = newdata)
-      emf.x <- model.matrix(as.formula(paste(" ~ ", bronze[[2]]),
-                                  env = environment(tt)),
-                            data = newdata)
+      emf.xf <- model.frame(tt.xf, data = newdata)
       
-      emf.xf <- model.frame(as.formula(paste(" ~ ", bronze[[2]]),
-                                  env = environment(tt)),
-                            data = newdata)
-      
-      if (has.ey)
+      if (y.eval)
         eydat <- model.response(emf)
 
-      exdat <- as.data.frame(emf.x[, -1, drop = FALSE])
-
-      cc <- attr(emf.x,'assign')[-1]
-    
-      for(i in 1:length(cc))
-        exdat[,i] <- cast(exdat[,i], emf.xf[,cc[i]], same.levels = FALSE)
-
+      exdat <- emf.xf
       ezdat <- emf[, bws$chromoly[[3]], drop = FALSE]
     }
 
     ev <-
       eval(parse(text=paste("npplreg(txdat = txdat, tydat = tydat, tzdat = tzdat,",
                    ifelse(has.eval,paste("exdat = exdat, ezdat = ezdat,",
-                                         ifelse(has.ey,"eydat = eydat,","")),""),
+                                         ifelse(y.eval,"eydat = eydat,","")),""),
                    "bws = bws, ...)")))
 
     ev$omit <- attr(umf,"na.action")

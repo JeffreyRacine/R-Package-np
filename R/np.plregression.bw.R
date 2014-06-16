@@ -11,7 +11,6 @@ npplregbw <-
 
 npplregbw.formula <-
   function(formula, data, subset, na.action, call, ...){
-
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
@@ -28,10 +27,9 @@ npplregbw.formula <-
       
     }
 
-    mf.xf <- mf.x <- mf
+    mf.xf <- mf
     
     mf[[1]] <- as.name("model.frame")
-    mf.x[[1]] <- as.name("model.matrix")
     mf.xf[[1]] <- as.name("model.frame")
     
     ## mangle formula ...
@@ -43,28 +41,44 @@ npplregbw.formula <-
     ## make formula evaluable, then eval
     bronze <- lapply(chromoly, paste, collapse = " + ")
 
-    mf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                  env = environment(formula))
-
     mf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
                                     env = environment(formula))
 
     mf[["formula"]] <- as.formula(paste(bronze[[1]]," ~ ", bronze[[3]]),
                                   env = environment(formula))
+
+    formula.all <- terms(as.formula(paste(" ~ ",bronze[[1]]," + ",bronze[[2]], " + ",bronze[[3]]),
+                                  env = environment(formula)))
+
+    orig.class <- if (missing(data))
+      sapply(eval(attr(formula.all, "variables"), environment(formula.all)),class)
+    else sapply(eval(attr(formula.all, "variables"), data, environment(formula.all)),class)
+
+    arguments.mfx <- chromoly[[2]]
+    arguments.mf <- c(chromoly[[1]],chromoly[[3]])
+
+    mf[["formula"]] <- terms(mf[["formula"]])
+    mf.xf[["formula"]] <- terms(mf.xf[["formula"]])
+    
+    if(all(orig.class == "ts")){
+      arguments <- (as.list(attr(formula.all, "variables"))[-1])
+      attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mf,arguments)),drop = FALSE])
+      attr(mf.xf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mfx,arguments)),drop = FALSE])
+    }else if(any(orig.class == "ts")){
+      arguments <- (as.list(attr(formula.all, "variables"))[-1])
+      arguments.normal <- arguments[which(orig.class != "ts")]
+      arguments.timeseries <- arguments[which(orig.class == "ts")]
+
+      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      attr(mf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mf,arguments)),drop = FALSE])
+      attr(mf.xf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
+    }
     
     mf <- eval(mf, parent.frame())
-    mf.x <- eval(mf.x,parent.frame())
     mf.xf <- eval(mf.xf,parent.frame())
 
-    
     ydat <- model.response(mf)
-    xdat <- as.data.frame(mf.x[,-1, drop = FALSE])
-
-    cc <- attr(mf.x,'assign')[-1]
-    
-    for(i in 1:length(cc))
-      xdat[,i] <- cast(xdat[,i], mf.xf[,cc[i]], same.levels = FALSE)
-      
+    xdat <- mf.xf
     zdat <- mf[, chromoly[[3]], drop = FALSE]
 
     tbw <- npplregbw(xdat = xdat, ydat = ydat, zdat = zdat, ...)
@@ -76,6 +90,7 @@ npplregbw.formula <-
     tbw$rows.omit <- as.vector(attr(mf,"na.action"))
     tbw$nobs.omit <- length(tbw$rows.omit)
     tbw$terms <- attr(mf,"terms")
+    tbw$xterms <- attr(mf.xf,"terms")
     tbw$chromoly <- chromoly
 
     tbw <-

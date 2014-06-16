@@ -36,7 +36,7 @@ npindex <-
   }
 
 npindex.formula <-
-    function(bws, data = NULL, newdata = NULL, ...){
+    function(bws, data = NULL, newdata = NULL, y.eval = FALSE, ...){
 
         tt <- terms(bws)
         m <- match(c("formula", "data", "subset", "na.action"),
@@ -50,15 +50,35 @@ npindex.formula <-
         txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
 
         if ((has.eval <- !is.null(newdata))) {
-            if (!(has.ey <- succeedWithResponse(tt, newdata)))
-                tt <- delete.response(tt)
+          if (!y.eval){
+            tt <- delete.response(tt)
 
-            umf <- emf <- model.frame(tt, data = newdata)
+            orig.class <- sapply(eval(attr(tt, "variables"), newdata, environment(tt)),class)
+            
+            ## delete.response clobbers predvars, which is used for timeseries objects
+            ## so we need to reconstruct it
 
-            if (has.ey)
-                eydat <- model.response(emf)
+            if(all(orig.class == "ts")){
+              args <- (as.list(attr(tt, "variables"))[-1])
+              attr(tt, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
+            }else if(any(orig.class == "ts")){
+              arguments <- (as.list(attr(tt, "variables"))[-1])
+              arguments.normal <- arguments[which(orig.class != "ts")]
+              arguments.timeseries <- arguments[which(orig.class == "ts")]
 
-            exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+              ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+              attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
+            }else{
+              attr(tt, "predvars") <- attr(tt, "variables")
+            }
+          }
+          
+          umf <- emf <- model.frame(tt, data = newdata)
+
+          if (y.eval)
+            eydat <- model.response(emf)
+          
+          exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
         }
 
         ev <-
