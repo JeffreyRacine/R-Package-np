@@ -134,31 +134,35 @@ static char rcsid[] = "$Id: kernelcv.c,v 1.9 2006/11/02 16:56:49 tristen Exp $";
 
 
 double cv_func_regression_categorical_ls(double *vector_scale_factor){
-    if(check_valid_scale_factor_cv(
-        KERNEL_reg_extern,
-        KERNEL_reg_unordered_extern,
-        BANDWIDTH_reg_extern,
-        BANDWIDTH_reg_extern,
-        0,
-        num_obs_train_extern,
-        0,
-        0,
-        0,
-        num_reg_continuous_extern,
-        num_reg_unordered_extern,
-        num_reg_ordered_extern,
-        num_categories_extern,
-        vector_scale_factor) == 1)
+  double cv = 0.0;
+  clock_t start, diff;
+
+  if(check_valid_scale_factor_cv(
+                                 KERNEL_reg_extern,
+                                 KERNEL_reg_unordered_extern,
+                                 BANDWIDTH_reg_extern,
+                                 BANDWIDTH_reg_extern,
+                                 0,
+                                 num_obs_train_extern,
+                                 0,
+                                 0,
+                                 0,
+                                 num_reg_continuous_extern,
+                                 num_reg_unordered_extern,
+                                 num_reg_ordered_extern,
+                                 num_categories_extern,
+                                 vector_scale_factor) == 1)
     {
       //Rprintf("toasty!\n");
       //for(int ii = 1; ii <= num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern; ii++)
       //Rprintf("%3.15g ", vector_scale_factor[ii]);
       //Rprintf("\n");
 
-        return(DBL_MAX);
+      return(DBL_MAX);
     }
+    start = clock();
 
-    return(np_kernel_estimate_regression_categorical_ls_aic(
+    cv = (np_kernel_estimate_regression_categorical_ls_aic(
                                                             int_ll_extern,
                                                             RBWM_CVLS,
                                                             KERNEL_reg_extern,
@@ -175,6 +179,11 @@ double cv_func_regression_categorical_ls(double *vector_scale_factor){
                                                             vector_Y_extern,
                                                             &vector_scale_factor[1],
                                                             num_categories_extern));
+    diff = clock() - start;
+    timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
+
+    return(cv);
+
 }
 
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor)
@@ -1134,27 +1143,31 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
 /* Numerical recipes wrapper function for Hurvich/Simonoff/Tsai JRSS B 1998 */
 
 /* Declarations */
+  double cv = 0.0;
+  clock_t start, diff;
 
-    if(check_valid_scale_factor_cv(
-        KERNEL_reg_extern,
-        KERNEL_reg_unordered_extern,
-        BANDWIDTH_reg_extern,
-        BANDWIDTH_reg_extern,
-        0,
-        num_obs_train_extern,
-        0,
-        0,
-        0,
-        num_reg_continuous_extern,
-        num_reg_unordered_extern,
-        num_reg_ordered_extern,
-        num_categories_extern,
-        vector_scale_factor) == 1)
+  if(check_valid_scale_factor_cv(
+                                 KERNEL_reg_extern,
+                                 KERNEL_reg_unordered_extern,
+                                 BANDWIDTH_reg_extern,
+                                 BANDWIDTH_reg_extern,
+                                 0,
+                                 num_obs_train_extern,
+                                 0,
+                                 0,
+                                 0,
+                                 num_reg_continuous_extern,
+                                 num_reg_unordered_extern,
+                                 num_reg_ordered_extern,
+                                 num_categories_extern,
+                                 vector_scale_factor) == 1)
     {
-        return(DBL_MAX);
+      return(DBL_MAX);
     }
 
-    return(np_kernel_estimate_regression_categorical_ls_aic(int_ll_extern,
+    start = clock();
+
+    cv = (np_kernel_estimate_regression_categorical_ls_aic(int_ll_extern,
                                                             RBWM_CVAIC,
                                                             KERNEL_reg_extern,
                                                             KERNEL_reg_unordered_extern,
@@ -1170,4 +1183,8 @@ double cv_func_regression_categorical_aic_c(double *vector_scale_factor)
                                                             vector_Y_extern,
                                                             &vector_scale_factor[1],
                                                             num_categories_extern));
+    diff = clock() - start;
+    timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
+
+    return(cv);
 }

@@ -3559,7 +3559,7 @@ void np_density(double * tuno, double * tord, double * tcon,
 
 
 void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval, double * objective_function_values){
+                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval, double * objective_function_values, double * timing){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -4032,6 +4032,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   fval[0] = fret;
   fval[1] = iImproved;
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
