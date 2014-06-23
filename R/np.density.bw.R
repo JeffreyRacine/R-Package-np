@@ -171,14 +171,15 @@ npudensbw.bandwidth <-
         nconfac = nconfac, ncatfac = ncatfac)
 
       if (bws$method != "normal-reference"){
-        myout=
-          .C("np_density_bw", as.double(duno), as.double(dord), as.double(dcon),
-             as.double(mysd),
-             as.integer(myopti), as.double(myoptd), 
-             bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
-             fval = double(2), fval.history = double(max(1,nmulti)),
-             timing = double(1),
-             PACKAGE="np" )[c("bw","fval","fval.history","timing")]
+        total.time <-
+          system.time(myout <- 
+                      .C("np_density_bw", as.double(duno), as.double(dord), as.double(dcon),
+                         as.double(mysd),
+                         as.integer(myopti), as.double(myoptd), 
+                         bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
+                         fval = double(2), fval.history = double(max(1,nmulti)),
+                         timing = double(1),
+                         PACKAGE="np" )[c("bw","fval","fval.history","timing")])[1]
       } else {
         nbw = double(ncol)
         if (bws$ncon > 0){
@@ -198,6 +199,7 @@ npudensbw.bandwidth <-
       tbw$ifval = myout$fval[2]
       tbw$fval.history <- myout$fval.history
       tbw$timing <- myout$timing
+      tbw$total.time <- total.time
     }
     
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
@@ -250,7 +252,8 @@ npudensbw.bandwidth <-
                      ncatfac = ncatfac,
                      sdev = mysd,
                      bandwidth.compute = bandwidth.compute,
-                     timing = tbw$timing)
+                     timing = tbw$timing,
+                     total.time = total.time)
     
     tbw
   }

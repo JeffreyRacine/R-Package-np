@@ -277,7 +277,8 @@ npcdistbw.condbandwidth <-
         nconfac = nconfac, ncatfac = ncatfac)
 
       if (bws$method != "normal-reference"){
-        myout=
+        total.time <-
+          system.time(myout <- 
           .C("np_distribution_conditional_bw", as.double(yuno), as.double(yord), as.double(ycon),
              as.double(xuno), as.double(xord), as.double(xcon),
              as.double(gyuno), as.double(gyord), as.double(gycon),
@@ -288,7 +289,7 @@ npcdistbw.condbandwidth <-
                bws$xbw[bws$ixuno],bws$xbw[bws$ixord]),
              fval = double(2),fval.history = double(max(1,nmulti)),
              timing = double(1),
-             PACKAGE="np" )[c("bw","fval","fval.history","timing")]
+             PACKAGE="np" )[c("bw","fval","fval.history","timing")])[1]
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
@@ -327,6 +328,7 @@ npcdistbw.condbandwidth <-
       tbw$ifval = myout$fval[2]
       tbw$fval.history <- myout$fval.history
       tbw$timing <- myout$timing
+      tbw$total.time <- total.time
     }
     
     ## bandwidth metadata
@@ -398,7 +400,8 @@ npcdistbw.condbandwidth <-
                          ncatfac = ncatfac,
                          sdev = mysd,
                          bandwidth.compute = bandwidth.compute,
-                         timing = tbw$timing)
+                         timing = tbw$timing,
+                         total.time = tbw$total.time)
            
     tbw
   }

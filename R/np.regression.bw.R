@@ -197,7 +197,8 @@ npregbw.rbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
 
-      myout=
+        total.time <-
+          system.time(myout <- 
         .C("np_regression_bw",
            as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
            as.double(mysd),
@@ -205,7 +206,7 @@ npregbw.rbandwidth <-
            bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
            fval = double(2),fval.history = double(max(1,nmulti)),
            timing = double(1),
-           PACKAGE="np" )[c("bw","fval","fval.history","timing")]
+           PACKAGE="np" )[c("bw","fval","fval.history","timing")])[1]
       
 
       rorder = numeric(ncol)
@@ -216,6 +217,7 @@ npregbw.rbandwidth <-
       tbw$ifval <- myout$fval[2]
       tbw$fval.history <- myout$fval.history
       tbw$timing <- myout$timing
+      tbw$total.time <- total.time
     }
 
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
@@ -272,7 +274,8 @@ npregbw.rbandwidth <-
                       ncatfac = ncatfac,
                       sdev = mysd,
                       bandwidth.compute = bandwidth.compute,
-                      timing = tbw$timing)
+                      timing = tbw$timing,
+                      total.time = tbw$total.time)
     tbw
   }
 
