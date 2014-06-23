@@ -758,7 +758,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
 void np_distribution_bw(double * myuno, double * myord, double * mycon, 
                         double * myeuno, double * myeord, double * myecon, double * mysd,
-                        int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
+                        int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -1271,6 +1271,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   fval[0] = fret;
   fval[1] = iImproved;
+
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
