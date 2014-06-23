@@ -944,6 +944,7 @@ double np_cv_func_density_categorical_ls(double *vector_scale_factor){
 /* Declarations */
 
     double cv = 0.0;
+    clock_t start, diff;
 
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
@@ -962,6 +963,7 @@ double np_cv_func_density_categorical_ls(double *vector_scale_factor){
         vector_scale_factor) == 1) return(DBL_MAX);
 
 /* Compute the cross-validation function */
+    start = clock();
 
     if(np_kernel_estimate_density_categorical_convolution_cv(KERNEL_den_extern,
         KERNEL_den_unordered_extern,
@@ -982,6 +984,8 @@ double np_cv_func_density_categorical_ls(double *vector_scale_factor){
         return(DBL_MAX);
     }
 
+    diff = clock() - start;
+    timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
 
     return(cv);
 
