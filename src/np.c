@@ -573,6 +573,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   }
 
   iImproved = (fret < fret_best);
+  *timing = timing_extern;
 
   /* When multistarting save initial minimum of objective function and scale factors */
   objective_function_values[0]=-fret;
@@ -690,6 +691,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
+        *timing = timing_extern;
        
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -721,7 +723,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   fval[0] = -fret;
   fval[1] = iImproved;
 
-  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -1129,6 +1130,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   }
 
   iImproved = (fret < fret_best);
+  *timing = timing_extern;
+
   objective_function_values[0]=fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
@@ -1241,6 +1244,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
       if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
+        *timing = timing_extern;
        
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -1272,7 +1276,6 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   fval[0] = fret;
   fval[1] = iImproved;
 
-  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -1861,6 +1864,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   }
 
   iImproved = (fret < fret_best);
+  *timing = timing_extern;
+
   objective_function_values[0]=-fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
@@ -1974,6 +1979,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
+        *timing = timing_extern;
         
         for(i = 1; i <= num_all_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -2001,7 +2007,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   fval[0] = -fret;
   fval[1] = iImproved;
-  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -2614,6 +2619,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   }
 
   iImproved = (fret < fret_best);
+  *timing = timing_extern;
+
   objective_function_values[0]=fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
@@ -2729,6 +2736,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
+        *timing = timing_extern;
         
         for(i = 1; i <= num_all_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -2756,7 +2764,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   fval[0] = fret;
   fval[1] = iImproved;
-  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -3885,6 +3892,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   }
 
   iImproved = (fret < fret_best);
+  *timing = timing_extern;
+
   objective_function_values[0]=fret;
   /* When multistarting save initial minimum of objective function and scale factors */
 
@@ -4002,6 +4011,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
       if(fret < fret_best){
         fret_best = fret;
         iImproved = iMs_counter+1;
+        *timing = timing_extern;
         
         for(i = 1; i <= num_var; i++)	
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
@@ -4032,7 +4042,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   fval[0] = fret;
   fval[1] = iImproved;
-  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
