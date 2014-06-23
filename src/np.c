@@ -196,6 +196,8 @@ double np_tgauss2_k22 = 1.40866160472795e-01, np_tgauss2_km = 2.23983611906613e-
 
 extern double cksup[OP_NCFUN][2];
 
+double timing_extern  = -1.0;
+
 void np_set_tgauss2(double * coefficients){
   np_tgauss2_b = coefficients[TG2_B];
   np_tgauss2_alpha = coefficients[TG2_ALPHA];
@@ -250,7 +252,7 @@ void np_mpi_init(int * mpi_status){
 
 
 void np_density_bw(double * myuno, double * myord, double * mycon, 
-                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
+                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -718,6 +720,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   fval[0] = -fret;
   fval[1] = iImproved;
+
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */

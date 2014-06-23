@@ -17,6 +17,7 @@ bandwidth <-
            rows.omit = NA, 
            nconfac = NA, ncatfac = NA, sdev = NA,
            bandwidth.compute = TRUE,
+           timing = NA,
            ...){
     
     ndim = length(bw)
@@ -106,7 +107,8 @@ bandwidth <-
       vartitle = list(x = ""),
       vartitleabb = list(x = ""),
       rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+      timing = timing)
 
     mybw$klist = list(
       x =

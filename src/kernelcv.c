@@ -8,6 +8,9 @@
 #include <float.h>
 #include <errno.h>
 
+// timing tests
+#include <time.h>
+
 #include "headers.h"
 
 #include <R.h>
@@ -111,6 +114,9 @@ extern double **matrix_XY_ordered_eval_extern;
 // cdf extern
 extern double dbl_memfac_ccdf_extern;
 extern double dbl_memfac_dls_extern;
+
+// timing
+extern double timing_extern;
 
 #ifdef RCSID
 static char rcsid[] = "$Id: kernelcv.c,v 1.9 2006/11/02 16:56:49 tristen Exp $";
@@ -296,7 +302,7 @@ double cv_func_density_categorical_ml(double *vector_scale_factor)
     {
         return(DBL_MAX);
     }
-
+    
 
     return(cv);
 
@@ -311,6 +317,7 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
 /* Declarations */
 
     double cv = 0.0;
+    clock_t start, diff;
 
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
@@ -332,7 +339,8 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
     }
 
 /* Compute the cross-validation function */
-
+    start = clock();
+    
     if(np_kernel_estimate_density_categorical_leave_one_out_cv(KERNEL_den_extern,
         KERNEL_den_unordered_extern,
         KERNEL_den_ordered_extern,
@@ -351,6 +359,8 @@ double np_cv_func_density_categorical_ml(double *vector_scale_factor)
         return(DBL_MAX);
     }
 
+    diff = clock() - start;
+    timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
 
     return(cv);
 
