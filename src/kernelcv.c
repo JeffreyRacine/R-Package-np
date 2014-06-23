@@ -521,6 +521,7 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 /* Declarations */
 
     double cv = 0.0;
+    clock_t start, diff;
 
     if(check_valid_scale_factor_cv(
         KERNEL_den_extern,
@@ -546,6 +547,7 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
       return(DBL_MAX);
     }
 /* Compute the cross-validation function */
+    start = clock();
 
     if(np_kernel_estimate_con_density_categorical_leave_one_out_cv(KERNEL_den_extern,
         KERNEL_den_unordered_extern,
@@ -581,6 +583,9 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 
         return(DBL_MAX);
     }
+    diff = clock() - start;
+    timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
+
 
     //    for(int ii = 1; ii <= num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern + num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern; ii++)
     //      Rprintf("%3.15g ", vector_scale_factor[ii]);
@@ -674,6 +679,7 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
 /* Declarations */
 
   double cv = 0.0;
+  clock_t start, diff;
 
   if(check_valid_scale_factor_cv(KERNEL_den_extern,
                                  KERNEL_reg_unordered_extern,  /* Only for conditioning vars in conditional den */
@@ -697,7 +703,7 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
     return(DBL_MAX);
   }
   /* Compute the cross-validation function */
-
+    start = clock();
     if(np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv(KERNEL_den_extern,
                                                                       KERNEL_den_unordered_extern,
                                                                       KERNEL_den_ordered_extern,
@@ -734,6 +740,8 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
 
         return(DBL_MAX);
       }
+    diff = clock() - start;
+    timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
 
     //        for(int ii = 1; ii <= num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern + num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern; ii++)
     //          Rprintf("%3.15g ", vector_scale_factor[ii]);
