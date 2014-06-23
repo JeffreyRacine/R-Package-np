@@ -175,16 +175,17 @@ npqreg(bws, \dots)
 }
 
 \value{
-  \code{npqreg} returns a \code{npqregression} object.
-  The generic
+
+  \code{npqreg} returns a \code{npqregression} object.  The generic
   functions \code{\link{fitted}} (or \code{\link{quantile}}),
-  \code{\link{se}}, \code{\link{predict}}, and
+  \code{\link{se}}, \code{\link{predict}} (when using
+  \code{\link{predict}} you must add the argument \code{tau=} to
+  generate predictions other than the median), and
   \code{\link{gradients}}, extract (or generate) estimated values,
-  asymptotic standard 
-  errors on estimates, predictions, and gradients, respectively, from
-  the returned object. Furthermore, the functions \code{\link{summary}}
-  and \code{\link{plot}} support objects of this type. The returned object
-  has the following components:
+  asymptotic standard errors on estimates, predictions, and gradients,
+  respectively, from the returned object. Furthermore, the functions
+  \code{\link{summary}} and \code{\link{plot}} support objects of this
+  type. The returned object has the following components:
 
   \item{eval}{ evaluation points }
   \item{quantile}{ estimation of the quantile regression function
