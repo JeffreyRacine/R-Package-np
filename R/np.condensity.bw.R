@@ -224,7 +224,8 @@ npcdensbw.conbandwidth <-
                bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
                bws$xbw[bws$ixuno],bws$xbw[bws$ixord]),
              fval = double(2), fval.history = double(max(1,nmulti)),
-             PACKAGE="npRmpi" )[c("bw","fval","fval.history")]
+             timing = double(1),
+             PACKAGE="npRmpi" )[c("bw","fval","fval.history","timing")]
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
@@ -261,6 +262,7 @@ npcdensbw.conbandwidth <-
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
       tbw$fval.history <- myout$fval.history
+      tbw$timing <- myout$timing
     }
     
     ## bandwidth metadata
@@ -331,7 +333,8 @@ npcdensbw.conbandwidth <-
                         nconfac = nconfac,
                         ncatfac = ncatfac,
                         sdev = mysd,
-                        bandwidth.compute = bandwidth.compute)
+                        bandwidth.compute = bandwidth.compute,
+                        timing = tbw$timing)
            
     tbw
   }

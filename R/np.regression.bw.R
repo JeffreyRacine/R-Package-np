@@ -204,7 +204,8 @@ npregbw.rbandwidth <-
            as.integer(myopti), as.double(myoptd), 
            bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
            fval = double(2),fval.history = double(max(1,nmulti)),
-           PACKAGE="npRmpi" )[c("bw","fval","fval.history")]
+           timing = double(1),
+           PACKAGE="npRmpi" )[c("bw","fval","fval.history","timing")]
       
 
       rorder = numeric(ncol)
@@ -214,6 +215,7 @@ npregbw.rbandwidth <-
       tbw$fval <- myout$fval[1]
       tbw$ifval <- myout$fval[2]
       tbw$fval.history <- myout$fval.history
+      tbw$timing <- myout$timing
     }
 
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
@@ -269,7 +271,8 @@ npregbw.rbandwidth <-
                       nconfac = nconfac,
                       ncatfac = ncatfac,
                       sdev = mysd,
-                      bandwidth.compute = bandwidth.compute)
+                      bandwidth.compute = bandwidth.compute,
+                      timing = tbw$timing)
     tbw
   }
 

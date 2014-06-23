@@ -196,6 +196,8 @@ double np_tgauss2_k22 = 1.40866160472795e-01, np_tgauss2_km = 2.23983611906613e-
 
 extern double cksup[OP_NCFUN][2];
 
+double timing_extern  = -1.0;
+
 void np_set_tgauss2(double * coefficients){
   np_tgauss2_b = coefficients[TG2_B];
   np_tgauss2_alpha = coefficients[TG2_ALPHA];
@@ -250,7 +252,7 @@ void np_mpi_init(int * mpi_status){
 
 
 void np_density_bw(double * myuno, double * myord, double * mycon, 
-                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
+                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -718,6 +720,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   fval[0] = -fret;
   fval[1] = iImproved;
+
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -754,7 +758,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
 void np_distribution_bw(double * myuno, double * myord, double * mycon, 
                         double * myeuno, double * myeord, double * myecon, double * mysd,
-                        int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
+                        int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -1267,6 +1271,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   fval[0] = fret;
   fval[1] = iImproved;
+
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -1310,7 +1316,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                double * u_uno, double * u_ord, double * u_con,
                                double * mysd,
-                               int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
+                               int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y = NULL;
@@ -1995,6 +2001,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   fval[0] = -fret;
   fval[1] = iImproved;
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -2069,7 +2076,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
-                                    int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values){
+                                    int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -2749,6 +2756,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   fval[0] = fret;
   fval[1] = iImproved;
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */
@@ -3551,7 +3559,7 @@ void np_density(double * tuno, double * tord, double * tcon,
 
 
 void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval, double * objective_function_values){
+                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval, double * objective_function_values, double * timing){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -4024,6 +4032,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   fval[0] = fret;
   fval[1] = iImproved;
+  *timing = timing_extern;
   /* end return data */
 
   /* Free data objects */

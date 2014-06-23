@@ -24,7 +24,9 @@ condbandwidth <-
            nconfac = NA,
            ncatfac = NA,
            sdev = NA,
-           bandwidth.compute = TRUE,...){
+           bandwidth.compute = TRUE,
+           timing = NA,
+           ...){
 
   if (missing(xbw) | missing(ybw))
     stop("improper invocation of condbandwidth constructor: 'bw' or i[cuo]* missing")
@@ -178,7 +180,8 @@ condbandwidth <-
     vartitle = list(x = "Explanatory", y = "Dependent"),
     vartitleabb = list(x = "Exp.", y = "Dep."),
     rows.omit = rows.omit,
-    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+    timing = timing)
 
   mybw$klist = list(
     x =
