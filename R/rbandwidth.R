@@ -172,6 +172,9 @@ summary.rbandwidth <- function(object, ...){
   cat(genBwScaleStrs(object))
   cat(genBwKerStrs(object))
 
+  if(!is.na(object$total.time))
+    cat("\nEstimation Time: ",object$total.time," seconds",sep = "")
+
   cat("\n\n")
 
 }
