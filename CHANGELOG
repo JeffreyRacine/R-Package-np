@@ -1,3 +1,11 @@
+Changes from Version 0.60-1 to 0.60-2 [XXX]
+
+* npqreg no longer accepts gradients=true when gradients are in fact not
+  supported
+
+* npqreg fails with an informative message when passed a conditional
+  density bandwidth
+
 Changes from Version 0.60-0 to 0.60-1 [6-Jun-2014]
 
 * Fixed glitch in adaptive_nn/generalized_nn bandwidths that affected all
