@@ -253,7 +253,7 @@ npudensbw.bandwidth <-
                      sdev = mysd,
                      bandwidth.compute = bandwidth.compute,
                      timing = tbw$timing,
-                     total.time = total.time)
+                     total.time = tbw$total.time)
     
     tbw
   }
