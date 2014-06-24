@@ -12,7 +12,8 @@ plbandwidth <-
            xnames, ynames, znames,
            nobs = NA,
            rows.omit = NA,
-           bandwidth.compute = TRUE,...){
+           bandwidth.compute = TRUE,
+           total.time = NA,...){
 
     regtype = match.arg(regtype)
     bwmethod = match.arg(bwmethod)
@@ -84,7 +85,8 @@ plbandwidth <-
       vartitleabb = list(x = "Exp.", y = "Dep.", z = "Exp."),
       dati = list(x = xdati, y = ydati, z = zdati),
       rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+      total.time = total.time)
 
     mybw$klist = list(z = list(ckertype = ckertype,
                         pckertype = mybw$pckertype,
@@ -150,5 +152,6 @@ summary.plbandwidth <- function(object, ...){
   cat(paste("\n\n", nm, " on z:", scale, sep=""))
   
   cat(genBwKerStrs(object))
+  cat(genTimingStr(object))
   cat("\n\n")  
 }
