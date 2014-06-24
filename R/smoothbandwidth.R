@@ -24,7 +24,9 @@ scbandwidth <-
            ncatfac = NA,
            sdev = NA,
            bandwidth.compute = TRUE,
-           optim.method = "NA",...){
+           optim.method = "NA",
+           total.time = NA,
+           ...){
 
   ndim = length(bw)
   bwmethod = match.arg(bwmethod)
@@ -117,7 +119,8 @@ scbandwidth <-
     vartitle = list(x = "Explanatory", y = "Dependent", z = "Explanatory"),
     vartitleabb = list(x = "Exp.", y = "Dep.", z = "Exp."),
     rows.omit = rows.omit,
-    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+    total.time = total.time)
 
   mybw$klist <-
       list(list(ckertype = ckertype,
@@ -178,7 +181,7 @@ summary.scbandwidth <- function(object, ...){
   cat(genBwScaleStrs(object))
 
   cat(genBwKerStrs(object))
-
+  cat(genTimingStr(object))
   cat("\n\n")
 
 }

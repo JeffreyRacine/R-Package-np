@@ -471,6 +471,11 @@ genGofStr <- function(x){
                                     format(x$R2))), sep="")
 }
 
+genTimingStr <- function(x){
+  ifelse(is.na(x$total.time),"",
+         paste("\nEstimation Time: ",format(x$total.time)," seconds",sep = ""))
+}
+  
 pCatGofStr <- function(x){
   if(!identical(x$confusion.matrix, NA)){
     cat("\nConfusion Matrix\n")

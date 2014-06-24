@@ -166,16 +166,18 @@ npplregbw.plbandwidth =
     zdat = zdat[goodrows,,drop = FALSE]
 
     ## y on z
-    bws$bw$yzbw = npregbw(xdat = zdat, ydat = ydat,
-      bws = bws$bw$yzbw, nmulti = nmulti, ...)
-    
-    ## x on z
+    total.time <-
+      system.time({
+        bws$bw$yzbw  <- npregbw(xdat = zdat, ydat = ydat,
+                                bws = bws$bw$yzbw, nmulti = nmulti, ...)
+        
+        ## x on z
 
-    for (i in 1:ncol(xdat)){
-      bws$bw[[i+1]] = npregbw(xdat=zdat, ydat=xdat[,i],
-              bws = bws$bw[[i+1]], nmulti = nmulti, ...)
-    }
-
+        for (i in 1:ncol(xdat)){
+          bws$bw[[i+1]] <- npregbw(xdat=zdat, ydat=xdat[,i],
+                  bws = bws$bw[[i+1]], nmulti = nmulti, ...)
+        }
+      })[1]
     bws <- plbandwidth(bws = bws$bw,
                        regtype = bws$regtype,
                        bwmethod = bws$method,
@@ -192,7 +194,8 @@ npplregbw.plbandwidth =
                        ynames = bws$ynames,
                        znames = bws$znames,
                        nobs = bws$nobs,
-                       rows.omit = rows.omit)
+                       rows.omit = rows.omit,
+                       total.time = total.time)
 
   }
 

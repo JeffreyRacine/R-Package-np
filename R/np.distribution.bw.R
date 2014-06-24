@@ -231,14 +231,15 @@ npudistbw.dbandwidth <-
         nconfac = nconfac, ncatfac = ncatfac, memfac = memfac)
 
       if (bws$method != "normal-reference"){
-        myout=
+        total.time <-
+          system.time(myout <- 
           .C("np_distribution_bw", as.double(duno), as.double(dord), as.double(dcon),
              as.double(guno), as.double(gord), as.double(gcon), as.double(mysd),
              as.integer(myopti), as.double(myoptd), 
              bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
              fval = double(2), fval.history = double(max(1,nmulti)),
              timing = double(1),
-             PACKAGE="npRmpi" )[c("bw","fval","fval.history","timing")]
+             PACKAGE="npRmpi" )[c("bw","fval","fval.history","timing")])[1]
       } else {
         nbw = double(ncol)
         gbw = bws$ncon
@@ -259,6 +260,7 @@ npudistbw.dbandwidth <-
       tbw$ifval = myout$fval[2]
       tbw$fval.history <- myout$fval.history
       tbw$timing <- myout$timing
+      tbw$total.time <- total.time
     }
     
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
@@ -311,7 +313,8 @@ npudistbw.dbandwidth <-
                       ncatfac = ncatfac,
                       sdev = mysd,
                       bandwidth.compute = bandwidth.compute,
-                      timing = tbw$timing)
+                      timing = tbw$timing,
+                      total.time = tbw$total.time)
     
     tbw
   }

@@ -26,6 +26,7 @@ condbandwidth <-
            sdev = NA,
            bandwidth.compute = TRUE,
            timing = NA,
+           total.time = NA,
            ...){
 
   if (missing(xbw) | missing(ybw))
@@ -181,7 +182,8 @@ condbandwidth <-
     vartitleabb = list(x = "Exp.", y = "Dep."),
     rows.omit = rows.omit,
     nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
-    timing = timing)
+    timing = timing,
+    total.time = total.time)
 
   mybw$klist = list(
     x =
@@ -240,6 +242,8 @@ summary.condbandwidth <- function(object, ...) {
 
   cat(paste("\n", genBwScaleStrs(object), sep=""))
   cat(genBwKerStrs(object))
+
+  cat(genTimingStr)
   
   cat("\n\n")
 }

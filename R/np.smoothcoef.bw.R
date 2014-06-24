@@ -239,270 +239,273 @@ npscoefbw.scbandwidth <-
     bws$sdev <- mysd
     bws$nconfac <- nconfac
     bws$ncatfac <- ncatfac
-    
-    if (bandwidth.compute){
-      maxPenalty <- sqrt(.Machine$double.xmax)
-      overall.cv.ls <- function(param) {
-        sbw <- bws
-        sbw$bw <- param
-        sbw$bandwidth[[1]] <- param
-        if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
-          return(maxPenalty)
-        
-        bws$bw <- param
 
-        if(bws$scaling)
-            bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
-        else
-            bws$bandwidth[[1]] <- bws$bw
-        
-        
-        tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = bws,
-                      leave.one.out = TRUE)$ksum
+    total.time <-
+      system.time({
+        if (bandwidth.compute){
+          maxPenalty <- sqrt(.Machine$double.xmax)
+          overall.cv.ls <- function(param) {
+            sbw <- bws
+            sbw$bw <- param
+            sbw$bandwidth[[1]] <- param
+            if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
+              return(maxPenalty)
+            
+            bws$bw <- param
 
-        mean.loo <- rep(maxPenalty,n)
-        epsilon <- 1.0/n
-        ridge <- double(n)
-        doridge <- !logical(n)
-
-        nc <- ncol(tww[-1,-1,1])
-
-        ridger <- function(i) {
-          doridge[i] <<- FALSE
-          ridge.val <- ridge[i]*tww[-1,1,i][1]/NZD(tww[-1,-1,i][1,1])
-          W[i,, drop = FALSE] %*% tryCatch(solve(tww[-1,-1,i]+diag(rep(ridge[i],nc)),
-                  tww[-1,1,i]+c(ridge.val,rep(0,nc-1))),
-                  error = function(e){
-                    ridge[i] <<- ridge[i]+epsilon
-                    doridge[i] <<- TRUE
-                    return(rep(maxPenalty,nc))
-                  })
-        }
-
-        while(any(doridge)){
-          iloo <- (1:n)[doridge]
-          mean.loo[iloo] <- sapply(iloo, ridger)
-        }
-
-        cv.console <<- printClear(cv.console)
-        ##cv.console <<- printPush(msg = paste("param:", param), console = cv.console)
-
-        stopifnot(all(is.finite(mean.loo)))
-
-        if(!any(mean.loo == maxPenalty)){
-          fv <- sum((ydat-mean.loo)^2)/n
-          cv.console <<- printPush(msg = paste("fval:", signif(fv, digits = options('digits')$digits)), console = cv.console)
-        } else {
-          cv.console <<- printPush(msg = "near-singular system encountered, ridging", console = cv.console)
-          fv <- maxPenalty
-        }
-
-        return(ifelse(is.finite(fv),fv,maxPenalty))
-
-      }
-
-      scoef.looE <- parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                            ifelse(miss.z,'','tzdat = zdat,'),
-                            'leave.one.out = TRUE, iterate = TRUE,',
-                            'maxiter = backfit.maxiter, tol = backfit.tol,',
-                            'betas = TRUE)'))
-      
-      partial.cv.ls <- function(param, partial.index) {
-        sbw <- bws
-        sbw$bw <- param
-        sbw$bandwidth[[1]] <- param
-
-        if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
-          return(maxPenalty)
-        
-        if (backfit.iterate){
-          bws$bw.fitted[,partial.index] <- param
-          scoef.loo <- eval(scoef.looE)
-          partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
-        } else {
-          bws$bw <- param
-
-          if(bws$scaling)
+            if(bws$scaling)
               bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
-          else
+            else
               bws$bandwidth[[1]] <- bws$bw
-
-          tww <- npksum(txdat=zdat,
-                        tydat=cbind(partial.orig * W[,partial.index],W[,partial.index]^2),
-                        weights=cbind(partial.orig * W[,partial.index],1),
-                        bws=bws,
-                        leave.one.out=TRUE)$ksum
-
-          partial.loo <- W[,partial.index]*tww[1,2,]/NZD(tww[2,2,])
-          
-        }
-        
-
-        fv <- sum((partial.orig - partial.loo)^2)/n
-        
-        cv.console <<- printClear(cv.console)
-        cv.console <<- printPush(msg = paste("fval:",
-                                   signif(fv, digits = options('digits')$digits)),
-                                 console = cv.console)
-        return(ifelse(is.finite(fv),fv,maxPenalty))
-      }
-
-      ## Now we implement multistarting
-
-      fval.min <- .Machine$double.xmax
-      numimp <- 0
-      value.overall <- numeric(nmulti)
-
-      x.scale <- sapply(1:bws$ndim, function(i){
-        if (dati$icon[i]){
-            return(1.059224*(ifelse(bws$scaling, 1.0, mysd[sum(dati$icon[1:i])]*nconfac)))
-        }
-        
-        if (dati$iord[i])
-          return(0.5*oMaxL(dati$all.nlev[[i]], kertype = bws$okertype)*
-                 ifelse(bws$scaling,ncatfac,1.0))
-        
-        if (dati$iuno[i])
-          return(0.5*uMaxL(dati$all.nlev[[i]], kertype = bws$ukertype)*
-                 ifelse(bws$scaling,ncatfac,1.0))       
-      })
-
-      console <- newLineConsole()
-      optim.control <- list(abstol = optim.abstol,
-                            reltol = optim.reltol,
-                            maxit = optim.maxit)
-
-      for (i in 1:nmulti) {
-
-        console <- printPush(msg = paste(sep="", "Multistart ", i, " of ", nmulti, "... "), console)
-        cv.console <- newLineConsole(console)
-        
-        if (i == 1) {
-          tbw <- x.scale
-          if(all(bws$bw != 0))
-            tbw <- bws$bw
-        } else {
-            tbw <- runif(bws$ndim, min=0.5, max=1.5)*x.scale
-        }
-
-        suppressWarnings(optim.return <- optim(tbw,
-                                               fn = overall.cv.ls,
-                                               control = optim.control))
-        attempts <- 0
-        while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
-          attempts <- attempts + 1
-          tbw <- runif(bws$ndim, min=0.5, max=1.5)*x.scale
-          optim.control <- lapply(optim.control, '*', 10.0)
-          suppressWarnings(optim.return <- optim(tbw,
-                                                 fn = overall.cv.ls,
-                                                 control = optim.control))
-
-        }
-
-        cv.console <- printClear(cv.console)
-
-        value.overall[i] <- optim.return$value
-
-        if(optim.return$value < fval.min) {
-          param <- optim.return$par
-          min.overall <- optim.return$value
-          fval.min <- min.overall ## Added by jracine Jul 22 2010
-          numimp.overall <- numimp + 1
-          best.overall <- i
-        }
-
-        if(i < nmulti)
-          console <- printPop(console)
-        else
-          console <- printClear(console)
-      }
-
-      param.overall <- bws$bw <- param
-
-      if(cv.iterate){
-        
-        console <- newLineConsole()
-        
-        n.part <- (ncol(xdat)+1)
-        
-        bws$bw.fitted <- matrix(data = bws$bw, nrow = length(bws$bw), ncol = n.part)
-        ## obtain matrix of alpha.hat | h0 and beta.hat | h0
-
-        scoef <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                              ifelse(miss.z, '', 'tzdat = zdat,'),
-                              'iterate = FALSE, betas = TRUE)')))
-        
-        resid.full <- ydat - scoef$mean
-
-        
-        for(i in 1:cv.num.iterations){
-          console <- printPush(msg = paste(sep="", "backfitting iteration ", i, " of ", cv.num.iterations, "... "), console)
-
-          for(j in 1:n.part){
-            console <- printPush(msg = paste(sep="", "partial residual ", j, " of ", n.part, "... "), console)
-            cv.console <- newLineConsole(console)
-
-            ## estimate partial residuals
-            partial.orig <- W[,j] * scoef$beta[,j] + resid.full
             
-            ## minimise
-            suppressWarnings(optim.return <-
-                             optim(tbw, fn = partial.cv.ls,
-                                   control = optim.control,
-                                   partial.index = j))
             
-            cv.console <- printClear(cv.console)
-            
-            ## grab parameter
-            bws$bw.fitted[,j] <- optim.return$par
+            tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = bws,
+                          leave.one.out = TRUE)$ksum
 
-            if (backfit.iterate){
-              ## re-estimate all betas
-              scoef <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                                    ifelse(miss.z, '', 'tzdat = zdat,'),
-                                    'iterate = TRUE, maxiter = backfit.maxiter,',
-                                    'tol = backfit.tol, betas = TRUE)')))
-              resid.full <- ydat - scoef$mean
-            } else {
-              bws$bw <- bws$bw.fitted[,j]
-              ## estimate new beta.hats
+            mean.loo <- rep(maxPenalty,n)
+            epsilon <- 1.0/n
+            ridge <- double(n)
+            doridge <- !logical(n)
 
-              if(bws$scaling)
-                  bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
-              else
-                  bws$bandwidth[[1]] <- bws$bw
+            nc <- ncol(tww[-1,-1,1])
 
-              tww <- npksum(txdat=zdat,
-                            tydat=cbind(partial.orig * W[,j],W[,j]^2),
-                            weights=cbind(partial.orig * W[,j],1),
-                            bws=bws)$ksum
-              
-              scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
-              
-              bws$bw <- param.overall
-              ## estimate new full residuals 
-              resid.full <- partial.orig - W[,j] * scoef$beta[,j]
+            ridger <- function(i) {
+              doridge[i] <<- FALSE
+              ridge.val <- ridge[i]*tww[-1,1,i][1]/NZD(tww[-1,-1,i][1,1])
+              W[i,, drop = FALSE] %*% tryCatch(solve(tww[-1,-1,i]+diag(rep(ridge[i],nc)),
+                      tww[-1,1,i]+c(ridge.val,rep(0,nc-1))),
+                      error = function(e){
+                        ridge[i] <<- ridge[i]+epsilon
+                        doridge[i] <<- TRUE
+                        return(rep(maxPenalty,nc))
+                      })
             }
 
-            console <- printPop(console)
-          }
-          if(i < cv.num.iterations)
-            console <- printPop(console)
-          else
-            console <- printClear(console)
-        }
-        scoef.loo <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                                  ifelse(miss.z,'', 'tzdat = zdat,'),
-                                  'iterate = TRUE, maxiter = backfit.maxiter,',
-                                  'tol = backfit.tol, leave.one.out = TRUE)$mean')))
-        bws$fval.fitted <- sum((ydat - scoef.loo)^2)/n
-      }
+            while(any(doridge)){
+              iloo <- (1:n)[doridge]
+              mean.loo[iloo] <- sapply(iloo, ridger)
+            }
 
-      bws$fval = min.overall
-      bws$ifval = best.overall
-      bws$numimp = numimp.overall
-      bws$fval.vector = value.overall
-    }
+            cv.console <<- printClear(cv.console)
+            ##cv.console <<- printPush(msg = paste("param:", param), console = cv.console)
+
+            stopifnot(all(is.finite(mean.loo)))
+
+            if(!any(mean.loo == maxPenalty)){
+              fv <- sum((ydat-mean.loo)^2)/n
+              cv.console <<- printPush(msg = paste("fval:", signif(fv, digits = options('digits')$digits)), console = cv.console)
+            } else {
+              cv.console <<- printPush(msg = "near-singular system encountered, ridging", console = cv.console)
+              fv <- maxPenalty
+            }
+
+            return(ifelse(is.finite(fv),fv,maxPenalty))
+
+          }
+
+          scoef.looE <- parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
+                                ifelse(miss.z,'','tzdat = zdat,'),
+                                'leave.one.out = TRUE, iterate = TRUE,',
+                                'maxiter = backfit.maxiter, tol = backfit.tol,',
+                                'betas = TRUE)'))
+          
+          partial.cv.ls <- function(param, partial.index) {
+            sbw <- bws
+            sbw$bw <- param
+            sbw$bandwidth[[1]] <- param
+
+            if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
+              return(maxPenalty)
+            
+            if (backfit.iterate){
+              bws$bw.fitted[,partial.index] <- param
+              scoef.loo <- eval(scoef.looE)
+              partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
+            } else {
+              bws$bw <- param
+
+              if(bws$scaling)
+                bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+              else
+                bws$bandwidth[[1]] <- bws$bw
+
+              tww <- npksum(txdat=zdat,
+                            tydat=cbind(partial.orig * W[,partial.index],W[,partial.index]^2),
+                            weights=cbind(partial.orig * W[,partial.index],1),
+                            bws=bws,
+                            leave.one.out=TRUE)$ksum
+
+              partial.loo <- W[,partial.index]*tww[1,2,]/NZD(tww[2,2,])
+              
+            }
+            
+
+            fv <- sum((partial.orig - partial.loo)^2)/n
+            
+            cv.console <<- printClear(cv.console)
+            cv.console <<- printPush(msg = paste("fval:",
+                                       signif(fv, digits = options('digits')$digits)),
+                                     console = cv.console)
+            return(ifelse(is.finite(fv),fv,maxPenalty))
+          }
+
+          ## Now we implement multistarting
+
+          fval.min <- .Machine$double.xmax
+          numimp <- 0
+          value.overall <- numeric(nmulti)
+
+          x.scale <- sapply(1:bws$ndim, function(i){
+            if (dati$icon[i]){
+              return(1.059224*(ifelse(bws$scaling, 1.0, mysd[sum(dati$icon[1:i])]*nconfac)))
+            }
+            
+            if (dati$iord[i])
+              return(0.5*oMaxL(dati$all.nlev[[i]], kertype = bws$okertype)*
+                     ifelse(bws$scaling,ncatfac,1.0))
+            
+            if (dati$iuno[i])
+              return(0.5*uMaxL(dati$all.nlev[[i]], kertype = bws$ukertype)*
+                     ifelse(bws$scaling,ncatfac,1.0))       
+          })
+
+          console <- newLineConsole()
+          optim.control <- list(abstol = optim.abstol,
+                                reltol = optim.reltol,
+                                maxit = optim.maxit)
+
+          for (i in 1:nmulti) {
+
+            console <- printPush(msg = paste(sep="", "Multistart ", i, " of ", nmulti, "... "), console)
+            cv.console <- newLineConsole(console)
+            
+            if (i == 1) {
+              tbw <- x.scale
+              if(all(bws$bw != 0))
+                tbw <- bws$bw
+            } else {
+              tbw <- runif(bws$ndim, min=0.5, max=1.5)*x.scale
+            }
+
+            suppressWarnings(optim.return <- optim(tbw,
+                                                   fn = overall.cv.ls,
+                                                   control = optim.control))
+            attempts <- 0
+            while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
+              attempts <- attempts + 1
+              tbw <- runif(bws$ndim, min=0.5, max=1.5)*x.scale
+              optim.control <- lapply(optim.control, '*', 10.0)
+              suppressWarnings(optim.return <- optim(tbw,
+                                                     fn = overall.cv.ls,
+                                                     control = optim.control))
+
+            }
+
+            cv.console <- printClear(cv.console)
+
+            value.overall[i] <- optim.return$value
+
+            if(optim.return$value < fval.min) {
+              param <- optim.return$par
+              min.overall <- optim.return$value
+              fval.min <- min.overall ## Added by jracine Jul 22 2010
+              numimp.overall <- numimp + 1
+              best.overall <- i
+            }
+
+            if(i < nmulti)
+              console <- printPop(console)
+            else
+              console <- printClear(console)
+          }
+
+          param.overall <- bws$bw <- param
+
+          if(cv.iterate){
+            
+            console <- newLineConsole()
+            
+            n.part <- (ncol(xdat)+1)
+            
+            bws$bw.fitted <- matrix(data = bws$bw, nrow = length(bws$bw), ncol = n.part)
+            ## obtain matrix of alpha.hat | h0 and beta.hat | h0
+
+            scoef <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
+                                  ifelse(miss.z, '', 'tzdat = zdat,'),
+                                  'iterate = FALSE, betas = TRUE)')))
+            
+            resid.full <- ydat - scoef$mean
+
+            
+            for(i in 1:cv.num.iterations){
+              console <- printPush(msg = paste(sep="", "backfitting iteration ", i, " of ", cv.num.iterations, "... "), console)
+
+              for(j in 1:n.part){
+                console <- printPush(msg = paste(sep="", "partial residual ", j, " of ", n.part, "... "), console)
+                cv.console <- newLineConsole(console)
+
+                ## estimate partial residuals
+                partial.orig <- W[,j] * scoef$beta[,j] + resid.full
+                
+                ## minimise
+                suppressWarnings(optim.return <-
+                                 optim(tbw, fn = partial.cv.ls,
+                                       control = optim.control,
+                                       partial.index = j))
+                
+                cv.console <- printClear(cv.console)
+                
+                ## grab parameter
+                bws$bw.fitted[,j] <- optim.return$par
+
+                if (backfit.iterate){
+                  ## re-estimate all betas
+                  scoef <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
+                                        ifelse(miss.z, '', 'tzdat = zdat,'),
+                                        'iterate = TRUE, maxiter = backfit.maxiter,',
+                                        'tol = backfit.tol, betas = TRUE)')))
+                  resid.full <- ydat - scoef$mean
+                } else {
+                  bws$bw <- bws$bw.fitted[,j]
+                  ## estimate new beta.hats
+
+                  if(bws$scaling)
+                    bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+                  else
+                    bws$bandwidth[[1]] <- bws$bw
+
+                  tww <- npksum(txdat=zdat,
+                                tydat=cbind(partial.orig * W[,j],W[,j]^2),
+                                weights=cbind(partial.orig * W[,j],1),
+                                bws=bws)$ksum
+                  
+                  scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
+                  
+                  bws$bw <- param.overall
+                  ## estimate new full residuals 
+                  resid.full <- partial.orig - W[,j] * scoef$beta[,j]
+                }
+
+                console <- printPop(console)
+              }
+              if(i < cv.num.iterations)
+                console <- printPop(console)
+              else
+                console <- printClear(console)
+            }
+            scoef.loo <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
+                                      ifelse(miss.z,'', 'tzdat = zdat,'),
+                                      'iterate = TRUE, maxiter = backfit.maxiter,',
+                                      'tol = backfit.tol, leave.one.out = TRUE)$mean')))
+            bws$fval.fitted <- sum((ydat - scoef.loo)^2)/n
+          }
+
+          bws$fval = min.overall
+          bws$ifval = best.overall
+          bws$numimp = numimp.overall
+          bws$fval.vector = value.overall
+        }
+      })[1]
     
     bws$sfactor <- bws$bandwidth <- bws$bw
     nfactor <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
@@ -554,7 +557,8 @@ npscoefbw.scbandwidth <-
                        bandwidth = bws$bandwidth,
                        rows.omit = rows.omit,
                        bandwidth.compute = bandwidth.compute,
-                       optim.method = optim.method)
+                       optim.method = optim.method,
+                       total.time = total.time)
 
     bws
   }

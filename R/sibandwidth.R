@@ -16,6 +16,7 @@ sibandwidth <-
            rows.omit = NA, bandwidth.compute = TRUE,
            optim.method = "NA",
            only.optimize.beta = FALSE,
+           total.time = NA,
            ...){
 
   ndim = length(beta)
@@ -95,7 +96,8 @@ sibandwidth <-
     vartitle = list(x = "Explanatory", y = "Dependent", index = "Explanatory"),
     vartitleabb = list(x = "Exp.", y = "Dep.", index = "Exp."),
     rows.omit = rows.omit,
-    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+    total.time = total.time)
 
   mybw$klist <- list(
     index =
@@ -151,6 +153,7 @@ summary.sibandwidth <- function(object, ...){
   cat(genOmitStr(object))
   cat(genBwSelStr(object))
   cat(genBwKerStrs(object))
+  cat(genTimingStr(object))
   cat("\n\n")
 }
 
