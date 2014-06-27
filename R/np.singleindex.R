@@ -83,7 +83,7 @@ npindex.formula <-
 
         ev <-
             eval(parse(text=paste("npindex(txdat = txdat, tydat = tydat,",
-                           ifelse(has.eval,paste("exdat = exdat,",ifelse(has.ey,"eydat = eydat,","")),""),
+                           ifelse(has.eval,paste("exdat = exdat,",ifelse(y.eval,"eydat = eydat,","")),""),
                            "bws = bws, ...)")))
 
         ev$omit <- attr(umf,"na.action")
