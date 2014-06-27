@@ -243,7 +243,7 @@ summary.conbandwidth <- function(object, ...) {
   cat(paste("\n", genBwScaleStrs(object), sep=""))
   cat(genBwKerStrs(object))
 
-  cat(genTimingStr)
+  cat(genTimingStr(object))
   
   cat("\n\n")
 }

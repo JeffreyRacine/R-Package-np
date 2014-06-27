@@ -75,7 +75,7 @@ npscoef.formula <-
       eval(parse(text=paste("npscoef(txdat = txdat, tydat = tydat,",
                    ifelse(miss.z, '','tzdat = tzdat,'),
                    ifelse(has.eval,paste("exdat = exdat,",
-                                         ifelse(has.ey,"eydat = eydat,",""),
+                                         ifelse(y.eval,"eydat = eydat,",""),
                                          ifelse(miss.z,'', 'ezdat = ezdat,')),""),
                    "bws = bws, ...)")))
 

@@ -165,7 +165,7 @@ summary.dbandwidth <- function(object, ...) {
 
   cat(genBwKerStrs(object))
 
-  cat(genTimingStr)
+  cat(genTimingStr(object))
   
   cat("\n\n")
 }

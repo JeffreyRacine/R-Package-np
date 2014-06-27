@@ -188,6 +188,7 @@ npudensbw.bandwidth <-
             nbw[1:bws$ncon]=nbw[1:bws$ncon]*mysd*nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
+        total.time <- NA
       }
 
       rorder = numeric(ncol)
@@ -253,7 +254,7 @@ npudensbw.bandwidth <-
                      sdev = mysd,
                      bandwidth.compute = bandwidth.compute,
                      timing = tbw$timing,
-                     total.time = total.time)
+                     total.time = tbw$total.time)
     
     tbw
   }
