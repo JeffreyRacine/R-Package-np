@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.89 2014/04/17 05:36:22 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.90 2014/06/27 14:22:06 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{npRmpi}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -286,28 +286,31 @@ as one could always do with, say, \texttt{read.table()}.
     observations (of computational order $n^2$ hence a doubling of the
     sample size will increase run time by a factor of four). The
     solution I favor is to run the code in a parallel computing
-    environment. The underlying C code for \texttt{np} is MPI-aware (MPI
-    denotes the `message passing interface', a popular parallel
+    environment. The underlying C code for \texttt{np} is MPI-aware
+    (MPI denotes the `message passing interface', a popular parallel
     programming library that is an international standard), and a
-    version of the \texttt{np} package titled `\texttt{npRmpi}' exists for
-    running jobs in a parallel environment that leverages the \texttt{Rmpi} package (\cite{Rmpi}).\footnote{We are extremely grateful
-      to Hao Yu for providing the MPI functionality contained in the
-      \texttt{Rmpi} package.}
+    version of the \texttt{np} package titled `\texttt{npRmpi}' exists
+    for running jobs in a parallel environment that leverages the
+    \texttt{Rmpi} package (\cite{Rmpi}).\footnote{We are extremely
+      grateful to Hao Yu for providing the MPI functionality contained
+      in the \texttt{Rmpi} package.}
 
     With respect to the \texttt{npRmpi} package, kindly note that I
     cannot assist with issues surrounding installation and setup due
     to the vast heterogeneity of MPI implementations and methods for
     executing such programs. You are instead strongly advised to seek
-    local advice from your sysadmin or others. The document \texttt{npRmpi.pdf} may contain some useful information for such
+    local advice from your sysadmin or others. The document
+    \texttt{npRmpi.pdf} may contain some useful information for such
     issues. You might also want to first get the \texttt{Rmpi} package
     installed and running properly as once you are at this stage it
-    ought to then be trivial to install the \texttt{npRmpi} package. Also
-    note that running programs in a parallel environment requires
-    minor differences in how \texttt{np} functions are called, and you
-    would be wise to examine the examples in the demo directory
-    (download and unpack the source code and look in this directory)
-    and the overview file \texttt{npRmpi.pdf} in the inst/doc/ directory of
-    the \texttt{npRmpi} package you downloaded and unpacked.
+    ought to then be trivial to install the \texttt{npRmpi}
+    package. Also note that running programs in a parallel environment
+    requires minor differences in how \texttt{np} functions are
+    called, and you would be wise to examine the examples in the demo
+    directory (download and unpack the source code and look in this
+    directory) and the overview file \texttt{npRmpi.pdf} in the
+    inst/doc/ directory of the \texttt{npRmpi} package you downloaded
+    and unpacked.
 
   \item Alternatively, you can use the method outlined in Racine
     (1993) \cite{RACINE:1993}. The method is based on the fact that
@@ -416,21 +419,21 @@ plot(bw,xtrim=.01)
 \end{verbatim}
 \end{singlespacing}
 
-  \item Barring this, you can set the search tolerances to be a bit
-    less terse (at the expense of potential accuracy, i.e., becoming
-    trapped in local minima) by setting, say, \texttt{tol=0.1} and \texttt{ftol=0.1} in the respective bandwidth routine (see the docs for
-    examples). Also, you can set \texttt{nmulti=1} which overrides the
-    number of times the search procedure restarts from different
-    random starting values (the default is to restart $k$ times where
-    $k$ is the number of variables). Be warned, however, that this is
-    {\em definitely not recommended} and should {\em be avoided at all
-      costs} for all but the most casual examination of a
-    relationship. One ought to use multistarting for any final results
-    and never override default search tolerances {\em unless
-      increasing multistarts beyond the default}. Results based upon
-    exhaustive search {\em often differ dramatically} from that based
-    on limited search achieved by overriding default search
-    tolerances.
+\item Barring this, you can set the search tolerances to be a bit less
+  terse (at the expense of potential accuracy, i.e., becoming trapped
+  in local minima) by setting, say, \texttt{tol=0.1} and
+  \texttt{ftol=0.1} in the respective bandwidth routine (see the docs
+  for examples). Also, you can set \texttt{nmulti=1} which overrides
+  the number of times the search procedure restarts from different
+  random starting values (the default is to restart $k$ times where
+  $k$ is the number of variables). Be warned, however, that this is
+  {\em definitely not recommended} and should {\em be avoided at all
+    costs} for all but the most casual examination of a
+  relationship. One ought to use multistarting for any final results
+  and never override default search tolerances {\em unless increasing
+    multistarts beyond the default}. Results based upon exhaustive
+  search {\em often differ dramatically} from that based on limited
+  search achieved by overriding default search tolerances.
 
   \item For those who like to tinker and who work on a *NIX system
     with the gcc compiler suite, you can change the default compiler
@@ -469,7 +472,8 @@ plot(bw,xtrim=.01)
       used). When the penalty is zero this produces a function that
       interpolates the data points. When the penalty is infinite, this
       delivers the linear OLS fit to the data.}) to admit categorical
-    predictors (see references for papers with Yang and Ma in the \texttt{crs} package). Because regression splines involve simple
+    predictors (see references for papers with Yang and Ma in the
+    \texttt{crs} package). Because regression splines involve simple
     least-squares fits, they scale much better with respect to the
     sample size so for large sample sizes you may wish to instead
     consider this approach (kindly see my webpage for further
@@ -672,13 +676,14 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     does not work as I expected\dots}
 
   There exist a rather extensive set of examples contained in the
-  docs. You can run these examples by typing \texttt{example("npfunctionname")} where npfunctionname is, say, \texttt{w},
-  as in \texttt{example("w")}.\footnote{For a listing of all routines in
-    the np package type: \texttt{library(help="np")}.} These examples
-  all pass quality control and produce the expected results, so first
-  see whether your problem fits into an existing example, and if not,
-  carefully follow the examples listed in a given function for syntax
-  issues etc.
+  docs. You can run these examples by typing
+  \texttt{example("npfunctionname")} where npfunctionname is, say,
+  \texttt{w}, as in \texttt{example("w")}.\footnote{For a listing of
+    all routines in the np package type: \texttt{library(help="np")}.}
+  These examples all pass quality control and produce the expected
+  results, so first see whether your problem fits into an existing
+  example, and if not, carefully follow the examples listed in a given
+  function for syntax issues etc.
 
   If you are convinced that the problem lies with \texttt{np} (there
   certainly will be undiscovered `features', i.e., bugs), then kindly
@@ -721,18 +726,19 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 \subsection{Some results take a while, and my MS Windows computer is
     sluggish while \texttt{R} is running\dots}
 
-  You can easily change the priority of your \texttt{R} job on the fly,
-  just as you might under *NIX.  Pull up the task manager
+  You can easily change the priority of your \texttt{R} job on the
+  fly, just as you might under *NIX.  Pull up the task manager
   (\verb+<Ctrl>-<Alt>-<Del>+), go to the process list, and find the
-  process \texttt{Rgui.exe} (or \texttt{R.exe} if you are running \texttt{Rterm}), select this process by left clicking on it, then right
-  clicking will bring up a menu, select \texttt{Set priority}, then
-  change priority to \texttt{low} and hit $<$\texttt{ok}$>$. For lengthy
-  jobs this will make your life much smoother, and you can, say, run
-  multiple jobs in low priority with no sluggishness whatsoever for
-  your other applications (useful for queuing a number of long
-  jobs). Alternatively, you could permanently change the default
-  priority of \texttt{R} under MS Windows by modifying the properties of
-  your \texttt{R} desktop icon.
+  process \texttt{Rgui.exe} (or \texttt{R.exe} if you are running
+  \texttt{Rterm}), select this process by left clicking on it, then
+  right clicking will bring up a menu, select \texttt{Set priority},
+  then change priority to \texttt{low} and hit $<$\texttt{ok}$>$. For
+  lengthy jobs this will make your life much smoother, and you can,
+  say, run multiple jobs in low priority with no sluggishness
+  whatsoever for your other applications (useful for queuing a number
+  of long jobs). Alternatively, you could permanently change the
+  default priority of \texttt{R} under MS Windows by modifying the
+  properties of your \texttt{R} desktop icon.
 
 \subsection{\label{factor}A variable must be cast as, say, a factor in
     order for \texttt{np} to recognize this as an unordered factor. How
@@ -787,19 +793,21 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   definition when you called the bandwidth selection routine (e.g.,
   \texttt{npregbw(y\textasciitilde x,data=dataframe)}).
 
-  To correct this, simply call \texttt{plot()} with the argument \texttt{data=dataframe} where \texttt{dataframe} is the name of your
+  To correct this, simply call \texttt{plot()} with the argument
+  \texttt{data=dataframe} where \texttt{dataframe} is the name of your
   data frame.
 
 \subsection{My \texttt{np} code produces errors when I attempt to run
     it\dots}
 
   First, it is good practice to name all arguments (see the docs for
-  examples) as in \texttt{npregbw(formula=y\textasciitilde x)} (i.e., explicitly
-  call formula for functions that use named formulas). This will help
-  the code return a potentially helpful error message.
+  examples) as in \texttt{npregbw(formula=y\textasciitilde x)} (i.e.,
+  explicitly call formula for functions that use named formulas). This
+  will help the code return a potentially helpful error message.
 
   Next, follow the examples listed at the end of each function help
-  page closely (i.e., \texttt{?npreg} then scroll down to \texttt{Examples:}). See also \ref{code_nowork} above.
+  page closely (i.e., \texttt{?npreg} then scroll down to
+  \texttt{Examples:}). See also \ref{code_nowork} above.
 
 \subsection{\label{0/1}I have (numeric) 0/1 dummy variable regressors
     in my parametric model. Can I just pass them to the \texttt{np}
@@ -813,8 +821,8 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   create these by habit for parametric models. But, the underlying
   variable is simply year, which equals 2006, 2007, and so forth.
 
-  In \texttt{np} (and \texttt{R} in general), you get to economize by just
-  telling the function that the variable `year' is ordered, as in
+  In \texttt{np} (and \texttt{R} in general), you get to economize by
+  just telling the function that the variable `year' is ordered, as in
   ordered(year), where year is a vector containing elements 2006, 2007
   etc. Of course, seasoned R users would appreciate that this is in
   fact the simple way to do it with a parametric model as well.
@@ -822,9 +830,9 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   You would {\em never}, therefore, just pass dummy variables to an
   \texttt{np} function as you would for linear parametric models. The
   {\em only} exception is where you have only one 0/1 dummy for one
-  variable, say `\texttt{sex}', and in this case you still would have to
-  enter this as \texttt{factor(sex)} so that the \texttt{np} function
-  recognizes this as a factor (otherwise it would treat it as
+  variable, say `\texttt{sex}', and in this case you still would have
+  to enter this as \texttt{factor(sex)} so that the \texttt{np}
+  function recognizes this as a factor (otherwise it would treat it as
   continuous and use a kernel function that is inappropriate for a
   factor).
 
@@ -839,8 +847,8 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 
   Presuming your variable is not in fact a constant (i.e., is not in
   fact a `variable'), this can only occur in the case where a variable
-  is `pathological' in that it has \texttt{IQR=0} but \texttt{std>0} (see
-  the section titled `Changes from Version 0.30-1 to 0.30-2
+  is `pathological' in that it has \texttt{IQR=0} but \texttt{std>0}
+  (see the section titled `Changes from Version 0.30-1 to 0.30-2
   [19-Apr-2009]' for further details).  This should no longer occur
   for np versions 0.30-2 and up.
 
@@ -886,9 +894,9 @@ legend(20,15,
     plot a model with the \texttt{gradients=TRUE} option, they are. The
     \texttt{gradients()} function must be broken\dots}
 
-  The function \texttt{plot()} (\texttt{npplot()}) plots `partial' means and
-  gradients. In other words, it plots $x_1$ versus $\hat g(x_1,\bar
-  x_2)$ for the partial mean, where $\bar x_2$ is, say, the
+  The function \texttt{plot()} (\texttt{npplot()}) plots `partial'
+  means and gradients. In other words, it plots $x_1$ versus $\hat
+  g(x_1,\bar x_2)$ for the partial mean, where $\bar x_2$ is, say, the
   median/modal value of $x_2$. It also plots $x_1$ versus
   $\partial\hat g(x_1,\bar x_2)/\partial x_1$ for the gradient. Note
   that we are controlling for the values of the other
@@ -900,12 +908,13 @@ legend(20,15,
 
   The example below shows how you could manually generate the partial
   gradients (and means) for your data where the sample realizations
-  form the evaluation data for $x_1$ (unlike \texttt{npplot()} which uses
-  an evenly spaced grid). Note we use the function \texttt{uocquantile()}
-  to generate a vector that holds $x_2$ constant at is median/modal
-  value (i.e., the 0.5 quantile) in the evaluation data. The function
-  \texttt{uocquantile()} can compute quantiles for ordered, unordered,
-  and continuous data (see \texttt{?uocquantile} for details).
+  form the evaluation data for $x_1$ (unlike \texttt{npplot()} which
+  uses an evenly spaced grid). Note we use the function
+  \texttt{uocquantile()} to generate a vector that holds $x_2$
+  constant at is median/modal value (i.e., the 0.5 quantile) in the
+  evaluation data. The function \texttt{uocquantile()} can compute
+  quantiles for ordered, unordered, and continuous data (see
+  \texttt{?uocquantile} for details).
 
 \begin{singlespacing}
 \begin{verbatim}
@@ -955,15 +964,15 @@ data.eval <-  data.frame(x1 = seq(min(x1),max(x1),length=50),
   undersmoothed. Data-driven (i.e., automatic) bandwidth selection
   procedures are not guaranteed always to produce good results due to
   perhaps the presence of outliers or the rounding/discretization of
-  continuous data, among others. By default, \texttt{npplot()} takes the
-  two extremes of the data (minimum, maximum i.e., actual data points)
-  then creates an equally spaced grid of evaluation data (i.e., not
-  actual data points in general) and computes the density for these
-  points. Since the bandwidth is extremely small, the density estimate
-  at these evaluation points is correctly zero, while those for the
-  sample realizations (in this case only two, the min and max) are
-  non-zero, hence we get two peaks at the edges of the plot and a flat
-  bowl equal to zero everywhere else.
+  continuous data, among others. By default, \texttt{npplot()} takes
+  the two extremes of the data (minimum, maximum i.e., actual data
+  points) then creates an equally spaced grid of evaluation data
+  (i.e., not actual data points in general) and computes the density
+  for these points. Since the bandwidth is extremely small, the
+  density estimate at these evaluation points is correctly zero, while
+  those for the sample realizations (in this case only two, the min
+  and max) are non-zero, hence we get two peaks at the edges of the
+  plot and a flat bowl equal to zero everywhere else.
 
   This can also happen when your data is heavily discretized and you
   treat it as continuous. In such cases, treating the data as ordered
@@ -972,10 +981,11 @@ data.eval <-  data.frame(x1 = seq(min(x1),max(x1),length=50),
 \subsection{Can \texttt{npksum()} compute analytical derivatives with
     respect to a continuous variable?}
 
-  As of version 0.20-0 and up, yes it can, using the \texttt{operator =
-    "derivative"} argument, which is put to its paces in the following
-  code snippet (this supports multiple arguments including \texttt{"integral"} and \texttt{"convolution"} in addition to \texttt{"normal"},
-  the default).
+  As of version 0.20-0 and up, yes it can, using the \texttt{operator
+    = "derivative"} argument, which is put to its paces in the
+  following code snippet (this supports multiple arguments including
+  \texttt{"integral"} and \texttt{"convolution"} in addition to
+  \texttt{"normal"}, the default).
 
   \begin{singlespacing}
 \begin{verbatim}
@@ -1166,13 +1176,17 @@ Z
 
   Note that, alternatively, you can get robust bootstrapped standard
   errors for the estimated model and gradients by adding the argument
-  \texttt{errors=TRUE} to your call to npindex so that \texttt{se(model)}
-  returns the vector of standard errors for the estimated conditional
-  mean where \texttt{model} is the name of your model.  Note that \texttt{model\$merr } will contain the standard errors returned by \texttt{se(model)} while \texttt{model\$gerr} will return the matrix of
-  standard errors for the gradients {\em provided} you have set \texttt{gradients=TRUE} (furthermore, \texttt{model\$mean.grad} and \texttt{model\$mean.gerr} will give the average derivative and its
-  bootstrapped standard errors). See the documentation of npindex for
-  further details. The following code snippet demonstrates how one
-  could do this for a simulated dataset.
+  \texttt{errors=TRUE} to your call to npindex so that
+  \texttt{se(model)} returns the vector of standard errors for the
+  estimated conditional mean where \texttt{model} is the name of your
+  model.  Note that \texttt{model\$merr } will contain the standard
+  errors returned by \texttt{se(model)} while \texttt{model\$gerr}
+  will return the matrix of standard errors for the gradients {\em
+    provided} you have set \texttt{gradients=TRUE} (furthermore,
+  \texttt{model\$mean.grad} and \texttt{model\$mean.gerr} will give
+  the average derivative and its bootstrapped standard errors). See
+  the documentation of npindex for further details. The following code
+  snippet demonstrates how one could do this for a simulated dataset.
 \begin{verbatim}
   n <- 100
   x1 <- runif(n, min=-1, max=1)
@@ -1229,7 +1243,8 @@ Z
     10''') crowd out desired output. How can I turn off these unwanted
     status messages?}
 
-  After loading the np library add the line \texttt{options(np.messages=FALSE)} and all such messages will be
+  After loading the np library add the line
+  \texttt{options(np.messages=FALSE)} and all such messages will be
   disabled.
 
 \subsection{I am getting an `unable to allocate...' message after
@@ -1248,23 +1263,25 @@ Z
     improper formula'. I have double checked and everything looks
     fine. Furthermore, it works fine with the data frame interface.}
 
-  The issue is that converting formulas into character strings in \texttt{R} appears to be limited to 500 characters. We are not aware of a
-  simple workaround so we simply advise that you use the data frame
-  interface when this occurs.
+  The issue is that converting formulas into character strings in
+  \texttt{R} appears to be limited to 500 characters. We are not aware
+  of a simple workaround so we simply advise that you use the data
+  frame interface when this occurs.
 
 \subsection{How can I estimate additive semiparametric models?}
 
-  Generalized additive semiparametric models (see Hastie and
-  Tibshirani (1990) \cite{HASTIE_TIBSHIRANI:1990}) are implemented in
-  the \texttt{gam} package (though they do not support categorical
-  variables). The \texttt{gam} package function \texttt{gam()} (the \texttt{mgcv} package also contains a similar function by the same name)
-  uses iteratively reweighted least squares and either smoothing
-  splines (\texttt{s($\cdot$)}) or local polynomial regression fitting
-  (\texttt{`loess', lo($\cdot$)}, with default manual `span' of 0.75, the
-  parameter which controls the degree of smoothing). The following
-  code snippet demonstrates the capabilities of the \texttt{gam()}
-  function via the \verb+wage1+ dataset included in the \texttt{np}
-  packages using three numeric regressors.
+Generalized additive semiparametric models (see Hastie and Tibshirani
+(1990) \cite{HASTIE_TIBSHIRANI:1990}) are implemented in the
+\texttt{gam} package (though they do not support categorical
+variables). The \texttt{gam} package function \texttt{gam()} (the
+\texttt{mgcv} package also contains a similar function by the same
+name) uses iteratively reweighted least squares and either smoothing
+splines (\texttt{s($\cdot$)}) or local polynomial regression fitting
+(\texttt{`loess', lo($\cdot$)}, with default manual `span' of 0.75,
+the parameter which controls the degree of smoothing). The following
+code snippet demonstrates the capabilities of the \texttt{gam()}
+function via the \verb+wage1+ dataset included in the \texttt{np}
+packages using three numeric regressors.
 
 \begin{verbatim}
 library(gam)
@@ -1276,14 +1293,13 @@ plot(model.gam,se=T)
 detach(wage1)
 \end{verbatim}
 
-  The \texttt{mgcv} package also has an implementation of generalized
-  additive models via the identical function name, \texttt{gam()}. The
-  biggest difference is that this uses generalized cross validation to
-  select the `span' (rather than manually) hence the degree of
-  smoothing becomes part of the method (as is the case for all
-  functions in the \texttt{np} package). The following code snippet
-  demonstrates the \texttt{mgcv} implementation of the \texttt{gam()}
-  function.
+The \texttt{mgcv} package also has an implementation of generalized
+additive models via the identical function name, \texttt{gam()}. The
+biggest difference is that this uses generalized cross validation to
+select the `span' (rather than manually) hence the degree of smoothing
+becomes part of the method (as is the case for all functions in the
+\texttt{np} package). The following code snippet demonstrates the
+\texttt{mgcv} implementation of the \texttt{gam()} function.
 
 \begin{verbatim}
 library(mgcv)
@@ -1334,17 +1350,21 @@ When your demo program stops at the following point in your file
 +               caller.execute=TRUE)
 Error: could not find function "mpi.bcast.cmd"
 \end{verbatim}
-this likely means that either you have failed to place the \texttt{.Rprofile} file in the current or root directory as directed, or the
-\texttt{.Rprofile} initialization code is not being loaded as expected.
+this likely means that either you have failed to place the
+\texttt{.Rprofile} file in the current or root directory as directed,
+or the \texttt{.Rprofile} initialization code is not being loaded as
+expected.
 
 \begin{enumerate}
 
 \item Make sure a copy of the initialization file \texttt{Rprofile}
-  exists in your working or root directory and is named \texttt{.Rprofile}
+  exists in your working or root directory and is named
+  \texttt{.Rprofile}
 
-\item Make sure you did not run \texttt{R} with either the \texttt{--no-init-file} or \texttt{--vanilla} option (this combines a number
-  of options including \texttt{--no-init-file} which will disable reading
-  of \texttt{.Rprofile})
+\item Make sure you did not run \texttt{R} with either the
+  \texttt{--no-init-file} or \texttt{--vanilla} option (this combines
+  a number of options including \texttt{--no-init-file} which will
+  disable reading of \texttt{.Rprofile})
 
 \end{enumerate}
 
@@ -1951,13 +1971,16 @@ ought to produce no console I/O whatsoever in the call to
 
 \begin{itemize}
 
-\item Fixed issue with \texttt{ckertype} and \texttt{ckerorder} not being
-  propagated in \texttt{np.singleindex.bw.R}
+\item Fixed issue with \texttt{ckertype} and \texttt{ckerorder} not
+  being propagated in \texttt{np.singleindex.bw.R}
 
-\item Fixed issue with negative penalties being returned by \texttt{bwmethod="cv.aic"} in \texttt{npregbw} (ought to have been +infinity)
+\item Fixed issue with negative penalties being returned by
+  \texttt{bwmethod="cv.aic"} in \texttt{npregbw} (ought to have been
+  +infinity)
 
-\item Error being thrown by \texttt{system(..., intern=TRUE)} when \texttt{mpi.quit()} is called, changed to FALSE (change to \texttt{system()}
-  behaviour detailed in R CHANGELOG 2.12.0)
+\item Error being thrown by \texttt{system(..., intern=TRUE)} when
+  \texttt{mpi.quit()} is called, changed to FALSE (change to
+  \texttt{system()} behaviour detailed in R CHANGELOG 2.12.0)
 
 \end{itemize}
 
@@ -1973,17 +1996,19 @@ ought to produce no console I/O whatsoever in the call to
   multistarting was not working (always returned last computed
   function value and not the minimum)
 
-\item Fixed issue for \texttt{npRmpi} where the \texttt{C} code underlying
-  regression cross-validation (code in \texttt{jksum.c}) differs between
-  np and npRmpi (both are correct with the latter being a tad slower)
+\item Fixed issue for \texttt{npRmpi} where the \texttt{C} code
+  underlying regression cross-validation (code in \texttt{jksum.c})
+  differs between np and npRmpi (both are correct with the latter
+  being a tad slower)
 
 \item Fixed a scope issue whereby a user would write a function that
   calls an \texttt{np/npRmpi} command, however, objects passed to the
-  user's function and called by the \texttt{np/npRmpi} command (i.e. such
-  as \texttt{newdata}) cannot be found in the environment yet they exist
-  outside of the function
+  user's function and called by the \texttt{np/npRmpi} command
+  (i.e. such as \texttt{newdata}) cannot be found in the environment
+  yet they exist outside of the function
 
-\item Fixed issue with \texttt{bwscaling=TRUE} and \texttt{bwmethod="cv.aic"} in npreg
+\item Fixed issue with \texttt{bwscaling=TRUE} and
+  \texttt{bwmethod="cv.aic"} in npreg
 
 \end{itemize}
 
@@ -1991,9 +2016,11 @@ ought to produce no console I/O whatsoever in the call to
 
 \begin{itemize}
 
-\item Added asymptotic standard errors to \texttt{npindex} for the Klein
-  and Spady and Ichimura parameter estimates which, when \texttt{gradients=TRUE}, can be extracted via \texttt{vcov(foo)} where \texttt{foo} is a npsingleindex object (the Z-scores can be obtained via
-  \texttt{Z <- coef(foo)[-1]/sqrt(diag(vcov(foo)))[-1]})
+\item Added asymptotic standard errors to \texttt{npindex} for the
+  Klein and Spady and Ichimura parameter estimates which, when
+  \texttt{gradients=TRUE}, can be extracted via \texttt{vcov(foo)}
+  where \texttt{foo} is a npsingleindex object (the Z-scores can be
+  obtained via \texttt{Z <- coef(foo)[-1]/sqrt(diag(vcov(foo)))[-1]})
 
 \end{itemize}
 
@@ -2015,9 +2042,11 @@ ought to produce no console I/O whatsoever in the call to
 \item Fixed issue where \texttt{ukertype} and \texttt{okertype} were being
   ignored by \texttt{npscoef}
 
-\item Fixed code regression (dating to version 0.30-4) where \texttt{random.seed=42} was not initialized in functions \texttt{npcmstest},
-  \texttt{npdeneqtest}, \texttt{npindexbw}, \texttt{npsdeptest}, \texttt{npqcmstest}, \texttt{npsigtest}, \texttt{npsymtest}, \texttt{npunitest},
-  and \texttt{npplot}
+\item Fixed code regression (dating to version 0.30-4) where
+  \texttt{random.seed=42} was not initialized in functions
+  \texttt{npcmstest}, \texttt{npdeneqtest}, \texttt{npindexbw},
+  \texttt{npsdeptest}, \texttt{npqcmstest}, \texttt{npsigtest},
+  \texttt{npsymtest}, \texttt{npunitest}, and \texttt{npplot}
 
 \item Fixed issue with saving and restoring random seed in \texttt{npdeptest}
 
@@ -2152,7 +2181,8 @@ ought to produce no console I/O whatsoever in the call to
 \item Fixed a bug with the ridging routine in \texttt{npscoefbw()}, added
   ridging to \texttt{npscoef()}
 
-\item Fixed minor i/o issue with \texttt{Multistart 1 of...} using \texttt{npscoefbw()}
+\item Fixed minor i/o issue with \texttt{Multistart 1 of...} using
+  \texttt{npscoefbw()}
 
 \end{itemize}
 
@@ -2260,10 +2290,11 @@ ought to produce no console I/O whatsoever in the call to
 \item Significance tests can now be performed on \texttt{npreg()}
   outputs, so \texttt{npsigtest(modelname)} is now supported
 
-\item Added a vignette and faq. To see the vignette try \texttt{vignette("np",package="np")}
+\item Added a vignette and faq. To see the vignette try
+  \texttt{vignette("np",package="np")}
 
-\item \texttt{summary()} on \texttt{npconmode()} now properly retrieves
-  names from bandwidth objects
+\item \texttt{summary()} on \texttt{npconmode()} now properly
+  retrieves names from bandwidth objects
 
 \item Fixed the 6th and 8th order epanechnikov kernels
 
@@ -2353,8 +2384,9 @@ ought to produce no console I/O whatsoever in the call to
 
 \item Fixed bug in uniform CDF kernel
 
-\item Fixed bug where \texttt{npindexbw()} would ignore \texttt{bandwidth.compute = FALSE} and compute bandwidths when supplied
-  with a preexisting bw object
+\item Fixed bug where \texttt{npindexbw()} would ignore
+  \texttt{bandwidth.compute = FALSE} and compute bandwidths when
+  supplied with a preexisting bw object
 
 \item Now can handle estimation out of discrete support
 

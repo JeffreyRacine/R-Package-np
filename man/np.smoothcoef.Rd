@@ -22,7 +22,8 @@
 \usage{
 npscoef(bws, \dots)
 
-\method{npscoef}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npscoef}{formula}(bws, data = NULL, newdata = NULL, y.eval =
+FALSE, \dots)
 
 \method{npscoef}{call}(bws, \dots)
 
@@ -80,6 +81,11 @@ npscoef(bws, \dots)
     omitted, the training data are used.  
   }
 
+  \item{y.eval}{
+    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
+    \code{\link{np}} will compute goodness of fit statistics on these
+    data and return them. Defaults to \code{FALSE}.
+  }
 
   \item{txdat}{
     a \eqn{p}-variate data frame of explanatory data (training data),

@@ -20,7 +20,8 @@
 \usage{
 npplreg(bws, \dots)
 
-\method{npplreg}{formula}(bws, data = NULL, newdata = NULL, \dots)
+\method{npplreg}{formula}(bws, data = NULL, newdata = NULL, y.eval =
+FALSE, \dots)
 
 \method{npplreg}{call}(bws, \dots)
 
@@ -69,6 +70,12 @@ npplreg(bws, \dots)
   \item{newdata}{
     An optional data frame in which to look for evaluation data. If
     omitted, the training data are used.  
+  }
+
+  \item{y.eval}{
+    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
+    \code{\link{np}} will compute goodness of fit statistics on these
+    data and return them. Defaults to \code{FALSE}.
   }
 
   \item{txdat}{
