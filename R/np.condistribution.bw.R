@@ -300,6 +300,7 @@ npcdistbw.condbandwidth <-
             nbw[1:gbw]=nbw[1:gbw]*mysd*nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
+        total.time <- NA
       }
 
       yr = 1:yncol
