@@ -1,10 +1,16 @@
-Changes from Version 0.60-1 to 0.60-2 [XXX]
+Changes from Version 0.60-1 to 0.60-2 [27-Jun-2014]
 
-* npqreg no longer accepts gradients=true when gradients are in fact not
+* added timeseries support for all relevant objects (i.e. for a
+  ts() vector data object x, npreg(x~lag(x,-1)+lag(x,-2)) is now
+  supported)
+
+* added total time to summary for bandwidth objects
+
+* npqreg no longer accepts gradients=TRUE when gradients are in fact not
   supported
 
 * npqreg fails with an informative message when passed a conditional
-  density bandwidth
+  density bandwidth object
 
 Changes from Version 0.60-0 to 0.60-1 [6-Jun-2014]
 
