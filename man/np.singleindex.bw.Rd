@@ -9,10 +9,14 @@
 
 \description{
   \code{npindexbw} computes a \code{npindexbw} bandwidth specification
-  using the model \eqn{Y = G(X\beta) + \epsilon}{Y = G(XB) + epsilon}
-  via the approach of Hardle, Hall and Ichimura (1993) which jointly
-  minimizes a cross-validation function with respect to the parameters
-  and bandwidth. The bandwidth object contains parameters for the single
+  using the model \eqn{Y = G(X\beta) + \epsilon}{Y = G(XB) +
+  epsilon}. For continuous \eqn{Y}, the approach is that of Hardle, Hall
+  and Ichimura (1993) which jointly minimizes a least-squares
+  cross-validation function with respect to the parameters and
+  bandwidth. For binary \eqn{Y}, a likelihood-based cross-validation
+  approach is employed which jointly maximizes a likelihood
+  cross-validation function with respect to the parameters and
+  bandwidth. The bandwidth object contains parameters for the single
   index model and the (scalar) bandwidth for the index function.
 }
 
