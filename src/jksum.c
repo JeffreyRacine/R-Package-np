@@ -5057,6 +5057,7 @@ int num_obs_eval,
 int num_reg_unordered,
 int num_reg_ordered,
 int num_reg_continuous,
+int cdfontrain,
 double memfac,
 double ** matrix_X_unordered_train,
 double ** matrix_X_ordered_train,
@@ -5235,7 +5236,8 @@ double * cv){
                            kwx);
     
     for(i = is; i <= ie; i++){
-      for(j = wxo; j < (wxo + dwx); j++){             
+      for(j = wxo; j < (wxo + dwx); j++){
+        if(cdfontrain && (j == i)) continue;
         const int64_t jo = j - wxo;
         indy = 1;
         for(l = 0; (l < num_reg_ordered) && (indy != 0); l++){

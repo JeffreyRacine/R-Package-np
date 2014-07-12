@@ -1052,6 +1052,7 @@ double cv_func_distribution_categorical_ls(double *vector_scale_factor)
                                              num_reg_unordered_extern,
                                              num_reg_ordered_extern,
                                              num_reg_continuous_extern,
+                                             cdfontrain_extern,
                                              dbl_memfac_dls_extern,
                                              matrix_X_unordered_train_extern,
                                              matrix_X_ordered_train_extern,

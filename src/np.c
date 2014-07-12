@@ -789,7 +789,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   int * ipt = NULL, * ipe = NULL;
 
-  cdfontrain =  myopti[DBW_CDFONTRAIN];
+  cdfontrain_extern = cdfontrain =  myopti[DBW_CDFONTRAIN];
 
   num_reg_unordered_extern = myopti[DBW_NUNOI];
   num_reg_ordered_extern = myopti[DBW_NORDI];
