@@ -31,7 +31,7 @@ npudistbw(\dots)
           nmulti,
           remin = TRUE,
           itmax = 10000,
-          do.full.integral = TRUE,
+          do.full.integral = FALSE,
           ngrid = 100,
           ftol = 1.490116e-07,
           tol = 1.490116e-04,
@@ -245,7 +245,8 @@ npudistbw(\dots)
 
   \item{do.full.integral}{
     a logical value which when set as \code{TRUE} evaluates the
-    moment-based integral on the entire sample.
+    moment-based integral on the entire sample. Defaults
+    to \code{FALSE}.
   }
 
   \item{ngrid}{
