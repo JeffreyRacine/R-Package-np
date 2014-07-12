@@ -5292,6 +5292,7 @@ int num_var_continuous,
 int num_reg_unordered,
 int num_reg_ordered,
 int num_reg_continuous,
+int cdfontrain,
 double memfac,
 double **matrix_Y_unordered_train,
 double **matrix_Y_ordered_train,
@@ -5690,6 +5691,7 @@ double *cv){
           const int64_t io = i - wxo;
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
+            if(cdfontrain && (j == i)) continue;
             const int64_t jo = j - wyo;
             indy = 1;
             for(l = 0; l < num_var_ordered; l++){
@@ -5919,6 +5921,8 @@ double *cv){
           boxSearchNLPartial(kdt_extern_XY, &nls, bb, &nlps, NULL, icx, num_reg_continuous);
 
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
+            if(cdfontrain && (j == i)) continue;
+
             const int64_t jo = j - wyo;
 
             const int iybw = (BANDWIDTH_den == BW_FIXED) ? 0 : j;

@@ -152,6 +152,7 @@ int BANDWIDTH_den_extern;
 // cdf algorithm extern
 double dbl_memfac_ccdf_extern = 1.0;
 double dbl_memfac_dls_extern = 1.0;
+int cdfontrain_extern = 0;
 
 /* Statics for dependence metric */
 
@@ -2114,7 +2115,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int * ipt_lookup_XY = NULL, * ipt_lookup_Y = NULL, * ipt_lookup_X = NULL;
   int num_obs_alt;
 
-  cdfontrain =  myopti[CDBW_CDFONTRAIN];
+  cdfontrain_extern = cdfontrain =  myopti[CDBW_CDFONTRAIN];
 
   num_var_unordered_extern = myopti[CDBW_CNUNOI];
   num_var_ordered_extern = myopti[CDBW_CNORDI];
@@ -2280,7 +2281,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   num_all_uvar = num_reg_unordered_extern + num_var_unordered_extern;
   num_all_ovar = num_reg_ordered_extern + num_var_ordered_extern;
 
-  // we need 3 trees to accelerate ccdf :)
+  // we need 3 trees to accelerate cg_concdf :)
 
   ipt_X = (int *)malloc(num_obs_train_extern*sizeof(int));
   if(!(ipt_X != NULL))
