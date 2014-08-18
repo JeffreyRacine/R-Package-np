@@ -1587,6 +1587,8 @@ x2.boot <- rnorm(n.boot,x2[i.boot],bw$bw[2])
 plot(npudens(~x1.boot+x2.boot,bws=bw$bw),view="fixed",xtrim=-.2,neval=100)
 \end{verbatim}
 
+%% See page 294 and up in cosma_resampling_ch15.pdf in ~/R/
+
 \subsection{Some of my variables are measured with an unusually large
   number of digits\dots should I rescale?}
 
