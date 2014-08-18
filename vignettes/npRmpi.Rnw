@@ -30,13 +30,13 @@
   
   The \pkg{npRmpi} package is a parallel implementation of the
   \proglang{R} (\citet{R}) package \pkg{np} (\citet{np}). The
-  underlying \proglang{C} code uses the \proglang{MPI} message passing
-  interface and is \proglang{MPI2} compliant.
+  underlying \proglang{C} code uses the message passing interface
+  (`\proglang{MPI}') and is \proglang{MPI2} compliant.
 
 }
 
 \Keywords{nonparametric, semiparametric, kernel smoothing,
-  categorical data.}
+  categorical data}
 
 \Plainkeywords{Nonparametric, kernel, econometrics, qualitative,
   categorical}
@@ -46,7 +46,7 @@
   McMaster University\\
   Hamilton, Ontario, Canada, L8S 4L8\\
   E-mail: \email{racinej@mcmaster.ca}\\
-  URL: \url{http://www.mcmaster.ca/economics/racine/}\\
+  URL: \url{http://www.economics.mcmaster.ca/faculty/racinej}\\
 }
 
 \begin{document}
@@ -64,113 +64,197 @@
 
 \section{Overview}
 
-A common and understandable complaint often levied against
-nonparametric kernel methods is the large amount of computation time
+A common and understandable complaint often voiced about applied
+nonparametric kernel methods is the amount of computation time
 required for data-driven bandwidth selection when one has a large data
 set. There is a certain irony at play here since nonparametric methods
-are ideally suited to situations involving large data sets, however
+are ideally suited to situations involving large data sets yet,
 computationally speaking, their analysis may lie beyond the reach of
-many users.  Some background may be in order. Cross-validation
-bandwidth selection methods have run times that are exponential in the
-number of observations (of computational order $n^2$ hence a doubling
-of the sample size will increase run time by a factor of four). 
+many users.  Some background may be in order. My co-authors and I
+favor data-driven methods of bandwidth selection such as
+cross-validation, among others. These methods possess a number of very
+desirable properties but have run times that are proportional to the
+square of the number of observations hence doubling the number of
+observations will increase run time by a factor of four. For large
+data sets run time many simply not be feasible in a serial
+(i.e.~single processor) environment.
 
 The solution adopted in the \pkg{npRmpi} package is to run the code in
 a parallel computing environment and exploit the presence of multiple
-processors if available. The underlying \proglang{C} code for \pkg{np}
+processors when available. The underlying \proglang{C} code for \pkg{np}
 is \proglang{MPI}-aware (\proglang{MPI} denotes the `message passing
 interface', a popular parallel programming library that is an
-international standard), and we combine the \pkg{R np} and \pkg{Rmpi}
-packages to form the \pkg{npRmpi} package (this requires some
-modification to some of the underlying \pkg{Rmpi} code which is why we
-cannot simply load the \pkg{Rmpi} package itself).
+international standard), and we merge the \pkg{R np} and \pkg{Rmpi}
+packages to form the \pkg{npRmpi} package (this requires minor
+modification of some of the underlying \pkg{Rmpi} code which is why we
+cannot simply load the \pkg{Rmpi} package itself).\footnote{The
+  \pkg{npRmpi} package incorporates the \pkg{Rmpi} package (Hao Yu
+  <hyu@stats.uwo.ca>) with minor modifications and we are extremely
+  grateful to Hao Yu for his contributions to the \proglang{R}
+  community.}
 
 All of the functions in \pkg{np} can exploit the presence of multiple
-processors, and run time is in general linear in the number of
-processors present such that two processors will complete the job in
-one half the amount of time that one processor could. Given the
-availability of commodity cluster computers and the presence of
-multiple cores in desktop and laptop machines, leveraging the
+processors. Run time is inversely proportional to the number of
+processors hence doubling the number of processors will cut run time
+in half.\footnote{There is minor overhead involved with message
+  passing, and for small samples the overhead can be substantial when
+  the ratio of message passing to computing the kernel estimator
+  increases - this will be negligible for sufficiently large samples.}
+Given the availability of commodity cluster computers and the presence
+of multiple cores in desktop and laptop machines, leveraging the
 \pkg{npRmpi} package for large data sets may present a feasible
 solution to the often lengthy computation times associated with
 nonparametric kernel methods.
 
 The code has been tested in the Mac OS X and Linux environments which
-allow the user to compile \proglang{R} packages on the fly. Users
-running MS Windows will have to consult their tech support personnel
-and may also wish to consult the \pkg{Rmpi} package and web site for
-assistance here. I cannot assist with installation issues beyond what
-is provided in this document and trust the reader will forgive me for
-this.
+allow the user to compile \proglang{R} packages on the fly (presuming
+of course that a C compiler exists on your system). Users running MS
+Windows will have to consult local tech support personnel and may also
+wish to consult the resources available for the \pkg{Rmpi} package and
+associated web site for further assistance. I cannot assist with
+installation issues beyond what is provided in this document and trust
+the reader will forgive me for this.
 
-\section{Differences between np and npRmpi}
+\section{Differences Between np and npRmpi}
 
 There are only a few visible differences between running code in
-serial versus parallel environments. Typically you run your parallel
+serial versus parallel environments.  Typically you run your parallel
 code in batch mode so the first step would be to get your code running
-in serial mode using the \pkg{np} package (obviously on a subset of
-your data). Once you have properly functioning code, you will next add
-some `hooks' necessary for \proglang{MPI} to run, and finally you will
-run the job using either \code{mpirun} or, indirectly, via a batch
-scheduler on your cluster such as \code{sqsub}.
+in batch mode using the \pkg{np} package (obviously on a subset of
+your data for large data sets). Once you have properly functioning
+code, you will next add some `hooks' necessary for \proglang{MPI} to
+run (see Section \ref{sec example} below for a detailed example), and
+finally you will run the job using either \code{mpirun} or,
+indirectly, via a batch scheduler on your cluster such as \code{sqsub}
+(kindly consult your local support personnel for assistance on using
+batch queueing systems on your local cluster).
+
+Note that, since the data has to be broadcast to the slave notes, it
+is a good idea to put it in a dataframe first and it is always a good
+idea at this stage to cast your variables according to type.
 
 \subsection*{Installation}
 
-Installation will depend on your hardware and software
-configuration. If you are not familiar with parallel computing you
-must seek local advice. 
+Installation will depend on your hardware and software configuration
+and will vary widely across platforms. If you are not familiar with
+parallel computing you are strongly advised to seek local advice.
 
-That being said, if you have Open \proglang{MPI} and \proglang{MPI2}
-properly installed on your system, installation could be as simple as
-downloading the tarball and, from a command shell, running
-
+That being said, if you have current versions of \proglang{R} and Open
+\proglang{MPI} properly installed on your system, installation of the
+\pkg{npRmpi} package can be done in the standard manner from within
+\proglang{R} via
+\begin{verbatim}
+> install.packages("npRmpi")
+\end{verbatim}
+or, alternatively, you can download the \pkg{npRmpi} tarball from CRAN
+and, from a command shell, run
 \begin{verbatim}
 R CMD INSTALL npRmpi_foo.tar.gz 
 \end{verbatim}
-
 where foo is the version number. 
 
 For clusters you may additionally need to provide locations of
 libraries (kindly see your local sysadmin as there are far too many
 variations for me to assist). On a local Linux cluster I use the
-following by way of illustration (we need to set \proglang{MPI}
-library paths and \proglang{MPI} root directories):
-
+following by way of illustration (for this illustration we use the
+Intel compiler suite and need to set \proglang{MPI} library paths and
+\proglang{MPI} root directories):
 \begin{verbatim}
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/sharcnet/openmpi/1.4.1/intel/lib
-export MPI_ROOT=/opt/sharcnet/openmpi/1.4.1/intel 
-R CMD INSTALL npRmpi_foo.tar.gz
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/sharcnet/openmpi/current/intel/lib
+export MPI_ROOT=/opt/sharcnet/openmpi/current/intel 
 \end{verbatim}
-
 where again foo is the version number. 
 
 Please seek local help for further assistance on installing and
 running parallel programs.
 
-\subsection{Parallel MPI Program Batch Execution}
+\subsection{Parallel Batch Execution}
 
-To run the \proglang{MPI} version install the \pkg{npRmpi} program,
-copy the \code{Rprofile} file in \code{npRmpi/inst} to the current
-directory and name it \code{.Rprofile} (or copy it to your home
-directory and again name it \code{.Rprofile}) and then on Open
-\proglang{MPI} systems run something like
+To run a parallel \pkg{np} job having successfully installed the
+\pkg{npRmpi} program, copy the \code{Rprofile} file in
+\code{npRmpi/inst} to the current directory and name it
+\code{.Rprofile} (or copy it to your home directory and again name it
+\code{.Rprofile}).\footnote{You will need to download the \pkg{npRmpi}
+  source code and unpack it in order to get Rprofile from the
+  npRmpi/inst directory.} Then to run the batch code in the file
+\code{npudensml_npRmpi.R} using two processors on an Open \proglang{MPI}
+system you will enter something like
 
 \begin{verbatim}
-mpirun -np 2 R CMD BATCH npudens_npRmpi.R
+mpirun -np 2 R CMD BATCH npudensml_npRmpi.R
 \end{verbatim}
 
 You can compare run times and any other differences by examining the
-files \verb+npudens_serial.Rout+ and
-\verb+npudens_npRmpi.Rout+. Clearly you could do this with a subset of
-your data for large problems to judge the extent to which the parallel
-code reduces run time.
+files \code{npudensml_serial.Rout} and \code{npudensml_npRmpi.Rout}
+(see Section \ref{sec run time} below for some illustrative
+examples). Clearly you could do this with a subset of your data for
+large problems to judge the extent to which the parallel code reduces
+run time.
 
-\subsection{Essential Program Elements}
+If you have a batch scheduler installed on your cluster you might
+instead enter something like
+
+\begin{verbatim}
+sqsub -q mpi -n 2 R CMD BATCH npudensml_npRmpi.R
+\end{verbatim}
+
+Again, kindly consult local tech support personnel for issues
+concerning the use of batch queueing systems and using compute
+clusters.
+
+\subsection{Parallel Execution in an Interactive R Session}
+
+You might instead wish to run your code interactively in an
+\proglang{R} terminal/console rather than in batch mode. Doing so
+requires the essential elements in Section \ref{sec example} below
+with two minor differences. For this we do not require that the
+initialization file \code{.Rprofile} reside in the root or current
+directory (if it does it will be benign). To start a session, (i) you
+will load the \pkg{npRmpi} package in the normal manner via
+\code{library("npRmpi")}, then (ii) generate the slave nodes using the
+command \code{mpi.spawn.Rslaves(nslaves=foo)}. For example, on a dual
+core desktop set \code{foo=1} so that
+\code{mpi.spawn.Rslaves(nslaves=1)} will spawn one slave node in
+addition to the master node on which \proglang{R} is running for a
+total of two compute nodes. See the file \code{interactive_Rterm.R} in
+the demo directory for an illustration, but here is some sample code
+illustrating the additional elements required for an interactive
+session.
+
+Note also that in an interactive session the messages displayed during
+execution might be informative so there is no need for the option
+\code{option(np.messages=FALSE)} and you likely would want to comment
+this statement out in the demo files if you are running them
+interactively.
+
+\begin{verbatim}
+## This code can be run interactively inside the R terminal/console
+## It does not require that you have the .Rprofile file from
+## npRmpi/inst/ in your current directory or home directory as we can
+## load the npRmpi package in the standard manner.
+
+library(npRmpi)
+
+## Now we can spawn our slaves from within the R terminal/console manually. 
+## On a two core desktop we need an additional slave on top of the master
+## node to allow both cores to run simultaneously.
+
+mpi.spawn.Rslaves(nslaves=1)
+
+## Then the rest of your program would follow along the lines of that 
+## in, say, Section \ref{sec example}...
+\end{verbatim}
+
+A number of illustrative examples are readily available in the
+interactive session via \code{example()} e.g.~\code{example(npreg)}
+and so forth.
+
+\subsection{Essential Program Elements}\label{sec example}
 
 Here is a simple illustrative example of a serial batch program that
 you would typically run using the \pkg{np} package.
 \begin{verbatim}
-## This is the serial version of npudens_npRmpi.R for comparison
+## This is the serial version of npudensml_npRmpi.R for comparison
 ## purposes (bandwidth ought to be identical, timing may
 ## differ). Study the differences between this file and its MPI
 ## counterpart for insight about your own problems.
@@ -180,17 +264,22 @@ options(np.messages=FALSE)
 
 ## Generate some data
 
+n <- 2500
+
 set.seed(42)
-x <- rnorm(2500)
+
+x <- rnorm(n)
 
 ## A simple example with likelihood cross-validation
 
-system.time(bw <- npudensbw(~x))
+t <- system.time(bw <- npudensbw(~x, bwmethod="cv.ml"))
 
 summary(bw)
+
+cat("Elapsed time =", t[3], "\n")
 \end{verbatim}
 
-Below is the same code set up to run in parallel using the
+Below is the same code modified to run in parallel using the
 \pkg{npRmpi} package. The salient differences are as follows:
 
 \begin{enumerate}
@@ -199,10 +288,9 @@ Below is the same code set up to run in parallel using the
     directory of the tarball/zip file into either your root directory
     or current working directory and rename it \code{.Rprofile}. 
     
-    \item You will notice that there are some \code{mpi.foo} commands
-      where \code{foo} is, for example, \code{bcast.cmd}. These the
-      the \pkg{Rmpi} commands for telling the slave nodes what to
-      run. 
+  \item You will notice that there are some \code{mpi.foo} commands
+    where \code{foo} is, for example, \code{bcast.cmd}. These are the
+    \pkg{Rmpi} commands for telling the slave nodes what to run.
       
       The first thing we do is initialize the master and slave nodes
       using the \code{np.mpi.initialize()} command.
@@ -217,8 +305,8 @@ Below is the same code set up to run in parallel using the
       \code{caller.execute=TRUE} which indicates it is to execute on
       the master and slave nodes simultaneously.
       
-    \item Finally, we clean up gracefully via the
-      \code{mpi.close.Rslaves()} and \code{mpi.quit()} commands.
+    \item Finally, we clean up gracefully by broadcasting the
+      \code{mpi.quit()} command.
       
     \item There are a number of example files (including that above
       and below) in the \code{npRmpi/demo} directory that you may wish
@@ -233,47 +321,48 @@ Below is the same code set up to run in parallel using the
 ## current directory or home directory. It is necessary.
 
 ## To run this on systems with OPENMPI installed and working, try
-## mpirun -np 2 R CMD BATCH npudens_npRmpi. Check the time in the
-## output file foo.Rout (the name of this file with extension .Rout),
-## then try with, say, 4 processors and compare run time.
+## mpirun -np 2 R CMD BATCH npudensml_npRmpi.R. Check the time in the
+## output file npudensml_npRmpi.Rout (the name of this file with extension
+## .Rout), then try with, say, 4 processors and compare run time.
 
 ## Initialize master and slaves.
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
+mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)
 
 ## Generate some data and broadcast it to all slaves (it will be known
 ## to the master node)
 
-set.seed(42)
-x <- rnorm(2500)
+n <- 2500
+
+mpi.bcast.cmd(set.seed(42), caller.execute=TRUE)
+
+x <- rnorm(n)
 mpi.bcast.Robj2slave(x)
 
 ## A simple example with likelihood cross-validation
 
-system.time(mpi.bcast.cmd(bw <- npudensbw(~x),
-                          caller.execute=TRUE))
+t <- system.time(mpi.bcast.cmd(bw <- npudensbw(~x, bwmethod="cv.ml"),
+                               caller.execute=TRUE))
 
 summary(bw)
 
+cat("Elapsed time =", t[3], "\n")
+
 ## Clean up properly then quit()
 
-mpi.close.Rslaves()
-
-mpi.quit()
+mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)
 \end{verbatim}
 
 For more examples including regression, conditional density
 estimation, and semiparametric models, see the files in the
 \code{npRmpi/demo} directory.  Kindly study these files and the
 comments in each in order to extend the parallel examples to your
-problem.
+specific problem.
 
 Note that the output from the serial and parallel runs ought to be
 identical save for execution time. If they are not there is a problem
@@ -286,9 +375,13 @@ The \pkg{npRmpi} package is a parallel implementation of the \pkg{np}
 package that can exploit the presence of multiple processors and the
 \proglang{MPI} interface for parallel computing to reduce the
 computational run time associated with kernel methods. Run time is
-linear in the number of processors available, so two processors will
-complete a job in roughly one half the time of one processor, ten in
-one tenth and so forth. Though installation of a working
+inversely proportional to the number of available processors, so two
+processors will complete a job in roughly one half the time of one
+processor, ten in one tenth and so forth.\footnote{There is minor
+  overhead involved with message passing, and for small samples the
+  overhead can be substantial as the ratio of message passing to
+  computing the kernel estimator increases - this will be negligible
+  for sufficiently large samples.} Though installation of a working
 \proglang{MPI} implementation requires some familiarity with computer
 systems, local expertise exists for many and help is to be found
 there. That being said, the Mac OS X operating system comes stock with
@@ -300,4 +393,99 @@ encouraged and much appreciated.
 
 \bibliography{npRmpi}
 
+\appendix
+
+\section{Illustrative Timed Runs}\label{sec run time}
+
+The run times reported in Table \ref{run table} were generated using R
+2.11-0 and Open MPI 1.2.8 on a MacBook laptop running Snow Leopard
+10.6.3 on a 2.4 GHz Intel Core 2 Duo (a completely stock
+installation). The ratios reported in Table \ref{run saw table} were
+run on the SHARCNET cluster `saw' (\url{www.sharcnet.ca}) using R
+2.11-0 and Open MPI 1.4.2.\footnote{`saw' is an HP cluster with 2,704
+  cores running Red Hat Enterprise Linux version 5.1 with InfiniBand
+  interconnects, 16 GB RAM/node, 2 sockets x 4 cores per socket
+  outfitted with 2.83 GHz Xeon processors.}  Each example was first
+run in serial mode using the np package version 0.40-0 then in
+parallel mode with 2 processors (on the MacBook) through 8 processors
+(on the Infiniband Cluster) using the npRmpi package version
+0.40-0. Elapsed time for the np functions is provided in Table
+\ref{run table} (seconds) as is the ratio of the elapsed time for each
+parallel run to the serial run.
+
+\begin{table}[!ht]
+\begin{center}
+  \caption{\label{run table}Illustrative timed runs (seconds) with 1
+    processor (serial, np package) and 2 processors (parallel, npRmpi
+    package) on a 2.4 GHz Intel Core 2 Duo running Mac OS X 10.6.3.}
+\begin{tabular}{lrrr}
+Function & Secs(1) & Secs(2) & Ratio\cr
+\hline
+npcdens (ls) & 126.3 & 112.3 & 0.89\cr
+npcdens (ml) & 50.1 & 25.5 & 0.51\cr
+npcmstest & 73.9 & 51.9 & 0.70\cr
+npconmode & 90.8 & 37.2 & 0.41\cr
+npdeneqtest & 43.2 & 23.9 & 0.55\cr
+npdeptest & 69.0 & 37.9 & 0.55\cr
+npindex (Ichimura) & 36.7 & 19.9 & 0.54\cr
+npindex (Klein/Spady) & 50.2 & 27.7 & 0.55\cr
+npqreg & 95.9 & 51.7 & 0.54\cr
+npreg (lc, aic) & 77.8 & 57.3 & 0.74\cr
+npreg (lc, ls) & 81.8 & 49.7 & 0.61\cr
+npreg (ll, aic) & 86.0 & 43.7 & 0.51\cr
+npreg (ll, ls) & 89.3 & 46.0 & 0.52\cr
+npscoef & 38.1 & 31.8 & 0.84\cr
+npsdeptest & 79.4 & 58.6 & 0.74\cr
+npsigtest & 143.2 & 87.3 & 0.61\cr
+npsymtest & 43.2 & 30.5 & 0.71\cr
+npudens (ls) & 60.9 & 30.6 & 0.50\cr
+npudens (ml) & 25.3 & 14.5 & 0.57\cr
+npunitest & 41.6 & 28.1 & 0.67\cr
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+\begin{table}[!ht]
+\begin{center}
+  \caption{\label{run saw table}Illustrative timed runs (ratio of
+    execution time for the serial np package versus the npRmpi package
+    with cpu=processors) on an HP cluster equipped with 2.83 GHz Xeon
+    processors running Red Hat Enterprise Linux 5.1.}
+\begin{tabular}{lrrrrrrr}
+Function  & cpu=2 & cpu=3 & cpu=4 & cpu=5 & cpu=6 & cpu=7 & cpu=8\cr
+\hline
+npcdens (ls) & 0.51 & 0.35 & 0.29 & 0.28 & 0.24 & 0.22 & 0.24\cr
+npcdens (ml) & 0.49 & 0.31 & 0.24 & 0.20 & 0.16 & 0.14 & 0.13\cr
+npcmstest & 0.55 & 0.42 & 0.35 & 0.34 & 0.33 & 0.33 & 0.33\cr
+npconmode & 0.54 & 0.28 & 0.25 & 0.21 & 0.17 & 0.14 & 0.12\cr
+npdeneqtest & 0.53 & 0.37 & 0.29 & 0.25 & 0.22 & 0.20 & 0.18\cr
+npdeptest & 0.53 & 0.36 & 0.28 & 0.24 & 0.21 & 0.19 & 0.16\cr
+npindex (Ichimura) & 0.51 & 0.35 & 0.27 & 0.23 & 0.20 & 0.18 & 0.17\cr
+npindex (Klein/Spady) & 0.53 & 0.35 & 0.28 & 0.23 & 0.21 & 0.19 & 0.17\cr
+npqreg & 0.52 & 0.31 & 0.23 & 0.19 & 0.20 & 0.19 & 0.12\cr
+npreg (lc, aic) & 0.52 & 0.35 & 0.30 & 0.24 & 0.19 & 0.18 & 0.15\cr
+npreg (lc, ls) & 0.53 & 0.35 & 0.27 & 0.21 & 0.18 & 0.16 & 0.14\cr
+npreg (ll, aic) & 0.68 & 0.48 & 0.38 & 0.40 & 0.24 & 0.28 & 0.20\cr
+npreg (ll, ls) & 0.55 & 0.37 & 0.29 & 0.23 & 0.19 & 0.16 & 0.14\cr
+npscoef & 0.65 & 0.58 & 0.56 & 0.57 & 0.58 & 0.59 & 0.60\cr
+npsdeptest & 0.55 & 0.42 & 0.37 & 0.35 & 0.33 & 0.33 & 0.33\cr
+npsigtest & 0.63 & 0.42 & 0.33 & 0.28 & 0.25 & 0.23 & 0.24\cr
+npsymtest & 0.58 & 0.44 & 0.38 & 0.35 & 0.34 & 0.33 & 0.33\cr
+npudens (ls) & 0.48 & 0.32 & 0.24 & 0.21 & 0.16 & 0.10 & 0.13\cr
+npudens (ml) & 0.48 & 0.31 & 0.25 & 0.20 & 0.16 & 0.14 & 0.12\cr
+npunitest & 0.52 & 0.40 & 0.33 & 0.30 & 0.28 & 0.28 & 0.28\cr
+\hline
+\end{tabular}
+\end{center}
+\end{table}
+
+Note that many of these illustrative examples use smallish sample
+sizes hence the run time with 2 processors will not be 1/2 that with 1
+processor due to overhead. But for larger samples (i.e. the ones you
+actually need parallel computing for, not these toy illustrations) you
+ought to see an improvement in run time that is inversely related to
+the number of processors.
+
 \end{document}
+
