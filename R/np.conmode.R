@@ -154,7 +154,7 @@ npconmode.conbandwidth <-
 
     if(any(indices==0)) {
       warning("identical probabilities for choices produced, randomizing mode")
-      indices[indices==0] <- sample(nlevels(efac),length(indices[indices==0]))
+      indices[indices==0] <- sample(length(indices),length(indices[indices==0]))
     }
 
     con.mode <- eval(parse(text = paste("conmode(bws = bws,",
