@@ -206,9 +206,9 @@ FALSE, \dots)
  global functionals and a measure of the explanatory power of covariates
  in regression,} The Annals of Statistics, 23 1443-1473.
 
- Gao, Q. and L. Liu and J.S. Racine (forthcoming), \dQuote{A
- partially linear kernel estimator for categorical data,} Econometric
- Reviews.
+ Gao, Q. and L. Liu and J.S. Racine (2015), \dQuote{A partially linear
+ kernel estimator for categorical data,} Econometric Reviews, 34 (6-10),
+ 958-977.
 
  Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
  and Practice,} Princeton University Press.
