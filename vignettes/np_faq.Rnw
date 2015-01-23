@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.90 2014/06/27 14:22:06 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.92 2014/12/26 19:14:33 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -281,19 +281,45 @@ as one could always do with, say, \texttt{read.table()}.
 
   \begin{enumerate}
 
-  \item Some background may be in order. Cross-validation methods have
-    run times that are proportional to the square of the number of
-    observations (of computational order $n^2$ hence a doubling of the
-    sample size will increase run time by a factor of four). The
-    solution I favor is to run the code in a parallel computing
-    environment. The underlying C code for \texttt{np} is MPI-aware
-    (MPI denotes the `message passing interface', a popular parallel
-    programming library that is an international standard), and a
-    version of the \texttt{np} package titled `\texttt{npRmpi}' exists
-    for running jobs in a parallel environment that leverages the
-    \texttt{Rmpi} package (\cite{Rmpi}).\footnote{We are extremely
-      grateful to Hao Yu for providing the MPI functionality contained
-      in the \texttt{Rmpi} package.}
+  \item Some background may be in order.  Suppose, by way of
+    illustration, that you are conducting nonparametric regression
+    (local constant or local linear) for a \textsl{given} bandwidth
+    vector (nonparametric kernel regression is simply locally weighted
+    least squares estimation). Let $g(x)$ denote the true conditional
+    mean at some point $x$, and $\hat g(x)$ some estimate. To solve
+    this problem requires computing weighted least squares not once
+    (as would be the case for parametric regression), but $n$ times
+    (the weights are local to the point at which you construct the
+    regression model, $x_i$, $i=1,\dots,n$). That is, to compute
+    $\hat g(x_i)$, $i=1,\dots,n$ requires an order of magnitude
+    ($O(n)$) times more computation than that for parametric
+    regression. So, for a \textsl{given} bandwidth, we require $O(n)$
+    more computation than parametric regression. But to determine the
+    appropriate bandwidth vector, we minimize, say, a cross-validation
+    function numerically, which requires a large number of evaluations
+    of some objective function, say the delete-one least squares
+    criterion function $CV=n^{-1}\sum_{i=1}^n(y_i-\hat g_{-i}(x_i))^2$
+    where $\hat g_{-i}(x_i)$ is the leave-one-out estimator of
+    $g(x_i)$. This takes a problem that is already an order of
+    magnitude more computationally involved than parametric regression
+    and again increases the computational burden by potentially
+    another order of magnitude. It is evident that as $n$ increases
+    the computational burden associated with optimal bandwidth
+    selection will increase exponentially.
+
+    In general, cross-validation methods have run times that are
+    proportional to the square of the number of observations (of
+    computational order $n^2$ hence a doubling of the sample size will
+    increase run time by a factor of four). The solution I currently
+    favor is to run the code in a parallel computing environment. The
+    underlying C code for \texttt{np} is MPI-aware (MPI denotes the
+    `message passing interface', a popular parallel programming
+    library that is an international standard), and a version of the
+    \texttt{np} package titled `\texttt{npRmpi}' exists for running
+    jobs in a parallel environment that leverages the \texttt{Rmpi}
+    package (\cite{Rmpi}).\footnote{We are extremely grateful to Hao
+      Yu for providing the MPI functionality contained in the
+      \texttt{Rmpi} package.}
 
     With respect to the \texttt{npRmpi} package, kindly note that I
     cannot assist with issues surrounding installation and setup due
@@ -474,55 +500,19 @@ plot(bw,xtrim=.01)
       delivers the linear OLS fit to the data.}) to admit categorical
     predictors (see references for papers with Yang and Ma in the
     \texttt{crs} package). Because regression splines involve simple
-    least-squares fits, they scale much better with respect to the
-    sample size so for large sample sizes you may wish to instead
-    consider this approach (kindly see my webpage for further
-    details). You can run cross-validation with hundreds of thousands
-    of observations on a decent desktop in far less time than that
-    required for cross-validated kernel estimates.
+    (i.e., `global' as opposed to local) least-squares fits, they
+    scale much better with respect to the sample size so for large
+    sample sizes you may wish to instead consider this approach
+    (kindly see my webpage for further details). You can run
+    cross-validation with hundreds of thousands of observations on a
+    decent desktop in far less time than that required for
+    cross-validated kernel estimates. Be forewarned, however, that the
+    presence of categorical predictors can lead to increased execution
+    time unless the option \texttt{kernel=FALSE} is invoked (the
+    default is to use local kernel weighting in the presence of
+    categorical predictors).
 
   \end{enumerate}
-
-\subsection{I estimated a parametric model using the
-  \texttt{lm()} function. How can I compare the cross-validation score
-  from the \texttt{npreg()} approach with that for the parametric
-  model?}
-
-This can be readily achieved for the parametric model as follows:
-\begin{verbatim}
-data(wage1)
-model.lm <- lm(lwage ~ married + female + nonwhite + educ +
-                       exper + tenure, data = wage1)
-cv.lm <-mean(residuals(model.lm)^2/(1-hatvalues(model.lm))^2)                                      
-cv.lm
-\end{verbatim}
-You can then compare \verb+cv.lm+ with the cross-validation score for
-the \verb+npreg+ object as follows: if your model is named \verb+foo+
-(i.e.\ you ran something like \verb^foo <- npreg(y~x1+x2)^) then
-\verb+summary(foo$bws)+ will give you a summary of the model's
-bandwidth object (the value of the objective function is the
-cross-validation score), while \verb+foo$bws$fval+ will give you the
-function value, i.e.\ the value of the cross-validation function, {\em
-  provided} that the model was estimated via least-squares
-cross-validation (default, \verb+bwmethod="cv.ls"+). If the
-cross-validation score is lower for one model, that indicates that the
-model possessing the lowest score is to be preferred.
-
-\subsection{Where can I get some examples of R code for the np
-  package in addition to the examples in the help files?}
-
-Start \texttt{R} then type \verb+demo(package="np")+ and you will be
-presented with a list of demos for constrained estimation, inference,
-and so forth. To run one of these demos type, for example,
-\verb+demo(npregiv)+ (note that you must first install the \texttt{rgl} package to run this particular demo).
-
-To find the location of a demo type
-\verb+system.file("demo","npregiv.R",package="np")+ for example,
-then you can take the source code for this demo and modify it for your
-particular application.
-
-You can also find examples and illustrations at the `Gallery' located
-at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
 
 \subsection{Is
     there a way to figure out roughly how long
@@ -585,6 +575,47 @@ plot(n.seq.aug,time.fcst/3600,type="b",
      "hours"))
 \end{verbatim}
   \end{singlespacing}
+
+\subsection{I estimated a parametric model using the
+  \texttt{lm()} function. How can I compare the cross-validation score
+  from the \texttt{npreg()} approach with that for the parametric
+  model?}
+
+This can be readily achieved for the parametric model as follows:
+\begin{verbatim}
+data(wage1)
+model.lm <- lm(lwage ~ married + female + nonwhite + educ +
+                       exper + tenure, data = wage1)
+cv.lm <-mean(residuals(model.lm)^2/(1-hatvalues(model.lm))^2)                                      
+cv.lm
+\end{verbatim}
+You can then compare \verb+cv.lm+ with the cross-validation score for
+the \verb+npreg+ object as follows: if your model is named \verb+foo+
+(i.e.\ you ran something like \verb^foo <- npreg(y~x1+x2)^) then
+\verb+summary(foo$bws)+ will give you a summary of the model's
+bandwidth object (the value of the objective function is the
+cross-validation score), while \verb+foo$bws$fval+ will give you the
+function value, i.e.\ the value of the cross-validation function, {\em
+  provided} that the model was estimated via least-squares
+cross-validation (default, \verb+bwmethod="cv.ls"+). If the
+cross-validation score is lower for one model, that indicates that the
+model possessing the lowest score is to be preferred.
+
+\subsection{Where can I get some examples of R code for the np
+  package in addition to the examples in the help files?}
+
+Start \texttt{R} then type \verb+demo(package="np")+ and you will be
+presented with a list of demos for constrained estimation, inference,
+and so forth. To run one of these demos type, for example,
+\verb+demo(npregiv)+ (note that you must first install the \texttt{rgl} package to run this particular demo).
+
+To find the location of a demo type
+\verb+system.file("demo","npregiv.R",package="np")+ for example,
+then you can take the source code for this demo and modify it for your
+particular application.
+
+You can also find examples and illustrations at the `Gallery' located
+at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
 
 \subsection{I need to apply a boundary correction for a univariate
   density estimate - how can I do this?}

@@ -27,7 +27,6 @@ npregiv(y,
         w,
         x = NULL,
         zeval = NULL,
-        weval = NULL,
         xeval = NULL,
         p = 1,
         nmulti = 1,
@@ -50,7 +49,11 @@ npregiv(y,
         start.from = c("Eyz","EEywz"),
         starting.values  = NULL,
         stop.on.increase = TRUE,
-        ...)
+        return.weights.phi = FALSE,
+        return.weights.phi.deriv.1 = FALSE,
+        return.weights.phi.deriv.2 = FALSE,
+        bw = NULL,
+        \dots)
 }
 \arguments{
   \item{y}{
@@ -78,11 +81,6 @@ npregiv(y,
     a \eqn{p}-variate data frame of endogenous regressors on which the
     regression will be estimated (evaluation data). By default, evaluation
     takes place on the data provided by \code{z}.
-  }
-  \item{weval}{
-    a \eqn{q}-variate data frame of instruments on which the regression
-    will be estimated (evaluation data). By default, evaluation
-    takes place on the data provided by \code{w}.
   }
   \item{xeval}{
     an \eqn{r}-variate data frame of exogenous regressors on which the
@@ -161,58 +159,80 @@ npregiv(y,
     maximum of search range for \eqn{\alpha}{alpha}, the Tikhonov
     regularization parameter, when using  \code{method="Tikhonov"}.
   }
-\item{alpha.tol}{
-  the search tolerance for \code{optimize} when solving for
-  \eqn{\alpha}{alpha}, the Tikhonov regularization parameter,
-  when using \code{method="Tikhonov"}.
-}
-\item{iterate.max}{
-  an integer indicating the maximum number of iterations permitted
-  before termination occurs when using \code{method="Landweber-Fridman"}.
-}
-\item{iterate.diff.tol}{
-  the search tolerance for the difference in the stopping rule from
-  iteration to iteration when using \code{method="Landweber-Fridman"}
-  (disable by setting to zero).
-}
-\item{constant}{
-  the constant to use when using  \code{method="Landweber-Fridman"}.
-}
-\item{method}{
-  the regularization method employed (defaults to
-   \code{"Landweber-Fridman"}, see Horowitz (2011); see Darolles,
-   Fan, Florens and Renault (2011) for details for
-   \code{"Tikhonov"}).
-}
-\item{penalize.iteration}{ a logical value indicating whether to
+  \item{alpha.tol}{
+    the search tolerance for \code{optimize} when solving for
+    \eqn{\alpha}{alpha}, the Tikhonov regularization parameter,
+    when using \code{method="Tikhonov"}.
+  }
+  \item{iterate.max}{
+    an integer indicating the maximum number of iterations permitted
+    before termination occurs when using \code{method="Landweber-Fridman"}.
+  }
+  \item{iterate.diff.tol}{
+    the search tolerance for the difference in the stopping rule from
+    iteration to iteration when using \code{method="Landweber-Fridman"}
+    (disable by setting to zero).
+  }
+  \item{constant}{
+    the constant to use when using  \code{method="Landweber-Fridman"}.
+  }
+  \item{method}{
+    the regularization method employed (defaults to
+    \code{"Landweber-Fridman"}, see Horowitz (2011); see Darolles,
+    Fan, Florens and Renault (2011) for details for
+    \code{"Tikhonov"}).
+  }
+  \item{penalize.iteration}{ a logical value indicating whether to
     penalize the norm by the number of iterations or not (default
     \code{TRUE})
-}    
-\item{smooth.residuals}{
-  a logical value (defaults to \code{TRUE}) indicating whether to
-  optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
-  on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
-  \eqn{w} during iteration
- }
-\item{start.from}{ a character string indicating whether to start from
-  \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
-  be overridden by providing \code{starting.values} below)
-}  
-\item{starting.values}{ a value indicating whether to commence
-  Landweber-Fridman assuming
-  \eqn{\varphi_{-1}=starting.values}{phi[-1]=starting.values} (proper
-  Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
-  \code{NULL}, see details below)
-}
-\item{stop.on.increase}{
-  a logical value (defaults to \code{TRUE}) indicating whether to halt
-  iteration if the stopping criterion (see below) increases over the
-  course of one iteration (i.e. it may be above the iteration tolerance
-  but increased)
-}
-\item{...}{
-  additional arguments supplied to \code{\link{npksum}}.
-}
+  }    
+  \item{smooth.residuals}{
+    a logical value (defaults to \code{TRUE}) indicating whether to
+    optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
+    on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
+    \eqn{w} during iteration
+  }
+  \item{start.from}{ a character string indicating whether to start from
+    \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
+    be overridden by providing \code{starting.values} below)
+  }  
+  \item{starting.values}{ a value indicating whether to commence
+    Landweber-Fridman assuming
+    \eqn{\varphi_{-1}=starting.values}{phi[-1]=starting.values} (proper
+    Landweber-Fridman) or instead begin from \eqn{E(y|z)} (defaults to
+    \code{NULL}, see details below)
+  }
+  \item{stop.on.increase}{
+    a logical value (defaults to \code{TRUE}) indicating whether to halt
+    iteration if the stopping criterion (see below) increases over the
+    course of one iteration (i.e. it may be above the iteration tolerance
+    but increased)
+  }
+  \item{return.weights.phi}{
+    a logical value (defaults to \code{FALSE}) indicating whether to
+    return the weight matrix which when postmultiplied by the response
+    \eqn{y} delivers the instrumental regression
+  }
+  \item{return.weights.phi.deriv.1}{
+    a logical value (defaults to \code{FALSE}) indicating whether to
+    return the weight matrix which when postmultiplied by the response
+    \eqn{y} delivers the first partial derivative of the instrumental
+    regression with respect to \eqn{z}
+  }
+  \item{return.weights.phi.deriv.2}{
+    a logical value (defaults to \code{FALSE}) indicating whether to
+    return the weight matrix which when postmultiplied by the response
+    \eqn{y} delivers the second partial derivative of the instrumental
+    regression with respect to \eqn{z}
+  }
+  \item{bw}{
+    a list which, if provided, use used to compute all conditional moments
+    rather than to compute them via cross-validation (see details for an
+    illustration)
+  }
+  \item{\dots}{
+    additional arguments supplied to \code{\link{npksum}}.
+  }
 }
 \details{
   Tikhonov regularization requires computation of weight matrices of
@@ -237,14 +257,48 @@ npregiv(y,
   less than \code{iterate.diff.tol} or we hit \code{iterate.max} or
   \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
-  starts rising.  }
+  starts rising.
+
+  When passing \code{bw}, it must be obtained from a previous invocation
+  of \code{npregiv}. For instance, if \code{model.iv} was obtained from
+  an invocation of \code{npregiv}, then the following needs to be fed to
+  the subsequent invocation of \code{npregiv}.
+
+  \preformatted{
+    
+    bw <- list(bw.E.y.w=model.iv$bw.E.y.w,
+               bw.E.y.z=model.iv$bw.E.y.z,
+               bw.resid.w=model.iv$bw.resid.w,
+               bw.resid.fitted.w.z=model.iv$bw.resid.fitted.w.z,
+               norm.index=model.iv$norm.index)
+  }
+
+}
 
 \value{
 
-  \code{npregiv} returns a list with components \code{phi} and either
-  \code{alpha} when \code{method="Tikhonov"} or \code{num.iterations},
-  \code{norm.stop} and \code{convergence} when
+  \code{npregiv} returns a list with components \code{phi},
+  \code{phi.mat} and either \code{alpha} when \code{method="Tikhonov"}
+  or \code{norm.index}, \code{norm.stop} and \code{convergence} when
   \code{method="Landweber-Fridman"}.
+
+  In addition, when \code{method="Landweber-Fridman"} is invoked, if any
+  of \code{return.weights.*} are invoked (\code{*=1,2}), then
+  \code{phi.weights.list} and \code{phi.deriv.*.weights.list} return
+  lists of weight matrices for computing the instrumental regression and
+  its partial derivatives. Note that these lists, when evaluated at
+  \code{[[model.iv$norm.index]]} and post multiplied by the response
+  vector \eqn{y}, will deliver the estimates returned in \code{phi},
+  \code{phi.deriv.1}, and \code{phi.deriv.2} (the latter only being
+  produced when \code{p} is 2 or greater). When invoked with evaluation
+  data, similar matrices are returned but named \code{phi.eval.weights}
+  and \code{phi.deriv.eval.*.weights.list}.
+
+  When \code{method="Landweber-Fridman"} is invoked, bandwidth objects
+  are returned in \code{bw.E.y.w} (scalar/vector), \code{bw.E.y.z}
+  (scalar/vector), and \code{bw.resid.w} (matrix) and
+  \code{bw.resid.fitted.w.z}, the latter matrices containing bandwidths
+  for each iteration stored as rows.
   
 }
 
