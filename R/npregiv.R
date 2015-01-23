@@ -272,14 +272,14 @@ npregiv <- function(y,
 
           ## Re-use this matrix, shrinking occurs here
 
-          W.z <- W.glp(xdat=X.train.numeric,
+          W.z <- crs:::W.glp(xdat=X.train.numeric,
                              degree=rep(p,NCOL(X.train.numeric)))
 
           if(is.null(mydata.eval)) {
               ## Guess we could avoid copy with conditional statement below using either W.z or W.z.eval
               W.z.eval <- W.z
           } else {
-              W.z.eval <- W.glp(xdat=X.train.numeric,
+              W.z.eval <- crs:::W.glp(xdat=X.train.numeric,
                                       exdat=as.data.frame(X.eval.numeric),
                                       degree=rep(p,NCOL(X.train.numeric)))
           }
@@ -336,7 +336,7 @@ npregiv <- function(y,
 
           if(deriv==0) Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))
           if(deriv==1) {
-              W.z.deriv.1 <- W.glp(xdat=X.train.numeric,
+              W.z.deriv.1 <- crs:::W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(z)),
                                          gradient.vec = 1)
@@ -357,7 +357,7 @@ npregiv <- function(y,
 
           if(deriv==1) {
 
-              W.z.deriv.1 <- W.glp(xdat=X.train.numeric,
+              W.z.deriv.1 <- crs:::W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 1)
@@ -368,7 +368,7 @@ npregiv <- function(y,
 
           if(deriv==2) {
 
-              W.z.deriv.2 <- W.glp(xdat=X.train.numeric,
+              W.z.deriv.2 <- crs:::W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 2)
@@ -382,150 +382,6 @@ npregiv <- function(y,
       return(Kmat)
   }
 
-  ## Functions for generalized local polynomial regression
-
-  mypoly <- function(X,degree) {
-
-    if(missing(X)) stop(" X required")
-    if(missing(degree)) stop(" degree required")
-    if(degree < 1) stop("degree must be a positive integer")
-
-    P <- NULL
-    for(i in 1:degree) P <- cbind(P,X**i)
-
-    return(as.matrix(P))
-
-  }
-  ## Functions for generalized local polynomial regression
-
-  mypoly <- function(X,degree) {
-
-    if(missing(X)) stop(" X required")
-    if(missing(degree)) stop(" degree required")
-    if(degree < 1) stop("degree must be a positive integer")
-
-    P <- NULL
-    for(i in 1:degree) P <- cbind(P,X**i)
-
-    return(as.matrix(P))
-
-  }
-
-  ## W.glp is a modified version of the polym() function (stats). The
-  ## function accepts a vector of degrees and provides a generalized
-  ## polynomial with varying polynomial order.
-  
-  W.glp <- function(xdat = NULL,
-                    exdat = NULL,
-                    degree = NULL,
-                    gradient.vec = NULL,
-                    Bernstein = TRUE) {
-      
-      if(is.null(xdat)) stop(" Error: You must provide data")
-      if(is.null(degree) || any(degree < 0)) stop(paste(" Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
-      
-      xdat <- as.data.frame(xdat)
-      
-      xdat.col.numeric <- sapply(1:ncol(xdat),function(i){is.numeric(xdat[,i])})
-      k <- ncol(as.data.frame(xdat[,xdat.col.numeric]))
-      
-      xdat.numeric <- NULL
-      if(k > 0) {
-          xdat.numeric <- as.data.frame(xdat[,xdat.col.numeric])
-          if(!is.null(exdat)) {
-              exdat.numeric <- as.data.frame(exdat[,xdat.col.numeric])
-          } else {
-              exdat.numeric <- NULL
-          }
-      }
-      
-      if(!is.null(gradient.vec) && (length(gradient.vec) != k)) stop(paste(" Error: gradient vector and number of numeric predictors must be conformable\n",sep=""))
-      if(!is.null(gradient.vec) && any(gradient.vec < 0)) stop(paste(" Error: gradient vector must contain non-negative integers\n",sep=""))
-      
-      if(!is.null(gradient.vec)) {
-          gradient.compute <- TRUE
-      } else {
-          gradient.compute <- FALSE
-          gradient.vec <- rep(NA,k)
-      }
-      
-      if(length(degree) != k) stop(" Error: degree vector and number of numeric predictors incompatible")
-      
-      if(all(degree == 0) || (k == 0)) {
-          
-          ## Local constant OR no continuous variables
-          
-          if(is.null(exdat)) {
-              return(matrix(1,nrow=nrow(xdat.numeric),ncol=1))
-          } else {
-              return(matrix(1,nrow=nrow(exdat.numeric),ncol=1))
-          }
-          
-      } else {
-          
-          degree.list <- list()
-          for(i in 1:k) degree.list[[i]] <- 0:degree[i]
-          z <- do.call("expand.grid", degree.list, k)
-          s <- rowSums(z)
-          ind <- (s > 0) & (s <= max(degree))
-          z <- z[ind, ,drop=FALSE]
-          if(!all(degree==max(degree))) {
-              for(j in 1:length(degree)) {
-                  d <- degree[j]
-                  if((d < max(degree)) & (d > 0)) {
-                      s <- rowSums(z)
-                      d <- (s > d) & (z[,j,drop=FALSE]==matrix(d,nrow(z),1,byrow=TRUE))
-                      z <- z[!d, ]
-                  }
-              }
-          }
-          if(is.null(exdat)) {
-              res <- rep.int(1,nrow(xdat.numeric))
-          } else {
-              res <- rep.int(1,nrow(exdat.numeric))
-          }
-          res.deriv <- 1
-          if(degree[1] > 0) {
-              res <- cbind(1, mypoly(x=xdat.numeric[,1],
-                                     ex=exdat.numeric[,1],
-                                     degree=degree[1],
-                                     gradient.compute=gradient.compute,
-                                     r=gradient.vec[1],
-                                     Bernstein=Bernstein))[, 1 + z[, 1]]
-              
-              if(gradient.compute && gradient.vec[1] != 0) res.deriv <- cbind(1,matrix(NA,1,degree[1]))[, 1 + z[, 1],drop=FALSE]
-              if(gradient.compute && gradient.vec[1] == 0) res.deriv <- cbind(1,matrix(0,1,degree[1]))[, 1 + z[, 1],drop=FALSE]
-          }
-          if(k > 1) for (i in 2:k) if(degree[i] > 0) {
-              res <- res * cbind(1, mypoly(x=xdat.numeric[,i],
-                                           ex=exdat.numeric[,i],
-                                           degree=degree[i],
-                                           gradient.compute=gradient.compute,
-                                           r=gradient.vec[i],
-                                           Bernstein=Bernstein))[, 1 + z[, i]]
-              if(gradient.compute && gradient.vec[i] != 0) res.deriv <- res.deriv * cbind(1,matrix(NA,1,degree[i]))[, 1 + z[, i],drop=FALSE]
-              if(gradient.compute && gradient.vec[i] == 0) res.deriv <- res.deriv *cbind(1,matrix(0,1,degree[i]))[, 1 + z[, i],drop=FALSE]
-          }
-          
-          if(is.null(exdat)) {
-              res <- matrix(res,nrow=NROW(xdat))
-          } else {
-              res <- matrix(res,nrow=NROW(exdat))
-          }
-          if(gradient.compute) res.deriv <- matrix(res.deriv,nrow=1)
-          colnames(res) <- apply(z, 1L, function(x) paste(x, collapse = "."))
-          if(gradient.compute) colnames(res.deriv) <- apply(z, 1L, function(x) paste(x, collapse = "."))
-          
-          if(gradient.compute) {
-              res[,!is.na(as.numeric(res.deriv))] <- 0
-              return(cbind(0,res))
-          } else {
-              return(cbind(1,res))
-          }
-          
-      }
-      
-  }
   glpreg <- function(tydat=NULL,
                      txdat=NULL,
                      exdat=NULL,
@@ -616,14 +472,14 @@ npregiv <- function(y,
 
     } else {
 
-      W <- W.glp(xdat=txdat,
+      W <- crs:::W.glp(xdat=txdat,
                        degree=rep(degree,NCOL(txdat)))
 
-      W.eval <- W.glp(xdat=txdat,
+      W.eval <- crs:::W.glp(xdat=txdat,
                             exdat=exdat,
                             degree=rep(degree,NCOL(txdat)))
 
-      W.eval.deriv <- W.glp(xdat=txdat,
+      W.eval.deriv <- crs:::W.glp(xdat=txdat,
                                   exdat=exdat,
                                   degree=rep(degree,NCOL(txdat)),
                                   gradient.vec=rep(deriv,NCOL(txdat)))
@@ -1003,7 +859,7 @@ npregiv <- function(y,
     ## Pass in the local polynomial weight matrix rather than
     ## recomputing with each iteration.
 
-    W <- W.glp(xdat=xdat,
+    W <- crs:::W.glp(xdat=xdat,
                      degree=rep(degree,NCOL(xdat)))
 
     sum.lscv <- function(bw.gamma,...) {
