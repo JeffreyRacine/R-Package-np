@@ -248,7 +248,7 @@ npregiv(y,
   }{||E(y|w)-E(phi(z,x)|w)||^2 }. However, if insufficient training is
   conducted the estimates can be overly noisy. To best guard against
   this eventuality set \code{nmulti} to a larger number than the default
-  \code{nmulti=0} for \code{\link{npreg}}.
+  \code{nmulti=1} for \code{\link{npreg}}.
 
   When using \code{method="Landweber-Fridman"}, iteration will terminate
   when either the change in the value of
@@ -356,7 +356,7 @@ This function should be considered to be in `beta test' status until further not
 ## <samuele.centorrino@univ-tlse1.fr>
 
 set.seed(42)
-n <- 1500
+n <- 500
 
 ## The DGP is as follows:
 
@@ -430,13 +430,14 @@ lines(z,phi.iv,col="blue",lwd=2,lty=2)
 
 lines(z,ll.mean,col="red",lwd=2,lty=4)
 
-legend(quantile(z,trim),quantile(y,1-trim),
+legend("topright",
        c(expression(paste(varphi(z))),
          expression(paste("Nonparametric ",hat(varphi)(z))),
          "Nonparametric E(y|z)"),
        lty=c(1,2,4),
        col=c("black","blue","red"),
-       lwd=c(2,2,2))
+       lwd=c(2,2,2),
+       bty="n")
        
 } % enddontrun
 }

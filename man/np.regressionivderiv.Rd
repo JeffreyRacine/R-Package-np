@@ -201,7 +201,7 @@ npregivderiv(y,
   \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2 }{||E(y|w)-E(phi(z,x)|w)||^2
   }. However, if insufficient training is conducted the estimates can be
   overly noisy. To best guard against this eventuality set \code{nmulti}
-  to a larger number than the default \code{nmulti=0} for
+  to a larger number than the default \code{nmulti=1} for
   \code{\link{npreg}}.
 
   Iteration will terminate when either the change in the value of
