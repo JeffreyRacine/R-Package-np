@@ -32,6 +32,7 @@ npregiv <- function(y,
                     w,
                     x=NULL,
                     zeval=NULL,
+                    weval=NULL,
                     xeval=NULL,
                     p=1,
                     nmulti=1,
@@ -114,9 +115,9 @@ npregiv <- function(y,
 
   tikh <- function(alpha,CZ,CY,Cr.r,cholesky=FALSE){
     if(cholesky) {
-        return(chol2inv(chol(alpha*diag(length(Cr.r)) + CY%*%CZ) %*% Cr.r))
+        return(chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ)) %*% Cr.r)
     } else {
-        return(solve(alpha*diag(length(Cr.r)) + CY%*%CZ) %*% Cr.r)
+        return(solve(alpha*diag(nrow(CY)) + CY%*%CZ) %*% Cr.r)
     }
   }
 
@@ -150,15 +151,16 @@ npregiv <- function(y,
 
   ittik <- function(alpha,CZ,CY,Cr.r,r,cholesky=FALSE) {
       if(cholesky) {
-          invmat <- chol2inv(chol(alpha*diag(length(Cr.r)) + CY%*%CZ))
+          invmat <- chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ))
       } else {
-          invmat <- solve(alpha*diag(length(Cr.r)) + CY%*%CZ)
+          invmat <- solve(alpha*diag(nrow(CY)) + CY%*%CZ)
       }
-      phi <- invmat %*% Cr.r + alpha * invmat %*% invmat %*% Cr.r
+      invmat.Cr.r <- invmat %*% Cr.r
+      phi <- invmat.Cr.r + alpha * invmat %*% invmat.Cr.r
       return(sum((CZ%*%phi - r)^2)/alpha)
   }
 
-  ## $Id: npregiv.R,v 1.48 2015/01/21 13:18:14 jracine Exp jracine $
+  ## $Id: npregiv.R,v 1.1 2015/01/26 11:40:38 jracine Exp jracine $
 
   ## This function returns the weight matrix for a local polynomial,
   ## and was rewritten 14/1/15 in Toulouse while visiting JP. It
@@ -238,10 +240,10 @@ npregiv <- function(y,
           stop(paste("Error: p (order of polynomial) must be a non-negative integer\np is (", p, ")\n",sep=""))
 
       K.x <- npksum(txdat=X.train,
-                         exdat=X.eval,
-                         bws=bws,
-                         return.kernel.weights=TRUE,
-                         ...)$kw
+                    exdat=X.eval,
+                    bws=bws,
+                    return.kernel.weights=TRUE,
+                    ...)$kw
 
       if(p==0) {
 
@@ -254,11 +256,11 @@ npregiv <- function(y,
           } else if(deriv==1) {
 
               K.x.deriv <- npksum(txdat=X.train,
-                                       exdat=X.eval,
-                                       bws=bws,
-                                       return.kernel.weights=TRUE,
-                                       operator="derivative",
-                                       ...)$kw/NZD(h$bw)
+                                  exdat=X.eval,
+                                  bws=bws,
+                                  return.kernel.weights=TRUE,
+                                  operator="derivative",
+                                  ...)$kw/NZD(h$bw)
 
               rSk <- NZD(rowSums(t(K.x)))
 
@@ -1045,6 +1047,7 @@ npregiv <- function(y,
   ## Check for evaluation data
 
   if(is.null(zeval)) zeval <- z
+  if(is.null(weval)) weval <- w
   if(is.null(xeval)) xeval <- x
 
   ## Need to determine how many x, w, z are numeric
@@ -1062,6 +1065,7 @@ npregiv <- function(y,
       ## (append to w before invoking the function)
   }
   if(!is.null(xeval)) zeval <- data.frame(zeval,xeval)
+  if(!is.null(xeval)) weval <- data.frame(weval,xeval)  
 
   z.numeric <- sapply(1:NCOL(z),function(i){is.numeric(z[,i])})
   num.z.numeric <- NCOL(as.data.frame(z[,z.numeric]))
@@ -1079,7 +1083,7 @@ npregiv <- function(y,
     ## Convergence value returned for Landweber-Fridman but value
     ## required
 
-    convergence <- NULL
+    ## convergence <- NULL
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1096,6 +1100,8 @@ npregiv <- function(y,
                  optim.abstol=optim.abstol,
                  optim.maxit=optim.maxit,
                  ...)
+
+    bw.E.y.w <- hyw$bw
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1130,19 +1136,21 @@ npregiv <- function(y,
                   optim.maxit=optim.maxit,
                   ...)
 
+    bw.E.E.y.w.z <- hywz$bw
+
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weight matrix and E(E(y|w)|z)...", console)
 
     E.E.y.w.z <- glpreg(tydat=E.y.w,
                         txdat=z,
-                        exdat=zeval,
+#                        exdat=zeval, ## 23/1/15 - optimal alpha function of training data only?
                         bws=hywz$bw,
                         degree=rep(p, num.z.numeric),
                         ...)$mean
 
     KYWZ <- Kmat.lp(mydata.train=data.frame(z),
-                    mydata.eval=data.frame(z=zeval),
+#                    mydata.eval=data.frame(z=zeval), ## 23/1/15 - optimal alpha function of training data only?
                     bws=hywz$bw,
                     p=rep(p, num.z.numeric),
                     ...)
@@ -1155,7 +1163,7 @@ npregiv <- function(y,
 
     ## E(r|z)=E(E(phi(z)|w)|z)
     ## \phi^\alpha = (\alpha I+CzCw)^{-1}Cr x r
-
+    
     if(is.null(alpha)) {
       console <- printClear(console)
       console <- printPop(console)
@@ -1179,7 +1187,7 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
 
-    hphiw <- glpcv(ydat=phi,
+    hphiw <- glpcv(ydat=phi, ## 23/1/15 phi is sample
                    xdat=w,
                    degree=rep(p, num.w.numeric),
                    nmulti=nmulti,
@@ -1191,9 +1199,13 @@ npregiv <- function(y,
                    optim.maxit=optim.maxit,
                    ...)
 
+    bw.E.phi.w <- hphiw$bw
+
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
+
+    ## 23/1/15 - could construct these for evaluation w...
 
     E.phi.w <- glpreg(tydat=phi,
                       txdat=w,
@@ -1222,12 +1234,14 @@ npregiv <- function(y,
                     optim.maxit=optim.maxit,
                     ...)
 
+    bw.E.E.phi.w.z <- hphiwz$bw
+
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
 
     KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
-                      mydata.eval=data.frame(z=zeval),
+#                      mydata.eval=data.frame(z=zeval),
                       bws=hphiwz$bw,
                       p=rep(p, num.z.numeric),
                       ...)
@@ -1236,6 +1250,13 @@ npregiv <- function(y,
     ## of alpha (here we use the iterated Tikhonov approach) to
     ## determine the optimal alpha for the non-iterated scheme.
 
+#    print(length(E.E.y.w.z))
+#    print(length(E.y.w))
+#    print(dim(KPHIW))
+#    print(dim(KPHIWZ))
+
+## 23/1/15 - to get optimal alpha probably only want to use training data?
+    
     if(is.null(alpha)) {
       console <- printClear(console)
       console <- printPop(console)
@@ -1246,18 +1267,62 @@ npregiv <- function(y,
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha and the updated bandwidths.
 
+#    print("Here we are")
+## XXX 24/1/15, Toulouse - evaluation broken (always has been with Tikhnonv?)
+## 23/1/15 - probably here that we take the optimal alpha (from
+## training data) then construct phi for the evaluation data? I can do
+## this, just need to find the time...
+
+    E.E.y.w.z <- glpreg(tydat=E.y.w,
+                        txdat=z,
+                        exdat=zeval, ## 23/1/15 - optimal alpha function of training data only?
+                        bws=hywz$bw,
+                        degree=rep(p, num.z.numeric),
+                        ...)$mean
+    
+##    print("Here we are")
+    KPHIW <- Kmat.lp(mydata.train=data.frame(w), ## would need weval here too...
+                     mydata.eval=data.frame(w=weval),
+                     bws=hphiw$bw,
+                     p=rep(p, num.w.numeric),
+                     ...)
+
+    KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
+                      mydata.eval=data.frame(z=zeval),
+                      bws=hphiwz$bw,
+                      p=rep(p, num.z.numeric),
+                      ...)
+
+#    print(NROW(E.E.y.w.z))
+#    print(dim(KPHIW))
+#    print(dim(KPHIWZ))
+    
+#  tikh <- function(alpha,CZ,CY,Cr.r,cholesky=FALSE){
+#    if(cholesky) {
+#        return(chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ)) %*% Cr.r)
+#    } else {
+#        return(solve(alpha*diag(length(Cr.r)) + CY%*%CZ) %*% Cr.r)
+#    }
+#  }
+    
+
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing final phi(z) estimate...", console)
+#    phi <- as.vector(tikh(alpha, CZ = KPHIW, CY = t(KPHIWZ), Cr.r = E.E.y.w.z))
     phi <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z))
-
     console <- printClear(console)
     console <- printPop(console)
 
     if((alpha-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
     if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
 
-    return(list(phi=phi, alpha=alpha))
+    return(list(phi=phi,
+                alpha=alpha,
+                bw.E.y.w=bw.E.y.w,
+                bw.E.E.y.w.z=bw.E.E.y.w.z,
+                bw.E.phi.w=bw.E.phi.w,
+                bw.E.E.phi.w.z=bw.E.E.phi.w.z))
 
   } else {
 
@@ -2106,51 +2171,35 @@ npregiv <- function(y,
         convergence <- NULL
     }
     
-    ## Landweber-Fridman supports weights now and returns multiple
-    ## objects not returned by Tikhonov
-    
-    if(method=="Tikhonov") {
-        
-        return(list(phi=phi,
-                    phi.mat=phi.mat,
-                    norm.index=j,
-                    norm.stop=norm.stop,
-                    norm.value=norm.value,
-                    convergence=convergence,
-                    starting.values.phi=starting.values.phi))
-        
-    } else {
-
-        return(list(phi=phi,
-                    phi.mat=phi.mat,
-                    phi.deriv.1=as.matrix(phi.deriv.1),
-                    phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},                
-                    phi.deriv.1.list=phi.deriv.1.list,
-                    phi.deriv.2.list=phi.deriv.2.list,                
-                    phi.weights.list=phi.weights.list,
-                    phi.deriv.1.weights.list=phi.deriv.1.weights.list,
-                    phi.deriv.2.weights.list=phi.deriv.2.weights.list,
-                    phi.eval=phi.eval,
-                    phi.eval.mat=phi.eval.mat,
-                    phi.deriv.eval.1=as.matrix(phi.deriv.eval.1),
-                    phi.deriv.eval.1.list=phi.deriv.eval.1.list,
-                    phi.deriv.eval.2=if(!is.null(phi.deriv.eval.2)){as.matrix(phi.deriv.eval.2)}else{NULL},
-                    phi.deriv.eval.2.list=phi.deriv.eval.2.list,
-                    phi.eval.weights.list=phi.eval.weights.list,
-                    phi.deriv.eval.1.weights.list=phi.deriv.eval.1.weights.list,
-                    phi.deriv.eval.2.weights.list=phi.deriv.eval.2.weights.list,
-                    norm.index=j,
-                    norm.stop=norm.stop,
-                    norm.value=norm.value,
-                    convergence=convergence,
-                    starting.values.phi=starting.values.phi,
-                    return.weights.phi=return.weights.phi,
-                    bw.E.y.w=bw.E.y.w,
-                    bw.E.y.z=bw.E.y.z,
-                    bw.resid.w=as.matrix(bw.resid.w),
-                    bw.resid.fitted.w.z=as.matrix(bw.resid.fitted.w.z)))
-    }
+    return(list(phi=phi,
+                phi.mat=phi.mat,
+                phi.deriv.1=as.matrix(phi.deriv.1),
+                phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},                
+                phi.deriv.1.list=phi.deriv.1.list,
+                phi.deriv.2.list=phi.deriv.2.list,                
+                phi.weights.list=phi.weights.list,
+                phi.deriv.1.weights.list=phi.deriv.1.weights.list,
+                phi.deriv.2.weights.list=phi.deriv.2.weights.list,
+                phi.eval=phi.eval,
+                phi.eval.mat=phi.eval.mat,
+                phi.deriv.eval.1=as.matrix(phi.deriv.eval.1),
+                phi.deriv.eval.1.list=phi.deriv.eval.1.list,
+                phi.deriv.eval.2=if(!is.null(phi.deriv.eval.2)){as.matrix(phi.deriv.eval.2)}else{NULL},
+                phi.deriv.eval.2.list=phi.deriv.eval.2.list,
+                phi.eval.weights.list=phi.eval.weights.list,
+                phi.deriv.eval.1.weights.list=phi.deriv.eval.1.weights.list,
+                phi.deriv.eval.2.weights.list=phi.deriv.eval.2.weights.list,
+                norm.index=j,
+                norm.stop=norm.stop,
+                norm.value=norm.value,
+                convergence=convergence,
+                starting.values.phi=starting.values.phi,
+                return.weights.phi=return.weights.phi,
+                bw.E.y.w=bw.E.y.w,
+                bw.E.y.z=bw.E.y.z,
+                bw.resid.w=as.matrix(bw.resid.w),
+                bw.resid.fitted.w.z=as.matrix(bw.resid.fitted.w.z)))
     
   }
-
+  
 }

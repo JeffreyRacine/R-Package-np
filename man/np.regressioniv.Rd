@@ -273,6 +273,13 @@ npregiv(y,
                norm.index=model.iv$norm.index)
   }
 
+  When exogenous predictors \code{x} (\code{xeval}) are passed, they are
+  appended to both the endogenous predictors \code{z} and the
+  instruments \code{w} as additional columns. If this is not desired,
+  one can manually append the exogenous variables to \code{z} (or
+  \code{w}) prior to passing \code{z} (or \code{w}), and then they will
+  only appear among the \code{z} or \code{w} as desired.
+  
 }
 
 \value{

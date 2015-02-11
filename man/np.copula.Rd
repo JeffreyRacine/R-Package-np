@@ -4,7 +4,7 @@
 
 \description{
   \code{npcopula} implements the nonparametric mixed data kernel copula
-  approach of Racine (2012) for an arbitrary number of dimensions
+  approach of Racine (2015) for an arbitrary number of dimensions
 }
 
 \usage{
@@ -68,8 +68,8 @@ npcopula(bws,
   Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
   Edition, Springer-Verlag.
 
-  Racine, J.S. (2012), \dQuote{Mixed Data Kernel Copulas,}
-  manuscript.
+  Racine, J.S. (2015), \dQuote{Mixed Data Kernel Copulas,} Empirical
+  Economics, 48, 37-59.
 
 }
 \author{
