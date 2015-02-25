@@ -32,7 +32,6 @@ npregiv <- function(y,
                     w,
                     x=NULL,
                     zeval=NULL,
-                    weval=NULL,
                     xeval=NULL,
                     p=1,
                     nmulti=1,
@@ -114,10 +113,24 @@ npregiv <- function(y,
   ## phi:   the vector of estimated values for the unknown function at the evaluation points
 
   tikh <- function(alpha,CZ,CY,Cr.r,cholesky=FALSE){
+      if(cholesky) {
+          return(chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ)) %*% Cr.r)
+      } else {
+          return(solve(alpha*diag(nrow(CY)) + CY%*%CZ) %*% Cr.r)
+      }
+  }
+
+  ## Samuele indicates alternate form for estimator (visit to SUNY
+  ## Stony Brook Feb 24 2015) that can be used with evaluation
+  ## data. There is no need to carry around two versions of the same
+  ## function, so with some thought we could jettison the above and
+  ## use this throughout.
+
+  tikh.eval <- function(alpha,CZ,CY,CY.eval,r,cholesky=FALSE){
     if(cholesky) {
-        return(chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ)) %*% Cr.r)
+        return(CY.eval%*%chol2inv(chol(alpha*diag(nrow(CY)) + CZ%*%CY)) %*% r)
     } else {
-        return(solve(alpha*diag(nrow(CY)) + CY%*%CZ) %*% Cr.r)
+        return(CY.eval%*%solve(alpha*diag(nrow(CY)) + CZ%*%CY) %*% r)
     }
   }
 
@@ -160,7 +173,7 @@ npregiv <- function(y,
       return(sum((CZ%*%phi - r)^2)/alpha)
   }
 
-  ## $Id: npregiv.R,v 1.1 2015/01/26 11:40:38 jracine Exp jracine $
+  ## $Id: npregiv.R,v 1.5 2015/02/25 02:30:02 jracine Exp jracine $
 
   ## This function returns the weight matrix for a local polynomial,
   ## and was rewritten 14/1/15 in Toulouse while visiting JP. It
@@ -1044,11 +1057,11 @@ npregiv <- function(y,
   start.from <- match.arg(start.from)
   method <- match.arg(method)
 
-  ## Check for evaluation data
+  ## Check for evaluation data XXX this is perhaps not optimal??? SUNY visit - revisit
 
-  if(is.null(zeval)) zeval <- z
-  if(is.null(weval)) weval <- w
-  if(is.null(xeval)) xeval <- x
+#  if(is.null(zeval)) zeval <- z
+#  if(is.null(xeval)) xeval <- x
+  if(!is.null(zeval)&&!is.null(xeval)) zeval <- data.frame(zeval,xeval)
 
   ## Need to determine how many x, w, z are numeric
 
@@ -1057,15 +1070,13 @@ npregiv <- function(y,
   if(!is.null(x)) {
       z <- data.frame(z,x)
       ## JP points out that, with exogenous predictors, they must be
-      ## part of both z and the instruments. But note that there is no
-      ## weval. The line below was added 20/1/15 in Toulouse.
+      ## part of both z and the instruments. The line below was added
+      ## 20/1/15 in Toulouse.
       w <- data.frame(w,x)
       ## Obviously, if you have exogenous variables that are only in
       ## the instrubment set, you can trivially accommodate this
       ## (append to w before invoking the function)
   }
-  if(!is.null(xeval)) zeval <- data.frame(zeval,xeval)
-  if(!is.null(xeval)) weval <- data.frame(weval,xeval)  
 
   z.numeric <- sapply(1:NCOL(z),function(i){is.numeric(z[,i])})
   num.z.numeric <- NCOL(as.data.frame(z[,z.numeric]))
@@ -1144,13 +1155,11 @@ npregiv <- function(y,
 
     E.E.y.w.z <- glpreg(tydat=E.y.w,
                         txdat=z,
-#                        exdat=zeval, ## 23/1/15 - optimal alpha function of training data only?
                         bws=hywz$bw,
                         degree=rep(p, num.z.numeric),
                         ...)$mean
 
     KYWZ <- Kmat.lp(mydata.train=data.frame(z),
-#                    mydata.eval=data.frame(z=zeval), ## 23/1/15 - optimal alpha function of training data only?
                     bws=hywz$bw,
                     p=rep(p, num.z.numeric),
                     ...)
@@ -1205,8 +1214,6 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
 
-    ## 23/1/15 - could construct these for evaluation w...
-
     E.phi.w <- glpreg(tydat=phi,
                       txdat=w,
                       bws=hphiw$bw,
@@ -1241,7 +1248,6 @@ npregiv <- function(y,
     console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
 
     KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
-#                      mydata.eval=data.frame(z=zeval),
                       bws=hphiwz$bw,
                       p=rep(p, num.z.numeric),
                       ...)
@@ -1250,13 +1256,6 @@ npregiv <- function(y,
     ## of alpha (here we use the iterated Tikhonov approach) to
     ## determine the optimal alpha for the non-iterated scheme.
 
-#    print(length(E.E.y.w.z))
-#    print(length(E.y.w))
-#    print(dim(KPHIW))
-#    print(dim(KPHIWZ))
-
-## 23/1/15 - to get optimal alpha probably only want to use training data?
-    
     if(is.null(alpha)) {
       console <- printClear(console)
       console <- printPop(console)
@@ -1267,50 +1266,95 @@ npregiv <- function(y,
     ## Finally, we conduct regularized Tikhonov regression using this
     ## optimal alpha and the updated bandwidths.
 
-#    print("Here we are")
-## XXX 24/1/15, Toulouse - evaluation broken (always has been with Tikhnonv?)
-## 23/1/15 - probably here that we take the optimal alpha (from
-## training data) then construct phi for the evaluation data? I can do
-## this, just need to find the time...
+    console <- printClear(console)
+    console <- printPop(console)
+    console <- printPush("Computing final phi(z) estimate...", console)
 
     E.E.y.w.z <- glpreg(tydat=E.y.w,
                         txdat=z,
-                        exdat=zeval, ## 23/1/15 - optimal alpha function of training data only?
-                        bws=hywz$bw,
+                        bws=hphiwz$bw,
                         degree=rep(p, num.z.numeric),
                         ...)$mean
     
-##    print("Here we are")
-    KPHIW <- Kmat.lp(mydata.train=data.frame(w), ## would need weval here too...
-                     mydata.eval=data.frame(w=weval),
+    KPHIW <- Kmat.lp(mydata.train=data.frame(w),
                      bws=hphiw$bw,
                      p=rep(p, num.w.numeric),
                      ...)
 
     KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
-                      mydata.eval=data.frame(z=zeval),
                       bws=hphiwz$bw,
                       p=rep(p, num.z.numeric),
                       ...)
 
-#    print(NROW(E.E.y.w.z))
-#    print(dim(KPHIW))
-#    print(dim(KPHIWZ))
-    
-#  tikh <- function(alpha,CZ,CY,Cr.r,cholesky=FALSE){
-#    if(cholesky) {
-#        return(chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ)) %*% Cr.r)
-#    } else {
-#        return(solve(alpha*diag(length(Cr.r)) + CY%*%CZ) %*% Cr.r)
-#    }
-#  }
-    
+    phi <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
 
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing final phi(z) estimate...", console)
-#    phi <- as.vector(tikh(alpha, CZ = KPHIW, CY = t(KPHIWZ), Cr.r = E.E.y.w.z))
-    phi <- as.vector(tikh(alpha, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z))
+    ## First derivative
+
+    KPHIWZ.deriv.1 <- Kmat.lp(deriv=1,
+                              mydata.train=data.frame(z),
+                              bws=hphiwz$bw,
+                              p=rep(p, num.z.numeric),
+                              ...)
+
+    phi.deriv.1 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.1, r = E.y.w))
+
+    ## Second derivative
+
+    phi.deriv.2 <- NULL
+
+    if(p >= 2) {
+        
+        KPHIWZ.deriv.2 <- Kmat.lp(deriv=2,
+                                  mydata.train=data.frame(z),
+                                  bws=hphiwz$bw,
+                                  p=rep(p, num.z.numeric),
+                                  ...)
+        
+        phi.deriv.2 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.2, r = E.y.w))
+
+    }
+
+    ## If evaluation data are provided...
+
+    phi.eval <- NULL
+    phi.deriv.eval.1 <- NULL
+    phi.deriv.eval.2 <- NULL    
+
+    if(!is.null(zeval)) {
+        ## If there is evaluation data, KPHIWZ and KPHIWZ.eval will
+        ## differ...
+
+        KPHIWZ.eval <- Kmat.lp(mydata.train=data.frame(z),
+                               mydata.eval=data.frame(z=zeval),
+                               bws=hphiwz$bw,
+                               p=rep(p, num.z.numeric),
+                               ...)
+
+        phi.eval <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval, r = E.y.w))    
+
+        KPHIWZ.eval.deriv.1 <- Kmat.lp(deriv=1,
+                                       mydata.train=data.frame(z),
+                                       mydata.eval=data.frame(z=zeval),
+                                       bws=hphiwz$bw,
+                                       p=rep(p, num.z.numeric),
+                                       ...)
+        
+        phi.deriv.eval.1 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.1, r = E.y.w))
+
+        if(p >= 2) {
+        
+            KPHIWZ.eval.deriv.2 <- Kmat.lp(deriv=2,
+                                           mydata.train=data.frame(z),
+                                           mydata.eval=data.frame(z=zeval),
+                                           bws=hphiwz$bw,
+                                           p=rep(p, num.z.numeric),
+                                           ...)
+            
+            phi.deriv.eval.2 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.2, r = E.y.w))
+            
+        }
+    }
+
     console <- printClear(console)
     console <- printPop(console)
 
@@ -1318,6 +1362,11 @@ npregiv <- function(y,
     if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
 
     return(list(phi=phi,
+                phi.eval=phi.eval,
+                phi.deriv.1=phi.deriv.1,
+                phi.deriv.eval.1=phi.deriv.eval.1,
+                phi.deriv.2=phi.deriv.2,
+                phi.deriv.eval.2=phi.deriv.eval.2,                                
                 alpha=alpha,
                 bw.E.y.w=bw.E.y.w,
                 bw.E.E.y.w.z=bw.E.E.y.w.z,
