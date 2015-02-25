@@ -1970,6 +1970,7 @@ npregiv <- function(y,
                        optim.maxit=optim.maxit,
                        ...)
         } else {
+            h <- NULL
             h$bw <- bw$bw.resid.w[j,]
         }
 
@@ -1995,6 +1996,7 @@ npregiv <- function(y,
                        optim.maxit=optim.maxit,
                        ...)
         } else {
+            h <- NULL
             h$bw <- bw$bw.resid.w[j,]
         }
 

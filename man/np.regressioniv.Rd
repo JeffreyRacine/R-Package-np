@@ -279,7 +279,7 @@ npregiv(y,
                bw.resid.fitted.w.z=model.iv$bw.resid.fitted.w.z,
                norm.index=model.iv$norm.index)
 
-    foo <- npregiv(...,bw=bw)
+    foo <- npregiv(\dots,bw=bw)
   }
 
   If, on the other hand \code{model.iv} was obtained from an invocation
@@ -297,7 +297,7 @@ npregiv(y,
     bw$bw.E.phi.w <- model.iv$bw.E.phi.w
     bw$bw.E.E.phi.w.z <- model.iv$bw.E.E.phi.w.z
 
-    foo <- npregiv(...,bw=bw)    
+    foo <- npregiv(\dots,bw=bw)    
 
   }
   
