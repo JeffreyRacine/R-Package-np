@@ -272,6 +272,8 @@ npregiv(y,
   to the subsequent invocation of \code{npregiv}:
 
   \preformatted{
+
+    model.iv <- npregiv(\dots)
     
     bw <- list(bw.E.y.w=model.iv$bw.E.y.w,
                bw.E.y.z=model.iv$bw.E.y.z,
@@ -289,6 +291,8 @@ npregiv(y,
 
   \preformatted{
 
+    model.iv <- npregiv(\dots)
+
     bw <- NULL
     bw$alpha <- model.iv$alpha
     bw$alpha.iter <- model.iv$alpha.iter
@@ -300,6 +304,19 @@ npregiv(y,
     foo <- npregiv(\dots,bw=bw)    
 
   }
+
+  Or, if \code{model.iv} was obtained from an invocation of
+  \code{npregiv} with \code{method="Tikhonov"}, then the following would
+  also work:
+
+  \preformatted{
+
+    model.iv <- npregiv(\dots)
+
+    foo <- npregiv(\dots,bw=model.iv)    
+
+  }
+
   
   When exogenous predictors \code{x} (\code{xeval}) are passed, they are
   appended to both the endogenous predictors \code{z} and the

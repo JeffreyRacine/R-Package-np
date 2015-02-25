@@ -269,12 +269,15 @@ npregiv <- function(y,
 
           } else if(deriv==1) {
 
+              ## Note this is not general XXX Feb 25 2015, for
+              ## univariate z only
+
               K.x.deriv <- npksum(txdat=X.train,
                                   exdat=X.eval,
                                   bws=bws,
                                   return.kernel.weights=TRUE,
                                   operator="derivative",
-                                  ...)$kw/NZD(h$bw)
+                                  ...)$kw/NZD(bws)
 
               rSk <- NZD(rowSums(t(K.x)))
 
@@ -1122,7 +1125,6 @@ npregiv <- function(y,
     } else {
         bw.E.y.w <- bw$bw.E.y.w
     }
-
 
     console <- printClear(console)
     console <- printPop(console)
