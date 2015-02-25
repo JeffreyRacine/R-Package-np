@@ -42,6 +42,7 @@ npregiv <- function(y,
                     optim.abstol=.Machine$double.eps,
                     optim.maxit=500,
                     alpha=NULL,
+                    alpha.iter=NULL,
                     alpha.min=1.0e-10,
                     alpha.max=1.0e-01,
                     alpha.tol=.Machine$double.eps^0.25,
@@ -59,7 +60,7 @@ npregiv <- function(y,
                     return.weights.phi.deriv.2=FALSE,
                     bw=NULL,
                     ...) {
-    
+
   ## This function was constructed initially by Samuele Centorrino
   ## <samuele.centorrino@univ-tlse1.fr> to reproduce illustrations in
   ## the following papers:
@@ -173,7 +174,7 @@ npregiv <- function(y,
       return(sum((CZ%*%phi - r)^2)/alpha)
   }
 
-  ## $Id: npregiv.R,v 1.5 2015/02/25 02:30:02 jracine Exp jracine $
+  ## $Id: npregiv.R,v 1.9 2015/02/25 13:57:53 jracine Exp jracine $
 
   ## This function returns the weight matrix for a local polynomial,
   ## and was rewritten 14/1/15 in Toulouse while visiting JP. It
@@ -483,7 +484,8 @@ npregiv <- function(y,
                               gradients=TRUE,
                               ...))
 
-      return(list(mean = mhat,grad = grad))
+      return(list(mean = mhat,
+                  grad = grad))
 
     } else {
 
@@ -568,7 +570,8 @@ npregiv <- function(y,
 
       grad <- sapply(1:n.eval, function(i) {W.eval.deriv[i,-1, drop = FALSE] %*% coef.mat[-1,i]})
 
-      return(list(mean = mhat,grad = grad))
+      return(list(mean = mhat,
+                  grad = grad))
 
     }
 
@@ -1022,7 +1025,11 @@ npregiv <- function(y,
 
     if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
 
-    return(list(bw=bw.opt,fv=fv,numimp=numimp,best=best,fv.vec=fv.vec))
+    return(list(bw=bw.opt,
+                fv=fv,
+                numimp=numimp,
+                best=best,
+                fv.vec=fv.vec))
 
   }
 
@@ -1047,12 +1054,11 @@ npregiv <- function(y,
   if(p < 0) stop("p must be a non-negative integer")
 
   if(!is.null(alpha) && alpha <= 0) stop("alpha must be positive")
+  if(!is.null(alpha.iter) && alpha.iter <= 0) stop("alpha.iter must be positive")
 
   if(return.weights.phi.deriv.1 && !return.weights.phi) stop("must use return.weights.phi=TRUE when using return.weights.phi.deriv.1=TRUE")
-  if(return.weights.phi.deriv.2 && !return.weights.phi) stop("must use return.weights.phi=TRUE when using return.weights.phi.deriv.2=TRUE")  
+  if(return.weights.phi.deriv.2 && !return.weights.phi) stop("must use return.weights.phi=TRUE when using return.weights.phi.deriv.2=TRUE")
   if(return.weights.phi.deriv.2 && p<2) stop("must use p >= 2 when using return.weights.phi.deriv.2=TRUE")
-
-  if(any(c(return.weights.phi,return.weights.phi.deriv.1,return.weights.phi.deriv.2)) && method=="Tikhonov") warning("return.weights is only supported for method=\"Landweber-Fridman\"")
 
   start.from <- match.arg(start.from)
   method <- match.arg(method)
@@ -1098,21 +1104,30 @@ npregiv <- function(y,
 
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing bandwidths for E(y|w)...", console)
+    if(is.null(bw)) {
+        console <- printPush(paste("Computing bandwidths and E(y|w)...",sep=""),console)
+    } else {
+        console <- printPush(paste("Computing E(y|w) using supplied bandwidths...",sep=""),console)
+    }
 
-    hyw <- glpcv(ydat=y,
-                 xdat=w,
-                 degree=rep(p, num.w.numeric),
-                 nmulti=nmulti,
-                 random.seed=random.seed,
-                 optim.maxattempts=optim.maxattempts,
-                 optim.method=optim.method,
-                 optim.reltol=optim.reltol,
-                 optim.abstol=optim.abstol,
-                 optim.maxit=optim.maxit,
-                 ...)
+    if(is.null(bw)) {
+        hyw <- glpcv(ydat=y,
+                     xdat=w,
+                     degree=rep(p, num.w.numeric),
+                     nmulti=nmulti,
+                     random.seed=random.seed,
+                     optim.maxattempts=optim.maxattempts,
+                     optim.method=optim.method,
+                     optim.reltol=optim.reltol,
+                     optim.abstol=optim.abstol,
+                     optim.maxit=optim.maxit,
+                     ...)
 
-    bw.E.y.w <- hyw$bw
+        bw.E.y.w <- hyw$bw
+    } else {
+        bw.E.y.w <- bw$bw.E.y.w
+    }
+
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1120,12 +1135,12 @@ npregiv <- function(y,
 
     E.y.w <- glpreg(tydat=y,
                     txdat=w,
-                    bws=hyw$bw,
+                    bws=bw.E.y.w,
                     degree=rep(p, num.w.numeric),
                     ...)$mean
 
     KYW <- Kmat.lp(mydata.train=data.frame(w),
-                   bws=hyw$bw,
+                   bws=bw.E.y.w,
                    p=rep(p, num.w.numeric),
                    ...)
 
@@ -1133,21 +1148,29 @@ npregiv <- function(y,
 
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing bandwidths for E(E(y|w)|z)...", console)
+    if(is.null(bw)) {
+        console <- printPush("Computing bandwidths for E(E(y|w)|z)...", console)
+    } else {
+        console <- printPush("Computing E(E(y|w)|z) using supplied bandwidths...", console)
+    }
 
-    hywz <- glpcv(ydat=E.y.w,
-                  xdat=z,
-                  degree=rep(p, num.z.numeric),
-                  nmulti=nmulti,
-                  random.seed=random.seed,
-                  optim.maxattempts=optim.maxattempts,
-                  optim.method=optim.method,
-                  optim.reltol=optim.reltol,
-                  optim.abstol=optim.abstol,
-                  optim.maxit=optim.maxit,
-                  ...)
+    if(is.null(bw)) {
+        hywz <- glpcv(ydat=E.y.w,
+                      xdat=z,
+                      degree=rep(p, num.z.numeric),
+                      nmulti=nmulti,
+                      random.seed=random.seed,
+                      optim.maxattempts=optim.maxattempts,
+                      optim.method=optim.method,
+                      optim.reltol=optim.reltol,
+                      optim.abstol=optim.abstol,
+                      optim.maxit=optim.maxit,
+                      ...)
 
-    bw.E.E.y.w.z <- hywz$bw
+        bw.E.E.y.w.z <- hywz$bw
+    } else {
+        bw.E.E.y.w.z <- bw$bw.E.E.y.w.z
+    }
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1155,12 +1178,12 @@ npregiv <- function(y,
 
     E.E.y.w.z <- glpreg(tydat=E.y.w,
                         txdat=z,
-                        bws=hywz$bw,
+                        bws=bw.E.E.y.w.z,
                         degree=rep(p, num.z.numeric),
                         ...)$mean
 
     KYWZ <- Kmat.lp(mydata.train=data.frame(z),
-                    bws=hywz$bw,
+                    bws=bw.E.E.y.w.z,
                     p=rep(p, num.z.numeric),
                     ...)
 
@@ -1172,8 +1195,10 @@ npregiv <- function(y,
 
     ## E(r|z)=E(E(phi(z)|w)|z)
     ## \phi^\alpha = (\alpha I+CzCw)^{-1}Cr x r
-    
-    if(is.null(alpha)) {
+
+    if(!is.null(bw)) alpha <- bw$alpha
+
+    if(is.null(alpha)&&is.null(bw)) {
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush("Numerically solving for alpha...", console)
@@ -1188,27 +1213,31 @@ npregiv <- function(y,
     console <- printPush("Computing initial phi(z) estimate...", console)
     phi <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
 
-    ## KYWZ and KYWS no longer used, save memory
-
-    rm(KYWZ, KYW)
-
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
+    if(is.null(bw)) {
+        console <- printPush("Computing bandwidths for E(phi(z)|w)...", console)
+    } else {
+        console <- printPush("Computing E(phi(z)|w) using supplied bandwidths...", console)
+    }
 
-    hphiw <- glpcv(ydat=phi, ## 23/1/15 phi is sample
-                   xdat=w,
-                   degree=rep(p, num.w.numeric),
-                   nmulti=nmulti,
-                   random.seed=random.seed,
-                   optim.maxattempts=optim.maxattempts,
-                   optim.method=optim.method,
-                   optim.reltol=optim.reltol,
-                   optim.abstol=optim.abstol,
-                   optim.maxit=optim.maxit,
-                   ...)
+    if(is.null(bw)) {
+        hphiw <- glpcv(ydat=phi, ## 23/1/15 phi is sample
+                       xdat=w,
+                       degree=rep(p, num.w.numeric),
+                       nmulti=nmulti,
+                       random.seed=random.seed,
+                       optim.maxattempts=optim.maxattempts,
+                       optim.method=optim.method,
+                       optim.reltol=optim.reltol,
+                       optim.abstol=optim.abstol,
+                       optim.maxit=optim.maxit,
+                       ...)
 
-    bw.E.phi.w <- hphiw$bw
+        bw.E.phi.w <- hphiw$bw
+    } else {
+        bw.E.phi.w <- bw$bw.E.phi.w
+    }
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1216,39 +1245,47 @@ npregiv <- function(y,
 
     E.phi.w <- glpreg(tydat=phi,
                       txdat=w,
-                      bws=hphiw$bw,
+                      bws=bw.E.phi.w,
                       degree=rep(p, num.w.numeric),
                       ...)$mean
 
     KPHIW <- Kmat.lp(mydata.train=data.frame(w),
-                     bws=hphiw$bw,
+                     bws=bw.E.phi.w,
                      p=rep(p, num.w.numeric),
                      ...)
 
     console <- printClear(console)
     console <- printPop(console)
-    console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
+    if(is.null(bw)) {
+        console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
+    } else {
+        console <- printPush("Computing E(E(phi(z)|w)|z) using supplied bandwidths...", console)
+    }
 
-    hphiwz <- glpcv(ydat=E.phi.w,
-                    xdat=z,
-                    degree=rep(p, num.z.numeric),
-                    nmulti=nmulti,
-                    random.seed=random.seed,
-                    optim.maxattempts=optim.maxattempts,
-                    optim.method=optim.method,
-                    optim.reltol=optim.reltol,
-                    optim.abstol=optim.abstol,
-                    optim.maxit=optim.maxit,
-                    ...)
+    if(is.null(bw)) {
+        hphiwz <- glpcv(ydat=E.phi.w,
+                        xdat=z,
+                        degree=rep(p, num.z.numeric),
+                        nmulti=nmulti,
+                        random.seed=random.seed,
+                        optim.maxattempts=optim.maxattempts,
+                        optim.method=optim.method,
+                        optim.reltol=optim.reltol,
+                        optim.abstol=optim.abstol,
+                        optim.maxit=optim.maxit,
+                        ...)
 
-    bw.E.E.phi.w.z <- hphiwz$bw
+        bw.E.E.phi.w.z <- hphiwz$bw
+    } else {
+        bw.E.E.phi.w.z <- bw$bw.E.E.phi.w.z
+    }
 
     console <- printClear(console)
     console <- printPop(console)
     console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
 
     KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
-                      bws=hphiwz$bw,
+                      bws=bw.E.E.phi.w.z,
                       p=rep(p, num.z.numeric),
                       ...)
 
@@ -1256,11 +1293,13 @@ npregiv <- function(y,
     ## of alpha (here we use the iterated Tikhonov approach) to
     ## determine the optimal alpha for the non-iterated scheme.
 
-    if(is.null(alpha)) {
+    if(!is.null(bw)) alpha.iter <- bw$alpha.iter ## need to checking here
+
+    if(is.null(alpha.iter)&&is.null(bw)) {
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-      alpha <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
+      alpha.iter <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
     }
 
     ## Finally, we conduct regularized Tikhonov regression using this
@@ -1272,45 +1311,61 @@ npregiv <- function(y,
 
     E.E.y.w.z <- glpreg(tydat=E.y.w,
                         txdat=z,
-                        bws=hphiwz$bw,
+                        bws=bw.E.E.phi.w.z,
                         degree=rep(p, num.z.numeric),
                         ...)$mean
-    
+
     KPHIW <- Kmat.lp(mydata.train=data.frame(w),
-                     bws=hphiw$bw,
+                     bws=bw.E.phi.w,
                      p=rep(p, num.w.numeric),
                      ...)
 
     KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
-                      bws=hphiwz$bw,
+                      bws=bw.E.E.phi.w.z,
                       p=rep(p, num.z.numeric),
                       ...)
 
-    phi <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
+    phi <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
+
+    H <- NULL
+    if(return.weights.phi) {
+        H <- KPHIWZ%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+    }
 
     ## First derivative
 
     KPHIWZ.deriv.1 <- Kmat.lp(deriv=1,
                               mydata.train=data.frame(z),
-                              bws=hphiwz$bw,
+                              bws=bw.E.E.phi.w.z,
                               p=rep(p, num.z.numeric),
                               ...)
 
-    phi.deriv.1 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.1, r = E.y.w))
+    phi.deriv.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.1, r = E.y.w))
+
+    H.deriv.1 <- NULL
+    if(return.weights.phi.deriv.1) {
+        H.deriv.1 <- KPHIWZ.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+    }
 
     ## Second derivative
 
     phi.deriv.2 <- NULL
-
+    H.deriv.2 <- NULL
+    
     if(p >= 2) {
-        
+
         KPHIWZ.deriv.2 <- Kmat.lp(deriv=2,
                                   mydata.train=data.frame(z),
-                                  bws=hphiwz$bw,
+                                  bws=bw.E.E.phi.w.z,
                                   p=rep(p, num.z.numeric),
                                   ...)
-        
-        phi.deriv.2 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.2, r = E.y.w))
+
+        phi.deriv.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.2, r = E.y.w))
+
+
+        if(return.weights.phi.deriv.2) {
+            H.deriv.2 <- KPHIWZ.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+        }
 
     }
 
@@ -1318,7 +1373,10 @@ npregiv <- function(y,
 
     phi.eval <- NULL
     phi.deriv.eval.1 <- NULL
-    phi.deriv.eval.2 <- NULL    
+    phi.deriv.eval.2 <- NULL
+    H.eval <- NULL
+    H.deriv.eval.1 <- NULL
+    H.deriv.eval.2 <- NULL    
 
     if(!is.null(zeval)) {
         ## If there is evaluation data, KPHIWZ and KPHIWZ.eval will
@@ -1326,48 +1384,67 @@ npregiv <- function(y,
 
         KPHIWZ.eval <- Kmat.lp(mydata.train=data.frame(z),
                                mydata.eval=data.frame(z=zeval),
-                               bws=hphiwz$bw,
+                               bws=bw.E.E.phi.w.z,
                                p=rep(p, num.z.numeric),
                                ...)
 
-        phi.eval <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval, r = E.y.w))    
+        phi.eval <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval, r = E.y.w))
+
+        if(return.weights.phi) {
+            H.eval <- KPHIWZ.eval%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+        }
 
         KPHIWZ.eval.deriv.1 <- Kmat.lp(deriv=1,
                                        mydata.train=data.frame(z),
                                        mydata.eval=data.frame(z=zeval),
-                                       bws=hphiwz$bw,
+                                       bws=bw.E.E.phi.w.z,
                                        p=rep(p, num.z.numeric),
                                        ...)
-        
-        phi.deriv.eval.1 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.1, r = E.y.w))
+
+        phi.deriv.eval.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.1, r = E.y.w))
+
+        if(return.weights.phi.deriv.1) {
+            H.deriv.eval.1 <- KPHIWZ.eval.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+        }
 
         if(p >= 2) {
-        
+
             KPHIWZ.eval.deriv.2 <- Kmat.lp(deriv=2,
                                            mydata.train=data.frame(z),
                                            mydata.eval=data.frame(z=zeval),
-                                           bws=hphiwz$bw,
+                                           bws=bw.E.E.phi.w.z,
                                            p=rep(p, num.z.numeric),
                                            ...)
-            
-            phi.deriv.eval.2 <- as.vector(tikh.eval(alpha, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.2, r = E.y.w))
-            
+
+            phi.deriv.eval.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.2, r = E.y.w))
+
+            if(return.weights.phi.deriv.2) {
+                H.deriv.eval.2 <- KPHIWZ.eval.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+            }
+
         }
     }
 
     console <- printClear(console)
     console <- printPop(console)
 
-    if((alpha-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
-    if((alpha.max-alpha)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
+    if((alpha.iter-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
+    if((alpha.max-alpha.iter)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
 
     return(list(phi=phi,
                 phi.eval=phi.eval,
-                phi.deriv.1=phi.deriv.1,
-                phi.deriv.eval.1=phi.deriv.eval.1,
-                phi.deriv.2=phi.deriv.2,
-                phi.deriv.eval.2=phi.deriv.eval.2,                                
+                phi.deriv.1=as.matrix(phi.deriv.1),
+                phi.deriv.eval.1=if(!is.null(phi.deriv.eval.1)){as.matrix(phi.deriv.eval.1)}else{NULL},
+                phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},
+                phi.deriv.eval.2=if(!is.null(phi.deriv.eval.2)){as.matrix(phi.deriv.eval.2)}else{NULL},
+                phi.weights=H,
+                phi.deriv.1.weights=H.deriv.1,
+                phi.deriv.2.weights=H.deriv.2,                
+                phi.eval.weights=H.eval,
+                phi.deriv.eval.1.weights=H.deriv.eval.1,
+                phi.deriv.eval.2.weights=H.deriv.eval.2,                
                 alpha=alpha,
+                alpha.iter=alpha.iter,
                 bw.E.y.w=bw.E.y.w,
                 bw.E.E.y.w.z=bw.E.E.y.w.z,
                 bw.E.phi.w=bw.E.phi.w,
@@ -1401,18 +1478,16 @@ npregiv <- function(y,
                    optim.abstol=optim.abstol,
                    optim.maxit=optim.maxit,
                    ...)
+        bw.E.y.w <- h$bw
     } else {
-        h <- NULL
-        h$bw <- bw$bw.E.y.w
+        bw.E.y.w <- bw$bw.E.y.w
     }
 
     E.y.w <- glpreg(tydat=y,
                     txdat=w,
-                    bws=h$bw,
+                    bws=bw.E.y.w,
                     degree=rep(p, num.w.numeric),
                     ...)$mean
-
-    bw.E.y.w <- h$bw
 
     if(return.weights.phi) {
 
@@ -1420,7 +1495,7 @@ npregiv <- function(y,
         if(NCOL(z) > 1) stop("dimension of z must be one for currently supported return weights")
 
         T.mat.r <- Kmat.lp(mydata.train=data.frame(w),
-                           bws=h$bw,
+                           bws=bw.E.y.w,
                            p=rep(p, num.w.numeric),
                            ...)
 
@@ -1451,13 +1526,14 @@ npregiv <- function(y,
                      optim.abstol=optim.abstol,
                      optim.maxit=optim.maxit,
                      ...)
+          bw.E.y.z <- h$bw
       } else {
-          h$bw <- bw$bw.E.y.z
+          bw.E.y.z <- bw$bw.E.y.z
       }
 
       g <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
                   txdat=z,
-                  bws=h$bw,
+                  bws=bw.E.y.z,
                   degree=rep(p, num.z.numeric),
                   ...)
 
@@ -1466,7 +1542,7 @@ npregiv <- function(y,
       if(p >= 2) {
           phi.0.deriv.2 <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
                                   txdat=z,
-                                  bws=h$bw,
+                                  bws=bw.E.y.z,
                                   degree=rep(p, num.z.numeric),
                                   deriv=2,
                                   ...)$grad
@@ -1476,7 +1552,7 @@ npregiv <- function(y,
           g <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
                       txdat=z,
                       exdat=zeval,
-                      bws=h$bw,
+                      bws=bw.E.y.z,
                       degree=rep(p, num.z.numeric),
                       ...)
 
@@ -1486,7 +1562,7 @@ npregiv <- function(y,
               phi.eval.0.deriv.2 <- glpreg(tydat=if(start.from=="Eyz") y else E.y.w,
                                            txdat=z,
                                            exdat=zeval,
-                                           bws=h$bw,
+                                           bws=bw.E.y.z,
                                            degree=rep(p, num.z.numeric),
                                            deriv=2,
                                            ...)$grad
@@ -1494,38 +1570,36 @@ npregiv <- function(y,
       } else {
           phi.eval.0 <- NULL
           phi.eval.0.deriv.1 <- NULL
-          phi.eval.0.deriv.2 <- NULL          
+          phi.eval.0.deriv.2 <- NULL
       }
-
-      bw.E.y.z <- h$bw
 
       if(return.weights.phi) {
 
           H <- Kmat.lp(mydata.train=data.frame(z),
-                       bws=h$bw,
+                       bws=bw.E.y.z,
                        p=rep(p, num.z.numeric),
                        ...)
 
           if(!is.null(zeval)) H.eval <- Kmat.lp(mydata.train=data.frame(z),
                                                 mydata.eval=data.frame(z=zeval),
-                                                bws=h$bw,
+                                                bws=bw.E.y.z,
                                                 p=rep(p, num.z.numeric),
                                                 ...)
 
           if(p==0 || p==1) {
 
               if(return.weights.phi.deriv.1) {
-              
+
                   H.deriv.1 <- Kmat.lp(deriv=1,
                                        mydata.train=data.frame(z),
-                                       bws=h$bw,
+                                       bws=bw.E.y.z,
                                        p=rep(p, num.z.numeric),
                                        ...)
-                  
+
                   if(!is.null(zeval)) H.deriv.eval.1 <- Kmat.lp(deriv=1,
                                                                 mydata.train=data.frame(z),
                                                                 mydata.eval=data.frame(z=zeval),
-                                                                bws=h$bw,
+                                                                bws=bw.E.y.z,
                                                                 p=rep(p, num.z.numeric),
                                                                 ...)
               }
@@ -1533,44 +1607,44 @@ npregiv <- function(y,
           } else {
 
               if(return.weights.phi.deriv.1) {
-              
+
                   H.deriv.1 <- Kmat.lp(deriv=1,
                                        mydata.train=data.frame(z),
-                                       bws=h$bw,
+                                       bws=bw.E.y.z,
                                        p=rep(p, num.z.numeric),
                                        ...)
                   if(!is.null(zeval)) {
-                      
+
                       H.deriv.eval.1 <- Kmat.lp(deriv=1,
                                                 mydata.train=data.frame(z),
                                                 mydata.eval=data.frame(z=zeval),
-                                                bws=h$bw,
+                                                bws=bw.E.y.z,
                                                 p=rep(p, num.z.numeric),
                                                 ...)
-                      
+
                   }
 
               }
 
               if(return.weights.phi.deriv.2) {
-              
+
                   H.deriv.2 <- Kmat.lp(deriv=2,
                                        mydata.train=data.frame(z),
-                                       bws=h$bw,
+                                       bws=bw.E.y.z,
                                        p=rep(p, num.z.numeric),
                                        ...)
 
                   if(!is.null(zeval)) {
-                      
+
                       H.deriv.eval.2 <- Kmat.lp(deriv=2,
                                                 mydata.train=data.frame(z),
                                                 mydata.eval=data.frame(z=zeval),
-                                                bws=h$bw,
+                                                bws=bw.E.y.z,
                                                 p=rep(p, num.z.numeric),
                                                 ...)
-                      
+
                   }
-                  
+
               }
 
           }
@@ -1602,7 +1676,7 @@ npregiv <- function(y,
 
       resid <- y - phi.0
 
-      if(is.null(bw)) {  
+      if(is.null(bw)) {
           h <- glpcv(ydat=resid,
                      xdat=w,
                      degree=rep(p, num.w.numeric),
@@ -1614,19 +1688,20 @@ npregiv <- function(y,
                      optim.abstol=optim.abstol,
                      optim.maxit=optim.maxit,
                      ...)
+          bw.resid.w <- h$bw
       } else {
-          h$bw <- bw$bw.resid.w[1,]
+          bw.resid.w <- bw$bw.resid.w[1,]
       }
 
       resid.fitted <- glpreg(tydat=resid,
                              txdat=w,
-                             bws=h$bw,
+                             bws=bw.resid.w,
                              degree=rep(p, num.w.numeric),
                              ...)$mean
 
     } else {
 
-      if(is.null(bw)) {  
+      if(is.null(bw)) {
           h <- glpcv(ydat=phi.0,
                      xdat=w,
                      degree=rep(p, num.w.numeric),
@@ -1638,24 +1713,23 @@ npregiv <- function(y,
                      optim.abstol=optim.abstol,
                      optim.maxit=optim.maxit,
                      ...)
+          bw.resid.w <- h$bw
       } else {
-          h$bw <- bw$bw.resid.w[1,]
+          bw.resid.w <- bw$bw.resid.w[1,]
       }
 
       resid.fitted <- E.y.w - glpreg(tydat=phi.0,
                                      txdat=w,
-                                     bws=h$bw,
+                                     bws=bw.resid.w,
                                      degree=rep(p, num.w.numeric),
                                      ...)$mean
 
     }
 
-    bw.resid.w <- h$bw
-
     if(return.weights.phi) {
 
         T.mat <- Kmat.lp(mydata.train=data.frame(w),
-                         bws=h$bw,
+                         bws=bw.resid.w,
                          p=rep(p, num.z.numeric),
                          ...)
 
@@ -1683,13 +1757,14 @@ npregiv <- function(y,
                    optim.abstol=optim.abstol,
                    optim.maxit=optim.maxit,
                    ...)
+        bw.resid.fitted.w.z <- h$bw
     } else {
-        h$bw <- bw$bw.resid.fitted.w.z[1,]
+        bw.resid.fitted.w.z <- bw$bw.resid.fitted.w.z[1,]
     }
 
     g <- glpreg(tydat=resid.fitted,
                 txdat=z,
-                bws=h$bw,
+                bws=bw.resid.fitted.w.z,
                 degree=rep(p, num.z.numeric),
                 ...)
 
@@ -1710,18 +1785,18 @@ npregiv <- function(y,
     if(p >= 2) {
         phi.deriv.2 <- phi.0.deriv.2 + constant*glpreg(tydat=resid.fitted,
                                                        txdat=z,
-                                                       bws=h$bw,
+                                                       bws=bw.resid.fitted.w.z,
                                                        degree=rep(p, num.z.numeric),
                                                        deriv=2,
                                                        ...)$grad
-        phi.deriv.2.list[[1]] <- phi.deriv.2        
+        phi.deriv.2.list[[1]] <- phi.deriv.2
     }
 
     if(!is.null(zeval)) {
         g <- glpreg(tydat=resid.fitted,
                     txdat=z,
                     exdat=zeval,
-                    bws=h$bw,
+                    bws=bw.resid.fitted.w.z,
                     degree=rep(p, num.z.numeric),
                     ...)
         phi.eval <- phi.eval.0 + constant*g$mean
@@ -1733,7 +1808,7 @@ npregiv <- function(y,
         if(p >= 2) {
             phi.deriv.eval.2 <- phi.eval.0.deriv.2 + constant*glpreg(tydat=resid.fitted,
                                                                      txdat=z,
-                                                                     bws=h$bw,
+                                                                     bws=bw.resid.fitted.w.z,
                                                                      exdat=zeval,
                                                                      degree=rep(p, num.z.numeric),
                                                                      deriv=2,
@@ -1742,15 +1817,13 @@ npregiv <- function(y,
         }
 
 
-        
+
     } else {
         phi.eval <- NULL
         phi.eval.mat <- NULL
         phi.deriv.eval.1 <- NULL
         phi.deriv.eval.1.list <- NULL
     }
-
-    bw.resid.fitted.w.z <- h$bw
 
     ## Need these list even when no weights for return
 
@@ -1765,13 +1838,13 @@ npregiv <- function(y,
     if(return.weights.phi) {
 
         T.mat.adjoint <- Kmat.lp(mydata.train=data.frame(z),
-                                 bws=h$bw,
+                                 bws=bw.resid.fitted.w.z,
                                  p=rep(p, num.z.numeric),
                                  ...)
 
         if(!is.null(zeval)) T.mat.adjoint.eval <- Kmat.lp(mydata.train=data.frame(z),
                                                           mydata.eval=data.frame(z=zeval),
-                                                          bws=h$bw,
+                                                          bws=bw.resid.fitted.w.z,
                                                           p=rep(p, num.z.numeric),
                                                           ...)
         if(p==0 || p==1) {
@@ -1780,14 +1853,14 @@ npregiv <- function(y,
 
                 T.mat.adjoint.deriv.1 <- Kmat.lp(deriv=1,
                                                  mydata.train=data.frame(z),
-                                                 bws=h$bw,
+                                                 bws=bw.resid.fitted.w.z,
                                                  p=rep(p, num.z.numeric),
                                                  ...)
-                
+
                 if(!is.null(zeval)) T.mat.adjoint.deriv.eval.1 <- Kmat.lp(deriv=1,
                                                                           mydata.train=data.frame(z),
                                                                           mydata.eval=data.frame(z=zeval),
-                                                                          bws=h$bw,
+                                                                          bws=bw.resid.fitted.w.z,
                                                                           p=rep(p, num.z.numeric),
                                                                           ...)
             }
@@ -1798,44 +1871,44 @@ npregiv <- function(y,
 
                 T.mat.adjoint.deriv.1 <- Kmat.lp(deriv=1,
                                                  mydata.train=data.frame(z),
-                                                 bws=h$bw,
+                                                 bws=bw.resid.fitted.w.z,
                                                  p=rep(p, num.z.numeric),
                                                  ...)
-                
+
                 if(!is.null(zeval)) {
-                    
+
                     T.mat.adjoint.deriv.eval.1 <- Kmat.lp(deriv=1,
                                                           mydata.train=data.frame(z),
                                                           mydata.eval=data.frame(z=zeval),
-                                                          bws=h$bw,
+                                                          bws=bw.resid.fitted.w.z,
                                                           p=rep(p, num.z.numeric),
                                                           ...)
-                    
+
                 }
-                
+
             }
 
             if(return.weights.phi.deriv.2) {
 
                 T.mat.adjoint.deriv.2 <- Kmat.lp(deriv=2,
                                                  mydata.train=data.frame(z),
-                                                 bws=h$bw,
+                                                 bws=bw.resid.fitted.w.z,
                                                  p=rep(p, num.z.numeric),
                                                  ...)
-                
+
                 if(!is.null(zeval)) {
-                    
+
                     T.mat.adjoint.deriv.eval.2 <- Kmat.lp(deriv=2,
                                                           mydata.train=data.frame(z),
                                                           mydata.eval=data.frame(z=zeval),
-                                                          bws=h$bw,
+                                                          bws=bw.resid.fitted.w.z,
                                                           p=rep(p, num.z.numeric),
                                                           ...)
-                    
+
                 }
 
             }
-                
+
         }
 
         if(smooth.residuals) {
@@ -1870,6 +1943,10 @@ npregiv <- function(y,
     }
 
     if(!is.null(bw)) iterate.max <- bw$norm.index
+
+    ## In what follows we rbind() bandwidths to return and are careful
+    ## about which ones are used when fed in, so we use h$bw below
+    ## (but above all are named).
 
     for(j in 2:iterate.max) {
 
@@ -2025,22 +2102,22 @@ npregiv <- function(y,
                                    bws=h$bw,
                                    p=rep(p, num.z.numeric),
                                    ...)
-          
+
           if(!is.null(zeval)) T.mat.adjoint.eval <- Kmat.lp(mydata.train=data.frame(z),
                                                             mydata.eval=data.frame(z=zeval),
                                                             bws=h$bw,
                                                             p=rep(p, num.z.numeric),
                                                             ...)
           if(p==0 || p==1) {
-              
+
               if(return.weights.phi.deriv.1) {
-                  
+
                   T.mat.adjoint.deriv.1 <- Kmat.lp(deriv=1,
                                                    mydata.train=data.frame(z),
                                                    bws=h$bw,
                                                    p=rep(p, num.z.numeric),
                                                    ...)
-                  
+
                   if(!is.null(zeval)) T.mat.adjoint.deriv.eval.1 <- Kmat.lp(deriv=1,
                                                                             mydata.train=data.frame(z),
                                                                             mydata.eval=data.frame(z=zeval),
@@ -2048,53 +2125,53 @@ npregiv <- function(y,
                                                                             p=rep(p, num.z.numeric),
                                                                             ...)
               }
-              
+
           } else {
-              
+
               if(return.weights.phi.deriv.1) {
-                  
+
                   T.mat.adjoint.deriv.1 <- Kmat.lp(deriv=1,
                                                    mydata.train=data.frame(z),
                                                    bws=h$bw,
                                                    p=rep(p, num.z.numeric),
                                                    ...)
-                  
+
                   if(!is.null(zeval)) {
-                      
+
                       T.mat.adjoint.deriv.eval.1 <- Kmat.lp(deriv=1,
                                                             mydata.train=data.frame(z),
                                                             mydata.eval=data.frame(z=zeval),
                                                             bws=h$bw,
                                                             p=rep(p, num.z.numeric),
                                                             ...)
-                      
+
                   }
-                  
+
               }
-              
+
               if(return.weights.phi.deriv.2) {
-                  
+
                   T.mat.adjoint.deriv.2 <- Kmat.lp(deriv=2,
                                                    mydata.train=data.frame(z),
                                                    bws=h$bw,
                                                    p=rep(p, num.z.numeric),
                                                    ...)
-                  
+
                   if(!is.null(zeval)) {
-                      
+
                       T.mat.adjoint.deriv.eval.2 <- Kmat.lp(deriv=2,
                                                             mydata.train=data.frame(z),
                                                             mydata.eval=data.frame(z=zeval),
                                                             bws=h$bw,
                                                             p=rep(p, num.z.numeric),
                                                             ...)
-                      
+
                   }
-                  
+
               }
-              
+
           }
-          
+
           if(smooth.residuals) {
               if(!is.null(zeval)) {
                   H.eval <- H.eval + constant*T.mat.adjoint.eval%*%(T.mat-T.mat%*%H)
@@ -2114,7 +2191,7 @@ npregiv <- function(y,
               if(p>1 && return.weights.phi.deriv.2) H.deriv.2 <- H.deriv.2 + constant*T.mat.adjoint.deriv.2%*%(T.mat.r-T.mat%*%H)
               H <- H + constant*T.mat.adjoint%*%(T.mat.r-T.mat%*%H)
           }
-          
+
           phi.weights.list[[j]] <- H
           if(return.weights.phi.deriv.1) phi.deriv.1.weights.list[[j]] <- H.deriv.1
           if(p>1 && return.weights.phi.deriv.2) phi.deriv.2.weights.list[[j]] <- H.deriv.2
@@ -2123,9 +2200,9 @@ npregiv <- function(y,
               if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights.list[[j]] <- H.deriv.eval.1
               if(p>1 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights.list[[j]] <- H.deriv.eval.2
           }
-          
+
       }
-      
+
       console <- printClear(console)
       console <- printPop(console)
       if(is.null(bw)) console <- printPush(paste("Computing stopping rule for iteration ", j,"...",sep=""),console)
@@ -2144,10 +2221,10 @@ npregiv <- function(y,
       if(is.null(bw))  {
 
           if(j > round(sqrt(nrow(z))) && !is.monotone.increasing(norm.stop)) {
-              
+
               ## If stopping rule criterion increases or we are below stopping
               ## tolerance then break
-              
+
               if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
                   convergence <- "STOP_ON_INCREASE"
                   break()
@@ -2156,11 +2233,11 @@ npregiv <- function(y,
                   convergence <- "ITERATE_DIFF_TOL"
                   break()
               }
-              
+
           }
-          
+
           convergence <- "ITERATE_MAX"
-          
+
       }
 
     }
@@ -2185,11 +2262,11 @@ npregiv <- function(y,
             j <- j-1 + which.min(norm.value[j:length(norm.value)])
             phi <- phi.mat[,j]
             if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
-            if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]            
+            if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
             if(!is.null(zeval)) {
                 phi.eval <- phi.eval.mat[,j]
                 if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
-                if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]                
+                if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
             }
         } else {
             ## Ignore the initial increasing portion, take the min to the
@@ -2199,19 +2276,19 @@ npregiv <- function(y,
             j <- j-1 + which.min(norm.stop[j:length(norm.stop)])
             phi <- phi.mat[,j]
             if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
-            if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]            
+            if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
             if(!is.null(zeval)) {
                 phi.eval <- phi.eval.mat[,j]
                 if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
-                if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]                
+                if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
             }
         }
-        
+
     }
-    
+
     console <- printClear(console)
     console <- printPop(console)
-    
+
     if(is.null(bw)) {
         if(j == iterate.max) warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")
     } else {
@@ -2219,19 +2296,19 @@ npregiv <- function(y,
         norm.stop <- NULL
         convergence <- NULL
     }
-    
+
     return(list(phi=phi,
                 phi.mat=phi.mat,
                 phi.deriv.1=as.matrix(phi.deriv.1),
-                phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},                
+                phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},
                 phi.deriv.1.list=phi.deriv.1.list,
-                phi.deriv.2.list=phi.deriv.2.list,                
+                phi.deriv.2.list=phi.deriv.2.list,
                 phi.weights.list=phi.weights.list,
                 phi.deriv.1.weights.list=phi.deriv.1.weights.list,
                 phi.deriv.2.weights.list=phi.deriv.2.weights.list,
                 phi.eval=phi.eval,
                 phi.eval.mat=phi.eval.mat,
-                phi.deriv.eval.1=as.matrix(phi.deriv.eval.1),
+                phi.deriv.eval.1=if(!is.null(phi.deriv.eval.1)){as.matrix(phi.deriv.eval.1)}else{NULL},
                 phi.deriv.eval.1.list=phi.deriv.eval.1.list,
                 phi.deriv.eval.2=if(!is.null(phi.deriv.eval.2)){as.matrix(phi.deriv.eval.2)}else{NULL},
                 phi.deriv.eval.2.list=phi.deriv.eval.2.list,
@@ -2248,7 +2325,7 @@ npregiv <- function(y,
                 bw.E.y.z=bw.E.y.z,
                 bw.resid.w=as.matrix(bw.resid.w),
                 bw.resid.fitted.w.z=as.matrix(bw.resid.fitted.w.z)))
-    
+
   }
-  
+
 }
