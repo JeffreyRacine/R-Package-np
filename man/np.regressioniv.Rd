@@ -267,8 +267,9 @@ npregiv(y,
 
   When passing \code{bw}, it must be obtained from a previous invocation
   of \code{npregiv}. For instance, if \code{model.iv} was obtained from
-  an invocation of \code{npregiv}, then the following needs to be fed to
-  the subsequent invocation of \code{npregiv}.
+  an invocation of \code{npregiv} with
+  \code{method="Landweber-Fridman"}, then the following needs to be fed
+  to the subsequent invocation of \code{npregiv}:
 
   \preformatted{
     
@@ -277,8 +278,29 @@ npregiv(y,
                bw.resid.w=model.iv$bw.resid.w,
                bw.resid.fitted.w.z=model.iv$bw.resid.fitted.w.z,
                norm.index=model.iv$norm.index)
+
+    foo <- npregiv(...,bw=bw)
   }
 
+  If, on the other hand \code{model.iv} was obtained from an invocation
+  of \code{npregiv} with \code{method="Tikhonov"}, then the
+  following needs to be fed to the subsequent invocation of
+  \code{npregiv}:
+
+  \preformatted{
+
+    bw <- NULL
+    bw$alpha <- model.iv$alpha
+    bw$alpha.iter <- model.iv$alpha.iter
+    bw$bw.E.y.w <- model.iv$bw.E.y.w
+    bw$bw.E.E.y.w.z <- model.iv$bw.E.E.y.w.z
+    bw$bw.E.phi.w <- model.iv$bw.E.phi.w
+    bw$bw.E.E.phi.w.z <- model.iv$bw.E.E.phi.w.z
+
+    foo <- npregiv(...,bw=bw)    
+
+  }
+  
   When exogenous predictors \code{x} (\code{xeval}) are passed, they are
   appended to both the endogenous predictors \code{z} and the
   instruments \code{w} as additional columns. If this is not desired,

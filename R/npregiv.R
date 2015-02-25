@@ -21,7 +21,7 @@
 
 ## phi: the IV estimator of phi(y)
 ## alpha:  the Tikhonov regularization parameter
-## phi.mat: the matrix with colums phi_1, phi_2 etc. over all iterations
+## phi.mat: the matrix with columns phi_1, phi_2 etc. over all iterations
 ## norm.index:  the number of Landweber-Fridman iterations when stopped
 ## norm.stop: the vector of values of the objective function used for stopping
 ## norm.value: the norm not multiplied by the number of iterations
@@ -215,7 +215,7 @@ npregiv <- function(y,
       ## glpreg(). However, they all appear to agree with the previous
       ## Kmat.lp with ** also ** did not shrink towards the lc
       ## estimator. This is noticeably faster, which ought to render
-      ## tikhonov faster as well.
+      ## Tikhonov faster as well.
 
       ## Basic error checking...
 
@@ -1063,12 +1063,6 @@ npregiv <- function(y,
   start.from <- match.arg(start.from)
   method <- match.arg(method)
 
-  ## Check for evaluation data XXX this is perhaps not optimal??? SUNY visit - revisit
-
-#  if(is.null(zeval)) zeval <- z
-#  if(is.null(xeval)) xeval <- x
-  if(!is.null(zeval)&&!is.null(xeval)) zeval <- data.frame(zeval,xeval)
-
   ## Need to determine how many x, w, z are numeric
 
   z <- data.frame(z)
@@ -1080,8 +1074,9 @@ npregiv <- function(y,
       ## 20/1/15 in Toulouse.
       w <- data.frame(w,x)
       ## Obviously, if you have exogenous variables that are only in
-      ## the instrubment set, you can trivially accommodate this
+      ## the instrument set, you can trivially accommodate this
       ## (append to w before invoking the function)
+      if(!is.null(zeval)&&!is.null(xeval)) zeval <- data.frame(zeval,xeval)
   }
 
   z.numeric <- sapply(1:NCOL(z),function(i){is.numeric(z[,i])})
