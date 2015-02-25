@@ -37,6 +37,7 @@ npregiv(y,
         optim.abstol = .Machine$double.eps,
         optim.maxit = 500,
         alpha = NULL,
+        alpha.iter = NULL,
         alpha.min = 1e-10,
         alpha.max = 1e-01,
         alpha.tol = .Machine$double.eps^0.25,
@@ -151,6 +152,11 @@ npregiv(y,
     a numeric scalar that, if supplied, is used rather than numerically
     solving for \code{alpha}, when using \code{method="Tikhonov"}.
     }
+  \item{alpha.iter}{
+    a numeric scalar that, if supplied, is used for iterated Tikhonov
+    rather than numerically solving for \code{alpha}, when using
+    \code{method="Tikhonov"}.
+  }
   \item{alpha.min}{
     minimum of search range for \eqn{\alpha}{alpha}, the Tikhonov
     regularization parameter, when using \code{method="Tikhonov"}.
@@ -299,13 +305,17 @@ npregiv(y,
   \code{phi.deriv.1}, and \code{phi.deriv.2} (the latter only being
   produced when \code{p} is 2 or greater). When invoked with evaluation
   data, similar matrices are returned but named \code{phi.eval.weights}
-  and \code{phi.deriv.eval.*.weights.list}.
+  and \code{phi.deriv.eval.*.weights.list}. When
+  \code{method="Tikhonov"} is invoked, the return objects are matrices
+  rather than lists and \code{.list} is omitted from their name.
 
   When \code{method="Landweber-Fridman"} is invoked, bandwidth objects
   are returned in \code{bw.E.y.w} (scalar/vector), \code{bw.E.y.z}
   (scalar/vector), and \code{bw.resid.w} (matrix) and
   \code{bw.resid.fitted.w.z}, the latter matrices containing bandwidths
-  for each iteration stored as rows.
+  for each iteration stored as rows. When \code{method="Tikhonov"} is
+  invoked, bandwidth objects are returned in \code{bw.E.y.w},
+  \code{bw.E.E.y.w.z}, and \code{bw.E.phi.w} and \code{bw.E.E.phi.w.z}.
   
 }
 
