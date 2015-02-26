@@ -242,9 +242,11 @@ npregiv(y,
     regression with respect to \eqn{z}
   }
   \item{bw}{
-    a list which, if provided, use used to compute all conditional moments
-    rather than to compute them via cross-validation (see details for an
-    illustration)
+    an object which, if provided, contains bandwidths and parameters
+    (obtained from a previous invocation of \code{npregiv}) required to
+    re-compute the estimator without having to re-run cross-validation
+    and/or numerical optimization which is particularly costly in this
+    setting (see details below for an illustration of its use)
   }
   \item{\dots}{
     additional arguments supplied to \code{\link{npksum}}.
@@ -275,9 +277,10 @@ npregiv(y,
   }{||(E(y|w)-E(phi(z,x)|w))/E(y|w)||^2 } stops falling in value and
   starts rising.
 
-  When passing \code{bw}, it must be obtained from a previous invocation
-  of \code{npregiv}. For instance, if \code{model.iv} was obtained from
-  an invocation of \code{npregiv} with
+  The option \code{bw=} would be useful, say, when bootstrapping is
+  necessary. Note that when passing \code{bw}, it must be obtained from
+  a previous invocation of \code{npregiv}. For instance, if
+  \code{model.iv} was obtained from an invocation of \code{npregiv} with
   \code{method="Landweber-Fridman"}, then the following needs to be fed
   to the subsequent invocation of \code{npregiv}:
 
@@ -342,21 +345,18 @@ npregiv(y,
   \code{npregiv} returns a list with components \code{phi},
   \code{phi.mat} and either \code{alpha} when \code{method="Tikhonov"}
   or \code{norm.index}, \code{norm.stop} and \code{convergence} when
-  \code{method="Landweber-Fridman"}.
+  \code{method="Landweber-Fridman"}, among others.
 
-  In addition, when \code{method="Landweber-Fridman"} is invoked, if any
-  of \code{return.weights.*} are invoked (\code{*=1,2}), then
-  \code{phi.weights.list} and \code{phi.deriv.*.weights.list} return
-  lists of weight matrices for computing the instrumental regression and
-  its partial derivatives. Note that these lists, when evaluated at
-  \code{[[model.iv$norm.index]]} and post multiplied by the response
-  vector \eqn{y}, will deliver the estimates returned in \code{phi},
-  \code{phi.deriv.1}, and \code{phi.deriv.2} (the latter only being
-  produced when \code{p} is 2 or greater). When invoked with evaluation
-  data, similar matrices are returned but named \code{phi.eval.weights}
-  and \code{phi.deriv.eval.*.weights.list}. When
-  \code{method="Tikhonov"} is invoked, the return objects are matrices
-  rather than lists and \code{.list} is omitted from their name.
+  In addition, if any of \code{return.weights.*} are invoked
+  (\code{*=1,2}), then \code{phi.weights} and \code{phi.deriv.*.weights}
+  return weight matrices for computing the instrumental regression and
+  its partial derivatives. Note that these weights, post multiplied by
+  the response vector \eqn{y}, will deliver the estimates returned in
+  \code{phi}, \code{phi.deriv.1}, and \code{phi.deriv.2} (the latter
+  only being produced when \code{p} is 2 or greater). When invoked with
+  evaluation data, similar matrices are returned but named
+  \code{phi.eval.weights} and \code{phi.deriv.eval.*.weights}. These
+  weights can be used for constrained estimation, among others.
 
   When \code{method="Landweber-Fridman"} is invoked, bandwidth objects
   are returned in \code{bw.E.y.w} (scalar/vector), \code{bw.E.y.z}
