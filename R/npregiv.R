@@ -2285,43 +2285,63 @@ npregiv <- function(y,
     ## and take the min from where the initial inflection point occurs
     ## to the length of norm.stop
 
-      if(is.null(bw))  {
+    phi.weights <- NULL
+    phi.deriv.1.weights <- NULL
+    phi.deriv.2.weights <- NULL
 
-        norm.value <- norm.stop/(1:length(norm.stop))
+    phi.eval.weights <- NULL
+    phi.deriv.eval.1.weights <- NULL
+    phi.deriv.eval.2.weights <- NULL
 
-        if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
-            warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
-            convergence <- "FAILURE_MONOTONE_INCREASING"
-            phi <- starting.values.phi
-            j <- 1
-            while(norm.value[j+1] > norm.value[j]) j <- j + 1
-            j <- j-1 + which.min(norm.value[j:length(norm.value)])
-            phi <- phi.mat[,j]
-            if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
-            if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
-            if(!is.null(zeval)) {
-                phi.eval <- phi.eval.mat[,j]
-                if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
-                if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
-            }
-        } else {
-            ## Ignore the initial increasing portion, take the min to the
-            ## right of where the initial inflection point occurs
-            j <- 1
-            while(norm.stop[j+1] > norm.stop[j]) j <- j + 1
-            j <- j-1 + which.min(norm.stop[j:length(norm.stop)])
-            phi <- phi.mat[,j]
-            if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
-            if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
-            if(!is.null(zeval)) {
-                phi.eval <- phi.eval.mat[,j]
-                if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
-                if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
-            }
-        }
+    if(is.null(bw))  {
 
+      norm.value <- norm.stop/(1:length(norm.stop))
+
+      if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
+          warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
+          convergence <- "FAILURE_MONOTONE_INCREASING"
+          phi <- starting.values.phi
+          j <- 1
+          while(norm.value[j+1] > norm.value[j]) j <- j + 1
+          j <- j-1 + which.min(norm.value[j:length(norm.value)])
+          phi <- phi.mat[,j]
+          if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
+          if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
+          if(return.weights.phi) phi.weights <- phi.weights.list[[j]]
+          if(return.weights.phi.deriv.1) phi.deriv.1.weights <- phi.deriv.1.weights.list[[j]]
+          if(p>=2 && return.weights.phi.deriv.2) phi.deriv.2.weights <- phi.deriv.2.weights.list[[j]]
+          if(!is.null(zeval)) {
+              phi.eval <- phi.eval.mat[,j]
+              if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
+              if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
+              if(return.weights.phi) phi.eval.weights <- phi.eval.weights.list[[j]]
+              if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights <- phi.deriv.eval.1.weights.list[[j]]
+              if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
+          }
+      } else {
+          ## Ignore the initial increasing portion, take the min to the
+          ## right of where the initial inflection point occurs
+          j <- 1
+          while(norm.stop[j+1] > norm.stop[j]) j <- j + 1
+          j <- j-1 + which.min(norm.stop[j:length(norm.stop)])
+          phi <- phi.mat[,j]
+          if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
+          if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
+          if(return.weights.phi) phi.weights <- phi.weights.list[[j]]
+          if(return.weights.phi.deriv.1) phi.deriv.1.weights <- phi.deriv.1.weights.list[[j]]
+          if(p>=2 && return.weights.phi.deriv.2) phi.deriv.2.weights <- phi.deriv.2.weights.list[[j]]
+          if(!is.null(zeval)) {
+              phi.eval <- phi.eval.mat[,j]
+              if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
+              if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
+              if(return.weights.phi) phi.eval.weights <- phi.eval.weights.list[[j]]
+              if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights <- phi.deriv.eval.1.weights.list[[j]]
+              if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
+          }
+      }
+      
     }
-
+    
     console <- printClear(console)
     console <- printPop(console)
 
@@ -2337,20 +2357,16 @@ npregiv <- function(y,
                 phi.mat=phi.mat,
                 phi.deriv.1=as.matrix(phi.deriv.1),
                 phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},
-                phi.deriv.1.list=phi.deriv.1.list,
-                phi.deriv.2.list=phi.deriv.2.list,
-                phi.weights.list=phi.weights.list,
-                phi.deriv.1.weights.list=phi.deriv.1.weights.list,
-                phi.deriv.2.weights.list=phi.deriv.2.weights.list,
+                phi.weights=phi.weights,
+                phi.deriv.1.weights=phi.deriv.1.weights,
+                phi.deriv.2.weights=phi.deriv.2.weights,
                 phi.eval=phi.eval,
                 phi.eval.mat=phi.eval.mat,
                 phi.deriv.eval.1=if(!is.null(phi.deriv.eval.1)){as.matrix(phi.deriv.eval.1)}else{NULL},
-                phi.deriv.eval.1.list=phi.deriv.eval.1.list,
                 phi.deriv.eval.2=if(!is.null(phi.deriv.eval.2)){as.matrix(phi.deriv.eval.2)}else{NULL},
-                phi.deriv.eval.2.list=phi.deriv.eval.2.list,
-                phi.eval.weights.list=phi.eval.weights.list,
-                phi.deriv.eval.1.weights.list=phi.deriv.eval.1.weights.list,
-                phi.deriv.eval.2.weights.list=phi.deriv.eval.2.weights.list,
+                phi.eval.weights=phi.eval.weights,
+                phi.deriv.eval.1.weights=phi.deriv.eval.1.weights,
+                phi.deriv.eval.2.weights=phi.deriv.eval.2.weights,
                 norm.index=j,
                 norm.stop=norm.stop,
                 norm.value=norm.value,

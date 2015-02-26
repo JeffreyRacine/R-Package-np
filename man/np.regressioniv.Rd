@@ -284,20 +284,20 @@ npregiv(y,
   \preformatted{
 
     model.iv <- npregiv(\dots)
-    
-    bw <- list(bw.E.y.w=model.iv$bw.E.y.w,
-               bw.E.y.z=model.iv$bw.E.y.z,
-               bw.resid.w=model.iv$bw.resid.w,
-               bw.resid.fitted.w.z=model.iv$bw.resid.fitted.w.z,
-               norm.index=model.iv$norm.index)
+
+    bw <- NULL
+    bw$bw.E.y.w=model.iv$bw.E.y.w,
+    bw$bw.E.y.z=model.iv$bw.E.y.z,
+    bw$bw.resid.w=model.iv$bw.resid.w,
+    bw$bw.resid.fitted.w.z=model.iv$bw.resid.fitted.w.z,
+    bw$norm.index=model.iv$norm.index
 
     foo <- npregiv(\dots,bw=bw)
   }
 
   If, on the other hand \code{model.iv} was obtained from an invocation
-  of \code{npregiv} with \code{method="Tikhonov"}, then the
-  following needs to be fed to the subsequent invocation of
-  \code{npregiv}:
+  of \code{npregiv} with \code{method="Tikhonov"}, then the following
+  needs to be fed to the subsequent invocation of \code{npregiv}:
 
   \preformatted{
 
@@ -316,8 +316,8 @@ npregiv(y,
   }
 
   Or, if \code{model.iv} was obtained from an invocation of
-  \code{npregiv} with \code{method="Tikhonov"}, then the following would
-  also work:
+  \code{npregiv} with either \code{method="Landweber-Fridman"} or
+  \code{method="Tikhonov"}, then the following would also work:
 
   \preformatted{
 
