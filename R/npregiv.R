@@ -1233,6 +1233,12 @@ npregiv <- function(y,
 
     for(i in 1:iterate.Tikhonov.num) {
 
+      if(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num) {
+          console <- printClear(console)
+          console <- printPop(console)
+          console <- printPush(paste("Iteration ",i," of ",iterate.Tikhonov.num,sep=""), console)
+      }
+
       if(is.null(bw)) {
           hphiw <- glpcv(ydat=phi, ## 23/1/15 phi is sample
                          xdat=w,
@@ -1251,9 +1257,11 @@ npregiv <- function(y,
           bw.E.phi.w <- bw$bw.E.phi.w
       }
 
-      console <- printClear(console)
-      console <- printPop(console)
-      console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
+      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
+          console <- printClear(console)
+          console <- printPop(console)
+          console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
+      }
 
       E.phi.w <- glpreg(tydat=phi,
                         txdat=w,
@@ -1266,12 +1274,14 @@ npregiv <- function(y,
                        p=rep(p, num.w.numeric),
                        ...)
 
-      console <- printClear(console)
-      console <- printPop(console)
-      if(is.null(bw)) {
-          console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
-      } else {
-          console <- printPush("Computing E(E(phi(z)|w)|z) using supplied bandwidths...", console)
+      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
+          console <- printClear(console)
+          console <- printPop(console)
+          if(is.null(bw)) {
+              console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
+          } else {
+              console <- printPush("Computing E(E(phi(z)|w)|z) using supplied bandwidths...", console)
+          }
       }
 
       if(is.null(bw)) {
@@ -1298,10 +1308,12 @@ npregiv <- function(y,
                             degree=rep(p, num.z.numeric),
                             ...)$mean
 
-      console <- printClear(console)
-      console <- printPop(console)
-      console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
-
+      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
+          console <- printClear(console)
+          console <- printPop(console)
+          console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
+      }
+      
       KPHIW <- Kmat.lp(mydata.train=data.frame(w),
                        bws=bw.E.phi.w,
                        p=rep(p, num.w.numeric),
@@ -1321,20 +1333,25 @@ npregiv <- function(y,
       if(!iterate.Tikhonov) {
           alpha.iter <- alpha
       } else {
+
           if(is.null(alpha.iter)&&is.null(bw)) {
-              console <- printClear(console)
-              console <- printPop(console)
-              console <- printPush(paste("Iterating and recomputing the numerical solution for alpha (iteration ",i," of ",iterate.Tikhonov.num,")",sep=""), console)
+              if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
+                  console <- printClear(console)
+                  console <- printPop(console)
+                  console <- printPush(paste("Iterating and recomputing the numerical solution for alpha (iteration ",i," of ",iterate.Tikhonov.num,")",sep=""), console)
+              }
               alpha.iter <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.phi.w.z, r = E.y.w)$minimum
           }
       }
 
       ## Finally, we conduct regularized Tikhonov regression using this
       ## optimal alpha and the updated bandwidths.
-
-      console <- printClear(console)
-      console <- printPop(console)
-      console <- printPush("Computing final phi(z) estimate...", console)
+      
+      if(!(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num)) {
+          console <- printClear(console)
+          console <- printPop(console)
+          console <- printPush("Computing final phi(z) estimate...", console)
+      }
 
       phi <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
       phi.mat <- cbind(phi.mat,phi)    
