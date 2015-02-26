@@ -17,14 +17,9 @@
 ## p: order of the local polynomial kernel estimator (p=0 is local
 ##    constant, p=1 local linear etc.)
 
-## This function returns a list with the following elements:
+## This function returns a list with at least the following elements:
 
-## phi: the IV estimator of phi(y)
-## alpha:  the Tikhonov regularization parameter
-## phi.mat: the matrix with columns phi_1, phi_2 etc. over all iterations
-## norm.index:  the number of Landweber-Fridman iterations when stopped
-## norm.stop: the vector of values of the objective function used for stopping
-## norm.value: the norm not multiplied by the number of iterations
+## phi: the IV estimator of phi(z)
 ## convergence: a character string indicating whether/why iteration terminated
 
 npregiv <- function(y,
@@ -46,6 +41,8 @@ npregiv <- function(y,
                     alpha.min=1.0e-10,
                     alpha.max=1.0e-01,
                     alpha.tol=.Machine$double.eps^0.25,
+                    iterate.Tikhonov=TRUE,
+                    iterate.Tikhonov.num=1,                    
                     iterate.max=1000,
                     iterate.diff.tol=1.0e-08,
                     constant=0.5,
@@ -65,8 +62,7 @@ npregiv <- function(y,
   ## <samuele.centorrino@univ-tlse1.fr> to reproduce illustrations in
   ## the following papers:
 
-  ## A) Econometrica (forthcoming, article date February 25 2011)
-
+  ## A) Econometrica (2011), Volume 79, pp. 1541-1565
   ## "Nonparametric Instrumental Regression"
   ## S. Darolles, Y. Fan, J.P. Florens, E. Renault
 
@@ -173,8 +169,6 @@ npregiv <- function(y,
       phi <- invmat.Cr.r + alpha * invmat %*% invmat.Cr.r
       return(sum((CZ%*%phi - r)^2)/alpha)
   }
-
-  ## $Id: npregiv.R,v 1.9 2015/02/25 13:57:53 jracine Exp jracine $
 
   ## This function returns the weight matrix for a local polynomial,
   ## and was rewritten 14/1/15 in Toulouse while visiting JP. It
@@ -1045,6 +1039,8 @@ npregiv <- function(y,
   if(!is.logical(penalize.iteration)) stop("penalize.iteration must be logical (TRUE/FALSE)")
   if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")
   if(!is.logical(stop.on.increase)) stop("stop.on.increase must be logical (TRUE/FALSE)")
+  if(!is.logical(iterate.Tikhonov)) stop("iterate.Tikhonov must be logical (TRUE/FALSE)")
+  if(iterate.Tikhonov.num < 1) stop("iterate.Tikhonov.num must be a positive integer")  
 
   if(missing(y)) stop("You must provide y")
   if(missing(z)) stop("You must provide z")
@@ -1078,7 +1074,8 @@ npregiv <- function(y,
       w <- data.frame(w,x)
       ## Obviously, if you have exogenous variables that are only in
       ## the instrument set, you can trivially accommodate this
-      ## (append to w before invoking the function)
+      ## (append to w before invoking the function - added to man
+      ## page)
       if(!is.null(zeval)&&!is.null(xeval)) zeval <- data.frame(zeval,xeval)
   }
 
@@ -1103,9 +1100,9 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
     if(is.null(bw)) {
-        console <- printPush(paste("Computing bandwidths and E(y|w)...",sep=""),console)
+        console <- printPush("Computing bandwidths and E(y|w)...",console)
     } else {
-        console <- printPush(paste("Computing E(y|w) using supplied bandwidths...",sep=""),console)
+        console <- printPush("Computing E(y|w) using supplied bandwidths...",console)
     }
 
     if(is.null(bw)) {
@@ -1209,6 +1206,22 @@ npregiv <- function(y,
     console <- printPop(console)
     console <- printPush("Computing initial phi(z) estimate...", console)
     phi <- as.vector(tikh(alpha, CZ = KYW, CY = KYWZ, Cr.r = E.E.y.w.z))
+    phi.mat <- phi
+    
+    phi.eval.mat <- NULL
+    if(!is.null(zeval)) {
+        ## If there is evaluation data, KPHIWZ and KPHIWZ.eval will
+        ## differ...
+        
+        KPHIWZ.eval <- Kmat.lp(mydata.train=data.frame(z),
+                               mydata.eval=data.frame(z=zeval),
+                               bws=bw.E.E.y.w.z,
+                               p=rep(p, num.z.numeric),
+                               ...)
+        
+        phi.eval <- as.vector(tikh.eval(alpha, CZ = KYW, CY = KYWZ, CY.eval = KPHIWZ.eval, r = E.y.w))
+        phi.eval.mat <- cbind(phi.eval.mat,phi.eval)
+    }    
 
     console <- printClear(console)
     console <- printPop(console)
@@ -1218,210 +1231,215 @@ npregiv <- function(y,
         console <- printPush("Computing E(phi(z)|w) using supplied bandwidths...", console)
     }
 
-    if(is.null(bw)) {
-        hphiw <- glpcv(ydat=phi, ## 23/1/15 phi is sample
-                       xdat=w,
-                       degree=rep(p, num.w.numeric),
-                       nmulti=nmulti,
-                       random.seed=random.seed,
-                       optim.maxattempts=optim.maxattempts,
-                       optim.method=optim.method,
-                       optim.reltol=optim.reltol,
-                       optim.abstol=optim.abstol,
-                       optim.maxit=optim.maxit,
-                       ...)
+    for(i in 1:iterate.Tikhonov.num) {
 
-        bw.E.phi.w <- hphiw$bw
-    } else {
-        bw.E.phi.w <- bw$bw.E.phi.w
-    }
+      if(is.null(bw)) {
+          hphiw <- glpcv(ydat=phi, ## 23/1/15 phi is sample
+                         xdat=w,
+                         degree=rep(p, num.w.numeric),
+                         nmulti=nmulti,
+                         random.seed=random.seed,
+                         optim.maxattempts=optim.maxattempts,
+                         optim.method=optim.method,
+                         optim.reltol=optim.reltol,
+                         optim.abstol=optim.abstol,
+                         optim.maxit=optim.maxit,
+                         ...)
 
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
+          bw.E.phi.w <- hphiw$bw
+      } else {
+          bw.E.phi.w <- bw$bw.E.phi.w
+      }
 
-    E.phi.w <- glpreg(tydat=phi,
-                      txdat=w,
-                      bws=bw.E.phi.w,
-                      degree=rep(p, num.w.numeric),
-                      ...)$mean
-
-    KPHIW <- Kmat.lp(mydata.train=data.frame(w),
-                     bws=bw.E.phi.w,
-                     p=rep(p, num.w.numeric),
-                     ...)
-
-    console <- printClear(console)
-    console <- printPop(console)
-    if(is.null(bw)) {
-        console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
-    } else {
-        console <- printPush("Computing E(E(phi(z)|w)|z) using supplied bandwidths...", console)
-    }
-
-    if(is.null(bw)) {
-        hphiwz <- glpcv(ydat=E.phi.w,
-                        xdat=z,
-                        degree=rep(p, num.z.numeric),
-                        nmulti=nmulti,
-                        random.seed=random.seed,
-                        optim.maxattempts=optim.maxattempts,
-                        optim.method=optim.method,
-                        optim.reltol=optim.reltol,
-                        optim.abstol=optim.abstol,
-                        optim.maxit=optim.maxit,
-                        ...)
-
-        bw.E.E.phi.w.z <- hphiwz$bw
-    } else {
-        bw.E.E.phi.w.z <- bw$bw.E.E.phi.w.z
-    }
-
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
-
-    KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
-                      bws=bw.E.E.phi.w.z,
-                      p=rep(p, num.z.numeric),
-                      ...)
-
-    ## Next, we minimize the function ittik to obtain the optimal value
-    ## of alpha (here we use the iterated Tikhonov approach) to
-    ## determine the optimal alpha for the non-iterated scheme.
-
-    if(!is.null(bw)) alpha.iter <- bw$alpha.iter ## need to checking here
-
-    if(is.null(alpha.iter)&&is.null(bw)) {
       console <- printClear(console)
       console <- printPop(console)
-      console <- printPush("Iterating and recomputing the numerical solution for alpha...", console)
-      alpha.iter <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.y.w.z, r = E.y.w)$minimum
-    }
+      console <- printPush("Computing weight matrix for E(phi(z)|w)...", console)
 
-    ## Finally, we conduct regularized Tikhonov regression using this
-    ## optimal alpha and the updated bandwidths.
-
-    console <- printClear(console)
-    console <- printPop(console)
-    console <- printPush("Computing final phi(z) estimate...", console)
-
-    E.E.y.w.z <- glpreg(tydat=E.y.w,
-                        txdat=z,
-                        bws=bw.E.E.phi.w.z,
-                        degree=rep(p, num.z.numeric),
+      E.phi.w <- glpreg(tydat=phi,
+                        txdat=w,
+                        bws=bw.E.phi.w,
+                        degree=rep(p, num.w.numeric),
                         ...)$mean
 
-    KPHIW <- Kmat.lp(mydata.train=data.frame(w),
-                     bws=bw.E.phi.w,
-                     p=rep(p, num.w.numeric),
-                     ...)
+      KPHIW <- Kmat.lp(mydata.train=data.frame(w),
+                       bws=bw.E.phi.w,
+                       p=rep(p, num.w.numeric),
+                       ...)
 
-    KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
-                      bws=bw.E.E.phi.w.z,
-                      p=rep(p, num.z.numeric),
-                      ...)
+      console <- printClear(console)
+      console <- printPop(console)
+      if(is.null(bw)) {
+          console <- printPush("Computing bandwidths for E(E(phi(z)|w)|z)...", console)
+      } else {
+          console <- printPush("Computing E(E(phi(z)|w)|z) using supplied bandwidths...", console)
+      }
 
-    phi <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
+      if(is.null(bw)) {
+          hphiwz <- glpcv(ydat=E.phi.w,
+                          xdat=z,
+                          degree=rep(p, num.z.numeric),
+                          nmulti=nmulti,
+                          random.seed=random.seed,
+                          optim.maxattempts=optim.maxattempts,
+                          optim.method=optim.method,
+                          optim.reltol=optim.reltol,
+                          optim.abstol=optim.abstol,
+                          optim.maxit=optim.maxit,
+                          ...)
 
-    H <- NULL
-    if(return.weights.phi) {
-        H <- KPHIWZ%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+          bw.E.E.phi.w.z <- hphiwz$bw
+      } else {
+          bw.E.E.phi.w.z <- bw$bw.E.E.phi.w.z
+      }
+
+      E.E.phi.w.z <- glpreg(tydat=E.y.w,
+                            txdat=z,
+                            bws=bw.E.E.phi.w.z,
+                            degree=rep(p, num.z.numeric),
+                            ...)$mean
+
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush("Computing weight matrix for E(E(phi(z)|w)|z)...", console)
+
+      KPHIW <- Kmat.lp(mydata.train=data.frame(w),
+                       bws=bw.E.phi.w,
+                       p=rep(p, num.w.numeric),
+                       ...)
+
+      KPHIWZ <- Kmat.lp(mydata.train=data.frame(z),
+                        bws=bw.E.E.phi.w.z,
+                        p=rep(p, num.z.numeric),
+                        ...)
+
+      ## Next, we minimize the function ittik to obtain the optimal value
+      ## of alpha (here we use the iterated Tikhonov approach) to
+      ## determine the optimal alpha for the non-iterated scheme.
+
+      if(!is.null(bw)) alpha.iter <- bw$alpha.iter ## need to checking here
+
+      if(!iterate.Tikhonov) {
+          alpha.iter <- alpha
+      } else {
+          if(is.null(alpha.iter)&&is.null(bw)) {
+              console <- printClear(console)
+              console <- printPop(console)
+              console <- printPush(paste("Iterating and recomputing the numerical solution for alpha (iteration ",i," of ",iterate.Tikhonov.num,")",sep=""), console)
+              alpha.iter <- optimize(ittik, c(alpha.min, alpha.max), tol = alpha.tol, CZ = KPHIW, CY = KPHIWZ, Cr.r = E.E.phi.w.z, r = E.y.w)$minimum
+          }
+      }
+
+      ## Finally, we conduct regularized Tikhonov regression using this
+      ## optimal alpha and the updated bandwidths.
+
+      console <- printClear(console)
+      console <- printPop(console)
+      console <- printPush("Computing final phi(z) estimate...", console)
+
+      phi <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ, r = E.y.w))
+      phi.mat <- cbind(phi.mat,phi)    
+
+      H <- NULL
+      if(return.weights.phi) {
+          H <- KPHIWZ%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+      }
+      
+      ## First derivative
+      
+      KPHIWZ.deriv.1 <- Kmat.lp(deriv=1,
+                                mydata.train=data.frame(z),
+                                bws=bw.E.E.phi.w.z,
+                                p=rep(p, num.z.numeric),
+                                ...)
+      
+      phi.deriv.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.1, r = E.y.w))
+      
+      H.deriv.1 <- NULL
+      if(return.weights.phi.deriv.1) {
+          H.deriv.1 <- KPHIWZ.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+      }
+      
+      ## Second derivative
+      
+      phi.deriv.2 <- NULL
+      H.deriv.2 <- NULL
+      
+      if(p >= 2) {
+          
+          KPHIWZ.deriv.2 <- Kmat.lp(deriv=2,
+                                    mydata.train=data.frame(z),
+                                    bws=bw.E.E.phi.w.z,
+                                    p=rep(p, num.z.numeric),
+                                    ...)
+          
+          phi.deriv.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.2, r = E.y.w))
+          
+          
+          if(return.weights.phi.deriv.2) {
+              H.deriv.2 <- KPHIWZ.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+          }
+          
+      }
+      
+      ## If evaluation data are provided...
+      
+      phi.eval <- NULL
+      phi.deriv.eval.1 <- NULL
+      phi.deriv.eval.2 <- NULL
+      H.eval <- NULL
+      H.deriv.eval.1 <- NULL
+      H.deriv.eval.2 <- NULL
+      
+      if(!is.null(zeval)) {
+          ## If there is evaluation data, KPHIWZ and KPHIWZ.eval will
+          ## differ...
+          
+          KPHIWZ.eval <- Kmat.lp(mydata.train=data.frame(z),
+                                 mydata.eval=data.frame(z=zeval),
+                                 bws=bw.E.E.phi.w.z,
+                                 p=rep(p, num.z.numeric),
+                                 ...)
+          
+          phi.eval <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval, r = E.y.w))
+          phi.eval.mat <- cbind(phi.eval.mat,phi.eval)
+          
+          if(return.weights.phi) {
+              H.eval <- KPHIWZ.eval%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+          }
+          
+          KPHIWZ.eval.deriv.1 <- Kmat.lp(deriv=1,
+                                         mydata.train=data.frame(z),
+                                         mydata.eval=data.frame(z=zeval),
+                                         bws=bw.E.E.phi.w.z,
+                                         p=rep(p, num.z.numeric),
+                                         ...)
+          
+          phi.deriv.eval.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.1, r = E.y.w))
+          
+          if(return.weights.phi.deriv.1) {
+              H.deriv.eval.1 <- KPHIWZ.eval.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+          }
+          
+          if(p >= 2) {
+              
+              KPHIWZ.eval.deriv.2 <- Kmat.lp(deriv=2,
+                                             mydata.train=data.frame(z),
+                                             mydata.eval=data.frame(z=zeval),
+                                             bws=bw.E.E.phi.w.z,
+                                             p=rep(p, num.z.numeric),
+                                             ...)
+              
+              phi.deriv.eval.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.2, r = E.y.w))
+              
+              if(return.weights.phi.deriv.2) {
+                  H.deriv.eval.2 <- KPHIWZ.eval.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
+              }
+              
+          }
+      }
+      
     }
-
-    ## First derivative
-
-    KPHIWZ.deriv.1 <- Kmat.lp(deriv=1,
-                              mydata.train=data.frame(z),
-                              bws=bw.E.E.phi.w.z,
-                              p=rep(p, num.z.numeric),
-                              ...)
-
-    phi.deriv.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.1, r = E.y.w))
-
-    H.deriv.1 <- NULL
-    if(return.weights.phi.deriv.1) {
-        H.deriv.1 <- KPHIWZ.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
-    }
-
-    ## Second derivative
-
-    phi.deriv.2 <- NULL
-    H.deriv.2 <- NULL
     
-    if(p >= 2) {
-
-        KPHIWZ.deriv.2 <- Kmat.lp(deriv=2,
-                                  mydata.train=data.frame(z),
-                                  bws=bw.E.E.phi.w.z,
-                                  p=rep(p, num.z.numeric),
-                                  ...)
-
-        phi.deriv.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.deriv.2, r = E.y.w))
-
-
-        if(return.weights.phi.deriv.2) {
-            H.deriv.2 <- KPHIWZ.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
-        }
-
-    }
-
-    ## If evaluation data are provided...
-
-    phi.eval <- NULL
-    phi.deriv.eval.1 <- NULL
-    phi.deriv.eval.2 <- NULL
-    H.eval <- NULL
-    H.deriv.eval.1 <- NULL
-    H.deriv.eval.2 <- NULL    
-
-    if(!is.null(zeval)) {
-        ## If there is evaluation data, KPHIWZ and KPHIWZ.eval will
-        ## differ...
-
-        KPHIWZ.eval <- Kmat.lp(mydata.train=data.frame(z),
-                               mydata.eval=data.frame(z=zeval),
-                               bws=bw.E.E.phi.w.z,
-                               p=rep(p, num.z.numeric),
-                               ...)
-
-        phi.eval <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval, r = E.y.w))
-
-        if(return.weights.phi) {
-            H.eval <- KPHIWZ.eval%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
-        }
-
-        KPHIWZ.eval.deriv.1 <- Kmat.lp(deriv=1,
-                                       mydata.train=data.frame(z),
-                                       mydata.eval=data.frame(z=zeval),
-                                       bws=bw.E.E.phi.w.z,
-                                       p=rep(p, num.z.numeric),
-                                       ...)
-
-        phi.deriv.eval.1 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.1, r = E.y.w))
-
-        if(return.weights.phi.deriv.1) {
-            H.deriv.eval.1 <- KPHIWZ.eval.deriv.1%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
-        }
-
-        if(p >= 2) {
-
-            KPHIWZ.eval.deriv.2 <- Kmat.lp(deriv=2,
-                                           mydata.train=data.frame(z),
-                                           mydata.eval=data.frame(z=zeval),
-                                           bws=bw.E.E.phi.w.z,
-                                           p=rep(p, num.z.numeric),
-                                           ...)
-
-            phi.deriv.eval.2 <- as.vector(tikh.eval(alpha.iter, CZ = KPHIW, CY = KPHIWZ, CY.eval = KPHIWZ.eval.deriv.2, r = E.y.w))
-
-            if(return.weights.phi.deriv.2) {
-                H.deriv.eval.2 <- KPHIWZ.eval.deriv.2%*%solve(alpha.iter*diag(nrow(KPHIWZ)) + KPHIW%*%KPHIWZ)%*%KYW
-            }
-
-        }
-    }
-
     console <- printClear(console)
     console <- printPop(console)
 
@@ -1430,16 +1448,18 @@ npregiv <- function(y,
 
     return(list(phi=phi,
                 phi.eval=phi.eval,
+                phi.mat=phi.mat,
+                phi.eval.mat=phi.eval.mat,
                 phi.deriv.1=as.matrix(phi.deriv.1),
                 phi.deriv.eval.1=if(!is.null(phi.deriv.eval.1)){as.matrix(phi.deriv.eval.1)}else{NULL},
                 phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},
                 phi.deriv.eval.2=if(!is.null(phi.deriv.eval.2)){as.matrix(phi.deriv.eval.2)}else{NULL},
                 phi.weights=H,
                 phi.deriv.1.weights=H.deriv.1,
-                phi.deriv.2.weights=H.deriv.2,                
+                phi.deriv.2.weights=H.deriv.2,
                 phi.eval.weights=H.eval,
                 phi.deriv.eval.1.weights=H.deriv.eval.1,
-                phi.deriv.eval.2.weights=H.deriv.eval.2,                
+                phi.deriv.eval.2.weights=H.deriv.eval.2,
                 alpha=alpha,
                 alpha.iter=alpha.iter,
                 bw.E.y.w=bw.E.y.w,

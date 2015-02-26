@@ -41,6 +41,8 @@ npregiv(y,
         alpha.min = 1e-10,
         alpha.max = 1e-01,
         alpha.tol = .Machine$double.eps^0.25,
+        iterate.Tikhonov = TRUE,
+        iterate.Tikhonov.num = 1,
         iterate.max = 1000,
         iterate.diff.tol = 1.0e-08,
         constant = 0.5,
@@ -169,6 +171,14 @@ npregiv(y,
     the search tolerance for \code{optimize} when solving for
     \eqn{\alpha}{alpha}, the Tikhonov regularization parameter,
     when using \code{method="Tikhonov"}.
+  }
+  \item{iterate.Tikhonov}{
+    a logical value indicating whether to use iterated Tikhonov (one
+    iteration) or not when using \code{method="Tikhonov"}.
+  }
+  \item{iterate.Tikhonov.num}{
+    an integer indicating the number of iterations to conduct when using
+    \code{method="Tikhonov"}.
   }
   \item{iterate.max}{
     an integer indicating the maximum number of iterations permitted
