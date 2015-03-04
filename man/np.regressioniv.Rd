@@ -289,11 +289,11 @@ npregiv(y,
     model.iv <- npregiv(\dots)
 
     bw <- NULL
-    bw$bw.E.y.w=model.iv$bw.E.y.w,
-    bw$bw.E.y.z=model.iv$bw.E.y.z,
-    bw$bw.resid.w=model.iv$bw.resid.w,
-    bw$bw.resid.fitted.w.z=model.iv$bw.resid.fitted.w.z,
-    bw$norm.index=model.iv$norm.index
+    bw$bw.E.y.w <- model.iv$bw.E.y.w
+    bw$bw.E.y.z <- model.iv$bw.E.y.z
+    bw$bw.resid.w <- model.iv$bw.resid.w
+    bw$bw.resid.fitted.w.z <- model.iv$bw.resid.fitted.w.z
+    bw$norm.index <- model.iv$norm.index
 
     foo <- npregiv(\dots,bw=bw)
   }

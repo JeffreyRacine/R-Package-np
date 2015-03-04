@@ -1328,7 +1328,7 @@ npregiv <- function(y,
       ## of alpha (here we use the iterated Tikhonov approach) to
       ## determine the optimal alpha for the non-iterated scheme.
 
-      if(!is.null(bw)) alpha.iter <- bw$alpha.iter ## need to checking here
+      if(!is.null(bw)) alpha.iter <- bw$alpha.iter
 
       if(!iterate.Tikhonov) {
           alpha.iter <- alpha
@@ -2288,7 +2288,7 @@ npregiv <- function(y,
     phi.weights <- NULL
     phi.deriv.1.weights <- NULL
     phi.deriv.2.weights <- NULL
-
+    
     phi.eval.weights <- NULL
     phi.deriv.eval.1.weights <- NULL
     phi.deriv.eval.2.weights <- NULL
@@ -2339,19 +2339,31 @@ npregiv <- function(y,
               if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
           }
       }
-      
-    }
-    
-    console <- printClear(console)
-    console <- printPop(console)
-
-    if(is.null(bw)) {
-        if(j == iterate.max) warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")
+      if(j == iterate.max) warning("iterate.max reached: increase iterate.max or inspect norm.stop vector")      
     } else {
+        ## bw passed in, set j to norm.index, push out weights etc.
+        j <- bw$norm.index
+        phi <- phi.mat[,j]
+        if(p>0) phi.deriv.1 <- phi.deriv.1.list[[j]]
+        if(p>=2) phi.deriv.2 <- phi.deriv.2.list[[j]]
+        if(return.weights.phi) phi.weights <- phi.weights.list[[j]]
+        if(return.weights.phi.deriv.1) phi.deriv.1.weights <- phi.deriv.1.weights.list[[j]]
+        if(p>=2 && return.weights.phi.deriv.2) phi.deriv.2.weights <- phi.deriv.2.weights.list[[j]]
+        if(!is.null(zeval)) {
+            phi.eval <- phi.eval.mat[,j]
+            if(p>0) phi.deriv.eval.1 <- phi.deriv.eval.1.list[[j]]
+            if(p>=2) phi.deriv.eval.2 <- phi.deriv.eval.2.list[[j]]
+            if(return.weights.phi) phi.eval.weights <- phi.eval.weights.list[[j]]
+            if(return.weights.phi.deriv.1) phi.deriv.eval.1.weights <- phi.deriv.eval.1.weights.list[[j]]
+            if(p>=2 && return.weights.phi.deriv.2) phi.deriv.eval.2.weights <- phi.deriv.eval.2.weights.list[[j]]    
+        }
         norm.value <- NULL
         norm.stop <- NULL
         convergence <- NULL
     }
+    
+    console <- printClear(console)
+    console <- printPop(console)
 
     return(list(phi=phi,
                 phi.mat=phi.mat,
