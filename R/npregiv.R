@@ -351,7 +351,7 @@ npregiv <- function(y,
           if(deriv==1) {
               W.z.deriv.1 <- crs:::W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
-                                         degree=rep(p,NCOL(z)),
+                                         degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 1)
 
               Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))

@@ -423,8 +423,12 @@ npudistbw(\dots)
 }
 \references{
 
-  Aitchison, J. and , C.G.G. Aitken (1976), \dQuote{Multivariate binary
-   discrimination by the kernel method,} Biometrika, 63, 413-420.
+  Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
+    discrimination by the kernel method,} Biometrika, 63, 413-420.
+
+  Bowman, A. and P. Hall and T. Prvan (1998), \dQuote{Bandwidth
+    selection for the smoothing of distribution functions,} Biometrika,
+    85, 799-808.
 
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
   and Practice,} Princeton University Press.
