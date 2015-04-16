@@ -180,7 +180,7 @@ npregiv <- function(y,
   ## went unused).
 
   ## Update - from ?npksum, "The option permutation.operator= can be
-  ## used to ‘mix and match’ operator strings to create a ‘hybrid’
+  ## used to `mix and match' operator strings to create a `hybrid'
   ## kernel, in addition to the kernel sum with no operators applied,
   ## one for each continuous dimension in the data. For example, for a
   ## two-dimensional data frame of numeric datatypes,
