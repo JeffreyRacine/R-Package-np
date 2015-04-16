@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.92 2014/12/26 19:14:33 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.93 2015/04/01 15:43:26 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -107,7 +107,7 @@ A BibTeX entry for LaTeX users is
   Documentation/Manuals (\url{http://cran.r-project.org/manuals.html})
   where you will discover a wealth of documentation for \texttt{R} users
   of all levels. See also the \texttt{R} task views summary page
-  (\url{http://cran.nedmirror.nl/web/views/index.html}) for
+  (\url{http://cran.r-project.org/web/views}) for
   information grouped under field of interest. A few documents that I
   mention to my students which are tailored to econometricians include
   \url{http://cran.r-project.org/doc/contrib/Verzani-SimpleR.pdf},
