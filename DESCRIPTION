@@ -1,6 +1,6 @@
 Package: npRmpi
 Version: 0.60-2
-Date: 2014-08-18
+Date: 2015-04-26
 Imports: boot, cubature, stats
 Suggests: quantreg, MASS, parallel
 Title: Parallel Nonparametric Kernel Smoothing Methods for Mixed Data Types
