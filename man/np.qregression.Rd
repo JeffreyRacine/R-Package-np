@@ -251,14 +251,13 @@ npqreg(bws, \dots)
 data("Italy")
 attach(Italy)
 
-# First, compute the likelihood cross-validation bandwidths (default).
-# Note - this may take a few minutes depending on the speed of your
-# computer...
+# First, compute the cross-validated bandwidths.  Note - this may take a
+# few minutes depending on the speed of your computer...
 
 bw <- npcdistbw(formula=gdp~ordered(year))
 
-# Note - numerical search for computing the quantiles will take a
-# minute or so...
+# Note - numerical search for computing the quantiles may take a minute
+# or so...
 
 model.q0.25 <- npqreg(bws=bw, tau=0.25)
 model.q0.50 <- npqreg(bws=bw, tau=0.50)
