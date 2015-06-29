@@ -487,15 +487,15 @@ npregiv <- function(y,
     } else {
 
       W <- crs:::W.glp(xdat=txdat,
-                       degree=rep(degree,NCOL(txdat)))
+                       degree=degree)
 
       W.eval <- crs:::W.glp(xdat=txdat,
                             exdat=exdat,
-                            degree=rep(degree,NCOL(txdat)))
+                            degree=degree)
 
       W.eval.deriv <- crs:::W.glp(xdat=txdat,
                                   exdat=exdat,
-                                  degree=rep(degree,NCOL(txdat)),
+                                  degree=degree,
                                   gradient.vec=rep(deriv,NCOL(txdat)))
 
       ## Local polynomial via smooth coefficient formulation and one
@@ -875,7 +875,7 @@ npregiv <- function(y,
     ## recomputing with each iteration.
 
     W <- crs:::W.glp(xdat=xdat,
-                     degree=rep(degree,NCOL(xdat)))
+                     degree=degree)
 
     sum.lscv <- function(bw.gamma,...) {
 
