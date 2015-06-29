@@ -33,7 +33,7 @@ and **devtools** (via install.packages("devtools")), install the
 development package using the following command:
 
 ```r
-library(devtools); install_github('R-Package-np', 'JeffreyRacine')
+library(devtools); install_github('JeffreyRacine/R-Package-np')
 ```
 
 Note also that if you wish a fast install without the building of
