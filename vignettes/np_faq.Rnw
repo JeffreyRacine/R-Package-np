@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.93 2015/04/01 15:43:26 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.94 2015/07/01 09:00:52 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -1692,6 +1692,127 @@ model.np <- suppressWarnings(npreg(y~x+z))
 \end{verbatim}
 ought to produce no console I/O whatsoever in the call to
 \texttt{npreg}.
+
+\subsection{Is there a way to exploit the sparse nature of the design
+  matrix when all predictors are categorical and reduce computation
+  time, particularly for cross-validation?}
+
+Certainly. The following conducts kernel regression with exclusively
+binary predictors by way of illustration.
+\begin{verbatim}
+## This routine exploits a sparse design matrix when computing the
+## kernel estimator of a conditional mean presuming unordered
+## categorical predictors. Numerical optimization is undertaken, and
+## this function is much faster than that ignoring the sparse
+## structure (e.g., the function npreg() currently does not attempt to
+## exploit this structure).
+
+rm(list=ls())
+
+n <- 1000
+k <- 4
+
+## Create data/DGP
+
+z <- matrix(rbinom(n*k,1,.5),n,k)
+y <- rowSums(z) + rnorm(n)
+
+## Fire up uniquecombs() on a matrix of discrete support predictors.
+## We call the crs() variant of uniquecombs (the function is taken
+## from mgcv(), but mgcv() has serious load time overhead, and I don't
+## want to rely on other packages unnecessarily).
+
+z.unique <- crs:::uniquecombs(as.matrix(z))
+num.z <- ncol(z.unique)
+ind <-  attr(z.unique,"index")
+ind.vals <-  unique(ind)
+c <- nrow(z.unique)
+
+## Kernel function (li-racine unordered kernel)
+
+kernel <- function(X,x,lambda) ifelse(X==x,1,lambda)
+
+## Least-squares cross-validation objective function
+
+cv.ls.uniquecombs <- function(lambda,y,z,z.unique,ind,ind.vals,num.z,c) {
+    g <- numeric()
+    for(i in 1:c) {
+        zz <- ind == ind.vals[i]
+        L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
+                                                      z.unique[ind.vals[i],j],
+                                                      lambda[j])}),1,prod)
+        g[zz] <- (sum(y*L)-(y*L)[zz])/(sum(L)-L[zz])
+    }
+    return(mean((y-g)^2))
+}
+
+## Start timing for comparison with npreg()
+
+ptm <- proc.time()
+
+## Numerical optimization via optim() - could be faster if we also
+## used fn.gradient (not done here)
+
+optim.out <- optim(runif(num.z),
+                   fn=cv.ls.uniquecombs,
+                   method="L-BFGS-B",
+                   lower=rep(0,num.z),
+                   upper=rep(1,num.z),
+                   y=y,
+                   z=z,
+                   z.unique=z.unique,
+                   ind=ind,
+                   ind.vals=ind.vals,
+                   num.z=num.z,
+                   c=c)
+
+## Extract least-squares cross-validation optimal bandwidths
+
+lambda.opt <- optim.out$par
+
+## Compute the estimator using the optimal bandwidths
+
+g <- numeric()
+for(i in 1:c) {
+    zz <- ind == ind.vals[i]
+    L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
+                                                  z.unique[ind.vals[i],j],
+                                                  lambda.opt[j])}),1,prod)
+    g[zz] <- sum(y*L)/sum(L)
+}
+
+## Save execution time for optimization and estimation
+
+t.uniquecombs <- proc.time() - ptm
+
+## Compare timing and results with npreg() (comment out the following
+## for general use)
+
+library(np)
+t.npreg <- system.time(g.npreg <- npreg(y~factor(z[,1])+
+                                          factor(z[,2])+
+                                          factor(z[,3])+
+                                          factor(z[,4]),
+                                          ukertype="liracine",
+                                          nmulti=1))
+
+## Compare fitted values for first 10 observations
+
+cbind(g[1:10],fitted(g.npreg)[1:10])
+
+## Compare bandwidths
+
+cbind(lambda.opt,g.npreg$bws$bw)
+
+## Compare objective function values
+
+cbind(optim.out$value,g.npreg$bws$fval)
+
+## Compare computation time in seconds
+
+cbind(t.uniquecombs[1],t.npreg[1])
+
+\end{verbatim}
 
 \bibliographystyle{plain} 
 
