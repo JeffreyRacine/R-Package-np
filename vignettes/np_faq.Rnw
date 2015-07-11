@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.94 2015/07/01 09:00:52 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.96 2015/07/02 06:49:08 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -1698,17 +1698,21 @@ ought to produce no console I/O whatsoever in the call to
   matrix when all predictors are categorical and reduce computation
   time, particularly for cross-validation?}
 
-Certainly. The following conducts kernel regression with exclusively
-binary predictors by way of illustration.
+Certainly. This would occur if, for instance, you had 4 predictors
+each of which was binary 0/1, so there are only $2^4=16$ possible
+unique rows in the design matrix. The following conducts kernel
+regression with exclusively binary predictors by way of illustration.
 \begin{verbatim}
 ## This routine exploits a sparse design matrix when computing the
 ## kernel estimator of a conditional mean presuming unordered
 ## categorical predictors. Numerical optimization is undertaken, and
-## this function is much faster than that ignoring the sparse
-## structure (e.g., the function npreg() currently does not attempt to
-## exploit this structure).
+## this function can be much faster than that ignoring the sparse
+## structure for large n and small k (the function npreg() currently
+## does not attempt to exploit this structure).
 
 rm(list=ls())
+
+## Set the number of observations and number of binary predictors
 
 n <- 1000
 k <- 4
@@ -1728,6 +1732,7 @@ num.z <- ncol(z.unique)
 ind <-  attr(z.unique,"index")
 ind.vals <-  unique(ind)
 c <- nrow(z.unique)
+if(c == n) stop("design is not sparse (no repeated rows)")
 
 ## Kernel function (li-racine unordered kernel)
 
@@ -1742,7 +1747,7 @@ cv.ls.uniquecombs <- function(lambda,y,z,z.unique,ind,ind.vals,num.z,c) {
         L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
                                                       z.unique[ind.vals[i],j],
                                                       lambda[j])}),1,prod)
-        g[zz] <- (sum(y*L)-(y*L)[zz])/(sum(L)-L[zz])
+        g[zz] <- (sum(y*L)-(y*L)[zz])/np:::NZD(sum(L)-L[zz])
     }
     return(mean((y-g)^2))
 }
@@ -1779,7 +1784,7 @@ for(i in 1:c) {
     L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
                                                   z.unique[ind.vals[i],j],
                                                   lambda.opt[j])}),1,prod)
-    g[zz] <- sum(y*L)/sum(L)
+    g[zz] <- sum(y*L)/np:::NZD(sum(L))
 }
 
 ## Save execution time for optimization and estimation
@@ -1790,12 +1795,14 @@ t.uniquecombs <- proc.time() - ptm
 ## for general use)
 
 library(np)
-t.npreg <- system.time(g.npreg <- npreg(y~factor(z[,1])+
-                                          factor(z[,2])+
-                                          factor(z[,3])+
-                                          factor(z[,4]),
-                                          ukertype="liracine",
-                                          nmulti=1))
+g.Formula <- "y ~"
+for (p in 1:k) {
+  g.Formula <- paste(g.Formula," + factor(z[,",p,"])")
+}
+g.Formula <- formula(g.Formula)
+t.npreg <- system.time(g.npreg <- npreg(g.Formula,
+                                        ukertype="liracine",
+                                        nmulti=1))
 
 ## Compare fitted values for first 10 observations
 
@@ -1812,7 +1819,6 @@ cbind(optim.out$value,g.npreg$bws$fval)
 ## Compare computation time in seconds
 
 cbind(t.uniquecombs[1],t.npreg[1])
-
 \end{verbatim}
 
 \bibliographystyle{plain} 

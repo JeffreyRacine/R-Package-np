@@ -1700,10 +1700,18 @@ npregiv <- function(y,
 
     console <- printClear(console)
     console <- printPop(console)
-    if(is.null(bw)) {
-        console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration 1...",sep=""),console)
+    if(smooth.residuals) {
+        if(is.null(bw)) {
+            console <- printPush(paste("Computing bandwidths and E[y-phi(z)|w] for iteration 1...",sep=""),console)
+        } else {
+            console <- printPush(paste("Computing E[y-phi(z)|w] for iteration 1 using supplied bandwidths...",sep=""),console)
+        }
     } else {
-        console <- printPush(paste("Computing E(y-phi(z)|w) for iteration 1 using supplied bandwidths...",sep=""),console)
+        if(is.null(bw)) {
+            console <- printPush(paste("Computing bandwidths and E[phi(z)|w] for iteration 1...",sep=""),console)
+        } else {
+            console <- printPush(paste("Computing E[phi(z)|w] for iteration 1 using supplied bandwidths...",sep=""),console)
+        }
     }
 
     if(smooth.residuals) {
@@ -1773,10 +1781,18 @@ npregiv <- function(y,
 
     console <- printClear(console)
     console <- printPop(console)
-    if(is.null(bw)) {
-        console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration 1...",sep=""),console)
+    if(smooth.residuals) {
+        if(is.null(bw)) {
+            console <- printPush(paste("Computing bandwidths and E[E(y-phi(z)|w)|z] for iteration 1...",sep=""),console)
+        } else {
+            console <- printPush(paste("Computing E[E(y-phi(z)|w)|z] for iteration 1 using supplied bandwidths...",sep=""),console)
+        }
     } else {
-        console <- printPush(paste("Computing E(E(y-phi(z)|w)|z) for iteration 1 using supplied bandwidths...",sep=""),console)
+        if(is.null(bw)) {
+            console <- printPush(paste("Computing bandwidths and E[E(y|w) - E(phi(z)|w)|z] for iteration 1...",sep=""),console)
+        } else {
+            console <- printPush(paste("Computing E[E(y|w) - E(phi(z)|w)|z] for iteration 1 using supplied bandwidths...",sep=""),console)
+        }
     }
 
     if(is.null(bw)) {
@@ -1986,10 +2002,19 @@ npregiv <- function(y,
 
       console <- printClear(console)
       console <- printPop(console)
-      if(is.null(bw)) {
-          console <- printPush(paste("Computing bandwidths and E(y-phi(z)|w) for iteration ", j,"...",sep=""),console)
+
+      if(smooth.residuals) {
+          if(is.null(bw)) {
+              console <- printPush(paste("Computing bandwidths and E[E(y-phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
+          } else {
+              console <- printPush(paste("Computing E[y-phi(z)|w] for iteration ", j," using supplied bandwidths...",sep=""),console)
+          }
       } else {
-          console <- printPush(paste("Computing E(y-phi(z)|w) for iteration ", j," using supplied bandwidths...",sep=""),console)
+          if(is.null(bw)) {
+              console <- printPush(paste("Computing bandwidths and E[E(y|z)-E(phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
+          } else {
+              console <- printPush(paste("Computing E[E(y|z)-E(phi(z)|w)|z] for iteration ", j," using supplied bandwidths...",sep=""),console)
+          }
       }
 
       if(smooth.residuals) {
@@ -2062,10 +2087,18 @@ npregiv <- function(y,
 
       console <- printClear(console)
       console <- printPop(console)
-      if(is.null(bw)) {
-          console <- printPush(paste("Computing bandwidths and E(E(y-phi(z)|w)|z) for iteration ", j,"...",sep=""),console)
+      if(smooth.residuals) {
+          if(is.null(bw)) {
+              console <- printPush(paste("Computing bandwidths and E[E(y-phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
+          } else {
+              console <- printPush(paste("Computing E[E(y-phi(z)|w)|z] for iteration ", j," using supplied bandwidths...",sep=""),console)
+          }
       } else {
-          console <- printPush(paste("Computing E(E(y-phi(z)|w)|z) for iteration ", j," using supplied bandwidths...",sep=""),console)
+          if(is.null(bw)) {
+              console <- printPush(paste("Computing bandwidths and E[E(y|z)-E(phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
+          } else {
+              console <- printPush(paste("Computing E[E(y|z)-E(phi(z)|w)|z] for iteration ", j," using supplied bandwidths...",sep=""),console)
+          }
       }
 
       if(is.null(bw)) {

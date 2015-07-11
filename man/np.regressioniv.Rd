@@ -202,10 +202,10 @@ npregiv(y,
     penalize the norm by the number of iterations or not (default
     \code{TRUE})
   }    
-  \item{smooth.residuals}{
-    a logical value (defaults to \code{TRUE}) indicating whether to
-    optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
-    on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
+  \item{smooth.residuals}{ a logical value indicating whether to
+    optimize bandwidths for the regression of
+    \eqn{(y-\varphi(z))}{(y-phi(z))} on \eqn{w} (defaults to
+    \code{TRUE}) or for the regression of \eqn{\varphi(z)}{phi(z)} on
     \eqn{w} during iteration
   }
   \item{start.from}{ a character string indicating whether to start from
