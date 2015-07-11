@@ -2005,15 +2005,15 @@ npregiv <- function(y,
 
       if(smooth.residuals) {
           if(is.null(bw)) {
-              console <- printPush(paste("Computing bandwidths and E[E(y-phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
+              console <- printPush(paste("Computing bandwidths and E[y-phi(z)|w] for iteration ", j,"...",sep=""),console)
           } else {
               console <- printPush(paste("Computing E[y-phi(z)|w] for iteration ", j," using supplied bandwidths...",sep=""),console)
           }
       } else {
           if(is.null(bw)) {
-              console <- printPush(paste("Computing bandwidths and E[E(y|z)-E(phi(z)|w)|z] for iteration ", j,"...",sep=""),console)
+              console <- printPush(paste("Computing bandwidths and E[phi(z)|w] for iteration ", j,"...",sep=""),console)
           } else {
-              console <- printPush(paste("Computing E[E(y|z)-E(phi(z)|w)|z] for iteration ", j," using supplied bandwidths...",sep=""),console)
+              console <- printPush(paste("Computing E[phi(z)|w] for iteration ", j," using supplied bandwidths...",sep=""),console)
           }
       }
 
