@@ -289,7 +289,7 @@ npregivderiv <- function(y,
           M.vector <- y*K
           sK <- max(.Machine$double.eps,sum(K))
 
-          g.hat.weights <- M.vector/sK
+          g.hat.weights <- M.vector/NZD(sK)
 
           Ridge.mat[,1] <- ridge*g.hat.weights
 
@@ -299,14 +299,14 @@ npregivderiv <- function(y,
           for(m in 1:k) {
 
             h <- max(.Machine$double.eps,bws[X.col.numeric][m])
-            Z <- (as.data.frame(X.train[,X.col.numeric])[,m]-as.data.frame(X.eval[j,X.col.numeric])[,m])/h
+            Z <- (as.data.frame(X.train[,X.col.numeric])[,m]-as.data.frame(X.eval[j,X.col.numeric])[,m])/NZD(h)
 
-            M.1.vector <- M.vector*Z/h
-            K.1.vector <- K*Z/h
+            M.1.vector <- M.vector*Z/NZD(h)
+            K.1.vector <- K*Z/NZD(h)
 
-            sK1divsK <- sum(K.1.vector)/sK
+            sK1divsK <- sum(K.1.vector)/NZD(sK)
 
-            fp.hat.weights <- M.1.vector/sK-g.hat.weights*sK1divsK
+            fp.hat.weights <- M.1.vector/NZD(sK)-g.hat.weights*sK1divsK
 
             Ridge.mat[,m+1] <- ridge*fp.hat.weights
 
@@ -314,12 +314,12 @@ npregivderiv <- function(y,
 
             if(p >= 2) {
 
-              K.2.vector <- K*(Z^2-1)/h^2
-              sK2divsK <- sum(K.2.vector)/sK
-              M.2.vector <- M.vector*(Z^2-1)/(h^2)
+              K.2.vector <- K*(Z^2-1)/NZD(h^2)
+              sK2divsK <- sum(K.2.vector)/NZD(sK)
+              M.2.vector <- M.vector*(Z^2-1)/NZD(h^2)
 
-              sp.hat.weights <- M.2.vector/sK -
-                M.1.vector/sK*sK1divsK -
+              sp.hat.weights <- M.2.vector/NZD(sK) -
+                M.1.vector/NZD(sK)*sK1divsK -
                   fp.hat.weights*sK1divsK -
                     g.hat.weights*(sK2divsK-sK1divsK^2)
 
@@ -673,7 +673,7 @@ npregivderiv <- function(y,
         while(any(doridge)){
           iloo <- (1:n)[doridge]
           mean.loo[iloo] <- (1-ridge[iloo])*sapply(iloo, ridger) + ridge.lc[iloo]
-        }
+      }
 
         if (!any(mean.loo == maxPenalty)){
           fv <- mean((ydat-mean.loo)^2)
@@ -1291,7 +1291,7 @@ npregivderiv <- function(y,
 
   }
 
-  norm.stop[1] <- sum(predicted.E.mu.w^2)/sum(E.y.w^2)
+  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
 
   ## We again require the mean of the fitted values
 
@@ -1310,7 +1310,7 @@ npregivderiv <- function(y,
 
   survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
-  T.star.mu <- (survivor.weighted.average-S.z*mean.predicted.E.mu.w)/f.z
+  T.star.mu <- (survivor.weighted.average-S.z*mean.predicted.E.mu.w)/NZD(f.z)
 
   ## Now we update phi.prime.0, this provides phi.prime.1, and now
   ## we can iterate until convergence... note we replace phi.prime.0
@@ -1351,6 +1351,7 @@ npregivderiv <- function(y,
       console <- printClear(console)
       console <- printPop(console)
       console <- printPush(paste("Computing optimal smoothing for E(mu|w) for iteration ", j,"...",sep=""),console)
+
 
       ## Additional smoothing on top of the stopping rule required, but
       ## we have computed the stopping rule so reuse the bandwidth
@@ -1405,7 +1406,7 @@ npregivderiv <- function(y,
 
     }
 
-    norm.stop[j] <- ifelse(penalize.iteration,j*sum(predicted.E.mu.w^2)/sum(E.y.w^2),sum(predicted.E.mu.w^2)/sum(E.y.w^2))
+    norm.stop[j] <- ifelse(penalize.iteration,j*sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2)),sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2)))
 
     mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
@@ -1422,7 +1423,7 @@ npregivderiv <- function(y,
 
     survivor.weighted.average <- mean.predicted.E.mu.w - cdf.weighted.average
 
-    T.star.mu <- (survivor.weighted.average-S.z*mean.mu)/f.z
+    T.star.mu <- (survivor.weighted.average-S.z*mean.mu)/NZD(f.z)
 
     ## Now we update, this provides phi.prime.1, and now we can
     ## iterate until convergence...

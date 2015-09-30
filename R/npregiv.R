@@ -167,7 +167,7 @@ npregiv <- function(y,
       }
       invmat.Cr.r <- invmat %*% Cr.r
       phi <- invmat.Cr.r + alpha * invmat %*% invmat.Cr.r
-      return(sum((CZ%*%phi - r)^2)/alpha)
+      return(sum((CZ%*%phi - r)^2)/NZD(alpha))
   }
 
   ## This function returns the weight matrix for a local polynomial,
@@ -275,7 +275,7 @@ npregiv <- function(y,
 
               rSk <- NZD(rowSums(t(K.x)))
 
-              Kmat <- t(K.x.deriv)/rSk-t(K.x)/rSk*(rowSums(t(K.x.deriv))/rSk)
+              Kmat <- t(K.x.deriv)/NZD(rSk)-t(K.x)/NZD(rSk)*(rowSums(t(K.x.deriv))/NZD(rSk))
 
           }
 
@@ -1460,8 +1460,8 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
 
-    if((alpha.iter-alpha.min)/alpha.min < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
-    if((alpha.max-alpha.iter)/alpha.max < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
+    if((alpha.iter-alpha.min)/NZD(alpha.min) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
+    if((alpha.max-alpha.iter)/NZD(alpha.max) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
 
     return(list(phi=phi,
                 phi.eval=phi.eval,
