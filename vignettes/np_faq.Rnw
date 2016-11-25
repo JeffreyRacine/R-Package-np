@@ -623,7 +623,8 @@ at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
 You could do this using `data-reflection' (see the description in
 \cite[Page 30]{SILVERMAN:1986}, as the following illustration
 demonstrates; see also \cite{KARUNAMUNIA_ZHANG:2008} for improved data
-reflection approaches.
+reflection approaches and \cite{MARRON_RUPPERT:1994} for alternative
+transformations to reduce boundary bias.
 
 \begin{verbatim}
 ## Use trees to speed up estimation 
