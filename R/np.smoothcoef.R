@@ -123,8 +123,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   if(txdat.named)
     txdat <- toFrame(txdat)
 
-  if(tydat.named)
-    tydat <- toFrame(tydat)
+  ## if(tydat.named)
+  ## tydat <- toFrame(tydat)
 
   if(tydat.named)
     tzdat <- toFrame(tzdat)
