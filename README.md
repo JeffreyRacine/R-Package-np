@@ -1,5 +1,7 @@
 # np
 
+![CRAN downloads](http://cranlogs.r-pkg.org/badges/grand-total/np)
+
 This is the R package `np' (Nonparametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield (tristen.hayfield@gmail.com)
 
 ## Installation
