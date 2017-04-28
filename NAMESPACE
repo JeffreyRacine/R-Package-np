@@ -1,5 +1,10 @@
 useDynLib(np)
 import(stats, boot, cubature)
+importFrom("grDevices", "boxplot.stats", "extendrange")
+importFrom("graphics", "lines", "par", "persp", "plot", "points")
+importFrom("utils", "combn", "flush.console")
+importFrom("methods", "is")
+importFrom("quantreg", "rq")
 export(b.star
        ,npudensbw
        ,npudistbw
@@ -295,4 +300,7 @@ S3method(npscoef, default)
 S3method(npscoef, call)
 S3method(npscoef, formula)
 S3method(npscoef, scbandwidth)
+
+S3method(gsl.bs, default)
+S3method(predict, gsl.bs)
 

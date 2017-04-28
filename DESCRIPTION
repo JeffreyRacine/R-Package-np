@@ -1,8 +1,8 @@
 Package: np
 Version: 0.60-2
-Date: 2017-04-11
-Imports: boot, cubature, stats
-Suggests: quantreg, MASS
+Date: 2017-04-28
+Imports: boot, cubature, methods, quantreg, stats
+Suggests: MASS
 Title: Nonparametric Kernel Smoothing Methods for Mixed Data Types
 Authors@R: c(person(given = "Jeffrey S.", family = "Racine", role = c("aut","cre"), email = "racinej@mcmaster.ca"),
              person(given = "Tristen", family = "Hayfield", role = c("aut"), email = "tristen.hayfield@gmail.com"))

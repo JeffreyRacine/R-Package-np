@@ -831,6 +831,179 @@ se <- function(x){
 gradients <- function(x, ...){
   UseMethod("gradients",x)
 }
+
+## From crs to avoid crs:::W.glp
+
+mypoly <- function(x,
+                   ex=NULL,
+                   degree,
+                   gradient.compute = FALSE,
+                   r=0,
+                   Bernstein = TRUE) {
+
+  if(missing(x)) stop(" Error: x required")
+  if(missing(degree)) stop(" Error: degree required")
+  if(degree < 1) stop(" Error: degree must be a positive integer")
+  if(!is.logical(Bernstein)) stop(" Error: Bernstein must be logical")
+
+  if(!Bernstein) {
+
+    ## Raw polynomials and their derivatives
+
+    if(!is.null(ex)) x <- ex
+
+    if(gradient.compute) {
+      Z <- NULL
+      for(i in 1:degree) {
+        if((i-r) >= 0) {
+          tmp <- (factorial(i)/factorial(i-r))*x^max(0,i-r)
+        } else {
+          tmp <- rep(0,length(x))
+        }
+        Z <- cbind(Z,tmp)
+      }
+    } else {
+      Z <- outer(x,1L:degree,"^")
+    }
+
+  } else {
+    ## Bernstein polynomials and their derivatives (i.e. Bezier curves
+    ## i.e. B-splines with no interior knots)
+    if(is.null(ex)) {
+      if(gradient.compute) {
+        Z <- gsl.bs(x,degree=degree,deriv=r)
+      } else {
+        Z <- gsl.bs(x,degree=degree)
+      }
+    } else {
+      if(gradient.compute) {
+        Z <- predict(gsl.bs(x,degree=degree,deriv=r),newx=ex)
+      } else {
+        Z <- predict(gsl.bs(x,degree=degree),newx=ex)
+      }
+    }
+  }
+
+  return(as.matrix(Z))
+
+}
+
+## W.glp is a modified version of the polym() function (stats). The
+## function accepts a vector of degrees and provides a generalized
+## polynomial with varying polynomial order.
+
+W.glp <- function(xdat = NULL,
+                  exdat = NULL,
+                  degree = NULL,
+                  gradient.vec = NULL,
+                  Bernstein = TRUE) {
+
+  if(is.null(xdat)) stop(" Error: You must provide data")
+  if(is.null(degree) || any(degree < 0)) stop(paste(" Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
+
+  xdat <- as.data.frame(xdat)
+
+  xdat.col.numeric <- sapply(1:ncol(xdat),function(i){is.numeric(xdat[,i])})
+  k <- ncol(as.data.frame(xdat[,xdat.col.numeric]))
+
+  xdat.numeric <- NULL
+  if(k > 0) {
+    xdat.numeric <- as.data.frame(xdat[,xdat.col.numeric])
+    if(!is.null(exdat)) {
+      exdat.numeric <- as.data.frame(exdat[,xdat.col.numeric])
+    } else {
+      exdat.numeric <- NULL
+    }
+  }
+
+  if(!is.null(gradient.vec) && (length(gradient.vec) != k)) stop(paste(" Error: gradient vector and number of numeric predictors must be conformable\n",sep=""))
+  if(!is.null(gradient.vec) && any(gradient.vec < 0)) stop(paste(" Error: gradient vector must contain non-negative integers\n",sep=""))
+
+  if(!is.null(gradient.vec)) {
+    gradient.compute <- TRUE
+  } else {
+    gradient.compute <- FALSE
+    gradient.vec <- rep(NA,k)
+  }
+
+  if(length(degree) != k) stop(" Error: degree vector and number of numeric predictors incompatible")
+
+  if(all(degree == 0) || (k == 0)) {
+
+    ## Local constant OR no continuous variables
+
+    if(is.null(exdat)) {
+      return(matrix(1,nrow=nrow(xdat.numeric),ncol=1))
+    } else {
+      return(matrix(1,nrow=nrow(exdat.numeric),ncol=1))
+    }
+
+  } else {
+
+    degree.list <- list()
+    for(i in 1:k) degree.list[[i]] <- 0:degree[i]
+    z <- do.call("expand.grid", degree.list, k)
+    s <- rowSums(z)
+    ind <- (s > 0) & (s <= max(degree))
+    z <- z[ind, ,drop=FALSE]
+    if(!all(degree==max(degree))) {
+      for(j in 1:length(degree)) {
+        d <- degree[j]
+        if((d < max(degree)) & (d > 0)) {
+          s <- rowSums(z)
+          d <- (s > d) & (z[,j,drop=FALSE]==matrix(d,nrow(z),1,byrow=TRUE))
+          z <- z[!d, ]
+        }
+      }
+    }
+    if(is.null(exdat)) {
+      res <- rep.int(1,nrow(xdat.numeric))
+    } else {
+      res <- rep.int(1,nrow(exdat.numeric))
+    }
+    res.deriv <- 1
+    if(degree[1] > 0) {
+      res <- cbind(1, mypoly(x=xdat.numeric[,1],
+                             ex=exdat.numeric[,1],
+                             degree=degree[1],
+                             gradient.compute=gradient.compute,
+                             r=gradient.vec[1],
+                             Bernstein=Bernstein))[, 1 + z[, 1]]
+
+      if(gradient.compute && gradient.vec[1] != 0) res.deriv <- cbind(1,matrix(NA,1,degree[1]))[, 1 + z[, 1],drop=FALSE]
+      if(gradient.compute && gradient.vec[1] == 0) res.deriv <- cbind(1,matrix(0,1,degree[1]))[, 1 + z[, 1],drop=FALSE]
+    }
+    if(k > 1) for (i in 2:k) if(degree[i] > 0) {
+      res <- res * cbind(1, mypoly(x=xdat.numeric[,i],
+                                   ex=exdat.numeric[,i],
+                                   degree=degree[i],
+                                   gradient.compute=gradient.compute,
+                                   r=gradient.vec[i],
+                                   Bernstein=Bernstein))[, 1 + z[, i]]
+      if(gradient.compute && gradient.vec[i] != 0) res.deriv <- res.deriv * cbind(1,matrix(NA,1,degree[i]))[, 1 + z[, i],drop=FALSE]
+      if(gradient.compute && gradient.vec[i] == 0) res.deriv <- res.deriv *cbind(1,matrix(0,1,degree[i]))[, 1 + z[, i],drop=FALSE]
+    }
+
+    if(is.null(exdat)) {
+      res <- matrix(res,nrow=NROW(xdat))
+    } else {
+      res <- matrix(res,nrow=NROW(exdat))
+    }
+    if(gradient.compute) res.deriv <- matrix(res.deriv,nrow=1)
+    colnames(res) <- apply(z, 1L, function(x) paste(x, collapse = "."))
+    if(gradient.compute) colnames(res.deriv) <- apply(z, 1L, function(x) paste(x, collapse = "."))
+
+    if(gradient.compute) {
+      res[,!is.na(as.numeric(res.deriv))] <- 0
+      return(cbind(0,res))
+    } else {
+      return(cbind(1,res))
+    }
+
+  }
+
+}
+
 ### internal constants used in the c backend
 
 SF_NORMAL = 0

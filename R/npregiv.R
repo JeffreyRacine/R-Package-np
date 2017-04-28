@@ -285,14 +285,14 @@ npregiv <- function(y,
 
           ## Re-use this matrix, shrinking occurs here
 
-          W.z <- crs:::W.glp(xdat=X.train.numeric,
+          W.z <- W.glp(xdat=X.train.numeric,
                              degree=rep(p,NCOL(X.train.numeric)))
 
           if(is.null(mydata.eval)) {
               ## Guess we could avoid copy with conditional statement below using either W.z or W.z.eval
               W.z.eval <- W.z
           } else {
-              W.z.eval <- crs:::W.glp(xdat=X.train.numeric,
+              W.z.eval <- W.glp(xdat=X.train.numeric,
                                       exdat=as.data.frame(X.eval.numeric),
                                       degree=rep(p,NCOL(X.train.numeric)))
           }
@@ -349,7 +349,7 @@ npregiv <- function(y,
 
           if(deriv==0) Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))
           if(deriv==1) {
-              W.z.deriv.1 <- crs:::W.glp(xdat=X.train.numeric,
+              W.z.deriv.1 <- W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 1)
@@ -370,7 +370,7 @@ npregiv <- function(y,
 
           if(deriv==1) {
 
-              W.z.deriv.1 <- crs:::W.glp(xdat=X.train.numeric,
+              W.z.deriv.1 <- W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 1)
@@ -381,7 +381,7 @@ npregiv <- function(y,
 
           if(deriv==2) {
 
-              W.z.deriv.2 <- crs:::W.glp(xdat=X.train.numeric,
+              W.z.deriv.2 <- W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 2)
@@ -486,14 +486,14 @@ npregiv <- function(y,
 
     } else {
 
-      W <- crs:::W.glp(xdat=txdat,
+      W <- W.glp(xdat=txdat,
                        degree=degree)
 
-      W.eval <- crs:::W.glp(xdat=txdat,
+      W.eval <- W.glp(xdat=txdat,
                             exdat=exdat,
                             degree=degree)
 
-      W.eval.deriv <- crs:::W.glp(xdat=txdat,
+      W.eval.deriv <- W.glp(xdat=txdat,
                                   exdat=exdat,
                                   degree=degree,
                                   gradient.vec=rep(deriv,NCOL(txdat)))
@@ -874,7 +874,7 @@ npregiv <- function(y,
     ## Pass in the local polynomial weight matrix rather than
     ## recomputing with each iteration.
 
-    W <- crs:::W.glp(xdat=xdat,
+    W <- W.glp(xdat=xdat,
                      degree=degree)
 
     sum.lscv <- function(bw.gamma,...) {
