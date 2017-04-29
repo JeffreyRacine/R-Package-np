@@ -1,4 +1,4 @@
-Changes from Version 0.60-2 to 0.60-3 [XXX-May-2017]
+Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]
 
 * fixed the `cannot find function is()' glitch that just surfaced with R 3.4.0
 
