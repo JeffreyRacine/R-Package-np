@@ -1,4 +1,4 @@
-useDynLib(np)
+useDynLib(np, .registration = TRUE)
 import(stats, boot, cubature)
 importFrom("grDevices", "boxplot.stats", "extendrange")
 importFrom("graphics", "lines", "par", "persp", "plot", "points")
