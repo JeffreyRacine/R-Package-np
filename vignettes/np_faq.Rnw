@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.97 2016/07/14 13:19:29 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.98 2017/04/29 16:30:01 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -1834,10 +1834,40 @@ cbind(t.uniquecombs[1],t.npreg[1])
 
 \begin{itemize}
 
-\item fixed the `cannot find function \texttt{is()}' glitch that just surfaced with R 3.4.0
+\item Fixed the `cannot find function \texttt{is()}' glitch that just surfaced with R 3.4.0
 
-\item fixed glitch in \texttt{npconmode()} when randomizing if all probabilities
+\item Fixed glitch in \texttt{npconmode()} when randomizing if all probabilities
   are equal
+
+\item Migrated some code from crs (which I wrote) to avoid \texttt{crs:::}
+
+\item Fixed	outstanding glitch in \texttt{npscoef()} with \texttt{tydat}
+
+\item Option \texttt{leave.one.out} not properly implemented in \texttt{npscoef()}, corrected
+
+\item Using pmin/pmax in NZD (parallel min/max more efficient with vectors)
+
+\item Improved screen i/o when \texttt{smooth.residuals=TRUE/FALSE}
+
+\item Corrected glitch in \texttt{npregiv()} where multivariate z would halt with error
+
+\item \texttt{npregiv()} with \texttt{method="Landweber-Fridman"} no longer passes back lists
+
+\item Fixed glitch in \texttt{Kmat.lp} with p=0 and derivatives
+
+\item Tikhonov regularization in \texttt{npregiv()} now supports evaluation data
+
+\item Updated \texttt{npregiv()} (was sorely lacking, did not support eval etc.)
+
+\item Use of \texttt{.onLoad} suggested (by Bernd Bischl)
+
+\item Added \texttt{vignette("entropy\_np",package="np")} to startup message
+
+\item In \texttt{np.distribution.bw.R} default for \texttt{do.full.integral} changed to FALSE
+
+\item Fixed the CDF objective function when averaging over the training data
+
+\item Fixed crash error with \texttt{npcdistbw()} and adaptive bandwidths
 
 \end{itemize}
 

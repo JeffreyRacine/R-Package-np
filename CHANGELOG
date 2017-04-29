@@ -1,40 +1,40 @@
 Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]
 
-* fixed the `cannot find function is()' glitch that just surfaced with R 3.4.0
+* Fixed the `cannot find function is()' glitch that just surfaced with R 3.4.0
 
-* fixed glitch in npconmode when randomizing if all probabilities are equal
+* Fixed glitch in npconmode when randomizing if all probabilities are equal
 
-* migrated some code from crs (which I wrote) to avoid crs:::
+* Migrated some code from crs (which I wrote) to avoid crs:::
 
-* fixed	outstanding glitch in npscoef() with tydat being converted
+* Fixed	outstanding glitch in npscoef() with tydat being converted
 
-* leave.one.out not properly implemented in npscoef, corrected
+* Leave.one.out not properly implemented in npscoef, corrected
 
-* using pmin/pmax in NZD (parallel min/max more efficient with vectors)
+* Using pmin/pmax in NZD (parallel min/max more efficient with vectors)
 
-* improved screen i/o when smooth.residuals=TRUE/FALSE
+* Improved screen i/o when smooth.residuals=TRUE/FALSE
 
-* corrected glitch in npregiv() where multivariate z would halt with error
+* Corrected glitch in npregiv() where multivariate z would halt with error
 
-* npregiv with method="Landweber-Fridman" no longer passes back lists
+* Npregiv with method="Landweber-Fridman" no longer passes back lists
 
-* fixed glitch in Kmat.lp with p=0 and derivatives
+* Fixed glitch in Kmat.lp with p=0 and derivatives
 
 * Tikhonov regularization in npregiv now supports evaluation data
 
-* updated npregiv (was sorely lacking, did not support eval etc.)
+* Updated npregiv (was sorely lacking, did not support eval etc.)
 
-* use of .onLoad suggested (by Bernd Bischl)
+* Use of .onLoad suggested (by Bernd Bischl)
 
-* fixed glitch in npconmode
+* Fixed glitch in npconmode
 
-* added vignette("entropy_np",package="np") to startup message
+* Added vignette("entropy_np",package="np") to startup message
 
-* in np.distribution.bw.R default for do.full.integral changed to FALSE
+* In np.distribution.bw.R default for do.full.integral changed to FALSE
 
-* fixed the CDF objective function when averaging over the training data
+* Fixed the CDF objective function when averaging over the training data
 
-* fixed crash error with npcdistbw and adaptive bandwidths
+* Fixed crash error with npcdistbw and adaptive bandwidths
 
 Changes from Version 0.60-1 to 0.60-2 [27-Jun-2014]
 
