@@ -1105,7 +1105,7 @@ npregivderiv <- function(y,
 
   ## Let's compute the bandwidth object for the unconditional
   ## density for the moment. Use the normal-reference rule for speed
-  ## considerations.
+  ## considerations, same smoothing for PDF and CDF.
 
   bw <- npudensbw(dat=z,
                   bwmethod="normal-reference",
@@ -1115,7 +1115,7 @@ npregivderiv <- function(y,
                       ...)
   f.z <- predict(model.fz,newdata=zeval)
   model.Sz <- npudist(tdat=z,
-                      bwmethod="normal-reference",
+                      bws=bw$bw,
                       ...)
   S.z <- 1-predict(model.Sz,newdata=zeval)
 
@@ -1477,7 +1477,7 @@ npregivderiv <- function(y,
 
     }
 
-    if(!penalize.iteration && j > round(sqrt(nrow(z))) ) {
+    if(!penalize.iteration && j > round(sqrt(nrow(z)))  && !is.monotone.increasing(norm.stop)) {
 
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
@@ -1495,6 +1495,7 @@ npregivderiv <- function(y,
 
     }
 
+    j.opt <- j
     convergence <- "ITERATE_MAX"
 
   }
@@ -1511,7 +1512,7 @@ npregivderiv <- function(y,
   if(is.monotone.increasing(norm.stop)) {
     warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g., instead set `start.from' to EEywz or provide a vector of starting values")
     convergence <- "FAILURE_MONOTONE_INCREASING"
-    j <- 1
+    j <- length(norm.stop)
     phi <- phi.mat[,1]
     phi.prime <- phi.prime.mat[,1]
   } else {
