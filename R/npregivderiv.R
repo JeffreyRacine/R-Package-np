@@ -1115,7 +1115,7 @@ npregivderiv <- function(y,
                       ...)
   f.z <- predict(model.fz,newdata=zeval)
   model.Sz <- npudist(tdat=z,
-                      bws=bw$bw,
+                      bwmethod="normal-reference",
                       ...)
   S.z <- 1-predict(model.Sz,newdata=zeval)
 
@@ -1461,7 +1461,7 @@ npregivderiv <- function(y,
     ## N^0.5. Note that derivative estimation seems to require more
     ## iterations hence the heuristic sqrt(N)
 
-    if(j > round(sqrt(nrow(z))) && !is.monotone.increasing(norm.stop)) {
+    if(penalize.iteration && j > round(sqrt(nrow(z))) && !is.monotone.increasing(norm.stop)) {
 
       ## If stopping rule criterion increases or we are below stopping
       ## tolerance then break
@@ -1472,6 +1472,24 @@ npregivderiv <- function(y,
       }
       if(abs(norm.value[j-1]-norm.value[j]) < iterate.diff.tol || norm.value[j] < iterate.diff.tol/2) {
         convergence <- "ITERATE_DIFF_TOL"
+        if(iterate.break) break()
+      }
+
+    }
+
+    if(!penalize.iteration && j > round(sqrt(nrow(z))) ) {
+
+      ## If stopping rule criterion increases or we are below stopping
+      ## tolerance then break
+
+      if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
+        convergence <- "STOP_ON_INCREASE"
+        j.opt <- j-1
+        if(iterate.break) break()
+      }
+      if(abs(norm.value[j-1]-norm.value[j]) < iterate.diff.tol || norm.value[j] < iterate.diff.tol/2) {
+        convergence <- "ITERATE_DIFF_TOL"
+        j.opt <- j-1
         if(iterate.break) break()
       }
 
@@ -1497,16 +1515,21 @@ npregivderiv <- function(y,
     phi <- phi.mat[,1]
     phi.prime <- phi.prime.mat[,1]
   } else {
-    ## Ignore the initial increasing portion, take the min to the
-    ## right of where the initial inflection point occurs.
-    j <- 1
-    ## Climb the initial hill...
-    while(norm.stop[j+1] >= norm.stop[j] & j < length(norm.stop)) j <- j + 1
-    ## Descend into the first valley
-    while(norm.stop[j+1] < norm.stop[j] & j < length(norm.stop)) j <- j + 1
-    ## When you start to climb again, stop, previous location was min
-    phi <- phi.mat[,j-1]
-    phi.prime <- phi.prime.mat[,j-1]
+    if(penalize.iteration) {
+      ## Ignore the initial increasing portion, take the min to the
+      ## right of where the initial inflection point occurs.
+      j <- 1
+      ## Climb the initial hill...
+      while(norm.stop[j+1] >= norm.stop[j] & j < length(norm.stop)) j <- j + 1
+      ## Descend into the first valley
+      while(norm.stop[j+1] < norm.stop[j] & j < length(norm.stop)) j <- j + 1
+      ## When you start to climb again, stop, previous location was min
+      phi <- phi.mat[,j-1]
+      phi.prime <- phi.prime.mat[,j-1]
+    } else {
+      phi <- phi.mat[,j.opt]
+      phi.prime <- phi.prime.mat[,j.opt]
+    }
   }
   
   console <- printClear(console)
