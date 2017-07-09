@@ -1830,7 +1830,7 @@ cbind(t.uniquecombs[1],t.npreg[1])
 
 \appendix
 
-\section*{Changes from Version 0.60-2 to 0.60-3 [29-Apr-201]}
+\section*{Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]}
 
 \begin{itemize}
 

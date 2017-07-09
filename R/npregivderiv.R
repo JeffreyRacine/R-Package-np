@@ -63,12 +63,14 @@ npregivderiv <- function(y,
                          p=1,
                          nmulti=1,
                          random.seed=42,
+                         norm.ratio=TRUE,
                          optim.maxattempts = 10,
                          optim.method=c("Nelder-Mead", "BFGS", "CG"),
                          optim.reltol=sqrt(.Machine$double.eps),
                          optim.abstol=.Machine$double.eps,
                          optim.maxit=500,
                          iterate.max=1000,
+                         iterate.break=TRUE,
                          iterate.diff.tol=1.0e-08,
                          constant=0.5,
                          penalize.iteration=TRUE,
@@ -1224,7 +1226,11 @@ npregivderiv <- function(y,
   console <- printPop(console)
   console <- printPush(paste("Computing optimal smoothing for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
 
+  ## When penalize.iteration = TRUE the norm gets scaled up by the
+  ## iteration number - norm.value is the unscaled version
+  
   norm.stop <- numeric()
+  norm.value <- numeric()
 
   ## Now we compute mu.0 (a residual of sorts)
 
@@ -1291,8 +1297,13 @@ npregivderiv <- function(y,
 
   }
 
-  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
 
+  if(norm.ratio) {
+      norm.value[1] <- norm.stop[1] <- mean((predicted.E.mu.w/NZD(E.y.w))^2)
+  } else {
+      norm.value[1] <- norm.stop[1] <- mean(predicted.E.mu.w^2)
+  }
+  
   ## We again require the mean of the fitted values
 
   mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
@@ -1406,8 +1417,14 @@ npregivderiv <- function(y,
 
     }
 
-    norm.stop[j] <- ifelse(penalize.iteration,j*sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2)),sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2)))
+    if(norm.ratio) {
+      norm.value[j] <-  mean((predicted.E.mu.w/NZD(E.y.w))^2)
+    } else {
+      norm.value[j] <-  mean(predicted.E.mu.w^2)
+    }
 
+    norm.stop[j] <- ifelse(penalize.iteration,j*norm.value[j],norm.value[j])
+    
     mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
     ## Now we compute T^* applied to mu
@@ -1451,11 +1468,11 @@ npregivderiv <- function(y,
 
       if(stop.on.increase && norm.stop[j] > norm.stop[j-1]) {
         convergence <- "STOP_ON_INCREASE"
-        break()
+        if(iterate.break) break()
       }
-      if(abs(norm.stop[j-1]-norm.stop[j]) < iterate.diff.tol) {
+      if(abs(norm.value[j-1]-norm.value[j]) < iterate.diff.tol || norm.value[j] < iterate.diff.tol/2) {
         convergence <- "ITERATE_DIFF_TOL"
-        break()
+        if(iterate.break) break()
       }
 
     }
@@ -1469,30 +1486,29 @@ npregivderiv <- function(y,
   ## then decreasing (and potentially increasing thereafter) portion
   ## of the stopping function, ignore the initial increasing portion,
   ## and take the min from where the initial inflection point occurs
-  ## to the length of norm.stop
+  ## to the length of norm.stop. Note - if norm.value is monotonically
+  ## increasing then so must be norm.stop (default penalize.iteration
+  ## is j*norm.stop)
 
-  norm.value <- norm.stop/(1:length(norm.stop))
-
-  if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
-    warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
+  if(is.monotone.increasing(norm.stop)) {
+    warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g., instead set `start.from' to EEywz or provide a vector of starting values")
     convergence <- "FAILURE_MONOTONE_INCREASING"
-#    phi <- starting.values.phi
-#    phi.prime <- starting.values.phi.prime
     j <- 1
-    while(norm.value[j+1] > norm.value[j]) j <- j + 1
-    j <- j-1 + which.min(norm.value[j:length(norm.value)])
-    phi <- phi.mat[,j]
-    phi.prime <- phi.prime.mat[,j]
+    phi <- phi.mat[,1]
+    phi.prime <- phi.prime.mat[,1]
   } else {
     ## Ignore the initial increasing portion, take the min to the
-    ## right of where the initial inflection point occurs
+    ## right of where the initial inflection point occurs.
     j <- 1
-    while(norm.stop[j+1] > norm.stop[j]) j <- j + 1
-    j <- j-1 + which.min(norm.stop[j:length(norm.stop)])
-    phi <- phi.mat[,j]
-    phi.prime <- phi.prime.mat[,j]
+    ## Climb the initial hill...
+    while(norm.stop[j+1] >= norm.stop[j] & j < length(norm.stop)) j <- j + 1
+    ## Descend into the first valley
+    while(norm.stop[j+1] < norm.stop[j] & j < length(norm.stop)) j <- j + 1
+    ## When you start to climb again, stop, previous location was min
+    phi <- phi.mat[,j-1]
+    phi.prime <- phi.prime.mat[,j-1]
   }
-
+  
   console <- printClear(console)
   console <- printPop(console)
 

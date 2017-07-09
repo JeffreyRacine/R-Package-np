@@ -26,12 +26,14 @@ npregivderiv(y,
              p = 1,
              nmulti = 1,
              random.seed = 42,
+             norm.ratio = TRUE,
              optim.maxattempts = 10,
              optim.method = c("Nelder-Mead", "BFGS", "CG"),
              optim.reltol = sqrt(.Machine$double.eps),
              optim.abstol = .Machine$double.eps,
              optim.maxit = 500,
              iterate.max = 1000,
+             iterate.break = TRUE,
              iterate.diff.tol = 1.0e-08,
              constant = 0.5,
              penalize.iteration = TRUE,
@@ -93,6 +95,11 @@ npregivderiv(y,
     replicability of the numerical search. Defaults to 42.
   }
 
+  \item{norm.ratio}{
+    a logical value indicating whether to take the norm of the ratio in
+    the stopping rule (default) or the ratio of the norms
+  }
+
   \item{optim.method}{ method used by \code{\link{optim}} for minimization of
     the objective function. See \code{?optim} for references. Defaults
     to \code{"Nelder-Mead"}.
@@ -137,11 +144,20 @@ npregivderiv(y,
   \item{optim.maxit}{
     maximum number of iterations used by \code{\link{optim}}. Defaults
      to \code{500}.
-   }
-\item{iterate.max}{
-  an integer indicating the maximum number of iterations permitted
-  before termination occurs for Landweber-Fridman iteration.
-}
+  }
+
+  \item{iterate.max}{
+    an integer indicating the maximum number of iterations permitted
+    before termination occurs for Landweber-Fridman iteration.
+  }
+
+  \item{iterate.break}{
+    a logical value indicating whether to compute all objects up to
+    \code{iterate.max} or to break when a potential optimum arises
+    (useful for inspecting full stopping rule profile up to
+    \code{iterate.max})
+  }
+
 \item{iterate.diff.tol}{
   the search tolerance for the difference in the stopping rule from
   iteration to iteration when using Landweber-Fridman iteration
