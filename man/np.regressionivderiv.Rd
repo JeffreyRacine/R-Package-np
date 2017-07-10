@@ -23,20 +23,12 @@ npregivderiv(y,
              zeval = NULL,
              weval = NULL,
              xeval = NULL,
-             p = 1,
              nmulti = 1,
              random.seed = 42,
-             norm.ratio = TRUE,
-             optim.maxattempts = 10,
-             optim.method = c("Nelder-Mead", "BFGS", "CG"),
-             optim.reltol = sqrt(.Machine$double.eps),
-             optim.abstol = .Machine$double.eps,
-             optim.maxit = 500,
              iterate.max = 1000,
              iterate.break = TRUE,
              iterate.diff.tol = 1.0e-08,
              constant = 0.5,
-             penalize.iteration = TRUE,
              start.from = c("Eyz","EEywz"),
              starting.values = NULL,
              stop.on.increase = TRUE,
@@ -80,10 +72,7 @@ npregivderiv(y,
     regression will be estimated (evaluation data). By default,
     evaluation takes place on the data provided by \code{x}.
   }
-  \item{p}{
-    the order of the local polynomial regression (defaults to
-    \code{p=1}, i.e. local linear).
-  }
+
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
@@ -93,57 +82,6 @@ npregivderiv(y,
   \item{random.seed}{
     an integer used to seed R's random number generator. This ensures
     replicability of the numerical search. Defaults to 42.
-  }
-
-  \item{norm.ratio}{
-    a logical value indicating whether to take the norm of the ratio in
-    the stopping rule (default) or the ratio of the norms
-  }
-
-  \item{optim.method}{ method used by \code{\link{optim}} for minimization of
-    the objective function. See \code{?optim} for references. Defaults
-    to \code{"Nelder-Mead"}.
-
-    the default method is an implementation of that of Nelder and Mead
-    (1965), that uses only function values and is robust but relatively
-    slow.  It will work reasonably well for non-differentiable
-    functions.
-
-    method \code{"BFGS"} is a quasi-Newton method (also known as a
-    variable metric algorithm), specifically that published
-    simultaneously in 1970 by Broyden, Fletcher, Goldfarb and Shanno.
-    This uses function values and gradients to build up a picture of the
-    surface to be optimized.
-
-    method \code{"CG"} is a conjugate gradients method based
-    on that by Fletcher and Reeves (1964) (but with the option of
-    Polak-Ribiere or Beale-Sorenson updates).  Conjugate gradient
-    methods will generally be more fragile than the BFGS method, but as
-    they do not store a matrix they may be successful in much larger
-    optimization problems.
-  }
-
-  \item{optim.maxattempts}{
-    maximum number of attempts taken trying to achieve successful
-    convergence in \code{\link{optim}}. Defaults to \code{100}.
-  }
-
-  \item{optim.abstol}{
-    the absolute convergence tolerance used by \code{\link{optim}}. Only useful
-    for non-negative functions, as a tolerance for reaching
-    zero. Defaults to \code{.Machine$double.eps}.
-  }
-
-  \item{optim.reltol}{
-    relative convergence tolerance used by \code{\link{optim}}.  The algorithm
-    stops if it is unable to reduce the value by a factor of 'reltol *
-    (abs(val) + reltol)' at a step.  Defaults to
-    \code{sqrt(.Machine$double.eps)}, typically about \code{1e-8}.
-  }
-
-  \item{optim.maxit}{
-    maximum number of iterations used by \code{\link{optim}}. Defaults
-     to \code{500}.
   }
 
   \item{iterate.max}{
@@ -166,10 +104,7 @@ npregivderiv(y,
 \item{constant}{
   the constant to use for Landweber-Fridman iteration.
 }
-\item{penalize.iteration}{ a logical value indicating whether to
-    penalize the norm by the number of iterations or not (default
-    \code{TRUE})
-}    
+
 \item{start.from}{ a character string indicating whether to start from
   \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
   be overridden by providing \code{starting.values} below)
@@ -193,7 +128,7 @@ npregivderiv(y,
   \eqn{w} during Landweber-Fridman iteration.
  }
 \item{...}{ 
-  additional arguments supplied to \code{\link{npksum}}.
+  additional arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
 }
 
 }
