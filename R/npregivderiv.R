@@ -20,7 +20,6 @@
 ## phi.prime.mat: the matrix with colums phi'_1, phi'_2 etc. over all iterations
 ## num.iterations: number of iterations taken by Landweber-Fridman
 ## norm.stop: the stopping rule for each Landweber-Fridman iteration
-## norm.value: the norm not multiplied by the number of iterations
 ## convergence: a character string indicating whether/why iteration terminated
 
 ## First, a series of functions for local polynomial kernel regression
@@ -63,7 +62,6 @@ npregivderiv <- function(y,
                          random.seed=42,
                          iterate.max=1000,
                          iterate.break=TRUE,
-                         iterate.diff.tol=1.0e-08,
                          constant=0.5,
                          start.from=c("Eyz","EEywz"),
                          starting.values=NULL,
@@ -81,7 +79,6 @@ npregivderiv <- function(y,
   start.from <- match.arg(start.from)
 
   if(iterate.max < 2) stop("iterate.max must be at least 2")
-  if(iterate.diff.tol < 0) stop("iterate.diff.tol must be non-negative")
   if(constant <= 0 || constant >= 1) stop("constant must lie in the range (0,1)")
 
   if(missing(y)) stop("You must provide y")
@@ -136,17 +133,11 @@ npregivderiv <- function(y,
   ## density for the moment. Use the normal-reference rule for speed
   ## considerations, same smoothing for PDF and CDF.
 
-  bw <- npudensbw(dat=z,
-                  bwmethod="normal-reference",
-                  ...)
-  model.fz <- npudens(tdat=z,
-                      bws=bw$bw,
-                      ...)
-  f.z <- predict(model.fz,newdata=zeval)
-  model.Sz <- npudist(tdat=z,
-                      bws=bw$bw,
-                      ...)
-  S.z <- 1-predict(model.Sz,newdata=zeval)
+  bw <- npudensbw(dat=z, bwmethod="normal-reference")
+  model.fz <- npudens(tdat=z, bws=bw$bw)
+  f.z <- predict(model.fz, newdata=zeval)
+  model.Sz <- npudist(tdat=z, bws=bw$bw)
+  S.z <- 1-predict(model.Sz, newdata=zeval)
 
   console <- printClear(console)
   console <- printPop(console)
@@ -205,7 +196,6 @@ npregivderiv <- function(y,
   console <- printPush(paste("Computing optimal smoothing for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
 
   norm.stop <- numeric()
-  norm.value <- numeric()
 
   ## Now we compute mu.0 (a residual of sorts)
 
@@ -228,7 +218,6 @@ npregivderiv <- function(y,
 
     predicted.E.mu.w <- npreg(tydat=mu,
                               txdat=w,
-                              eydat=mu,
                               exdat=weval,
                               ...)$mean
 
@@ -236,7 +225,6 @@ npregivderiv <- function(y,
 
     E.phi.w <- npreg(tydat=phi,
                      txdat=w,
-                     eydat=phi,
                      exdat=weval,
                      ...)$mean
 
@@ -245,7 +233,7 @@ npregivderiv <- function(y,
   }
 
 
-  norm.value[1] <- norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
+  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
   
   ## We again require the mean of the fitted values
 
@@ -332,9 +320,7 @@ npregivderiv <- function(y,
 
     }
 
-    norm.value[j] <- sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
-
-    norm.stop[j] <- j*norm.value[j]
+    norm.stop[j] <- j*sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
     
     mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
@@ -381,10 +367,6 @@ npregivderiv <- function(y,
         convergence <- "STOP_ON_INCREASE"
         if(iterate.break) break()
       }
-      if(abs(norm.value[j-1]-norm.value[j]) < iterate.diff.tol || norm.value[j] < iterate.diff.tol/2) {
-        convergence <- "ITERATE_DIFF_TOL"
-        if(iterate.break) break()
-      }
 
     }
 
@@ -397,8 +379,7 @@ npregivderiv <- function(y,
   ## then decreasing (and potentially increasing thereafter) portion
   ## of the stopping function, ignore the initial increasing portion,
   ## and take the min from where the initial inflection point occurs
-  ## to the length of norm.stop. Note - if norm.value is monotonically
-  ## increasing then so must be norm.stop.
+  ## to the length of norm.stop.
 
   if(is.monotone.increasing(norm.stop)) {
     warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g., instead set `start.from' to EEywz or provide a vector of starting values")
@@ -430,7 +411,6 @@ npregivderiv <- function(y,
               phi.prime.mat=phi.prime.mat,
               num.iterations=j,
               norm.stop=norm.stop,
-              norm.value=norm.value,
               convergence=convergence,
               starting.values.phi=starting.values.phi,
               starting.values.phi.prime=starting.values.phi.prime))
