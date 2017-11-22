@@ -11,8 +11,8 @@
   \code{npudist} computes kernel unconditional cumulative distribution
   estimates on evaluation data, given a set of training data and a
   bandwidth specification (a \code{dbandwidth} object or a bandwidth
-  vector, bandwidth type, and kernel type) using the method of Li and
-  Racine (2013).
+  vector, bandwidth type, and kernel type) using the method of Li, Li
+  and Racine (2017).
 
 }
 \usage{

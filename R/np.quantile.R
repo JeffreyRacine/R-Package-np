@@ -43,6 +43,14 @@ npquantile <- function(x=NULL,
     x.tau[i] <-  min(x.eval[F>=tau[i]])
   }
 
+  ## Asymptotic standard errors could be passed as an attribute
+  
+  ## f <- fitted(npudens(tdat=x,
+  ##                     edat=x.tau,
+  ##                     bws=bws$bw))
+  ## asy.var <- tau*(1-tau)/(length(x)*f**2)
+  ## attr(x.tau,"asy.var") <- asy.var
+
   names(x.tau) <- paste(tau*100,"%",sep="")
 
   return(x.tau)

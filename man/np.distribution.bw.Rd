@@ -9,9 +9,9 @@
 \description{
   \code{npudistbw} computes a bandwidth object for a \eqn{p}-variate
   kernel cumulative distribution estimator defined over mixed continuous
-  and discrete (ordered) data using either the normal
-  reference rule-of-thumb or least-squares cross validation using the
-  method of Li and Racine (2013).
+  and discrete (ordered) data using either the normal reference
+  rule-of-thumb or least-squares cross validation using the method of
+  Li, Li and Racine (2017).
 }
 
 \usage{
@@ -161,7 +161,7 @@ npudistbw(\dots)
   
   \item{bwmethod}{ a character string specifying the bandwidth selection
     method.  \code{cv.cdf} specifies least-squares cross-validation for
-    cumulative distribution functions (Li and Racine (2013)), and
+    cumulative distribution functions (Li, Li and Racine (2017)), and
     \code{normal-reference} just computes the \sQuote{rule-of-thumb}
     bandwidth \eqn{h_j}{h[j]} using the standard formula \eqn{h_j =
     1.587 \sigma_j n^{-1/(P+l)}}{h[j] = 1.587*sigma[j]*n^(-1.0/(P+l))},
