@@ -23,11 +23,9 @@ npregivderiv(y,
              zeval = NULL,
              weval = NULL,
              xeval = NULL,
-             nmulti = 1,
              random.seed = 42,
              iterate.max = 1000,
              iterate.break = TRUE,
-             iterate.diff.tol = 1.0e-08,
              constant = 0.5,
              start.from = c("Eyz","EEywz"),
              starting.values = NULL,
@@ -73,12 +71,6 @@ npregivderiv(y,
     evaluation takes place on the data provided by \code{x}.
   }
 
-  \item{nmulti}{
-    integer number of times to restart the process of finding extrema of
-    the cross-validation function from different (random) initial
-    points.
-  }
-
   \item{random.seed}{
     an integer used to seed R's random number generator. This ensures
     replicability of the numerical search. Defaults to 42.
@@ -96,11 +88,6 @@ npregivderiv(y,
     \code{iterate.max})
   }
 
-\item{iterate.diff.tol}{
-  the search tolerance for the difference in the stopping rule from
-  iteration to iteration when using Landweber-Fridman iteration
-  (disable by setting to zero).
-}
 \item{constant}{
   the constant to use for Landweber-Fridman iteration.
 }

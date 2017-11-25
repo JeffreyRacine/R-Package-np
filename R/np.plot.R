@@ -858,9 +858,13 @@ npplot.rbandwidth <-
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
 
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
+      
     miss.xy = c(missing(xdat),missing(ydat))
     
     if (any(miss.xy) && !all(miss.xy))
@@ -1094,7 +1098,7 @@ npplot.rbandwidth <-
 
     } else {
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=dim.plot(bws$ndim))
 
       ev = xdat[1,,drop = FALSE]
@@ -1317,7 +1321,7 @@ npplot.rbandwidth <-
         }
       }
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=c(1,1))
       
       if (plot.behavior != "plot"){
@@ -1361,12 +1365,15 @@ npplot.scbandwidth <-
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
 
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
+
     if(!missing(gradients))
       stop("gradients not supported with smooth coefficient models.")
-
 
     miss.xy = c(missing(xdat),missing(ydat))
     miss.z = missing(zdat) & is.null(bws$zdati)
@@ -1645,7 +1652,7 @@ npplot.scbandwidth <-
 
       tot.dim <- (bws$xndim <- length(bws$xdati$icon)) + (bws$zndim <- length(bws$zdati$icon))
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=dim.plot(tot.dim))
 
       maxneval = max(c(sapply(xdat,nlevels), unlist(sapply(zdat,nlevels)), neval))
@@ -2019,7 +2026,7 @@ npplot.scbandwidth <-
         }
       }
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=c(1,1))
       
       if (plot.behavior != "plot"){
@@ -2063,9 +2070,13 @@ npplot.plbandwidth <-
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
 
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
+      
     if(!missing(gradients))
       stop("gradients not supported with partially linear models. Coefficients may be extracted with coef()")
 
@@ -2332,7 +2343,7 @@ npplot.plbandwidth <-
     } else {
 ##      stop("not yet supported!")
       
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=dim.plot(bws$xndim + bws$zndim))
 
       x.ev = xdat[1,,drop = FALSE]
@@ -2697,7 +2708,7 @@ npplot.plbandwidth <-
         }
       }
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=c(1,1))
       
       if (plot.behavior != "plot"){
@@ -2735,9 +2746,13 @@ npplot.bandwidth <-
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
 
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
+      
     miss.x <- missing(xdat)
 
     if(miss.x && !is.null(bws$formula)){
@@ -2963,7 +2978,7 @@ npplot.bandwidth <-
 
     } else {
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=dim.plot(bws$ndim))
 
       ev = xdat[1,,drop = FALSE]
@@ -3178,7 +3193,7 @@ npplot.bandwidth <-
         }
       }
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=c(1,1))
 
       if (plot.behavior != "plot"){
@@ -3211,8 +3226,12 @@ npplot.dbandwidth <-
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
+
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
 
     miss.x <- missing(xdat)
 
@@ -3432,7 +3451,7 @@ npplot.dbandwidth <-
 
     } else {
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=dim.plot(bws$ndim))
 
       ev = xdat[1,,drop = FALSE]
@@ -3639,7 +3658,7 @@ npplot.dbandwidth <-
         }
       }
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=c(1,1))
 
       if (plot.behavior != "plot"){
@@ -3677,8 +3696,13 @@ npplot.conbandwidth <-
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
+
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
+
     cdf <- FALSE
     quantreg <- FALSE
     miss.xy = c(missing(xdat),missing(ydat))
@@ -3980,7 +4004,7 @@ npplot.conbandwidth <-
       dsf = ifelse(gradients,bws$xndim,1)
       tot.dim = bws$xndim + bws$yndim - quantreg
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=dim.plot(dsf*tot.dim))
 
       x.ev = xdat[1,,drop = FALSE]
@@ -4381,7 +4405,7 @@ npplot.conbandwidth <-
         }
       }
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=c(1,1))
 
       if (plot.behavior != "plot"){
@@ -4418,9 +4442,13 @@ npplot.condbandwidth <-
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
 
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
+      
     cdf <- TRUE
     miss.xy = c(missing(xdat),missing(ydat))
     
@@ -4721,7 +4749,7 @@ npplot.condbandwidth <-
       dsf = ifelse(gradients,bws$xndim,1)
       tot.dim = bws$xndim + bws$yndim - quantreg
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=dim.plot(dsf*tot.dim))
 
       x.ev = xdat[1,,drop = FALSE]
@@ -5122,7 +5150,7 @@ npplot.condbandwidth <-
         }
       }
 
-      if (plot.behavior != "data")
+      if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=c(1,1))
 
       if (plot.behavior != "plot"){
@@ -5152,8 +5180,12 @@ npplot.sibandwidth <-
            plot.errors.style = c("bar","band"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = NULL,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
+
+    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
 
     miss.xy = c(missing(xdat),missing(ydat))
     
@@ -5224,7 +5256,7 @@ npplot.sibandwidth <-
     plot.errors = (plot.errors.method != "none")
 
 
-    if (plot.behavior != "data")
+    if (plot.behavior != "data" && plot.par.mfrow)
       par(mfrow=if(gradients) dim.plot(bws$ndim) else c(1,1))
 
 
@@ -5406,7 +5438,7 @@ npplot.sibandwidth <-
 
     
     
-    if (plot.behavior != "data")
+    if (plot.behavior != "data" && plot.par.mfrow)
       par(mfrow=c(1,1))
     
     if (plot.behavior != "plot"){

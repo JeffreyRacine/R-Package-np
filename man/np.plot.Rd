@@ -48,6 +48,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -83,6 +84,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -118,6 +120,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -150,6 +153,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -185,6 +189,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -208,6 +213,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.style = c("bar","band"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = NULL,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -418,6 +424,11 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   \item{plot.bxp.out}{
     a logical value specifying whether outliers should be plotted on
     boxplots. Defaults to \code{TRUE}.
+  }
+
+  \item{plot.par.mfrow}{
+    a logical value specifying whether \code{par(mfrow=c(,))} should be called
+    before plotting. Defaults to \code{TRUE}.
   }
 
   \item{random.seed}{

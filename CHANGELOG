@@ -1,3 +1,9 @@
+* Added option plot.par.mfrow=TRUE/FALSE to npplot() so that the
+  automated setting of par(mfrow=c(,)) in plot is disabled and the
+  user can do this manually if desired
+
+* This can be overridden by setting options(plot.par.mfrow=TRUE/FALSE)
+
 Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]
 
 * Fixed the `cannot find function is()' glitch that just surfaced with R 3.4.0
