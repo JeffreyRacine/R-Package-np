@@ -832,13 +832,27 @@ npplot.rbandwidth <-
            xdat,
            ydat,
            data = NULL,
-           xq = 0.5, xtrim = 0.0, neval = 50,
-           common.scale = TRUE, perspective = TRUE,
+           xq = 0.5,
+           xtrim = 0.0,
+           neval = 50,
+           common.scale = TRUE,
+           perspective = TRUE,
            gradients = FALSE,
            main = NULL,
-           theta = 0.0, phi = 10.0,
-           view = c("rotate","fixed"), type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
+           theta = 0.0,
+           phi = 10.0,
+           view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 399,
@@ -1008,11 +1022,13 @@ npplot.rbandwidth <-
 
       }
 
-      zlim =
-        if (plot.errors)
-          c(min(lerr),max(herr))
-        else
-          c(min(tobj$mean),max(tobj$mean))
+      if(is.null(zlim)) {
+          zlim =
+              if (plot.errors)
+                  c(min(lerr),max(herr))
+              else
+                  c(min(tobj$mean),max(tobj$mean))
+      }
         
       if (plot.behavior != "plot"){
         r1 = npregression(bws = bws,
@@ -1033,7 +1049,7 @@ npplot.rbandwidth <-
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
 ##      for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
         for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
@@ -1337,15 +1353,29 @@ npplot.scbandwidth <-
            ydat,
            zdat = NULL,
            data = NULL,
-           xq = 0.5, zq = 0.5,
-           xtrim = 0.0, ztrim = 0.0,
+           xq = 0.5,
+           zq = 0.5,
+           xtrim = 0.0,
+           ztrim = 0.0,
            neval = 50,
-           common.scale = TRUE, perspective = TRUE,
+           common.scale = TRUE,
+           perspective = TRUE,
            gradients = FALSE,
            main = NULL,
-           theta = 0.0, phi = 10.0,
-           view = c("rotate","fixed"), type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
+           theta = 0.0,
+           phi = 10.0,
+           view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 399,
@@ -1559,11 +1589,13 @@ npplot.scbandwidth <-
 
       }
 
-      zlim =
-        if (plot.errors)
-          c(min(lerr),max(herr))
-        else
-          c(min(tobj$mean),max(tobj$mean))
+      if(is.null(zlim)) {
+          zlim =
+              if (plot.errors)
+                  c(min(lerr),max(herr))
+              else
+                  c(min(tobj$mean),max(tobj$mean))
+      }
         
       if (plot.behavior != "plot"){
         r1 <-
@@ -1585,7 +1617,7 @@ npplot.scbandwidth <-
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
       ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
         for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
@@ -2042,15 +2074,29 @@ npplot.plbandwidth <-
            ydat,
            zdat,
            data = NULL,
-           xq = 0.5, zq = 0.5,
-           xtrim = 0.0,  ztrim = 0.0,
+           xq = 0.5,
+           zq = 0.5,
+           xtrim = 0.0,
+           ztrim = 0.0,
            neval = 50,
-           common.scale = TRUE, perspective = TRUE,
+           common.scale = TRUE,
+           perspective = TRUE,
            gradients = FALSE,
            main = NULL,
-           theta = 0.0, phi = 10.0,
-           view = c("rotate","fixed"), type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
+           theta = 0.0,
+           phi = 10.0,
+           view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -2243,11 +2289,13 @@ npplot.plbandwidth <-
 
       }
       
-      zlim =
-        if (plot.errors)
-          c(min(lerr),max(herr))
-        else
-          c(min(tobj$mean),max(tobj$mean))
+      if(is.null(zlim)) {
+          zlim =
+              if (plot.errors)
+                  c(min(lerr),max(herr))
+              else
+                  c(min(tobj$mean),max(tobj$mean))
+      }
         
       if (plot.behavior != "plot"){
         r1 = plregression(bws = bws, xcoef = tobj$xcoef,
@@ -2277,7 +2325,7 @@ npplot.plbandwidth <-
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
       ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
         for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
@@ -2721,12 +2769,26 @@ npplot.bandwidth <-
   function(bws,
            xdat,
            data = NULL,
-           xq = 0.5, xtrim = 0.0, neval = 50,
-           common.scale = TRUE, perspective = TRUE,
+           xq = 0.5,
+           xtrim = 0.0,
+           neval = 50,
+           common.scale = TRUE,
+           perspective = TRUE,
            main = NULL,
-           theta = 0.0, phi = 10.0,
-           view = c("rotate","fixed"), type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
+           theta = 0.0,
+           phi = 10.0,
+           view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -2884,12 +2946,14 @@ npplot.bandwidth <-
 
       }
 
-      zlim =
-        if (plot.errors)
-          c(min(lerr),max(herr))
-        else
-          c(min(eval(tcomp)),max(eval(tcomp)))
-
+      if(is.null(zlim)) {
+          zlim =
+              if (plot.errors)
+                  c(min(lerr),max(herr))
+              else
+                  c(min(eval(tcomp)),max(eval(tcomp)))
+      }
+          
       tret = parse(text=paste(
                      "npdensity",
                      "(bws = bws, eval = x.eval,",
@@ -2913,10 +2977,9 @@ npplot.bandwidth <-
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
-##      for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
-        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+      for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
             persp(x1.eval,
                   x2.eval,
@@ -2964,8 +3027,8 @@ npplot.bandwidth <-
           }
 
           Sys.sleep(0.5)
-        }
-      ##}
+      }
+      
 
       if (plot.behavior == "plot-data")
         return ( list(d1 = d1) )        
@@ -3201,12 +3264,26 @@ npplot.dbandwidth <-
   function(bws,
            xdat,
            data = NULL,
-           xq = 0.5, xtrim = 0.0, neval = 50,
-           common.scale = TRUE, perspective = TRUE,
+           xq = 0.5,
+           xtrim = 0.0,
+           neval = 50,
+           common.scale = TRUE,
+           perspective = TRUE,
            main = NULL,
-           theta = 0.0, phi = 10.0,
-           view = c("rotate","fixed"), type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
+           theta = 0.0,
+           phi = 10.0,
+           view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -3361,12 +3438,13 @@ npplot.dbandwidth <-
 
       }
 
-      zlim =
-        if (plot.errors)
-          c(min(lerr),max(herr))
-        else
-          c(min(tobj$dist),max(tobj$dist))
-
+      if(is.null(zlim)) {
+          zlim =
+              if (plot.errors)
+                  c(min(lerr),max(herr))
+              else
+                  c(min(tobj$dist),max(tobj$dist))
+      }
 
       if (plot.behavior != "plot"){
         d1 <- npdistribution(bws = bws, eval = x.eval,
@@ -3386,10 +3464,9 @@ npplot.dbandwidth <-
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
-##      for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
-        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+      for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
             persp(x1.eval,
                   x2.eval,
@@ -3437,8 +3514,8 @@ npplot.dbandwidth <-
           }
 
           Sys.sleep(0.5)
-        }
-      ##}
+      }
+
 
       if (plot.behavior == "plot-data")
         return ( list(d1 = d1) )        
@@ -3668,15 +3745,30 @@ npplot.conbandwidth <-
            xdat,
            ydat,
            data = NULL,
-           xq = 0.5, yq = 0.5,
-           xtrim = 0.0, ytrim = 0.0, neval = 50,
+           xq = 0.5,
+           yq = 0.5,
+           xtrim = 0.0,
+           ytrim = 0.0,
+           neval = 50,
            gradients = FALSE,
-           common.scale = TRUE, perspective = TRUE,
+           common.scale = TRUE,
+           perspective = TRUE,
            main = NULL,
-           theta = 0.0, phi = 10.0,
-           tau = 0.5,
-           view = c("rotate","fixed"), type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
+           theta = 0.0,
+           phi = 10.0,
+           tau = 0.5,
+           view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -3904,11 +3996,13 @@ npplot.conbandwidth <-
 
       }
 
-      zlim =
-        if (plot.errors)
-          c(min(lerr),max(herr))
-        else
-          c(min(eval(tcomp)),max(eval(tcomp)))
+      if(is.null(zlim)) {
+          zlim =
+              if (plot.errors)
+                  c(min(lerr),max(herr))
+              else
+                  c(min(eval(tcomp)),max(eval(tcomp)))
+      }
 
       ## I am sorry it had to come to this ...
       tret = parse(text=paste(
@@ -3940,10 +4034,9 @@ npplot.conbandwidth <-
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
-      ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
-        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+      for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
             persp(x1.eval,
                   x2.eval,
@@ -3991,8 +4084,7 @@ npplot.conbandwidth <-
           }
 
           Sys.sleep(0.5)
-        }
-      ##}
+      }
     } else {
 
       dsf = ifelse(gradients,bws$xndim,1)
@@ -4414,15 +4506,31 @@ npplot.condbandwidth <-
            xdat,
            ydat,
            data = NULL,
-           xq = 0.5, yq = 0.5,
-           xtrim = 0.0, ytrim = 0.0, neval = 50,
-           quantreg = FALSE, gradients = FALSE,
-           common.scale = TRUE, perspective = TRUE,
+           xq = 0.5,
+           yq = 0.5,
+           xtrim = 0.0,
+           ytrim = 0.0,
+           neval = 50,
+           quantreg = FALSE,
+           gradients = FALSE,
+           common.scale = TRUE,
+           perspective = TRUE,
            main = NULL,
-           theta = 0.0, phi = 10.0,
-           tau = 0.5,
-           view = c("rotate","fixed"), type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
+           theta = 0.0,
+           phi = 10.0,
+           tau = 0.5,
+           view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -4685,10 +4793,9 @@ npplot.condbandwidth <-
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, "lightblue")
+      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
-      ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
-        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+      for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
             persp(x1.eval,
                   x2.eval,
@@ -4737,7 +4844,6 @@ npplot.condbandwidth <-
 
           Sys.sleep(0.5)
         }
-      ##}
     } else {
 
       dsf = ifelse(gradients,bws$xndim,1)
@@ -5162,8 +5268,17 @@ npplot.sibandwidth <-
            common.scale = TRUE,
            gradients = FALSE,
            main = NULL,
-           type = "l",
+           type = NULL,
+           border = NULL,
+           col = NULL,
+           ylab = NULL,
+           xlab = NULL,
+           zlab = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           zlim = NULL,
+           lty = NULL,
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 399,
