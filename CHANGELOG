@@ -1,3 +1,7 @@
+* plot() calls npplot() and npplot() behaves better when most passable
+  parameters are fed (col =, lty = , xlab = etc.) but there is still much
+  room for improvement
+
 * Added option plot.par.mfrow=TRUE/FALSE to npplot() so that the
   automated setting of par(mfrow=c(,)) in plot is disabled and the
   user can do this manually if desired
