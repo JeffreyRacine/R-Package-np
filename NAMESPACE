@@ -1,6 +1,6 @@
 useDynLib(np, .registration = TRUE)
 import(stats, boot, cubature)
-importFrom("grDevices", "boxplot.stats", "extendrange")
+importFrom("grDevices", "boxplot.stats", "extendrange", "n2mfrow")
 importFrom("graphics", "lines", "par", "persp", "plot", "points")
 importFrom("utils", "combn", "flush.console")
 importFrom("methods", "is")

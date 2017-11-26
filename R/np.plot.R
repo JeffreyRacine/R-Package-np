@@ -835,7 +835,7 @@ npplot.rbandwidth <-
            xq = 0.5, xtrim = 0.0, neval = 50,
            common.scale = TRUE, perspective = TRUE,
            gradients = FALSE,
-           main = "",
+           main = NULL,
            theta = 0.0, phi = 10.0,
            view = c("rotate","fixed"), type = "l",
            ylim = NULL,
@@ -1065,7 +1065,7 @@ npplot.rbandwidth <-
                 zlab=gen.label(bws$ynames,"Conditional Mean"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -1342,7 +1342,7 @@ npplot.scbandwidth <-
            neval = 50,
            common.scale = TRUE, perspective = TRUE,
            gradients = FALSE,
-           main = "",
+           main = NULL,
            theta = 0.0, phi = 10.0,
            view = c("rotate","fixed"), type = "l",
            ylim = NULL,
@@ -1617,7 +1617,7 @@ npplot.scbandwidth <-
                 zlab=gen.label(bws$ynames,"Conditional Mean"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -2047,7 +2047,7 @@ npplot.plbandwidth <-
            neval = 50,
            common.scale = TRUE, perspective = TRUE,
            gradients = FALSE,
-           main = "",
+           main = NULL,
            theta = 0.0, phi = 10.0,
            view = c("rotate","fixed"), type = "l",
            ylim = NULL,
@@ -2309,7 +2309,7 @@ npplot.plbandwidth <-
                 zlab=gen.label(names(ydat),"Conditional Mean"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -2723,7 +2723,7 @@ npplot.bandwidth <-
            data = NULL,
            xq = 0.5, xtrim = 0.0, neval = 50,
            common.scale = TRUE, perspective = TRUE,
-           main = "",
+           main = NULL,
            theta = 0.0, phi = 10.0,
            view = c("rotate","fixed"), type = "l",
            ylim = NULL,
@@ -2945,7 +2945,7 @@ npplot.bandwidth <-
                 zlab=paste("Joint", "Density"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -3203,7 +3203,7 @@ npplot.dbandwidth <-
            data = NULL,
            xq = 0.5, xtrim = 0.0, neval = 50,
            common.scale = TRUE, perspective = TRUE,
-           main = "",
+           main = NULL,
            theta = 0.0, phi = 10.0,
            view = c("rotate","fixed"), type = "l",
            ylim = NULL,
@@ -3418,7 +3418,7 @@ npplot.dbandwidth <-
                 zlab="Joint Distribution",
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -3672,7 +3672,7 @@ npplot.conbandwidth <-
            xtrim = 0.0, ytrim = 0.0, neval = 50,
            gradients = FALSE,
            common.scale = TRUE, perspective = TRUE,
-           main = "",
+           main = NULL,
            theta = 0.0, phi = 10.0,
            tau = 0.5,
            view = c("rotate","fixed"), type = "l",
@@ -3972,7 +3972,7 @@ npplot.conbandwidth <-
                 zlab=paste("Conditional", ifelse(cdf,"Distribution", "Density")),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -4418,7 +4418,7 @@ npplot.condbandwidth <-
            xtrim = 0.0, ytrim = 0.0, neval = 50,
            quantreg = FALSE, gradients = FALSE,
            common.scale = TRUE, perspective = TRUE,
-           main = "",
+           main = NULL,
            theta = 0.0, phi = 10.0,
            tau = 0.5,
            view = c("rotate","fixed"), type = "l",
@@ -4717,7 +4717,7 @@ npplot.condbandwidth <-
                 zlab=paste("Conditional", ifelse(cdf,"Distribution", "Density")),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!missing(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -5161,7 +5161,8 @@ npplot.sibandwidth <-
            data = NULL,
            common.scale = TRUE,
            gradients = FALSE,
-           main = "", type = "l",
+           main = NULL,
+           type = "l",
            ylim = NULL,
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
