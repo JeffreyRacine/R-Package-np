@@ -10,12 +10,6 @@ gen.tflabel = function(condition, tlabel, flabel){
   paste(ifelse(condition,tlabel,flabel))
 }
 
-dim.plot = function(x) {
-  a1 = round(sqrt(4.0/3.0*x))
-  a2 = ceiling(x/a1)
-  c(a1,a2)
-}
-
 draw.error.bands = function(ex, ely, ehy, lty = 2){
   lines(ex,ely,lty=lty)
   lines(ex,ehy,lty=lty)
@@ -1099,7 +1093,7 @@ npplot.rbandwidth <-
     } else {
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=dim.plot(bws$ndim))
+        par(mfrow=n2mfrow(bws$ndim))
 
       ev = xdat[1,,drop = FALSE]
 
@@ -1653,7 +1647,7 @@ npplot.scbandwidth <-
       tot.dim <- (bws$xndim <- length(bws$xdati$icon)) + (bws$zndim <- length(bws$zdati$icon))
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=dim.plot(tot.dim))
+        par(mfrow=n2mfrow(tot.dim))
 
       maxneval = max(c(sapply(xdat,nlevels), unlist(sapply(zdat,nlevels)), neval))
       all.isFactor = c(sapply(xdat, is.factor), unlist(sapply(zdat, is.factor)))
@@ -2344,7 +2338,7 @@ npplot.plbandwidth <-
 ##      stop("not yet supported!")
       
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=dim.plot(bws$xndim + bws$zndim))
+        par(mfrow=n2mfrow(bws$xndim + bws$zndim))
 
       x.ev = xdat[1,,drop = FALSE]
       z.ev = zdat[1,,drop = FALSE]
@@ -2943,7 +2937,7 @@ npplot.bandwidth <-
                 x2.eval,
                 tdens,
                 zlim = zlim,
-                col= persp.col,
+                col = persp.col,
                 border = "black",
                 ticktype="detailed",
                 xlab=gen.label(names(xdat)[1], "X1"),
@@ -2979,7 +2973,7 @@ npplot.bandwidth <-
     } else {
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=dim.plot(bws$ndim))
+        par(mfrow=n2mfrow(bws$ndim))
 
       ev = xdat[1,,drop = FALSE]
 
@@ -3416,7 +3410,7 @@ npplot.dbandwidth <-
                 x2.eval,
                 tdens,
                 zlim = zlim,
-                col= persp.col,
+                col = persp.col,
                 border = "black",
                 ticktype="detailed",
                 xlab=gen.label(names(xdat)[1], "X1"),
@@ -3452,7 +3446,7 @@ npplot.dbandwidth <-
     } else {
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=dim.plot(bws$ndim))
+        par(mfrow=n2mfrow(bws$ndim))
 
       ev = xdat[1,,drop = FALSE]
 
@@ -3970,7 +3964,7 @@ npplot.conbandwidth <-
                 x2.eval,
                 tdens,
                 zlim = zlim,
-                col=persp.col,
+                col = persp.col,
                 border = "black",
                 ticktype="detailed",
                 xlab=gen.label(names(xdat)[1], "X"),
@@ -4005,7 +3999,7 @@ npplot.conbandwidth <-
       tot.dim = bws$xndim + bws$yndim - quantreg
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=dim.plot(dsf*tot.dim))
+        par(mfrow=n2mfrow(dsf*tot.dim))
 
       x.ev = xdat[1,,drop = FALSE]
       y.ev = ydat[1,,drop = FALSE]
@@ -4715,7 +4709,7 @@ npplot.condbandwidth <-
                 x2.eval,
                 tdens,
                 zlim = zlim,
-                col=persp.col,
+                col = persp.col,
                 border = "black",
                 ticktype="detailed",
                 xlab=gen.label(names(xdat)[1], "X"),
@@ -4750,7 +4744,7 @@ npplot.condbandwidth <-
       tot.dim = bws$xndim + bws$yndim - quantreg
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=dim.plot(dsf*tot.dim))
+        par(mfrow=n2mfrow(dsf*tot.dim))
 
       x.ev = xdat[1,,drop = FALSE]
       y.ev = ydat[1,,drop = FALSE]
@@ -5257,7 +5251,7 @@ npplot.sibandwidth <-
 
 
     if (plot.behavior != "data" && plot.par.mfrow)
-      par(mfrow=if(gradients) dim.plot(bws$ndim) else c(1,1))
+      par(mfrow=if(gradients) n2mfrow(bws$ndim) else c(1,1))
 
 
     plot.out = list()
