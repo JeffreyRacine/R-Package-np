@@ -1075,13 +1075,13 @@ npplot.rbandwidth <-
                 zlim = zlim,
                 col = persp.col,
                 border = "black",
-                ticktype="detailed",
-                xlab=gen.label(bws$xnames[1], "X1"),
-                ylab=gen.label(bws$xnames[2], "X2"),
-                zlab=gen.label(bws$ynames,"Conditional Mean"),
+                ticktype = "detailed",
+                xlab = gen.label(bws$xnames[1], "X1"),
+                ylab = gen.label(bws$xnames[2], "X2"),
+                zlab = gen.label(bws$ynames,"Conditional Mean"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -1160,8 +1160,8 @@ npplot.rbandwidth <-
           paste('Gradient Component ', i, ' of', sep=''), ''),
           gen.label(bws$ynames, 'Conditional Mean')),"
 
-      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
-      pmainE = "main = main"
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,\"l\"), lty = ifelse(!is.null(lty),lty,1),"))
+      pmainE = "main = ifelse(!is.null(main),main,\"\")"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -1643,13 +1643,13 @@ npplot.scbandwidth <-
                 zlim = zlim,
                 col = persp.col,
                 border = "black",
-                ticktype="detailed",
-                xlab=gen.label(bws$xnames[1], "X1"),
-                ylab=gen.label(x2.names[1], "X2"),
-                zlab=gen.label(bws$ynames,"Conditional Mean"),
+                ticktype = "detailed",
+                xlab = gen.label(bws$xnames[1], "X1"),
+                ylab = gen.label(x2.names[1], "X2"),
+                zlab = gen.label(bws$ynames,"Conditional Mean"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -1754,8 +1754,8 @@ npplot.scbandwidth <-
           paste('Gradient Component ', i, ' of', sep=''), ''),
           gen.label(bws$ynames, 'Conditional Mean')),"
 
-      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
-      pmainE = "main = main"
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,\"l\"), lty = ifelse(!is.null(lty),lty,1),"))
+      pmainE = "main = ifelse(!is.null(main),main,\"\")"
 
       txobjE <-
         parse(text = paste("npscoef(txdat = xdat, tydat = ydat,",
@@ -2351,13 +2351,13 @@ npplot.plbandwidth <-
                 zlim = zlim,
                 col = persp.col,
                 border = "black",
-                ticktype="detailed",
-                xlab=gen.label(names(xdat)[1], "X1"),
-                ylab=gen.label(names(xdat)[2], "Z1"),
-                zlab=gen.label(names(ydat),"Conditional Mean"),
+                ticktype = "detailed",
+                xlab = gen.label(names(xdat)[1], "X1"),
+                ylab = gen.label(names(xdat)[2], "Z1"),
+                zlab = gen.label(names(ydat),"Conditional Mean"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -2458,8 +2458,8 @@ npplot.plbandwidth <-
           paste('Gradient Component ', i, ' of', sep=''), ''),
           gen.label(bws$ynames, 'Conditional Mean')),"
 
-      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
-      pmainE = "main = main"
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,\"l\"), lty = ifelse(!is.null(lty),lty,1),"))
+      pmainE = "main = ifelse(!is.null(main),main,\"\")"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -3002,13 +3002,13 @@ npplot.bandwidth <-
                 zlim = zlim,
                 col = persp.col,
                 border = "black",
-                ticktype="detailed",
-                xlab=gen.label(names(xdat)[1], "X1"),
-                ylab=gen.label(names(xdat)[2], "X2"),
-                zlab=paste("Joint", "Density"),
+                ticktype = "detailed",
+                xlab = gen.label(names(xdat)[1], "X1"),
+                ylab = gen.label(names(xdat)[2], "X2"),
+                zlab = paste("Joint", "Density"),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -3087,8 +3087,8 @@ npplot.bandwidth <-
 
       pylabE = paste("ylab = ", "'Density'", ",")
 
-      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
-      pmainE = "main = main"
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,\"l\"), lty = ifelse(!is.null(lty),lty,1),"))
+      pmainE = "main = ifelse(!is.null(main),main,\"\")"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -3489,13 +3489,13 @@ npplot.dbandwidth <-
                 zlim = zlim,
                 col = persp.col,
                 border = "black",
-                ticktype="detailed",
-                xlab=gen.label(names(xdat)[1], "X1"),
-                ylab=gen.label(names(xdat)[2], "X2"),
-                zlab="Joint Distribution",
+                ticktype = "detailed",
+                xlab = gen.label(names(xdat)[1], "X1"),
+                ylab = gen.label(names(xdat)[2], "X2"),
+                zlab = "Joint Distribution",
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -3574,8 +3574,8 @@ npplot.dbandwidth <-
 
       pylabE = "ylab = 'Distribution',"
 
-      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
-      pmainE = "main = main"
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,\"l\"), lty = ifelse(!is.null(lty),lty,1),"))
+      pmainE = "main = ifelse(!is.null(main),main,\"\")"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -4059,13 +4059,13 @@ npplot.conbandwidth <-
                 zlim = zlim,
                 col = persp.col,
                 border = "black",
-                ticktype="detailed",
-                xlab=gen.label(names(xdat)[1], "X"),
-                ylab=gen.label(names(ydat)[1], "Y"),
-                zlab=paste("Conditional", ifelse(cdf,"Distribution", "Density")),
+                ticktype = "detailed",
+                xlab = gen.label(names(xdat)[1], "X"),
+                ylab = gen.label(names(ydat)[1], "Y"),
+                zlab = paste("Conditional", ifelse(cdf,"Distribution", "Density")),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -4164,8 +4164,8 @@ npplot.conbandwidth <-
 
       pylabE = paste("ylab =", "paste(", ifelse(gradients,"'GC',j,'of',",''), "tylabE),")
 
-      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
-      pmainE = "main = main"
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,\"l\"), lty = ifelse(!is.null(lty),lty,1),"))
+      pmainE = "main = ifelse(!is.null(main),main,\"\")"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -4818,13 +4818,13 @@ npplot.condbandwidth <-
                 zlim = zlim,
                 col = persp.col,
                 border = "black",
-                ticktype="detailed",
-                xlab=gen.label(names(xdat)[1], "X"),
-                ylab=gen.label(names(ydat)[1], "Y"),
-                zlab=paste("Conditional", ifelse(cdf,"Distribution", "Density")),
+                ticktype = "detailed",
+                xlab = gen.label(names(xdat)[1], "X"),
+                ylab = gen.label(names(ydat)[1], "Y"),
+                zlab = paste("Conditional", ifelse(cdf,"Distribution", "Density")),
                 theta = i,
                 phi = phi,
-                main=gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
+                main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
 
           if (plot.errors){
             par(new = TRUE)
@@ -4923,8 +4923,8 @@ npplot.condbandwidth <-
 
       pylabE = paste("ylab =", "paste(", ifelse(gradients,"'GC',j,'of',",''), "tylabE),")
 
-      prestE = expression(ifelse(xi.factor,"", "type = type, lty = 1,"))
-      pmainE = "main = main"
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,\"l\"), lty = ifelse(!is.null(lty),lty,1),"))
+      pmainE = "main = ifelse(!is.null(main),main,\"\")"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -5426,7 +5426,7 @@ npplot.sibandwidth <-
       if (plot.behavior != "data"){      
         if (plot.errors){
           plot(tobj$index[i.sort], temp.mean[i.sort],
-               ylim = c(ymin,ymax),
+               ylim = ifelse(!is.null(ylim),ylim,c(ymin,ymax)),
                xlab = "index",
                ylab = gen.label(bws$ynames, 'Conditional Mean'),
                type = type,
@@ -5452,6 +5452,7 @@ npplot.sibandwidth <-
           }
         } else {
           plot(tobj$index[i.sort], temp.mean[i.sort],
+               ylim = ifelse(!is.null(ylim),ylim,NULL),
                xlab = "Index",
                ylab = gen.label(bws$ynames, 'Conditional Mean'),
                type = type,
@@ -5506,7 +5507,7 @@ npplot.sibandwidth <-
               ylim = c(min(temp.mean*bws$beta[i]), max(temp.mean*bws$beta[i]))
             
             plot(tobj$index[i.sort], temp.mean[i.sort]*bws$beta[i],
-                 ylim = ylim,
+                 ylim = ifelse(!is.null(ylim),ylim,NULL),
                  xlab = "Index",
                  ylab = paste("Gradient Component",i, "of", gen.label(bws$ynames, 'Conditional Mean')),
                  type = type,
