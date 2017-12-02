@@ -1,3 +1,6 @@
+* using wrapLines(strwrap(...)) for summary output for model specification
+  test to automatically wrap long formula lines
+
 * plot() calls npplot() and npplot() behaves better when most passable
   parameters are fed (col =, lty = , xlab = etc.) but there is still much
   room for improvement

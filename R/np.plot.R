@@ -5302,6 +5302,7 @@ npplot.sibandwidth <-
            plot.errors.style = c("bar","band"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = NULL,
+           plot.par.mfrow = TRUE,
            ...,
            random.seed){
 
@@ -5374,9 +5375,8 @@ npplot.sibandwidth <-
     plot.errors = (plot.errors.method != "none")
 
 
-    if (plot.behavior != "data")
-      par(mfrow=if(gradients) dim.plot(bws$ndim) else c(1,1))
-
+    if (plot.behavior != "data" && plot.par.mfrow)
+      par(mfrow=if(gradients) n2mfrow(bws$ndim) else c(1,1))
 
     plot.out = list()
 
@@ -5556,10 +5556,7 @@ npplot.sibandwidth <-
         }
       }
     
-
-    
-    
-    if (plot.behavior != "data")
+    if (plot.behavior != "data" && plot.par.mfrow)
       par(mfrow=c(1,1))
     
     if (plot.behavior != "plot"){

@@ -441,7 +441,7 @@ npscoefbw(\dots)
 \seealso{
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-\dontrun{
+% \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA):
 set.seed(42)
 
@@ -460,6 +460,6 @@ z <- runif(n, min=-2, max=2)
 y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
 bw <- npscoefbw(xdat=x, ydat=y, zdat=z)
 summary(bw)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}

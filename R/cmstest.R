@@ -61,9 +61,9 @@ cmstest <- function(Jn, In, Omega.hat, sd,
 }
 
 print.cmstest <- function(x, ...){
-  cat("\nConsistent Model Specification Test",
-      "\nParametric null model: ", x$pcall,
-      "\nNumber of regressors: ", length(x$bws$bw),"\n",
+  cat("\nConsistent Model Specification Test\n")
+  writeLines(strwrap(paste("Parametric null model: ", x$pcall, sep=""),exdent=26,width=80))
+  cat("Number of regressors: ", length(x$bws$bw),"\n",
       if(x$pdistribution == "Bootstrap"){
         paste(x$pmethod, " Bootstrap ",
               "(", x$boot.num, " replications)",sep="")

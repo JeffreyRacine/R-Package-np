@@ -576,31 +576,6 @@ plot(n.seq.aug,time.fcst/3600,type="b",
 \end{verbatim}
   \end{singlespacing}
 
-\subsection{I estimated a parametric model using the
-  \texttt{lm()} function. How can I compare the cross-validation score
-  from the \texttt{npreg()} approach with that for the parametric
-  model?}
-
-This can be readily achieved for the parametric model as follows:
-\begin{verbatim}
-data(wage1)
-model.lm <- lm(lwage ~ married + female + nonwhite + educ +
-                       exper + tenure, data = wage1)
-cv.lm <-mean(residuals(model.lm)^2/(1-hatvalues(model.lm))^2)                                      
-cv.lm
-\end{verbatim}
-You can then compare \verb+cv.lm+ with the cross-validation score for
-the \verb+npreg+ object as follows: if your model is named \verb+foo+
-(i.e.\ you ran something like \verb^foo <- npreg(y~x1+x2)^) then
-\verb+summary(foo$bws)+ will give you a summary of the model's
-bandwidth object (the value of the objective function is the
-cross-validation score), while \verb+foo$bws$fval+ will give you the
-function value, i.e.\ the value of the cross-validation function, {\em
-  provided} that the model was estimated via least-squares
-cross-validation (default, \verb+bwmethod="cv.ls"+). If the
-cross-validation score is lower for one model, that indicates that the
-model possessing the lowest score is to be preferred.
-
 \subsection{Where can I get some examples of R code for the np
   package in addition to the examples in the help files?}
 
