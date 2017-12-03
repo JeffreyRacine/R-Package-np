@@ -130,7 +130,7 @@ npunitest(data.x = NULL,
 }
 
 \examples{
-% \dontrun{
+% % \dontrun{
 set.seed(1234)
 n <- 1000
 
@@ -216,7 +216,7 @@ x <- factor(rbinom(n,2,.5))
 y <- factor(rbinom(n,2,.1))
 
 npunitest(x,y,boot.num=99)
-% } % enddontrun
+% % } % enddontrun
 }
 \keyword{ univar }
 \keyword{ nonparametric }

@@ -1805,6 +1805,28 @@ cbind(t.uniquecombs[1],t.npreg[1])
 
 \appendix
 
+\section*{Changes from Version 0.60-3 to 0.60-4 [03-Dec-2017]}
+
+\begin{itemize}
+
+\item Using \texttt{wrapLines(strwrap(...))} for summary output for
+  model specification test to automatically wrap long formula lines
+
+\item \texttt{plot()} calls \texttt{npplot()} and \texttt{npplot()}
+  behaves better when most passable parameters are fed (\texttt{col
+    =}, \texttt{lty =}, \texttt{xlab =}, etc.) but there may still be
+  room for improvement
+
+\item Added option \texttt{plot.par.mfrow=TRUE/FALSE} to
+  \texttt{npplot()} so that the automated setting of
+  \texttt{par(mfrow=c(,))} in plot is disabled and the user can do
+  this manually if desired
+
+\item Option \texttt{plot.par.mfrow=TRUE/FALSE} can be overridden by
+  setting \texttt{options(plot.par.mfrow=TRUE/FALSE)}
+
+\end{itemize}
+
 \section*{Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]}
 
 \begin{itemize}

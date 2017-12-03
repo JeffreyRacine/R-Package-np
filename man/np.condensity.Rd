@@ -208,7 +208,7 @@ npcdens(bws, \dots)
   \code{\link{npudens}}
 }
 \examples{
-% \dontrun{
+% % \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
 # likelihood cross-validated bandwidths (default) using a second-order
@@ -455,7 +455,7 @@ persp(x1.seq,
       main="Estimated Nonparametric Probability Perspective", 
       theta=310, 
       phi=25)
-% } % enddontrun
+% % } % enddontrun
 }
 \keyword{nonparametric}
 

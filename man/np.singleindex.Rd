@@ -233,7 +233,7 @@ npindex(bws, \dots)
 }
 
 \examples{
-% \dontrun{
+% % \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): Generate a simple linear model then
 # estimate it using a semiparametric single index specification and
 # Ichimura's nonlinear least squares coefficients and bandwidth
@@ -515,6 +515,6 @@ persp(x1.seq,
       main="Estimated Semiparametric Probability Perspective", 
       theta=310, 
       phi=25)
-% } % enddontrun
+% % } % enddontrun
 }
 \keyword{nonparametric}

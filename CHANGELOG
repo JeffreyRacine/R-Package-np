@@ -1,15 +1,20 @@
-* using wrapLines(strwrap(...)) for summary output for model specification
+Changes from Version 0.60-3 to 0.60-4 [03-Dec-2017]
+
+* Default plot.errors.style changed to "band"
+
+* Using wrapLines(strwrap(...)) for summary output for model specification
   test to automatically wrap long formula lines
 
 * plot() calls npplot() and npplot() behaves better when most passable
-  parameters are fed (col =, lty = , xlab = etc.) but there is still much
-  room for improvement
+  parameters are fed (col =, lty =, xlab =, etc.) but there may still
+  be room for improvement
 
 * Added option plot.par.mfrow=TRUE/FALSE to npplot() so that the
   automated setting of par(mfrow=c(,)) in plot is disabled and the
   user can do this manually if desired
 
-* This can be overridden by setting options(plot.par.mfrow=TRUE/FALSE)
+* Option plot.par.mfrow=TRUE/FALSE can be overridden by setting
+  options(plot.par.mfrow=TRUE/FALSE)
 
 Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]
 

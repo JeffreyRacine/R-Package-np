@@ -850,6 +850,7 @@ npplot.rbandwidth <-
            xlim = NULL,
            zlim = NULL,
            lty = NULL,
+           lwd = NULL,
            theta = 0.0,
            phi = 10.0,
            view = c("rotate","fixed"),
@@ -861,7 +862,7 @@ npplot.rbandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
@@ -1051,21 +1052,21 @@ npplot.rbandwidth <-
 
       persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
       
-##      for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
-        for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
+      for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
             persp(x1.eval,
                   x2.eval,
                   lerr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
             par(new = TRUE)
           }
 
@@ -1074,7 +1075,7 @@ npplot.rbandwidth <-
                 treg,
                 zlim = zlim,
                 col = persp.col,
-                border = "black",
+                border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(bws$xnames[2], "X2")),
@@ -1090,18 +1091,18 @@ npplot.rbandwidth <-
                   herr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
           }
 
           Sys.sleep(0.5)
-        }
-      ##}
+      }
 
       if (plot.behavior == "plot-data")
         return ( list(r1 = r1) )
@@ -1163,7 +1164,7 @@ npplot.rbandwidth <-
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
 
       ## Hack, adding col to main
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1),"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -1375,6 +1376,7 @@ npplot.scbandwidth <-
            xlim = NULL,
            zlim = NULL,
            lty = NULL,
+           lwd = NULL,
            theta = 0.0,
            phi = 10.0,
            view = c("rotate","fixed"),
@@ -1386,7 +1388,7 @@ npplot.scbandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
@@ -1629,13 +1631,14 @@ npplot.scbandwidth <-
                   lerr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
             par(new = TRUE)
           }
 
@@ -1644,7 +1647,7 @@ npplot.scbandwidth <-
                 treg,
                 zlim = zlim,
                 col = persp.col,
-                border = "black",
+                border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(x2.names[1], "X2")),
@@ -1660,13 +1663,14 @@ npplot.scbandwidth <-
                   herr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
           }
 
           Sys.sleep(0.5)
@@ -1757,7 +1761,8 @@ npplot.scbandwidth <-
           gen.label(bws$ynames, 'Conditional Mean')),"
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
-      pmainE = "main = ifelse(!is.null(main),main,'')"
+#      pmainE = "main = ifelse(!is.null(main),main,'')"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
 
       txobjE <-
         parse(text = paste("npscoef(txdat = xdat, tydat = ydat,",
@@ -2096,6 +2101,7 @@ npplot.plbandwidth <-
            xlim = NULL,
            zlim = NULL,
            lty = NULL,
+           lwd = NULL,
            theta = 0.0,
            phi = 10.0,
            view = c("rotate","fixed"),
@@ -2107,7 +2113,7 @@ npplot.plbandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
@@ -2337,13 +2343,14 @@ npplot.plbandwidth <-
                   lerr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
             par(new = TRUE)
           }
 
@@ -2352,7 +2359,7 @@ npplot.plbandwidth <-
                 treg,
                 zlim = zlim,
                 col = persp.col,
-                border = "black",
+                border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "Z1")),
@@ -2368,13 +2375,14 @@ npplot.plbandwidth <-
                   herr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
           }
 
           Sys.sleep(0.5)
@@ -2461,7 +2469,8 @@ npplot.plbandwidth <-
           gen.label(bws$ynames, 'Conditional Mean')),"
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
-      pmainE = "main = ifelse(!is.null(main),main,'')"
+#      pmainE = "main = ifelse(!is.null(main),main,'')"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -2788,6 +2797,7 @@ npplot.bandwidth <-
            xlim = NULL,
            zlim = NULL,
            lty = NULL,
+           lwd = NULL,
            theta = 0.0,
            phi = 10.0,
            view = c("rotate","fixed"),
@@ -2799,7 +2809,7 @@ npplot.bandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
@@ -2988,13 +2998,14 @@ npplot.bandwidth <-
                   lerr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
             par(new = TRUE)
           }
           
@@ -3003,7 +3014,7 @@ npplot.bandwidth <-
                 tdens,
                 zlim = zlim,
                 col = persp.col,
-                border = "black",
+                border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "X2")),
@@ -3019,13 +3030,14 @@ npplot.bandwidth <-
                   herr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
           }
 
           Sys.sleep(0.5)
@@ -3093,7 +3105,8 @@ npplot.bandwidth <-
 
       ## Hack (works) added color...
       
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
       
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -3286,6 +3299,7 @@ npplot.dbandwidth <-
            xlim = NULL,
            zlim = NULL,
            lty = NULL,
+           lwd = NULL,
            theta = 0.0,
            phi = 10.0,
            view = c("rotate","fixed"),
@@ -3297,7 +3311,7 @@ npplot.dbandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
@@ -3478,13 +3492,14 @@ npplot.dbandwidth <-
                   lerr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
             par(new = TRUE)
           }
           
@@ -3493,7 +3508,7 @@ npplot.dbandwidth <-
                 tdens,
                 zlim = zlim,
                 col = persp.col,
-                border = "black",
+                border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "X2")),
@@ -3509,13 +3524,14 @@ npplot.dbandwidth <-
                   herr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
           }
 
           Sys.sleep(0.5)
@@ -3584,7 +3600,8 @@ npplot.dbandwidth <-
 #      pmainE = "main = ifelse(!is.null(main),main,'')"
       ## Hack (works) added color...
       
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -3774,6 +3791,7 @@ npplot.conbandwidth <-
            xlim = NULL,
            zlim = NULL,
            lty = NULL,
+           lwd = NULL,
            theta = 0.0,
            phi = 10.0,
            tau = 0.5,
@@ -3786,7 +3804,7 @@ npplot.conbandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
@@ -4052,13 +4070,14 @@ npplot.conbandwidth <-
                   lerr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
             par(new = TRUE)
           }
 
@@ -4067,7 +4086,7 @@ npplot.conbandwidth <-
                 tdens,
                 zlim = zlim,
                 col = persp.col,
-                border = "black",
+                border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(ydat)[1], "Y")),
@@ -4083,13 +4102,14 @@ npplot.conbandwidth <-
                   herr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
           }
 
           Sys.sleep(0.5)
@@ -4175,7 +4195,8 @@ npplot.conbandwidth <-
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
 #      pmainE = "main = ifelse(!is.null(main),main,'')"
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -4537,6 +4558,7 @@ npplot.condbandwidth <-
            xlim = NULL,
            zlim = NULL,
            lty = NULL,
+           lwd = NULL,
            theta = 0.0,
            phi = 10.0,
            tau = 0.5,
@@ -4549,7 +4571,7 @@ npplot.condbandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
            plot.bxp = FALSE,
@@ -4812,13 +4834,14 @@ npplot.condbandwidth <-
                   lerr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
             par(new = TRUE)
           }
 
@@ -4827,7 +4850,7 @@ npplot.condbandwidth <-
                 tdens,
                 zlim = zlim,
                 col = persp.col,
-                border = "black",
+                border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(ydat)[1], "Y")),
@@ -4843,13 +4866,14 @@ npplot.condbandwidth <-
                   herr,
                   zlim = zlim,
                   col = persp.col,
-                  border = "grey",
+                  border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
-                  phi = phi)
+                  phi = phi,
+                  lwd = ifelse(!is.null(lwd),lwd,1))
           }
 
           Sys.sleep(0.5)
@@ -4935,7 +4959,8 @@ npplot.condbandwidth <-
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
 #      pmainE = "main = ifelse(!is.null(main),main,'')"
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -5280,17 +5305,14 @@ npplot.sibandwidth <-
            gradients = FALSE,
            main = NULL,
            type = NULL,
-#           border = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
-#           zlab = NULL,
-#           sub = NULL,
-#           ylim = NULL,
-#           xlim = NULL,
-#           zlim = NULL,
-           lty = NULL,
+           sub = NULL,
            ylim = NULL,
+           xlim = NULL,
+           lty = NULL,
+           lwd = NULL,
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 399,
@@ -5299,7 +5321,7 @@ npplot.sibandwidth <-
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("standard","quantiles"),
            plot.errors.quantiles = c(0.025,0.975),
-           plot.errors.style = c("bar","band"),
+           plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = NULL,
            plot.par.mfrow = TRUE,
@@ -5434,13 +5456,16 @@ npplot.sibandwidth <-
       if (plot.behavior != "data"){      
         if (plot.errors){
           plot(tobj$index[i.sort], temp.mean[i.sort],
-               ylim = c(ymin,ymax),
+               ylim = ifelse(!is.null(ylim),ylim,c(ymin,ymax)),
+               xlim = xlim,
                xlab = ifelse(!is.null(xlab),xlab,"index"),
                ylab = ifelse(!is.null(ylab),ylab,gen.label(bws$ynames, 'Conditional Mean')),
                type = ifelse(!is.null(type),type,'l'),
                lty = ifelse(!is.null(lty),lty,1),
                col = ifelse(!is.null(col),col,1),
-               main = main)
+               main = main,
+               sub = sub,
+               lwd = ifelse(!is.null(lwd),lwd,1))
           if (plot.errors.center == "estimate") {
             draw.errors(ex = na.omit(tobj$index[i.sort]),
                         ely = na.omit(temp.mean[i.sort] - temp.err[i.sort,1]),
@@ -5466,7 +5491,11 @@ npplot.sibandwidth <-
                type = ifelse(!is.null(type),type,'l'),
                lty = ifelse(!is.null(lty),lty,1),
                col = ifelse(!is.null(col),col,1),
-               main = main)
+               main = main,
+               sub = sub,
+               xlim = xlim,
+               ylim = ylim,
+               lwd = ifelse(!is.null(lwd),lwd,1))
         }
       }
 
@@ -5522,7 +5551,9 @@ npplot.sibandwidth <-
                  lty = ifelse(!is.null(lty),lty,1),
                  col = ifelse(!is.null(col),col,1),
                  type = ifelse(!is.null(type),type,'l'),
-                 main = main)
+                 main = main,
+                 sub = sub,
+                 lwd = ifelse(!is.null(lwd),lwd,1))
             
             if (plot.errors){
               if (plot.errors.center == "estimate") {
