@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-3. Kindly update your version should you not be using the most
+is 0.60-4. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1808,6 +1808,8 @@ cbind(t.uniquecombs[1],t.npreg[1])
 \section*{Changes from Version 0.60-3 to 0.60-4 [03-Dec-2017]}
 
 \begin{itemize}
+
+\item Default \texttt{plot.errors.style} changed to \texttt{"band"}
 
 \item Using \texttt{wrapLines(strwrap(...))} for summary output for
   model specification test to automatically wrap long formula lines
