@@ -469,7 +469,7 @@ npregbw(\dots)
   \code{\link{npreg}}
 }
 \examples{
-% % \dontrun{
+% \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
 # Bivariate nonparametric regression estimate for Giovanni Baiocchi's
 # Italian income panel (see Italy for details)
@@ -557,6 +557,6 @@ summary(bw)
 # order, bandwidth type and so forth.
 
 detach(Italy)
-% % } % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}

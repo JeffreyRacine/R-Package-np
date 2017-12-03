@@ -39,7 +39,7 @@ total.
 \keyword{datasets}
 
 \examples{
-% % \dontrun{
+% \dontrun{
 ## Example - compute nonparametric instrumental regression using
 ## Landweber-Fridman iteration of Fredholm integral equations of the
 ## first kind.
@@ -92,5 +92,5 @@ legend(quantile(logexp,trim),quantile(food,1-trim),
        lty=c(2,4),
        col=c("blue","red"),
        lwd=c(2,2))
-% % } % enddontrun
+% } % enddontrun
 }

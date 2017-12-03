@@ -259,7 +259,7 @@ FALSE, \dots)
   \code{\link{loess}}
 }
 \examples{
-% % \dontrun{
+% \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
 # bivariate nonparametric regression estimate for Giovanni Baiocchi's
 # Italian income panel (see Italy for details)
@@ -599,7 +599,7 @@ screen(2)
 
 persp(xs, zs, fit.mat, xlab="x1", ylab="x2", zlab="y",
       main="Local linear estimate")
-% % } % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}
 
