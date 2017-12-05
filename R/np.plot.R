@@ -1164,7 +1164,7 @@ npplot.rbandwidth <-
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
 
       ## Hack, adding col to main
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -1761,8 +1761,8 @@ npplot.scbandwidth <-
           gen.label(bws$ynames, 'Conditional Mean')),"
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
-#      pmainE = "main = ifelse(!is.null(main),main,'')"
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
+      ## Hack, adding col to main
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
 
       txobjE <-
         parse(text = paste("npscoef(txdat = xdat, tydat = ydat,",
@@ -2469,8 +2469,8 @@ npplot.plbandwidth <-
           gen.label(bws$ynames, 'Conditional Mean')),"
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
-#      pmainE = "main = ifelse(!is.null(main),main,'')"
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
+      ## Hack, adding col to main
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -3103,9 +3103,7 @@ npplot.bandwidth <-
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
 
-      ## Hack (works) added color...
-      
-#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+      ## Hack, adding col to main
       pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
       
       ## error plotting expressions
@@ -3597,10 +3595,7 @@ npplot.dbandwidth <-
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
 
-#      pmainE = "main = ifelse(!is.null(main),main,'')"
-      ## Hack (works) added color...
-      
-#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
+      ## Hack, adding col to main
       pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
 
       ## error plotting expressions
@@ -4194,9 +4189,8 @@ npplot.conbandwidth <-
       pylabE = paste("ylab =", "ifelse(!is.null(ylab),ylab,paste(", ifelse(gradients,"'GC',j,'of',",''), "tylabE)),")
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
-#      pmainE = "main = ifelse(!is.null(main),main,'')"
-#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
+      ## Hack, adding col to main
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -4958,9 +4952,8 @@ npplot.condbandwidth <-
       pylabE = paste("ylab =", "paste(", ifelse(gradients,"'GC',j,'of',",''), "tylabE),")
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1),"))
-#      pmainE = "main = ifelse(!is.null(main),main,'')"
-#      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1)"
-      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''),"
+      ## Hack, adding col to main
+      pmainE = "main = ifelse(!is.null(main),main,''), col = ifelse(!is.null(col),col,1), sub = ifelse(!is.null(sub),sub,''), lwd = ifelse(!is.null(lwd),lwd,1),"
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
