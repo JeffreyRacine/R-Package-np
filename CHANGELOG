@@ -1,3 +1,5 @@
+* More plotting routines accept more passable parameters
+
 Changes from Version 0.60-3 to 0.60-4 [03-Dec-2017]
 
 * Default plot.errors.style changed to "band"
