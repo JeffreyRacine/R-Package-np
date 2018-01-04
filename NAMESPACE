@@ -6,6 +6,8 @@ importFrom("utils", "combn", "flush.console")
 importFrom("methods", "is")
 importFrom("quantreg", "rq")
 export(b.star
+       ,npuniden.boundary
+       ,npuniden.reflect
        ,npudensbw
        ,npudistbw
        ,npudens
