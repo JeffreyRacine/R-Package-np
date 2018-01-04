@@ -68,6 +68,11 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
   random variable in the presence of bounds via the use of so-called
   boundary or edge kernel functions.
 
+  The kernel functions \code{"beta1"} and \code{"beta2"} are Chen's
+  (1999) type 1 and 2 kernel functions, the \code{"gamma"} is from Chen
+  (2000), and \code{"gaussian"}, and \code{"epanechnikov"} use Diggle's
+  (1985) end-correction.
+
 }
 \value{
 
@@ -82,14 +87,18 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
 
   Bouezmarni, T. and Rolin, J.-M. (2003). \dQuote{Consistency of the
   beta kernel density function estimator}.  The Canadian Journal of
-  Statistics / La Revue Canadienne de Statistique, 31(1):89–98.
+  Statistics / La Revue Canadienne de Statistique, 31(1):89-98.
 
   Chen, S. X. (1999). \dQuote{Beta kernel estimators for density
-  functions}. Computational Statistics & Data Analysis, 31(2):131–145.
+  functions}. Computational Statistics & Data Analysis, 31(2):131-145.
+
+  Chen, S. X. (2000). \dQuote{Probability density function estimation using
+  gamma kernels}. Annals of the Institute of Statistical Mathematics,
+  52(3):471-480.
 
   Diggle, P. (1985). \dQuote{A kernel method for smoothing point process
   data}. Journal of the Royal Statistical Society. Series C (Applied
-  Statistics), 34(2):138–147.
+  Statistics), 34(2):138-147.
   
 }
 \author{
@@ -99,6 +108,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 The \pkg{bde} package.
 }
 \examples{
+\dontrun{
 set.seed(42)
 n <- 100
 X <- sort(rbeta(n,5,1))
@@ -109,6 +119,7 @@ plot(X,model$f,type="l")
 lines(X,model.unadjusted$f,lty=2,col=2)
 lines(X,dgp,lty=3,col=3)
 legend("topleft",c("Boundary Kernel","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
+} % enddontrun
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

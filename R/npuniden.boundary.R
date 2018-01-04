@@ -80,8 +80,10 @@ npuniden.boundary <- function(X=NULL,
         }
     } else if(kertype=="gamma") {
         ## Gamma kernel function for x in [a,Inf]
-        kernel <- function(x,X,h,a=0,b=Inf) {
-            ## Rescale to lie in [0,Inf], b is a dummy
+        kernel <- function(x,X,h,a=0,b=1) {
+            ## Rescale to lie in [0,Inf], b is a dummy, not used but
+            ## needed to avoid warning about function kernel having
+            ## different named arguments
             X <- X-a
             x <- x-a
             dgamma(X,x/h+1,1/h)

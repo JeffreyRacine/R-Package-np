@@ -1,5 +1,5 @@
 Package: np
-Version: 0.60-4
+Version: 0.60-5
 Date: 2018-01-04
 Imports: boot, cubature, methods, quantreg, stats
 Suggests: MASS

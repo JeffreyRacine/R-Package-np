@@ -1,8 +1,8 @@
-npuniden.reflect <-
-function(X = NULL,
-         h=NULL,
-         a=0,
-         b=1,...) {
+npuniden.reflect <- function(X = NULL,
+                             h = NULL,
+                             a = 0,
+                             b = 1,
+                             ...) {
     ## Data reflection - note that the bandwidth should be based on
     ## the original sample of n observations (SCOTT (1992), Page 149)
     if(is.null(X)) stop("you must pass a vector X")

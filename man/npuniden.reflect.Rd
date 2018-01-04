@@ -16,12 +16,11 @@
 }
 
 \usage{
-npuniden.reflect(X
+npuniden.reflect(X = NULL,
                  h = NULL,
                  a = 0,
                  b = 1,
                  ...)
-
 }
 \arguments{
   \item{X}{
@@ -66,16 +65,16 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
   Boneva, L. I., Kendall, D., and Stefanov, I. (1971). \dQuote{Spline
   transformations: Three new diagnostic aids for the statistical data-
   analyst}. Journal of the Royal Statistical Society. Series B (Method-
-  ological), 33(1):1–71.
+  ological), 33(1):1-71.
 
   Cline, D. B. H. and Hart, J. D. (1991). \dQuote{Kernel estimation of
   densities with discontinuities or discontinuous
-  derivatives}. Statistics, 22(1):69–84.
+  derivatives}. Statistics, 22(1):69-84.
 
   Hall, P. and Wehrly, T. E. (1991). \dQuote{A geometrical method for
   removing edge effects from kernel- type nonparametric regression
   estimators}. Journal of the American Statistical Association,
-  86(415):665–672.
+  86(415):665-672.
   
 }
 \author{
@@ -85,6 +84,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 The \pkg{bde} package.
 }
 \examples{
+\dontrun{
 set.seed(42)
 n <- 100
 X <- sort(rbeta(n,5,1))
@@ -95,6 +95,7 @@ plot(X,model$f,type="l")
 lines(X,model.unadjusted$f,lty=2,col=2)
 lines(X,dgp,lty=3,col=3)
 legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
+} % enddontrun
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

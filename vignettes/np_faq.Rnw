@@ -595,52 +595,9 @@ at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
 \subsection{I need to apply a boundary correction for a univariate
   density estimate - how can I do this?}
 
-You could do this using `data-reflection' (see the description in
-\cite[Page 30]{SILVERMAN:1986}, as the following illustration
-demonstrates; see also \cite{KARUNAMUNIA_ZHANG:2008} for improved data
-reflection approaches and \cite{MARRON_RUPPERT:1994} for alternative
-transformations to reduce boundary bias.
-
-\begin{verbatim}
-## Use trees to speed up estimation 
-options(np.tree=TRUE)
-
-## Generate data where there is an asymptote at the left boundary
-
-set.seed(42)
-n <- 10000
-x <- sort(rexp(n))
-
-## Compute the bandwidth for the original data
-
-bw <- npudensbw(~x,ckertype="epanechnikov")
-
-## Construct the standard (i.e. no boundary correction) kernel estimate
-
-f.hat <- fitted(npudens(~x,bws=bw$bw,ckertype="epanechnikov"))
-
-## Reflect the data, compute the reflected density then take the estimator which
-## is 2 times the reflected density estimate for x >= 0 (see Silverman (1986,
-## page 30))
-
-x.reflect <- c(x,-x)
-f.reflect <- npudens(~x.reflect,bws=bw$bw,ckertype="epanechnikov")
-f.boundary <- 2*predict(f.reflect,newdata=data.frame(x.reflect=x))
-
-## Plot the nonsmooth histogram, the standard estimator, then the
-## boundary-corrected estimator
-
-hist(x,breaks=100,lty=3,freq=FALSE,ylim=c(0,1),main="")
-rug(x)
-lines(x,f.hat,col=1,lwd=2,lty=1)
-lines(x,f.boundary,col=2,lwd=2,lty=2)
-legend("topright",
-       c("Standard Kernel Estimator (no boundary correction)",
-         "Data-reflected Kernel Estimator (boundary correction)"),
-       lty=1:2,
-       col=1:2,
-       bty="n")
-\end{verbatim}
+As of version 0.60.5, you can use either \texttt{npuniden.boundary}
+(boundary kernel functions) or \texttt{npuniden.reflect} (data
+reflection).
 
 \subsection{I notice your density estimator supports manual bandwidths,
     the normal-reference rule-of-thumb, likelihood cross-validation

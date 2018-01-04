@@ -41,4 +41,6 @@ sed -i bak -f sed_dontrun.scr np.unitest.Rd
 sed -i bak -f sed_dontrun.scr np.sdeptest.Rd
 sed -i bak -f sed_dontrun.scr se.Rd
 sed -i bak -f sed_dontrun.scr uocquantile.Rd
+sed -i bak -f sed_dontrun.scr npuniden.boundary.Rd
+sed -i bak -f sed_dontrun.scr npuniden.reflect.Rd
 rm *.Rdbak
