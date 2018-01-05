@@ -65,8 +65,8 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
 
   Boneva, L. I., Kendall, D., and Stefanov, I. (1971). \dQuote{Spline
   transformations: Three new diagnostic aids for the statistical data-
-  analyst}. Journal of the Royal Statistical Society. Series B (Method-
-  ological), 33(1):1-71.
+  analyst}. Journal of the Royal Statistical Society. Series B
+  (Methodological), 33(1):1-71.
 
   Cline, D. B. H. and Hart, J. D. (1991). \dQuote{Kernel estimation of
   densities with discontinuities or discontinuous
@@ -86,6 +86,8 @@ The \pkg{bde} package.
 }
 \examples{
 \dontrun{
+## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
+## unadjusted density, and DGP
 set.seed(42)
 n <- 100
 X <- sort(rbeta(n,5,1))
@@ -96,6 +98,27 @@ plot(X,model$f,type="l")
 lines(X,model.unadjusted$f,lty=2,col=2)
 lines(X,dgp,lty=3,col=3)
 legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
+
+## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
+## asymptotic pointwise confidence intervals
+set.seed(42)
+X <- sort(rbeta(100,5,3))
+model <- npuniden.reflect(X)
+par(mfrow=c(1,2))
+ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
+plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
+lines(X,model$f+1.96*model$sd.f,lty=2)
+lines(X,model$f-1.96*model$sd.f,lty=2)
+lines(X,dbeta(X,5,3),col=2)
+rug(X)
+legend("topleft",c("Density","DGP"),lty=c(1,1),col=1:2,bty="n")
+
+plot(X,model$F,ylab="Distribution",type="l")
+lines(X,model$F+1.96*model$sd.F,lty=2)
+lines(X,model$F-1.96*model$sd.F,lty=2)
+lines(X,pbeta(X,5,3),col=2)
+rug(X)
+legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
 } % enddontrun
 }
 \keyword{ nonparametric }
