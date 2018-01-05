@@ -52,13 +52,14 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
   
 }
 \value{
-
   \code{npuniden.reflect} returns the following components:
   
-\item{f}{ estimated density at the points X }
-\item{h}{ bandwidth used }
-\item{nmulti}{ number of multistarts used }
-\item{int}{numeric integral of the estimated density }
+  \item{f}{ estimated density at the points X }
+  \item{F}{ estimated distribution at the points X }
+  \item{sd.f}{ asymptotic standard error of the estimated density at the points X }
+  \item{sd.F}{ asymptotic standard error of the estimated distribution at the points X }
+  \item{h}{ bandwidth used }
+  \item{nmulti}{ number of multistarts used }
 }
 \references{
 

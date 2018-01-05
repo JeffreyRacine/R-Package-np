@@ -16,17 +16,6 @@ npuniden.boundary <- function(X=NULL,
     if(!is.null(h) && h <= 0) stop("bandwidth h must be positive")
     if(nmulti < 1) stop("number of multistarts nmulti must be positive")
     h.opt <- NULL
-    integrate.trapezoidal <- function(x,y) {
-        n <- length(x)
-        rank.x <- rank(x)
-        order.x <- order(x)
-        y <- y[order.x]
-        x <- x[order.x]
-        int.vec <- numeric(length(x))
-        int.vec[1] <- 0
-        int.vec[2:n] <- cumsum((x[2:n] - x[2:n-1]) * (y[2:n] + y[2:n-1]) / 2)
-        return((int.vec[rank.x])[n])
-    }
     ## Epanechnikov kernel function and integrated kernel function
     depa <- function(z) {
         k <- numeric(length(z)) ## all zeros
@@ -174,10 +163,10 @@ npuniden.boundary <- function(X=NULL,
     if(is.null(h.opt)) {
         ## Manual bandwidth
         f <- fhat(X,h,a,b)
-        return(list(f=f,h=h,int=integrate.trapezoidal(X,f)))
+        return(list(f=f,F=integrate.trapezoidal(X,f),h=h))
     } else {
         ## Grid-hybrid or numeric bandwidth
         f <- fhat(X,h.opt,a,b)
-        return(list(f=f,h=h.opt,nmulti=nmulti,cv.opt=cv.opt,int=integrate.trapezoidal(X,f)))
+        return(list(f=f,F=integrate.trapezoidal(X,f),h=h.opt,nmulti=nmulti,cv.opt=cv.opt))
     }
 }

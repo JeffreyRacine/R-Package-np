@@ -17,33 +17,26 @@ npuniden.reflect <- function(X = NULL,
     } else {
         hh <- h
     }
-    integrate.trapezoidal <- function(x,y) {
-        n <- length(x)
-        rank.x <- rank(x)
-        order.x <- order(x)
-        y <- y[order.x]
-        x <- x[order.x]
-        int.vec <- numeric(length(x))
-        int.vec[1] <- 0
-        int.vec[2:n] <- cumsum((x[2:n] - x[2:n-1]) * (y[2:n] + y[2:n-1]) / 2)
-        return((int.vec[rank.x])[n])
-    }
     if(is.finite(a) && is.finite(b)) {
         X.reflect <- c(X,-X+2*a,-X+2*b)
-        f.reflect <- npudens(~X.reflect,bws=hh,...)
-        f <- 3*predict(f.reflect,newdata=data.frame(X.reflect=X))
+        f.reflect <- npudens(tdat=X.reflect,edat=X,bws=hh,...)
+        f <- 3*fitted(f.reflect)
+        std <- 3*se(f.reflect)
     } else if(is.finite(a) && !is.finite(b)) {
         X.reflect <- c(X,-X+2*a)
-        f.reflect <- npudens(~X.reflect,bws=hh,...)
-        f <- 2*predict(f.reflect,newdata=data.frame(X.reflect=X))
+        f.reflect <- npudens(tdat=X.reflect,edat=X,bws=hh,...)
+        f <- 2*fitted(f.reflect)
+        std <- 2*se(f.reflect)
     } else if(!is.finite(a) && is.finite(b)) {
         X.reflect <- c(X,-X+2*b)
-        f.reflect <- npudens(~X.reflect,bws=hh,...)
-        f <- 2*predict(f.reflect,newdata=data.frame(X.reflect=X))
+        f.reflect <- npudens(tdat=X.reflect,edat=X,bws=hh,...)
+        f <- 2*fitted(f.reflect)
+        std <- 2*se(f.reflect)
     }
+    cdf <- integrate.trapezoidal(X,f)
     if(is.null(h)) {
-        return(list(f=f,h=hh,nmulti=length(bw$fval.history),cv.opt=bw$fval,int=integrate.trapezoidal(X,f)))
+        return(list(f=f,F=cdf,sd.f=std,sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=hh,nmulti=length(bw$fval.history),cv.opt=bw$fval))
     } else {
-        return(list(f=f,h=hh,int=integrate.trapezoidal(X,f)))
+        return(list(f=f,F=cdf,sd.f=std,sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=hh))
     }
 }

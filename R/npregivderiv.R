@@ -36,22 +36,6 @@
 ## where the local polynomial estimator is ill-conditioned (sparse
 ## data, small h etc.).
 
-## This function will compute the cumulative integral at each sample
-## realization using the trapezoidal rule and the cumsum function as
-## we need to compute this in a computationally efficient manner.
-
-integrate.trapezoidal <- function(x,y) {
-  n <- length(x)
-  rank.x <- rank(x)
-  order.x <- order(x)
-  y <- y[order.x]
-  x <- x[order.x]
-  int.vec <- numeric(length(x))
-  int.vec[1] <- 0
-  int.vec[2:n] <- cumsum((x[2:n] - x[2:n-1]) * (y[2:n] + y[2:n-1]) / 2)
-  return(int.vec[rank.x])
-}
-
 npregivderiv <- function(y,
                          z,
                          w,

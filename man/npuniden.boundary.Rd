@@ -75,13 +75,12 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
 
 }
 \value{
-
   \code{npuniden.boundary} returns the following components:
   
-\item{f}{ estimated density at the points X }
-\item{h}{ bandwidth used }
-\item{nmulti}{ number of multistarts used }
-\item{int}{numeric integral of the estimated density }
+  \item{f}{ estimated density at the points X }
+  \item{F}{ estimated distribution at the points X }
+  \item{h}{ bandwidth used }
+  \item{nmulti}{ number of multistarts used }
 }
 \references{
 
