@@ -77,7 +77,19 @@ npuniden.boundary <- function(X=NULL,
             x <- x-a
             dgamma(X,x/h+1,1/h)
         }
-    }    
+    }
+    int.kernel.squared <- function(X,h,a=1,b=1) {
+        ## Use numeric integration to compute Kappa, the integral of
+        ## the square of the kernel function needed for the asymptotic
+        ## standard error of the density estimate
+        Kappa <- numeric(length(X))
+        X.seq <- seq(a,b,length=100)
+        for(i in 1:length(X)) {
+            ksq <- kernel(X[i],X.seq,h,a,b)**2
+            Kappa[i] <- integrate.trapezoidal(X.seq,ksq)[length(X.seq)]
+        }
+        return(Kappa)
+    }
     fhat <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel(X[i],X,h,a,b))})
     }
@@ -161,12 +173,14 @@ npuniden.boundary <- function(X=NULL,
         }
     }
     if(is.null(h.opt)) {
-        ## Manual bandwidth
+        ## Manual inputted bandwidth
         f <- fhat(X,h,a,b)
-        return(list(f=f,F=integrate.trapezoidal(X,f),h=h))
+        cdf <- integrate.trapezoidal(X,f)
+        return(list(f=f,F=cdf,sd.f=sqrt(f*Kappa/(h.opt*length(f))),sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=h))
     } else {
-        ## Grid-hybrid or numeric bandwidth
+        ## Grid-hybrid search or numeric search bandwidth
         f <- fhat(X,h.opt,a,b)
-        return(list(f=f,F=integrate.trapezoidal(X,f),h=h.opt,nmulti=nmulti,cv.opt=cv.opt))
+        cdf <- integrate.trapezoidal(X,f)
+        return(list(f=f,F=cdf,sd.f=sqrt(f*Kappa/(h.opt*length(f))),sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=h.opt,nmulti=nmulti,cv.opt=cv.opt))
     }
 }

@@ -55,7 +55,7 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
   \code{npuniden.reflect} returns the following components:
   
   \item{f}{ estimated density at the points X }
-  \item{F}{ estimated distribution at the points X }
+  \item{F}{ estimated distribution at the points X (numeric integral of f) }
   \item{sd.f}{ asymptotic standard error of the estimated density at the points X }
   \item{sd.F}{ asymptotic standard error of the estimated distribution at the points X }
   \item{h}{ bandwidth used }

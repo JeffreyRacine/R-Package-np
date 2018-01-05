@@ -78,7 +78,9 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
   \code{npuniden.boundary} returns the following components:
   
   \item{f}{ estimated density at the points X }
-  \item{F}{ estimated distribution at the points X }
+  \item{F}{ estimated distribution at the points X (numeric integral of f) }
+  \item{sd.f}{ asymptotic standard error of the estimated density at the points X }
+  \item{sd.F}{ asymptotic standard error of the estimated distribution at the points X }
   \item{h}{ bandwidth used }
   \item{nmulti}{ number of multistarts used }
 }
@@ -108,6 +110,8 @@ The \pkg{bde} package.
 }
 \examples{
 \dontrun{
+## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
+## unadjusted density, and DGP
 set.seed(42)
 n <- 100
 X <- sort(rbeta(n,5,1))
@@ -118,6 +122,27 @@ plot(X,model$f,type="l")
 lines(X,model.unadjusted$f,lty=2,col=2)
 lines(X,dgp,lty=3,col=3)
 legend("topleft",c("Boundary Kernel","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
+
+## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
+## asymptotic pointwise confidence intervals
+set.seed(42)
+X <- sort(rbeta(100,5,3))
+model <- npuniden.boundary(X)
+par(mfrow=c(1,2))
+ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
+plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
+lines(X,model$f+1.96*model$sd.f,lty=2)
+lines(X,model$f-1.96*model$sd.f,lty=2)
+lines(X,dbeta(X,5,3),col=2)
+rug(X)
+legend("topleft",c("Density","DGP"),lty=c(1,1),col=1:2,bty="n")
+
+plot(X,model$F,ylab="Distribution",type="l")
+lines(X,model$F+1.96*model$sd.F,lty=2)
+lines(X,model$F-1.96*model$sd.F,lty=2)
+lines(X,pbeta(X,5,3),col=2)
+rug(X)
+legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
 } % enddontrun
 }
 \keyword{ nonparametric }
