@@ -35,8 +35,18 @@ npuniden.reflect <- function(X = NULL,
     }
     cdf <- integrate.trapezoidal(X,f)
     if(is.null(h)) {
-        return(list(f=f,F=cdf,sd.f=std,sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=hh,nmulti=length(bw$fval.history),cv.opt=bw$fval))
+        return(list(f=f,
+                    F=cdf,
+                    sd.f=std,
+                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    h=hh,
+                    nmulti=length(bw$fval.history),
+                    cv.opt=bw$fval))
     } else {
-        return(list(f=f,F=cdf,sd.f=std,sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=hh))
+        return(list(f=f,
+                    F=cdf,
+                    sd.f=std,
+                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    h=hh))
     }
 }

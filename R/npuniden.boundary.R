@@ -70,9 +70,9 @@ npuniden.boundary <- function(X=NULL,
     } else if(kertype=="gamma") {
         ## Gamma kernel function for x in [a,Inf]
         kernel <- function(x,X,h,a=0,b=1) {
-            ## Rescale to lie in [0,Inf], b is a dummy, not used but
-            ## needed to avoid warning about function kernel having
-            ## different named arguments
+            ## No division by h, rescale to lie in [0,Inf], b is a
+            ## dummy, not used but needed to avoid warning about
+            ## function kernel having different named arguments
             X <- X-a
             x <- x-a
             dgamma(X,x/h+1,1/h)
@@ -82,13 +82,22 @@ npuniden.boundary <- function(X=NULL,
         ## Use numeric integration to compute Kappa, the integral of
         ## the square of the kernel function needed for the asymptotic
         ## standard error of the density estimate
-        Kappa <- numeric(length(X))
-        X.seq <- seq(a,b,length=100)
-        for(i in 1:length(X)) {
-            ksq <- kernel(X[i],X.seq,h,a,b)**2
-            Kappa[i] <- integrate.trapezoidal(X.seq,ksq)[length(X.seq)]
+        ## seq(a,b) will barf on -Inf or Inf, trap these cases and use extendrange 
+        if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=100)
+        if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
+        if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
+        if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
+        if(kertype=="gaussian" || kertype=="epanechnikov") {
+            ## Gaussian and Epanechnikov divide by h in kernel, need
+            ## to adjust for integration by multiplying kernel squared
+            ## by h (integral of kernel squared wrt X is h times
+            ## integral of kernel squared wrt (x-X)/h, so kernel
+            ## squared has 1/h^2 term, adjust by multiplying kernel
+            ## squared by h)
+            sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
+        } else {
+            sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
         }
-        return(Kappa)
     }
     fhat <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel(X[i],X,h,a,b))})
@@ -176,11 +185,21 @@ npuniden.boundary <- function(X=NULL,
         ## Manual inputted bandwidth
         f <- fhat(X,h,a,b)
         cdf <- integrate.trapezoidal(X,f)
-        return(list(f=f,F=cdf,sd.f=sqrt(f*Kappa/(h.opt*length(f))),sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=h))
+        return(list(f=f,
+                    F=cdf,
+                    sd.f=sqrt(f*int.kernel.squared(X,h,a,b)/(h*length(f))),
+                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    h=h))
     } else {
         ## Grid-hybrid search or numeric search bandwidth
         f <- fhat(X,h.opt,a,b)
         cdf <- integrate.trapezoidal(X,f)
-        return(list(f=f,F=cdf,sd.f=sqrt(f*Kappa/(h.opt*length(f))),sd.F=sqrt(cdf*(1-cdf)/length(cdf)),h=h.opt,nmulti=nmulti,cv.opt=cv.opt))
+        return(list(f=f,
+                    F=cdf,
+                    sd.f=sqrt(f*int.kernel.squared(X,h.opt,a,b)/(h.opt*length(f))),
+                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    h=h.opt,
+                    nmulti=nmulti,
+                    cv.opt=cv.opt))
     }
 }
