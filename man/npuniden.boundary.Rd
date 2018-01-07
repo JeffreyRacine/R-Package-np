@@ -24,8 +24,8 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
-                  kertype = c("gaussian", "epanechnikov", "beta1", "beta2", "gamma"),
-                  cv = c("grid-hybrid", "numeric"),
+                  kertype = c("gaussian1","gaussian2","epanechnikov","beta1","beta2","gamma"),
+                  cv = c("grid-hybrid","numeric"),
                   grid = NULL,
                   nmulti = 5)
 }
@@ -43,7 +43,7 @@ an optional lower bound (defaults to 0)
 an optional upper bound (defaults to 1)
 }
   \item{kertype}{
-an optional kernel specification (defaults to "gaussian")
+an optional kernel specification (defaults to "gaussian1")
 }
   \item{cv}{
 an optional argument for search (default is likely more reliable in the
@@ -69,9 +69,11 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
   boundary or edge kernel functions.
 
   The kernel functions \code{"beta1"} and \code{"beta2"} are Chen's
-  (1999) type 1 and 2 kernel functions, the \code{"gamma"} is from Chen
-  (2000), and \code{"gaussian"}, and \code{"epanechnikov"} use Diggle's
-  (1985) end-correction.
+  (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
+  \code{"gamma"} is from Chen (2000), and \code{"gaussian1"} and
+  \code{"gaussian2"} are renormalized Gaussian kernel functions with
+  biases of \eqn{O(h)} and \eqn{O(h^2)}, while \code{"epanechnikov"} is
+  a renormalized kernel function with bias of \eqn{O(h)}.
 
 }
 \value{

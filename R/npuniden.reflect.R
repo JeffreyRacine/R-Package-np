@@ -21,19 +21,21 @@ npuniden.reflect <- function(X = NULL,
         X.reflect <- c(X,-X+2*a,-X+2*b)
         f.reflect <- npudens(tdat=X.reflect,edat=X,bws=hh,...)
         f <- 3*fitted(f.reflect)
+        cdf <- 3*fitted(npudist(tdat=X.reflect,edat=X,bws=hh,...))-1
         std <- 3*se(f.reflect)
     } else if(is.finite(a) && !is.finite(b)) {
         X.reflect <- c(X,-X+2*a)
         f.reflect <- npudens(tdat=X.reflect,edat=X,bws=hh,...)
         f <- 2*fitted(f.reflect)
+        cdf <- 2*fitted(npudist(tdat=X.reflect,edat=X,bws=hh,...))-1      
         std <- 2*se(f.reflect)
     } else if(!is.finite(a) && is.finite(b)) {
         X.reflect <- c(X,-X+2*b)
         f.reflect <- npudens(tdat=X.reflect,edat=X,bws=hh,...)
         f <- 2*fitted(f.reflect)
+        cdf <- 2*fitted(npudist(tdat=X.reflect,edat=X,bws=hh,...))      
         std <- 2*se(f.reflect)
     }
-    cdf <- integrate.trapezoidal(X,f)
     if(is.null(h)) {
         return(list(f=f,
                     F=cdf,

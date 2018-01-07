@@ -1,3 +1,6 @@
+* Added asymptotic standard errors and integrated density (CDF) to
+  npuniden.boundary and npuniden.reflect plus additional examples
+
 Changes from Version 0.60-4 to 0.60-5 [04-Jan-2018]
 
 * Added two basic functions for univariate bounded kernel density
