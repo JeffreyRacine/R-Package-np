@@ -119,12 +119,23 @@ X <- sort(rbeta(n,5,1))
 dgp <- dbeta(X,5,1)
 model.g1 <- npuniden.boundary(X)
 model.g2 <- npuniden.boundary(X,kertype="gaussian2")
+model.b1 <- npuniden.boundary(X,kertype="beta1")
+model.b2 <- npuniden.boundary(X,kertype="beta2")
 model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
-plot(X,model.g1$f,type="l")
-lines(X,model.g2$f,lty=2,col=2)
-lines(X,model.unadjusted$f,lty=3,col=3)
-lines(X,dgp,lty=4,col=4)
-legend("topleft",c("Boundary Kernel (gaussian1)","Boundary Kernel (gaussian2)","Unadjusted","DGP"),col=1:4,lty=1:4,bty="n")
+ylim <- c(0,max(c(dgp,model.g1$f,model.g2$f)))
+plot(X,dgp,ylab="Density",ylim=ylim,type="l")
+lines(X,model.g1$f,lty=2,col=2)
+lines(X,model.g2$f,lty=3,col=3)
+lines(X,model.b1$f,lty=4,col=4)
+lines(X,model.b2$f,lty=5,col=5)
+lines(X,model.unadjusted$f,lty=6,col=6)
+rug(X)
+legend("topleft",c("DGP",
+                   "Boundary Kernel (gaussian1)",
+                   "Boundary Kernel (gaussian2)",
+                   "Boundary Kernel (beta1)",
+                   "Boundary Kernel (beta2)",
+                   "Unadjusted"),col=1:6,lty=1:6,bty="n")
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
 ## asymptotic pointwise confidence intervals

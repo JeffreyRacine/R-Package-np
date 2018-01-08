@@ -94,9 +94,11 @@ X <- sort(rbeta(n,5,1))
 dgp <- dbeta(X,5,1)
 model <- npuniden.reflect(X)
 model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
-plot(X,model$f,type="l")
+ylim <- c(0,max(c(dgp,model$f,model.unadjusted$f)))
+plot(X,model$f,ylab="Density",ylim=ylim,type="l")
 lines(X,model.unadjusted$f,lty=2,col=2)
 lines(X,dgp,lty=3,col=3)
+rug(X)
 legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
