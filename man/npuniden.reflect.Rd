@@ -129,6 +129,7 @@ model <- npuniden.reflect(age,a=21,b=65)
 hist(age,prob=T,main="",ylim=c(0,max(model$f)))
 lines(age,model$f)
 lines(density(age,bw=model$h),col=2)
+legend("topright",c("Data-Reflection","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 detach(cps71)
 } % enddontrun
 }

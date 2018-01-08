@@ -13,9 +13,9 @@
   [\code{a},\code{b}] can be supplied (default is [0,1]) and if \code{a}
   is set to \code{-Inf} there is only one bound on the right, while if
   \code{b} is set to \code{Inf} there is only one bound on the left. If
-  \code{a} is set to \code{-Inf} and \code{b} to \code{Inf} and either
-  the Gaussian or Epanechnikov kernel functions are used, this will
-  deliver the standard unadjusted kernel density estimate.
+  \code{a} is set to \code{-Inf} and \code{b} to \code{Inf} and the
+  Gaussian type 1 kernel function is used, this will deliver the
+  standard unadjusted kernel density estimate.
 
 }
 
@@ -24,7 +24,7 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
-                  kertype = c("gaussian1","gaussian2","epanechnikov","beta1","beta2","gamma"),
+                  kertype = c("gaussian1","gaussian2","beta1","beta2","gamma"),
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
                   nmulti = 5)
@@ -72,8 +72,7 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
   (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
   \code{"gamma"} is from Chen (2000), and \code{"gaussian1"} and
   \code{"gaussian2"} are renormalized Gaussian kernel functions with
-  biases of \eqn{O(h)} and \eqn{O(h^2)}, while \code{"epanechnikov"} is
-  a renormalized kernel function with bias of \eqn{O(h)}.
+  biases of \eqn{O(h)} and \eqn{O(h^2)}.
 
 }
 \value{
@@ -118,12 +117,14 @@ set.seed(42)
 n <- 100
 X <- sort(rbeta(n,5,1))
 dgp <- dbeta(X,5,1)
-model <- npuniden.boundary(X)
+model.g1 <- npuniden.boundary(X)
+model.g2 <- npuniden.boundary(X,kertype="gaussian2")
 model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
-plot(X,model$f,type="l")
-lines(X,model.unadjusted$f,lty=2,col=2)
-lines(X,dgp,lty=3,col=3)
-legend("topleft",c("Boundary Kernel","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
+plot(X,model.g1$f,type="l")
+lines(X,model.g2$f,lty=2,col=2)
+lines(X,model.unadjusted$f,lty=3,col=3)
+lines(X,dgp,lty=4,col=4)
+legend("topleft",c("Boundary Kernel (gaussian1)","Boundary Kernel (gaussian2)","Unadjusted","DGP"),col=1:4,lty=1:4,bty="n")
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
 ## asymptotic pointwise confidence intervals
@@ -154,6 +155,7 @@ model <- npuniden.boundary(age,a=21,b=65)
 hist(age,prob=T,main="")
 lines(age,model$f)
 lines(density(age,bw=model$h),col=2)
+legend("topright",c("Boundary Kernel","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 detach(cps71)
 } % enddontrun
 }
