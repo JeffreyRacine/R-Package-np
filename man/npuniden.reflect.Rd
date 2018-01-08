@@ -59,7 +59,7 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
   \item{sd.f}{ asymptotic standard error of the estimated density at the points X }
   \item{sd.F}{ asymptotic standard error of the estimated distribution at the points X }
   \item{h}{ bandwidth used }
-  \item{nmulti}{ number of multistarts used }
+  \item{nmulti}{ number of multi-starts used }
 }
 \references{
 
@@ -82,7 +82,7 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
 Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-The \pkg{bde} package.
+The \pkg{bde} package and the function \code{\link{npuniden.boundary}}.
 }
 \examples{
 \dontrun{
@@ -102,7 +102,7 @@ rug(X)
 legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n")
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
-## asymptotic pointwise confidence intervals
+## asymptotic point-wise confidence intervals
 set.seed(42)
 X <- sort(rbeta(100,5,3))
 model <- npuniden.reflect(X)
@@ -123,7 +123,7 @@ rug(X)
 legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
 
 
-## Example 3: Age for working age males in the cps71 dataset bounded
+## Example 3: Age for working age males in the cps71 data set bounded
 ## below by 21 and above by 65
 data(cps71)
 attach(cps71)

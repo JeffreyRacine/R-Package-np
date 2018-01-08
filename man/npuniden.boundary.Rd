@@ -53,7 +53,7 @@ presence of local maxima)
 an optional grid used for the initial grid search when \code{cv="grid-hybrid"}
 }
   \item{nmulti}{
-number of multistarts used when \code{cv="numeric"} (defaults to 5)
+number of multi-starts used when \code{cv="numeric"} (defaults to 5)
 }
 }
 \details{
@@ -83,7 +83,7 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
   \item{sd.f}{ asymptotic standard error of the estimated density at the points X }
   \item{sd.F}{ asymptotic standard error of the estimated distribution at the points X }
   \item{h}{ bandwidth used }
-  \item{nmulti}{ number of multistarts used }
+  \item{nmulti}{ number of multi-starts used }
 }
 \references{
 
@@ -94,20 +94,27 @@ number of multistarts used when \code{cv="numeric"} (defaults to 5)
   Chen, S. X. (1999). \dQuote{Beta kernel estimators for density
   functions}. Computational Statistics & Data Analysis, 31(2):131-145.
 
-  Chen, S. X. (2000). \dQuote{Probability density function estimation using
-  gamma kernels}. Annals of the Institute of Statistical Mathematics,
-  52(3):471-480.
+  Chen, S. X. (2000). \dQuote{Probability density function estimation
+  using gamma kernels}. Annals of the Institute of Statistical
+  Mathematics, 52(3):471-480.
 
   Diggle, P. (1985). \dQuote{A kernel method for smoothing point process
   data}. Journal of the Royal Statistical Society. Series C (Applied
   Statistics), 34(2):138-147.
+
+  Igarashi, G. (2016). \dQuote{Bias Reductions for Beta Kernel
+  Estimation}. Journal of Nonparametric Statistics, 28(1):1-30.
+  
+  Zhang, S. and R. J. Karunamuni (2010). \dQuote{Boundary Performance of
+  the Beta Kernel Estimators}. Journal of Nonparametric Statistics
+  22(1):81-104.
   
 }
 \author{
 Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-The \pkg{bde} package.
+The \pkg{bde} package and the function \code{\link{npuniden.reflect}}.
 }
 \examples{
 \dontrun{
@@ -138,7 +145,7 @@ legend("topleft",c("DGP",
                    "Unadjusted"),col=1:6,lty=1:6,bty="n")
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
-## asymptotic pointwise confidence intervals
+## asymptotic point-wise confidence intervals
 set.seed(42)
 X <- sort(rbeta(100,5,3))
 model <- npuniden.boundary(X)
@@ -158,7 +165,7 @@ lines(X,pbeta(X,5,3),col=2)
 rug(X)
 legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
 
-## Example 3: Age for working age males in the cps71 dataset bounded
+## Example 3: Age for working age males in the cps71 data set bounded
 ## below by 21 and above by 65
 data(cps71)
 attach(cps71)
