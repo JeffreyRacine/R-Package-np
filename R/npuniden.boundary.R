@@ -23,8 +23,10 @@ npuniden.boundary <- function(X=NULL,
             dnorm((x-X)/h)/(h*(pnorm((b-x)/h)-pnorm((a-x)/h)))
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
-            ## Does not work unless h close to zero or very large, don't understand why
-            (pnorm((x-X)/h)-pnorm((a-x)/h))/(pnorm((b-x)/h)-pnorm((a-x)/h))
+            z.a <- (a-x)/h
+            z.b <- (b-x)/h            
+            z <- pmax(pmin((x-X)/h,(b-x)/h),(a-x)/h)
+            (pnorm(z)-pnorm(z.a))/(pnorm(z.b)-pnorm(z.a))
         }
     } else if(kertype=="gaussian2") {
         ## Gaussian reweighted second-order boundary kernel function
@@ -36,11 +38,22 @@ npuniden.boundary <- function(X=NULL,
             pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
             mu.1 <- (dnorm(z.a)-dnorm(z.b))/(pnorm.zb.m.pnorm.za)
             mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)#-3*mu.2*mu.1+2*mu.1**3
-            #mu.2 <- mu.2-mu.1**2
+            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
             aa <- mu.3/(mu.3-mu.1*mu.2)
             bb <- -mu.1/(mu.3-mu.1*mu.2)
             (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
+        }
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            z.a <- (a-x)/h
+            z.b <- (b-x)/h
+            z <- pmax(pmin((x-X)/h,(b-x)/h),(a-x)/h)
+            pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
+            mu.1 <- (dnorm(z.a)-dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            aa <- mu.3/(mu.3-mu.1*mu.2)
+            bb <- -mu.1/(mu.3-mu.1*mu.2)
+            ((pnorm(z)-pnorm(z.a))*(aa+bb)+(dnorm(z.a)*z.a-dnorm(z)*z)*bb)/(pnorm.zb.m.pnorm.za)
         }
     } else if(kertype=="beta1") {
         ## Chen (1999), Beta 1 kernel function (bias of O(h), function
@@ -234,26 +247,15 @@ npuniden.boundary <- function(X=NULL,
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
         f <- fhat(X,h,a,b)
-        ## Hack
-        if(kertype=="gaussian1" | kertype=="gaussian2") {
-            F <- integrate.trapezoidal(X,f)
-        } else {
-            F <- Fhat(X,h,a,b)
-        }
+        F <- Fhat(X,h,a,b)
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(X,h,a,b)/(h*length(f)))),
                     sd.F=sqrt(abs(F*(1-F)/length(F))),
                     h=h))
     } else {
-        ## Grid-hybrid search or numeric search bandwidth
         f <- fhat(X,h.opt,a,b)
-        ## Hack
-        if(kertype=="gaussian1" | kertype=="gaussian2") {
-            F <- integrate.trapezoidal(X,f)
-        } else {
-            F <- Fhat(X,h.opt,a,b)
-        }
+        F <- Fhat(X,h.opt,a,b)
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(X,h.opt,a,b)/(h.opt*length(f)))),
