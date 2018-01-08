@@ -145,6 +145,16 @@ lines(X,model$F-1.96*model$sd.F,lty=2)
 lines(X,pbeta(X,5,3),col=2)
 rug(X)
 legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
+
+## Example 3: Age for working age males in the cps71 dataset bounded
+## below by 21 and above by 65
+data(cps71)
+attach(cps71)
+model <- npuniden.boundary(age,a=21,b=65)
+hist(age,prob=T,main="")
+lines(age,model$f)
+lines(density(age,bw=model$h),col=2)
+detach(cps71)
 } % enddontrun
 }
 \keyword{ nonparametric }
