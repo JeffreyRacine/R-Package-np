@@ -72,7 +72,10 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
   \code{"gamma"} is from Chen (2000), and \code{"gaussian1"} and
   \code{"gaussian2"} are renormalized Gaussian kernel functions with
-  biases of \eqn{O(h)} and \eqn{O(h^2)}.
+  biases of \eqn{O(h)} and \eqn{O(h^2)}. Since Chen's (1999) type 2
+  kernel function uses regions \eqn{[a,a+2h)}, \eqn{[a+2h,b-2h]}, and
+  \eqn{(b-2h,B]}, bandwidth search takes place on \code{(0,(b-a)/4)} for
+  this kernel function only (the rest search over \code{(0,Inf)}.
 
 }
 \value{
