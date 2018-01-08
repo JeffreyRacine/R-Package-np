@@ -65,16 +65,16 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
 
   Boneva, L. I., Kendall, D., and Stefanov, I. (1971). \dQuote{Spline
   transformations: Three new diagnostic aids for the statistical data-
-  analyst}. Journal of the Royal Statistical Society. Series B
+  analyst,} Journal of the Royal Statistical Society. Series B
   (Methodological), 33(1):1-71.
 
   Cline, D. B. H. and Hart, J. D. (1991). \dQuote{Kernel estimation of
   densities with discontinuities or discontinuous
-  derivatives}. Statistics, 22(1):69-84.
+  derivatives,} Statistics, 22(1):69-84.
 
   Hall, P. and Wehrly, T. E. (1991). \dQuote{A geometrical method for
   removing edge effects from kernel- type nonparametric regression
-  estimators}. Journal of the American Statistical Association,
+  estimators,} Journal of the American Statistical Association,
   86(415):665-672.
   
 }

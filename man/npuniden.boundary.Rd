@@ -88,25 +88,25 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
 \references{
 
   Bouezmarni, T. and Rolin, J.-M. (2003). \dQuote{Consistency of the
-  beta kernel density function estimator}.  The Canadian Journal of
+  beta kernel density function estimator,}  The Canadian Journal of
   Statistics / La Revue Canadienne de Statistique, 31(1):89-98.
 
   Chen, S. X. (1999). \dQuote{Beta kernel estimators for density
-  functions}. Computational Statistics & Data Analysis, 31(2):131-145.
+  functions,} Computational Statistics & Data Analysis, 31(2):131-145.
 
   Chen, S. X. (2000). \dQuote{Probability density function estimation
-  using gamma kernels}. Annals of the Institute of Statistical
+  using gamma kernels,} Annals of the Institute of Statistical
   Mathematics, 52(3):471-480.
 
   Diggle, P. (1985). \dQuote{A kernel method for smoothing point process
-  data}. Journal of the Royal Statistical Society. Series C (Applied
+  data,} Journal of the Royal Statistical Society. Series C (Applied
   Statistics), 34(2):138-147.
 
   Igarashi, G. (2016). \dQuote{Bias Reductions for Beta Kernel
-  Estimation}. Journal of Nonparametric Statistics, 28(1):1-30.
+  Estimation,} Journal of Nonparametric Statistics, 28(1):1-30.
   
   Zhang, S. and R. J. Karunamuni (2010). \dQuote{Boundary Performance of
-  the Beta Kernel Estimators}. Journal of Nonparametric Statistics
+  the Beta Kernel Estimators,} Journal of Nonparametric Statistics,
   22(1):81-104.
   
 }
