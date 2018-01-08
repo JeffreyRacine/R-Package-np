@@ -67,7 +67,7 @@ npuniden.boundary <- function(X=NULL,
         kernel.int <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            1-pbeta(X,x/h+1,(1-x)/h+1)/(b-a)
+            1-pbeta(X,x/h+1,(1-x)/h+1)
         }
     } else if(kertype=="beta2") {
         ## Chen (1999), Beta 2 kernel function (bias of O(h), function
@@ -89,11 +89,11 @@ npuniden.boundary <- function(X=NULL,
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
             if(x < 2*h) {
-                1-pbeta(X,rho(x,h),(1-x)/h)/(b-a)
+                1-pbeta(X,rho(x,h),(1-x)/h)
             } else if(2*h <= x & x <= 1-2*h) {
-                1-pbeta(X,x/h,(1-x)/h)/(b-a)
+                1-pbeta(X,x/h,(1-x)/h)
             } else if(x > 1-2*h) {
-                1-pbeta(X,x/h,rho(1-x,h))/(b-a)
+                1-pbeta(X,x/h,rho(1-x,h))
             }
         }
     } else if(kertype=="gamma") {
