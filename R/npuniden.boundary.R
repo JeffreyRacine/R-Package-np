@@ -2,7 +2,7 @@ npuniden.boundary <- function(X=NULL,
                               h=NULL,
                               a=0,
                               b=1,
-                              kertype=c("gaussian1","gaussian2","epanechnikov","beta1","beta2","gamma"),
+                              kertype=c("gaussian1","gaussian2","beta1","beta2","gamma"),
                               cv=c("grid-hybrid","numeric"),
                               grid=NULL,
                               nmulti=5) {
@@ -17,22 +17,14 @@ npuniden.boundary <- function(X=NULL,
     if(nmulti < 1) stop("number of multistarts nmulti must be positive")
     if(kertype=="gaussian2" && !is.finite(a) && !is.finite(b)) stop("at least one finite bound needed with kertype gaussian2")
     h.opt <- NULL
-    ## Epanechnikov kernel function and integrated kernel function
-    depa <- function(z) {
-        k <- numeric(length(z)) ## all zeros
-        k[-sqrt(5)<=z&z<=sqrt(5)] <- 0.3354101966249685*(1-0.2*z[-sqrt(5)<=z&z<=sqrt(5)]**2)/h
-        k
-    }
-    pepa <- function(z) {
-        k <- numeric(length(z)) ## all zeros
-        k[-sqrt(5)<=z&z<=sqrt(5)] <- 0.3354101966249685*(1.490711984999862-0.06666666666666667*(z[-sqrt(5)<=z&z<=sqrt(5)]**3-15*z[-sqrt(5)<=z&z<=sqrt(5)]))/h
-        k[z > sqrt(5)] <- 1 ## set to 1
-        k
-    }
     if(kertype=="gaussian1") {
         ## Gaussian reweighted boundary kernel function (bias of O(h))
         kernel <- function(x,X,h,a=0,b=1) {
-            dnorm((x-X)/h)/(h*(pnorm((b-x)/h)-pnorm((a-x)/h)))            
+            dnorm((x-X)/h)/(h*(pnorm((b-x)/h)-pnorm((a-x)/h)))
+        }
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            ## Does not work unless h close to zero or very large, don't understand why
+            (pnorm((x-X)/h)-pnorm((a-x)/h))/(pnorm((b-x)/h)-pnorm((a-x)/h))
         }
     } else if(kertype=="gaussian2") {
         ## Gaussian reweighted second-order boundary kernel function
@@ -41,19 +33,14 @@ npuniden.boundary <- function(X=NULL,
             z <- (x-X)/h
             z.a <- (a-x)/h
             z.b <- (b-x)/h
-            pnorm.zb.m.pnorm.za <- pnorm(z.b)-pnorm(z.a)
+            pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
             mu.1 <- (dnorm(z.a)-dnorm(z.b))/(pnorm.zb.m.pnorm.za)
             mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)#-3*mu.2*mu.1+2*mu.1**3
+            #mu.2 <- mu.2-mu.1**2
             aa <- mu.3/(mu.3-mu.1*mu.2)
             bb <- -mu.1/(mu.3-mu.1*mu.2)
             (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
-        }
-    } else if(kertype=="epanechnikov"){
-        ## Epanechnikov reweighted boundary kernel function (O(h) in
-        ## the boundary, note division by h)
-        kernel <- function(x,X,h,a=0,b=1) {
-            depa((x-X)/h)/(h*(pepa((b-x)/h)-pepa((a-x)/h)))
         }
     } else if(kertype=="beta1") {
         ## Chen (1999), Beta 1 kernel function (bias of O(h), function
@@ -63,6 +50,11 @@ npuniden.boundary <- function(X=NULL,
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
             dbeta(X,x/h+1,(1-x)/h+1)/(b-a)
+        }
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            X <- (X-a)/(b-a)
+            x <- (x-a)/(b-a)
+            1-pbeta(X,x/h+1,(1-x)/h+1)/(b-a)
         }
     } else if(kertype=="beta2") {
         ## Chen (1999), Beta 2 kernel function (bias of O(h), function
@@ -74,11 +66,22 @@ npuniden.boundary <- function(X=NULL,
             x <- (x-a)/(b-a)
             if(x < 2*h) {
                 dbeta(X,rho(x,h),(1-x)/h)/(b-a)
-            } else if(2*h <= x & x <= 1-2*h) { 
+            } else if(2*h <= x & x <= 1-2*h) {
                 dbeta(X,x/h,(1-x)/h)/(b-a)
-            } else if(x > 1-2*h) { 
+            } else if(x > 1-2*h) {
                 dbeta(X,x/h,rho(1-x,h))/(b-a)
-            } 
+            }
+        }
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            X <- (X-a)/(b-a)
+            x <- (x-a)/(b-a)
+            if(x < 2*h) {
+                1-pbeta(X,rho(x,h),(1-x)/h)/(b-a)
+            } else if(2*h <= x & x <= 1-2*h) {
+                1-pbeta(X,x/h,(1-x)/h)/(b-a)
+            } else if(x > 1-2*h) {
+                1-pbeta(X,x/h,rho(1-x,h))/(b-a)
+            }
         }
     } else if(kertype=="gamma") {
         ## Gamma kernel function for x in [a,Inf]
@@ -90,12 +93,20 @@ npuniden.boundary <- function(X=NULL,
             x <- x-a
             dgamma(X,x/h+1,1/h)
         }
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            ## No division by h, rescale to lie in [0,Inf], b is a
+            ## dummy, not used but needed to avoid warning about
+            ## function kernel having different named arguments
+            X <- X-a
+            x <- x-a
+            1-pgamma(X,x/h+1,1/h)
+        }
     }
     int.kernel.squared <- function(X,h,a=1,b=1) {
         ## Use numeric integration to compute Kappa, the integral of
         ## the square of the kernel function needed for the asymptotic
         ## standard error of the density estimate
-        ## seq(a,b) will barf on -Inf or Inf, trap these cases and use extendrange 
+        ## seq(a,b) will barf on -Inf or Inf, trap these cases and use extendrange
         if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=100)
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
@@ -109,7 +120,7 @@ npuniden.boundary <- function(X=NULL,
             ## squared by h)
             sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
         } else {
-            sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
+            sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
         }
     }
     fhat <- function(X,h,a=0,b=1) {
@@ -118,14 +129,20 @@ npuniden.boundary <- function(X=NULL,
     fhat.loo <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel(X[i],X[-i],h,a,b))})
     }
+    Fhat <- function(X,h,a=0,b=1) {
+        sapply(1:length(X),function(i){mean(kernel.int(X[i],X,h,a,b))})
+    }
+    ## For search, if gaussian2 use gaussian1
+    if(kertype=="gaussian2") {
+        ## Gaussian reweighted boundary kernel function (bias of O(h))
+        kernel <- function(x,X,h,a=0,b=1) {
+            dnorm((x-X)/h)/(h*(pnorm((b-x)/h)-pnorm((a-x)/h)))
+        }
+    }
     ## Likelihood cross-validation function
     cv.ml.function <- function(h,X,a=0,b=1) {
         f <- fhat.loo(X,h,a,b)
-        ##if(any(!is.finite(f))) print("non-finite f")
-        ##if(any(f<=0)) print("non-positive f")        
         return(sum(log(ifelse(f > 0 & is.finite(f), f, .Machine$double.xmin))))
-        #f <- f[f > 0 & is.finite(f)]
-        #return(mean(log(f)))
     }
     ## Numeric optimization bandwidth search with multistarting
     if(is.null(h) && cv == "numeric") {
@@ -196,23 +213,51 @@ npuniden.boundary <- function(X=NULL,
             cv.opt <- foo$value
         }
     }
+
+    if(kertype=="gaussian2") {
+        ## Gaussian reweighted second-order boundary kernel function
+        ## (bias of O(h^2))
+        kernel <- function(x,X,h,a=0,b=1) {
+            z <- (x-X)/h
+            z.a <- (a-x)/h
+            z.b <- (b-x)/h
+            pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
+            mu.1 <- (dnorm(z.a)-dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
+            aa <- mu.3/(mu.3-mu.1*mu.2)
+            bb <- -mu.1/(mu.3-mu.1*mu.2)
+            (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
+        }
+    }
+
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
         f <- fhat(X,h,a,b)
-        cdf <- integrate.trapezoidal(X,f)
+        ## Hack
+        if(kertype=="gaussian1" | kertype=="gaussian2") {
+            F <- integrate.trapezoidal(X,f)
+        } else {
+            F <- Fhat(X,h,a,b)
+        }
         return(list(f=f,
-                    F=cdf,
+                    F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(X,h,a,b)/(h*length(f)))),
-                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    sd.F=sqrt(abs(F*(1-F)/length(F))),
                     h=h))
     } else {
         ## Grid-hybrid search or numeric search bandwidth
         f <- fhat(X,h.opt,a,b)
-        cdf <- integrate.trapezoidal(X,f)
+        ## Hack
+        if(kertype=="gaussian1" | kertype=="gaussian2") {
+            F <- integrate.trapezoidal(X,f)
+        } else {
+            F <- Fhat(X,h.opt,a,b)
+        }
         return(list(f=f,
-                    F=cdf,
+                    F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(X,h.opt,a,b)/(h.opt*length(f)))),
-                    sd.F=sqrt(abs(cdf*(1-cdf)/length(cdf))),
+                    sd.F=sqrt(abs(F*(1-F)/length(F))),
                     h=h.opt,
                     nmulti=nmulti,
                     cv.opt=cv.opt))
