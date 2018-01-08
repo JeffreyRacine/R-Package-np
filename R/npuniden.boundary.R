@@ -118,23 +118,13 @@ npuniden.boundary <- function(X=NULL,
     int.kernel.squared <- function(X,h,a=1,b=1) {
         ## Use numeric integration to compute Kappa, the integral of
         ## the square of the kernel function needed for the asymptotic
-        ## standard error of the density estimate
-        ## seq(a,b) will barf on -Inf or Inf, trap these cases and use extendrange
+        ## standard error of the density estimate seq(a,b) will barf
+        ## on -Inf or Inf, trap these cases and use extendrange
         if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=100)
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-        if(kertype=="gaussian1" || kertype=="gaussian2" || kertype=="epanechnikov") {
-            ## Gaussian and Epanechnikov divide by h in kernel, need
-            ## to adjust for integration by multiplying kernel squared
-            ## by h (integral of kernel squared wrt X is h times
-            ## integral of kernel squared wrt (x-X)/h, so kernel
-            ## squared has 1/h^2 term, adjust by multiplying kernel
-            ## squared by h)
-            sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
-        } else {
-            sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
-        }
+        sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
     }
     fhat <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel(X[i],X,h,a,b))})
@@ -145,17 +135,19 @@ npuniden.boundary <- function(X=NULL,
     Fhat <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel.int(X[i],X,h,a,b))})
     }
-    ## For search, if gaussian2 use gaussian1
+    ## Likelihood cross-validation function
+    cv.ml.function <- function(h,X,a=0,b=1) {
+        f <- fhat.loo(X,h,a,b)
+        return(sum(log(ifelse(f > 0 & is.finite(f), f, .Machine$double.xmin))))
+    }
+    ## For search, if kertype=="gaussian2" use "gaussian1"
+    ## ("gaussian2" can produce negative density estimates which
+    ## appears to adversely affect likelihood cross-validation)
     if(kertype=="gaussian2") {
         ## Gaussian reweighted boundary kernel function (bias of O(h))
         kernel <- function(x,X,h,a=0,b=1) {
             dnorm((x-X)/h)/(h*(pnorm((b-x)/h)-pnorm((a-x)/h)))
         }
-    }
-    ## Likelihood cross-validation function
-    cv.ml.function <- function(h,X,a=0,b=1) {
-        f <- fhat.loo(X,h,a,b)
-        return(sum(log(ifelse(f > 0 & is.finite(f), f, .Machine$double.xmin))))
     }
     ## Numeric optimization bandwidth search with multistarting
     if(is.null(h) && cv == "numeric") {
@@ -226,7 +218,7 @@ npuniden.boundary <- function(X=NULL,
             cv.opt <- foo$value
         }
     }
-
+    ## Search completed, if kertype=="gaussian2" revert to this kernel
     if(kertype=="gaussian2") {
         ## Gaussian reweighted second-order boundary kernel function
         ## (bias of O(h^2))
@@ -254,6 +246,7 @@ npuniden.boundary <- function(X=NULL,
                     sd.F=sqrt(abs(F*(1-F)/length(F))),
                     h=h))
     } else {
+        ## Search bandwidth
         f <- fhat(X,h.opt,a,b)
         F <- Fhat(X,h.opt,a,b)
         return(list(f=f,
