@@ -2,7 +2,7 @@ npuniden.boundary <- function(X=NULL,
                               h=NULL,
                               a=0,
                               b=1,
-                              kertype=c("gaussian1","gaussian2","beta1","beta2","beta3","gamma","rig"),
+                              kertype=c("gaussian1","gaussian2","beta1","beta2","gamma","rig"),
                               cv=c("grid-hybrid","numeric"),
                               grid=NULL,
                               nmulti=5) {
@@ -96,15 +96,6 @@ npuniden.boundary <- function(X=NULL,
             } else if(x > 1-2*h) {
                 1-pbeta(X,x/h,rho(1-x,h))
             }
-        }
-    } else if(kertype=="beta3") {
-        kernel <- function(x,X,h,a=0,b=1) {
-            x.a <- (x-a)/((b-a)*h)
-            x.b <- ((b-x)/((b-a)*h))
-            ((X-a)**(x.a))*((b-X)**x.b)/((b-a)**(1+1/h)*beta(x.a+1,x.b+1))
-        }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
         }
     } else if(kertype=="gamma") {
         ## Gamma kernel function for x in [a,Inf]

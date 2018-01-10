@@ -24,7 +24,7 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
-                  kertype = c("gaussian1","gaussian2","beta1","beta2","beta3","gamma","rig"),
+                  kertype = c("gaussian1","gaussian2","beta1","beta2","gamma","rig"),
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
                   nmulti = 5)
@@ -69,10 +69,9 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   boundary or edge kernel functions.
 
   The kernel functions \code{"beta1"} and \code{"beta2"} are Chen's
-  (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)},
-  \code{"beta3"} is the extended beta function (Libengue, (2013)) the
-  \code{"gamma"} is from Chen (2000), \cite{"rig"} is the reverse
-  inverse Gaussian kernel function (Scaillet (2004)), and
+  (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
+  \code{"gamma"} kernel function is from Chen (2000), \cite{"rig"} is
+  the reverse inverse Gaussian kernel function (Scaillet (2004)), and
   \code{"gaussian1"} and \code{"gaussian2"} are truncated Gaussian
   kernel functions with biases of \eqn{O(h)} and \eqn{O(h^2)}. Since
   Chen's (1999) type 2 kernel function uses regions \eqn{[a,a+2h)},
@@ -107,11 +106,6 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   Diggle, P. (1985). \dQuote{A kernel method for smoothing point process
   data,} Journal of the Royal Statistical Society. Series C (Applied
   Statistics), 34(2):138-147.
-
-  Libengue, F.G. (2013). \emph{Méthode Non-Paramétrique par Noyaux
-  Associés Mixtes et Applications}, Ph.D. Thesis Manuscript (in French)
-  to Université de Franche-Comté, Besançon, France and Université de
-  Ouagadougou, Burkina Faso, June 2013, \bold{LMB no. 14334}, Besançon.
 
   Igarashi, G. and Y. Kakizawa (2015). \dQuote{Bias corrections for some
   asymmetric kernel estimators,} Journal of Statistical Planning and
