@@ -2,7 +2,7 @@ npuniden.boundary <- function(X=NULL,
                               h=NULL,
                               a=0,
                               b=1,
-                              kertype=c("gaussian1","gaussian2","beta1","beta2","gamma","rig"),
+                              kertype=c("gaussian1","gaussian2","beta1","beta2","gamma","rig","fb"),
                               cv=c("grid-hybrid","numeric"),
                               grid=NULL,
                               nmulti=5) {
@@ -117,7 +117,7 @@ npuniden.boundary <- function(X=NULL,
         }
     } else if(kertype=="rig") {
         ## Reverse inverse Gaussian for x in [a,Inf]
-        kernel <- function(x,X,h,a=0,b=Inf) {
+        kernel <- function(x,X,h,a=0,b=1) {
             ## No division by h, rescale to lie in [0,Inf], b is a
             ## dummy, not used but needed to avoid warning about
             ## function kernel having different named arguments
@@ -126,8 +126,27 @@ npuniden.boundary <- function(X=NULL,
             x.res <- sqrt(x**2+h*x)
             exp(-x.res/(2*h)*(X/x.res+x.res/X-2))/sqrt(2*pi*h*X)
         }
-        kernel.int <- function(x,X,h,a=0,b=Inf) {
-            np:::integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
+        }
+    } else if(kertype=="fb") {
+        ## Floating boundary kernel (Scott (1992), Page 46)
+        kernel <- function(x,X,h,a=0,b=1) {
+            if(x < a+h) {
+                c <- (a-x)/h
+                t <- (X-x)/h
+                ifelse(c <= t & t <= 2+c,0.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
+            } else if(a+h <= x && x <= b-h) {
+                t <- (x-X)/h
+                ifelse(abs(t)<1,(15/16)*(1-t**2)**2,0)/h
+            } else if(x > b-h) {
+                c <- (b-x)/h
+                t <- (X-x)/h
+                ifelse(c-2 <= t & t <= c,0.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
+            }
+        }
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
         }
     }
     int.kernel.squared <- function(X,h,a=1,b=1) {
