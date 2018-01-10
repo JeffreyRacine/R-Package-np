@@ -24,7 +24,7 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
-                  kertype = c("gaussian1","gaussian2","beta1","beta2","gamma"),
+                  kertype = c("gaussian1","gaussian2","beta1","beta2","beta3","gamma","rig"),
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
                   nmulti = 5)
@@ -69,13 +69,16 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   boundary or edge kernel functions.
 
   The kernel functions \code{"beta1"} and \code{"beta2"} are Chen's
-  (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
-  \code{"gamma"} is from Chen (2000), and \code{"gaussian1"} and
-  \code{"gaussian2"} are renormalized Gaussian kernel functions with
-  biases of \eqn{O(h)} and \eqn{O(h^2)}. Since Chen's (1999) type 2
-  kernel function uses regions \eqn{[a,a+2h)}, \eqn{[a+2h,b-2h]}, and
-  \eqn{(b-2h,B]}, bandwidth search takes place on \code{(0,(b-a)/4)} for
-  this kernel function only (the rest search over \code{(0,Inf)}.
+  (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)},
+  \code{"beta3"} is the extended beta function (Libengue, (2013)) the
+  \code{"gamma"} is from Chen (2000), \cite{"rig"} is the reverse
+  inverse Gaussian kernel function (Scaillet (2004)), and
+  \code{"gaussian1"} and \code{"gaussian2"} are truncated Gaussian
+  kernel functions with biases of \eqn{O(h)} and \eqn{O(h^2)}. Since
+  Chen's (1999) type 2 kernel function uses regions \eqn{[a,a+2h)},
+  \eqn{[a+2h,b-2h]}, and \eqn{(b-2h,B]}, bandwidth search takes place on
+  \code{(0,(b-a)/4)} for this kernel function only (the rest search over
+  \code{(0,Inf)}.
 
 }
 \value{
@@ -105,11 +108,24 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   data,} Journal of the Royal Statistical Society. Series C (Applied
   Statistics), 34(2):138-147.
 
-  Igarashi, G. (2016). \dQuote{Bias Reductions for Beta Kernel
-  Estimation,} Journal of Nonparametric Statistics, 28(1):1-30.
+  Libengue, F.G. (2013). \emph{Méthode Non-Paramétrique par Noyaux
+  Associés Mixtes et Applications}, Ph.D. Thesis Manuscript (in French)
+  to Université de Franche-Comté, Besançon, France and Université de
+  Ouagadougou, Burkina Faso, June 2013, \bold{LMB no. 14334}, Besançon.
+
+  Igarashi, G. and Y. Kakizawa (2015). \dQuote{Bias corrections for some
+  asymmetric kernel estimators,} Journal of Statistical Planning and
+  Inference, 159:37-63.
   
-  Zhang, S. and R. J. Karunamuni (2010). \dQuote{Boundary Performance of
-  the Beta Kernel Estimators,} Journal of Nonparametric Statistics,
+  Igarashi, G. (2016). \dQuote{Bias reductions for beta kernel
+  estimation,} Journal of Nonparametric Statistics, 28(1):1-30.
+
+  Scaillet, O. (2004). \dQuote{Density estimation using inverse and
+  reciprocal inverse Gaussian kernels,} Journal of Nonparametric
+  Statistics, 16(1-2):217-226.
+
+  Zhang, S. and R. J. Karunamuni (2010). \dQuote{Boundary performance of
+  the beta kernel estimators,} Journal of Nonparametric Statistics,
   22(1):81-104.
   
 }
@@ -117,7 +133,7 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
 Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-The \pkg{bde} package and the function \code{\link{npuniden.reflect}}.
+The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.reflect}}.
 }
 \examples{
 \dontrun{
@@ -127,10 +143,11 @@ set.seed(42)
 n <- 100
 X <- sort(rbeta(n,5,1))
 dgp <- dbeta(X,5,1)
-model.g1 <- npuniden.boundary(X)
+model.g1 <- npuniden.boundary(X,kertype="gaussian1")
 model.g2 <- npuniden.boundary(X,kertype="gaussian2")
 model.b1 <- npuniden.boundary(X,kertype="beta1")
 model.b2 <- npuniden.boundary(X,kertype="beta2")
+model.b3 <- npuniden.boundary(X,kertype="beta3")
 model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
 ylim <- c(0,max(c(dgp,model.g1$f,model.g2$f)))
 plot(X,dgp,ylab="Density",ylim=ylim,type="l")
@@ -138,14 +155,16 @@ lines(X,model.g1$f,lty=2,col=2)
 lines(X,model.g2$f,lty=3,col=3)
 lines(X,model.b1$f,lty=4,col=4)
 lines(X,model.b2$f,lty=5,col=5)
-lines(X,model.unadjusted$f,lty=6,col=6)
+lines(X,model.b3$f,lty=6,col=6)
+lines(X,model.unadjusted$f,lty=7,col=7)
 rug(X)
 legend("topleft",c("DGP",
                    "Boundary Kernel (gaussian1)",
                    "Boundary Kernel (gaussian2)",
                    "Boundary Kernel (beta1)",
                    "Boundary Kernel (beta2)",
-                   "Unadjusted"),col=1:6,lty=1:6,bty="n")
+                   "Boundary Kernel (beta3)",
+                   "Unadjusted"),col=1:7,lty=1:7,bty="n")
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
 ## asymptotic point-wise confidence intervals

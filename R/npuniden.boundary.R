@@ -2,7 +2,7 @@ npuniden.boundary <- function(X=NULL,
                               h=NULL,
                               a=0,
                               b=1,
-                              kertype=c("gaussian1","gaussian2","beta1","beta2","gamma"),
+                              kertype=c("gaussian1","gaussian2","beta1","beta2","beta3","gamma","rig"),
                               cv=c("grid-hybrid","numeric"),
                               grid=NULL,
                               nmulti=5) {
@@ -10,6 +10,7 @@ npuniden.boundary <- function(X=NULL,
     cv <- match.arg(cv)
     if(!is.null(grid) && any(grid<=0)) stop(" the grid vector must contain positive values")
     if(is.null(X)) stop("you must pass a vector X")
+    if(kertype=="gamma" || kertype=="rig") b <- Inf
     if(a>=b) stop("a must be less than b")
     if(any(X<a)) stop("X must be >= a")
     if(any(X>b)) stop("X must be <= b")
@@ -96,6 +97,15 @@ npuniden.boundary <- function(X=NULL,
                 1-pbeta(X,x/h,rho(1-x,h))
             }
         }
+    } else if(kertype=="beta3") {
+        kernel <- function(x,X,h,a=0,b=1) {
+            x.a <- (x-a)/((b-a)*h)
+            x.b <- ((b-x)/((b-a)*h))
+            ((X-a)**(x.a))*((b-X)**x.b)/((b-a)**(1+1/h)*beta(x.a+1,x.b+1))
+        }
+        kernel.int <- function(x,X,h,a=0,b=1) {
+            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
+        }
     } else if(kertype=="gamma") {
         ## Gamma kernel function for x in [a,Inf]
         kernel <- function(x,X,h,a=0,b=1) {
@@ -113,6 +123,20 @@ npuniden.boundary <- function(X=NULL,
             X <- X-a
             x <- x-a
             1-pgamma(X,x/h+1,1/h)
+        }
+    } else if(kertype=="rig") {
+        ## Reverse inverse Gaussian for x in [a,Inf]
+        kernel <- function(x,X,h,a=0,b=Inf) {
+            ## No division by h, rescale to lie in [0,Inf], b is a
+            ## dummy, not used but needed to avoid warning about
+            ## function kernel having different named arguments
+            X <- X - a
+            x <- x - a
+            x.res <- sqrt(x**2+h*x)
+            exp(-x.res/(2*h)*(X/x.res+x.res/X-2))/sqrt(2*pi*h*X)
+        }
+        kernel.int <- function(x,X,h,a=0,b=Inf) {
+            np:::integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
         }
     }
     int.kernel.squared <- function(X,h,a=1,b=1) {
@@ -190,7 +214,7 @@ npuniden.boundary <- function(X=NULL,
             rob.spread <- c(sd(X),IQR(X)/1.349)
             rob.spread <- min(rob.spread[rob.spread>0])
             constant <- rob.spread*length(X)**(-0.2)
-            h.vec <- c(seq(0.25,1.75,length=10),2^(1:25))*constant
+            h.vec <- c(seq(0.25,1.75,length=10),2**(1:25))*constant
             cv.vec <- sapply(1:length(h.vec),function(i){cv.ml.function(h.vec[i],X,a,b)})
             foo <- optim(h.vec[which.max(cv.vec)],
                          cv.ml.function,

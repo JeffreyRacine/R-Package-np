@@ -82,7 +82,7 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
 Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-The \pkg{bde} package and the function \code{\link{npuniden.boundary}}.
+The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.boundary}}.
 }
 \examples{
 \dontrun{
