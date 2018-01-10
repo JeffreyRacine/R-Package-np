@@ -78,22 +78,22 @@ npuniden.boundary <- function(X=NULL,
         kernel <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            if(x < 2*h && h < (b-a)) {
+            if(x < 2*h && x < (b-a)/2) {
                 dbeta(X,rho(x,h),(1-x)/h)/(b-a)
-            } else if(2*h <= x & x <= 1-2*h || h >= (b-a)) {
+            } else if(2*h <= x & x <= 1-2*h) {
                 dbeta(X,x/h,(1-x)/h)/(b-a)
-            } else if(x > 1-2*h && h < (b-a)) {
+            } else if(x > 1-2*h && x > (b-a)/2) {
                 dbeta(X,x/h,rho(1-x,h))/(b-a)
             }
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            if(x < 2*h && h < (b-a)) {
+            if(x < 2*h && x < (b-a)/2) {
                 1-pbeta(X,rho(x,h),(1-x)/h)
-            } else if(2*h <= x & x <= 1-2*h || h >= (b-a)) {
+            } else if(2*h <= x & x <= 1-2*h) {
                 1-pbeta(X,x/h,(1-x)/h)
-            } else if(x > 1-2*h && h < (b-a)) {
+            } else if(x > 1-2*h && x < (b-a)/2) {
                 1-pbeta(X,x/h,rho(1-x,h))
             }
         }
@@ -132,14 +132,14 @@ npuniden.boundary <- function(X=NULL,
     } else if(kertype=="fb") {
         ## Floating boundary kernel (Scott (1992), Page 46)
         kernel <- function(x,X,h,a=0,b=1) {
-            if(x < a+h && h < (b-a)) {
+            if(x < a+h && x < (b-a)/2) {
                 c <- (a-x)/h
                 t <- (X-x)/h
                 ifelse(c <= t & t <= 2+c,0.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
-            } else if(a+h <= x && x <= b-h || h >= (b-a)) {
+            } else if(a+h <= x && x <= b-h) {
                 t <- (x-X)/h
                 ifelse(abs(t)<1,(15/16)*(1-t**2)**2,0)/h
-            } else if(x > b-h && h < (b-a)) {
+            } else if(x > b-h && x > (b-a)/2) {
                 c <- (b-x)/h
                 t <- (X-x)/h
                 ifelse(c-2 <= t & t <= c,0.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
