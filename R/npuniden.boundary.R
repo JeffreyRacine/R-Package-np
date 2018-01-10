@@ -78,7 +78,7 @@ npuniden.boundary <- function(X=NULL,
         kernel <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            if(x < 2*h && x < (b-a)/2) {
+            if(x < 2*h && x <= (b-a)/2) {
                 dbeta(X,rho(x,h),(1-x)/h)/(b-a)
             } else if(2*h <= x & x <= 1-2*h) {
                 dbeta(X,x/h,(1-x)/h)/(b-a)
@@ -89,7 +89,7 @@ npuniden.boundary <- function(X=NULL,
         kernel.int <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            if(x < 2*h && x < (b-a)/2) {
+            if(x < 2*h && x <= (b-a)/2) {
                 1-pbeta(X,rho(x,h),(1-x)/h)
             } else if(2*h <= x & x <= 1-2*h) {
                 1-pbeta(X,x/h,(1-x)/h)
@@ -132,7 +132,7 @@ npuniden.boundary <- function(X=NULL,
     } else if(kertype=="fb") {
         ## Floating boundary kernel (Scott (1992), Page 46)
         kernel <- function(x,X,h,a=0,b=1) {
-            if(x < a+h && x < (b-a)/2) {
+            if(x < a+h && x <= (b-a)/2) {
                 c <- (a-x)/h
                 t <- (X-x)/h
                 ifelse(c <= t & t <= 2+c,0.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
