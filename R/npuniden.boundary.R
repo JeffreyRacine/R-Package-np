@@ -36,7 +36,8 @@ npuniden.boundary <- function(X=NULL,
         }
     } else if(kertype=="gaussian2") {
         ## Gaussian reweighted second-order boundary kernel function
-        ## (bias of O(h^2))
+        ## (bias of O(h^2)). Instability for extremely large
+        ## bandwidths relative to scale of data
         kernel <- function(x,X,h,a=0,b=1) {
             z <- (x-X)/h
             z.a <- (a-x)/h
@@ -47,7 +48,11 @@ npuniden.boundary <- function(X=NULL,
             mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
             aa <- mu.3/(mu.3-mu.1*mu.2)
             bb <- -mu.1/(mu.3-mu.1*mu.2)
-            (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
+            if((b-a)/h > 1e-04) {
+                (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
+            } else {
+                rep(1,length(X))
+            }
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
             z.a <- (a-x)/h
@@ -292,8 +297,6 @@ npuniden.boundary <- function(X=NULL,
     }
     ## Search completed, if kertype=="gaussian2" revert to this kernel
     if(kertype=="gaussian2") {
-        ## Gaussian reweighted second-order boundary kernel function
-        ## (bias of O(h^2))
         kernel <- function(x,X,h,a=0,b=1) {
             z <- (x-X)/h
             z.a <- (a-x)/h
@@ -304,10 +307,14 @@ npuniden.boundary <- function(X=NULL,
             mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
             aa <- mu.3/(mu.3-mu.1*mu.2)
             bb <- -mu.1/(mu.3-mu.1*mu.2)
-            (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
+            if((b-a)/h > 1e-04) {
+                (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
+            } else {
+                rep(1,length(X))
+            }
         }
     }
-
+    
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
         f <- fhat(X,h,a,b)
