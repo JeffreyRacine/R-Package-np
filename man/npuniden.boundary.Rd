@@ -24,7 +24,7 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
-                  kertype=c("gaussian1","gaussian2","beta1","beta2","fb","gamma","rigaussian"),
+                  kertype=c("gaussian1","gaussian2","beta1","beta2","fb","fbl","fbu","rigaussian","gamma"),
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
                   nmulti = 5)
@@ -74,13 +74,17 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   \cite{"rigaussian"} is the reverse inverse Gaussian kernel function
   (Scaillet (2004)), and \code{"gaussian1"} and \code{"gaussian2"} are
   truncated Gaussian kernel functions with biases of \eqn{O(h)} and
-  \eqn{O(h^2)}.
+  \eqn{O(h^2)}. The kernel functions \code{"fb"}, \code{"fbl"} and
+  \code{"fbu"} are floating boundary kernels (Scott (1992), Page 146).
 
-  Note that the defaults are \code{a=0} and \code{b=1}, so the default
-  left bound is zero and right bound is one, so when estimating a
-  variable on \eqn{[0,\infty)} the default can be used but when
-  estimating a variable on \eqn{(-\infty,0]} you must manually set the
-  upper bound.
+  The kernel functions \code{"gamma"}, \code{"rigaussian"}, and
+  \code{"fbl"} have support \eqn{[a,Inf]}. The kernel function
+  \code{"fbu"} has support \eqn{[-Inf,b]}. The rest have support on
+  \eqn{[a,b]}.  Note that the two sided support default values are
+  \code{a=0} and \code{b=1}, so the default left bound is zero and right
+  bound is one, so when estimating a variable on \eqn{[0,\infty)} the
+  default can be used but when estimating a variable on
+  \eqn{(-\infty,0]} you must manually set the upper bound.
 
   Note that data-driven bandwidth selection is more nuanced in bounded
   settings, therefore it would be prudent to manually select a bandwidth
@@ -88,6 +92,16 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   estimate (say \code{h=0.05} when \eqn{X\in [0,1]}). Also, it would be
   helpful to compare the density estimate with that from a histogram
   with \code{breaks=25}.
+
+  Scott (1992, Page 149) writes \dQuote{While boundary kernels can be
+  very useful, there are potentially serious problems with real
+  data. There are an infinite number of boundary kernels reflecting the
+  spectrum of possible design constraints, and these kernels are not
+  interchangable. Severe artifacts can be introduced by any one of them
+  in inappropriate situations. Very careful examination is required to
+  avoid being victimized by the particular boundary kernel
+  chosen. Artifacts can unfortunately be introduced by the choice of the
+  support interval for the boundary kernel.}
 
 }
 \value{
@@ -203,14 +217,14 @@ lines(density(age,bw=model$h),col=2)
 legend("topright",c("Boundary Kernel","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 detach(cps71)
 
-## Example 4: Floating bound kernel functions
+## Example 4: Floating boundary kernel
 set.seed(42)
-X <- sort(rexp(100))
+X <- sort(rexp(250))
 f <- npuniden.boundary(X,kertype="fbl",a=0)
 plot(X,f$f,type="l",xlim=range(c(X,-X)))
 lines(X,dexp(X),col="grey")
 rug(X)
-f <- npuniden.boundary(-X,kertype="fbr",b=0)
+f <- npuniden.boundary(-X,kertype="fbu",b=0)
 lines(-X,f$f,lty=2,col=2)
 lines(-X,dexp(X),col="grey")
 rug(-X)
