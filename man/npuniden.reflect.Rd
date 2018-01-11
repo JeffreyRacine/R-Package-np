@@ -49,6 +49,9 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
   \code{npuniden.reflect} implements the data-reflection method for
   estimating a univariate density function defined over a continuous
   random variable in the presence of bounds.
+
+  Note that data-reflection imposes a zero derivative at the boundary,
+  i.e., \eqn{f'(a)=f'(b)=0}.
   
 }
 \value{
