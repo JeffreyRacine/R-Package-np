@@ -2,7 +2,7 @@ npuniden.boundary <- function(X=NULL,
                               h=NULL,
                               a=0,
                               b=1,
-                              kertype=c("gaussian1","gaussian2","beta1","beta2","gamma","rigaussian","fb","fbl","fbr"),
+                              kertype=c("gaussian1","gaussian2","beta1","beta2","fb","gamma","rigaussian"),
                               cv=c("grid-hybrid","numeric"),
                               grid=NULL,
                               nmulti=5) {
@@ -11,8 +11,6 @@ npuniden.boundary <- function(X=NULL,
     if(!is.null(grid) && any(grid<=0)) stop(" the grid vector must contain positive values")
     if(is.null(X)) stop("you must pass a vector X")
     if(kertype=="gamma" || kertype=="rigaussian") b <- Inf
-    if(kertype=="fbr" || kertype=="rigaussian") a <- -Inf
-    if(kertype=="fbl" || kertype=="rigaussian") b <- Inf
     if(a>=b) stop("a must be less than b")
     if(any(X<a)) stop("X must be >= a")
     if(any(X>b)) stop("X must be <= b")
@@ -80,22 +78,22 @@ npuniden.boundary <- function(X=NULL,
         kernel <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            if(x < 2*h && x <= (b-a)/2) {
+            if(x < 2*h && h < (b-a)) {
                 dbeta(X,rho(x,h),(1-x)/h)/(b-a)
-            } else if(2*h <= x & x <= 1-2*h) {
+            } else if((2*h <= x && x <= 1-2*h) || h >= (b-a)) {
                 dbeta(X,x/h,(1-x)/h)/(b-a)
-            } else if(x > 1-2*h && x > (b-a)/2) {
+            } else if(x > 1-2*h && h < (b-a)) {
                 dbeta(X,x/h,rho(1-x,h))/(b-a)
             }
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
-            if(x < 2*h && x <= (b-a)/2) {
+            if(x < 2*h && h < (b-a)) {
                 1-pbeta(X,rho(x,h),(1-x)/h)
-            } else if(2*h <= x & x <= 1-2*h) {
+            } else if((2*h <= x && x <= 1-2*h) || h >= (b-a)) {
                 1-pbeta(X,x/h,(1-x)/h)
-            } else if(x > 1-2*h && x < (b-a)/2) {
+            } else if(x > 1-2*h && h < (b-a)) {
                 1-pbeta(X,x/h,rho(1-x,h))
             }
         }
@@ -126,65 +124,39 @@ npuniden.boundary <- function(X=NULL,
             X <- X - a
             x <- x - a
             x.res <- sqrt(x**2+h*x)
-            exp(-x.res/(2*h)*(X/x.res+x.res/X-2))/sqrt(2*pi*h*X)
+            k <- exp(-x.res/(2*h)*(X/x.res+x.res/X-2))/sqrt(2*pi*h*X)
+            k[is.nan(k)] <- 0
+            k
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
             integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
         }
     } else if(kertype=="fb") {
         ## Floating boundary kernel (Scott (1992), Page 46), left and
-        ## right bound
-        kernel <- function(x,X,h,a=0,b=1) {
-            if(x < a+h && x <= (b-a)/2) {
+        ## right bound, truncated biweight in interior
+        kernel <- function(x,X,h,a=0,b=2) {
+            if(x < a+h && h < (b-a)) {
                 c <- (a-x)/h
                 t <- (X-x)/h
-                ifelse(c <= t & t <= 2+c,0.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
-            } else if(a+h <= x && x <= b-h) {
+                ifelse(c <= t & t <= 2+c,.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
+            } else if((a+h <= x && x <= b-h) || h >= (b-a)) {
+                z.a <- (a-x)/h
+                z.b <- (b-x)/h  
                 t <- (x-X)/h
-                ifelse(abs(t)<1,(15/16)*(1-t**2)**2,0)/h
-            } else if(x > b-h && x > (b-a)/2) {
+                rw <- (3*(z.b^5-z.a^5)-10*(z.b^3-z.a^3)+15*(z.b-z.a))/16
+                rw[rw>1] <- 1
+                ifelse(abs(t)<1,(15/16)*(1-t**2)**2/(h*rw),0)
+            } else if(x > b-h && h < (b-a)) {
                 c <- (b-x)/h
                 t <- (X-x)/h
-                ifelse(c-2 <= t & t <= c,0.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
-            }
-        }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
-        }
-    } else if(kertype=="fbl") {
-        ## Floating boundary kernel (Scott (1992), Page 46), left
-        ## bound, b is an unused dummy
-        kernel <- function(x,X,h,a=0,b=1) {
-            if(x < a+h) {
-                c <- (a-x)/h
-                t <- (X-x)/h
-                ifelse(c <= t & t <= 2+c,0.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
-            } else {
-                t <- (x-X)/h
-                ifelse(abs(t)<1,(15/16)*(1-t**2)**2,0)/h
-            }
-        }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
-        }
-    } else if(kertype=="fbr") {
-        ## Floating boundary kernel (Scott (1992), Page 46), right
-        ## bound, a is an unused dummy
-        kernel <- function(x,X,h,a=0,b=1) {
-            if(x <= b-h) {
-                t <- (x-X)/h
-                ifelse(abs(t)<1,(15/16)*(1-t**2)**2,0)/h
-            } else {
-                c <- (b-x)/h
-                t <- (X-x)/h
-                ifelse(c-2 <= t & t <= c,0.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
+                ifelse(c-2 <= t & t <= c,.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
             }
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
             integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
         }
     }
-    int.kernel.squared <- function(X,h,a=1,b=1) {
+    int.kernel.squared <- function(X,h,a=a,b=b) {
         ## Use numeric integration to compute Kappa, the integral of
         ## the square of the kernel function needed for the asymptotic
         ## standard error of the density estimate seq(a,b) will barf

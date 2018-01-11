@@ -24,7 +24,7 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
-                  kertype=c("gaussian1","gaussian2","beta1","beta2","gamma","rigaussian","fb","fbl","fbr"),
+                  kertype=c("gaussian1","gaussian2","beta1","beta2","fb","gamma","rigaussian"),
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
                   nmulti = 5)
@@ -70,14 +70,11 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
 
   The kernel functions \code{"beta1"} and \code{"beta2"} are Chen's
   (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
-  \code{"gamma"} kernel function is from Chen (2000), \cite{"rigaussian"} is
-  the reverse inverse Gaussian kernel function (Scaillet (2004)), and
-  \code{"gaussian1"} and \code{"gaussian2"} are truncated Gaussian
-  kernel functions with biases of \eqn{O(h)} and \eqn{O(h^2)}. Since
-  Chen's (1999) type 2 kernel function uses regions \eqn{[a,a+2h)},
-  \eqn{[a+2h,b-2h]}, and \eqn{(b-2h,B]}, bandwidth search takes place on
-  \code{(0,(b-a)/4)} for this kernel function only (the rest search over
-  \code{(0,Inf)}.
+  \code{"gamma"} kernel function is from Chen (2000),
+  \cite{"rigaussian"} is the reverse inverse Gaussian kernel function
+  (Scaillet (2004)), and \code{"gaussian1"} and \code{"gaussian2"} are
+  truncated Gaussian kernel functions with biases of \eqn{O(h)} and
+  \eqn{O(h^2)}.
 
   Note that the defaults are \code{a=0} and \code{b=1}, so the default
   left bound is zero and right bound is one, so when estimating a
