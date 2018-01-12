@@ -8,7 +8,7 @@
 
   \code{npuniden.boundary} computes kernel univariate unconditional
   density estimates given a vector of continuously distributed training
-  data and, optionally, a bandwidth (otherwise likelihood
+  data and, optionally, a bandwidth (otherwise least squares
   cross-validation is used for its selection). Lower and upper bounds
   [\code{a},\code{b}] can be supplied (default is [0,1]) and if \code{a}
   is set to \code{-Inf} there is only one bound on the right, while if
@@ -80,7 +80,7 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
   \code{"gamma"} kernel function is from Chen (2000),
   \code{"rigaussian"} is the reverse inverse Gaussian kernel function
-  (Scaillet (2004)) iwth bias of \eqn{O(h)}, and \code{"gaussian1"} and
+  (Scaillet (2004)) with bias of \eqn{O(h)}, and \code{"gaussian1"} and
   \code{"gaussian2"} are truncated Gaussian kernel functions with biases
   of \eqn{O(h)} and \eqn{O(h^2)}. The kernel functions \code{"fb"},
   \code{"fbl"} and \code{"fbu"} are floating boundary polynomial
@@ -98,15 +98,21 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   Note that data-driven bandwidth selection is more nuanced in bounded
   settings, therefore it would be prudent to manually select a bandwidth
   that is, say, 1/25th of the range of the data and manually inspect the
-  estimate (say \code{h=0.05} when \eqn{X\in [0,1]}). Also, it would be
-  helpful to compare the density estimate with that from a histogram
-  with the option \code{breaks=25}.
+  estimate (say \code{h=0.05} when \eqn{X\in [0,1]}). Also, it may be
+  wise to compare the density estimate with that from a histogram with
+  the option \code{breaks=25}. Note also that the kernel functions
+  \code{"gaussian2"}, \code{"fb"}, \code{"fbl"} and \code{"fbu"} can
+  assume negative values leading to potentially negative density
+  estimates, which must be trimmed when conducting likelihood
+  cross-validation which can lead to oversmoothing. Least squares
+  cross-validation is unaffected and appears to be more reliable in such
+  instances hence is the default here.
 
   Scott (1992, Page 149) writes \dQuote{While boundary kernels can be
   very useful, there are potentially serious problems with real
   data. There are an infinite number of boundary kernels reflecting the
   spectrum of possible design constraints, and these kernels are not
-  interchangable. Severe artifacts can be introduced by any one of them
+  interchangeable. Severe artifacts can be introduced by any one of them
   in inappropriate situations. Very careful examination is required to
   avoid being victimized by the particular boundary kernel
   chosen. Artifacts can unfortunately be introduced by the choice of the
