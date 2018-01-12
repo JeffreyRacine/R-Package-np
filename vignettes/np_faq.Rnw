@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-5. Kindly update your version should you not be using the most
+is 0.60-6. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1761,6 +1761,22 @@ cbind(t.uniquecombs[1],t.npreg[1])
 \clearpage
 
 \appendix
+
+\section*{Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]}
+
+\begin{itemize}
+
+\item Added more edge kernel functions for
+  \texttt{npuniden.boundary()}, some glitches addressed
+
+\item Added asymptotic standard errors and integrated density (CDF) to
+  \texttt{npuniden.boundary()} and \texttt{npuniden.reflect()} plus
+  additional examples
+
+\item Added least squares cross-validation
+  \texttt{npuniden.boundary()} (default for boundary kernel functions)
+  
+\end{itemize}
 
 \section*{Changes from Version 0.60-4 to 0.60-5 [04-Jan-2018]}
 

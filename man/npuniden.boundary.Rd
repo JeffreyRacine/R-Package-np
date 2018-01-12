@@ -78,13 +78,18 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
 
   The kernel functions \code{"beta1"} and \code{"beta2"} are Chen's
   (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
-  \code{"gamma"} kernel function is from Chen (2000),
-  \code{"rigaussian"} is the reverse inverse Gaussian kernel function
-  (Scaillet (2004)) with bias of \eqn{O(h)}, and \code{"gaussian1"} and
-  \code{"gaussian2"} are truncated Gaussian kernel functions with biases
-  of \eqn{O(h)} and \eqn{O(h^2)}. The kernel functions \code{"fb"},
-  \code{"fbl"} and \code{"fbu"} are floating boundary polynomial
-  biweight kernels (Scott (1992), Page 146) with biases of \eqn{O(h)}.
+  \code{"gamma"} kernel function is from Chen (2000) with a bias of
+  \eqn{O(h)}, \code{"rigaussian"} is the reverse inverse Gaussian kernel
+  function (Scaillet (2004)) with bias of \eqn{O(h)}, and
+  \code{"gaussian1"} and \code{"gaussian2"} are truncated Gaussian
+  kernel functions with biases of \eqn{O(h)} and \eqn{O(h^2)},
+  respectively. The kernel functions \code{"fb"}, \code{"fbl"} and
+  \code{"fbu"} are floating boundary polynomial biweight kernels with
+  biases of \eqn{O(h^2)} (Scott (1992), Page 146). This function is
+  written purely in R, so to see the exact form for each of these kernel
+  functions, simply enter the name of this function in R (i.e., enter
+  \code{npuniden.boundary} after loading this package) and scroll up for
+  their definitions.
 
   The kernel functions \code{"gamma"}, \code{"rigaussian"}, and
   \code{"fbl"} have support \eqn{[a,\infty]}. The kernel function
@@ -103,7 +108,7 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   the option \code{breaks=25}. Note also that the kernel functions
   \code{"gaussian2"}, \code{"fb"}, \code{"fbl"} and \code{"fbu"} can
   assume negative values leading to potentially negative density
-  estimates, which must be trimmed when conducting likelihood
+  estimates, and must be trimmed when conducting likelihood
   cross-validation which can lead to oversmoothing. Least squares
   cross-validation is unaffected and appears to be more reliable in such
   instances hence is the default here.
@@ -161,6 +166,9 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   Scaillet, O. (2004). \dQuote{Density estimation using inverse and
   reciprocal inverse Gaussian kernels,} Journal of Nonparametric
   Statistics, 16(1-2):217-226.
+
+  Scott, D. W. (1992). \dQuote{Multivariate density estimation: Theory,
+  practice, and visualization,} New York: Wiley.
 
   Zhang, S. and R. J. Karunamuni (2010). \dQuote{Boundary performance of
   the beta kernel estimators,} Journal of Nonparametric Statistics,

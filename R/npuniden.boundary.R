@@ -23,7 +23,7 @@ npuniden.boundary <- function(X=NULL,
     if(any(X>b)) stop("X must be <= b")
     if(!is.null(h) && h <= 0) stop("bandwidth h must be positive")
     if(nmulti < 1) stop("number of multistarts nmulti must be positive")
-    if(kertype=="gaussian2" && !is.finite(a) && !is.finite(b)) stop("at least one finite bound needed with kertype gaussian2")
+    if(kertype=="gaussian2" && (!is.finite(a) || !is.finite(b))) stop("finite bounds are required for kertype gaussian2")
     h.opt <- NULL
     if(kertype=="gaussian1") {
         ## Gaussian reweighted boundary kernel function (bias of O(h))
@@ -231,7 +231,8 @@ npuniden.boundary <- function(X=NULL,
         }
     }
     ## Grid search and then numeric optimization search (no
-    ## multistarting)
+    ## multistarting, but sound starting point always used for
+    ## subsequent refinement by optim)
     if(is.null(h) && cv == "grid-hybrid") {
         ## First establish a sound starting value using grid search,
         ## then use that starting value for numeric search
