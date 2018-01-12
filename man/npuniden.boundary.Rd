@@ -79,17 +79,17 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   The kernel functions \code{"beta1"} and \code{"beta2"} are Chen's
   (1999) type 1 and 2 kernel functions with biases of \eqn{O(h)}, the
   \code{"gamma"} kernel function is from Chen (2000) with a bias of
-  \eqn{O(h)}, \code{"rigaussian"} is the reverse inverse Gaussian kernel
-  function (Scaillet (2004)) with bias of \eqn{O(h)}, and
-  \code{"gaussian1"} and \code{"gaussian2"} are truncated Gaussian
-  kernel functions with biases of \eqn{O(h)} and \eqn{O(h^2)},
-  respectively. The kernel functions \code{"fb"}, \code{"fbl"} and
-  \code{"fbu"} are floating boundary polynomial biweight kernels with
-  biases of \eqn{O(h^2)} (Scott (1992), Page 146). This function is
-  written purely in R, so to see the exact form for each of these kernel
-  functions, simply enter the name of this function in R (i.e., enter
-  \code{npuniden.boundary} after loading this package) and scroll up for
-  their definitions.
+  \eqn{O(h)}, \code{"rigaussian"} is the reciprocal inverse Gaussian
+  kernel function (Scaillet (2004), Igarashi & Kakizawa (2014)) with
+  bias of \eqn{O(h)}, and \code{"gaussian1"} and \code{"gaussian2"} are
+  truncated Gaussian kernel functions with biases of \eqn{O(h)} and
+  \eqn{O(h^2)}, respectively. The kernel functions \code{"fb"},
+  \code{"fbl"} and \code{"fbu"} are floating boundary polynomial
+  biweight kernels with biases of \eqn{O(h^2)} (Scott (1992), Page
+  146). This function is written purely in R, so to see the exact form
+  for each of these kernel functions, simply enter the name of this
+  function in R (i.e., enter \code{npuniden.boundary} after loading this
+  package) and scroll up for their definitions.
 
   The kernel functions \code{"gamma"}, \code{"rigaussian"}, and
   \code{"fbl"} have support \eqn{[a,\infty]}. The kernel function
@@ -155,6 +155,10 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   Diggle, P. (1985). \dQuote{A kernel method for smoothing point process
   data,} Journal of the Royal Statistical Society. Series C (Applied
   Statistics), 34(2):138-147.
+
+  Igarashi, G. and Y. Kakizawa (2014). \dQuote{Re-formulation of inverse
+  Gaussian, reciprocal inverse Gaussian, and Birnbaum-Saunders kernel
+  estimators,} Statistics & Probability Letters, 84:235-246.
 
   Igarashi, G. and Y. Kakizawa (2015). \dQuote{Bias corrections for some
   asymmetric kernel estimators,} Journal of Statistical Planning and
