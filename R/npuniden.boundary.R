@@ -7,10 +7,12 @@ npuniden.boundary <- function(X=NULL,
                                   "fb","fbl","fbu",
                                   "rigaussian","gamma"),
                               cv=c("grid-hybrid","numeric"),
+                              bwmethod=c("cv.ml","cv.ls"),
                               grid=NULL,
                               nmulti=5) {
     kertype <- match.arg(kertype)
     cv <- match.arg(cv)
+    bwmethod <- match.arg(bwmethod)
     if(!is.null(grid) && any(grid<=0)) stop(" the grid vector must contain positive values")
     if(is.null(X)) stop("you must pass a vector X")
     if(kertype=="gamma" || kertype=="rigaussian") b <- Inf
@@ -36,8 +38,9 @@ npuniden.boundary <- function(X=NULL,
         }
     } else if(kertype=="gaussian2") {
         ## Gaussian reweighted second-order boundary kernel function
-        ## (bias of O(h^2)). Instability for extremely large
-        ## bandwidths relative to scale of data
+        ## (bias of O(h^2)). Instability surfaces for extremely large
+        ## bandwidths relative to range of the data, so we shrink to
+        ## the uniform when h exceeds 10,000 times the range (b-a)
         kernel <- function(x,X,h,a=0,b=1) {
             z <- (x-X)/h
             z.a <- (a-x)/h
@@ -51,7 +54,7 @@ npuniden.boundary <- function(X=NULL,
             if((b-a)/h > 1e-04) {
                 (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
             } else {
-                rep(1,length(X))
+                rep(1/(b-a),length(X))
             }
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
@@ -139,7 +142,7 @@ npuniden.boundary <- function(X=NULL,
             k
         }
         kernel.int <- function(x,X,h,a=0,b=1) {
-            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
+            (integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))[order(X)])[length(X)]
         }
     } else if(kertype=="fb") {
         ## Floating boundary kernel (Scott (1992), Page 46), left and
@@ -212,50 +215,19 @@ npuniden.boundary <- function(X=NULL,
     Fhat <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel.int(X[i],X,h,a,b))})
     }
-    ## Likelihood cross-validation function
-    cv.ml.function <- function(h,X,a=0,b=1) {
-        f <- fhat.loo(X,h,a,b)
-        return(sum(log(ifelse(f > 0 & is.finite(f), f, .Machine$double.xmin))))
-    }
-    ## For search, if kertype=="gaussian2" use "gaussian1"
-    ## ("gaussian2" can produce negative density estimates which
-    ## appears to adversely affect likelihood cross-validation)
-    if(kertype=="gaussian2") {
-        ## Gaussian reweighted boundary kernel function (bias of O(h))
-        kernel <- function(x,X,h,a=0,b=1) {
-            dnorm((x-X)/h)/(h*(pnorm((b-x)/h)-pnorm((a-x)/h)))
+    if(bwmethod=="cv.ml") {
+        ## Likelihood cross-validation function (maximizing)
+        fnscale <- list(fnscale = -1)
+        cv.function <- function(h,X,a=0,b=1) {
+            f.loo <- fhat.loo(X,h,a,b)
+            return(sum(log(ifelse(f.loo > 0 & is.finite(f.loo), f.loo, .Machine$double.xmin))))
         }
-    }
-    ## Numeric optimization bandwidth search with multistarting
-    if(is.null(h) && cv == "numeric") {
-        h.vec <- numeric(nmulti)
-        cv.vec <- numeric(nmulti)
-        rob.spread <- c(sd(X),IQR(X)/1.349)
-        rob.spread <- min(rob.spread[rob.spread>0])
-        h.init <- runif(nmulti,0.5,1.5)*rob.spread*length(X)**(-0.2)
-        ## We are maximizing, so set the pre-optimization maximum for
-        ## the objective function to -Inf
-        cv.opt <- -Inf
-        ## Run the optimizer nmulti times, each time starting from
-        ## different random initial values
-        for(i in 1:nmulti) {
-            foo <- optim(h.init[i],
-                         cv.ml.function,
-                         method="L-BFGS-B",
-                         lower=sqrt(.Machine$double.eps),
-                         upper=ifelse(kertype=="beta2",(b-a)/4,Inf),
-                         control = list(fnscale = -1),
-                         X=X,
-                         a=a,
-                         b=b)
-            ## If we improve upon the previous maximum, save lambda
-            ## and reset the maximum (cv.opt)
-            h.vec[i] <- foo$par
-            cv.vec[i] <- foo$value
-            if(foo$value > cv.opt) {
-                cv.opt <- foo$value
-                h.opt <- foo$par
-            }
+    } else {
+        ## Least-squares cross-validation function (minimizing)
+        fnscale <- list(fnscale = 1) 
+        cv.function <- function(h,X,a=0,b=1) {
+            cv.ls <- (integrate.trapezoidal(X,fhat(X,h,a,b)**2)[order(X)])[length(X)]-2*mean(fhat.loo(X,h,a,b))
+            ifelse(is.finite(cv.ls),cv.ls,.Machine$double.xmax)
         }
     }
     ## Grid search and then numeric optimization search (no
@@ -267,27 +239,27 @@ npuniden.boundary <- function(X=NULL,
             rob.spread <- c(sd(X),IQR(X)/1.349)
             rob.spread <- min(rob.spread[rob.spread>0])
             constant <- rob.spread*length(X)**(-0.2)
-            h.vec <- c(seq(0.25,1.75,length=10),2**(1:25))*constant
-            cv.vec <- sapply(1:length(h.vec),function(i){cv.ml.function(h.vec[i],X,a,b)})
-            foo <- optim(h.vec[which.max(cv.vec)],
-                         cv.ml.function,
+            h.vec <- c(seq(0.25,1.75,length=10),2^(1:25))*constant
+            cv.vec <- sapply(1:length(h.vec),function(i){cv.function(h.vec[i],X,a,b)})
+            foo <- optim(h.vec[ifelse(bwmethod=="cv.ml",which.max(cv.vec),which.min(cv.vec))],
+                         cv.function,
                          method="L-BFGS-B",
                          lower=sqrt(.Machine$double.eps),
                          upper=ifelse(kertype=="beta2",(b-a)/4,Inf),
-                         control = list(fnscale = -1),
+                         control = fnscale,
                          X=X,
                          a=a,
                          b=b)
             h.opt <- foo$par
             cv.opt <- foo$value
         } else {
-            cv.vec <- sapply(1:length(grid),function(i){cv.ml.function(grid[i],X,a,b)})
-            foo <- optim(grid[which.max(cv.vec)],
-                         cv.ml.function,
+            cv.vec <- sapply(1:length(grid),function(i){cv.function(grid[i],X,a,b)})
+            foo <- optim(grid[ifelse(bwmethod=="cv.ml",which.max(cv.vec),which.min(cv.vec))],
+                         cv.function,
                          method="L-BFGS-B",
                          lower=sqrt(.Machine$double.eps),
                          upper=ifelse(kertype=="beta2",(b-a)/4,Inf),
-                         control = list(fnscale = -1),
+                         control = fnscale,
                          X=X,
                          a=a,
                          b=b)
