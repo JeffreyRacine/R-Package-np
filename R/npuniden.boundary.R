@@ -227,7 +227,7 @@ npuniden.boundary <- function(X=NULL,
         fnscale <- list(fnscale = 1) 
         cv.function <- function(h,X,a=0,b=1) {
             cv.ls <- (integrate.trapezoidal(X,fhat(X,h,a,b)**2)[order(X)])[length(X)]-2*mean(fhat.loo(X,h,a,b))
-            ifelse(is.finite(cv.ls),cv.ls,.Machine$double.xmax)
+            ifelse(is.finite(cv.ls),cv.ls,sqrt(.Machine$double.xmax))
         }
     }
     ## Grid search and then numeric optimization search (no
