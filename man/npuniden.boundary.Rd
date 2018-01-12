@@ -86,10 +86,14 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   \eqn{O(h^2)}, respectively. The kernel functions \code{"fb"},
   \code{"fbl"} and \code{"fbu"} are floating boundary polynomial
   biweight kernels with biases of \eqn{O(h^2)} (Scott (1992), Page
-  146). This function is written purely in R, so to see the exact form
-  for each of these kernel functions, simply enter the name of this
-  function in R (i.e., enter \code{npuniden.boundary} after loading this
-  package) and scroll up for their definitions.
+  146). Without exception, these kernel functions are asymmetric in
+  general with shape that changes depending on where the density is
+  being estimated (i.e., how close the estimation point \eqn{x} in
+  \eqn{\hat f(x)} is to a boundary). This function is written purely in
+  R, so to see the exact form for each of these kernel functions, simply
+  enter the name of this function in R (i.e., enter
+  \code{npuniden.boundary} after loading this package) and scroll up for
+  their definitions.
 
   The kernel functions \code{"gamma"}, \code{"rigaussian"}, and
   \code{"fbl"} have support \eqn{[a,\infty]}. The kernel function
