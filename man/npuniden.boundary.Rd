@@ -29,6 +29,7 @@ npuniden.boundary(X = NULL,
                             "fb","fbl","fbu",
                             "rigaussian","gamma"),
                   cv = c("grid-hybrid","numeric"),
+                  bwmethod=c("cv.ls","cv.ml"),
                   grid = NULL,
                   nmulti = 5)
 }
@@ -51,6 +52,10 @@ an optional kernel specification (defaults to "gaussian1")
   \item{cv}{
 an optional argument for search (default is likely more reliable in the
 presence of local maxima)
+}
+  \item{bwmethod}{
+whether to conduct bandwidth search via least squares cross-validation
+(\code{"cv.ls"}) or likelihood cross-validation (\code{"cv.ml"})
 }
   \item{grid}{
 an optional grid used for the initial grid search when \code{cv="grid-hybrid"}

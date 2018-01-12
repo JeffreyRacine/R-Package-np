@@ -7,7 +7,7 @@ npuniden.boundary <- function(X=NULL,
                                   "fb","fbl","fbu",
                                   "rigaussian","gamma"),
                               cv=c("grid-hybrid","numeric"),
-                              bwmethod=c("cv.ml","cv.ls"),
+                              bwmethod=c("cv.ls","cv.ml"),
                               grid=NULL,
                               nmulti=5) {
     kertype <- match.arg(kertype)
@@ -267,26 +267,6 @@ npuniden.boundary <- function(X=NULL,
             cv.opt <- foo$value
         }
     }
-    ## Search completed, if kertype=="gaussian2" revert to this kernel
-    if(kertype=="gaussian2") {
-        kernel <- function(x,X,h,a=0,b=1) {
-            z <- (x-X)/h
-            z.a <- (a-x)/h
-            z.b <- (b-x)/h
-            pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
-            mu.1 <- (dnorm(z.a)-dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            aa <- mu.3/(mu.3-mu.1*mu.2)
-            bb <- -mu.1/(mu.3-mu.1*mu.2)
-            if((b-a)/h > 1e-04) {
-                (aa+bb*z**2)*dnorm(z)/(h*pnorm.zb.m.pnorm.za)
-            } else {
-                rep(1,length(X))
-            }
-        }
-    }
-    
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
         f <- fhat(X,h,a,b)
