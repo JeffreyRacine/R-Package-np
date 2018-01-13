@@ -1773,7 +1773,7 @@ cbind(t.uniquecombs[1],t.npreg[1])
   \texttt{npuniden.boundary()} and \texttt{npuniden.reflect()} plus
   additional examples
 
-\item Added least squares cross-validation
+\item Added least squares cross-validation to
   \texttt{npuniden.boundary()} (default for boundary kernel functions)
   
 \end{itemize}

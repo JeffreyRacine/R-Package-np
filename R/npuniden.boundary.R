@@ -1,4 +1,5 @@
 npuniden.boundary <- function(X=NULL,
+                              Y=NULL,
                               h=NULL,
                               a=0,
                               b=1,
@@ -21,6 +22,9 @@ npuniden.boundary <- function(X=NULL,
     if(a>=b) stop("a must be less than b")
     if(any(X<a)) stop("X must be >= a")
     if(any(X>b)) stop("X must be <= b")
+    if(!is.null(Y) && any(Y<a)) stop("Y must be >= a")
+    if(!is.null(Y) && any(Y>b)) stop("Y must be <= b")
+    if(is.null(Y)) Y <- X
     if(!is.null(h) && h <= 0) stop("bandwidth h must be positive")
     if(nmulti < 1) stop("number of multistarts nmulti must be positive")
     if(kertype=="gaussian2" && (!is.finite(a) || !is.finite(b))) stop("finite bounds are required for kertype gaussian2")
@@ -206,14 +210,14 @@ npuniden.boundary <- function(X=NULL,
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
         sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
     }
-    fhat <- function(X,h,a=0,b=1) {
-        sapply(1:length(X),function(i){mean(kernel(X[i],X,h,a,b))})
+    fhat <- function(X,Y,h,a=0,b=1) {
+        sapply(1:length(Y),function(i){mean(kernel(Y[i],X,h,a,b))})
     }
     fhat.loo <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel(X[i],X[-i],h,a,b))})
     }
-    Fhat <- function(X,h,a=0,b=1) {
-        sapply(1:length(X),function(i){mean(kernel.int(X[i],X,h,a,b))})
+    Fhat <- function(X,Y,h,a=0,b=1) {
+        sapply(1:length(Y),function(i){mean(kernel.int(Y[i],X,h,a,b))})
     }
     if(bwmethod=="cv.ml") {
         ## Likelihood cross-validation function (maximizing)
@@ -226,7 +230,7 @@ npuniden.boundary <- function(X=NULL,
         ## Least-squares cross-validation function (minimizing)
         fnscale <- list(fnscale = 1) 
         cv.function <- function(h,X,a=0,b=1) {
-            cv.ls <- (integrate.trapezoidal(X,fhat(X,h,a,b)**2)[order(X)])[length(X)]-2*mean(fhat.loo(X,h,a,b))
+            cv.ls <- (integrate.trapezoidal(X,fhat(X,X,h,a,b)**2)[order(X)])[length(X)]-2*mean(fhat.loo(X,h,a,b))
             ifelse(is.finite(cv.ls),cv.ls,sqrt(sqrt(.Machine$double.xmax)))
         }
     }
@@ -270,20 +274,20 @@ npuniden.boundary <- function(X=NULL,
     }
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
-        f <- fhat(X,h,a,b)
-        F <- Fhat(X,h,a,b)
+        f <- fhat(X,Y,h,a,b)
+        F <- Fhat(X,Y,h,a,b)
         return(list(f=f,
                     F=F,
-                    sd.f=sqrt(abs(f*int.kernel.squared(X,h,a,b)/(h*length(f)))),
+                    sd.f=sqrt(abs(f*int.kernel.squared(Y,h,a,b)/(h*length(f)))),
                     sd.F=sqrt(abs(F*(1-F)/length(F))),
                     h=h))
     } else {
         ## Search bandwidth
-        f <- fhat(X,h.opt,a,b)
-        F <- Fhat(X,h.opt,a,b)
+        f <- fhat(X,Y,h.opt,a,b)
+        F <- Fhat(X,Y,h.opt,a,b)
         return(list(f=f,
                     F=F,
-                    sd.f=sqrt(abs(f*int.kernel.squared(X,h.opt,a,b)/(h.opt*length(f)))),
+                    sd.f=sqrt(abs(f*int.kernel.squared(Y,h.opt,a,b)/(h.opt*length(f)))),
                     sd.F=sqrt(abs(F*(1-F)/length(F))),
                     h=h.opt,
                     nmulti=nmulti,

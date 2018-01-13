@@ -21,6 +21,7 @@
 
 \usage{
 npuniden.boundary(X = NULL,
+                  Y = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
@@ -35,7 +36,10 @@ npuniden.boundary(X = NULL,
 }
 \arguments{
   \item{X}{
-a numeric vector of data
+a required numeric vector of training data lying in \eqn{[a,b]}
+}
+  \item{Y}{
+an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 }
   \item{h}{
 an optional bandwidth (>0)
