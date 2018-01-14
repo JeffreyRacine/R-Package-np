@@ -172,8 +172,8 @@ npuniden.boundary <- function(X=NULL,
             if(min(F)<0) F <- F+min(F)
             if(max(F)>1) F <- F/max(F)
         }
+        F
     }
-
     fhat.loo <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel(X[i],X[-i],h,a,b))})
     }

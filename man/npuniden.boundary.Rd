@@ -136,11 +136,10 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   function is obtained via numerical integration of the estimated
   density function and, if necessary, is adjusted to ensure that it lies
   in \eqn{[0,1]} when evaluated on the full range of the data
-  \eqn{[a,b]}, which is why there might occasionally be a discrepancy
-  between the estimated density and estimated distribution
-  function. This cannot arise when using the kernel functions
-  \code{"beta1"}, \code{"gamma"}, \code{"rigaussian"} or
-  \code{"gaussian1"}.
+  \eqn{[a,b]}, which is why there could be a discrepancy between the
+  estimated density and estimated distribution function. This cannot
+  arise when using the kernel functions \code{"beta1"}, \code{"gamma"},
+  \code{"rigaussian"} or \code{"gaussian1"}.
 
   Finally, note that this function is pretty bare-bones relative to
   other functions in this package. For one, at this time there is no
