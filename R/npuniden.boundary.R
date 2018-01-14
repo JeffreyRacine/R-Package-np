@@ -3,14 +3,15 @@ npuniden.boundary <- function(X=NULL,
                               h=NULL,
                               a=0,
                               b=1,
+                              bwmethod=c("cv.ls","cv.ml"),
+                              cv=c("grid-hybrid","numeric"),
+                              grid=NULL,
                               kertype=c("gaussian1","gaussian2",
                                   "beta1","beta2",
                                   "fb","fbl","fbu",
                                   "rigaussian","gamma"),
-                              cv=c("grid-hybrid","numeric"),
-                              bwmethod=c("cv.ls","cv.ml"),
-                              grid=NULL,
-                              nmulti=5) {
+                              nmulti=5,
+                              proper=FALSE) {
     kertype <- match.arg(kertype)
     cv <- match.arg(cv)
     bwmethod <- match.arg(bwmethod)
@@ -27,6 +28,7 @@ npuniden.boundary <- function(X=NULL,
     if(is.null(Y)) Y <- X
     if(!is.null(h) && h <= 0) stop("bandwidth h must be positive")
     if(nmulti < 1) stop("number of multistarts nmulti must be positive")
+    if(!is.logical(proper)) stop("proper must be either TRUE or FALSE")
     if(kertype=="gaussian2" && (!is.finite(a) || !is.finite(b))) stop("finite bounds are required for kertype gaussian2")
     h.opt <- NULL
     if(kertype=="gaussian1") {
@@ -156,21 +158,34 @@ npuniden.boundary <- function(X=NULL,
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
         sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
     }
-    fhat <- function(X,Y,h,a=0,b=1) {
-        sapply(1:length(Y),function(i){mean(kernel(Y[i],X,h,a,b))})
+    fhat <- function(X,Y,h,a=0,b=1,proper=FALSE) {
+        f <- sapply(1:length(Y),function(i){mean(kernel(Y[i],X,h,a,b))})
+        if(proper) {
+            X.seq <- seq(a,b,,1000)
+            f.seq <- sapply(1:length(X.seq),function(i){mean(kernel(X.seq[i],X,h,a,b))})
+            if(any(f.seq<0)) {
+                f <- f - min(f.seq)
+                f.seq <- f.seq - min(f.seq)
+            }
+            int.f.seq <- integrate.trapezoidal(X.seq,f.seq)[length(X.seq)]
+            f <- f/int.f.seq
+        }
+        return(f)
     }
-    Fhat <- function(Y,f,a,b) {
-        ## Numerical integration of f, check for abberant values, if
+    Fhat <- function(Y,f,a,b,proper=FALSE) {
+        ## Numerical integration of f, check for aberrant values, if
         ## on range of data ensure F\in[0,1], if not make sure value
         ## is proper (negative boundary kernel functions can cause
         ## unwanted artifacts)
         f[is.na(f)] <- 0
         F <- integrate.trapezoidal(Y,f)
-        if(min(Y)==a && max(Y)==b) {
-            F <- (F-min(F))/(max(F)-min(F))
-        } else {
-            if(min(F)<0) F <- F+min(F)
-            if(max(F)>1) F <- F/max(F)
+        if(proper) {
+            if(min(Y)==a && max(Y)==b) {
+                F <- (F-min(F))/(max(F)-min(F))
+            } else {
+                if(min(F)<0) F <- F+min(F)
+                if(max(F)>1) F <- F/max(F)
+            }
         }
         F
     }
@@ -232,9 +247,9 @@ npuniden.boundary <- function(X=NULL,
     }
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
-        f <- fhat(X,Y,h,a,b)
+        f <- fhat(X,Y,h,a,b,proper=proper)
         ## Numerical integration via the trapezoidal rule
-        F <- Fhat(Y,f,a,b)
+        F <- Fhat(Y,f,a,b,proper=proper)
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(Y,h,a,b)/(h*length(f)))),
@@ -242,9 +257,9 @@ npuniden.boundary <- function(X=NULL,
                     h=h))
     } else {
         ## Search bandwidth
-        f <- fhat(X,Y,h.opt,a,b)
+        f <- fhat(X,Y,h.opt,a,b,proper=proper)
         ## Numerical integration via the trapezoidal rule
-        F <- Fhat(Y,f,a,b)
+        F <- Fhat(Y,f,a,b,proper=proper)
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(Y,h.opt,a,b)/(h.opt*length(f)))),

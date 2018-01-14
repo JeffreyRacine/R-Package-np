@@ -25,14 +25,15 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
+                  bwmethod=c("cv.ls","cv.ml"),
+                  cv = c("grid-hybrid","numeric"),
+                  grid = NULL,
                   kertype=c("gaussian1","gaussian2",
                             "beta1","beta2",
                             "fb","fbl","fbu",
                             "rigaussian","gamma"),
-                  cv = c("grid-hybrid","numeric"),
-                  bwmethod=c("cv.ls","cv.ml"),
-                  grid = NULL,
-                  nmulti = 5)
+                  nmulti = 5,
+                  proper = FALSE)
 }
 \arguments{
   \item{X}{
@@ -66,6 +67,10 @@ an optional grid used for the initial grid search when \code{cv="grid-hybrid"}
 }
   \item{nmulti}{
 number of multi-starts used when \code{cv="numeric"} (defaults to 5)
+}
+  \item{proper} {
+an optional logical value indicating whether to enforce proper density
+and distribution function estimates over the range \eqn{[a,b]}
 }
 }
 \details{
@@ -134,12 +139,10 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   Note that since some kernel functions can assume negative values, this
   can lead to improper density estimates. The estimated distribution
   function is obtained via numerical integration of the estimated
-  density function and, if necessary, is adjusted to ensure that it lies
-  in \eqn{[0,1]} when evaluated on the full range of the data
-  \eqn{[a,b]}, which is why there could be a discrepancy between the
-  estimated density and estimated distribution function. This cannot
-  arise when using the kernel functions \code{"beta1"}, \code{"gamma"},
-  \code{"rigaussian"} or \code{"gaussian1"}.
+  density function and may itself not be proper even when evaluated on
+  the full range of the data \eqn{[a,b]}. Setting the option
+  \code{proper=TRUE} will render the density and distribution estimates
+  proper over the full range of the data.
 
   Finally, note that this function is pretty bare-bones relative to
   other functions in this package. For one, at this time there is no
@@ -217,7 +220,7 @@ model.b1 <- npuniden.boundary(X,kertype="beta1")
 model.b2 <- npuniden.boundary(X,kertype="beta2")
 model.fb <- npuniden.boundary(X,kertype="fb")
 model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
-ylim <- c(0,max(c(dgp,model.g1$f,model.g2$f)))
+ylim <- c(0,max(c(dgp,model.g1$f,model.g2$f,model.b1$f,model.b2$f,model.fb$f)))
 plot(X,dgp,ylab="Density",ylim=ylim,type="l")
 lines(X,model.g1$f,lty=2,col=2)
 lines(X,model.g2$f,lty=3,col=3)
