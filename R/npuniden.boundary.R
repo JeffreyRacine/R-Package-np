@@ -152,7 +152,7 @@ npuniden.boundary <- function(X=NULL,
         ## the square of the kernel function needed for the asymptotic
         ## standard error of the density estimate seq(a,b) will barf
         ## on -Inf or Inf, trap these cases and use extendrange
-        if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=100)
+        if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=1000)
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
@@ -161,7 +161,10 @@ npuniden.boundary <- function(X=NULL,
     fhat <- function(X,Y,h,a=0,b=1,proper=FALSE) {
         f <- sapply(1:length(Y),function(i){mean(kernel(Y[i],X,h,a,b))})
         if(proper) {
-            X.seq <- seq(a,b,,1000)
+            if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=1000)
+            if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
+            if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
+            if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
             f.seq <- sapply(1:length(X.seq),function(i){mean(kernel(X.seq[i],X,h,a,b))})
             if(any(f.seq<0)) {
                 f <- f - min(f.seq)
