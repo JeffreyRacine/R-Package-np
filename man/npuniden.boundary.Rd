@@ -76,7 +76,7 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   }
 
   \code{npuniden.boundary} implements a variety of methods for
-  estimating a univariate density functions defined over a continuous
+  estimating a univariate density function defined over a continuous
   random variable in the presence of bounds via the use of so-called
   boundary or edge kernel functions.
 
@@ -130,6 +130,17 @@ number of multi-starts used when \code{cv="numeric"} (defaults to 5)
   avoid being victimized by the particular boundary kernel
   chosen. Artifacts can unfortunately be introduced by the choice of the
   support interval for the boundary kernel.}
+
+  Note that since some kernel functions can assume negative values, this
+  can lead to improper density estimates. The estimated distribution
+  function is obtained via numerical integration of the estimated
+  density function and, if necessary, is adjusted to ensure that it lies
+  in \eqn{[0,1]} when evaluated on the full range of the data
+  \eqn{[a,b]}, which is why there might occasionally be a discrepancy
+  between the estimated density and estimated distribution
+  function. This cannot arise when using the kernel functions
+  \code{"beta1"}, \code{"gamma"}, \code{"rigaussian"} or
+  \code{"gaussian1"}.
 
   Finally, note that this function is pretty bare-bones relative to
   other functions in this package. For one, at this time there is no

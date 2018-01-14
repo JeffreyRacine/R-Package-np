@@ -9,9 +9,13 @@ integrate.trapezoidal <- function(x,y) {
   y <- y[order.x]
   x <- x[order.x]
   int.vec <- numeric(length(x))
+  ## Use a correction term at the boundary: -cx^2/12*(f'(b)-f'(a))
+  cx  <- x[2]-x[1]
+  ca <- (y[2]-y[1])/cx
+  cb <- (y[n]-y[n-1])/cx
   int.vec[1] <- 0
-  int.vec[2:n] <- cumsum((x[2:n] - x[2:n-1]) * (y[2:n] + y[2:n-1]) / 2)
-  return(int.vec[rank.x])
+  int.vec[2:n] <- cumsum((x[2:n]-x[2:n-1])*(y[2:n]+y[2:n-1])/2)
+  return(int.vec[rank.x]-cx^2/12*(cb-ca))
 }
 
 ## No Zero Denominator, used in C code for kernel estimation...

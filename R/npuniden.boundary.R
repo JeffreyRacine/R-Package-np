@@ -34,12 +34,6 @@ npuniden.boundary <- function(X=NULL,
         kernel <- function(x,X,h,a=0,b=1) {
             dnorm((x-X)/h)/(h*(pnorm((b-x)/h)-pnorm((a-x)/h)))
         }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            z.a <- (a-x)/h
-            z.b <- (b-x)/h            
-            z <- pmax(pmin((x-X)/h,(b-x)/h),(a-x)/h)
-            (pnorm(z)-pnorm(z.a))/(pnorm(z.b)-pnorm(z.a))
-        }
     } else if(kertype=="gaussian2") {
         ## Gaussian reweighted second-order boundary kernel function
         ## (bias of O(h^2)). Instability surfaces for extremely large
@@ -61,18 +55,6 @@ npuniden.boundary <- function(X=NULL,
                 rep(1/(b-a),length(X))
             }
         }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            z.a <- (a-x)/h
-            z.b <- (b-x)/h
-            z <- pmax(pmin((x-X)/h,(b-x)/h),(a-x)/h)
-            pnorm.zb.m.pnorm.za <- (pnorm(z.b)-pnorm(z.a))
-            mu.1 <- (dnorm(z.a)-dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            mu.2 <- 1+(z.a*dnorm(z.a)-z.b*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            mu.3 <- ((z.a**2+2)*dnorm(z.a)-(z.b**2+2)*dnorm(z.b))/(pnorm.zb.m.pnorm.za)
-            aa <- mu.3/(mu.3-mu.1*mu.2)
-            bb <- -mu.1/(mu.3-mu.1*mu.2)
-            ((pnorm(z)-pnorm(z.a))*(aa+bb)+(dnorm(z.a)*z.a-dnorm(z)*z)*bb)/(pnorm.zb.m.pnorm.za)
-        }
     } else if(kertype=="beta1") {
         ## Chen (1999), Beta 1 kernel function (bias of O(h), function
         ## of f' and f'', no division by h), need to rescale to
@@ -81,11 +63,6 @@ npuniden.boundary <- function(X=NULL,
             X <- (X-a)/(b-a)
             x <- (x-a)/(b-a)
             dbeta(X,x/h+1,(1-x)/h+1)/(b-a)
-        }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            X <- (X-a)/(b-a)
-            x <- (x-a)/(b-a)
-            1-pbeta(X,x/h+1,(1-x)/h+1)
         }
     } else if(kertype=="beta2") {
         ## Chen (1999), Beta 2 kernel function (bias of O(h), function
@@ -103,17 +80,6 @@ npuniden.boundary <- function(X=NULL,
                 dbeta(X,x/h,rho(1-x,h))/(b-a)
             }
         }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            X <- (X-a)/(b-a)
-            x <- (x-a)/(b-a)
-            if(x < 2*h && h < (b-a)) {
-                1-pbeta(X,rho(x,h),(1-x)/h)
-            } else if((2*h <= x && x <= 1-2*h) || h >= (b-a)) {
-                1-pbeta(X,x/h,(1-x)/h)
-            } else if(x > 1-2*h && h < (b-a)) {
-                1-pbeta(X,x/h,rho(1-x,h))
-            }
-        }
     } else if(kertype=="gamma") {
         ## Gamma kernel function for x in [a,Inf]
         kernel <- function(x,X,h,a=0,b=1) {
@@ -123,14 +89,6 @@ npuniden.boundary <- function(X=NULL,
             X <- X-a
             x <- x-a
             dgamma(X,x/h+1,1/h)
-        }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            ## No division by h, rescale to lie in [0,Inf], b is a
-            ## dummy, not used but needed to avoid warning about
-            ## function kernel having different named arguments
-            X <- X-a
-            x <- x-a
-            1-pgamma(X,x/h+1,1/h)
         }
     } else if(kertype=="rigaussian") {
         ## Reverse inverse Gaussian for x in [a,Inf]
@@ -144,9 +102,6 @@ npuniden.boundary <- function(X=NULL,
             k <- exp(-x.res/(2*h)*(X/x.res+x.res/X-2))/sqrt(2*pi*h*X)
             k[is.nan(k)] <- 0
             k
-        }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            (integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))[order(X)])[length(X)]
         }
     } else if(kertype=="fb") {
         ## Floating boundary kernel (Scott (1992), Page 46), left and
@@ -167,9 +122,6 @@ npuniden.boundary <- function(X=NULL,
                 ifelse(c-2 <= t & t <= c,.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
             }
         }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
-        }
     } else if(kertype=="fbl") {
         ## Floating boundary kernel (Scott (1992), Page 46), left bound
         kernel <- function(x,X,h,a=0,b=1) {
@@ -181,9 +133,6 @@ npuniden.boundary <- function(X=NULL,
                 ifelse(abs(t)<1,(15/16)*(1-t**2)**2/h,0)
             }
         }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
-        }
     } else if(kertype=="fbu") {
         kernel <- function(x,X,h,a=0,b=1) {
             ## Floating boundary kernel (Scott (1992), Page 46), right bound
@@ -194,9 +143,6 @@ npuniden.boundary <- function(X=NULL,
                 c <- (b-x)/h
                 ifelse(c-2 <= t & t <= c,.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
             }
-        }
-        kernel.int <- function(x,X,h,a=0,b=1) {
-            integrate.trapezoidal(X,kernel(x,X,h,a=a,b=b))
         }
     }
     int.kernel.squared <- function(X,h,a=a,b=b) {
@@ -213,11 +159,23 @@ npuniden.boundary <- function(X=NULL,
     fhat <- function(X,Y,h,a=0,b=1) {
         sapply(1:length(Y),function(i){mean(kernel(Y[i],X,h,a,b))})
     }
+    Fhat <- function(Y,f,a,b) {
+        ## Numerical integration of f, check for abberant values, if
+        ## on range of data ensure F\in[0,1], if not make sure value
+        ## is proper (negative boundary kernel functions can cause
+        ## unwanted artifacts)
+        f[is.na(f)] <- 0
+        F <- integrate.trapezoidal(Y,f)
+        if(min(Y)==a && max(Y)==b) {
+            F <- (F-min(F))/(max(F)-min(F))
+        } else {
+            if(min(F)<0) F <- F+min(F)
+            if(max(F)>1) F <- F/max(F)
+        }
+    }
+
     fhat.loo <- function(X,h,a=0,b=1) {
         sapply(1:length(X),function(i){mean(kernel(X[i],X[-i],h,a,b))})
-    }
-    Fhat <- function(X,Y,h,a=0,b=1) {
-        sapply(1:length(Y),function(i){mean(kernel.int(Y[i],X,h,a,b))})
     }
     if(bwmethod=="cv.ml") {
         ## Likelihood cross-validation function (maximizing)
@@ -275,7 +233,8 @@ npuniden.boundary <- function(X=NULL,
     if(is.null(h.opt)) {
         ## Manual inputted bandwidth
         f <- fhat(X,Y,h,a,b)
-        F <- Fhat(X,Y,h,a,b)
+        ## Numerical integration via the trapezoidal rule
+        F <- Fhat(Y,f,a,b)
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(Y,h,a,b)/(h*length(f)))),
@@ -284,7 +243,8 @@ npuniden.boundary <- function(X=NULL,
     } else {
         ## Search bandwidth
         f <- fhat(X,Y,h.opt,a,b)
-        F <- Fhat(X,Y,h.opt,a,b)
+        ## Numerical integration via the trapezoidal rule
+        F <- Fhat(Y,f,a,b)
         return(list(f=f,
                     F=F,
                     sd.f=sqrt(abs(f*int.kernel.squared(Y,h.opt,a,b)/(h.opt*length(f)))),
