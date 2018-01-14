@@ -25,10 +25,10 @@ npuniden.boundary(X = NULL,
                   h = NULL,
                   a = 0,
                   b = 1,
-                  bwmethod=c("cv.ls","cv.ml"),
+                  bwmethod = c("cv.ls","cv.ml"),
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
-                  kertype=c("gaussian1","gaussian2",
+                  kertype = c("gaussian1","gaussian2",
                             "beta1","beta2",
                             "fb","fbl","fbu",
                             "rigaussian","gamma"),
@@ -51,24 +51,24 @@ an optional lower bound (defaults to 0)
   \item{b}{
 an optional upper bound (defaults to 1)
 }
-  \item{kertype}{
-an optional kernel specification (defaults to "gaussian1")
+  \item{bwmethod}{
+whether to conduct bandwidth search via least squares cross-validation
+(\code{"cv.ls"}) or likelihood cross-validation (\code{"cv.ml"})
 }
   \item{cv}{
 an optional argument for search (default is likely more reliable in the
 presence of local maxima)
 }
-  \item{bwmethod}{
-whether to conduct bandwidth search via least squares cross-validation
-(\code{"cv.ls"}) or likelihood cross-validation (\code{"cv.ml"})
-}
   \item{grid}{
 an optional grid used for the initial grid search when \code{cv="grid-hybrid"}
+}
+  \item{kertype}{
+an optional kernel specification (defaults to "gaussian1")
 }
   \item{nmulti}{
 number of multi-starts used when \code{cv="numeric"} (defaults to 5)
 }
-  \item{proper} {
+  \item{proper}{
 an optional logical value indicating whether to enforce proper density
 and distribution function estimates over the range \eqn{[a,b]}
 }
@@ -142,7 +142,8 @@ and distribution function estimates over the range \eqn{[a,b]}
   density function and may itself not be proper even when evaluated on
   the full range of the data \eqn{[a,b]}. Setting the option
   \code{proper=TRUE} will render the density and distribution estimates
-  proper over the full range of the data.
+  proper over the full range of the data, though this may not in
+  general be a mean square error optimal strategy.
 
   Finally, note that this function is pretty bare-bones relative to
   other functions in this package. For one, at this time there is no
