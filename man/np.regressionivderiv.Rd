@@ -5,15 +5,15 @@
 Nonparametric Instrumental Derivatives
 }
 \description{
-\code{npregivderiv} uses the approach of Florens and Racine (2012) to
-compute the partial derivative of a nonparametric estimation of an
-instrumental regression function \eqn{\varphi}{phi} defined by
-conditional moment restrictions stemming from a structural econometric
-model: \eqn{E [Y - \varphi (Z,X) | W ] = 0}{E [Y - phi (Z,X) | W ] = 0},
-and involving endogenous variables \eqn{Y} and \eqn{Z} and exogenous
-variables \eqn{X} and instruments \eqn{W}. The derivative function
-\eqn{\varphi'}{phi'} is the solution of an ill-posed inverse problem,
-and is computed using Landweber-Fridman regularization.
+\code{npregivderiv} uses the approach of Florens, Racine and Centorrino
+(forthcoming) to compute the partial derivative of a nonparametric
+estimation of an instrumental regression function \eqn{\varphi}{phi}
+defined by conditional moment restrictions stemming from a structural
+econometric model: \eqn{E [Y - \varphi (Z,X) | W ] = 0}{E [Y - phi (Z,X)
+| W ] = 0}, and involving endogenous variables \eqn{Y} and \eqn{Z} and
+exogenous variables \eqn{X} and instruments \eqn{W}. The derivative
+function \eqn{\varphi'}{phi'} is the solution of an ill-posed inverse
+problem, and is computed using Landweber-Fridman regularization.
 }
 \usage{
 npregivderiv(y,
@@ -174,8 +174,9 @@ npregivderiv(y,
   non-parametric estimation by solving inverse problems: the example of
   transformation models,} Econometrics Journal, 13, S1-S27.
 
-  Florens, J.P. and J.S. Racine (2012), \dQuote{Nonparametric
-  instrumental derivatives,} Working Paper.
+  Florens, J.P. and J.S. Racine and S. Centorrino (forthcoming),
+  \dQuote{Nonparametric instrumental derivatives,} Journal of
+  Nonparametric Statistics.
 
   Fridman, V. M. (1956), \dQuote{A method of successive approximations
   for Fredholm integral equations of the first kind,} Uspeskhi,

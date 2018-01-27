@@ -1,3 +1,10 @@
+* Added option for renormalizing improper bounded density
+ estimates than can arise from the use of asymmetric negative edge
+ kernel functions (proper=TRUE)
+
+* Fixed issues with CDF estimation in the presence of large bandwidths for
+  bounded density estimates
+
 Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]
 
 * Added more edge kernel functions for npuniden.boundary(), some

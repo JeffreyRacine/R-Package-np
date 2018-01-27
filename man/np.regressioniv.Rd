@@ -384,8 +384,9 @@ npregiv(y,
   non-parametric estimation by solving inverse problems: the example of
   transformation models,} Econometrics Journal, 13, S1-S27.
 
-  Florens, J.P. and J.S. Racine (2012), \dQuote{Nonparametric
-  instrumental derivatives,} Working Paper.
+  Florens, J.P. and J.S. Racine and S. Centorrino (forthcoming),
+  \dQuote{Nonparametric instrumental derivatives,} Journal of
+  Nonparametric Statistics.
 
   Fridman, V. M. (1956), \dQuote{A method of successive approximations
   for Fredholm integral equations of the first kind,} Uspeskhi,
