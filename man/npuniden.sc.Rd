@@ -70,8 +70,10 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 \examples{
 \dontrun{
 n <- 250
-
 set.seed(42)
+
+## Example 1: Beta(5,1), DGP is monotone increasing, impose valid
+## restriction
 
 X <- sort(rbeta(n,5,1))
 Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
@@ -85,12 +87,16 @@ plot(Y,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
 lines(Y,foo$f,col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Derivative")
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
 lines(Y,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+
+## Example 2: Beta(1,5), DGP is monotone decreasing, impose valid
+## restriction
 
 X <- sort(rbeta(n,1,5))
 Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
@@ -104,13 +110,17 @@ plot(Y,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
 lines(Y,foo$f,col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Derivative")
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
 lines(Y,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
  
+## Example 3: N(0,1), DGP is log-concave, impose invalid concavity
+## restriction
+
 X <- sort(rnorm(n))
 Y <- seq(min(X),max(X),,1000)
 h <- bw.nrd0(X)
@@ -124,11 +134,14 @@ lines(Y,foo$f,col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Derivative")
+
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
 lines(Y,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+
+## Example 3: Beta(3/4,3/4), DGP is convex, impose valid restriction
 
 X <- sort(rbeta(n,3/4,3/4))
 Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
@@ -144,7 +157,7 @@ rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Derivative")
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
 lines(Y,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)

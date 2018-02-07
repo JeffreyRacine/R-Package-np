@@ -83,6 +83,12 @@ npuniden.sc <- function(X=NULL,
     deriv <- 1
     if(constraint=="concave" || constraint=="convex") deriv <- 2
 
+    ## Second derivative uses z.a and z.b times other arguments, which
+    ## must be finite
+    
+    if(deriv==2 && a==-Inf) a <- extendrange(X,f=100)[1]
+    if(deriv==2 && b==Inf) b <- extendrange(X,f=100)[2]
+
     A.deriv <- W.kernel(Y,X,h,a=a,b=b,deriv=deriv)
     f.deriv <- colMeans(A.deriv)
     
