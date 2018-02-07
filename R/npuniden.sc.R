@@ -3,11 +3,13 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
-                        constraint=c("mon.incr","mon.decr","concave","convex")) {
+                        constraint=c("mono.incr","mono.decr","concave","convex")) {
 
     ## Gaussian kernel function, derivatives up to order two
 
     kernel <- function(x,X,h,a=0,b=1,deriv=0) {
+
+        if(deriv < 0 || deriv > 2) stop("deriv must be one of 0, 1, or 2")
         
         ## Note: the different sign/position of x in z, z.a, and z.b
         ## changes the sign of the derivative from 1/h to -1/h
@@ -85,7 +87,7 @@ npuniden.sc <- function(X=NULL,
     f.deriv <- colMeans(A.deriv)
     
     sign.deriv <- 1
-    if(constraint=="mon.decr" || constraint=="concave") sign.deriv <- -1
+    if(constraint=="mono.decr" || constraint=="concave") sign.deriv <- -1
 
     n <- length(Y)
     n.train <- length(X)

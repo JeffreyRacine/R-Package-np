@@ -17,9 +17,10 @@
 \usage{
 npuniden.sc(X = NULL,
             Y = NULL,
-            h = NULL, a = 0,
+            h = NULL,
+            a = 0,
             b = 1,
-            constraint = c("mon.incr", "mon.decr", "concave", "convex"))
+            constraint = c("mono.incr", "mono.decr", "concave", "convex"))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -41,8 +42,8 @@ an optional upper bound (defaults to 1)
   
   \item{constraint}{
 a character string indicating whether the estimate is to be constrained
-to be monotonically increasing (\code{constraint="mon.incr"}),
-decreasing (\code{constraint="mon.incr"}), convex
+to be monotonically increasing (\code{constraint="mono.incr"}),
+decreasing (\code{constraint="mono.incr"}), convex
 (\code{constraint="convex"}), or concave (\code{constraint="concave"})
 }
 }
@@ -76,7 +77,7 @@ X <- sort(rbeta(n,5,1))
 Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mon.incr"))
+foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mono.incr"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
@@ -93,7 +94,7 @@ X <- sort(rbeta(n,1,5))
 Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mon.decr"))
+foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mono.decr"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
