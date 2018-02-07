@@ -5,9 +5,11 @@ importFrom("graphics", "lines", "par", "persp", "plot", "points")
 importFrom("utils", "combn", "flush.console")
 importFrom("methods", "is")
 importFrom("quantreg", "rq")
+importFrom("quadprog", "solve.QP")
 export(b.star
        ,npuniden.boundary
        ,npuniden.reflect
+       ,npuniden.sc
        ,npudensbw
        ,npudistbw
        ,npudens

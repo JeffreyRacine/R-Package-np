@@ -1,0 +1,145 @@
+\name{npuniden.sc}
+\alias{npuniden.sc}
+
+\title{
+  Kernel Shape Constrained Bounded Univariate Density Estimation
+}
+\description{
+
+  \code{npuniden.sc} computes shape constrained kernel univariate
+  unconditional density estimates given a vector of continuously
+  distributed training data and a bandwidth. Lower and upper bounds
+  [\code{a},\code{b}] can be supplied (default is [0,1]) and if \code{a}
+  is set to \code{-Inf} there is only one bound on the right, while if
+  \code{b} is set to \code{Inf} there is only one bound on the left.
+
+}
+\usage{
+npuniden.sc(X = NULL,
+            Y = NULL,
+            h = NULL, a = 0,
+            b = 1,
+            constraint = c("mon.incr", "mon.decr", "concave", "convex"))
+}
+%- maybe also 'usage' for other objects documented here.
+\arguments{
+  \item{X}{
+a required numeric vector of training data lying in \eqn{[a,b]}
+}
+  \item{Y}{
+an optional numeric vector of evaluation data lying in \eqn{[a,b]}
+}
+  \item{h}{
+an bandwidth (>0)
+}
+  \item{a}{
+an optional lower bound (defaults to 0)
+}
+  \item{b}{
+an optional upper bound (defaults to 1)
+}
+  
+  \item{constraint}{
+a character string indicating whether the estimate is to be constrained
+to be monotonically increasing (\code{constraint="mon.incr"}),
+decreasing (\code{constraint="mon.incr"}), convex
+(\code{constraint="convex"}), or concave (\code{constraint="concave"})
+}
+}
+
+\details{
+TBD
+}
+\value{
+\item{f }{unconstrained density estimate}
+\item{f.deriv }{unconstrained derivative estimate (or order 1 or 2)}
+\item{f.sc }{shape constrained density estimate}
+\item{f.sc.deriv }{shape constrained derivative estimate (or order 1 or 2)}
+}
+\references{
+TBD
+}
+\author{
+Jeffrey S. Racine \email{racinej@mcmaster.ca}
+}
+
+\seealso{
+  The function \code{\link{npuniden.boundary}}.
+}
+\examples{
+\dontrun{
+n <- 250
+
+set.seed(42)
+
+X <- sort(rbeta(n,5,1))
+Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
+h <- bw.nrd0(X)
+
+foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mon.incr"))
+
+par(mfrow=c(1,2))
+ylim <- range(c(foo$f.sc,foo$f))
+plot(Y,foo$f.sc,type="l",ylim=ylim)
+lines(Y,foo$f,col=2,lty=2)
+rug(X)
+ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim)
+lines(Y,foo$f.deriv,col=2,lty=2)
+abline(h=0,lty=2)
+rug(X)
+
+X <- sort(rbeta(n,1,5))
+Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
+h <- bw.nrd0(X)
+
+foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mon.decr"))
+
+par(mfrow=c(1,2))
+ylim <- range(c(foo$f.sc,foo$f))
+plot(Y,foo$f.sc,type="l",ylim=ylim)
+lines(Y,foo$f,col=2,lty=2)
+rug(X)
+ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim)
+lines(Y,foo$f.deriv,col=2,lty=2)
+abline(h=0,lty=2)
+rug(X)
+ 
+X <- sort(rnorm(n))
+Y <- seq(min(X),max(X),,1000)
+h <- bw.nrd0(X)
+
+foo <- npuniden.sc(X=X,Y=Y,h=h,a=-1000,b=1000,constraint=c("concave"))
+
+par(mfrow=c(1,2))
+ylim <- range(c(foo$f.sc,foo$f))
+plot(Y,foo$f.sc,type="l",ylim=ylim)
+lines(Y,foo$f,col=2,lty=2)
+rug(X)
+ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim)
+lines(Y,foo$f.deriv,col=2,lty=2)
+abline(h=0,lty=2)
+rug(X)
+
+X <- sort(rbeta(n,3/4,3/4))
+Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
+h <- bw.nrd0(X)
+
+foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("convex"))
+
+par(mfrow=c(1,2))
+ylim <- range(c(foo$f.sc,foo$f))
+plot(Y,foo$f.sc,type="l",ylim=ylim)
+lines(Y,foo$f,col=2,lty=2)
+rug(X)
+ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim)
+lines(Y,foo$f.deriv,col=2,lty=2)
+abline(h=0,lty=2)
+rug(X)
+} % enddontrun
+}
+\keyword{ nonparametric }
+\keyword{ smooth }
