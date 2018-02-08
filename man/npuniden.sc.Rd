@@ -20,7 +20,12 @@ npuniden.sc(X = NULL,
             h = NULL,
             a = 0,
             b = 1,
-            constraint = c("mono.incr", "mono.decr", "concave", "convex", "log-concave", "log-convex"))
+            constraint = c("mono.incr",
+                           "mono.decr",
+                           "concave",
+                           "convex",
+                           "log-concave",
+                           "log-convex"))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{

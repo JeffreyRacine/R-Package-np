@@ -3,7 +3,12 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
-                        constraint=c("mono.incr","mono.decr","concave","convex","log-concave","log-convex")) {
+                        constraint=c("mono.incr",
+                            "mono.decr",
+                            "concave",
+                            "convex",
+                            "log-concave",
+                            "log-convex")) {
 
     ## Gaussian kernel function, derivatives up to order two
 
@@ -117,16 +122,15 @@ npuniden.sc <- function(X=NULL,
     }
 
     if(is.null(output.QP) || any(is.nan(output.QP$solutions))) stop(" solve.QP was unable to find a solution ")
-    
     if(constraint=="log-concave" || constraint=="log-convex") {
-        f.sc.deriv <- exp(log(f.deriv)+t(A.deriv)%*%output.QP$solution)
-        f.sc <- exp(log(f)+t(A)%*%output.QP$solution)
+        f.sc <- as.numeric(exp(log(f)+t(A)%*%output.QP$solution))
+        f.sc.deriv <- f.sc*(f.deriv/f+t(A.deriv)%*%output.QP$solution) ## second derivative of log
     } else {
-        f.sc.deriv <- f.deriv+t(A.deriv)%*%output.QP$solution
-        f.sc <- f+t(A)%*%output.QP$solution
+        f.sc <- as.numeric(f+t(A)%*%output.QP$solution)
+        f.sc.deriv <- as.numeric(f.deriv+t(A.deriv)%*%output.QP$solution)
     }
 
-    corr.factor <- integrate.trapezoidal(x.grid,f.sc)[length(x.grid)]/integrate.trapezoidal(x.grid,f)[length(x.grid)]
+    corr.factor <- integrate.trapezoidal(Y,f.sc)[length(Y)]/integrate.trapezoidal(Y,f)[length(Y)]
     f.sc.deriv <- f.sc.deriv/corr.factor    
     f.sc <- f.sc/corr.factor
     
