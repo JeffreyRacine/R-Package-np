@@ -55,7 +55,23 @@ decreasing (\code{constraint="mono.incr"}), convex
 }
 
 \details{
-The bounded estimates use the truncated Gaussian kernel function.
+  Typical usages are (see below for a complete list of options and also
+  the examples at the end of this help file)
+  \preformatted{
+    model <- npuniden.sc(X,a=-2,b=3)
+  }
+
+  \code{npuniden.sc} implements a methods for estimating a univariate
+  density function defined over a continuous random variable in the
+  presence of bounds subject to a variety of shape constraints.  The
+  bounded estimates use the truncated Gaussian kernel function.
+
+  Note that for the log-constrained estimates, the derivative estimate
+  returned is that for the log-constrained estimate not the non-log
+  value of the estimate returned by the function. See Example 5 below
+  hat manually plots the log-density and returned derivative (no
+  transformation is needed when plotting the density estimate itself).
+
 }
 \value{
 A list with the following elements:
@@ -133,7 +149,7 @@ X <- sort(rnorm(n))
 Y <- seq(min(X),max(X),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,a=-1000,b=1000,constraint=c("concave"))
+foo <- npuniden.sc(X=X,Y=Y,h=h,a=-Inf,b=Inf,constraint=c("concave"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
@@ -149,7 +165,7 @@ abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
-## Example 3: Beta(3/4,3/4), DGP is convex, impose valid restriction
+## Example 4: Beta(3/4,3/4), DGP is convex, impose valid restriction
 
 X <- sort(rbeta(n,3/4,3/4))
 Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
@@ -170,6 +186,30 @@ lines(Y,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+
+## Example 5: N(0,1), DGP is log-concave, impose log-concavity
+## restriction
+
+X <- sort(rnorm(n))
+Y <- seq(min(X),max(X),,1000)
+h <- bw.nrd0(X)
+
+foo <- npuniden.sc(X=X,Y=Y,h=h,a=-Inf,b=Inf,constraint=c("log-concave"))
+
+par(mfrow=c(1,2))
+
+ylim <- range(c(log(foo$f.sc),log(foo$f)))
+plot(Y,log(foo$f.sc),type="l",ylim=ylim,xlab="X",ylab="Log-Density")
+lines(Y,log(foo$f),col=2,lty=2)
+rug(X)
+legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
+
+ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
+plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative of Log-Density")
+lines(Y,foo$f.deriv,col=2,lty=2)
+abline(h=0,lty=2)
+rug(X)
+legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
 } % enddontrun
 }
 \keyword{ nonparametric }

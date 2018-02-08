@@ -124,14 +124,18 @@ npuniden.sc <- function(X=NULL,
     if(is.null(output.QP) || any(is.nan(output.QP$solutions))) stop(" solve.QP was unable to find a solution ")
     if(constraint=="log-concave" || constraint=="log-convex") {
         f.sc <- as.numeric(exp(log(f)+t(A)%*%output.QP$solution))
-        f.sc.deriv <- f.sc*(f.deriv/f+t(A.deriv)%*%output.QP$solution) ## second derivative of log
+        ## Constrained derivatives, i.e., derivatives of log(f), not f
+        ## - if you wish derivatives of f uncomment the following
+        ## line.
+        ## f.deriv <- colMeans(A.deriv)
+        f.sc.deriv <- f.deriv+t(A.deriv)%*%output.QP$solution
     } else {
         f.sc <- as.numeric(f+t(A)%*%output.QP$solution)
         f.sc.deriv <- as.numeric(f.deriv+t(A.deriv)%*%output.QP$solution)
     }
 
     corr.factor <- integrate.trapezoidal(Y,f.sc)[length(Y)]/integrate.trapezoidal(Y,f)[length(Y)]
-    f.sc.deriv <- f.sc.deriv/corr.factor    
+    #f.sc.deriv <- f.sc.deriv/corr.factor    
     f.sc <- f.sc/corr.factor
     
     return(list(f=f,f.sc=f.sc,f.deriv=f.deriv,f.sc.deriv=f.sc.deriv))
