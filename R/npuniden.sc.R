@@ -3,7 +3,7 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
-                        constraint=c("mono.incr","mono.decr","concave","convex")) {
+                        constraint=c("mono.incr","mono.decr","concave","convex","log-concave","log-convex")) {
 
     ## Gaussian kernel function, derivatives up to order two
 
@@ -81,7 +81,7 @@ npuniden.sc <- function(X=NULL,
     ## First or second order derivative needed
 
     deriv <- 1
-    if(constraint=="concave" || constraint=="convex") deriv <- 2
+    if(constraint=="concave" || constraint=="convex" || constraint=="log-concave" || constraint=="log-convex") deriv <- 2
 
     ## Second derivative uses z.a and z.b times other arguments, which
     ## must be finite
@@ -90,10 +90,14 @@ npuniden.sc <- function(X=NULL,
     if(deriv==2 && b==Inf) b <- extendrange(X,f=100)[2]
 
     A.deriv <- W.kernel(Y,X,h,a=a,b=b,deriv=deriv)
-    f.deriv <- colMeans(A.deriv)
+    if(constraint=="log-concave" || constraint=="log-convex") {
+        f.deriv <- (colMeans(A.deriv)*f - colMeans(W.kernel(Y,X,h,a=a,b=b,deriv=1))^2)/(f^2)
+    } else {
+        f.deriv <- colMeans(A.deriv)
+    }
     
     sign.deriv <- 1
-    if(constraint=="mono.decr" || constraint=="concave") sign.deriv <- -1
+    if(constraint=="mono.decr" || constraint=="concave" || constraint=="log-concave") sign.deriv <- -1
 
     n <- length(Y)
     n.train <- length(X)
@@ -114,8 +118,17 @@ npuniden.sc <- function(X=NULL,
 
     if(is.null(output.QP) || any(is.nan(output.QP$solutions))) stop(" solve.QP was unable to find a solution ")
     
-    f.sc.deriv <- f.deriv+t(A.deriv)%*%output.QP$solution
-    f.sc <- f+t(A)%*%output.QP$solution
+    if(constraint=="log-concave" || constraint=="log-convex") {
+        f.sc.deriv <- exp(log(f.deriv)+t(A.deriv)%*%output.QP$solution)
+        f.sc <- exp(log(f)+t(A)%*%output.QP$solution)
+    } else {
+        f.sc.deriv <- f.deriv+t(A.deriv)%*%output.QP$solution
+        f.sc <- f+t(A)%*%output.QP$solution
+    }
+
+    corr.factor <- integrate.trapezoidal(x.grid,f.sc)[length(x.grid)]/integrate.trapezoidal(x.grid,f)[length(x.grid)]
+    f.sc.deriv <- f.sc.deriv/corr.factor    
+    f.sc <- f.sc/corr.factor
     
     return(list(f=f,f.sc=f.sc,f.deriv=f.deriv,f.sc.deriv=f.sc.deriv))
 

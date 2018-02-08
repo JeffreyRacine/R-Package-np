@@ -1,3 +1,5 @@
+* Added function for shape constrained univariate density estimation with bounds
+
 * Added option for renormalizing improper bounded density
  estimates than can arise from the use of asymmetric negative edge
  kernel functions (proper=TRUE)

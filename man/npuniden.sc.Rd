@@ -20,7 +20,7 @@ npuniden.sc(X = NULL,
             h = NULL,
             a = 0,
             b = 1,
-            constraint = c("mono.incr", "mono.decr", "concave", "convex"))
+            constraint = c("mono.incr", "mono.decr", "concave", "convex", "log-concave", "log-convex"))
 }
 %- maybe also 'usage' for other objects documented here.
 \arguments{
@@ -44,14 +44,16 @@ an optional upper bound (defaults to 1)
 a character string indicating whether the estimate is to be constrained
 to be monotonically increasing (\code{constraint="mono.incr"}),
 decreasing (\code{constraint="mono.incr"}), convex
-(\code{constraint="convex"}), or concave (\code{constraint="concave"})
+(\code{constraint="convex"}), concave (\code{constraint="concave"}), log-convex
+(\code{constraint="log-convex"}), or log-concave (\code{constraint="log-concave"})
 }
 }
 
 \details{
-TBD
+The bounded estimates use the truncated Gaussian kernel function.
 }
 \value{
+A list with the following elements:
 \item{f }{unconstrained density estimate}
 \item{f.deriv }{unconstrained derivative estimate (or order 1 or 2)}
 \item{f.sc }{shape constrained density estimate}
@@ -65,7 +67,8 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
 \seealso{
-  The function \code{\link{npuniden.boundary}}.
+  The \pkg{logcondens} and \pkg{scdensity} packages, and the function
+  \code{\link{npuniden.boundary}}.
 }
 \examples{
 \dontrun{
