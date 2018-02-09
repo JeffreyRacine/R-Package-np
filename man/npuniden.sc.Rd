@@ -20,7 +20,9 @@ npuniden.sc(X = NULL,
             h = NULL,
             a = 0,
             b = 1,
-            weight.distance=FALSE,
+            extend.range=0,
+            num.grid=100,
+            function.distance=FALSE,
             constraint = c("mono.incr",
                            "mono.decr",
                            "concave",
@@ -45,10 +47,18 @@ an optional lower bound (defaults to 0)
   \item{b}{
 an optional upper bound (defaults to 1)
 }
-\item{weight.distance}{
+\item{extend.range}{
+  number specifying the fraction by which the range should be extended
+}
+\item{num.grid}{
+  number of additional grid points (in addition to X and Y) placed on an
+  equi-spaced grid (if \code{num.grid=0} no additional grid points will
+  be used)
+}
+\item{function.distance}{
   a logical value that, if true, minimizes the squared deviation between
-  the constrained and unconstrained weights, otherwise minimizes the
-  squared deviation between the constrained and unconstrained estimates
+  the constrained and unconstrained estimates, otherwise, minimizes the
+  squared deviation between the constrained and unconstrained weights
 }
   
   \item{constraint}{
@@ -106,21 +116,20 @@ set.seed(42)
 ## restriction
 
 X <- sort(rbeta(n,5,1))
-Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mono.incr"))
+foo <- npuniden.sc(X=X,h=h,constraint=c("mono.incr"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-plot(Y,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(Y,foo$f,col=2,lty=2)
+plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+lines(X,foo$f,col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
-lines(Y,foo$f.deriv,col=2,lty=2)
+plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
+lines(X,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
@@ -129,21 +138,20 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## restriction
 
 X <- sort(rbeta(n,1,5))
-Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("mono.decr"))
+foo <- npuniden.sc(X=X,h=h,constraint=c("mono.decr"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-plot(Y,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(Y,foo$f,col=2,lty=2)
+plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+lines(X,foo$f,col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
-lines(Y,foo$f.deriv,col=2,lty=2)
+plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="First Derivative")
+lines(X,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
@@ -152,21 +160,20 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## restriction
 
 X <- sort(rnorm(n))
-Y <- seq(min(X),max(X),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,a=-Inf,b=Inf,constraint=c("concave"))
+foo <- npuniden.sc(X=X,h=h,a=-Inf,b=Inf,constraint=c("concave"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-plot(Y,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(Y,foo$f,col=2,lty=2)
+plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+lines(X,foo$f,col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
 
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
-lines(Y,foo$f.deriv,col=2,lty=2)
+plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
+lines(X,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
@@ -174,21 +181,20 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## Example 4: Beta(3/4,3/4), DGP is convex, impose valid restriction
 
 X <- sort(rbeta(n,3/4,3/4))
-Y <- seq(max(c(0,extendrange(X,f=.25)[1])),min(c(1,extendrange(X,f=.25)[2])),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,constraint=c("convex"))
+foo <- npuniden.sc(X=X,h=h,constraint=c("convex"))
 
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
-plot(Y,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
-lines(Y,foo$f,col=2,lty=2)
+plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+lines(X,foo$f,col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
-lines(Y,foo$f.deriv,col=2,lty=2)
+plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative")
+lines(X,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
@@ -197,22 +203,21 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## restriction
 
 X <- sort(rnorm(n))
-Y <- seq(min(X),max(X),,1000)
 h <- bw.nrd0(X)
 
-foo <- npuniden.sc(X=X,Y=Y,h=h,a=-Inf,b=Inf,constraint=c("log-concave"))
+foo <- npuniden.sc(X=X,h=h,a=-Inf,b=Inf,constraint=c("log-concave"))
 
 par(mfrow=c(1,2))
 
 ylim <- range(c(log(foo$f.sc),log(foo$f)))
-plot(Y,log(foo$f.sc),type="l",ylim=ylim,xlab="X",ylab="Log-Density")
-lines(Y,log(foo$f),col=2,lty=2)
+plot(X,log(foo$f.sc),type="l",ylim=ylim,xlab="X",ylab="Log-Density")
+lines(X,log(foo$f),col=2,lty=2)
 rug(X)
 legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
 
 ylim <- range(c(foo$f.sc.deriv,foo$f.deriv))
-plot(Y,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative of Log-Density")
-lines(Y,foo$f.deriv,col=2,lty=2)
+plot(X,foo$f.sc.deriv,type="l",ylim=ylim,xlab="X",ylab="Second Derivative of Log-Density")
+lines(X,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")

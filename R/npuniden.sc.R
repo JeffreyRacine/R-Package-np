@@ -3,7 +3,9 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
-                        weight.distance=FALSE,
+                        extend.range=0.0,
+                        num.grid=100,
+                        function.distance=TRUE,
                         constraint=c("mono.incr",
                             "mono.decr",
                             "concave",
@@ -75,13 +77,25 @@ npuniden.sc <- function(X=NULL,
     if(any(X>b)) stop("X must be <= b")
     if(!is.null(Y) && any(Y<a)) stop("Y must be >= a")
     if(!is.null(Y) && any(Y>b)) stop("Y must be <= b")
-    if(is.null(Y)) Y <- X
     if(is.null(h)) stop("you must provide a bandwidth")
     if(h <= 0) stop("bandwidth h must be positive")
+    if(num.grid < 0) stop("num.grid must be a non-negative integer")
 
+    ## First elements are X if Y=NULL or Y, rest are to make sure
+    ## constraints are imposed on the bulk of the support and a bit
+    ## outside goverened by f=extend.range
+
+    if(num.grid==0) {
+        grid <- NULL
+    } else {
+        grid <- seq(max(c(a,extendrange(X,f=extend.range)[1])),min(c(b,extendrange(X,f=extend.range)[2])),,num.grid)
+    }
+
+    X.grid <- c(Y,X,grid)
+    
     ## Always require the unrestricted weight matrix
 
-    A <- W.kernel(Y,X,h,a=a,b=b,deriv=0)
+    A <- W.kernel(X.grid,X,h,a=a,b=b,deriv=0)
     f <- colMeans(A)
 
     ## First or second order derivative needed
@@ -95,9 +109,9 @@ npuniden.sc <- function(X=NULL,
     if(deriv==2 && a==-Inf) a <- extendrange(X,f=100)[1]
     if(deriv==2 && b==Inf) b <- extendrange(X,f=100)[2]
 
-    A.deriv <- W.kernel(Y,X,h,a=a,b=b,deriv=deriv)
+    A.deriv <- W.kernel(X.grid,X,h,a=a,b=b,deriv=deriv)
     if(constraint=="log-concave" || constraint=="log-convex") {
-        f.deriv <- (colMeans(A.deriv)*f - colMeans(W.kernel(Y,X,h,a=a,b=b,deriv=1))^2)/(f^2)
+        f.deriv <- (colMeans(A.deriv)*f - colMeans(W.kernel(X.grid,X,h,a=a,b=b,deriv=1))^2)/(f^2)
     } else {
         f.deriv <- colMeans(A.deriv)
     }
@@ -105,15 +119,15 @@ npuniden.sc <- function(X=NULL,
     sign.deriv <- 1
     if(constraint=="mono.decr" || constraint=="concave" || constraint=="log-concave") sign.deriv <- -1
 
-    n <- length(Y)
+    n.grid <- length(X.grid)
     n.train <- length(X)
     
     output.QP <- NULL
     constant <- 1
     attempts <- 0
-    while((is.null(output.QP) || any(is.nan(output.QP$solutions))) && attempts < 25) {
+    while((is.null(output.QP) || any(is.nan(output.QP$solution))) && attempts < 5) {
         Dmat <- diag(n.train)
-        if(!weight.distance) Dmat <- A%*%t(A)+sqrt(.Machine$double.eps)*Dmat
+        if(function.distance) Dmat <- A%*%t(A)+sqrt(.Machine$double.eps)*Dmat
         output.QP <- tryCatch(solve.QP(Dmat=Dmat/constant,
                                        dvec=rep(0,n.train),
                                        Amat=cbind(rep(1,n.train),A,sign.deriv*A.deriv),
@@ -124,7 +138,11 @@ npuniden.sc <- function(X=NULL,
         attempts <- attempts+1
     }
 
-    if(is.null(output.QP) || any(is.nan(output.QP$solutions))) stop(" solve.QP was unable to find a solution ")
+    if(is.null(output.QP) || any(is.nan(output.QP$solution))) {
+        warning(" solve.QP was unable to find a solution, unrestricted estimate returned ", immediate. = TRUE)
+        output.QP$solution <- rep(0,n.train)
+    }
+    
     if(constraint=="log-concave" || constraint=="log-convex") {
         f.sc <- as.numeric(exp(log(f)+t(A)%*%output.QP$solution))
         ## Constrained derivatives, i.e., derivatives of log(f), not f
@@ -137,10 +155,16 @@ npuniden.sc <- function(X=NULL,
         f.sc.deriv <- as.numeric(f.deriv+t(A.deriv)%*%output.QP$solution)
     }
 
-    corr.factor <- integrate.trapezoidal(Y,f.sc)[length(Y)]/integrate.trapezoidal(Y,f)[length(Y)]
+    corr.factor <- integrate.trapezoidal(X.grid,f.sc)[n.grid]/integrate.trapezoidal(X.grid,f)[n.grid]
     #f.sc.deriv <- f.sc.deriv/corr.factor    
     f.sc <- f.sc/corr.factor
+
+    if(is.null(Y)) {
+        index <- 1:n.train
+    } else {
+        index <- 1:length(Y)
+    }
     
-    return(list(f=f,f.sc=f.sc,f.deriv=f.deriv,f.sc.deriv=f.sc.deriv))
+    return(list(f=f[index],f.sc=f.sc[index],f.deriv=f.deriv[index],f.sc.deriv=f.sc.deriv[index]))
 
 }
