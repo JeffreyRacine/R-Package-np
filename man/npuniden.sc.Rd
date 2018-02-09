@@ -22,7 +22,7 @@ npuniden.sc(X = NULL,
             b = 1,
             extend.range=0,
             num.grid=100,
-            function.distance=FALSE,
+            function.distance=TRUE,
             constraint = c("mono.incr",
                            "mono.decr",
                            "concave",
@@ -48,7 +48,8 @@ an optional lower bound (defaults to 0)
 an optional upper bound (defaults to 1)
 }
 \item{extend.range}{
-  number specifying the fraction by which the range should be extended
+  number specifying the fraction by which the range of the training data
+  should be extended for the additional grid points
 }
 \item{num.grid}{
   number of additional grid points (in addition to X and Y) placed on an
@@ -62,11 +63,13 @@ an optional upper bound (defaults to 1)
 }
   
   \item{constraint}{
-a character string indicating whether the estimate is to be constrained
-to be monotonically increasing (\code{constraint="mono.incr"}),
-decreasing (\code{constraint="mono.incr"}), convex
-(\code{constraint="convex"}), concave (\code{constraint="concave"}), log-convex
-(\code{constraint="log-convex"}), or log-concave (\code{constraint="log-concave"})
+  a character string indicating whether the estimate is to be
+  constrained to be monotonically increasing
+  (\code{constraint="mono.incr"}), decreasing
+  (\code{constraint="mono.incr"}), convex (\code{constraint="convex"}),
+  concave (\code{constraint="concave"}), log-convex
+  (\code{constraint="log-convex"}), or log-concave
+  (\code{constraint="log-concave"})
 }
 }
 
@@ -95,6 +98,7 @@ A list with the following elements:
 \item{f.deriv }{unconstrained derivative estimate (or order 1 or 2)}
 \item{f.sc }{shape constrained density estimate}
 \item{f.sc.deriv }{shape constrained derivative estimate (or order 1 or 2)}
+\item{solve.QP }{logical if TRUE solve.QP succeeded, otherwise failed}
 }
 \references{
 TBD
@@ -109,14 +113,14 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \examples{
 \dontrun{
-n <- 250
+n <- 25
 set.seed(42)
 
 ## Example 1: Beta(5,1), DGP is monotone increasing, impose valid
 ## restriction
 
 X <- sort(rbeta(n,5,1))
-h <- bw.nrd0(X)
+h <- npuniden.boundary(X)$h
 
 foo <- npuniden.sc(X=X,h=h,constraint=c("mono.incr"))
 
@@ -138,7 +142,7 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## restriction
 
 X <- sort(rbeta(n,1,5))
-h <- bw.nrd0(X)
+h <- npuniden.boundary(X)$h
 
 foo <- npuniden.sc(X=X,h=h,constraint=c("mono.decr"))
 
@@ -160,7 +164,7 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## restriction
 
 X <- sort(rnorm(n))
-h <- bw.nrd0(X)
+h <- npuniden.boundary(X,a=-Inf,b=Inf)$h
 
 foo <- npuniden.sc(X=X,h=h,a=-Inf,b=Inf,constraint=c("concave"))
 
@@ -181,7 +185,7 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## Example 4: Beta(3/4,3/4), DGP is convex, impose valid restriction
 
 X <- sort(rbeta(n,3/4,3/4))
-h <- bw.nrd0(X)
+h <- npuniden.boundary(X)$h
 
 foo <- npuniden.sc(X=X,h=h,constraint=c("convex"))
 
@@ -203,7 +207,7 @@ legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 ## restriction
 
 X <- sort(rnorm(n))
-h <- bw.nrd0(X)
+h <- npuniden.boundary(X,a=-Inf,b=Inf)$h
 
 foo <- npuniden.sc(X=X,h=h,a=-Inf,b=Inf,constraint=c("log-concave"))
 

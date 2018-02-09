@@ -121,7 +121,8 @@ npuniden.sc <- function(X=NULL,
 
     n.grid <- length(X.grid)
     n.train <- length(X)
-    
+
+    solve.QP.flag <- TRUE
     output.QP <- NULL
     constant <- 1
     attempts <- 0
@@ -141,6 +142,7 @@ npuniden.sc <- function(X=NULL,
     if(is.null(output.QP) || any(is.nan(output.QP$solution))) {
         warning(" solve.QP was unable to find a solution, unrestricted estimate returned ", immediate. = TRUE)
         output.QP$solution <- rep(0,n.train)
+        solve.QP.flag <- FALSE
     }
     
     if(constraint=="log-concave" || constraint=="log-convex") {
@@ -165,6 +167,6 @@ npuniden.sc <- function(X=NULL,
         index <- 1:length(Y)
     }
     
-    return(list(f=f[index],f.sc=f.sc[index],f.deriv=f.deriv[index],f.sc.deriv=f.sc.deriv[index]))
+    return(list(f=f[index],f.sc=f.sc[index],f.deriv=f.deriv[index],f.sc.deriv=f.sc.deriv[index],solve.QP=solve.QP.flag))
 
 }
