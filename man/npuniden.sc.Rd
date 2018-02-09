@@ -20,6 +20,7 @@ npuniden.sc(X = NULL,
             h = NULL,
             a = 0,
             b = 1,
+            weight.distance=FALSE,
             constraint = c("mono.incr",
                            "mono.decr",
                            "concave",
@@ -43,6 +44,11 @@ an optional lower bound (defaults to 0)
 }
   \item{b}{
 an optional upper bound (defaults to 1)
+}
+\item{weight.distance}{
+  a logical value that, if true, minimizes the squared deviation between
+  the constrained and unconstrained weights, otherwise minimizes the
+  squared deviation between the constrained and unconstrained estimates
 }
   
   \item{constraint}{

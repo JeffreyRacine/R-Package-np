@@ -3,6 +3,7 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
+                        weight.distance=FALSE,
                         constraint=c("mono.incr",
                             "mono.decr",
                             "concave",
@@ -111,7 +112,9 @@ npuniden.sc <- function(X=NULL,
     constant <- 1
     attempts <- 0
     while((is.null(output.QP) || any(is.nan(output.QP$solutions))) && attempts < 25) {
-        output.QP <- tryCatch(solve.QP(Dmat=diag(n.train)/constant,
+        Dmat <- diag(n.train)
+        if(!weight.distance) Dmat <- A%*%t(A)+sqrt(.Machine$double.eps)*Dmat
+        output.QP <- tryCatch(solve.QP(Dmat=Dmat/constant,
                                        dvec=rep(0,n.train),
                                        Amat=cbind(rep(1,n.train),A,sign.deriv*A.deriv),
                                        bvec=c(0,-f,-sign.deriv*f.deriv),
