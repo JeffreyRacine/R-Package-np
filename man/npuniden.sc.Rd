@@ -20,9 +20,10 @@ npuniden.sc(X = NULL,
             h = NULL,
             a = 0,
             b = 1,
-            extend.range=0,
-            num.grid=100,
-            function.distance=TRUE,
+            extend.range = 0.1,
+            num.grid = 1000,
+            function.distance = TRUE,
+            integral.equal = TRUE,
             constraint = c("mono.incr",
                            "mono.decr",
                            "concave",
@@ -49,20 +50,25 @@ an optional upper bound (defaults to 1)
 }
 \item{extend.range}{
   number specifying the fraction by which the range of the training data
-  should be extended for the additional grid points
+  should be extended for the additional grid points (passed to the
+  function \code{extendrange})
 }
 \item{num.grid}{
-  number of additional grid points (in addition to X and Y) placed on an
-  equi-spaced grid (if \code{num.grid=0} no additional grid points will
-  be used)
+  number of additional grid points (in addition to \code{X} and
+  \code{Y}) placed on an equi-spaced grid (if \code{num.grid=0} no
+  additional grid points will be used)
 }
 \item{function.distance}{
-  a logical value that, if true, minimizes the squared deviation between
+  a logical value that, if \code{TRUE}, minimizes the squared deviation between
   the constrained and unconstrained estimates, otherwise, minimizes the
   squared deviation between the constrained and unconstrained weights
 }
-  
-  \item{constraint}{
+\item{integral.equal}{
+  a logical value, that, if \code{TRUE} adjusts the constrained estimate
+  to have the same probability mass over the range \code{X}, \code{Y},
+  and the additional grid points
+}
+\item{constraint}{
   a character string indicating whether the estimate is to be
   constrained to be monotonically increasing
   (\code{constraint="mono.incr"}), decreasing
@@ -91,6 +97,12 @@ an optional upper bound (defaults to 1)
   hat manually plots the log-density and returned derivative (no
   transformation is needed when plotting the density estimate itself).
 
+  If the quadratic program solver fails to find a solution, the
+  unconstrained estimate is returned with an immediate warning. Possible
+  causes to be investigated are undersmoothing and sparsity. To
+  investigate the former try using a larger bandwidth, and for the
+  latter try decreasing \code{extend.range}.
+
 }
 \value{
 A list with the following elements:
@@ -98,7 +110,9 @@ A list with the following elements:
 \item{f.deriv }{unconstrained derivative estimate (or order 1 or 2)}
 \item{f.sc }{shape constrained density estimate}
 \item{f.sc.deriv }{shape constrained derivative estimate (or order 1 or 2)}
-\item{solve.QP }{logical if TRUE solve.QP succeeded, otherwise failed}
+\item{integral.f}{the integral of the unconstrained estimate over \code{X}, \code{Y}, and the additional grid points}
+\item{integral.f.sc}{the integral of the constrained estimate over \code{X}, \code{Y}, and the additional grid points}
+\item{solve.QP }{logical if \code{TRUE} solve.QP succeeded, otherwise failed}
 }
 \references{
 TBD

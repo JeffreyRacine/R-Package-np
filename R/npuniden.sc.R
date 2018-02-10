@@ -3,9 +3,10 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
-                        extend.range=0.0,
-                        num.grid=100,
+                        extend.range=0.1,
+                        num.grid=1000,
                         function.distance=TRUE,
+                        integral.equal=TRUE,
                         constraint=c("mono.incr",
                             "mono.decr",
                             "concave",
@@ -83,7 +84,7 @@ npuniden.sc <- function(X=NULL,
 
     ## First elements are X if Y=NULL or Y, rest are to make sure
     ## constraints are imposed on the bulk of the support and a bit
-    ## outside goverened by f=extend.range
+    ## outside governed by f=extend.range
 
     if(num.grid==0) {
         grid <- NULL
@@ -93,21 +94,25 @@ npuniden.sc <- function(X=NULL,
 
     X.grid <- c(Y,X,grid)
     
-    ## Always require the unrestricted weight matrix
+    ## We always need the unconstrained weight matrix and estimate
 
     A <- W.kernel(X.grid,X,h,a=a,b=b,deriv=0)
     f <- colMeans(A)
 
-    ## First or second order derivative needed
+    ## First or second order derivative needed, place them both in *.deriv
 
     deriv <- 1
     if(constraint=="concave" || constraint=="convex" || constraint=="log-concave" || constraint=="log-convex") deriv <- 2
 
     ## Second derivative uses z.a and z.b times other arguments, which
-    ## must be finite
+    ## must be finite, so set to very small and large values depending
+    ## on the range of the training data
     
     if(deriv==2 && a==-Inf) a <- extendrange(X,f=100)[1]
     if(deriv==2 && b==Inf) b <- extendrange(X,f=100)[2]
+
+    ## The derivative for the log-density estimate differs from that
+    ## for the raw density, and also requires the first derivative
 
     A.deriv <- W.kernel(X.grid,X,h,a=a,b=b,deriv=deriv)
     if(constraint=="log-concave" || constraint=="log-convex") {
@@ -115,32 +120,63 @@ npuniden.sc <- function(X=NULL,
     } else {
         f.deriv <- colMeans(A.deriv)
     }
+
+    ## The sign of the constraint matrix Amat and bvec switch
+    ## depending on whether the constraint is >= or <=, so automate
+    ## this
     
     sign.deriv <- 1
     if(constraint=="mono.decr" || constraint=="concave" || constraint=="log-concave") sign.deriv <- -1
 
+    ## Length of the grid vector and training data vector
+    
     n.grid <- length(X.grid)
     n.train <- length(X)
+
+    ## Solve the quadratic program
 
     solve.QP.flag <- TRUE
     output.QP <- NULL
     constant <- 1
     attempts <- 0
     while((is.null(output.QP) || any(is.nan(output.QP$solution))) && attempts < 5) {
+        ## Identity forcing matrix minimizes the squared weight
+        ## distance
         Dmat <- diag(n.train)
-        if(function.distance) Dmat <- A%*%t(A)+sqrt(.Machine$double.eps)*Dmat
-        output.QP <- tryCatch(solve.QP(Dmat=Dmat/constant,
-                                       dvec=rep(0,n.train),
-                                       Amat=cbind(rep(1,n.train),A,sign.deriv*A.deriv),
-                                       bvec=c(0,-f,-sign.deriv*f.deriv),
+        ## Non-identity forcing matrix minimizes the squared function
+        ## difference distance
+        if(function.distance) Dmat <- (A%*%t(A)+sqrt(.Machine$double.eps)*Dmat)/constant
+        ## The unconstrained weight vector contains zeros
+        dvec <- rep(0,n.train)
+        if(constraint=="log-concave" || constraint=="log-convex") {
+            ## The log-concave/convex estimate will be non-negative,
+            ## no need to impose this constraint (will be slack)
+            Amat <- cbind(rep(1,n.train),sign.deriv*A.deriv)
+            bvec <- c(0,-sign.deriv*f.deriv)
+        } else {
+            ## For other constraints we need to enforce non-negativity
+            ## of the estimate - in either case, the unconstrained
+            ## weights are zero hence the "sum to zero" constraint
+            Amat <- cbind(rep(1,n.train),A,sign.deriv*A.deriv)
+            bvec <- c(0,-f,-sign.deriv*f.deriv)
+        }
+        output.QP <- tryCatch(solve.QP(Dmat=Dmat,
+                                       dvec=dvec,
+                                       Amat=Amat,
+                                       bvec=bvec,
                                        meq=1),
                               error = function(e) NULL)
+        ## Sometimes rescaling Dmat can overcome deficiencies in
+        ## solve.QP
         constant <- constant*10
         attempts <- attempts+1
     }
 
+    ## If solve.QP cannot find a solution issue an immediate warning
+    ## but return the unconstrained vector
+
     if(is.null(output.QP) || any(is.nan(output.QP$solution))) {
-        warning(" solve.QP was unable to find a solution, unrestricted estimate returned ", immediate. = TRUE)
+        warning(" solve.QP was unable to find a solution, unconstrained estimate returned ", immediate. = TRUE)
         output.QP$solution <- rep(0,n.train)
         solve.QP.flag <- FALSE
     }
@@ -149,7 +185,7 @@ npuniden.sc <- function(X=NULL,
         f.sc <- as.numeric(exp(log(f)+t(A)%*%output.QP$solution))
         ## Constrained derivatives, i.e., derivatives of log(f), not f
         ## - if you wish derivatives of f uncomment the following
-        ## line.
+        ## line
         ## f.deriv <- colMeans(A.deriv)
         f.sc.deriv <- f.deriv+t(A.deriv)%*%output.QP$solution
     } else {
@@ -157,16 +193,34 @@ npuniden.sc <- function(X=NULL,
         f.sc.deriv <- as.numeric(f.deriv+t(A.deriv)%*%output.QP$solution)
     }
 
-    corr.factor <- integrate.trapezoidal(X.grid,f.sc)[n.grid]/integrate.trapezoidal(X.grid,f)[n.grid]
-    #f.sc.deriv <- f.sc.deriv/corr.factor    
+    ## If the option integral.equal=TRUE is set, adjust the
+    ## constrained estimate to have the same integral as the
+    ## unconstrained estimate
+
+    corr.factor <- 1
+    int.f.sc <- integrate.trapezoidal(X.grid,f.sc)[n.grid]
+    int.f <- integrate.trapezoidal(X.grid,f)[n.grid]
+    if(integral.equal) corr.factor <- int.f.sc/int.f
     f.sc <- f.sc/corr.factor
+
+    ## The constraints are imposed on X.grid, but we only want the
+    ## constrained estimate at the sample points X (or evaluation
+    ## points Y if Y is specified)
 
     if(is.null(Y)) {
         index <- 1:n.train
     } else {
         index <- 1:length(Y)
     }
+
+    ## Return a list
     
-    return(list(f=f[index],f.sc=f.sc[index],f.deriv=f.deriv[index],f.sc.deriv=f.sc.deriv[index],solve.QP=solve.QP.flag))
+    return(list(f=f[index],
+                f.sc=f.sc[index],
+                f.deriv=f.deriv[index],
+                f.sc.deriv=f.sc.deriv[index],
+                f.integral=int.f,
+                f.sc.integral=int.f.sc,                
+                solve.QP=solve.QP.flag))
 
 }
