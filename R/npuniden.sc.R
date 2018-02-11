@@ -96,6 +96,7 @@ npuniden.sc <- function(X=NULL,
     if(is.null(h)) stop("you must provide a bandwidth")
     if(h <= 0) stop("bandwidth h must be positive")
     if(num.grid < 0) stop("num.grid must be a non-negative integer")
+    if(constraint=="density" && is.null(lb) && is.null(ub)) stop("you must provide lower and/or upper bounds when constraining the density")
     if(!is.null(lb) && any(lb<0)) stop("lower bound must be non-negative")
     if(!is.null(ub) && any(ub<0)) stop("upper bound must be non-negative")
     if(!is.null(lb) && !is.null(ub) && any(ub<lb)) stop("upper bound must be greater than or equal to lower bound")

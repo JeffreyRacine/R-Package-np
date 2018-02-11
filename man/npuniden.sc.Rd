@@ -20,8 +20,8 @@ npuniden.sc(X = NULL,
             h = NULL,
             a = 0,
             b = 1,
-            l = NULL,
-            u = NULL,
+            lb = NULL,
+            ub = NULL,
             extend.range = 0,
             num.grid = 100,
             function.distance = TRUE,
@@ -161,7 +161,18 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 n <- 25
 set.seed(42)
 
-## Example 1: Beta(5,1), DGP is monotone increasing, impose valid
+## Example 1: N(0,1), constrain the density to lie within lb=.1 and ub=.2
+
+X <- sort(rnorm(n))
+h <- npuniden.boundary(X,a=-Inf,b=Inf)$h
+foo <- npuniden.sc(X,h=h,constraint="density",a=-Inf,b=Inf,lb=.1,ub=.2)
+ylim <- range(c(foo$f.sc,foo$f))
+plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
+lines(X,foo$f,col=2,lty=2)
+rug(X)
+legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
+
+## Example 2: Beta(5,1), DGP is monotone increasing, impose valid
 ## restriction
 
 X <- sort(rbeta(n,5,1))
@@ -183,7 +194,7 @@ abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
-## Example 2: Beta(1,5), DGP is monotone decreasing, impose valid
+## Example 3: Beta(1,5), DGP is monotone decreasing, impose valid
 ## restriction
 
 X <- sort(rbeta(n,1,5))
@@ -205,7 +216,7 @@ abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
  
-## Example 3: N(0,1), DGP is log-concave, impose invalid concavity
+## Example 4: N(0,1), DGP is log-concave, impose invalid concavity
 ## restriction
 
 X <- sort(rnorm(n))
@@ -227,7 +238,7 @@ abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
-## Example 4: Beta(3/4,3/4), DGP is convex, impose valid restriction
+## Example 45: Beta(3/4,3/4), DGP is convex, impose valid restriction
 
 X <- sort(rbeta(n,3/4,3/4))
 h <- npuniden.boundary(X)$h
@@ -248,7 +259,7 @@ abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained","Unconstrained"),lty=1:2,col=1:2,bty="n")
 
-## Example 5: N(0,1), DGP is log-concave, impose log-concavity
+## Example 6: N(0,1), DGP is log-concave, impose log-concavity
 ## restriction
 
 X <- sort(rnorm(n))
