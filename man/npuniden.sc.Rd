@@ -51,13 +51,13 @@ an optional lower bound on the support of \code{X} or \code{Y} (defaults to 0)
   \item{b}{
 an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 }
-\item{l}{
-  a scalar lower bound to be used in conjunction with
+\item{lb}{
+  a scalar lower bound (\eqn{\ge 0}) to be used in conjunction with
   \code{constraint="density"}
 }
-\item{lu}{
-  a scalar upper bound to be used in conjunction with
-  \code{constraint="density"}
+\item{ub}{
+  a scalar upper bound (\eqn{\ge 0} and \eqn{\ge} \code{lb}) to be used
+  in conjunction with \code{constraint="density"}
 }
 \item{extend.range}{
   number specifying the fraction by which the range of the training data
@@ -66,8 +66,10 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 }
 \item{num.grid}{
   number of additional grid points (in addition to \code{X} and
-  \code{Y}) placed on an equi-spaced grid (if \code{num.grid=0} no
-  additional grid points will be used)
+  \code{Y}) placed on an equi-spaced grid spanning
+  \code{extendrange(c(X,Y),f=extend.range)} (if \code{num.grid=0} no
+  additional grid points will be used regardless of the value of
+  \code{extend.range})
 }
 \item{function.distance}{
   a logical value that, if \code{TRUE}, minimizes the squared deviation between
@@ -132,12 +134,16 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 \value{
 A list with the following elements:
 \item{f }{unconstrained density estimate}
-\item{f.deriv }{unconstrained derivative estimate (or order 1 or 2)}
 \item{f.sc }{shape constrained density estimate}
-\item{f.sc.deriv }{shape constrained derivative estimate (or order 1 or 2)}
+\item{se.f }{asymptotic standard error of the unconstrained density estimate}
+\item{se.f.sc }{asymptotic standard error of the shape constrained density estimate}
+\item{f.deriv }{unconstrained derivative estimate (of order 1 or 2 or log thereof)}
+\item{f.sc.deriv }{shape constrained derivative estimate (of order 1 or 2 or log thereof)}
+\item{F }{unconstrained distribution estimate}
+\item{F.sc }{shape constrained distribution estimate}
 \item{integral.f}{the integral of the unconstrained estimate over \code{X}, \code{Y}, and the additional grid points}
 \item{integral.f.sc}{the integral of the constrained estimate over \code{X}, \code{Y}, and the additional grid points}
-\item{solve.QP }{logical if \code{TRUE} solve.QP succeeded, otherwise failed}
+\item{solve.QP }{logical, if \code{TRUE} solve.QP succeeded, otherwise failed}
 }
 \references{
 TBD

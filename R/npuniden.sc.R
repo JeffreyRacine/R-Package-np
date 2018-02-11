@@ -3,8 +3,8 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
-                        l=NULL,
-                        u=NULL,
+                        lb=NULL,
+                        ub=NULL,
                         extend.range=0,
                         num.grid=100,
                         function.distance=TRUE,
@@ -69,6 +69,18 @@ npuniden.sc <- function(X=NULL,
         }
     }
     
+    int.kernel.squared <- function(X,h,a=a,b=b) {
+        ## Use numeric integration to compute Kappa, the integral of
+        ## the square of the kernel function needed for the asymptotic
+        ## standard error of the density estimate seq(a,b) will barf
+        ## on -Inf or Inf, trap these cases and use extendrange
+        if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=1000)
+        if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
+        if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
+        if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
+        sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
+    }
+
     W.kernel <- function(x,X,h,a=0,b=1,deriv=0) {
         sapply(1:length(x),function(i){kernel(x[i],X,h,a,b,deriv)})
     }
@@ -84,9 +96,9 @@ npuniden.sc <- function(X=NULL,
     if(is.null(h)) stop("you must provide a bandwidth")
     if(h <= 0) stop("bandwidth h must be positive")
     if(num.grid < 0) stop("num.grid must be a non-negative integer")
-    if(!is.null(l) && any(l<0)) stop("lower bound must be non-negative")
-    if(!is.null(u) && any(u<0)) stop("upper bound must be non-negative")
-    if(!is.null(l) && !is.null(u) && any(u<l)) stop("upper bound must be greater than or equal to lower bound")
+    if(!is.null(lb) && any(lb<0)) stop("lower bound must be non-negative")
+    if(!is.null(ub) && any(ub<0)) stop("upper bound must be non-negative")
+    if(!is.null(lb) && !is.null(ub) && any(ub<lb)) stop("upper bound must be greater than or equal to lower bound")
 
     ## First elements are X if Y=NULL or Y, rest are to make sure
     ## constraints are imposed on the bulk of the support and a bit
@@ -172,7 +184,7 @@ npuniden.sc <- function(X=NULL,
         } else {
             ## Constrain the density
             Amat <- cbind(rep(1,n.train),A,-A)
-            bvec <- c(0,l-f,f-u)
+            bvec <- c(0,lb-f,f-ub)
         }
         output.QP <- tryCatch(solve.QP(Dmat=Dmat,
                                        dvec=dvec,
@@ -227,14 +239,30 @@ npuniden.sc <- function(X=NULL,
         index <- 1:length(Y)
     }
 
+    se.f <- sqrt(abs(f*int.kernel.squared(X.grid,h,a,b)/(h*length(f))))[index]
+    se.f.sc <- sqrt(abs(f.sc*int.kernel.squared(X.grid,h,a,b)/(h*length(f.sc))))[index]    
+
+    F <- integrate.trapezoidal(X.grid[index],f[index])
+    F.sc <- integrate.trapezoidal(X.grid[index],f.sc[index])
+    f <- f[index]
+    f.sc <- f.sc[index]
+    f.deriv <- f.deriv[index]
+    f.sc.deriv <- f.sc.deriv[index]
+
     ## Return a list
     
-    return(list(f=f[index],
-                f.sc=f.sc[index],
-                f.deriv=f.deriv[index],
-                f.sc.deriv=f.sc.deriv[index],
+    return(list(f=f,
+                f.sc=f.sc,
+                se.f=se.f,
+                se.f.sc=se.f.sc,
+                f.deriv=f.deriv,
+                f.sc.deriv=f.sc.deriv,
+                F=F,
+                F.sc=F.sc,
+                se.F=sqrt(abs(F*(1-F)/length(F))),
+                se.F.sc=sqrt(abs(F.sc*(1-F.sc)/length(F.sc))),                
                 f.integral=int.f,
-                f.sc.integral=int.f.sc,                
+                f.sc.integral=int.f.sc,
                 solve.QP=solve.QP.flag))
 
 }
