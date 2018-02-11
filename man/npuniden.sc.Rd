@@ -22,8 +22,8 @@ npuniden.sc(X = NULL,
             b = 1,
             l = NULL,
             u = NULL,
-            extend.range = 0.1,
-            num.grid = 1000,
+            extend.range = 0,
+            num.grid = 100,
             function.distance = TRUE,
             integral.equal = TRUE,
             constraint = c("density",
@@ -43,7 +43,7 @@ a required numeric vector of training data lying in \eqn{[a,b]}
 an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 }
   \item{h}{
-an bandwidth (>0)
+a bandwidth (\eqn{>0})
 }
   \item{a}{
 an optional lower bound on the support of \code{X} or \code{Y} (defaults to 0)
@@ -113,6 +113,20 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
   causes to be investigated are undersmoothing and sparsity. To
   investigate the former try using a larger bandwidth, and for the
   latter try decreasing \code{extend.range}.
+
+  Mean square error performance seems to improve generally when using
+  additional grid points in the empirical support of \code{X} and
+  \code{Y} (i.e., in the observed range of the data sample) but appears
+  to deteriorate when imposing constraints beyond the empirical support
+  (i.e., when \code{extend.range} is positive). Increasing the number of
+  additional points beyond a hundred or so appears to have a limited
+  impact.
+
+  The option \code{function.distance=TRUE} appears to perform better for
+  imposing convexity, concavity, log-convexity and log-concavity, while
+  \code{function.distance=FALSE} appears to perform better for imposing
+  monotonicity, whether increasing or decreasing (based on simulations
+  for the Beta(s1,s2) distribution with sample size \eqn{n=100}).
 
 }
 \value{
