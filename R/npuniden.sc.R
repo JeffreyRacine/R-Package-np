@@ -3,11 +3,14 @@ npuniden.sc <- function(X=NULL,
                         h=NULL,
                         a=0,
                         b=1,
+                        l=NULL,
+                        u=NULL,
                         extend.range=0.1,
                         num.grid=1000,
                         function.distance=TRUE,
                         integral.equal=TRUE,
-                        constraint=c("mono.incr",
+                        constraint=c("density",
+                            "mono.incr",
                             "mono.decr",
                             "concave",
                             "convex",
@@ -81,6 +84,9 @@ npuniden.sc <- function(X=NULL,
     if(is.null(h)) stop("you must provide a bandwidth")
     if(h <= 0) stop("bandwidth h must be positive")
     if(num.grid < 0) stop("num.grid must be a non-negative integer")
+    if(!is.null(l) && any(l<0)) stop("lower bound must be non-negative")
+    if(!is.null(u) && any(u<0)) stop("upper bound must be non-negative")
+    if(!is.null(l) && !is.null(u) && any(u<l)) stop("upper bound must be greater than or equal to lower bound")
 
     ## First elements are X if Y=NULL or Y, rest are to make sure
     ## constraints are imposed on the bulk of the support and a bit
@@ -101,7 +107,8 @@ npuniden.sc <- function(X=NULL,
 
     ## First or second order derivative needed, place them both in *.deriv
 
-    deriv <- 1
+    deriv <- 0
+    if(constraint=="mono.decr" || constraint=="mono.incr") deriv <- 1
     if(constraint=="concave" || constraint=="convex" || constraint=="log-concave" || constraint=="log-convex") deriv <- 2
 
     ## Second derivative uses z.a and z.b times other arguments, which
@@ -140,12 +147,15 @@ npuniden.sc <- function(X=NULL,
     constant <- 1
     attempts <- 0
     while((is.null(output.QP) || any(is.nan(output.QP$solution))) && attempts < 5) {
-        ## Identity forcing matrix minimizes the squared weight
-        ## distance
-        Dmat <- diag(n.train)
-        ## Non-identity forcing matrix minimizes the squared function
-        ## difference distance
-        if(function.distance) Dmat <- (A%*%t(A)+sqrt(.Machine$double.eps)*Dmat)/constant
+        if(function.distance) {
+            ## Non-identity forcing matrix minimizes the squared
+            ## function difference distance
+            Dmat <- (A%*%t(A)+sqrt(.Machine$double.eps)*diag(n.train))/constant
+        } else {
+            ## Identity forcing matrix minimizes the squared weight
+            ## distance
+            Dmat <- diag(n.train)/constant
+        }
         ## The unconstrained weight vector contains zeros
         dvec <- rep(0,n.train)
         if(constraint=="log-concave" || constraint=="log-convex") {
@@ -153,12 +163,16 @@ npuniden.sc <- function(X=NULL,
             ## no need to impose this constraint (will be slack)
             Amat <- cbind(rep(1,n.train),sign.deriv*A.deriv)
             bvec <- c(0,-sign.deriv*f.deriv)
-        } else {
+        } else if(constraint!="density") {
             ## For other constraints we need to enforce non-negativity
             ## of the estimate - in either case, the unconstrained
             ## weights are zero hence the "sum to zero" constraint
             Amat <- cbind(rep(1,n.train),A,sign.deriv*A.deriv)
             bvec <- c(0,-f,-sign.deriv*f.deriv)
+        } else {
+            ## Constrain the density
+            Amat <- cbind(rep(1,n.train),A,-A)
+            bvec <- c(0,l-f,f-u)
         }
         output.QP <- tryCatch(solve.QP(Dmat=Dmat,
                                        dvec=dvec,

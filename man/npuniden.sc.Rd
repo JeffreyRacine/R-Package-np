@@ -20,11 +20,14 @@ npuniden.sc(X = NULL,
             h = NULL,
             a = 0,
             b = 1,
+            l = NULL,
+            u = NULL,
             extend.range = 0.1,
             num.grid = 1000,
             function.distance = TRUE,
             integral.equal = TRUE,
-            constraint = c("mono.incr",
+            constraint = c("density",
+                           "mono.incr",
                            "mono.decr",
                            "concave",
                            "convex",
@@ -43,10 +46,18 @@ an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 an bandwidth (>0)
 }
   \item{a}{
-an optional lower bound (defaults to 0)
+an optional lower bound on the support of \code{X} or \code{Y} (defaults to 0)
 }
   \item{b}{
-an optional upper bound (defaults to 1)
+an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
+}
+\item{l}{
+  a scalar lower bound to be used in conjunction with
+  \code{constraint="density"}
+}
+\item{lu}{
+  a scalar upper bound to be used in conjunction with
+  \code{constraint="density"}
 }
 \item{extend.range}{
   number specifying the fraction by which the range of the training data
