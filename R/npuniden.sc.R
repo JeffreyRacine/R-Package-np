@@ -159,7 +159,7 @@ npuniden.sc <- function(X=NULL,
     output.QP <- NULL
     constant <- 1
     attempts <- 0
-    while((is.null(output.QP) || any(is.nan(output.QP$solution))) && attempts < 5) {
+    while((is.null(output.QP) || any(is.na(output.QP$solution))) && attempts < 5) {
         if(function.distance) {
             ## Non-identity forcing matrix minimizes the squared
             ## function difference distance
@@ -202,7 +202,7 @@ npuniden.sc <- function(X=NULL,
     ## If solve.QP cannot find a solution issue an immediate warning
     ## but return the unconstrained vector
 
-    if(is.null(output.QP) || any(is.nan(output.QP$solution))) {
+    if(is.null(output.QP) || any(is.na(output.QP$solution))) {
         warning(" solve.QP was unable to find a solution, unconstrained estimate returned ", immediate. = TRUE)
         output.QP$solution <- rep(0,n.train)
         solve.QP.flag <- FALSE

@@ -1,11 +1,12 @@
-* Added function for shape constrained univariate density estimation with bounds
+* Added function for shape constrained bounded univariate PDF and CDF estimation
+  (npuniden.sc)
 
 * Added option for renormalizing improper bounded density
  estimates than can arise from the use of asymmetric negative edge
- kernel functions (proper=TRUE)
+ kernel functions (proper=TRUE, npuniden.boundary)
 
 * Fixed issues with CDF estimation in the presence of large bandwidths for
-  bounded density estimates
+  bounded density estimates (npuniden.boundary)
 
 Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]
 

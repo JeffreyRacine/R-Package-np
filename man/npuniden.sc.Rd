@@ -77,7 +77,7 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
   squared deviation between the constrained and unconstrained weights
 }
 \item{integral.equal}{
-  a logical value, that, if \code{TRUE} adjusts the constrained estimate
+  a logical value, that, if \code{TRUE}, adjusts the constrained estimate
   to have the same probability mass over the range \code{X}, \code{Y},
   and the additional grid points
 }
@@ -153,12 +153,12 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
 \seealso{
-  The \pkg{logcondens} and \pkg{scdensity} packages, and the function
-  \code{\link{npuniden.boundary}}.
+  The \pkg{logcondens}, \pkg{LogConDEAD}, and \pkg{scdensity} packages,
+  and the function \code{\link{npuniden.boundary}}.
 }
 \examples{
 \dontrun{
-n <- 25
+n <- 100
 set.seed(42)
 
 ## Example 1: N(0,1), constrain the density to lie within lb=.1 and ub=.2
