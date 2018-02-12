@@ -157,17 +157,17 @@ npuniden.sc <- function(X=NULL,
 
     solve.QP.flag <- TRUE
     output.QP <- NULL
-    constant <- 1
-    attempts <- 0
-    while((is.null(output.QP) || any(is.na(output.QP$solution))) && attempts < 5) {
+    constant <- c(1,1/10,10,1/100,100,1/1000,1000,1/10000,10000,1/100000,100000)
+    attempts <- 1
+    while((is.null(output.QP) || any(is.na(output.QP$solution))) && attempts <= length(constant)) {
         if(function.distance) {
             ## Non-identity forcing matrix minimizes the squared
             ## function difference distance
-            Dmat <- (A%*%t(A)+sqrt(.Machine$double.eps)*diag(n.train))/constant
+            Dmat <- A%*%t(A)/constant[attempts]+sqrt(.Machine$double.eps)*diag(n.train)
         } else {
             ## Identity forcing matrix minimizes the squared weight
             ## distance
-            Dmat <- diag(n.train)/constant
+            Dmat <- diag(n.train)/constant[attempts]
         }
         ## The unconstrained weight vector contains zeros
         dvec <- rep(0,n.train)
@@ -195,7 +195,6 @@ npuniden.sc <- function(X=NULL,
                               error = function(e) NULL)
         ## Sometimes rescaling Dmat can overcome deficiencies in
         ## solve.QP
-        constant <- constant*10
         attempts <- attempts+1
     }
 
@@ -264,6 +263,7 @@ npuniden.sc <- function(X=NULL,
                 se.F.sc=sqrt(abs(F.sc*(1-F.sc)/length(F.sc))),                
                 f.integral=int.f,
                 f.sc.integral=int.f.sc,
-                solve.QP=solve.QP.flag))
+                solve.QP=solve.QP.flag,
+                attempts=attempts))
 
 }

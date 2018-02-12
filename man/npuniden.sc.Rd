@@ -112,9 +112,11 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 
   If the quadratic program solver fails to find a solution, the
   unconstrained estimate is returned with an immediate warning. Possible
-  causes to be investigated are undersmoothing and sparsity. To
-  investigate the former try using a larger bandwidth, and for the
-  latter try decreasing \code{extend.range}.
+  causes to be investigated are undersmoothing, sparsity, and the
+  presence of non-sample grid points. To investigate the possibility of
+  undersmoothing try using a larger bandwidth, to investigate sparsity
+  try decreasing \code{extend.range}, and to investigate non-sample grid
+  points try setting \code{num.grid} to \code{0}.
 
   Mean square error performance seems to improve generally when using
   additional grid points in the empirical support of \code{X} and
@@ -143,7 +145,8 @@ A list with the following elements:
 \item{F.sc }{shape constrained distribution estimate}
 \item{integral.f}{the integral of the unconstrained estimate over \code{X}, \code{Y}, and the additional grid points}
 \item{integral.f.sc}{the integral of the constrained estimate over \code{X}, \code{Y}, and the additional grid points}
-\item{solve.QP }{logical, if \code{TRUE} solve.QP succeeded, otherwise failed}
+\item{solve.QP }{logical, if \code{TRUE} \code{solve.QP} succeeded, otherwise failed}
+\item{attempts }{number of attempts when \code{solve.QP} fails (max = 9)}
 }
 \references{
 TBD
