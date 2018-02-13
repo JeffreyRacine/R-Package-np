@@ -6,9 +6,9 @@ npuniden.sc <- function(X=NULL,
                         lb=NULL,
                         ub=NULL,
                         extend.range=0,
-                        num.grid=100,
+                        num.grid=0,
                         function.distance=TRUE,
-                        integral.equal=TRUE,
+                        integral.equal=FALSE,
                         constraint=c("density",
                             "mono.incr",
                             "mono.decr",
@@ -163,7 +163,7 @@ npuniden.sc <- function(X=NULL,
         if(function.distance) {
             ## Non-identity forcing matrix minimizes the squared
             ## function difference distance
-            Dmat <- A%*%t(A)/constant[attempts]+sqrt(.Machine$double.eps)*diag(n.train)
+            Dmat <- (A%*%t(A)+sqrt(.Machine$double.eps)*diag(n.train))/constant[attempts]
         } else {
             ## Identity forcing matrix minimizes the squared weight
             ## distance
