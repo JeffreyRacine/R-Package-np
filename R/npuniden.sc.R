@@ -17,7 +17,9 @@ npuniden.sc <- function(X=NULL,
                             "log-concave",
                             "log-convex")) {
 
-    ## Gaussian kernel function, derivatives up to order two
+    constraint <- match.arg(constraint)
+
+    ## Gaussian1 kernel function, derivatives up to order two
 
     kernel <- function(x,X,h,a=0,b=1,deriv=0) {
 
@@ -29,10 +31,6 @@ npuniden.sc <- function(X=NULL,
         z <- (x-X)/h
         z.a <- (a-x)/h
         z.b <- (b-x)/h
-        
-        K.z <- dnorm(z)
-        K.z.d1 <- -z*K.z/h
-        K.z.d2 <- (z^2-1)*K.z/h^2    
         
         K.z.a <- dnorm(z.a)
         K.z.b <- dnorm(z.b)
@@ -52,6 +50,10 @@ npuniden.sc <- function(X=NULL,
         
         G.z.b.d2.m.G.z.a.d2 <- G.z.b.d2-G.z.a.d2
         
+        K.z <- dnorm(z)
+        K.z.d1 <- -z*K.z/h
+        K.z.d2 <- (z^2-1)*K.z/h^2
+
         ## If the above change due to the use of different base kernel
         ## functions, the formulae below remain unaffected
         
@@ -78,14 +80,12 @@ npuniden.sc <- function(X=NULL,
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-        sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
+        sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b,deriv=0)^2)[length(X.seq)]})
     }
 
     W.kernel <- function(x,X,h,a=0,b=1,deriv=0) {
         sapply(1:length(x),function(i){kernel(x[i],X,h,a,b,deriv)})
     }
-    
-    constraint <- match.arg(constraint)
     
     if(is.null(X)) stop("you must pass a vector X")
     if(a>=b) stop("a must be less than b")
@@ -158,8 +158,14 @@ npuniden.sc <- function(X=NULL,
     solve.QP.flag <- TRUE
     output.QP <- NULL
     constant <- c(1,1/10,10,1/100,100,1/1000,1000,1/10000,10000,1/100000,100000)
+    attempts.max <- length(constant)
     attempts <- 1
-    while((is.null(output.QP) || any(is.na(output.QP$solution))) && attempts <= length(constant)) {
+    while((is.null(output.QP) || any(is.na(output.QP$solution))) && attempts <= attempts.max) {
+        if(attempts==attempts.max && !function.distance) {
+            warning("solve.QP was unable to find a solution with function.distance=FALSE, restarting with function.distance=TRUE", immediate. = TRUE)
+            attempts <- 1
+            function.distance <- TRUE
+        }
         if(function.distance) {
             ## Non-identity forcing matrix minimizes the squared
             ## function difference distance
@@ -202,7 +208,7 @@ npuniden.sc <- function(X=NULL,
     ## but return the unconstrained vector
 
     if(is.null(output.QP) || any(is.na(output.QP$solution))) {
-        warning(" solve.QP was unable to find a solution, unconstrained estimate returned ", immediate. = TRUE)
+        warning("solve.QP was unable to find a solution, unconstrained estimate returned", immediate. = TRUE)
         output.QP$solution <- rep(0,n.train)
         solve.QP.flag <- FALSE
     }
