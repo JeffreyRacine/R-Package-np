@@ -14,7 +14,7 @@ deneqtest <- function(Tn,
     In.P=In.P,    
     boot.num=boot.num)
 
-  reject <- ''
+  reject <- ' '
   
   if (Tn.P < 0.1)
     reject <- '.'
@@ -30,10 +30,11 @@ deneqtest <- function(Tn,
 
   tdeneq$reject <- reject
   tdeneq$rejectNum <- switch(reject,
-                           '.' = 10,
-                           '*' = 5,
-                           '**' = 1,
-                           '***' = 0.1)
+                             ' ' = 100,
+                             '.' = 10,
+                             '*' = 5,
+                             '**' = 1,
+                             '***' = 0.1)
   
   class(tdeneq) <- "deneqtest"
 
@@ -46,7 +47,7 @@ print.deneqtest <- function(x, ...){
       "\n\nTest Statistic ", sQuote("Tn"), ": ",
       format(x$Tn), "\tP Value: ", format.pval(x$Tn.P)," ", x$reject,
       "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
-      ifelse(x$reject == '', "\nFail to reject the null of equality at the 10% level",
+      ifelse(x$reject == ' ', "\nFail to reject the null of equality at the 10% level",
              paste("\nNull of equality is rejected at the ", x$rejectNum, "% level", sep="")),
       "\n\n", sep="")
 }

@@ -23,7 +23,7 @@ deptest <- function(Srho,
 
   } else {
 
-    reject <- ''
+    reject <- ' '
     
     if (P < 0.1)
       reject <- '.'
@@ -39,6 +39,7 @@ deptest <- function(Srho,
     
     tdep$reject <- reject
     tdep$rejectNum <- switch(reject,
+                             ' ' = 100,
                              '.' = 10,
                              '*' = 5,
                              '**' = 1,
@@ -58,7 +59,7 @@ print.deptest <- function(x, ...){
     cat(paste("\n\nTest Statistic ", sQuote("Srho"), ": ",
               format(x$Srho), "\tP Value: ", format.pval(x$P)," ", x$reject,sep=""))
     cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
-    cat(ifelse(x$reject == '', paste("\nFail to reject the null of independence at the 10% level\n\n",sep=""),
+    cat(ifelse(x$reject == ' ', paste("\nFail to reject the null of independence at the 10% level\n\n",sep=""),
                paste("\nNull of independence is rejected at the ", x$rejectNum, "% level\n\n", sep="")))
   } else {
     cat("\nConsistent Dependence Metric Entropy",

@@ -1,4 +1,4 @@
-%% $Id: np_faq.tex,v 1.98 2017/04/29 16:30:01 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.99 2018/03/16 14:22:41 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
 %\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-6. Kindly update your version should you not be using the most
+is 0.60-7. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1754,6 +1754,60 @@ cbind(optim.out$value,g.npreg$bws$fval)
 cbind(t.uniquecombs[1],t.npreg[1])
 \end{verbatim}
 
+\subsection{I want to bootstrap the standard errors for the
+  coefficients in a varying coefficient specification. Is there a
+  simple way to accomplish this?}
+
+The code below presents one way to accomplish this. For this example
+the model is
+\begin{equation*}
+Y_i=\alpha(Z_i)+X_i\beta(Z_i)+\epsilon_i,
+\end{equation*}
+where $X_i$ is experience and $Z_i$ is tenure. The estimated slope
+vector $\beta(Z_i)$ is therefore a function of tenure. We bootstrap
+its standard error and then plot the resulting estimate and 95\%
+asymptotic confidence bounds.
+
+\begin{verbatim}
+library(np)
+data(wage1)
+## Fit the model
+model <- with(wage1,npscoef(tydat=lwage,
+                            txdat=exper,
+                            tzdat=tenure,
+                            betas=TRUE))
+beta2 <- coef(model)[,2]
+## Bootstrap the standard error for the slope coefficient (there
+## will be two coefficient vectors, the intercept and slope 
+## for exper, which vary with tenure)
+B <- 100
+coef.mat <- matrix(NA,nrow(wage1),B)
+for(b in 1:B) {
+    ## Bootstrap the training data, evaluate on the original
+    ## sample realizations, hold the bandwidth constant at
+    ## that for the original model/training data
+    wage1.boot <- wage1[sample(1:nrow(wage1),replace=TRUE),]
+    model.boot <- with(wage1.boot,npscoef(tydat=lwage,
+                                          txdat=exper,
+                                          tzdat=tenure,
+                                          exdat=wage1$exper,
+                                          ezdat=wage1$tenure,
+                                          betas=TRUE,
+                                          bws=model$bw))
+    coef.mat[,b] <- coef(model.boot)[,2]
+}
+
+se.beta2 <- apply(coef.mat,1,sd)
+ci.l <- beta2-1.96*se.beta2
+ci.u <- beta2+1.96*se.beta2
+
+ylim <- range(c(beta2,ci.l,ci.u))
+with(wage1,plot(tenure,beta2,ylim=ylim))
+with(wage1,points(tenure,ci.l,col=2))
+with(wage1,points(tenure,ci.u,col=2))
+legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
+\end{verbatim}
+
 \bibliographystyle{plain} 
 
 \bibliography{np_faq}
@@ -1761,6 +1815,27 @@ cbind(t.uniquecombs[1],t.npreg[1])
 \clearpage
 
 \appendix
+
+\section*{Changes from Version 0.60-6 to 0.60-7 [01-May-2018]}
+
+\begin{itemize}
+
+\item Fix for \texttt{switch()} and zero length character strings that
+  affected summary output for certain tests
+  
+\item Added function for shape constrained bounded univariate PDF and
+  CDF estimation (\texttt{npuniden.sc()})
+
+\item Added option for renormalizing improper bounded density
+  estimates than can arise from the use of asymmetric negative edge
+  kernel functions (\texttt{proper=TRUE},
+  \texttt{npuniden.boundary()})
+
+\item Fixed issues with CDF estimation in the presence of large
+  bandwidths for bounded density estimates
+  (\texttt{npuniden.boundary()})
+
+\end{itemize}
 
 \section*{Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]}
 

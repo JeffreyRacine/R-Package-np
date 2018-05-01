@@ -1,12 +1,16 @@
+Changes from Version 0.60-6 to 0.60-7 [01-May-2018]
+
+* Fix for switch() and zero length character strings that affected summary output for certain tests
+
 * Added function for shape constrained bounded univariate PDF and CDF estimation
-  (npuniden.sc)
+  (npuniden.sc())
 
 * Added option for renormalizing improper bounded density
- estimates than can arise from the use of asymmetric negative edge
- kernel functions (proper=TRUE, npuniden.boundary)
+  estimates than can arise from the use of asymmetric negative edge
+  kernel functions (proper=TRUE, npuniden.boundary())
 
 * Fixed issues with CDF estimation in the presence of large bandwidths for
-  bounded density estimates (npuniden.boundary)
+  bounded density estimates (npuniden.boundary())
 
 Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]
 

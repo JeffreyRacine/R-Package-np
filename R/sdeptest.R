@@ -30,8 +30,8 @@ sdeptest <- function(Srho,
     tsdep$rejectNum <- character()
 
     for(k in 1:lag.num) {
-      
-      reject <- ''
+
+      reject <- ' '
       
       if (P[k] < 0.1)
         reject <- '.'
@@ -44,13 +44,14 @@ sdeptest <- function(Srho,
       
       if (P[k] < 0.001)
         reject <- '***'
-      
+
       tsdep$reject[k] <- reject
       tsdep$rejectNum[k] <- switch(reject,
-                                  '.' = 10,
-                                  '*' = 5,
-                                  '**' = 1,
-                                  '***' = 0.1)
+                                   ' ' = 100,
+                                   '.' = 10,
+                                   '*' = 5,
+                                   '**' = 1,
+                                   '***' = 0.1)
 
     }
     
@@ -59,6 +60,7 @@ sdeptest <- function(Srho,
   class(tsdep) <- "sdeptest"
 
   tsdep
+  
 }
 
 print.sdeptest <- function(x, ...){
@@ -74,7 +76,7 @@ print.sdeptest <- function(x, ...){
     cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
     
     for(k in 1:x$lag.num) {
-      cat(ifelse(x$reject[k] == '', paste("\nFail to reject the null of independence at lag ", k, " at the 10% level",sep=""),
+      cat(ifelse(x$reject[k] == ' ', paste("\nFail to reject the null of independence at lag ", k, " at the 10% level",sep=""),
                  paste("\nNull of independence is rejected at lag ", k, " at the ", x$rejectNum[k], "% level", sep="")))
     }
   } else {
