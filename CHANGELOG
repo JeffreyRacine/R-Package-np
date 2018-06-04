@@ -1,3 +1,7 @@
+Changes from Version 0.60-7 to 0.60-8 [04-Jun-2018]
+
+* Used patch suggested by Scott Thompson for issue https://github.com/JeffreyRacine/R-Package-np/issues/8 regarding npcdens/npcdist and formulas
+
 Changes from Version 0.60-6 to 0.60-7 [01-May-2018]
 
 * Fix for switch() and zero length character strings that affected summary output for certain tests
