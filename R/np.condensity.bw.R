@@ -34,6 +34,12 @@ npcdensbw.formula <-
 
     mf[[1]] <- as.name("model.frame")
 
+    if (m[2] > 0) { # use data as environment
+        mf[["formula"]] = eval(mf[[m[1]]], environment(mf[[m[2]]]))
+    } else { # use parent frame
+        mf[["formula"]] = eval(mf[[m[1]]], parent.frame())
+    }
+    
     variableNames <- explodeFormula(mf[["formula"]])
     
     ## make formula evaluable, then eval
