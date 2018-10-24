@@ -841,6 +841,10 @@ npplot.rbandwidth <-
            main = NULL,
            type = NULL,
            border = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -1058,6 +1062,10 @@ npplot.rbandwidth <-
                   x2.eval,
                   lerr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -1077,6 +1085,10 @@ npplot.rbandwidth <-
                 col = persp.col,
                 border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
+                cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(bws$xnames[2], "X2")),
                 zlab = ifelse(!is.null(zlab),zlab,gen.label(bws$ynames,"Conditional Mean")),
@@ -1090,6 +1102,10 @@ npplot.rbandwidth <-
                   x2.eval,
                   herr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -1161,7 +1177,7 @@ npplot.rbandwidth <-
           paste('Gradient Component ', i, ' of', sep=''), ''),
           gen.label(bws$ynames, 'Conditional Mean'))),"
 
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1),"))
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1), cex.axis = ifelse(!is.null(cex.axis),cex.axis,1), cex.lab = ifelse(!is.null(cex.lab),cex.lab,1), cex.main = ifelse(!is.null(cex.main),cex.main,1.2), cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
@@ -1366,6 +1382,10 @@ npplot.scbandwidth <-
            main = NULL,
            type = NULL,
            border = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -1629,6 +1649,10 @@ npplot.scbandwidth <-
                   x2.eval,
                   lerr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -1648,6 +1672,10 @@ npplot.scbandwidth <-
                 col = persp.col,
                 border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
+                cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(x2.names[1], "X2")),
                 zlab = ifelse(!is.null(zlab),zlab,gen.label(bws$ynames,"Conditional Mean")),
@@ -1661,6 +1689,10 @@ npplot.scbandwidth <-
                   x2.eval,
                   herr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -1759,7 +1791,7 @@ npplot.scbandwidth <-
           paste('Gradient Component ', i, ' of', sep=''), ''),
           gen.label(bws$ynames, 'Conditional Mean')),"
 
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1),"))
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1), cex.axis = ifelse(!is.null(cex.axis),cex.axis,1), cex.lab = ifelse(!is.null(cex.lab),cex.lab,1), cex.main = ifelse(!is.null(cex.main),cex.main,1.2), cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
@@ -2091,6 +2123,10 @@ npplot.plbandwidth <-
            main = NULL,
            type = NULL,
            border = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -2341,6 +2377,10 @@ npplot.plbandwidth <-
                   z1.eval,
                   lerr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -2360,6 +2400,10 @@ npplot.plbandwidth <-
                 col = persp.col,
                 border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
+                cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "Z1")),
                 zlab = ifelse(!is.null(zlab),zlab,gen.label(names(ydat),"Conditional Mean")),
@@ -2373,6 +2417,10 @@ npplot.plbandwidth <-
                   z1.eval,
                   herr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -2467,7 +2515,7 @@ npplot.plbandwidth <-
           paste('Gradient Component ', i, ' of', sep=''), ''),
           gen.label(bws$ynames, 'Conditional Mean')),"
 
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1),"))
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1), cex.axis = ifelse(!is.null(cex.axis),cex.axis,1), cex.lab = ifelse(!is.null(cex.lab),cex.lab,1), cex.main = ifelse(!is.null(cex.main),cex.main,1.2), cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
@@ -2787,6 +2835,10 @@ npplot.bandwidth <-
            main = NULL,
            type = NULL,
            border = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -2996,6 +3048,10 @@ npplot.bandwidth <-
                   x2.eval,
                   lerr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -3015,6 +3071,10 @@ npplot.bandwidth <-
                 col = persp.col,
                 border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
+                cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "X2")),
                 zlab = ifelse(!is.null(zlab),zlab,"Joint Density"),
@@ -3028,6 +3088,10 @@ npplot.bandwidth <-
                   x2.eval,
                   herr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -3100,7 +3164,7 @@ npplot.bandwidth <-
 
       pylabE = paste("ylab = ", "ifelse(!is.null(ylab),ylab,'Density')", ",")
 
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1),"))
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1), cex.axis = ifelse(!is.null(cex.axis),cex.axis,1), cex.lab = ifelse(!is.null(cex.lab),cex.lab,1), cex.main = ifelse(!is.null(cex.main),cex.main,1.2), cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
@@ -3286,6 +3350,10 @@ npplot.dbandwidth <-
            main = NULL,
            type = NULL,
            border = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -3487,6 +3555,10 @@ npplot.dbandwidth <-
                   x2.eval,
                   lerr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -3506,6 +3578,10 @@ npplot.dbandwidth <-
                 col = persp.col,
                 border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
+                cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "X2")),
                 zlab = ifelse(!is.null(zlab),zlab,"Joint Distribution"),
@@ -3519,6 +3595,10 @@ npplot.dbandwidth <-
                   x2.eval,
                   herr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -3591,7 +3671,7 @@ npplot.dbandwidth <-
 
       pylabE = "ylab = ifelse(!is.null(ylab),ylab,'Distribution'),"
 
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1),"))
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1), cex.axis = ifelse(!is.null(cex.axis),cex.axis,1), cex.lab = ifelse(!is.null(cex.lab),cex.lab,1), cex.main = ifelse(!is.null(cex.main),cex.main,1.2), cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
@@ -3774,6 +3854,10 @@ npplot.conbandwidth <-
            main = NULL,
            type = NULL,
            border = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -4061,6 +4145,10 @@ npplot.conbandwidth <-
                   x2.eval,
                   lerr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -4080,6 +4168,10 @@ npplot.conbandwidth <-
                 col = persp.col,
                 border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
+                cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(ydat)[1], "Y")),
                 zlab = ifelse(!is.null(zlab),zlab,paste("Conditional", ifelse(cdf,"Distribution", "Density"))),
@@ -4093,6 +4185,10 @@ npplot.conbandwidth <-
                   x2.eval,
                   herr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -4185,7 +4281,7 @@ npplot.conbandwidth <-
 
       pylabE = paste("ylab =", "ifelse(!is.null(ylab),ylab,paste(", ifelse(gradients,"'GC',j,'of',",''), "tylabE)),")
 
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1),"))
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1), cex.axis = ifelse(!is.null(cex.axis),cex.axis,1), cex.lab = ifelse(!is.null(cex.lab),cex.lab,1), cex.main = ifelse(!is.null(cex.main),cex.main,1.2), cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
@@ -4540,6 +4636,10 @@ npplot.condbandwidth <-
            main = NULL,
            type = NULL,
            border = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -4824,6 +4924,10 @@ npplot.condbandwidth <-
                   x2.eval,
                   lerr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -4843,6 +4947,10 @@ npplot.condbandwidth <-
                 col = persp.col,
                 border = ifelse(!is.null(border),border,"black"),
                 ticktype = "detailed",
+                cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(ydat)[1], "Y")),
                 zlab = ifelse(!is.null(zlab),zlab,paste("Conditional", ifelse(cdf,"Distribution", "Density"))),
@@ -4856,6 +4964,10 @@ npplot.condbandwidth <-
                   x2.eval,
                   herr,
                   zlim = zlim,
+                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,1),
+                  cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                   col = persp.col,
                   border = ifelse(!is.null(border),border,"grey"),
                   ticktype = "detailed",
@@ -4948,7 +5060,7 @@ npplot.condbandwidth <-
 
       pylabE = paste("ylab =", "paste(", ifelse(gradients,"'GC',j,'of',",''), "tylabE),")
 
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1),"))
+      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,1), col = ifelse(!is.null(col),col,1), lwd = ifelse(!is.null(lwd),lwd,1), cex.axis = ifelse(!is.null(cex.axis),cex.axis,1), cex.lab = ifelse(!is.null(cex.lab),cex.lab,1), cex.main = ifelse(!is.null(cex.main),cex.main,1.2), cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
@@ -5295,6 +5407,10 @@ npplot.sibandwidth <-
            gradients = FALSE,
            main = NULL,
            type = NULL,
+           cex.axis = NULL,
+           cex.lab = NULL,
+           cex.main = NULL,
+           cex.sub = NULL,
            col = NULL,
            ylab = NULL,
            xlab = NULL,
@@ -5448,6 +5564,10 @@ npplot.sibandwidth <-
           plot(tobj$index[i.sort], temp.mean[i.sort],
                ylim = ifelse(!is.null(ylim),ylim,c(ymin,ymax)),
                xlim = xlim,
+               cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+               cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+               cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+               cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                xlab = ifelse(!is.null(xlab),xlab,"index"),
                ylab = ifelse(!is.null(ylab),ylab,gen.label(bws$ynames, 'Conditional Mean')),
                type = ifelse(!is.null(type),type,'l'),
@@ -5476,6 +5596,10 @@ npplot.sibandwidth <-
           }
         } else {
           plot(tobj$index[i.sort], temp.mean[i.sort],
+               cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+               cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+               cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+               cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                xlab = ifelse(!is.null(xlab),xlab,"Index"),
                ylab = ifelse(!is.null(ylab),ylab,gen.label(bws$ynames, 'Conditional Mean')),
                type = ifelse(!is.null(type),type,'l'),
@@ -5536,6 +5660,10 @@ npplot.sibandwidth <-
             
             plot(tobj$index[i.sort], temp.mean[i.sort]*bws$beta[i],
                  ylim = ylim,
+                 cex.axis = ifelse(!is.null(cex.axis),cex.axis,1),
+                 cex.lab =  ifelse(!is.null(cex.lab),cex.lab,1),
+                 cex.main = ifelse(!is.null(cex.main),cex.main,1.2),
+                 cex.sub = ifelse(!is.null(cex.sub),cex.sub,1),
                  xlab = ifelse(!is.null(xlab),xlab,"index"),
                  ylab = paste("Gradient Component",i, "of", gen.label(bws$ynames, 'Conditional Mean')),
                  lty = ifelse(!is.null(lty),lty,1),
