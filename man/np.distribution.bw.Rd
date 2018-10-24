@@ -499,7 +499,7 @@ npudistbw(\dots)
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}},  \code{\link{hist}},
   \code{\link{npudist}}, \code{\link{npudist}} }
 \examples{
-\dontrun{
+% \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous.
@@ -708,6 +708,6 @@ bw <- npudistbw(dat=data, bws=c(1, 1))
 summary(bw)
 
 detach(Italy)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{nonparametric}

@@ -193,7 +193,7 @@ npudist(bws, \dots)
 \seealso{ \code{\link{npudistbw}} , \code{\link{density}} }
 
 \examples{
-\dontrun{
+% \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), then create a
 # data frame in which year is an ordered factor, GDP is continuous,
@@ -388,7 +388,7 @@ summary(bw)
 plot(bw, xtrim=-0.2)
 
 detach(faithful)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
 

@@ -1126,7 +1126,7 @@ npplot.rbandwidth <-
     } else {
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$ndim))
+        par(mfrow=n2mfrow(bws$ndim),cex=par()$cex)
 
       ev = xdat[1,,drop = FALSE]
 
@@ -1350,7 +1350,7 @@ npplot.rbandwidth <-
       }
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=c(1,1))
+        par(mfrow=c(1,1),cex=par()$cex)
       
       if (plot.behavior != "plot"){
         names(plot.out) =
@@ -1716,7 +1716,7 @@ npplot.scbandwidth <-
       tot.dim <- (bws$xndim <- length(bws$xdati$icon)) + (bws$zndim <- length(bws$zdati$icon))
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(tot.dim))
+        par(mfrow=n2mfrow(tot.dim),cex=par()$cex)
 
       maxneval = max(c(sapply(xdat,nlevels), unlist(sapply(zdat,nlevels)), neval))
       all.isFactor = c(sapply(xdat, is.factor), unlist(sapply(zdat, is.factor)))
@@ -2091,7 +2091,7 @@ npplot.scbandwidth <-
       }
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=c(1,1))
+        par(mfrow=c(1,1),cex=par()$cex)
       
       if (plot.behavior != "plot"){
         names(plot.out) =
@@ -2443,7 +2443,7 @@ npplot.plbandwidth <-
 ##      stop("not yet supported!")
       
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$xndim + bws$zndim))
+        par(mfrow=n2mfrow(bws$xndim + bws$zndim),cex=par()$cex)
 
       x.ev = xdat[1,,drop = FALSE]
       z.ev = zdat[1,,drop = FALSE]
@@ -2809,7 +2809,7 @@ npplot.plbandwidth <-
       }
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=c(1,1))
+        par(mfrow=c(1,1),cex=par()$cex)
       
       if (plot.behavior != "plot"){
         names(plot.out) =
@@ -3113,7 +3113,7 @@ npplot.bandwidth <-
     } else {
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$ndim))
+        par(mfrow=n2mfrow(bws$ndim),cex=par()$cex)
 
       ev = xdat[1,,drop = FALSE]
 
@@ -3329,7 +3329,7 @@ npplot.bandwidth <-
       }
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=c(1,1))
+        par(mfrow=c(1,1),cex=par()$cex)
 
       if (plot.behavior != "plot"){
         names(plot.out) = paste("d",1:bws$ndim,sep="")
@@ -3620,7 +3620,7 @@ npplot.dbandwidth <-
     } else {
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$ndim))
+        par(mfrow=n2mfrow(bws$ndim),cex=par()$cex)
 
       ev = xdat[1,,drop = FALSE]
 
@@ -3828,7 +3828,7 @@ npplot.dbandwidth <-
       }
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=c(1,1))
+        par(mfrow=c(1,1),cex=par()$cex)
 
       if (plot.behavior != "plot"){
         names(plot.out) = paste("d",1:bws$ndim,sep="")
@@ -4208,7 +4208,7 @@ npplot.conbandwidth <-
       tot.dim = bws$xndim + bws$yndim - quantreg
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(dsf*tot.dim))
+        par(mfrow=n2mfrow(dsf*tot.dim),cex=par()$cex)
 
       x.ev = xdat[1,,drop = FALSE]
       y.ev = ydat[1,,drop = FALSE]
@@ -4610,7 +4610,7 @@ npplot.conbandwidth <-
       }
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=c(1,1))
+        par(mfrow=c(1,1),cex=par()$cex)
 
       if (plot.behavior != "plot"){
         names(plot.out) = paste("cd", 1:tot.dim, sep="")
@@ -4987,7 +4987,7 @@ npplot.condbandwidth <-
       tot.dim = bws$xndim + bws$yndim - quantreg
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(dsf*tot.dim))
+        par(mfrow=n2mfrow(dsf*tot.dim),cex=par()$cex)
 
       x.ev = xdat[1,,drop = FALSE]
       y.ev = ydat[1,,drop = FALSE]
@@ -5389,7 +5389,7 @@ npplot.condbandwidth <-
       }
 
       if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=c(1,1))
+        par(mfrow=c(1,1),cex=par()$cex)
 
       if (plot.behavior != "plot"){
         names(plot.out) = paste("cd", 1:tot.dim, sep="")
@@ -5504,7 +5504,7 @@ npplot.sibandwidth <-
 
 
     if (plot.behavior != "data" && plot.par.mfrow)
-      par(mfrow=if(gradients) n2mfrow(bws$ndim) else c(1,1))
+      par(mfrow=if(gradients) n2mfrow(bws$ndim) else c(1,1),cex=par()$cex)
 
     plot.out = list()
 
@@ -5706,7 +5706,7 @@ npplot.sibandwidth <-
       }
     
     if (plot.behavior != "data" && plot.par.mfrow)
-      par(mfrow=c(1,1))
+      par(mfrow=c(1,1),cex=par()$cex)
     
     if (plot.behavior != "plot"){
       names(plot.out) = paste(ifelse(gradients, "si.grad", "si"),1:ncol(xdat),sep="")
