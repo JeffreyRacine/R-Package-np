@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-8. Kindly update your version should you not be using the most
+is 0.60-9. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1815,6 +1815,14 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 \clearpage
 
 \appendix
+
+\section*{Changes from Version 0.60-8 to 0.60-9 [24-Oct-2018]}
+
+\begin{itemize}
+
+\item Added support for character expansion to \texttt{npplot()} (which is invoked by calling \texttt{plot()} on an np object) - will take defaults from the environment \texttt{par()} or can be set directly, e.g., \texttt{plot(foo,cex.main=0.8)}
+
+\end{itemize}
 
 \section*{Changes from Version 0.60-7 to 0.60-8 [04-Jun-2018]}
 

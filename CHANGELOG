@@ -1,3 +1,7 @@
+Changes from Version 0.60-8 to 0.60-9 [24-Oct-2018]
+
+* Added support for character expansion to npplot() (which is invoked by calling plot() on an np object) - will take defaults from the environment par() or can be set directly, e.g., plot(foo,cex.main=0.8)
+
 Changes from Version 0.60-7 to 0.60-8 [04-Jun-2018]
 
 * Used patch suggested by Scott Thompson for issue https://github.com/JeffreyRacine/R-Package-np/issues/8 regarding npcdens/npcdist and formulas
