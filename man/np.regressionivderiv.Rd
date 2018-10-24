@@ -209,7 +209,7 @@ npregivderiv(y,
 \code{\link{npregiv},\link{npreg}}
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
 
@@ -279,6 +279,6 @@ plot(z,model.ivderiv$phi.prime,
      type="l",
      lwd=2)
 rug(z)     
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ instrument }
