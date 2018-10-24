@@ -32,6 +32,10 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        main = NULL,
        type = NULL,
        border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
        col = NULL,
        ylab = NULL,
        xlab = NULL,
@@ -77,6 +81,10 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        main = NULL,
        type = NULL,
        border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
        col = NULL,
        ylab = NULL,
        xlab = NULL,
@@ -124,6 +132,10 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        main = NULL,
        type = NULL,
        border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
        col = NULL,
        ylab = NULL,
        xlab = NULL,
@@ -167,6 +179,10 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        main = NULL,
        type = NULL,
        border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
        col = NULL,
        ylab = NULL,
        xlab = NULL,
@@ -213,6 +229,10 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        main = NULL,
        type = NULL,
        border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
        col = NULL,
        ylab = NULL,
        xlab = NULL,
@@ -391,6 +411,36 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   \item{border}{
     optional character indicating the border of plotting; actually any of
     the borders as in \code{\link{plot.default}}. Defaults to \code{NULL}.
+  }
+
+  \item{cex.axis}{
+    The magnification to be used for axis annotation relative to the
+    current setting of cex.
+  }
+
+  \item{cex.axis}{
+    The magnification to be used for axis annotation relative to the
+    current setting of cex.
+  }
+
+  \item{cex.axis}{
+    The magnification to be used for axis annotation relative to the
+    current setting of cex.
+  }
+
+  \item{cex.lab}{
+    The magnification to be used for x and y labels relative to the
+    current setting of cex.
+  }
+
+  \item{cex.main}{
+    The magnification to be used for main titles relative to the
+    current setting of cex.
+  }
+
+  \item{cex.sub}{
+    The magnification to be used for sub-titles relative to the
+    current setting of cex.
   }
 
   \item{col}{
