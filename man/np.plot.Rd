@@ -422,16 +422,6 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
     current setting of cex.
   }
 
-  \item{cex.axis}{
-    The magnification to be used for axis annotation relative to the
-    current setting of cex.
-  }
-
-  \item{cex.axis}{
-    The magnification to be used for axis annotation relative to the
-    current setting of cex.
-  }
-
   \item{cex.lab}{
     The magnification to be used for x and y labels relative to the
     current setting of cex.
