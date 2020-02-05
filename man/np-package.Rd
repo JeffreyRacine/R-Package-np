@@ -128,12 +128,13 @@
 }
 
 \details{ The kernel methods in \code{np} employ the so-called
-	`generalized product kernels' found in Hall, Racine, and Li (2004),
-	Li, Lin, and Racine (2013), Li, Ouyang, and Racine (2013), Li and
-	Racine (2003), Li and Racine (2004), Li and Racine (2007), Li and
-	Racine (2010), Ouyang, Li, and Racine (2006), and Racine and Li
-	(2004), among others. For details on a particular method, kindly refer
-	to the original references listed above.
+	\sQuote{generalized product kernels} found in Hall, Racine,
+	and Li (2004), Li, Lin, and Racine (2013), Li, Ouyang, and
+	Racine (2013), Li and Racine (2003), Li and Racine (2004), Li
+	and Racine (2007), Li and Racine (2010), Ouyang, Li, and
+	Racine (2006), and Racine and Li (2004), among others. For
+	details on a particular method, kindly refer to the original
+	references listed above.
 
   We briefly describe the particulars of various univariate kernels used
   to generate the generalized product kernels that underlie the kernel

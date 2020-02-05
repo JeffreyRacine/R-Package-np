@@ -113,7 +113,7 @@ npdeptest(data.x = NULL,
   when \code{data.x} and \code{data.y} lack common support or are sparse
   (the summation version involves division of densities while the
   integration version involves differences). Warning messages are
-  produced should this occur (`integration recommended') and should be
+  produced should this occur (\sQuote{integration recommended}) and should be
   heeded.
  
 }

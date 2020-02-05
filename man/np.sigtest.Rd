@@ -89,9 +89,9 @@ npsigtest(bws, \dots)
   }
 
   \item{boot.type}{
-    a character string specifying whether to use a `Bootstrap I' or
-    `Bootstrap II' method (see Racine, Hart, and Li (2006) for
-    details). The `Bootstrap II' method re-runs cross-validation for
+    a character string specifying whether to use a \sQuote{Bootstrap I} or
+    \sQuote{Bootstrap II} method (see Racine, Hart, and Li (2006) for
+    details). The \sQuote{Bootstrap II} method re-runs cross-validation for
     each bootstrap replication and uses the new cross-validated
     bandwidth for variable \eqn{i} and the original ones for the
     remaining variables. Defaults to \code{boot.type="I"}.

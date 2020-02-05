@@ -92,8 +92,7 @@ functions are summarized in Table \ref{np function table} below.
 \code{npdeneqtest} &  Nonparametric Test for Equality of Densities & \citet{LI_MAASOUMI_RACINE:2009} \\
 \code{npdeptest} &  Nonparametric Entropy Test for Pairwise Dependence & \citet{MAASOUMI_RACINE:2002} \\
 \code{npsdeptest} & Nonparametric Entropy Test for Serial Nonlinear Dependence& \citet{GRANGER_MAASOUMI_RACINE:2004}\\
-\code{npsymtest} & Nonparametric Entropy Test for Asymmetry&
-\citet{RACINE_MAASOUMI:2007}, \citet{MAASOUMI_RACINE:2009}\\
+\code{npsymtest} & Nonparametric Entropy Test for Asymmetry&\citet{RACINE_MAASOUMI:2007}, \citet{MAASOUMI_RACINE:2009}\\
 \code{npunitest} &  Nonparametric Entropy Test for Univariate Density Equality & \citet{MAASOUMI_RACINE:2002}\\
 \hline
     \end{tabular}

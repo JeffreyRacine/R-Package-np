@@ -1,24 +1,40 @@
+Changes from Version 0.60-9 to 0.60-10 [5-Feb-2020]
+
+* Corrected issue `Documented arguments not in usage in documentation
+  object se: ...'
+
+* Removal of directed quotes in some Rd documents, replacement with sQuote
+
+* Fixed issue causing rebuilding of vignettes to crash (uocquantile() was
+  the culprit)
+
 Changes from Version 0.60-8 to 0.60-9 [24-Oct-2018]
 
-* Added support for character expansion to npplot() (which is invoked by calling plot() on an np object) - will take defaults from the environment par() or can be set directly, e.g., plot(foo,cex.main=0.8)
+* Added support for character expansion to npplot() (which is invoked
+  by calling plot() on an np object) - will take defaults from the
+  environment par() or can be set directly, e.g.,
+  plot(foo,cex.main=0.8)
 
 Changes from Version 0.60-7 to 0.60-8 [04-Jun-2018]
 
-* Used patch suggested by Scott Thompson for issue https://github.com/JeffreyRacine/R-Package-np/issues/8 regarding npcdens/npcdist and formulas
+* Used patch suggested by Scott Thompson for issue
+  https://github.com/JeffreyRacine/R-Package-np/issues/8 regarding
+  npcdens/npcdist and formulas
 
 Changes from Version 0.60-6 to 0.60-7 [01-May-2018]
 
-* Fix for switch() and zero length character strings that affected summary output for certain tests
+* Fix for switch() and zero length character strings that affected
+  summary output for certain tests
 
-* Added function for shape constrained bounded univariate PDF and CDF estimation
-  (npuniden.sc())
+* Added function for shape constrained bounded univariate PDF and CDF
+  estimation (npuniden.sc())
 
-* Added option for renormalizing improper bounded density
-  estimates than can arise from the use of asymmetric negative edge
-  kernel functions (proper=TRUE, npuniden.boundary())
+* Added option for renormalizing improper bounded density estimates
+  than can arise from the use of asymmetric negative edge kernel
+  functions (proper=TRUE, npuniden.boundary())
 
-* Fixed issues with CDF estimation in the presence of large bandwidths for
-  bounded density estimates (npuniden.boundary())
+* Fixed issues with CDF estimation in the presence of large bandwidths
+  for bounded density estimates (npuniden.boundary())
 
 Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]
 
@@ -26,8 +42,7 @@ Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]
   glitches addressed
 
 * Added asymptotic standard errors and integrated density (CDF) to
-  npuniden.boundary() and npuniden.reflect() plus additional
-  examples
+  npuniden.boundary() and npuniden.reflect() plus additional examples
 
 * Added least squares cross-validation to npuniden.boundary() (default
   for boundary kernel functions)

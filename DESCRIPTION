@@ -1,6 +1,6 @@
 Package: np
-Version: 0.60-9
-Date: 2018-10-24
+Version: 0.60-10
+Date: 2020-02-05
 Imports: boot, cubature, methods, quadprog, quantreg, stats
 Suggests: MASS
 Title: Nonparametric Kernel Smoothing Methods for Mixed Data Types

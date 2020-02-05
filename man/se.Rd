@@ -7,7 +7,6 @@ se(x)
 \arguments{
   \item{x}{an object for which the extraction of standard errors is
     meaningful.}
-  \item{\dots}{other arguments.}
 }
 \value{
   Standard errors extracted from the model object \code{x}.

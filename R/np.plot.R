@@ -775,7 +775,7 @@ compute.bootstrap.errors.sibandwidth =
 
 
 uocquantile <- function(x, prob) {
-  if(prob < 0 || prob > 1) stop("'prob' outside [0,1]")
+  if(any(prob < 0 | prob > 1)) stop("'prob' outside [0,1]")
   if(any(is.na(x))||any(is.nan(x))) stop("missing values and NaN's not allowed")
   if (is.ordered(x)){
     tq = unclass(table(x))

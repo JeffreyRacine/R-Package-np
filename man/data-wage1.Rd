@@ -15,8 +15,8 @@ dataset \code{"wage"} plus additional objects \code{"bw.all"} and
 
 \format{ A data frame with 24 columns, and 526 rows.
 
-    Two local-linear \code{rbandwidth} objects (`\code{bw.all}' and
-    `\code{bw.subset}') have been computed for the user's convenience
+    Two local-linear \code{rbandwidth} objects (\code{bw.all} and
+    \code{bw.subset}) have been computed for the user's convenience
     which can be used to visualize this dataset using
     \code{\link{plot}(bw.all)}
   

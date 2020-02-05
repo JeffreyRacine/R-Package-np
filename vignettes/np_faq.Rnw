@@ -35,7 +35,7 @@ are encountering unexpected or undesired behavior when trying to use
 the \texttt{np} package.
 
 Many of the underlying C routines have been extensively tested over
-the past two decades. However, the \texttt{R} `hooks' needed to call
+the past two decades. However, the \texttt{R} 'hooks' needed to call
 these routines along with processing of the data required for a
 seamless user experience may produce unexpected or undesired results
 in some settings.
@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-9. Kindly update your version should you not be using the most
+is 0.60-10. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -119,7 +119,7 @@ A BibTeX entry for LaTeX users is
   the \texttt{np} package are directed to the \texttt{Ecdat} \cite{Ecdat}
   and \texttt{AER} \cite{AER} packages.
 
-  I maintain a `Gallery' to provide a forum for users to share code
+  I maintain a 'Gallery' to provide a forum for users to share code
   and discover examples and illustrations which can be found at
   \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
 
@@ -145,7 +145,7 @@ A BibTeX entry for LaTeX users is
   Certainly. The Comprehensive R Archive Network (CRAN) is a network
   of ftp and web servers around the world that store identical,
   up-to-date, versions of code and documentation for \texttt{R}.  The
-  CRAN `task view' for computational econometrics might be of
+  CRAN 'task view' for computational econometrics might be of
   particular interest to econometricians.  The econometric task view
   provides an excellent summary of both parametric and nonparametric
   econometric packages that exist for the R environment and provides
@@ -173,11 +173,11 @@ or
 update.views("Econometrics")
 \end{verbatim}
 
-\subsection{Is there a `gentle guide' to the \texttt{np} package that
+\subsection{Is there a 'gentle guide' to the \texttt{np} package that
     contains some easy to follow examples?}
 
   Perhaps the most gentle introduction is contained in the \texttt{np}
-  package itself in the form of a `vignette'. To view the vignette run
+  package itself in the form of a 'vignette'. To view the vignette run
   R, install the \texttt{np} package (\texttt{install.packages("np")}), then
   type \texttt{vignette("np",package="np")} to view or print the vignette
   (this vignette is essentially the article that appeared in the
@@ -276,7 +276,7 @@ as one could always do with, say, \texttt{read.table()}.
 
   This is the most common complaint from frustrated users coming to
   terms with numerically demanding statistical methods.  I am fond of
-  saying `if you want the wrong answer, I can give it to you right
+  saying 'if you want the wrong answer, I can give it to you right
   away', but this wears thin quickly.
 
   \begin{enumerate}
@@ -313,9 +313,9 @@ as one could always do with, say, \texttt{read.table()}.
     increase run time by a factor of four). The solution I currently
     favor is to run the code in a parallel computing environment. The
     underlying C code for \texttt{np} is MPI-aware (MPI denotes the
-    `message passing interface', a popular parallel programming
+    'message passing interface', a popular parallel programming
     library that is an international standard), and a version of the
-    \texttt{np} package titled `\texttt{npRmpi}' exists for running
+    \texttt{np} package titled '\texttt{npRmpi}' exists for running
     jobs in a parallel environment that leverages the \texttt{Rmpi}
     package (\cite{Rmpi}).\footnote{We are extremely grateful to Hao
       Yu for providing the MPI functionality contained in the
@@ -340,7 +340,7 @@ as one could always do with, say, \texttt{read.table()}.
 
   \item Alternatively, you can use the method outlined in Racine
     (1993) \cite{RACINE:1993}. The method is based on the fact that
-    the unknown constant $c_j$ (the `scale factor') in the formula
+    the unknown constant $c_j$ (the 'scale factor') in the formula
     $c_j\sigma_j n^{-1/(2p+r)}$ is independent of the sample size, so
     one can conduct bandwidth selection on random subsets and do this
     for a large number of subsets then take the mean/median over these
@@ -500,7 +500,7 @@ plot(bw,xtrim=.01)
       delivers the linear OLS fit to the data.}) to admit categorical
     predictors (see references for papers with Yang and Ma in the
     \texttt{crs} package). Because regression splines involve simple
-    (i.e., `global' as opposed to local) least-squares fits, they
+    (i.e., 'global' as opposed to local) least-squares fits, they
     scale much better with respect to the sample size so for large
     sample sizes you may wish to instead consider this approach
     (kindly see my webpage for further details). You can run
@@ -589,7 +589,7 @@ To find the location of a demo type
 then you can take the source code for this demo and modify it for your
 particular application.
 
-You can also find examples and illustrations at the `Gallery' located
+You can also find examples and illustrations at the 'Gallery' located
 at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
 
 \subsection{I need to apply a boundary correction for a univariate
@@ -651,7 +651,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   function for syntax issues etc.
 
   If you are convinced that the problem lies with \texttt{np} (there
-  certainly will be undiscovered `features', i.e., bugs), then kindly
+  certainly will be undiscovered 'features', i.e., bugs), then kindly
   send me your code and data so that I can replicate and help resolve
   the issue.
 
@@ -668,12 +668,12 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     platforms.}  experience. 
 
   But also note that there is a platform-independent interface that
-  does not suffer from this limitation called `RStudio' that you might
+  does not suffer from this limitation called 'RStudio' that you might
   prefer to existing interfaces (\url{http://www.rstudio.org}).
 
 \subsection{When some routines are running under MS Windows, \texttt{R}
-    appears to be `not responding.' It appears that the program is not
-    `hung', rather is simply computing. The previous stand-alone
+    appears to be 'not responding.' It appears that the program is not
+    'hung', rather is simply computing. The previous stand-alone
     program (N \copyright) always displayed useful information\dots}
 
   This should no longer occur for np versions 0.30-0 and up. For
@@ -685,7 +685,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   ``When using Rgui the output to the console seems to be delayed.
   This is deliberate: the console output is buffered and re-written in
   chunks to be faster and less distracting. You can turn buffering off
-  or on from the `Misc' menu or the right-click menu: \verb+<Ctrl-W>+
+  or on from the 'Misc' menu or the right-click menu: \verb+<Ctrl-W>+
   toggles the setting.''
 
 \subsection{Some results take a while, and my MS Windows computer is
@@ -737,8 +737,8 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 
   \texttt{data <- data.frame(year=ordered(year),gdp)}
 
-  \noindent so that the ordered factor appears as `year' and not
-  `ordered.year'
+  \noindent so that the ordered factor appears as 'year' and not
+  'ordered.year'
 
 \subsection{Sometimes \texttt{plot()} appends my variable names with
     .ordered or .factor\dots}
@@ -750,7 +750,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     selection. However, when I try to plot the resulting object, it
     complains with the following message:}
 
-    \texttt{Error in eval(expr, envir, enclos) : object "variable" not
+    \texttt{Error in eval(expr, envir, enclos) : object ``variable'' not
       found\dots}
 
   This arises because \texttt{plot()} (\texttt{npplot()}) tries to retrieve
@@ -787,7 +787,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   variable is simply year, which equals 2006, 2007, and so forth.
 
   In \texttt{np} (and \texttt{R} in general), you get to economize by
-  just telling the function that the variable `year' is ordered, as in
+  just telling the function that the variable 'year' is ordered, as in
   ordered(year), where year is a vector containing elements 2006, 2007
   etc. Of course, seasoned R users would appreciate that this is in
   fact the simple way to do it with a parametric model as well.
@@ -795,7 +795,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   You would {\em never}, therefore, just pass dummy variables to an
   \texttt{np} function as you would for linear parametric models. The
   {\em only} exception is where you have only one 0/1 dummy for one
-  variable, say `\texttt{sex}', and in this case you still would have
+  variable, say '\texttt{sex}', and in this case you still would have
   to enter this as \texttt{factor(sex)} so that the \texttt{np}
   function recognizes this as a factor (otherwise it would treat it as
   continuous and use a kernel function that is inappropriate for a
@@ -811,9 +811,9 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 \end{verbatim}
 
   Presuming your variable is not in fact a constant (i.e., is not in
-  fact a `variable'), this can only occur in the case where a variable
-  is `pathological' in that it has \texttt{IQR=0} but \texttt{std>0}
-  (see the section titled `Changes from Version 0.30-1 to 0.30-2
+  fact a 'variable'), this can only occur in the case where a variable
+  is 'pathological' in that it has \texttt{IQR=0} but \texttt{std>0}
+  (see the section titled 'Changes from Version 0.30-1 to 0.30-2
   [19-Apr-2009]' for further details).  This should no longer occur
   for np versions 0.30-2 and up.
 
@@ -855,11 +855,11 @@ legend(20,15,
 
 \subsection{\label{partial grad q}When I estimate my gradients and
     there are two or more covariates and then extract them with the
-    \texttt{gradients()} function, they are not `smooth', though if I
+    \texttt{gradients()} function, they are not 'smooth', though if I
     plot a model with the \texttt{gradients=TRUE} option, they are. The
     \texttt{gradients()} function must be broken\dots}
 
-  The function \texttt{plot()} (\texttt{npplot()}) plots `partial'
+  The function \texttt{plot()} (\texttt{npplot()}) plots 'partial'
   means and gradients. In other words, it plots $x_1$ versus $\hat
   g(x_1,\bar x_2)$ for the partial mean, where $\bar x_2$ is, say, the
   median/modal value of $x_2$. It also plots $x_1$ versus
@@ -1056,7 +1056,7 @@ legend(20,-0.05,c("Numerical","Analytic"),col=c("blue","red"),lty=c(1,2))
   \end{singlespacing}
 
   A slightly better way (as discussed in Li \& Wang (1998)
-  \cite{LI_WANG:1998}) would be to use a `mixed' residual, i.e., $\hat
+  \cite{LI_WANG:1998}) would be to use a 'mixed' residual, i.e., $\hat
   u_i = y_i - X_i'\tilde \beta - Z_i'\hat \gamma$ in the test, where
   $\tilde\beta$ is the semiparametric estimator of $\beta$ (based on
   the semiparametric partially linear model), and $\hat \gamma$ is the
@@ -1107,7 +1107,7 @@ ckerorder=8)$ksum,type="l",main="Epanechnikov [order = 8]")
 \end{verbatim}
   \end{singlespacing}
 
-\subsection{In version 0.20-0 and up I can `combine' steps such as
+\subsection{In version 0.20-0 and up I can 'combine' steps such as
     bandwidth selection and estimation. But when I do \texttt{summary(model)} I don't get the same summary that I would
     get from, say, \texttt{summary(bw)} and then \texttt{summary(model)}. How do I get bandwidth object summaries
     when combining steps?}
@@ -1204,15 +1204,15 @@ Z
   \end{enumerate}
 
 \subsection{When I run \texttt{R} in batch mode via \texttt{R CMD BATCH
-      filename.R} unwanted status messages (e.g., ```Multistart 1 of
-    10''') crowd out desired output. How can I turn off these unwanted
+      filename.R} unwanted status messages (e.g., ``Multistart 1 of
+    10'') crowd out desired output. How can I turn off these unwanted
     status messages?}
 
   After loading the np library add the line
   \texttt{options(np.messages=FALSE)} and all such messages will be
   disabled.
 
-\subsection{I am getting an `unable to allocate...' message after
+\subsection{I am getting an 'unable to allocate...' message after
     repeatedly interrupting large jobs.}
 
   Repeated interruption of large jobs can reduce available memory
@@ -1224,7 +1224,7 @@ Z
   issue simply restart R (i.e., exit then run a fresh R session).
 
 \subsection{I have a large number of variables, and when using the
-    formula interface I get an error message stating `invoked with
+    formula interface I get an error message stating 'invoked with
     improper formula'. I have double checked and everything looks
     fine. Furthermore, it works fine with the data frame interface.}
 
@@ -1242,7 +1242,7 @@ variables). The \texttt{gam} package function \texttt{gam()} (the
 \texttt{mgcv} package also contains a similar function by the same
 name) uses iteratively reweighted least squares and either smoothing
 splines (\texttt{s($\cdot$)}) or local polynomial regression fitting
-(\texttt{`loess', lo($\cdot$)}, with default manual `span' of 0.75,
+(\texttt{'loess', lo($\cdot$)}, with default manual 'span' of 0.75,
 the parameter which controls the degree of smoothing). The following
 code snippet demonstrates the capabilities of the \texttt{gam()}
 function via the \verb+wage1+ dataset included in the \texttt{np}
@@ -1261,7 +1261,7 @@ detach(wage1)
 The \texttt{mgcv} package also has an implementation of generalized
 additive models via the identical function name, \texttt{gam()}. The
 biggest difference is that this uses generalized cross validation to
-select the `span' (rather than manually) hence the degree of smoothing
+select the 'span' (rather than manually) hence the degree of smoothing
 becomes part of the method (as is the case for all functions in the
 \texttt{np} package). The following code snippet demonstrates the
 \texttt{mgcv} implementation of the \texttt{gam()} function.
@@ -1287,7 +1287,7 @@ that installation can proceed.
 By way of illustration, the following environment variables need to be
 set for the MacPorts version of OpenMPI (www.macports.org) running on
 Mac OS X 10.8.3 (the environment commands listed below are for those
-using the `bash' shell):
+using the 'bash' shell):
 
 \begin{verbatim}
 export LD_LIBRARY_PATH=/opt/local/lib
@@ -1307,7 +1307,7 @@ resolved by someone with familiarity of the local installation.
     
   \subsection{I am using the \texttt{npRmpi} package but when I launch
     one of the demo parallel jobs I get the error \texttt{Error: could
-      not find function "mpi.bcast.cmd"}}
+      not find function ``mpi.bcast.cmd''}}
 
 When your demo program stops at the following point in your file
 \begin{verbatim}
@@ -1369,7 +1369,7 @@ model <- npplreg(y~x1+factor(x2)|factor(z1)+z2,regtype="ll")
 
 ## Next, subtract the fitted parametric component from y so that we
 ## have y-xbetahat. Since we can have factors we need to create the
-## `model matrix' but make sure we don't keep the intercept generated
+## 'model matrix' but make sure we don't keep the intercept generated
 ## by model.matrix hence the [,-1]. This gives us the numeric matrix X
 ## which we multiply by the coefficient vector to obtain xbetahat which
 ## we can subtract from y.
@@ -1388,7 +1388,7 @@ model.sub <- npreg(y.sub~factor(z1)+z2,regtype="ll",gradients=TRUE)
 plot(model.sub,gradients=TRUE)
 \end{verbatim}
 
-\subsection{The R function `lag()' does not work as I expect it
+\subsection{The R function 'lag()' does not work as I expect it
   to. How can I create the $l$th lag of a numeric variable in R to be
   fed to functions in the \texttt{np} package?}
 
@@ -1413,7 +1413,7 @@ object since \texttt{lynx} was itself a \texttt{ts} object).
 
 Or, you can use the \texttt{embed} function to accomplish
 this task. Here is a simple function that might work more along the
-lines that you expect. By default we `pad' the vector with NAs but you
+lines that you expect. By default we 'pad' the vector with NAs but you
 can switch this to \texttt{FALSE} if you prefer. The function will
 return a vector of the same length as the original vector with NA's
 padded for the missing values.
@@ -1432,7 +1432,7 @@ x.lag.1 <- lag.numeric(x,1)
 \subsection{Can I provide sample weights to be used by functions in
   the \texttt{np} package?}
 
-Unfortunately, at this stage the answer is `no', at least not directly
+Unfortunately, at this stage the answer is 'no', at least not directly
 with many of the functions as they stand. However, the function
 \texttt{npksum} underlies many of the functions in the \texttt{np}
 package and it supports passing of weights, so you may be able to use
@@ -1451,7 +1451,7 @@ extreme values as well). The reason for this is because numerical
 methods are used to invert the CDF. This must be done for each
 predictor observation requiring the solution to $n$ (or $neval$)
 optimization problems. An alternative is to compute the
-`pseudo-inverse' via a `lookup method'. In essence, one computes the
+'pseudo-inverse' via a 'lookup method'. In essence, one computes the
 conditional CDF for a range of $y$ values, and then computes the
 pseudo-inverse which is defined as
 \begin{align*}
@@ -1523,7 +1523,7 @@ legend(min(year),max(gdp.tau,gdp),
 This can be accomplished by picking a sample realization, uniformly at
 random, then drawing from the kernel distribution centered on that
 training point with scale equal to the bandwidth. Below is a
-demonstration for the `Old Faithful' data where we draw a random
+demonstration for the 'Old Faithful' data where we draw a random
 sample of size $n=1,000$ where a Gaussian kernel was used for the
 density estimator.
 
@@ -1559,7 +1559,7 @@ plot(npudens(~x1.boot+x2.boot,bws=bw$bw),view="fixed",xtrim=-.2,neval=100)
 
 In general there should be no need to rescale data for one's
 statistical analysis. However, occasionally one can encounter issues
-with numerical accuracy (e.g.\ numerical `overflow') regardless of the
+with numerical accuracy (e.g.\ numerical 'overflow') regardless of the
 method used. It is therefore prudent to be aware of this issue. For
 instance, if your dependent variable represents housing prices in a
 particular currency and entries are recorded as e.g.\
@@ -1573,7 +1573,7 @@ difference. See \texttt{?scale} for a function whose default method
 centers and/or scales the columns of a numeric matrix.
 
 \subsection{The local linear gradient estimates appear to be somewhat
-  `off' in that they do not correspond to the first derivative of the
+  'off' in that they do not correspond to the first derivative of the
   estimated regression function.}
 
 It is perhaps not a widely known fact that the local linear partial
@@ -1816,6 +1816,20 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \appendix
 
+\section*{Changes from Version 0.60-9 to 0.60-10 [5-Feb-2020]}
+
+\begin{itemize}
+
+\item Corrected issue \texttt{Documented arguments not in usage in documentation object se: \dots}
+
+\item Removal of directed quotes in some Rd documents, replacement
+  with \verb+\sQuote{}+
+
+\item Fixed issue causing rebuilding of vignettes to crash (\texttt{uocquantile()} was the culprit)
+  
+  
+\end{itemize}  
+
 \section*{Changes from Version 0.60-8 to 0.60-9 [24-Oct-2018]}
 
 \begin{itemize}
@@ -1908,7 +1922,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \begin{itemize}
 
-\item Fixed the `cannot find function \texttt{is()}' glitch that just surfaced with R 3.4.0
+\item Fixed the 'cannot find function \texttt{is()}' glitch that just surfaced with R 3.4.0
 
 \item Fixed glitch in \texttt{npconmode()} when randomizing if all probabilities
   are equal
@@ -2094,7 +2108,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \item Using .onUnload rather than .Last.lib in zzz.R
 
-\item Fixed glitch in \texttt{npreg()} summary where `Residual
+\item Fixed glitch in \texttt{npreg()} summary where 'Residual
   standard error' was reporting residual variance
 
 \item \texttt{npksum()} functionality extended
@@ -2145,7 +2159,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
   (multistarting, parameters passed to \texttt{optim()} for
   cross-validation)
 
-\item Changes to code to improve compliance with R `Writing portable
+\item Changes to code to improve compliance with R 'Writing portable
   packages' guidelines and correct partial argument matches
 
 \end{itemize}
@@ -2226,7 +2240,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
   (2011, Econometrica) and Horowitz (2011, Econometrica). Note that
   this function currently returns the fitted $\varphi(z)$ (i.e.\ lacks
   much functionality relative to other \texttt{np} functions) and is in
-  `beta status' until further notice.
+  'beta status' until further notice.
 
 \item Added a new dataset \texttt{Engel95} that allows one to estimate
   Engel curves using the new nonparametric instrumental regression
@@ -2468,16 +2482,16 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 \begin{itemize}
 
 \item Added basic user-interrupt checking for all underlying C code so
-  that either \verb+<Ctrl-C>+ (Rterm) or the `STOP' icon (Rgui) will
+  that either \verb+<Ctrl-C>+ (Rterm) or the 'STOP' icon (Rgui) will
   interrupt all running processes. This has a number of desirable side
   effects in addition to being able to interrupt C-based processes
-  including i) R no longer showing up as `not responding' under the
+  including i) R no longer showing up as 'not responding' under the
   task manager (Windows) or the activity monitor (Mac OS X) and ii)
   buffered output now being correctly displayed when using Rgui under
   Windows and Mac OS X
 
   Note that repeated interruption of large jobs can reduce available
-  memory under R - if this becomes an issue (i.e., you get a `cannot
+  memory under R - if this becomes an issue (i.e., you get a 'cannot
   allocate...' error under R) simply restart R (i.e., exit then run a
   fresh R session)
 
@@ -2614,7 +2628,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 \item \texttt{example(foobar)} now works again. This was disabled in
   0.14-1 at the request of the \texttt{R} maintainers in order to shorten
   the duration of \texttt{R CMD check}. All examples remained in the help
-  files but due to the presence of `dontrun' they were not run when
+  files but due to the presence of 'dontrun' they were not run when
   \texttt{example(foobar)} is requested. Now a limited subset is run
   while the full set of examples remain in the documents
 

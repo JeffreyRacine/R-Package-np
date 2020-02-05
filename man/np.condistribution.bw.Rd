@@ -192,9 +192,9 @@ npcdistbw(\dots)
     factors. Defaults to \code{cv.ls}.  }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
-    supplied bandwidths are interpreted as `scale factors'
+    supplied bandwidths are interpreted as \sQuote{scale factors}
     (\eqn{c_j}{c[j]}), otherwise when the value is \code{FALSE} they are
-    interpreted as `raw bandwidths' (\eqn{h_j}{h[j]} for continuous data
+    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for continuous data
     types, \eqn{\lambda_j}{lambda[j]} for discrete data types). For
     continuous data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =

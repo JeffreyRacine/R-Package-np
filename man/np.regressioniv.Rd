@@ -411,7 +411,7 @@ npregiv(y,
  \email{samuele.centorrino@univ-tlse1.fr}
 }
 \note{
-This function should be considered to be in `beta test' status until further notice.
+This function should be considered to be in \sQuote{beta test} status until further notice.
 }
 
 \seealso{

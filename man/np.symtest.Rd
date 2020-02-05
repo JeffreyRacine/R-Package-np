@@ -109,7 +109,7 @@ npsymtest(data = NULL,
   The summation version of this statistic may be numerically unstable
   when \code{y} is sparse (the summation version involves division of
   densities while the integration version involves differences). Warning
-  messages are produced should this occur (`integration recommended')
+  messages are produced should this occur (\sQuote{integration recommended})
   and should be heeded.
  
 }
