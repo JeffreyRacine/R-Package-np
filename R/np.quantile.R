@@ -10,7 +10,7 @@ npquantile <- function(x=NULL,
   if(is.null(x)) stop("must provide data")
   if(class(x) != "numeric") stop("x must be numeric and univariate")
 
-  if(any(tau<0)|any(tau>1)) stop("tau must lie in the closed interval [0,1]")
+  if(any(tau<0 | tau>1)) stop("tau must lie in the closed interval [0,1]")
   if(length(bws$xnames)>1) stop("bw object must be univariate")
   if(num.eval < 100) stop("num.eval must be >= 100")
 
