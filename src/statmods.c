@@ -63,7 +63,8 @@ int np_fround(double x)
 int simple_unique(int n, double * vector){
   int i, m;
 
-  double * v=NULL;
+  /*  double * v=NULL; */
+  double *v;
 
   v=(double *)malloc(sizeof(double)*n);
 

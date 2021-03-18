@@ -23,8 +23,8 @@
 npuniden.boundary(X = NULL,
                   Y = NULL,
                   h = NULL,
-                  a = 0,
-                  b = 1,
+                  a = min(X),
+                  b = max(X),
                   bwmethod = c("cv.ls","cv.ml"),
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
@@ -46,10 +46,10 @@ an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 an optional bandwidth (>0)
 }
   \item{a}{
-an optional lower bound (defaults to 0)
+an optional lower bound (defaults to lower bound of empirical support \eqn{\min(X)})
 }
   \item{b}{
-an optional upper bound (defaults to 1)
+an optional upper bound (defaults to upper bound of empirical support \eqn{\max(X)})
 }
   \item{bwmethod}{
 whether to conduct bandwidth search via least squares cross-validation
