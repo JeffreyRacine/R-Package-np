@@ -10,7 +10,8 @@
   density estimates given a vector of continuously distributed training
   data and, optionally, a bandwidth (otherwise least squares
   cross-validation is used for its selection). Lower and upper bounds
-  [\code{a},\code{b}] can be supplied (default is [0,1]) and if \code{a}
+  [\code{a},\code{b}] can be supplied (default is the empirical support 
+  \eqn{[min(X),max(X)]}) and if \code{a}
   is set to \code{-Inf} there is only one bound on the right, while if
   \code{b} is set to \code{Inf} there is only one bound on the left. If
   \code{a} is set to \code{-Inf} and \code{b} to \code{Inf} and the
@@ -46,10 +47,10 @@ an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 an optional bandwidth (>0)
 }
   \item{a}{
-an optional lower bound (defaults to lower bound of empirical support \eqn{\min(X)})
+an optional lower bound (defaults to lower bound of empirical support \eqn{min(X)})
 }
   \item{b}{
-an optional upper bound (defaults to upper bound of empirical support \eqn{\max(X)})
+an optional upper bound (defaults to upper bound of empirical support \eqn{max(X)})
 }
   \item{bwmethod}{
 whether to conduct bandwidth search via least squares cross-validation

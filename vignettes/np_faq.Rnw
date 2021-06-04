@@ -1820,6 +1820,9 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \begin{itemize}
 
+\item \texttt{npuniden.boundary()} uses empirical support for a and b
+  (previously was [0,1], now [min(X),max(X)])
+
 \item Corrected potential issue with \texttt{malloc} failing on null vector
   in C function \texttt{sort\_unique()} detected by development version of
   \texttt{gcc11} (thanks to Professor Brian Ripley for pointing this out
