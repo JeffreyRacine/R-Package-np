@@ -1816,7 +1816,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \appendix
 
-\section*{Changes from Version 0.60-10 to 0.60-11 [20-Oct-2020]}
+\section*{Changes from Version 0.60-10 to 0.60-11 [04-Jun-2021]}
 
 \begin{itemize}
 
@@ -1827,6 +1827,8 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
   in C function \texttt{sort\_unique()} detected by development version of
   \texttt{gcc11} (thanks to Professor Brian Ripley for pointing this out
   and for his assistance)
+
+\item Corrected outdated URLs  
 
 \end{itemize}    
 

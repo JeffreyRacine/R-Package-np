@@ -1,4 +1,4 @@
-Changes from Version 0.60-10 to 0.60-11 [20-Oct-2020]
+Changes from Version 0.60-10 to 0.60-11 [04-Jun-20201]
 
 * npuniden.boundary() uses empirical support for a and b (previously was
   [0,1], now [min(X),max(X)])
@@ -7,6 +7,8 @@ Changes from Version 0.60-10 to 0.60-11 [20-Oct-2020]
   in C function sort_unique() detected by development version of
   gcc11 (thanks to Professor Brian Ripley for pointing this out
   and for his assistance)
+
+* Corrected outdated URLs
 
 Changes from Version 0.60-9 to 0.60-10 [5-Feb-2020]
 
