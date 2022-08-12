@@ -11,7 +11,7 @@
 %% need no \usepackage{Sweave.sty}
 
 \usepackage{amsmath}
-\usepackage[utf8x]{inputenc} 
+\usepackage[utf8]{inputenc} 
 
 \newcommand{\field}[1]{\mathbb{#1}}
 \newcommand{\R}{\field{R}}
@@ -1444,7 +1444,7 @@ model.scoef <- npscoef(lwage ~ dfemale +
                        dmarried +
                        educ +
                        exper +
-                       tenure | female,
+                       tenure | dfemale,
                        betas = TRUE,
                        data = wage1.augmented)
 summary(model.scoef)
