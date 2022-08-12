@@ -88,7 +88,7 @@
 %% paper
 
 <<eval=TRUE,echo=FALSE,keep.source=TRUE>>=
-options(prompt = "R> ", np.messages = FALSE, digits = 3)
+options(prompt = "R> ", np.messages = FALSE, digits = 3, warn = -1)
 @ 
 
 %% Achim asks for making use of <<..., height= ..., width = ...>>= for
@@ -1444,7 +1444,7 @@ model.scoef <- npscoef(lwage ~ dfemale +
                        dmarried +
                        educ +
                        exper +
-                       tenure | dfemale,
+                       tenure | female,
                        betas = TRUE,
                        data = wage1.augmented)
 summary(model.scoef)

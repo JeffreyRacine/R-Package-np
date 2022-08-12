@@ -374,7 +374,7 @@ bw.mat <- matrix(NA,nrow=num.res,ncol=2)
 
 ## Get the scale factors for resamples from the full sample of size n.sub
 
-options(np.messages=FALSE)
+options(np.messages=FALSE, warn = -1)
 
 for(i in 1:num.res)  {
 

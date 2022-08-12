@@ -69,7 +69,7 @@
 
 <<eval=TRUE,echo=FALSE,results=hide,keep.source=TRUE>>=
 library(np)
-options(prompt = "R> ", np.messages = FALSE, digits = 3)
+options(prompt = "R> ", np.messages = FALSE, digits = 3, warn = -1)
 @ 
 
 %% Achim asks for making use of <<..., height= ..., width = ...>>= for
