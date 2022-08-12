@@ -7,11 +7,10 @@
 %\VignettePackage{np}
 
 \documentclass[nojss]{jss}
-
-%% need no \usepackage{Sweave.sty}
+\usepackage{Sweave}
 
 \usepackage{amsmath}
-\usepackage[utf8x]{inputenc} 
+\usepackage[utf8]{inputenc}
 
 \newcommand{\field}[1]{\mathbb{#1}}
 \newcommand{\R}{\field{R}}
@@ -31,7 +30,7 @@
   
   We describe the \proglang{R} \pkg{np} package via a series of
   applications that may be of interest to applied econometricians.
-  This vignette is based on \citet{v27i01:Hayfield+Racine:2008}.  The
+  This vignette is based on \citet{JSSv027i05}.  The
   \pkg{np} package implements a variety of nonparametric and
   semiparametric kernel-based estimators that are popular among
   econometricians. There are also procedures for nonparametric tests
@@ -75,6 +74,7 @@
 }
 
 \begin{document}
+\SweaveOpts{concordance=TRUE}
 
 %% Note that you should use the \pkg{}, \proglang{} and \code{} commands.
 
@@ -88,7 +88,7 @@
 %% paper
 
 <<eval=TRUE,echo=FALSE,keep.source=TRUE>>=
-options(prompt = "R> ", np.messages = FALSE, digits = 3)
+options(prompt = "R> ", np.messages = FALSE, digits = 3, warn = -1)
 @ 
 
 %% Achim asks for making use of <<..., height= ..., width = ...>>= for

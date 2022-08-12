@@ -1,4 +1,11 @@
-Changes from Version 0.60-10 to 0.60-11 [04-Jun-20201]
+Changes from Version 0.60-11 to 0.60-12 [12-Aug-2022]
+
+* JSS issues corrected in vignette/*.bib and inst/CITATION (use of DOI,
+  etc., thanks to Achim Zeileis)
+
+* Issues with utf8x in entropy_np.Rnw and np.Rnw corrected (utf8x -> utf8, etc.)
+
+Changes from Version 0.60-10 to 0.60-11 [04-Jun-2021]
 
 * npuniden.boundary() uses empirical support for a and b (previously was
   [0,1], now [min(X),max(X)])

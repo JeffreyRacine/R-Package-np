@@ -11,7 +11,7 @@
 %% need no \usepackage{Sweave.sty}
 
 \usepackage{amsmath,amsfonts}
-\usepackage[utf8x]{inputenc} 
+\usepackage[utf8]{inputenc}
 
 \newcommand{\field}[1]{\mathbb{#1}}
 \newcommand{\N}{\field{N}}
@@ -69,7 +69,7 @@
 
 <<eval=TRUE,echo=FALSE,results=hide,keep.source=TRUE>>=
 library(np)
-options(prompt = "R> ", np.messages = FALSE, digits = 3)
+options(prompt = "R> ", np.messages = FALSE, digits = 3, warn = -1)
 @ 
 
 %% Achim asks for making use of <<..., height= ..., width = ...>>= for

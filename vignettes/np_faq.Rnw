@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-11. Kindly update your version should you not be using the most
+is 0.60-12. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1816,12 +1816,25 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \appendix
 
+\section*{Changes from Version 0.60-11 to 0.60-12 [12-Aug-2022]}
+
+\begin{itemize}
+
+\item JSS issues corrected in vignette/*.bib and inst/CITATION (use of DOI,
+  etc., thanks to Achim Zeileis)
+
+\item Issues with utf8x in entropy\_np.Rnw and np.Rnw corrected (utf8x
+  changed to utf8, etc.)
+
+\end{itemize}  
+
 \section*{Changes from Version 0.60-10 to 0.60-11 [04-Jun-2021]}
 
 \begin{itemize}
 
-\item \texttt{npuniden.boundary()} uses empirical support for a and b
-  (previously was [0,1], now [min(X),max(X)])
+\item \texttt{npuniden.boundary()} uses empirical support for
+  \texttt{a} and \texttt{b} (previously was \texttt{[0,1]}, now
+  \texttt{[min(X),max(X)]})
 
 \item Corrected potential issue with \texttt{malloc} failing on null vector
   in C function \texttt{sort\_unique()} detected by development version of
