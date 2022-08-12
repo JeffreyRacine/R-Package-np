@@ -1,3 +1,8 @@
+Changes from Version 0.60-12 to 0.60-13 [XX-XX-XX]
+
+* Minor changes to np.Rnw vignette viz Sweave options and class
+  (redundancies commented out)
+
 Changes from Version 0.60-11 to 0.60-12 [12-Aug-2022]
 
 * JSS issues corrected in vignette/*.bib and inst/CITATION (use of DOI,

@@ -13,7 +13,8 @@ npsigtest <-
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$xdat))
           UseMethod("npsigtest",bws$formula)
-        else if (!is.null(bws$call) && is.null(args$xdat) && (class(bws) != "npregression"))
+#        else if (!is.null(bws$call) && is.null(args$xdat) && (class(bws) != "npregression"))
+        else if (!is.null(bws$call) && is.null(args$xdat) && (!isa(bws,"npregression")))
           UseMethod("npsigtest",bws$call)
         else if (!is.call(bws))
           UseMethod("npsigtest",bws)

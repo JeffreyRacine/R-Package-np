@@ -106,7 +106,8 @@ npksum.default <-
     if (!miss.ty && is.vector(tydat))
       tydat = as.matrix(tydat)
 
-    if(class(bws) != "kbandwidth")
+#    if(class(bws) != "kbandwidth")
+    if(!isa(bws,"kbandwidth"))
         bws = kbandwidth(bws)
 
     if (!miss.ex){
