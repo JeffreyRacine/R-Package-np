@@ -1,7 +1,11 @@
-Changes from Version 0.60-12 to 0.60-13 [XX-XX-XX]
+Changes from Version 0.60-12 to 0.60-13 [15-Aug-2022]
 
 * Minor changes to np.Rnw vignette viz Sweave options and class
-  (redundancies commented out)
+	(redundancies commented out)
+
+* Fixed issues relating to new NOTE "Found if() conditions
+  comparing class() to string [..] Use inherits() (or maybe is())
+  instead." Addressed by using by using isa()
 
 Changes from Version 0.60-11 to 0.60-12 [12-Aug-2022]
 
