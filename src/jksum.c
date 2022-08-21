@@ -3555,7 +3555,7 @@ double * const kw){
   m = matrix_bandwidth;
 
     /* do sums */
-  for(j=js; j <= je; j++, ws += ws_step, p_ws += ws_step){
+  for(j=js; j <= je; j++, ws = (ws==NULL ? NULL : ws+ws_step), p_ws=(p_ws == NULL ? NULL : p_ws+ws_step)){
     R_CheckUserInterrupt();
 
     dband = 1.0;
@@ -3686,7 +3686,7 @@ double * const kw){
         if(p_nvar == 0){
           np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, p_pxl+k, swap_xxt, bpso[l], do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score);
         }
       }
       else

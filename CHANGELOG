@@ -1,3 +1,7 @@
+Changes from Version 0.60-13 to 0.60-14 [XX-XX-XXXX]
+
+* Added logspline and ks to DESCRIPTION to address NOTE on some system builds stating "Undeclared packages ‘logspline’, ‘ks’ in Rd xrefs"
+
 Changes from Version 0.60-12 to 0.60-13 [15-Aug-2022]
 
 * Minor changes to np.Rnw vignette viz Sweave options and class
