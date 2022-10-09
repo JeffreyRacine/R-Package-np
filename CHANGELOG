@@ -1,11 +1,22 @@
-Changes from Version 0.60-13 to 0.60-14 [XX-XX-XXXX]
+Changes from Version 0.60-14 to 0.60-15 [09-Oct-2022]
 
-* Added logspline and ks to DESCRIPTION to address NOTE on some system builds stating "Undeclared packages ‘logspline’, ‘ks’ in Rd xrefs"
+* Explicit acknowledgment in DESCRIPTION of code gsl_bspline.c/.h
+  adapted from the GNU GSL library with further details appended to
+  gsl_bspline.c/.h (thanks to Professor Brian Ripley for noting this
+  oversight).
+
+Changes from Version 0.60-13 to 0.60-14 [22-Aug-2022]
+
+* Added logspline and ks to DESCRIPTION to address NOTE on some system
+  builds stating "Undeclared packages ‘logspline’, ‘ks’ in Rd xrefs"
+
+* Zhenghua Nie kindly addressed the clang-UBSAN issue in jksum.c
+  causing `runtime error: applying non-zero offset 8 to null pointer`
 
 Changes from Version 0.60-12 to 0.60-13 [15-Aug-2022]
 
 * Minor changes to np.Rnw vignette viz Sweave options and class
-	(redundancies commented out)
+  (redundancies commented out)
 
 * Fixed issues relating to new NOTE "Found if() conditions
   comparing class() to string [..] Use inherits() (or maybe is())

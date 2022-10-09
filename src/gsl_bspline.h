@@ -1,16 +1,14 @@
-/* Note:
- *  This file includs the original gsl_bspline.h of gsl/bspline. We
- *  merge all other necessary structures and definitions of gsl routines 
- *  to this file,  so now we can compile and link it without linking to the gsl library.
- *  
- *  The source files are downloaded from http://www.gnu.org/software/gsl/,  
- *  and the current version is 1.14.*
- *
- *
- *
- * */
-
-
+/* Note: We would like to acknowledge the contributions of the GNU GSL
+ * authors. In particular, we adapt the GNU GSL B-spline routine
+ * gsl_bspline.c adding automated support for quantile knots (in
+ * addition to uniform knots), providing missing functionality for
+ * derivatives, and for extending the splines beyond their
+ * endpoints. The source files were downloaded from
+ * http://www.gnu.org/software/gsl/ version 1.14.*, distributed under
+ * the terms of the GPL, version 2 or later.  This file includes the
+ * original gsl_bspline.h of gsl/bspline. We merge all other necessary
+ * structures and definitions of gsl routines to this file, so now we
+ * can compile and link it without linking to the gsl library. */
 
 /* bspline/gsl_bspline.h
  *
