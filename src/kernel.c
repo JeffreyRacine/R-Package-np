@@ -537,7 +537,7 @@ double kernel_convol(int KERNEL, int BANDWIDTH, double z, double h1, double h2)
 
 /* Second Order Epanechnikov */
 
-/* Error pointed out by Alicia Pérez-Alonso and colleagues May 22
+/* Error pointed out by Alicia Perez-Alonso and colleagues May 22
    2009, previous version incorporated incorrect limits of
    integration. Confirmed May 27 and incorporated. New version
    requires additional test for negative and positive values, and
