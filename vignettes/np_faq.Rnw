@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-15. Kindly update your version should you not be using the most
+is 0.60-17. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1818,6 +1818,28 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \appendix
 
+\section*{Changes from Version 0.60-16 to 0.60-17 [12-Mar-2023]}
+
+\begin{itemize}
+
+\item Fixed warning \texttt{Check: S3 generic/method consistency
+  Result: WARN compute.bootstrap.errors: function(..., bws)
+  compute.bootstrap.errors.*} triggered potentially by lack of
+  \texttt{...,bw} in functions called (thanks to Kurt Hornik for
+  assistance!)
+  
+\end{itemize}
+
+\section*{Changes from Version 0.60-15 to 0.60-16 [18-Oct-2022]}
+
+\begin{itemize}
+
+\item Fixed \texttt{warning: a function definition without a prototype is
+  deprecated in all versions of C and is not supported in C2x
+  [-Wdeprecated-non-prototype]} (thanks Zhenghua!)
+
+\end{itemize}
+  
 \section*{Changes from Version 0.60-14 to 0.60-15 [09-Oct-2022]}
 
 \begin{itemize}

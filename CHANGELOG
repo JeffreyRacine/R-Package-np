@@ -1,3 +1,17 @@
+Changes from Version 0.60-16 to 0.60-17 [12-Mar-2023]
+
+* Fixed warning "Check: S3 generic/method consistency Result: WARN
+  compute.bootstrap.errors: function(..., bws)
+  compute.bootstrap.errors.*" triggered potentially by lack of
+  "...,bw" in functions called (thanks to Kurt Hornik for
+  assistance!)
+
+Changes from Version 0.60-15 to 0.60-16 [18-Oct-2022]
+
+* Fixed warning: a function definition without a prototype is
+  deprecated in all versions of C and is not supported in C2x
+  [-Wdeprecated-non-prototype] (thanks Zhenghua!)
+
 Changes from Version 0.60-14 to 0.60-15 [09-Oct-2022]
 
 * Explicit acknowledgment in DESCRIPTION of code gsl_bspline.c/.h

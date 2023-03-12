@@ -105,6 +105,7 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
 
@@ -183,6 +184,7 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -278,6 +280,7 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
 
@@ -365,6 +368,7 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
 
@@ -433,7 +437,7 @@ compute.bootstrap.errors.bandwidth =
     list(boot.err = boot.err, bxp = all.bp)
   }
 
-compute.bootstrap.errors.dbandwidth <- 
+compute.bootstrap.errors.dbandwidth =
   function(xdat, 
            exdat,
            slice.index,
@@ -443,6 +447,7 @@ compute.bootstrap.errors.dbandwidth <-
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
 
@@ -522,6 +527,7 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -628,6 +634,7 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -728,6 +735,7 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.center,
            plot.errors.type,
            plot.errors.quantiles,
+           ...,
            bws){
 
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
