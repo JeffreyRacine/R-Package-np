@@ -1,3 +1,9 @@
+Changes from Version 0.60-17 to 0.60-18 [XX-XXX-XXXX]
+
+* Incorporated Kurt Hornik's suggestion "If indeed intended as a
+  package overview help file, please add \alias{np-package} to file
+  'np/man/np-package.Rd'."
+
 Changes from Version 0.60-16 to 0.60-17 [12-Mar-2023]
 
 * Fixed warning "Check: S3 generic/method consistency Result: WARN
@@ -5,6 +11,8 @@ Changes from Version 0.60-16 to 0.60-17 [12-Mar-2023]
   compute.bootstrap.errors.*" triggered potentially by lack of
   "...,bw" in functions called (thanks to Kurt Hornik for
   assistance!)
+
+* Updated inst/CITATIONS to get rid of old-style cit and bib entries
 
 Changes from Version 0.60-15 to 0.60-16 [18-Oct-2022]
 

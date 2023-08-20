@@ -1,5 +1,6 @@
 \name{np}
 \alias{np}
+\alias{np-package}
 \docType{package}
 \title{Nonparametric Kernel Smoothing Methods for Mixed Data Types}
 \description{
