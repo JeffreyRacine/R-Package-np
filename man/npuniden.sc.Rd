@@ -149,7 +149,7 @@ A list with the following elements:
 \item{attempts }{number of attempts when \code{solve.QP} fails (max = 9)}
 }
 \references{
-  Du, P. and C. Parmeter and J. Racine, \dQuote{Shape Constrained Kernel Density Estimation}, manuscript.
+  Du, P. and C. Parmeter and J. Racine (forthcoming), \dQuote{Shape Constrained Kernel PDF and PMF Estimation}, Statistica Sinica.
 }
 \author{
 Jeffrey S. Racine \email{racinej@mcmaster.ca}
