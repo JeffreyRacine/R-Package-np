@@ -11,7 +11,7 @@
   data and, optionally, a bandwidth (otherwise least squares
   cross-validation is used for its selection). Lower and upper bounds
   [\code{a},\code{b}] can be supplied (default is the empirical support 
-  \eqn{[min(X),max(X)]}) and if \code{a}
+  \eqn{[\min(X),\max(X)]}) and if \code{a}
   is set to \code{-Inf} there is only one bound on the right, while if
   \code{b} is set to \code{Inf} there is only one bound on the left. If
   \code{a} is set to \code{-Inf} and \code{b} to \code{Inf} and the
@@ -30,9 +30,9 @@ npuniden.boundary(X = NULL,
                   cv = c("grid-hybrid","numeric"),
                   grid = NULL,
                   kertype = c("gaussian1","gaussian2",
-                            "beta1","beta2",
-                            "fb","fbl","fbu",
-                            "rigaussian","gamma"),
+                              "beta1","beta2",
+                              "fb","fbl","fbu",
+                              "rigaussian","gamma"),
                   nmulti = 5,
                   proper = FALSE)
 }
@@ -47,10 +47,10 @@ an optional numeric vector of evaluation data lying in \eqn{[a,b]}
 an optional bandwidth (>0)
 }
   \item{a}{
-an optional lower bound (defaults to lower bound of empirical support \eqn{min(X)})
+an optional lower bound (defaults to lower bound of empirical support \eqn{\min(X)})
 }
   \item{b}{
-an optional upper bound (defaults to upper bound of empirical support \eqn{max(X)})
+an optional upper bound (defaults to upper bound of empirical support \eqn{\max(X)})
 }
   \item{bwmethod}{
 whether to conduct bandwidth search via least squares cross-validation
@@ -109,10 +109,7 @@ and distribution function estimates over the range \eqn{[a,b]}
   \code{"fbl"} have support \eqn{[a,\infty]}. The kernel function
   \code{"fbu"} has support \eqn{[-\infty,b]}. The rest have support on
   \eqn{[a,b]}.  Note that the two sided support default values are
-  \code{a=0} and \code{b=1}. When estimating a variable on
-  \eqn{[0,\infty)} the default lower bound can be used but when
-  estimating a variable on \eqn{(-\infty,0]} you must manually set the
-  upper bound to \code{b=0}.
+  \code{a=min(X)} and \code{b=max(X)}. 
 
   Note that data-driven bandwidth selection is more nuanced in bounded
   settings, therefore it would be prudent to manually select a bandwidth
@@ -189,6 +186,11 @@ and distribution function estimates over the range \eqn{[a,b]}
   
   Igarashi, G. (2016). \dQuote{Bias reductions for beta kernel
   estimation,} Journal of Nonparametric Statistics, 28(1):1-30.
+  
+  Racine, J. S. and Q. Li and Q. Wang, \dQuote{Boundary-adaptive 
+  kernel density estimation: the case of (near) uniform density}, 
+  Journal of Nonparametric Statistics, 2023, 1-19, 
+  https://doi.org/10.1080/10485252.2023.225001.
 
   Scaillet, O. (2004). \dQuote{Density estimation using inverse and
   reciprocal inverse Gaussian kernels,} Journal of Nonparametric
