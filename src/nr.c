@@ -529,7 +529,7 @@ double ran3(int *idum)
     if (*idum < 0 || iff == 0)
     {
         iff=1;
-        mj=MSEED-(*idum < 0 ? -*idum : *idum);
+        mj=labs(MSEED-(*idum < 0 ? -*idum : *idum));
         mj %= MBIG;
         ma[55]=mj;
         mk=1;
