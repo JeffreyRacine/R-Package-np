@@ -85,7 +85,7 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
   a character string indicating whether the estimate is to be
   constrained to be monotonically increasing
   (\code{constraint="mono.incr"}), decreasing
-  (\code{constraint="mono.incr"}), convex (\code{constraint="convex"}),
+  (\code{constraint="mono.decr"}), convex (\code{constraint="convex"}),
   concave (\code{constraint="concave"}), log-convex
   (\code{constraint="log-convex"}), or log-concave
   (\code{constraint="log-concave"})
