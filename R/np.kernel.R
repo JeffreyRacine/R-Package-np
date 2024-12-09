@@ -287,13 +287,21 @@ npksum.default <-
       compute.score = compute.score,
       compute.ocg = compute.ocg)
     
-
+   asDouble <- function(data){
+	   if (is.null(data)){
+	 	   result <- as.double(0.0)
+	   }
+	   else {
+		   result <- as.double(data)
+	   }
+	   return(result)
+   }
 
     myout <- 
       .C("np_kernelsum",
-         as.double(tuno), as.double(tord), as.double(tcon),
-         as.double(tydat), as.double(weights),
-         as.double(euno),  as.double(eord),  as.double(econ), 
+         asDouble(tuno), asDouble(tord), asDouble(tcon),
+         asDouble(tydat), asDouble(weights),
+         asDouble(euno),  asDouble(eord),  asDouble(econ), 
          as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
          as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),

@@ -1,6 +1,9 @@
-Changes from Version 0.60-17 to 0.60-18 [XX-XXX-XXXX]
+Changes from Version 0.60-17 to 0.60-18 [09-12-2024]
 
-* Merged rng pull request  https://github.com/JeffreyRacine/R-Package-np/pull/48
+* Patched issue with as.double(data) when data is a NULL object
+  reported by Brian Ripley
+
+* Merged rng pull request https://github.com/JeffreyRacine/R-Package-np/pull/48
 
 * Incorporated Kurt Hornik's suggestion "If indeed intended as a
   package overview help file, please add \alias{np-package} to file
