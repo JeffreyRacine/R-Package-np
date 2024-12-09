@@ -279,6 +279,7 @@ S3method(npqreg, formula)
 S3method(npqreg, call)
 S3method(npqreg, default)
 S3method(npqreg, condbandwidth)
+S3method(npqreg, conbandwidth)
 
 S3method(npconmode, formula)
 S3method(npconmode, call)
