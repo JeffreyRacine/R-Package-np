@@ -6,7 +6,7 @@ Nonparametric Instrumental Derivatives
 }
 \description{
 \code{npregivderiv} uses the approach of Florens, Racine and Centorrino
-(forthcoming) to compute the partial derivative of a nonparametric
+(2018) to compute the partial derivative of a nonparametric
 estimation of an instrumental regression function \eqn{\varphi}{phi}
 defined by conditional moment restrictions stemming from a structural
 econometric model: \eqn{E [Y - \varphi (Z,X) | W ] = 0}{E [Y - phi (Z,X)
@@ -174,9 +174,9 @@ npregivderiv(y,
   non-parametric estimation by solving inverse problems: the example of
   transformation models,} Econometrics Journal, 13, S1-S27.
 
-  Florens, J.P. and J.S. Racine and S. Centorrino (forthcoming),
+  Florens, J.P. and J.S. Racine and S. Centorrino (2018),
   \dQuote{Nonparametric instrumental derivatives,} Journal of
-  Nonparametric Statistics.
+  Nonparametric Statistics, 30 (2), 368-391.
 
   Fridman, V. M. (1956), \dQuote{A method of successive approximations
   for Fredholm integral equations of the first kind,} Uspeskhi,
