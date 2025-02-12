@@ -190,7 +190,7 @@ and distribution function estimates over the range \eqn{[a,b]}
   Racine, J. S. and Q. Li and Q. Wang, \dQuote{Boundary-adaptive 
   kernel density estimation: the case of (near) uniform density}, 
   Journal of Nonparametric Statistics, 2024, 36 (1), 146-164, 
-  https://doi.org/10.1080/10485252.2023.225001.
+  https://doi.org/10.1080/10485252.2023.2250011.
 
   Scaillet, O. (2004). \dQuote{Density estimation using inverse and
   reciprocal inverse Gaussian kernels,} Journal of Nonparametric
