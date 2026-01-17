@@ -217,7 +217,7 @@ npregivderiv <- function(y,
   }
 
 
-  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
+  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
   
   ## We again require the mean of the fitted values
 
@@ -304,7 +304,7 @@ npregivderiv <- function(y,
 
     }
 
-    norm.stop[j] <- j*sum(predicted.E.mu.w^2)/NZD(sum(E.y.w^2))
+    norm.stop[j] <- j*sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
     
     mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 

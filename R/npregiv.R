@@ -1777,7 +1777,7 @@ npregiv <- function(y,
 
     }
 
-    norm.stop[1] <- sum(resid.fitted^2)/NZD(sum(E.y.w^2))
+    norm.stop[1] <- sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
 
     console <- printClear(console)
     console <- printPop(console)
@@ -2083,7 +2083,7 @@ npregiv <- function(y,
 
       }
 
-      norm.stop[j] <- ifelse(penalize.iteration,j*sum(resid.fitted^2)/NZD(sum(E.y.w^2)),sum(resid.fitted^2)/NZD(sum(E.y.w^2)))
+      norm.stop[j] <- ifelse(penalize.iteration,j*sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)),sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)))
 
       console <- printClear(console)
       console <- printPop(console)

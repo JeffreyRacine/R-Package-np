@@ -81,6 +81,7 @@ npcopula <- function(bws,
                            data=data)
         ## Divide the copula density by its marginals
         copula <- copula/NZD(fitted(npudens(bws=bws.f.marginal,data=data)))
+
       }
     }
   } else {
