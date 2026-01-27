@@ -22,7 +22,7 @@ Alternatively, you can install the development version but before
 doing so Windows users have to first install
 [Rtools](https://cran.r-project.org/bin/windows/Rtools/), while OS X
 users have to first install
-[Xcode](https://apps.apple.com/us/app/xcode/id497799835) and the
+[Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) and the
 command line tools (in OS X 10.9 or higher, once you have Xcode
 installed, open a terminal and run xcode-select --install). Note also
 that versions of e.g. Rtools are paired with versions of R so ensure
@@ -30,7 +30,7 @@ you have the latest version of R installed prior to commencing this
 process.
 
 After installing
-[Rtools](https://cran.r-project.org/bin/windows/Rtools/)/[Xcode](https://apps.apple.com/us/app/xcode/id497799835)
+[Rtools](https://cran.r-project.org/bin/windows/Rtools/)/[Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12)
 and **devtools** (via install.packages("devtools")), install the
 development package using the following command:
 

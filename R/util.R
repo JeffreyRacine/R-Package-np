@@ -23,7 +23,7 @@
 
 # Benches 1.3-1.7 times faster (mean/median) produces identical results
 
-integrate_trapezoidal <- function(x, y) {
+integrate.trapezoidal <- function(x, y) {
   n <- length(x)
   order.x <- order(x)
   x <- x[order.x]
