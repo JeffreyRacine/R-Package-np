@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-18. Kindly update your version should you not be using the most
+is 0.60-19. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1818,7 +1818,19 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \appendix
 
-\section*{Changes from Version 0.60-17 to 0.60-18 [09-12-2024]}
+\section*{Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]}
+
+\begin{itemize}
+
+\item Added crs to Suggests field in DESCRIPTION per CRAN requirements
+
+\item Utility functions \texttt{integrate.trapezoidal()}, \texttt{NZD()}, \texttt{NZD_pos()} (new, affect npregiv() and npregivderiv())
+
+\item Miscellaneous typos fixed
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-17 to 0.60-18 [09-Dec-2024]}
 
 \begin{itemize}
 

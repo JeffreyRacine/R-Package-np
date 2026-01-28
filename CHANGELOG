@@ -1,4 +1,12 @@
-Changes from Version 0.60-17 to 0.60-18 [09-12-2024]
+Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]
+
+* Added crs to Suggests field in DESCRIPTION per CRAN requirements
+
+* Utility functions integrate.trapezoidal(), NZD(), NZD_pos() (new, affect npregiv() and npregivderiv())
+
+* Miscellaneous typos fixed
+
+Changes from Version 0.60-17 to 0.60-18 [09-Dec-2024]
 
 * Patched issue with as.double(data) when data is a NULL object
   reported by Brian Ripley
