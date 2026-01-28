@@ -51,7 +51,7 @@
   McMaster University\\
   Hamilton, Ontario, Canada, L8S 4L8\\
   E-mail: \email{racinej@mcmaster.ca}\\
-  URL: \url{http://www.mcmaster.ca/economics/racine/}\\
+  URL: \url{https://experts.mcmaster.ca/people/racinej}\\
 }
 
 \begin{document}
@@ -495,12 +495,11 @@ the relevant published research papers and the \pkg{np} package
 
 \section*{Acknowledgments}
 
-We would like to gratefully acknowledge support from the Natural
-Sciences and Engineering Research Council of Canada
-(\url{http://www.nserc.ca}), the Social Sciences and Humanities
-Research Council of Canada (\url{http://www.sshrc.ca}), and the Shared
-Hierarchical Academic Research Computing Network
-(\url{http://www.sharcnet.ca}).
+We would like to gratefully acknowledge support from the Natural Sciences and
+Engineering Research Council of Canada (\url{https://nserc-crsng.canada.ca/}),
+the Social Sciences and Humanities Research Council of Canada
+(\url{https://sshrc-crsh.canada.ca/}), and the Shared Hierarchical Academic
+Research Computing Network (\url{https://www.sharcnet.ca/}).
 
 \bibliography{entropy_np}
 

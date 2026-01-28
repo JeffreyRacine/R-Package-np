@@ -62,15 +62,15 @@
   ETH H\"onggerberg Campus\\
   Physics Department\\
   CH-8093 Z\"urich, Switzerland\\
-  E-mail: \email{hayfield@phys.ethz.ch}\\
-  URL: \url{http://www.exp-astro.phys.ethz.ch/hayfield/}\\
+  E-mail: \email{hayfield@phys.ethz.ch}
+%%  URL: \url{http://www.exp-astro.phys.ethz.ch/hayfield/}\\
   ~\\
   Jeffrey S.~Racine\\
   Department of Economics\\
   McMaster University\\
   Hamilton, Ontario, Canada, L8S 4L8\\
   E-mail: \email{racinej@mcmaster.ca}\\
-  URL: \url{http://www.mcmaster.ca/economics/racine/}\\
+  URL: \url{https://experts.mcmaster.ca/people/racinej}\\
 }
 
 \begin{document}
@@ -151,7 +151,7 @@ and extensible environment for applied kernel estimation. We
 appreciate that there exists tension among these goals, and have tried
 to balance these competing ends, with varying degrees of success.
 \pkg{np} is available from the Comprehensive \proglang{R} Archive
-Network at \url{http://CRAN.R-project.org/package=np}.
+Network at \url{https://CRAN.R-project.org/package=np}.
 
 Currently, a range of methods can be found in the \pkg{np} package
 including unconditional (\citeauthor{LI_RACINE:2003a}
@@ -349,8 +349,8 @@ overriding default search tolerances (unless increasing \code{nmulti =}
 beyond its default value).
 
 We direct the interested reader to the frequently asked questions
-document on the author's website
-(\url{http://socserv.mcmaster.ca/racine/np_faq.pdf}) for a range of
+document 
+(\url{https://cran.r-project.org/web/packages/np/vignettes/np_faq.pdf}) for a range of
 potentially helpful tips and suggestions surrounding bandwidth
 selection and the \pkg{np} package.
 
@@ -1558,10 +1558,10 @@ We are indebted to Achim Zeileis and to two anonymous referees whose
 comments and feedback have resulted in numerous improvements to the
 \pkg{np} package and to the exposition of this article. Racine would
 like to gratefully acknowledge support from the Natural Sciences and
-Engineering Research Council of Canada (\url{http://www.nserc.ca}),
+Engineering Research Council of Canada (\url{https://nserc-crsng.canada.ca/}),
 the Social Sciences and Humanities Research Council of Canada
-(\url{http://www.sshrc.ca}), and the Shared Hierarchical Academic
-Research Computing Network (\url{http://www.sharcnet.ca}).
+(\url{https://sshrc-crsh.canada.ca/}), and the Shared Hierarchical Academic
+Research Computing Network (\url{https://www.sharcnet.ca/}).
 
 \bibliography{np}
 

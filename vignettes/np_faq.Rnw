@@ -105,14 +105,14 @@ A BibTeX entry for LaTeX users is
 
   There are many excellent introductions to the \texttt{R} environment
   with more on the way. First, I would recommend going directly to the
-  \texttt{R} website (\url{http://www.r-project.org}) and looking under
-  Documentation/Manuals (\url{http://cran.r-project.org/manuals.html})
+  \texttt{R} website (\url{https://www.r-project.org}) and looking under
+  Documentation/Manuals (\url{https://cran.r-project.org/manuals.html})
   where you will discover a wealth of documentation for \texttt{R} users
   of all levels. See also the \texttt{R} task views summary page
-  (\url{http://cran.r-project.org/web/views}) for
+  (\url{https://cran.r-project.org/web/views}) for
   information grouped under field of interest. A few documents that I
   mention to my students which are tailored to econometricians include
-  \url{http://cran.r-project.org/doc/contrib/Verzani-SimpleR.pdf},
+  \url{https://cran.r-project.org/doc/contrib/Verzani-SimpleR.pdf},
   Cribari-Neto \& Zarkos (1999) \cite{CRIBARI_NETO_ZARKOS:1999},
   Racine \& Hyndman (2002) \cite{RACINE_HYNDMAN:2002} and Farnsworth
   (2006) \cite{FARNSWORTH:2006}, to name but a few.
@@ -123,7 +123,7 @@ A BibTeX entry for LaTeX users is
 
   I maintain a 'Gallery' to provide a forum for users to share code
   and discover examples and illustrations which can be found at
-  \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
+  \url{https://jeffreyracine.github.io/gallery/}.
 
   Often the best resource is right down the hall. Ask a colleague
   whether they use or know anyone who uses R, then offer to buy that
@@ -154,7 +154,7 @@ A BibTeX entry for LaTeX users is
   one-stop installation for these packages.
 
 See
-\href{http://cran.r-project.org/web/views/Econometrics.html}{cran.r-project.org/web/views/Econometrics.html} for further information.
+\href{https://cran.r-project.org/web/views/Econometrics.html}{cran.r-project.org/web/views/Econometrics.html} for further information.
 
 To automatically install a task view, the \texttt{ctv} package first
 needs to be installed and loaded, i.e.,
@@ -203,7 +203,7 @@ update.views("Econometrics")
     modified, fixed etc?}
 
   See the CHANGELOG on the CRAN site
-  (\url{http://cran.r-project.org/web/packages/np/ChangeLog}), or go
+  (\url{https://cran.r-project.org/web/packages/np/ChangeLog}), or go
   to the end of this document where the CHANGELOG is provided for your
   convenience.
 
@@ -592,7 +592,7 @@ then you can take the source code for this demo and modify it for your
 particular application.
 
 You can also find examples and illustrations at the 'Gallery' located
-at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
+at \url{https://jeffreyracine.github.io/gallery/}.
 
 \subsection{I need to apply a boundary correction for a univariate
   density estimate - how can I do this?}
@@ -671,7 +671,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 
   But also note that there is a platform-independent interface that
   does not suffer from this limitation called 'RStudio' that you might
-  prefer to existing interfaces (\url{http://www.rstudio.org}).
+  prefer to existing interfaces (\url{https://posit.co/}).
 
 \subsection{When some routines are running under MS Windows, \texttt{R}
     appears to be 'not responding.' It appears that the program is not
@@ -725,7 +725,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   to switch from one to another and overwrite existing graphics
   windows should you so choose.
 
-  Alternately, you can use RStudio (\url{http://www.rstudio.org})
+  Alternately, you can use RStudio (\url{https://posit.co/})
   where the plot window is such that previous plots can be recalled on
   the fly, resized, saved in various formats etc.
 
@@ -1824,7 +1824,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \item Added crs to Suggests field in DESCRIPTION per CRAN requirements
 
-\item Utility functions \texttt{integrate.trapezoidal()}, \texttt{NZD()}, \texttt{NZD_pos()} (new, affect npregiv() and npregivderiv())
+\item Utility functions \texttt{integrate.trapezoidal()}, \texttt{NZD()}, \texttt{NZD\_pos()} (new, affect npregiv() and npregivderiv())
 
 \item Miscellaneous typos fixed
 
