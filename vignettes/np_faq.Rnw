@@ -109,7 +109,7 @@ A BibTeX entry for LaTeX users is
   Documentation/Manuals (\url{https://cran.r-project.org/manuals.html})
   where you will discover a wealth of documentation for \texttt{R} users
   of all levels. See also the \texttt{R} task views summary page
-  (\url{https://cran.r-project.org/web/views}) for
+  (\url{https://cran.r-project.org/web/views/}) for
   information grouped under field of interest. A few documents that I
   mention to my students which are tailored to econometricians include
   \url{https://cran.r-project.org/doc/contrib/Verzani-SimpleR.pdf},
