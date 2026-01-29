@@ -350,7 +350,7 @@ beyond its default value).
 
 We direct the interested reader to the frequently asked questions
 document 
-(\url{https://cran.r-project.org/web/packages/np/vignettes/np_faq.pdf}) for a range of
+(\url{https://CRAN.R-project.org/package=np/vignettes/np_faq.pdf}) for a range of
 potentially helpful tips and suggestions surrounding bandwidth
 selection and the \pkg{np} package.
 
