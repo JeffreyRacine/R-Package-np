@@ -28,34 +28,34 @@ npregiv <- function(y,
                     x=NULL,
                     zeval=NULL,
                     xeval=NULL,
-                    p=1,
-                    nmulti=1,
-                    random.seed=42,
-                    optim.maxattempts = 10,
-                    optim.method=c("Nelder-Mead", "BFGS", "CG"),
-                    optim.reltol=sqrt(.Machine$double.eps),
-                    optim.abstol=.Machine$double.eps,
-                    optim.maxit=500,
                     alpha=NULL,
                     alpha.iter=NULL,
-                    alpha.min=1.0e-10,
                     alpha.max=1.0e-01,
+                    alpha.min=1.0e-10,
                     alpha.tol=.Machine$double.eps^0.25,
-                    iterate.Tikhonov=TRUE,
-                    iterate.Tikhonov.num=1,                    
-                    iterate.max=1000,
-                    iterate.diff.tol=1.0e-08,
+                    bw=NULL,
                     constant=0.5,
+                    iterate.diff.tol=1.0e-08,
+                    iterate.max=1000,
+                    iterate.Tikhonov=TRUE,
+                    iterate.Tikhonov.num=1,
                     method=c("Landweber-Fridman","Tikhonov"),
+                    nmulti=1,
+                    optim.abstol=.Machine$double.eps,
+                    optim.maxattempts = 10,
+                    optim.maxit=500,
+                    optim.method=c("Nelder-Mead", "BFGS", "CG"),
+                    optim.reltol=sqrt(.Machine$double.eps),
+                    p=1,
                     penalize.iteration=TRUE,
+                    random.seed=42,
+                    return.weights.phi=FALSE,
+                    return.weights.phi.deriv.1=FALSE,
+                    return.weights.phi.deriv.2=FALSE,
                     smooth.residuals=TRUE,
                     start.from=c("Eyz","EEywz"),
                     starting.values=NULL,
                     stop.on.increase=TRUE,
-                    return.weights.phi=FALSE,
-                    return.weights.phi.deriv.1=FALSE,
-                    return.weights.phi.deriv.2=FALSE,
-                    bw=NULL,
                     ...) {
 
   ## This function was constructed initially by Samuele Centorrino
@@ -111,9 +111,9 @@ npregiv <- function(y,
 
   tikh <- function(alpha,CZ,CY,Cr.r,cholesky=FALSE){
       if(cholesky) {
-          return(chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ)) %*% Cr.r)
+          return(chol2inv(chol(diag(alpha, nrow(CY)) + CY%*%CZ)) %*% Cr.r)
       } else {
-          return(solve(alpha*diag(nrow(CY)) + CY%*%CZ) %*% Cr.r)
+          return(solve(diag(alpha, nrow(CY)) + CY%*%CZ) %*% Cr.r)
       }
   }
 
@@ -125,9 +125,9 @@ npregiv <- function(y,
 
   tikh.eval <- function(alpha,CZ,CY,CY.eval,r,cholesky=FALSE){
     if(cholesky) {
-        return(CY.eval%*%chol2inv(chol(alpha*diag(nrow(CY)) + CZ%*%CY)) %*% r)
+        return(CY.eval%*%chol2inv(chol(diag(alpha, nrow(CY)) + CZ%*%CY)) %*% r)
     } else {
-        return(CY.eval%*%solve(alpha*diag(nrow(CY)) + CZ%*%CY) %*% r)
+        return(CY.eval%*%solve(diag(alpha, nrow(CY)) + CZ%*%CY) %*% r)
     }
   }
 
@@ -161,9 +161,9 @@ npregiv <- function(y,
 
   ittik <- function(alpha,CZ,CY,Cr.r,r,cholesky=FALSE) {
       if(cholesky) {
-          invmat <- chol2inv(chol(alpha*diag(nrow(CY)) + CY%*%CZ))
+          invmat <- chol2inv(chol(diag(alpha, nrow(CY)) + CY%*%CZ))
       } else {
-          invmat <- solve(alpha*diag(nrow(CY)) + CY%*%CZ)
+          invmat <- solve(diag(alpha, nrow(CY)) + CY%*%CZ)
       }
       invmat.Cr.r <- invmat %*% Cr.r
       phi <- invmat.Cr.r + alpha * invmat %*% invmat.Cr.r
@@ -347,24 +347,33 @@ npregiv <- function(y,
 
       if(p==1) {
 
-          if(deriv==0) Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))
+          if(deriv==0) {
+              Kmat <- matrix(NA, n.eval, n.train)
+              for(i in 1:n.eval) {
+                  Kmat[i,] <- W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
+              }
+          }
           if(deriv==1) {
               W.z.deriv.1 <- W.glp(xdat=X.train.numeric,
                                          exdat=as.matrix(X.eval.numeric),
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 1)
 
-              Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))
+              Kmat <- matrix(NA, n.eval, n.train)
+              for(i in 1:n.eval) {
+                  Kmat[i,] <- W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
+              }
           }
 
       }
 
       if(p >= 2) {
 
+          Kmat <- matrix(NA, n.eval, n.train)
           if(deriv==0) {
-
-              Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))
-
+              for(i in 1:n.eval) {
+                  Kmat[i,] <- W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
+              }
           }
 
 
@@ -375,7 +384,9 @@ npregiv <- function(y,
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 1)
 
-              Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))
+              for(i in 1:n.eval) {
+                  Kmat[i,] <- W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
+              }
 
           }
 
@@ -386,7 +397,9 @@ npregiv <- function(y,
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 2)
 
-              Kmat <- t(sapply(1:ncol(K.x),function(i){W.z.deriv.2[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]}))
+              for(i in 1:n.eval) {
+                  Kmat[i,] <- W.z.deriv.2[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
+              }
 
           }
 
@@ -541,6 +554,7 @@ npregiv <- function(y,
       doridge <- !logical(n.eval)
 
       nc <- ncol(tww[,,1])
+      I.nc <- diag(nc)
 
       ## Test for singularity of the generalized local polynomial
       ## estimator, shrink the mean towards the local constant mean.
@@ -548,7 +562,7 @@ npregiv <- function(y,
       ridger <- function(i) {
         doridge[i] <<- FALSE
         ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
-        tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
+        tryCatch(chol2inv(chol(tww[,,i] + ridge[i]*I.nc))%*%tyw[,i],
                  error = function(e){
                    ridge[i] <<- ridge[i]+epsilon
                    doridge[i] <<- TRUE
@@ -1818,17 +1832,18 @@ npregiv <- function(y,
                 degree=rep(p, num.z.numeric),
                 ...)
 
-    phi.deriv.1.list <- list()
-    phi.deriv.eval.1.list <- list()
+    phi.deriv.1.list <- vector(mode="list", length=iterate.max)
+    phi.deriv.eval.1.list <- vector(mode="list", length=iterate.max)
 
     phi <- phi.0 + constant*g$mean
     phi.deriv.1 <- phi.0.deriv.1 + constant*g$grad
 
-    phi.mat <- phi
+    phi.mat <- matrix(NA, length(phi), iterate.max)
+    phi.mat[,1] <- phi
     phi.deriv.1.list[[1]] <- phi.deriv.1
 
-    phi.deriv.2.list <- list()
-    phi.deriv.eval.2.list <- list()
+    phi.deriv.2.list <- vector(mode="list", length=iterate.max)
+    phi.deriv.eval.2.list <- vector(mode="list", length=iterate.max)
     phi.deriv.2 <- NULL
     phi.deriv.eval.2 <- NULL
 
@@ -1850,7 +1865,8 @@ npregiv <- function(y,
                     degree=rep(p, num.z.numeric),
                     ...)
         phi.eval <- phi.eval.0 + constant*g$mean
-        phi.eval.mat <- phi.eval
+        phi.eval.mat <- matrix(NA, length(phi.eval), iterate.max)
+        phi.eval.mat[,1] <- phi.eval
 
         phi.deriv.eval.1 <- phi.eval.0.deriv.1 + constant*g$grad
         phi.deriv.eval.1.list[[1]] <- phi.deriv.eval.1
@@ -1877,13 +1893,19 @@ npregiv <- function(y,
 
     ## Need these list even when no weights for return
 
-    phi.weights.list <- list()
-    phi.deriv.1.weights.list <- list()
-    phi.deriv.2.weights.list <- list()
+    phi.weights.list <- vector(mode="list", length=iterate.max)
+    phi.deriv.1.weights.list <- vector(mode="list", length=iterate.max)
+    phi.deriv.2.weights.list <- vector(mode="list", length=iterate.max)
 
-    phi.eval.weights.list <- list()
-    phi.deriv.eval.1.weights.list <- list()
-    phi.deriv.eval.2.weights.list <- list()
+    phi.eval.weights.list <- vector(mode="list", length=iterate.max)
+    phi.deriv.eval.1.weights.list <- vector(mode="list", length=iterate.max)
+    phi.deriv.eval.2.weights.list <- vector(mode="list", length=iterate.max)
+
+    ## Pre-allocate bandwidth matrices
+    bw.resid.w.mat <- matrix(NA, iterate.max, length(bw.resid.w))
+    bw.resid.w.mat[1,] <- bw.resid.w
+    bw.resid.fitted.w.z.mat <- matrix(NA, iterate.max, length(bw.resid.fitted.w.z))
+    bw.resid.fitted.w.z.mat[1,] <- bw.resid.fitted.w.z
 
     if(return.weights.phi) {
 
@@ -2072,7 +2094,7 @@ npregiv <- function(y,
 
       }
 
-      bw.resid.w <- rbind(bw.resid.w,h$bw)
+      bw.resid.w.mat[j,] <- h$bw
 
       if(return.weights.phi) {
 
@@ -2124,7 +2146,7 @@ npregiv <- function(y,
                   ...)
 
       phi <- phi + constant*g$mean
-      phi.mat <- cbind(phi.mat,phi)
+      phi.mat[,j] <- phi
       phi.deriv.1 <- phi.deriv.1 + constant*g$grad
       phi.deriv.1.list[[j]] <- phi.deriv.1
 
@@ -2146,7 +2168,7 @@ npregiv <- function(y,
                       degree=rep(p, num.z.numeric),
                       ...)
           phi.eval <- phi.eval + constant*g$mean
-          phi.eval.mat <- cbind(phi.eval.mat,phi.eval)
+          phi.eval.mat[,j] <- phi.eval
 
           phi.deriv.eval.1 <- phi.deriv.eval.1 + constant*g$grad
           phi.deriv.eval.1.list[[j]] <- phi.deriv.eval.1
@@ -2163,7 +2185,7 @@ npregiv <- function(y,
 
       }
 
-      bw.resid.fitted.w.z <- rbind(bw.resid.fitted.w.z,h$bw)
+      bw.resid.fitted.w.z.mat[j,] <- h$bw
 
       if(return.weights.phi) {
 
@@ -2311,8 +2333,29 @@ npregiv <- function(y,
 
     }
 
+    ## Trim matrices and lists to the actual number of iterations performed
+    if(j < iterate.max) {
+        phi.mat <- phi.mat[, 1:j, drop=FALSE]
+        if(!is.null(phi.eval.mat)) phi.eval.mat <- phi.eval.mat[, 1:j, drop=FALSE]
+        norm.stop <- norm.stop[1:j]
+        phi.deriv.1.list <- phi.deriv.1.list[1:j]
+        phi.deriv.2.list <- phi.deriv.2.list[1:j]
+        if(!is.null(phi.deriv.eval.1.list)) phi.deriv.eval.1.list <- phi.deriv.eval.1.list[1:j]
+        if(!is.null(phi.deriv.eval.2.list)) phi.deriv.eval.2.list <- phi.deriv.eval.2.list[1:j]
+        phi.weights.list <- phi.weights.list[1:j]
+        phi.deriv.1.weights.list <- phi.deriv.1.weights.list[1:j]
+        phi.deriv.2.weights.list <- phi.deriv.2.weights.list[1:j]
+        phi.eval.weights.list <- phi.eval.weights.list[1:j]
+        phi.deriv.eval.1.weights.list <- phi.deriv.eval.1.weights.list[1:j]
+        phi.deriv.eval.2.weights.list <- phi.deriv.eval.2.weights.list[1:j]
+        bw.resid.w.mat <- bw.resid.w.mat[1:j, , drop=FALSE]
+        bw.resid.fitted.w.z.mat <- bw.resid.fitted.w.z.mat[1:j, , drop=FALSE]
+    }
+
+    bw.resid.w <- bw.resid.w.mat
+    bw.resid.fitted.w.z <- bw.resid.fitted.w.z.mat
+
     ## Extract minimum, and check for monotone increasing function and
-    ## issue warning in that case. Otherwise allow for an increasing
     ## then decreasing (and potentially increasing thereafter) portion
     ## of the stopping function, ignore the initial increasing portion,
     ## and take the min from where the initial inflection point occurs

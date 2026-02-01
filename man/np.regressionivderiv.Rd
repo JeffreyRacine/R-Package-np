@@ -23,14 +23,14 @@ npregivderiv(y,
              zeval = NULL,
              weval = NULL,
              xeval = NULL,
-             random.seed = 42,
-             iterate.max = 1000,
-             iterate.break = TRUE,
              constant = 0.5,
+             iterate.break = TRUE,
+             iterate.max = 1000,
+             random.seed = 42,
+             smooth.residuals = TRUE,
              start.from = c("Eyz","EEywz"),
              starting.values = NULL,
              stop.on.increase = TRUE,
-             smooth.residuals = TRUE,
              ...)
 }
 \arguments{
@@ -71,15 +71,9 @@ npregivderiv(y,
     evaluation takes place on the data provided by \code{x}.
   }
 
-  \item{random.seed}{
-    an integer used to seed R's random number generator. This ensures
-    replicability of the numerical search. Defaults to 42.
-  }
-
-  \item{iterate.max}{
-    an integer indicating the maximum number of iterations permitted
-    before termination occurs for Landweber-Fridman iteration.
-  }
+\item{constant}{
+  the constant to use for Landweber-Fridman iteration.
+}
 
   \item{iterate.break}{
     a logical value indicating whether to compute all objects up to
@@ -88,9 +82,22 @@ npregivderiv(y,
     \code{iterate.max})
   }
 
-\item{constant}{
-  the constant to use for Landweber-Fridman iteration.
-}
+  \item{iterate.max}{
+    an integer indicating the maximum number of iterations permitted
+    before termination occurs for Landweber-Fridman iteration.
+  }
+
+  \item{random.seed}{
+    an integer used to seed R's random number generator. This ensures
+    replicability of the numerical search. Defaults to 42.
+  }
+
+\item{smooth.residuals}{
+  a logical value (defaults to \code{TRUE}) indicating whether to
+  optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
+  on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
+  \eqn{w} during Landweber-Fridman iteration.
+ }
 
 \item{start.from}{ a character string indicating whether to start from
   \eqn{E(Y|z)} (default, \code{"Eyz"}) or from \eqn{E(E(Y|z)|z)} (this can
@@ -108,15 +115,9 @@ npregivderiv(y,
   course of one iteration (i.e. it may be above the iteration tolerance
   but increased).
 }
-\item{smooth.residuals}{
-  a logical value (defaults to \code{TRUE}) indicating whether to
-  optimize bandwidths for the regression of \eqn{y-\varphi(z)}{y-phi(z)}
-  on \eqn{w} or for the regression of \eqn{\varphi(z)}{phi(z)} on
-  \eqn{w} during Landweber-Fridman iteration.
- }
-\item{...}{ 
-  additional arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
-}
+  \item{...}{ 
+    additional arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
+  }
 
 }
 

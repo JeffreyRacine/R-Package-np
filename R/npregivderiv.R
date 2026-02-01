@@ -43,14 +43,14 @@ npregivderiv <- function(y,
                          zeval=NULL,
                          weval=NULL,
                          xeval=NULL,
-                         random.seed=42,
-                         iterate.max=1000,
-                         iterate.break=TRUE,
                          constant=0.5,
+                         iterate.break=TRUE,
+                         iterate.max=1000,
+                         random.seed=42,
+                         smooth.residuals=TRUE,
                          start.from=c("Eyz","EEywz"),
                          starting.values=NULL,
                          stop.on.increase=TRUE,
-                         smooth.residuals=TRUE,
                          ...) {
 
   console <- newLineConsole()
@@ -165,7 +165,28 @@ npregivderiv <- function(y,
   ## NOTE - this presumes univariate z case... in general this would
   ## be a continuous variable's index
 
-  phi <- integrate.trapezoidal(z[,1],phi.prime)
+  # Pre-calculate components for integrate.trapezoidal
+  z.val <- z[,1]
+  n.z <- length(z.val)
+  order.z <- order(z.val)
+  z.sorted <- z.val[order.z]
+  dz.sorted <- diff(z.sorted)
+  cz.z <- dz.sorted[1]
+  inv.order.z <- order(order.z)
+
+  integrate.trapezoidal.internal <- function(y.val) {
+      y.sorted <- y.val[order.z]
+      dy.sorted <- diff(y.sorted)
+      ca.z <- dy.sorted[1] / cz.z
+      cb.z <- dy.sorted[n.z - 1] / cz.z
+      cf.z <- cz.z^2 / 12 * (cb.z - ca.z)
+      if (!is.finite(cf.z)) cf.z <- 0
+      int.vec <- c(0, cumsum(dz.sorted * (y.sorted[-n.z] + y.sorted[-1]) / 2))
+      int.vec <- int.vec - cf.z
+      int.vec[inv.order.z]
+  }
+
+  phi <- integrate.trapezoidal.internal(phi.prime)
 
   starting.values.phi <- phi
   starting.values.phi.prime <- phi.prime
@@ -175,11 +196,14 @@ npregivderiv <- function(y,
 
   phi <- phi - mean(phi) + mean(y)
 
-  console <- printClear(console)
-  console <- printPop(console)
-  console <- printPush(paste("Computing optimal smoothing for E(phi|w) (stopping rule) for iteration 1...",sep=""),console)
+  phi.mat <- matrix(NA, length(phi), iterate.max)
+  phi.mat[,1] <- phi
+  phi.prime.mat <- matrix(NA, length(phi.prime), iterate.max)
+  phi.prime.mat[,1] <- phi.prime
 
-  norm.stop <- numeric()
+  norm.stop <- numeric(iterate.max)
+
+  console <- printClear(console)
 
   ## Now we compute mu.0 (a residual of sorts)
 
@@ -243,8 +267,18 @@ npregivderiv <- function(y,
   ## with phi.prime.1 (i.e. overwrite phi.prime)
 
   phi.prime <- phi.prime + constant*T.star.mu
-  phi.mat <- phi
-  phi.prime.mat <- phi.prime
+
+  phi.mat <- matrix(NA, length(phi), iterate.max)
+  phi.mat[,1] <- phi
+  phi.prime.mat <- matrix(NA, length(phi.prime), iterate.max)
+  phi.prime.mat[,1] <- phi.prime
+
+  norm.stop <- numeric(iterate.max)
+  norm.stop[1] <- sum(predicted.E.mu.w^2)/NZD_pos(sum(E.y.w^2))
+  
+  ## We again require the mean of the fitted values
+
+  mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
   ## This we iterate...
 
@@ -257,7 +291,7 @@ npregivderiv <- function(y,
     ## NOTE - this presumes univariate z case... in general this would
     ## be a continuous variable's index
 
-    phi <- integrate.trapezoidal(z[,1],phi.prime)
+    phi <- integrate.trapezoidal.internal(phi.prime)
 
     ## In the definition of phi we have the integral minus the mean of
     ## the integral with respect to z, so subtract the mean here
@@ -327,8 +361,8 @@ npregivderiv <- function(y,
     ## iterate until convergence...
 
     phi.prime <- phi.prime + constant*T.star.mu
-    phi.mat <- cbind(phi.mat,phi)
-    phi.prime.mat <- cbind(phi.prime.mat,phi.prime)
+    phi.mat[,j] <- phi
+    phi.prime.mat[,j] <- phi.prime
 
     ## The number of iterations in LF is asymptotically equivalent to
     ## 1/alpha (where alpha is the regularization parameter in
@@ -356,6 +390,13 @@ npregivderiv <- function(y,
 
     convergence <- "ITERATE_MAX"
 
+  }
+
+  ## Trim matrices and norm.stop to the actual number of iterations performed
+  if(j < iterate.max) {
+      phi.mat <- phi.mat[, 1:j, drop=FALSE]
+      phi.prime.mat <- phi.prime.mat[, 1:j, drop=FALSE]
+      norm.stop <- norm.stop[1:j]
   }
 
   ## Extract minimum, and check for monotone increasing function and
