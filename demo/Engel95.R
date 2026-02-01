@@ -20,7 +20,7 @@ Engel95 <- Engel95[order(Engel95$logexp),]
 attach(Engel95)
 
 model.iv <- npregiv(y=food,z=logexp,w=logwages,method="Landweber-Fridman")
-phihat <- model.iv$phihat
+phi <- model.iv$phi
 
 ## Compute the non-IV regression (i.e. regress y on z)
 
@@ -42,7 +42,7 @@ plot(logexp,food,
      cex=.5,
      col="lightgrey")
 
-lines(logexp,phihat,col="blue",lwd=2,lty=2)
+lines(logexp,phi,col="blue",lwd=2,lty=2)
 
 lines(logexp,fitted(ghat),col="red",lwd=2,lty=4)
 

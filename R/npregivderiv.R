@@ -14,7 +14,7 @@
 ## This function returns a list with the following elements:
 
 ## phi: the IV estimator of phi(z) corresponding to the estimated
-## derivative phihat(z)
+## derivative phi(z)
 ## phi.prime: the IV derivative estimator
 ## phi.mat: the matrix with colums phi_1, phi_2 etc. over all iterations
 ## phi.prime.mat: the matrix with colums phi'_1, phi'_2 etc. over all iterations

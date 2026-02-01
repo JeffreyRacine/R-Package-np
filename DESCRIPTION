@@ -2,7 +2,7 @@ Package: np
 Version: 0.60-20
 Date: 2026-02-01
 Imports: boot, cubature, methods, quadprog, quantreg, stats
-Suggests: crs, MASS, logspline, ks
+Suggests: crs, MASS, logspline, ks, testthat
 Title: Nonparametric Kernel Smoothing Methods for Mixed Data Types
 Authors@R: c(person(given = "Jeffrey S.", family = "Racine", role = c("aut","cre"), email = "racinej@mcmaster.ca"),
              person(given = "Tristen", family = "Hayfield", role = c("aut"), email = "tristen.hayfield@gmail.com"))
