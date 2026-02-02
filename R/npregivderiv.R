@@ -46,12 +46,12 @@ npregivderiv <- function(y,
                          constant=0.5,
                          iterate.break=TRUE,
                          iterate.max=1000,
+                         nmulti=NULL,
                          random.seed=42,
                          smooth.residuals=TRUE,
                          start.from=c("Eyz","EEywz"),
                          starting.values=NULL,
                          stop.on.increase=TRUE,
-                         nmulti=NULL,
                          ...) {
 
   cl <- match.call()

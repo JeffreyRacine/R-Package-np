@@ -26,12 +26,12 @@ npregivderiv(y,
              constant = 0.5,
              iterate.break = TRUE,
              iterate.max = 1000,
+             nmulti = NULL,
              random.seed = 42,
              smooth.residuals = TRUE,
              start.from = c("Eyz","EEywz"),
              starting.values = NULL,
              stop.on.increase = TRUE,
-             nmulti = NULL,
              ...)
 }
 \arguments{
@@ -88,6 +88,12 @@ npregivderiv(y,
     before termination occurs for Landweber-Fridman iteration.
   }
 
+  \item{nmulti}{
+    integer number of times to restart the process of finding extrema of
+    the cross-validation function from different (random) initial
+    points.
+  }
+
   \item{random.seed}{
     an integer used to seed R's random number generator. This ensures
     replicability of the numerical search. Defaults to 42.
@@ -115,11 +121,6 @@ npregivderiv(y,
     iteration if the stopping criterion (see below) increases over the
     course of one iteration (i.e. it may be above the iteration tolerance
     but increased).
-  }
-  \item{nmulti}{
-    integer number of times to restart the process of finding extrema of
-    the cross-validation function from different (random) initial
-    points.
   }
   \item{...}{ 
     additional arguments supplied to \code{\link{npreg}} and \code{\link{npksum}}.
