@@ -18,8 +18,9 @@ test_that("npregiv basic functionality works", {
   # Let's try a very small example
   model <- npregiv(y=y, w=w, z=z, method="Landweber-Fridman", iterate.max=10)
   
-  expect_type(model, "list")
+  expect_s3_class(model, "npregiv")
   expect_true("phi" %in% names(model))
+  expect_false(is.null(model$call))
 })
 
 test_that("npregivderiv basic functionality works", {
@@ -31,6 +32,7 @@ test_that("npregivderiv basic functionality works", {
   
   # Just check if it runs
   model <- npregivderiv(y=y, z=z, w=w, iterate.max=2)
-  expect_type(model, "list")
+  expect_s3_class(model, "npregivderiv")
   expect_true("phi.prime" %in% names(model))
+  expect_false(is.null(model$call))
 })
