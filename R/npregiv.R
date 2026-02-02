@@ -839,6 +839,7 @@ npregiv <- function(y,
                     optim.abstol=.Machine$double.eps,
                     optim.maxit=500,
                     debug=FALSE,
+                    bw.init=NULL,
                     ...) {
 
     ## Save seed prior to setting
@@ -933,13 +934,18 @@ npregiv <- function(y,
 
       num.numeric <- ncol(as.data.frame(xdat[,xdat.numeric]))
 
-      ## First initialize to values for factors (`liracine' kernel)
+      if(iMulti == 1 && !is.null(bw.init)) {
+        init.search.vals <- bw.init
+      } else {
 
-      init.search.vals <- runif(ncol(xdat),0,1)
+        ## First initialize to values for factors (`liracine' kernel)
 
-      for(i in 1:ncol(xdat)) {
-        if(xdat.numeric[i]==TRUE) {
-          init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
+        init.search.vals <- runif(ncol(xdat),0,1)
+
+        for(i in 1:ncol(xdat)) {
+          if(xdat.numeric[i]==TRUE) {
+            init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
+          }
         }
       }
 
@@ -1245,6 +1251,9 @@ npregiv <- function(y,
         console <- printPush("Computing E(phi(z)|w) using supplied bandwidths...", console)
     }
 
+    bw.E.phi.w <- NULL
+    bw.E.E.phi.w.z <- NULL
+
     for(i in 1:iterate.Tikhonov.num) {
 
       if(iterate.Tikhonov.num > 1 && i < iterate.Tikhonov.num) {
@@ -1264,6 +1273,7 @@ npregiv <- function(y,
                          optim.reltol=optim.reltol,
                          optim.abstol=optim.abstol,
                          optim.maxit=optim.maxit,
+                         bw.init=bw.E.phi.w,
                          ...)
 
           bw.E.phi.w <- hphiw$bw
@@ -1309,6 +1319,7 @@ npregiv <- function(y,
                           optim.reltol=optim.reltol,
                           optim.abstol=optim.abstol,
                           optim.maxit=optim.maxit,
+                          bw.init=bw.E.E.phi.w.z,
                           ...)
 
           bw.E.E.phi.w.z <- hphiwz$bw
@@ -2054,6 +2065,7 @@ npregiv <- function(y,
                        optim.reltol=optim.reltol,
                        optim.abstol=optim.abstol,
                        optim.maxit=optim.maxit,
+                       bw.init=bw.resid.w.mat[j-1,],
                        ...)
         } else {
             h <- NULL
@@ -2080,6 +2092,7 @@ npregiv <- function(y,
                        optim.reltol=optim.reltol,
                        optim.abstol=optim.abstol,
                        optim.maxit=optim.maxit,
+                       bw.init=bw.resid.w.mat[j-1,],
                        ...)
         } else {
             h <- NULL
@@ -2134,6 +2147,7 @@ npregiv <- function(y,
                      optim.reltol=optim.reltol,
                      optim.abstol=optim.abstol,
                      optim.maxit=optim.maxit,
+                     bw.init=bw.resid.fitted.w.z.mat[j-1,],
                      ...)
       } else {
           h$bw <- bw$bw.resid.fitted.w.z[j,]

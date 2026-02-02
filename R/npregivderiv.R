@@ -129,10 +129,12 @@ npregivderiv <- function(y,
 
   ## For stopping rule...
 
-  E.y.w <- npreg(tydat=y,
-                 txdat=w,
-                 exdat=weval,
-                 ...)$mean
+  model.E.y.w <- npreg(tydat=y,
+                       txdat=w,
+                       exdat=weval,
+                       ...)
+  E.y.w <- model.E.y.w$mean
+  bw.E.y.w <- model.E.y.w$bws
 
   ## Potential alternative starting rule (consistent with
   ## npregiv). Here we start with E(Y|Z) rather than zero
@@ -147,15 +149,18 @@ npregivderiv <- function(y,
       console <- printPush(paste("Computing optimal smoothing for E(y|z,x) for iteration 1...",sep=""),console)
     }
 
-    phi.prime <- npreg(tydat=if(start.from=="Eyz") y else E.y.w,
-                       txdat=z,
-                       exdat=zeval,
-                       gradients=TRUE,
-                       ...)$grad[,1]
+    model.phi.prime <- npreg(tydat=if(start.from=="Eyz") y else E.y.w,
+                             txdat=z,
+                             exdat=zeval,
+                             gradients=TRUE,
+                             ...)
+    phi.prime <- model.phi.prime$grad[,1]
+    bw.E.y.z <- model.phi.prime$bws
 
   } else {
 
     phi.prime <- starting.values
+    bw.E.y.z <- NULL
 
   }
 
@@ -280,6 +285,8 @@ npregivderiv <- function(y,
 
   mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
 
+  bw.mu.w <- NULL
+
   ## This we iterate...
 
   for(j in 2:iterate.max) {
@@ -320,19 +327,25 @@ npregivderiv <- function(y,
 
       ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
 
-      predicted.E.mu.w <- npreg(tydat=mu,
-                                txdat=w,
-                                eydat=mu,
-                                exdat=weval,
-                                ...)$mean
+      model.mu.w <- npreg(tydat=mu,
+                          txdat=w,
+                          eydat=mu,
+                          exdat=weval,
+                          bws=bw.mu.w,
+                          ...)
+      predicted.E.mu.w <- model.mu.w$mean
+      bw.mu.w <- model.mu.w$bws
 
     } else {
 
-      E.phi.w <- npreg(tydat=phi,
-                       txdat=w,
-                       eydat=phi,
-                       exdat=weval,
-                       ...)$mean
+      model.phi.w <- npreg(tydat=phi,
+                           txdat=w,
+                           eydat=phi,
+                           exdat=weval,
+                           bws=bw.mu.w,
+                           ...)
+      E.phi.w <- model.phi.w$mean
+      bw.mu.w <- model.phi.w$bws
 
       predicted.E.mu.w <- E.y.w - E.phi.w
 
