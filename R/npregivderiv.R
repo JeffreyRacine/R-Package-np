@@ -229,17 +229,21 @@ npregivderiv <- function(y,
 
     ## Next, we regress require \mu_{0,i} W using bws optimal for phi on w
 
-    predicted.E.mu.w <- npreg(tydat=mu,
-                              txdat=w,
-                              exdat=weval,
-                              ...)$mean
+    model.mu.w <- npreg(tydat=mu,
+                        txdat=w,
+                        exdat=weval,
+                        ...)
+    predicted.E.mu.w <- model.mu.w$mean
+    bw.mu.w <- model.mu.w$bws
 
   } else {
 
-    E.phi.w <- npreg(tydat=phi,
-                     txdat=w,
-                     exdat=weval,
-                     ...)$mean
+    model.phi.w <- npreg(tydat=phi,
+                         txdat=w,
+                         exdat=weval,
+                         ...)
+    E.phi.w <- model.phi.w$mean
+    bw.mu.w <- model.phi.w$bws
 
     predicted.E.mu.w <- E.y.w - E.phi.w
 
@@ -284,8 +288,6 @@ npregivderiv <- function(y,
   ## We again require the mean of the fitted values
 
   mean.predicted.E.mu.w <- mean(predicted.E.mu.w)
-
-  bw.mu.w <- NULL
 
   ## This we iterate...
 
