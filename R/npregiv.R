@@ -58,6 +58,7 @@ npregiv <- function(y,
                     stop.on.increase=TRUE,
                     ...) {
 
+  ptm.start <- proc.time()
   cl <- match.call()
 
   ## This function was constructed initially by Samuele Centorrino
@@ -1522,7 +1523,8 @@ npregiv <- function(y,
                 xeval=xeval,
                 p=p,
                 nmulti=nmulti,
-                method=method)
+                method=method,
+                ptm=proc.time() - ptm.start)
     class(ret) <- "npregiv"
     return(ret)
 
@@ -2505,7 +2507,8 @@ npregiv <- function(y,
                 xeval=xeval,
                 p=p,
                 nmulti=nmulti,
-                method=method)
+                method=method,
+                ptm=proc.time() - ptm.start)
     class(ret) <- "npregiv"
     return(ret)
 
@@ -2545,6 +2548,7 @@ summary.npregiv <- function(object, ...) {
   }
 
   cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
+  cat(paste("\nEstimation time: ", formatC(object$ptm[1],digits=1,format="f"), " seconds",sep=""))
   cat("\n\n")
 }
 

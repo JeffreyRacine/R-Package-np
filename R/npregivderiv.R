@@ -54,6 +54,7 @@ npregivderiv <- function(y,
                          stop.on.increase=TRUE,
                          ...) {
 
+  ptm.start <- proc.time()
   cl <- match.call()
 
   console <- newLineConsole()
@@ -472,7 +473,8 @@ npregivderiv <- function(y,
               zeval=zeval,
               weval=weval,
               xeval=xeval,
-              nmulti=nmulti)
+              nmulti=nmulti,
+              ptm=proc.time() - ptm.start)
   class(ret) <- "npregivderiv"
   return(ret)
 
@@ -500,6 +502,7 @@ summary.npregivderiv <- function(object, ...) {
   cat(paste("\nStopping rule value: ", format(object$norm.stop[length(object$norm.stop)],digits=8), sep=""))
 
   cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
+  cat(paste("\nEstimation time: ", formatC(object$ptm[1],digits=1,format="f"), " seconds",sep=""))
   cat("\n\n")
 }
 
