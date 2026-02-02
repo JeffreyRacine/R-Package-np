@@ -51,6 +51,7 @@ npregivderiv <- function(y,
                          start.from=c("Eyz","EEywz"),
                          starting.values=NULL,
                          stop.on.increase=TRUE,
+                         nmulti=NULL,
                          ...) {
 
   console <- newLineConsole()
@@ -61,6 +62,9 @@ npregivderiv <- function(y,
   if(!is.logical(smooth.residuals)) stop("smooth.residuals must be logical (TRUE/FALSE)")
 
   start.from <- match.arg(start.from)
+
+  nmulti.loop <- if(!is.null(nmulti)) nmulti else 1
+  nmulti <- if(!is.null(nmulti)) nmulti else 5
 
   if(iterate.max < 2) stop("iterate.max must be at least 2")
   if(constant <= 0 || constant >= 1) stop("constant must lie in the range (0,1)")
@@ -132,6 +136,7 @@ npregivderiv <- function(y,
   model.E.y.w <- npreg(tydat=y,
                        txdat=w,
                        exdat=weval,
+                       nmulti=nmulti,
                        ...)
   E.y.w <- model.E.y.w$mean
   bw.E.y.w <- model.E.y.w$bws
@@ -153,6 +158,7 @@ npregivderiv <- function(y,
                              txdat=z,
                              exdat=zeval,
                              gradients=TRUE,
+                             nmulti=nmulti,
                              ...)
     phi.prime <- model.phi.prime$grad[,1]
     bw.E.y.z <- model.phi.prime$bws
@@ -334,6 +340,7 @@ npregivderiv <- function(y,
                           eydat=mu,
                           exdat=weval,
                           bws=bw.mu.w,
+                          nmulti=nmulti.loop,
                           ...)
       predicted.E.mu.w <- model.mu.w$mean
       bw.mu.w <- model.mu.w$bws
@@ -345,6 +352,7 @@ npregivderiv <- function(y,
                            eydat=phi,
                            exdat=weval,
                            bws=bw.mu.w,
+                           nmulti=nmulti.loop,
                            ...)
       E.phi.w <- model.phi.w$mean
       bw.mu.w <- model.phi.w$bws
