@@ -58,6 +58,8 @@ npregiv <- function(y,
                     stop.on.increase=TRUE,
                     ...) {
 
+  cl <- match.call()
+
   ## This function was constructed initially by Samuele Centorrino
   ## <samuele.centorrino@univ-tlse1.fr> to reproduce illustrations in
   ## the following papers:
@@ -1491,7 +1493,7 @@ npregiv <- function(y,
     if((alpha.iter-alpha.min)/NZD(alpha.min) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search minimum (",alpha.min,")",sep=""))
     if((alpha.max-alpha.iter)/NZD(alpha.max) < 0.01) warning(paste("Tikhonov parameter alpha (",formatC(alpha.iter,digits=4,format="f"),") is close to the search maximum (",alpha.max,")",sep=""))
 
-    return(list(phi=phi,
+    ret <- list(phi=phi,
                 phi.eval=phi.eval,
                 phi.mat=phi.mat,
                 phi.eval.mat=phi.eval.mat,
@@ -1510,7 +1512,19 @@ npregiv <- function(y,
                 bw.E.y.w=bw.E.y.w,
                 bw.E.E.y.w.z=bw.E.E.y.w.z,
                 bw.E.phi.w=bw.E.phi.w,
-                bw.E.E.phi.w.z=bw.E.E.phi.w.z))
+                bw.E.E.phi.w.z=bw.E.E.phi.w.z,
+                call=cl,
+                y=y,
+                z=z,
+                w=w,
+                x=x,
+                zeval=zeval,
+                xeval=xeval,
+                p=p,
+                nmulti=nmulti,
+                method=method)
+    class(ret) <- "npregiv"
+    return(ret)
 
   } else {
 
@@ -2458,7 +2472,7 @@ npregiv <- function(y,
     console <- printClear(console)
     console <- printPop(console)
 
-    return(list(phi=phi,
+    ret <- list(phi=phi,
                 phi.mat=phi.mat,
                 phi.deriv.1=as.matrix(phi.deriv.1),
                 phi.deriv.2=if(!is.null(phi.deriv.2)){as.matrix(phi.deriv.2)}else{NULL},
@@ -2481,8 +2495,106 @@ npregiv <- function(y,
                 bw.E.y.w=bw.E.y.w,
                 bw.E.y.z=bw.E.y.z,
                 bw.resid.w=as.matrix(bw.resid.w),
-                bw.resid.fitted.w.z=as.matrix(bw.resid.fitted.w.z)))
+                bw.resid.fitted.w.z=as.matrix(bw.resid.fitted.w.z),
+                call=cl,
+                y=y,
+                z=z,
+                w=w,
+                x=x,
+                zeval=zeval,
+                xeval=xeval,
+                p=p,
+                nmulti=nmulti,
+                method=method)
+    class(ret) <- "npregiv"
+    return(ret)
 
   }
 
 }
+
+print.npregiv <- function(x, ...) {
+  cat("Call:\n")
+  print(x$call)
+}
+
+summary.npregiv <- function(object, ...) {
+  cat("Call:\n")
+  print(object$call)
+
+  if(is.null(object$alpha))
+    cat("\nNonparametric Instrumental Kernel Regression\n",sep="")
+  else
+    cat("\nNonparametric Instrumental Kernel Regression (Tikhonov)\n",sep="")
+
+  cat(paste("\nNumber of continuous endogenous predictors: ",format(NCOL(object$z)),sep=""),sep="")
+  cat(paste("\nNumber of continuous instruments: ",format(NCOL(object$w)),sep=""),sep="")
+  if(!is.null(object$x)) cat(paste("\nNumber of continuous exogenous predictors: ",format(NCOL(object$x)),sep=""),sep="")
+
+  cat(paste("\nLocal polynomial order (p): ", format(object$p), sep=""))
+  cat(paste("\nTraining observations: ", format(NROW(object$y)), sep=""))
+
+  if(!is.null(object$alpha)) {
+    cat(paste("\n\nRegularization method: Tikhonov",sep=""))
+    cat(paste("\nTikhonov parameter (alpha): ", format(object$alpha,digits=8), sep=""))
+    if(!is.null(object$alpha.iter)) cat(paste("\nIterated Tikhonov parameter (alpha.iter): ", format(object$alpha.iter,digits=8), sep=""))
+  } else {
+    cat(paste("\n\nRegularization method: Landweber-Fridman",sep=""))
+    cat(paste("\nNumber of iterations: ", format(object$norm.index), sep=""))
+    cat(paste("\nStopping rule value: ", format(object$norm.stop[length(object$norm.stop)],digits=8), sep=""))
+  }
+
+  cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
+  cat("\n\n")
+}
+
+plot.npregiv <- function(x,
+                         plot.data = FALSE,
+                         deriv = FALSE,
+                         ...) {
+
+  object <- x
+
+  ## We only support univariate endogenous predictor z
+  if(NCOL(object$z) > 1) stop(" only univariate z is supported")
+
+  z <- object$z[,1]
+  y <- object$y
+  phi <- object$phi
+
+  zname <- names(object$z)[1]
+  yname <- "y" ## Default
+
+  if(deriv) {
+    phi.prime <- object$phi.deriv.1[,1]
+
+    plot(z[order(z)], phi.prime[order(z)],
+         type="l",
+         xlab=zname,
+         ylab=paste("d", yname, "/d", zname, sep=""),
+         ...)
+
+  } else {
+
+    if(plot.data) {
+      plot(z, y,
+           xlab=zname,
+           ylab=yname,
+           type="p",
+           col="lightgrey",
+           ...)
+      lines(z[order(z)], phi[order(z)],
+            lwd=2,
+            ...)
+    } else {
+      plot(z[order(z)], phi[order(z)],
+           type="l",
+           xlab=zname,
+           ylab=yname,
+           lwd=2,
+           ...)
+    }
+  }
+
+}
+

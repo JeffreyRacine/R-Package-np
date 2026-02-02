@@ -350,6 +350,10 @@ npregiv(y,
 
 \value{
 
+  \code{npregiv} returns a \code{npregiv} object.  The generic
+    functions \code{\link{print}}, \code{\link{summary}}, and
+    \code{\link{plot}} support objects of this type.
+
   \code{npregiv} returns a list with components \code{phi},
   \code{phi.mat} and either \code{alpha} when \code{method="Tikhonov"}
   or \code{norm.index}, \code{norm.stop} and \code{convergence} when

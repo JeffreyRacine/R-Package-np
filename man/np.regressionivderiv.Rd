@@ -167,6 +167,10 @@ npregivderiv(y,
 
 \value{
 
+  \code{npregivderiv} returns a \code{npregivderiv} object.  The
+    generic functions \code{\link{print}}, \code{\link{summary}}, and
+    \code{\link{plot}} support objects of this type.
+
   \code{npregivderiv} returns a list with components \code{phi.prime},
   \code{phi}, \code{num.iterations}, \code{norm.stop} and
   \code{convergence}.

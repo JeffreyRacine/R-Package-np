@@ -54,6 +54,8 @@ npregivderiv <- function(y,
                          nmulti=NULL,
                          ...) {
 
+  cl <- match.call()
+
   console <- newLineConsole()
 
   ## Basic error checking
@@ -453,7 +455,7 @@ npregivderiv <- function(y,
 
   if(j == iterate.max) warning(" iterate.max reached: increase iterate.max or inspect norm.stop vector")
 
-  return(list(phi=phi,
+  ret <- list(phi=phi,
               phi.prime=phi.prime,
               phi.mat=phi.mat,
               phi.prime.mat=phi.prime.mat,
@@ -461,7 +463,94 @@ npregivderiv <- function(y,
               norm.stop=norm.stop,
               convergence=convergence,
               starting.values.phi=starting.values.phi,
-              starting.values.phi.prime=starting.values.phi.prime))
+              starting.values.phi.prime=starting.values.phi.prime,
+              call=cl,
+              y=y,
+              z=z,
+              w=w,
+              x=x,
+              zeval=zeval,
+              weval=weval,
+              xeval=xeval,
+              nmulti=nmulti)
+  class(ret) <- "npregivderiv"
+  return(ret)
 
 }
+
+print.npregivderiv <- function(x, ...) {
+  cat("Call:\n")
+  print(x$call)
+}
+
+summary.npregivderiv <- function(object, ...) {
+  cat("Call:\n")
+  print(object$call)
+
+  cat("\nNonparametric Instrumental Kernel Derivative Estimation\n",sep="")
+
+  cat(paste("\nNumber of continuous endogenous predictors: ",format(NCOL(object$z)),sep=""),sep="")
+  cat(paste("\nNumber of continuous instruments: ",format(NCOL(object$w)),sep=""),sep="")
+  if(!is.null(object$x)) cat(paste("\nNumber of continuous exogenous predictors: ",format(NCOL(object$x)),sep=""),sep="")
+
+  cat(paste("\nTraining observations: ", format(NROW(object$y)), sep=""))
+
+  cat(paste("\n\nRegularization method: Landweber-Fridman",sep=""))
+  cat(paste("\nNumber of iterations: ", format(object$num.iterations), sep=""))
+  cat(paste("\nStopping rule value: ", format(object$norm.stop[length(object$norm.stop)],digits=8), sep=""))
+
+  cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
+  cat("\n\n")
+}
+
+plot.npregivderiv <- function(x,
+                              plot.data = FALSE,
+                              phi = FALSE,
+                              ...) {
+
+  object <- x
+
+  ## We only support univariate endogenous predictor z
+  if(NCOL(object$z) > 1) stop(" only univariate z is supported")
+
+  z <- object$z[,1]
+  y <- object$y
+  zname <- names(object$z)[1]
+  yname <- "y"
+
+  if(phi) {
+    ## Plot the structural function phi
+    fit <- object$phi
+    ylab <- yname
+  } else {
+    ## Plot the derivative phi.prime (default for npregivderiv)
+    fit <- object$phi.prime
+    ylab <- paste("d", yname, "/d", zname, sep="")
+  }
+
+  if(plot.data && !phi) {
+      ## Scatter data doesn't make sense for derivative plots directly
+      plot.data <- FALSE
+  }
+
+  if(plot.data) {
+    plot(z, y,
+         xlab=zname,
+         ylab=yname,
+         type="p",
+         col="lightgrey",
+         ...)
+    lines(z[order(z)], fit[order(z)],
+          lwd=2,
+          ...)
+  } else {
+    plot(z, fit[order(z)],
+         type="l",
+         xlab=zname,
+         ylab=ylab,
+         lwd=2,
+         ...)
+  }
+}
+
 
