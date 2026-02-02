@@ -138,10 +138,24 @@ npregivderiv(y,
   
   Landweber-Fridman iteration uses an optimal stopping rule based upon
   \eqn{||E(y|w)-E(\varphi_k(z,x)|w)||^2 }{||E(y|w)-E(phi(z,x)|w)||^2
-  }. However, if insufficient training is conducted the estimates can be
-  overly noisy. To best guard against this eventuality set \code{nmulti}
-  to a larger number than the default \code{nmulti=1} for
-  \code{\link{npreg}}.
+  }. However, if local rather than global optima are encountered the
+  resulting estimates can be overly noisy. To best guard against this
+  eventuality set \code{nmulti} to a larger number than the default
+  \code{nmulti=5} for the first iteration.
+
+  Note that for subsequent Landweber-Fridman iterations, a \dQuote{warm
+  start} strategy is employed. The optimal bandwidths from the previous
+  iteration are used as starting values for the current iteration. The
+  user-supplied \code{nmulti} is respected for all iterations. For
+  iterations after the first successful one, these optimal bandwidths
+  serve as the first of the multiple initial points (a warm start),
+  while any remaining restarts are cold starts. If \code{nmulti} is not
+  explicitly supplied by the user, it defaults to 5 for the first
+  iteration and to 1 for all subsequent iterations. This strategy
+  provides a balance between computational efficiency and robustness,
+  allowing the numerical optimizer to refine the structural bandwidths
+  as the residuals evolve incrementally while still guarding against
+  local optima.
 
   Iteration will terminate when either the change in the value of
   \eqn{||(E(y|w)-E(\varphi_k(z,x)|w))/E(y|w)||^2
