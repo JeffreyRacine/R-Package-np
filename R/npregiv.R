@@ -2517,11 +2517,23 @@ npregiv <- function(y,
 }
 
 print.npregiv <- function(x, ...) {
-  cat("Call:\n")
-  print(x$call)
+  summary.npregiv(x, ...)
+  invisible(x)
 }
 
 summary.npregiv <- function(object, ...) {
+  format_bw <- function(bw, label, names = NULL) {
+    if(is.null(bw)) return()
+    if(is.matrix(bw)) bw <- bw[nrow(bw), , drop = TRUE]
+    bw <- as.numeric(bw)
+    if(!is.null(names) && length(names) == length(bw)) {
+      vals <- paste(paste(names, formatC(bw, digits=8, format="g"), sep=": "), collapse=", ")
+    } else {
+      vals <- paste(formatC(bw, digits=8, format="g"), collapse=", ")
+    }
+    cat(paste("\n", label, " ", vals, sep=""))
+  }
+
   cat("Call:\n")
   print(object$call)
 
@@ -2545,6 +2557,21 @@ summary.npregiv <- function(object, ...) {
     cat(paste("\n\nRegularization method: Landweber-Fridman",sep=""))
     cat(paste("\nNumber of iterations: ", format(object$norm.index), sep=""))
     cat(paste("\nStopping rule value: ", format(object$norm.stop[length(object$norm.stop)],digits=8), sep=""))
+  }
+
+  w.names <- if(!is.null(object$w)) colnames(object$w) else NULL
+  z.names <- if(!is.null(object$z)) colnames(object$z) else NULL
+
+  if(is.null(object$alpha)) {
+    format_bw(object$bw.E.y.w, "Bandwidth for E(y|w):", w.names)
+    format_bw(object$bw.E.y.z, "Bandwidth for E(y|z):", z.names)
+    format_bw(object$bw.resid.w, "Bandwidth for E(y-phi(z)|w):", w.names)
+    format_bw(object$bw.resid.fitted.w.z, "Bandwidth for E(E(y-phi(z)|w)|z):", z.names)
+  } else {
+    format_bw(object$bw.E.y.w, "Bandwidth for E(y|w):", w.names)
+    format_bw(object$bw.E.E.y.w.z, "Bandwidth for E(E(y|w)|z):", z.names)
+    format_bw(object$bw.E.phi.w, "Bandwidth for E(phi(z)|w):", w.names)
+    format_bw(object$bw.E.E.phi.w.z, "Bandwidth for E(E(phi(z)|w)|z):", z.names)
   }
 
   cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
@@ -2601,4 +2628,3 @@ plot.npregiv <- function(x,
   }
 
 }
-

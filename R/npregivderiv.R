@@ -465,6 +465,8 @@ npregivderiv <- function(y,
               convergence=convergence,
               starting.values.phi=starting.values.phi,
               starting.values.phi.prime=starting.values.phi.prime,
+              bw.E.y.w=bw.E.y.w,
+              bw.E.y.z=bw.E.y.z,
               call=cl,
               y=y,
               z=z,
@@ -481,11 +483,23 @@ npregivderiv <- function(y,
 }
 
 print.npregivderiv <- function(x, ...) {
-  cat("Call:\n")
-  print(x$call)
+  summary.npregivderiv(x, ...)
+  invisible(x)
 }
 
 summary.npregivderiv <- function(object, ...) {
+  format_bw <- function(bw, label, names = NULL) {
+    if(is.null(bw)) return()
+    if(is.matrix(bw)) bw <- bw[nrow(bw), , drop = TRUE]
+    bw <- as.numeric(bw)
+    if(!is.null(names) && length(names) == length(bw)) {
+      vals <- paste(paste(names, formatC(bw, digits=8, format="g"), sep=": "), collapse=", ")
+    } else {
+      vals <- paste(formatC(bw, digits=8, format="g"), collapse=", ")
+    }
+    cat(paste("\n", label, " ", vals, sep=""))
+  }
+
   cat("Call:\n")
   print(object$call)
 
@@ -500,6 +514,11 @@ summary.npregivderiv <- function(object, ...) {
   cat(paste("\n\nRegularization method: Landweber-Fridman",sep=""))
   cat(paste("\nNumber of iterations: ", format(object$num.iterations), sep=""))
   cat(paste("\nStopping rule value: ", format(object$norm.stop[length(object$norm.stop)],digits=8), sep=""))
+
+  w.names <- if(!is.null(object$w)) colnames(object$w) else NULL
+  z.names <- if(!is.null(object$z)) colnames(object$z) else NULL
+  format_bw(object$bw.E.y.w, "Bandwidth for E(y|w):", w.names)
+  format_bw(object$bw.E.y.z, "Bandwidth for E(y|z):", z.names)
 
   cat(paste("\nNumber of multistarts: ", format(object$nmulti), sep=""))
   cat(paste("\nEstimation time: ", formatC(object$ptm[1],digits=1,format="f"), " seconds",sep=""))
@@ -555,5 +574,4 @@ plot.npregivderiv <- function(x,
          ...)
   }
 }
-
 
