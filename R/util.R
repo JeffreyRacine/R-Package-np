@@ -327,6 +327,8 @@ explodeFormula <- function(formula){
 
 
 explodePipe <- function(formula){
+  if (!inherits(formula, "formula"))
+    formula <- eval(formula, parent.frame())
   tf <- as.character(formula)  
   tf <- tf[length(tf)]
 

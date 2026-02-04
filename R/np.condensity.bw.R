@@ -447,4 +447,3 @@ npcdensbw.default <-
 
     return(tbw)
   }
-

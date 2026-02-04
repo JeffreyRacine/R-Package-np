@@ -426,6 +426,8 @@ npindex.sibandwidth <-
       ## Need to trap case where k-1=1..., sapply will return a
       ## vector, need a 1 x n matrix
 
+      ## Need to trap case where k-1=1..., sapply will return a
+      ## vector, need a 1 x n matrix
       if(is.vector(xmex)) {
         dg.db.xmex <- matrix(index.tgrad[,1]*xmex,nrow=1,ncol=length(xmex))
       } else {

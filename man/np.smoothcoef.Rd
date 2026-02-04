@@ -61,7 +61,8 @@ FALSE, \dots)
   \item{\dots}{
     additional arguments supplied to specify the regression type,
     bandwidth type, kernel types, selection methods, and so on.
-    To do this, you may specify any of \code{bwscaling}, \code{bwtype},
+    To do this, you may specify any of \code{bwscaling}, \code{bwtype}
+    (one of \code{fixed}, \code{generalized_nn}, \code{adaptive_nn}),
     \code{ckertype}, \code{ckerorder}, as described in
     \code{\link{npscoefbw}}. 
     
@@ -288,4 +289,3 @@ plot(model)
 } % enddontrun
 }
 \keyword{nonparametric}
-
