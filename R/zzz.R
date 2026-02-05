@@ -14,6 +14,16 @@
   if (!is.loaded("mpi_initialize"))
     stop("Probably npRmpi has been detached. Please quit R.")
 
+  if (nzchar(Sys.getenv("NP_RMPI_SKIP_INIT"))) {
+    if(is.null(options('np.messages')$np.messages))
+      options(np.messages = TRUE)
+
+    if(is.null(options('np.tree')$np.tree))
+      options(np.tree = FALSE)
+
+    return(invisible())
+  }
+
   if(.Call("mpidist",PACKAGE="npRmpi") == 2){
     if (length(try(system("lamnodes",TRUE,ignore.stderr = TRUE))) == 0){
 	    system("lamboot -H",ignore.stderr = TRUE)
