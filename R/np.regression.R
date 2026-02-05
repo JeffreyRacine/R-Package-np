@@ -286,14 +286,24 @@ npreg.rbandwidth <-
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
       old.reg = FALSE)
     
+   asDouble <- function(data){
+	   if (is.null(data)){
+	 	   result <- as.double(0.0)
+	   }
+	   else {
+		   result <- as.double(data)
+	   }
+	   return(result)
+   }
+
 
     myout=
       .C("np_regression",
-         as.double(tuno), as.double(tord), as.double(tcon), as.double(tydat),
-         as.double(euno),  as.double(eord),  as.double(econ), as.double(eydat),
-         as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
-         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-         as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+         asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
+         asDouble(euno),  asDouble(eord),  asDouble(econ), asDouble(eydat),
+         asDouble(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
+         asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
+         asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
          as.integer(myopti),
          mean = double(enrow),
          merr = double(enrow),

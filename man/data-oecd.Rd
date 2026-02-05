@@ -17,7 +17,7 @@
   5-year periods: 1960-1964, 1965-1969, 1970-1974, 1975-1979, 1980-1984,
   1985-1989 and 1990-1994.
 
-  A separate local-linear \code{rbandwidth} object (`\code{bw}') has
+  A separate local-linear \code{rbandwidth} object (\code{bw}) has
   been computed for the user's convenience which can be used to
   visualize this dataset using \code{\link{plot}(bw)}.
   

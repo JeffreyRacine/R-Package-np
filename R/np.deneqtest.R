@@ -1,7 +1,7 @@
 ## Function that implements the multivariate density equality test
-## described in Li, Q., E. Maasoumi, and J.S. Racine (2009), “A
+## described in Li, Q., E. Maasoumi, and J.S. Racine (2009), "A
 ## Nonparametric Test for Equality of Distributions with Mixed
-## Categorical and Continuous Data,” Journal of Econometrics, Volume
+## Categorical and Continuous Data," Journal of Econometrics, Volume
 ## 148, pp 186-200.
 
 npdeneqtest <- function(x = NULL,

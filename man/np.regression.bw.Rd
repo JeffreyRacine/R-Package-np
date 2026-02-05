@@ -223,7 +223,7 @@ npregbw(\dots)
   \item{okertype}{
     character string used to specify the ordered categorical kernel type.
     Can be set as \code{wangvanryzin} or \code{liracine}. Defaults to
-    \code{wangvanryzin}.
+    \code{liracine}.
   }
 
   \item{nmulti}{

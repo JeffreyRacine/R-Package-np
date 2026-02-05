@@ -1,3 +1,193 @@
+Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]
+
+* Added crs to Suggests field in DESCRIPTION per CRAN requirements
+
+* Utility functions integrate.trapezoidal(), NZD(), NZD_pos() (new, affect npregiv() and npregivderiv())
+
+* Miscellaneous typos fixed
+
+Changes from Version 0.60-17 to 0.60-18 [09-Dec-2024]
+
+* Patched issue with as.double(data) when data is a NULL object
+  reported by Brian Ripley
+
+* Merged rng pull request https://github.com/JeffreyRacine/R-Package-np/pull/48
+
+* Incorporated Kurt Hornik's suggestion "If indeed intended as a
+  package overview help file, please add \alias{np-package} to file
+  'np/man/np-package.Rd'."
+
+Changes from Version 0.60-16 to 0.60-17 [12-Mar-2023]
+
+* Fixed warning "Check: S3 generic/method consistency Result: WARN
+  compute.bootstrap.errors: function(..., bws)
+  compute.bootstrap.errors.*" triggered potentially by lack of
+  "...,bw" in functions called (thanks to Kurt Hornik for
+  assistance!)
+
+* Updated inst/CITATIONS to get rid of old-style cit and bib entries
+
+Changes from Version 0.60-15 to 0.60-16 [18-Oct-2022]
+
+* Fixed warning: a function definition without a prototype is
+  deprecated in all versions of C and is not supported in C2x
+  [-Wdeprecated-non-prototype] (thanks Zhenghua!)
+
+Changes from Version 0.60-14 to 0.60-15 [09-Oct-2022]
+
+* Explicit acknowledgment in DESCRIPTION of code gsl_bspline.c/.h
+  adapted from the GNU GSL library with further details appended to
+  gsl_bspline.c/.h (thanks to Professor Brian Ripley for noting this
+  oversight).
+
+Changes from Version 0.60-13 to 0.60-14 [22-Aug-2022]
+
+* Added logspline and ks to DESCRIPTION to address NOTE on some system
+  builds stating "Undeclared packages ‘logspline’, ‘ks’ in Rd xrefs"
+
+* Zhenghua Nie kindly addressed the clang-UBSAN issue in jksum.c
+  causing `runtime error: applying non-zero offset 8 to null pointer`
+
+Changes from Version 0.60-12 to 0.60-13 [15-Aug-2022]
+
+* Minor changes to np.Rnw vignette viz Sweave options and class
+  (redundancies commented out)
+
+* Fixed issues relating to new NOTE "Found if() conditions
+  comparing class() to string [..] Use inherits() (or maybe is())
+  instead." Addressed by using by using isa()
+
+Changes from Version 0.60-11 to 0.60-12 [12-Aug-2022]
+
+* JSS issues corrected in vignette/*.bib and inst/CITATION (use of DOI,
+  etc., thanks to Achim Zeileis)
+
+* Issues with utf8x in entropy_np.Rnw and np.Rnw corrected (utf8x -> utf8, etc.)
+
+Changes from Version 0.60-10 to 0.60-11 [04-Jun-2021]
+
+* npuniden.boundary() uses empirical support for a and b (previously was
+  [0,1], now [min(X),max(X)])
+
+* Corrected potential issue with malloc failing on null vector
+  in C function sort_unique() detected by development version of
+  gcc11 (thanks to Professor Brian Ripley for pointing this out
+  and for his assistance)
+
+* Corrected outdated URLs
+
+Changes from Version 0.60-9 to 0.60-10 [5-Feb-2020]
+
+* Corrected issue `Documented arguments not in usage in documentation
+  object se: ...'
+
+* Removal of directed quotes in some Rd documents, replacement with sQuote
+
+* Fixed issue causing rebuilding of vignettes to crash (uocquantile() was
+  the culprit)
+
+Changes from Version 0.60-8 to 0.60-9 [24-Oct-2018]
+
+* Added support for character expansion to npplot() (which is invoked
+  by calling plot() on an np object) - will take defaults from the
+  environment par() or can be set directly, e.g.,
+  plot(foo,cex.main=0.8)
+
+Changes from Version 0.60-7 to 0.60-8 [04-Jun-2018]
+
+* Used patch suggested by Scott Thompson for issue
+  https://github.com/JeffreyRacine/R-Package-np/issues/8 regarding
+  npcdens/npcdist and formulas
+
+Changes from Version 0.60-6 to 0.60-7 [01-May-2018]
+
+* Fix for switch() and zero length character strings that affected
+  summary output for certain tests
+
+* Added function for shape constrained bounded univariate PDF and CDF
+  estimation (npuniden.sc())
+
+* Added option for renormalizing improper bounded density estimates
+  than can arise from the use of asymmetric negative edge kernel
+  functions (proper=TRUE, npuniden.boundary())
+
+* Fixed issues with CDF estimation in the presence of large bandwidths
+  for bounded density estimates (npuniden.boundary())
+
+Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]
+
+* Added more edge kernel functions for npuniden.boundary(), some
+  glitches addressed
+
+* Added asymptotic standard errors and integrated density (CDF) to
+  npuniden.boundary() and npuniden.reflect() plus additional examples
+
+* Added least squares cross-validation to npuniden.boundary() (default
+  for boundary kernel functions)
+
+Changes from Version 0.60-4 to 0.60-5 [04-Jan-2018]
+
+* Added two basic functions for univariate bounded kernel density
+  estimation, npuniden.boundary and npuniden.reflect
+
+* More plotting routines accept more passable parameters
+
+Changes from Version 0.60-3 to 0.60-4 [03-Dec-2017]
+
+* Default plot.errors.style changed to "band"
+
+* Using wrapLines(strwrap(...)) for summary output for model specification
+  test to automatically wrap long formula lines
+
+* plot() calls npplot() and npplot() behaves better when most passable
+  parameters are fed (col =, lty =, xlab =, etc.) but there may still
+  be room for improvement
+
+* Added option plot.par.mfrow=TRUE/FALSE to npplot() so that the
+  automated setting of par(mfrow=c(,)) in plot is disabled and the
+  user can do this manually if desired
+
+* Option plot.par.mfrow=TRUE/FALSE can be overridden by setting
+  options(plot.par.mfrow=TRUE/FALSE)
+
+Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]
+
+* Fixed the `cannot find function is()' glitch that just surfaced with R 3.4.0
+
+* Fixed glitch in npconmode when randomizing if all probabilities are equal
+
+* Migrated some code from crs (which I wrote) to avoid crs:::
+
+* Fixed	outstanding glitch in npscoef() with tydat being converted
+
+* Leave.one.out not properly implemented in npscoef, corrected
+
+* Using pmin/pmax in NZD (parallel min/max more efficient with vectors)
+
+* Improved screen i/o when smooth.residuals=TRUE/FALSE
+
+* Corrected glitch in npregiv() where multivariate z would halt with error
+
+* Npregiv with method="Landweber-Fridman" no longer passes back lists
+
+* Fixed glitch in Kmat.lp with p=0 and derivatives
+
+* Tikhonov regularization in npregiv now supports evaluation data
+
+* Updated npregiv (was sorely lacking, did not support eval etc.)
+
+* Use of .onLoad suggested (by Bernd Bischl)
+
+* Fixed glitch in npconmode
+
+* Added vignette("entropy_np",package="np") to startup message
+
+* In np.distribution.bw.R default for do.full.integral changed to FALSE
+
+* Fixed the CDF objective function when averaging over the training data
+
+* Fixed crash error with npcdistbw and adaptive bandwidths
+
 Changes from Version 0.60-1 to 0.60-2 [27-Jun-2014]
 
 * added timeseries support for all relevant objects (i.e. for a

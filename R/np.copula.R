@@ -16,10 +16,12 @@ npcopula <- function(bws,
   if(missing(data)) stop("You must provide a data frame")
   if(!is.data.frame(data)) stop("Object `data' must be a data frame")
   if(missing(bws)) stop("You must provide a bandwidth object")
-  if(class(bws)!="dbandwidth"&class(bws)!="bandwidth") stop("you must provide a density (npudensbw) or distribution (npudistbw) object")
+#  if(class(bws)!="dbandwidth"&class(bws)!="bandwidth") stop("you must provide a density (npudensbw) or distribution (npudistbw) object")
+  if(!isa(bws,"dbandwidth") & !isa(bws,"bandwidth")) stop("you must provide a density (npudensbw) or distribution (npudistbw) object")  
   density <- FALSE
-  if(!missing(bws)&&class(bws)=="bandwidth") density <- TRUE
-  if(!is.null(u)) if(any(u>1) || any(u<0)) stop("u must lie in [0,1]")
+#  if(!missing(bws)&&class(bws)=="bandwidth") density <- TRUE
+  if(!missing(bws) && isa(bws,"bandwidth")) density <- TRUE
+  if(!is.null(u)) if(any(u>1 | u<0)) stop("u must lie in [0,1]")
   num.var <- length(bws$xnames)
   if(!is.null(u) && (ncol(u)!=num.var)) stop("u and bws are incompatible")
   if(n.quasi.inv < 1) stop("n.quasi.inv must be a positive integer")
@@ -79,6 +81,7 @@ npcopula <- function(bws,
                            data=data)
         ## Divide the copula density by its marginals
         copula <- copula/NZD(fitted(npudens(bws=bws.f.marginal,data=data)))
+
       }
     }
   } else {

@@ -123,8 +123,8 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   if(txdat.named)
     txdat <- toFrame(txdat)
 
-  if(tydat.named)
-    tydat <- toFrame(tydat)
+  ## if(tydat.named)
+  ## tydat <- toFrame(tydat)
 
   if(tydat.named)
     tzdat <- toFrame(tzdat)
@@ -335,7 +335,7 @@ npscoef.scbandwidth <-
 
     tww <- eval(parse(text=paste("npksum(txdat = tzdat, tydat = yW, weights = yW,",
                     ifelse(miss.ex, "", "exdat = ezdat,"),
-                    "bws = bws)$ksum")))
+                    "bws = bws, leave.one.out = leave.one.out)$ksum")))
 
     tyw <- tww[-1,1,,drop=FALSE]
     dim(tyw) <- dim(tyw)[-2]
@@ -434,7 +434,8 @@ npscoef.scbandwidth <-
       tywtm <- npksum(txdat = tzdat,
                       tydat = yW,
                       weights = yW,
-                      bws = bws)$ksum
+                      bws = bws,
+                      leave.one.out = leave.one.out)$ksum
 
       tyw <- tywtm[-1,1,]
       tm <- tywtm[-1,-1,]
@@ -479,7 +480,7 @@ npscoef.scbandwidth <-
       u2.W <- t(u2.W)
 
       V.hat <- eval(parse(text = paste("npksum(txdat = tzdat, tydat = W.train, weights = u2.W,",
-                            ifelse(!miss.ex, "exdat = ezdat,", ""), "bws = bws)$ksum")))
+                            ifelse(!miss.ex, "exdat = ezdat,", ""), "bws = bws, leave.one.out = leave.one.out)$ksum")))
 
       ## asymptotics rely on positive definite nature of tww (ie. M.eval) and V.hat
       ## so choleski decomposition is used to assure their veracity

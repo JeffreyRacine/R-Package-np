@@ -103,13 +103,13 @@ npsymtest(data = NULL,
   conducts simple random resampling, while \code{geom} conducts Politis
   and Romano's (1994) stationary bootstrap using automatic block length
   selection via the \code{\link{b.star}} function in the
-  \code{\link{np}} package. See the \code{\link{boot}} package for
+  \code{\link{np}} package. See the \pkg{boot} package for
   details.
 
   The summation version of this statistic may be numerically unstable
   when \code{y} is sparse (the summation version involves division of
   densities while the integration version involves differences). Warning
-  messages are produced should this occur (`integration recommended')
+  messages are produced should this occur (\sQuote{integration recommended})
   and should be heeded.
  
 }

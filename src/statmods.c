@@ -63,9 +63,16 @@ int np_fround(double x)
 int simple_unique(int n, double * vector){
   int i, m;
 
-  double * v=NULL;
+  /* gcc 11 Found the following significant warnings: statmods.c:73:3:
+     warning: 'sort' accessing 8 bytes in a region of size 0
+     [-Wstringop-overflow=] */
+  
+  /*  double * v=NULL; */
+  double *v;
 
-  v=(double *)malloc(sizeof(double)*n);
+  /* v=(double *)malloc(sizeof(double)*n); */
+
+  v = alloc_vecd(n);
 
   for(i=0; i<n; i++)
     v[i]=vector[i];

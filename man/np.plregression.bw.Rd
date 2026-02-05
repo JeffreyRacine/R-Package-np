@@ -124,7 +124,8 @@ npplregbw(\dots)
     additional arguments supplied to specify the regression type,
     bandwidth type, kernel types, selection methods, and so on. To do
     this, you may specify any of \code{regtype}, 
-    \code{bwmethod}, \code{bwscaling}, \code{bwtype}, \code{ckertype},
+    \code{bwmethod}, \code{bwscaling}, \code{bwtype} (one of
+    \code{fixed}, \code{generalized_nn}, \code{adaptive_nn}), \code{ckertype},
     \code{ckerorder}, \code{ukertype}, \code{okertype}, as described in
     \code{\link{npregbw}}.
   }

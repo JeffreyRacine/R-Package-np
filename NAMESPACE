@@ -1,5 +1,11 @@
 useDynLib(npRmpi)
 import(stats, boot, cubature)
+importFrom("grDevices", "boxplot.stats", "extendrange", "grey", "n2mfrow", "rgb")
+importFrom("graphics", "axis", "lines", "mtext", "par", "persp", "plot", "plot.new", "plot.window", "points", "polygon")
+importFrom("utils", "combn", "flush.console")
+importFrom("methods", "is")
+importFrom("quantreg", "rq")
+importFrom("quadprog", "solve.QP")
 export(b.star
        ,.docall
        ,.force.type
@@ -149,6 +155,11 @@ export(b.star
        ,npindexbw
        ,npqcmstest       
        ,npseed
+       ,npuniden.boundary
+       ,npuniden.reflect
+       ,npuniden.sc
+       ,np.pairs
+       ,np.pairs.plot
        ,npscoef
        ,npscoefbw
        ,npsigtest
@@ -415,4 +426,3 @@ S3method(npscoef, default)
 S3method(npscoef, call)
 S3method(npscoef, formula)
 S3method(npscoef, scbandwidth)
-

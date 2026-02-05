@@ -1,16 +1,16 @@
 # npRmpi
 
-This is the R package `npRmpi' (NonpRmpiarametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield (tristen.hayfield@gmail.com)
+This is the R package `npRmpi' (Parallel Nonparametric Kernel Methods for Mixed Datatypes) written and maintained by Jeffrey S. Racine (racinej@mcmaster.ca) and co-authored by Tristen Hayfield (tristen.hayfield@gmail.com)
 
 ## Installation
 
-Presuming that a working implementation of MPI exists on the target machine, you can install the stable version on [CRAN](http://cran.r-project.org/package=npRmpi):
+Presuming that a working implementation of MPI exists on the target machine, you can install the stable version on [CRAN](https://cran.r-project.org/package=npRmpi):
 
 ```r
 install.packages('npRmpi', dependencies = TRUE)
 ```
 
-Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-npRmpi/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-npRmpi/tarball/master), decompress and run `R CMD INSTALL` on it, or install then use the **devtools** package to install the development version:
+Or download the [zip ball](https://github.com/JeffreyRacine/R-Package-npRmpi/zipball/master) or [tar ball](https://github.com/JeffreyRacine/R-Package-npRmpi/tarball/master), decompress and run `R CMD INSTALL` on it, or use the **devtools** package to install the development version:
 
 ```r
 library(devtools); install_github('R-Package-npRmpi', 'JeffreyRacine')
@@ -26,5 +26,4 @@ ref='npRmpi' to the install_github call above presuming that your
 system has the required MPI subsystem installed (see my homepage for
 further details).
 
-For more information on this project please visit the maintainer's website (http://www.economics.mcmaster.ca/faculty/racinej).
-
+For more information on this project please visit the maintainer's website (https://www.economics.mcmaster.ca/faculty/racinej).

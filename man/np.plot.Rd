@@ -29,12 +29,26 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        neval = 50,
        common.scale = TRUE,
        perspective = TRUE,
-       main = "",
+       main = NULL,
+       type = NULL,
+       border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
+       col = NULL,
+       ylab = NULL,
+       xlab = NULL,
+       zlab = NULL,
+       sub = NULL,
+       ylim = NULL,
+       xlim = NULL,
+       zlim = NULL,
+       lty = NULL,
+       lwd = NULL,
        theta = 0.0,
        phi = 10.0,
        view = c("rotate","fixed"),
-       type = "l",
-       ylim = NULL,
        plot.behavior = c("plot","plot-data","data"),
        plot.errors.method = c("none","bootstrap","asymptotic"),
        plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -43,11 +57,12 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.center = c("estimate","bias-corrected"),
        plot.errors.type = c("standard","quantiles"),
        plot.errors.quantiles = c(0.025,0.975),
-       plot.errors.style = c("bar","band"),
+       plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -63,13 +78,27 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        gradients = FALSE,
        common.scale = TRUE,
        perspective = TRUE,
-       main = "",
+       main = NULL,
+       type = NULL,
+       border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
+       col = NULL,
+       ylab = NULL,
+       xlab = NULL,
+       zlab = NULL,
+       sub = NULL,
+       ylim = NULL,
+       xlim = NULL,
+       zlim = NULL,
+       lty = NULL,
+       lwd = NULL,
        theta = 0.0,
        phi = 10.0,
        tau = 0.5,
        view = c("rotate","fixed"),
-       type = "l",
-       ylim = NULL,
        plot.behavior = c("plot","plot-data","data"),
        plot.errors.method = c("none","bootstrap","asymptotic"),
        plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -78,11 +107,12 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.center = c("estimate","bias-corrected"),
        plot.errors.type = c("standard","quantiles"),
        plot.errors.quantiles = c(0.025,0.975),
-       plot.errors.style = c("bar","band"),
+       plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -94,17 +124,31 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        xq = 0.5,
        zq = 0.5,
        xtrim = 0.0,
-        ztrim = 0.0,
+       ztrim = 0.0,
        neval = 50,
        common.scale = TRUE,
        perspective = TRUE,
        gradients = FALSE,
-       main = "",
+       main = NULL,
+       type = NULL,
+       border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
+       col = NULL,
+       ylab = NULL,
+       xlab = NULL,
+       zlab = NULL,
+       sub = NULL,
+       ylim = NULL,
+       xlim = NULL,
+       zlim = NULL,
+       lty = NULL,
+       lwd = NULL,
        theta = 0.0,
        phi = 10.0,
        view = c("rotate","fixed"),
-       type = "l",
-       ylim = NULL,
        plot.behavior = c("plot","plot-data","data"),
        plot.errors.method = c("none","bootstrap","asymptotic"),
        plot.errors.boot.method = c("inid", "fixed", "geom"),
@@ -113,11 +157,12 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.center = c("estimate","bias-corrected"),
        plot.errors.type = c("standard","quantiles"),
        plot.errors.quantiles = c(0.025,0.975),
-       plot.errors.style = c("bar","band"),
+       plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -131,12 +176,26 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        common.scale = TRUE,
        perspective = TRUE,
        gradients = FALSE,
-       main = "",
+       main = NULL,
+       type = NULL,
+       border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
+       col = NULL,
+       ylab = NULL,
+       xlab = NULL,
+       zlab = NULL,
+       sub = NULL,
+       ylim = NULL,
+       xlim = NULL,
+       zlim = NULL,
+       lty = NULL,
+       lwd = NULL,
        theta = 0.0,
        phi = 10.0,
        view = c("rotate","fixed"),
-       type = "l",
-       ylim = NULL,
        plot.behavior = c("plot","plot-data","data"),
        plot.errors.method = c("none","bootstrap","asymptotic"),
        plot.errors.boot.num = 399,
@@ -145,11 +204,12 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.center = c("estimate","bias-corrected"),
        plot.errors.type = c("standard","quantiles"),
        plot.errors.quantiles = c(0.025,0.975),
-       plot.errors.style = c("bar","band"),
+       plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -166,12 +226,26 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        common.scale = TRUE,
        perspective = TRUE,
        gradients = FALSE,
-       main = "",
+       main = NULL,
+       type = NULL,
+       border = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
+       col = NULL,
+       ylab = NULL,
+       xlab = NULL,
+       zlab = NULL,
+       sub = NULL,
+       ylim = NULL,
+       xlim = NULL,
+       zlim = NULL,
+       lty = NULL,
+       lwd = NULL,
        theta = 0.0,
        phi = 10.0,
        view = c("rotate","fixed"),
-       type = "l",
-       ylim = NULL,
        plot.behavior = c("plot","plot-data","data"),
        plot.errors.method = c("none","bootstrap","asymptotic"),
        plot.errors.boot.num = 399,
@@ -180,11 +254,12 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.center = c("estimate","bias-corrected"),
        plot.errors.type = c("standard","quantiles"),
        plot.errors.quantiles = c(0.025,0.975),
-       plot.errors.style = c("bar","band"),
+       plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
        plot.bxp = FALSE,
        plot.bxp.out = TRUE,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -194,9 +269,20 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        data = NULL,
        common.scale = TRUE,
        gradients = FALSE,
-       main = "",
-       type = "l",
+       main = NULL,
+       type = NULL,
+       cex.axis = NULL,
+       cex.lab = NULL,
+       cex.main = NULL,
+       cex.sub = NULL,
+       col = NULL,
+       ylab = NULL,
+       xlab = NULL,
+       sub = NULL,
        ylim = NULL,
+       xlim = NULL,
+       lty = NULL,
+       lwd = NULL,
        plot.behavior = c("plot","plot-data","data"),
        plot.errors.method = c("none","bootstrap","asymptotic"),
        plot.errors.boot.num = 399,
@@ -205,9 +291,10 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.center = c("estimate","bias-corrected"),
        plot.errors.type = c("standard","quantiles"),
        plot.errors.quantiles = c(0.025,0.975),
-       plot.errors.style = c("bar","band"),
+       plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = NULL,
+       plot.par.mfrow = TRUE,
        \dots,
        random.seed)
 
@@ -291,7 +378,6 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
     \code{tzdat}. Defaults to \code{0.0}. See details.
   }
 
-
   \item{neval}{
     an integer specifying the number of evaluation points. Only applies
     to continuous variables however, as discrete variables will be
@@ -313,15 +399,88 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
     (if possible). Defaults to \code{FALSE}.
   }
 
-  \item{main}{ the title, see \code{\link{title}} }
+  \item{main}{
+    optional title, see \code{\link{title}}. Defaults to \code{NULL}.
+  }
+
+  \item{sub}{
+    optional subtitle, see \code{\link{sub}}. Defaults to \code{NULL}.
+  }
 
   \item{type}{
-    character indicating the type of plotting; actually any of
-    the types as in \code{\link{plot.default}}
+    optional character indicating the type of plotting; actually any of
+    the types as in \code{\link{plot.default}}. Defaults to \code{NULL}.
   }
+
+  \item{border}{
+    optional character indicating the border of plotting; actually any of
+    the borders as in \code{\link{plot.default}}. Defaults to \code{NULL}.
+  }
+
+  \item{cex.axis}{
+    The magnification to be used for axis annotation relative to the
+    current setting of cex.
+  }
+
+  \item{cex.lab}{
+    The magnification to be used for x and y labels relative to the
+    current setting of cex.
+  }
+
+  \item{cex.main}{
+    The magnification to be used for main titles relative to the
+    current setting of cex.
+  }
+
+  \item{cex.sub}{
+    The magnification to be used for sub-titles relative to the
+    current setting of cex.
+  }
+
+  \item{col}{
+    optional character indicating the color of plotting; actually any of
+    the colours as in \code{\link{plot.default}}. Defaults to \code{NULL}.
+  }
+
+  \item{ylab}{
+    optional character indicating the y axis label of plotting; actually any of
+    the ylabs as in \code{\link{plot.default}}. Defaults to \code{NULL}.
+  }
+
+  \item{xlab}{
+    optional character indicating the x axis label of plotting; actually any of
+    the xlabs as in \code{\link{plot.default}}. Defaults to \code{NULL}.
+  }
+
+  \item{zlab}{
+    optional character indicating the z axis label of plotting; actually any of
+    the zlabs as in \code{\link{plot.default}}. Defaults to \code{NULL}.
+  }
+
   \item{ylim}{
-    a two-element numeric vector of the minimum and maximum y plotting
+    optional a two-element numeric vector of the minimum and maximum y plotting
     limits. Defaults to \code{NULL}.
+  }
+
+  \item{xlim}{
+    a two-element numeric vector of the minimum and maximum x plotting
+    limits. Defaults to \code{NULL}.
+  }
+
+  \item{zlim}{
+    a two-element numeric vector of the minimum and maximum z plotting
+    limits. Defaults to \code{NULL}.
+  }
+
+  \item{lty}{
+    a numeric value indicating the line type of plotting; actually any of
+    the ltys as in \code{\link{plot.default}}. Defaults to \code{1}.
+  }
+
+  \item{lwd}{
+    a numeric value indicating the width of the line of plotting;
+    actually any of the lwds as in \code{\link{plot.default}}. Defaults
+    to \code{1}.
   }
 
   \item{theta}{
@@ -336,7 +495,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
   \item{tau}{
     a numeric value specifying the \eqn{\tau}{tau}th quantile is
-    desired when plotting quantile regressions.
+    desired when plotting quantile regressions. Defaults to \code{0.5}.
   }
 
   \item{view}{
@@ -394,7 +553,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
   \item{plot.errors.style}{
     a character string used to specify the style of error plotting. Can
-    be set as \code{bar} or \code{band}. Defaults to \code{bar}. Bands
+    be set as \code{band} or \code{bar}. Defaults to \code{band}. Bands
     are not drawn for discrete variables.
   }
 
@@ -418,6 +577,11 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   \item{plot.bxp.out}{
     a logical value specifying whether outliers should be plotted on
     boxplots. Defaults to \code{TRUE}.
+  }
+
+  \item{plot.par.mfrow}{
+    a logical value specifying whether \code{par(mfrow=c(,))} should be called
+    before plotting. Defaults to \code{TRUE}.
   }
 
   \item{random.seed}{

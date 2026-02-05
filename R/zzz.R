@@ -1,5 +1,5 @@
 .onAttach <- function (lib, pkg) {
-	packageStartupMessage("Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-2) + Rmpi 0.6-5\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]", domain = NULL,  appendLF = TRUE)
+	packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21) + Rmpi 0.6-5\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
 }
 
 .onUnload <- function (lpath){
@@ -27,7 +27,6 @@
       round(.Random.seed[1]-5,-1) == .Random.seed[1]-5) {
     rm(.Random.seed, envir=.GlobalEnv)
   }
-
 
   if(is.null(options('np.messages')$np.messages))
     options(np.messages = TRUE)

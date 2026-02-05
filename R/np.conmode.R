@@ -145,16 +145,10 @@ npconmode.conbandwidth <-
 
 
     for(i in 1:nlevels(efac)){
-      tdens <- eval(tdensE)
-      
-      tf = tdens > mdens
-      indices[tf] = i
-      mdens[tf] = tdens[tf]
-    }
-
-    if(any(indices==0)) {
-      warning("identical probabilities for choices produced, randomizing mode")
-      indices[indices==0] <- sample(nlevels(efac),length(indices[indices==0]))
+        tdens <- eval(tdensE)
+        tf = tdens >= mdens
+        indices[tf] = i
+        mdens[tf] = tdens[tf]
     }
 
     con.mode <- eval(parse(text = paste("conmode(bws = bws,",

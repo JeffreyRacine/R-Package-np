@@ -191,7 +191,9 @@ npindexbw(\dots)
   \item{\dots}{
     additional arguments supplied to specify the parameters to the
     \code{sibandwidth} S3 method, which is called during the numerical
-    search. 
+    search. In particular, \code{bwtype} may be supplied here to request
+    \code{"fixed"}, \code{"generalized_nn"}, or \code{"adaptive_nn"} bandwidth
+    types.
   }
 
   

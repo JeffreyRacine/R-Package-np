@@ -13,7 +13,8 @@ npsigtest <-
       if (is.recursive(bws)){
         if (!is.null(bws$formula) && is.null(args$xdat))
           UseMethod("npsigtest",bws$formula)
-        else if (!is.null(bws$call) && is.null(args$xdat) && (class(bws) != "npregression"))
+#        else if (!is.null(bws$call) && is.null(args$xdat) && (class(bws) != "npregression"))
+        else if (!is.null(bws$call) && is.null(args$xdat) && (!isa(bws,"npregression")))
           UseMethod("npsigtest",bws$call)
         else if (!is.call(bws))
           UseMethod("npsigtest",bws)
@@ -120,7 +121,7 @@ npsigtest.rbandwidth <- function(bws,
 
   ## Test for valid entries in index
 
-  if(any(index < 1 || index>NCOL(xdat))) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
+  if(any(index < 1 | index > NCOL(xdat))) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
   if(length(unique(index))<length(unique)) stop("index contains repeated values (must be unique)")
 
   if(!joint) {

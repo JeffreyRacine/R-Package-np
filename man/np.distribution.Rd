@@ -11,8 +11,8 @@
   \code{npudist} computes kernel unconditional cumulative distribution
   estimates on evaluation data, given a set of training data and a
   bandwidth specification (a \code{dbandwidth} object or a bandwidth
-  vector, bandwidth type, and kernel type) using the method of Li and
-  Racine (2013).
+  vector, bandwidth type, and kernel type) using the method of Li, Li
+  and Racine (2017).
 
 }
 \usage{
@@ -156,9 +156,10 @@ npudist(bws, \dots)
     distributions with categorical and continuous data,} Journal
   of Multivariate Analysis, 86, 266-292.
 
-  Li, H. and J.S. Racine (2013), \dQuote{Cross-validated estimation of
-  cumulative distribution functions with categorical and continuous
-  data,} manuscript.
+  Li, C. and H. Li and J.S. Racine (2017), \dQuote{Cross-Validated Mixed
+  Datatype Bandwidth Selection for Nonparametric Cumulative
+  Distribution/Survivor Functions,} Econometric Reviews, \bold{36},
+  970-987.
 
   Ouyang, D. and Q. Li and J.S. Racine (2006), \dQuote{Cross-validation
     and the estimation of probability distributions with categorical

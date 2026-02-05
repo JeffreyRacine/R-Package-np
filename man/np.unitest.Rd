@@ -27,7 +27,7 @@ npunitest(data.x = NULL,
     a character string used to specify whether to compute
     the integral version or the summation version of the statistic. Can
     be set as \code{integration} or \code{summation}. Defaults to
-    \code{integration}. See `Details' below for important information
+    \code{integration}. See \sQuote{Details} below for important information
     regarding the use of \code{summation} when \code{data.x} and
     \code{data.y} lack common support and/or are sparse.
   }
@@ -106,7 +106,7 @@ npunitest(data.x = NULL,
    overlap is sparse (the summation version involves division of
    densities while the integration version involves differences, and the
    statistic in such cases can be reported as exactly 0.5 or 0). Warning
-   messages are produced when this occurs (`integration recommended')
+   messages are produced when this occurs (\sQuote{integration recommended})
    and should be heeded.
 
    Numerical integration can occasionally fail when the \code{data.x}

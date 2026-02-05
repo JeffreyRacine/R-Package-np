@@ -469,6 +469,7 @@ npindexbw.sibandwidth <-
                        method = bws$method,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder,
+                       bwtype = bws$type,
                        fval = bws$fval,
                        ifval = bws$ifval,
                        numimp = bws$numimp,

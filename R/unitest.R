@@ -16,7 +16,7 @@ unitest <- function(Srho,
 
   if(bootstrap) {
   
-    reject <- ''
+    reject <- ' '
     
     if (P < 0.1)
       reject <- '.'
@@ -32,6 +32,7 @@ unitest <- function(Srho,
     
     tuni$reject <- reject
     tuni$rejectNum <- switch(reject,
+                             ' ' = 100,
                              '.' = 10,
                              '*' = 5,
                              '**' = 1,
@@ -52,7 +53,7 @@ print.unitest <- function(x, ...){
         "\n\nTest Statistic ", sQuote("Srho"), ": ",
         format(x$Srho), "\tP Value: ", format.pval(x$P)," ", x$reject,
         "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
-        ifelse(x$reject == '', "\nFail to reject the null of equality at the 10% level",
+        ifelse(x$reject == ' ', "\nFail to reject the null of equality at the 10% level",
                paste("\nNull of equality is rejected at the ", x$rejectNum, "% level", sep="")),
         "\n\n", sep="")
   } else {

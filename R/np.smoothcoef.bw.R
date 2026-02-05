@@ -89,7 +89,6 @@ npscoefbw.NULL <-
            bws, ...){
 
     miss.z <- missing(zdat)
-    ##class(xdat)
 
     xdat <- toFrame(xdat)
 
@@ -156,7 +155,7 @@ npscoefbw.scbandwidth <-
     }
 
     if (!(is.vector(ydat) | is.factor(ydat)))
-      stop("'ydat' must be a vector")
+      stop("'ydat' must be a vector or a factor")
 
     eval(parse(text = paste("bwMatch(",
                  ifelse(miss.z, "xdat, bws$xdati", "zdat, bws$zdati"),")")))
@@ -589,7 +588,7 @@ npscoefbw.default <-
     xdat <- toFrame(xdat)
     
     if(!(is.vector(ydat) | is.factor(ydat)))
-      stop("'ydat' must be a vector")
+      stop("'ydat' must be a vector or a factor")
 
     if(!miss.z)
       zdat <- toFrame(zdat)

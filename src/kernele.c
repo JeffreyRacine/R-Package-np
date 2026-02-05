@@ -17593,7 +17593,6 @@ double  initd_dir)
 			fret_best = fret;
 			quantile_multistart[1] = quantile[1];
 
-      Rprintf("iMax_Num_Multistart: %d\n", iMax_Num_Multistart);
       imstot = iMax_Num_Multistart;
 			for(iMs_counter = 1, iNum_Ms = 1; iMs_counter < iMax_Num_Multistart; iMs_counter++, iNum_Ms++)
 			{

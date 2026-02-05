@@ -4,10 +4,10 @@
 \title{ Kernel Univariate Quantile Estimation }
 \description{
 
-  \code{npquantile} computes smooth quantiles from a univariate kernel
-  unconditional cumulative distribution estimate given data and,
+  \code{npquantile} computes smooth quantiles from a univariate
+  unconditional kernel cumulative distribution estimate given data and,
   optionally, a bandwidth specification i.e. a \code{dbandwidth} object
-  using the bandwidth selection method of Li and Racine (2013).
+  using the bandwidth selection method of Li, Li and Racine (2017).
 
 }
 \usage{
@@ -103,19 +103,32 @@ npquantile(x = NULL,
 }
 \references{
 
-  Hyndman, R. J. and Fan, Y. (1996), \dQuote{Sample quantiles in
+
+  Cheng, M.-Y. and Sun, S. (2006), \dQuote{Bandwidth selection for
+  kernel quantile estimation,} Journal of the Chinese Statistical
+  Association, \bold{44}, 271-295.
+  
+  Hyndman, R.J. and Fan, Y. (1996), \dQuote{Sample quantiles in
   statistical packages,} American Statistician, \bold{50}, 361-365.
 
-  Li, H. and J.S. Racine (2013), \dQuote{Cross-validated estimation of
-  cumulative distribution functions with categorical and continuous
-  data,} manuscript.
+  Li, Q. and J.S. Racine (2017), \dQuote{Smooth Unconditional Quantile
+  Estimation,} Manuscript.
 
-  Nelsen, R. B. (2006), \emph{An Introduction to Copulas,} Second
+  Li, C. and H. Li and J.S. Racine (2017), \dQuote{Cross-Validated Mixed
+  Datatype Bandwidth Selection for Nonparametric Cumulative
+  Distribution/Survivor Functions,} Econometric Reviews, \bold{36},
+  970-987.
+
+  Nelsen, R.B. (2006), \emph{An Introduction to Copulas,} Second
   Edition, Springer-Verlag.
 
-  Sheather, S. and J. S. Marron (1990), \dQuote{Kernel quantile
-  estimators,} Journal of the American Statistical Association,
-  Vol. 85, No. 410, 410-416.
+  Sheather, S. and J.S. Marron (1990), \dQuote{Kernel quantile
+  estimators,} Journal of the American Statistical Association, Vol. 85,
+  No. 410, 410-416.
+
+  Yang, S.-S. (1985), \dQuote{A Smooth Nonparametric Estimator of a
+  Quantile Function,} Journal of the American Statistical Association,
+  \bold{80}, 1004-1011.
   
 }
 \section{Usage Issues}{

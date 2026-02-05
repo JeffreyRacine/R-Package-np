@@ -175,16 +175,17 @@ npqreg(bws, \dots)
 }
 
 \value{
-  \code{npqreg} returns a \code{npqregression} object.
-  The generic
+
+  \code{npqreg} returns a \code{npqregression} object.  The generic
   functions \code{\link{fitted}} (or \code{\link{quantile}}),
-  \code{\link{se}}, \code{\link{predict}}, and
+  \code{\link{se}}, \code{\link{predict}} (when using
+  \code{\link{predict}} you must add the argument \code{tau=} to
+  generate predictions other than the median), and
   \code{\link{gradients}}, extract (or generate) estimated values,
-  asymptotic standard 
-  errors on estimates, predictions, and gradients, respectively, from
-  the returned object. Furthermore, the functions \code{\link{summary}}
-  and \code{\link{plot}} support objects of this type. The returned object
-  has the following components:
+  asymptotic standard errors on estimates, predictions, and gradients,
+  respectively, from the returned object. Furthermore, the functions
+  \code{\link{summary}} and \code{\link{plot}} support objects of this
+  type. The returned object has the following components:
 
   \item{eval}{ evaluation points }
   \item{quantile}{ estimation of the quantile regression function
@@ -242,43 +243,78 @@ npqreg(bws, \dots)
 \seealso{ \pkg{quantreg} }
 
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
-
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
+# bivariate nonparametric quantile regression estimate for Giovanni
+# Baiocchi's Italian income panel (see Italy for details)
 
 data("Italy")
-mpi.bcast.Robj2slave(Italy)
+attach(Italy)
 
-## A quantile regression example
+# First, compute the cross-validated bandwidths.  Note - this may take a
+# few minutes depending on the speed of your computer...
 
-mpi.bcast.cmd(bw <- npcdistbw(gdp~ordered(year),data=Italy),
-              caller.execute=TRUE)
+bw <- npcdistbw(formula=gdp~ordered(year))
 
-summary(bw)
+# Note - numerical search for computing the quantiles may take a minute
+# or so...
 
-mpi.bcast.cmd(model <- npqreg(bws=bw, tau=0.50),
-              caller.execute=TRUE)
+model.q0.25 <- npqreg(bws=bw, tau=0.25)
+model.q0.50 <- npqreg(bws=bw, tau=0.50)
+model.q0.75 <- npqreg(bws=bw, tau=0.75)
 
-summary(model)
+# Plot the resulting quantiles manually...
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+plot(ordered(year), gdp, 
+     main="CDF Quantile Estimates for the Italian Income Panel", 
+     xlab="Year", 
+     ylab="GDP Quantiles")
 
-mpi.close.Rslaves()
+lines(ordered(year), model.q0.25$quantile, col="red", lty=2)
+lines(ordered(year), model.q0.50$quantile, col="blue", lty=3)
+lines(ordered(year), model.q0.75$quantile, col="red", lty=2)
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"), 
+       lty=c(2, 3, 2), col=c("red", "blue", "red"))
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest     
+detach(Italy)
+
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
+# bivariate nonparametric quantile regression estimate for Giovanni
+# Baiocchi's Italian income panel (see Italy for details)
+
+data("Italy")
+attach(Italy)
+data <- data.frame(ordered(year), gdp)
+
+# First, compute the likelihood cross-validation bandwidths (default).
+# Note - this may take a few minutes depending on the speed of your
+# computer...
+
+bw <- npcdistbw(xdat=ordered(year), ydat=gdp)
+
+# Note - numerical search for computing the quantiles will take a
+# minute or so...
+
+model.q0.25 <- npqreg(bws=bw, tau=0.25)
+model.q0.50 <- npqreg(bws=bw, tau=0.50)
+model.q0.75 <- npqreg(bws=bw, tau=0.75)
+
+# Plot the resulting quantiles manually...
+
+plot(ordered(year), gdp, 
+     main="CDF Quantile Estimates for the Italian Income Panel", 
+     xlab="Year", 
+     ylab="GDP Quantiles")
+
+lines(ordered(year), model.q0.25$quantile, col="red", lty=2)
+lines(ordered(year), model.q0.50$quantile, col="blue", lty=3)
+lines(ordered(year), model.q0.75$quantile, col="red", lty=2)
+
+legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"), 
+       lty=c(2, 3, 2), col=c("red", "blue", "red"))
+
+detach(Italy)
+} % enddontrun
 }
 \keyword{nonparametric}

@@ -1350,6 +1350,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int * ipt_X = NULL, * ipt_XY = NULL, * ipt_Y = NULL; 
   int * ipt_lookup_XY = NULL, * ipt_lookup_Y = NULL, * ipt_lookup_X = NULL;
 
+  /* Ensure optional Y-only categorical arrays are reset each call */
+  num_categories_extern_Y = NULL;
+  matrix_categorical_vals_extern_Y = NULL;
+
   num_var_unordered_extern = myopti[CBW_CNUNOI];
   num_var_ordered_extern = myopti[CBW_CNORDI];
   num_var_continuous_extern = myopti[CBW_CNCONI];
@@ -1701,8 +1705,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                         num_categories_extern,
                         matrix_categorical_vals_extern,
                         NULL, NULL, NULL,
-                        num_categories_extern_X, num_categories_extern_Y, num_categories_extern_XY,
-                        matrix_categorical_vals_extern_X, matrix_categorical_vals_extern_Y, matrix_categorical_vals_extern_XY);
+                        num_categories_extern_X, (ibwmfunc == CBWM_CVLS) ? num_categories_extern_Y : NULL, num_categories_extern_XY,
+                        matrix_categorical_vals_extern_X, (ibwmfunc == CBWM_CVLS) ? matrix_categorical_vals_extern_Y : NULL, matrix_categorical_vals_extern_XY);
   
 
   vector_continuous_stddev = alloc_vecd(num_var_continuous_extern + num_reg_continuous_extern);
@@ -2037,6 +2041,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   if(ibwmfunc == CBWM_CVLS)
     free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
+  matrix_categorical_vals_extern_Y = NULL;
 
   safe_free(vector_continuous_stddev);
 
@@ -2050,6 +2055,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     safe_free(ipt_Y);
     safe_free(ipt_lookup_Y);
   }
+  num_categories_extern_Y = NULL;
 
   if(int_TREE_X == NP_TREE_TRUE){
     free_kdtree(&kdt_extern_X);
@@ -5250,4 +5256,3 @@ void np_quantile_conditional(double * tc_con,
     Rprintf("\r                   \r");
   return ;
 }
-

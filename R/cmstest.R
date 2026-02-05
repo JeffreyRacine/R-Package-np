@@ -34,7 +34,7 @@ cmstest <- function(Jn, In, Omega.hat, sd,
 
   ##Sn = if(pivot) Jn else In
 
-  reject <- ''
+  reject <- ' '
   
   if (P < 0.1)
     reject <- '.'
@@ -50,6 +50,7 @@ cmstest <- function(Jn, In, Omega.hat, sd,
 
   tcms$reject <- reject
   tcms$rejectNum <- switch(reject,
+                           ' ' = 100,
                            '.' = 10,
                            '*' = 5,
                            '**' = 1,
@@ -61,9 +62,9 @@ cmstest <- function(Jn, In, Omega.hat, sd,
 }
 
 print.cmstest <- function(x, ...){
-  cat("\nConsistent Model Specification Test",
-      "\nParametric null model: ", x$pcall,
-      "\nNumber of regressors: ", length(x$bws$bw),"\n",
+  cat("\nConsistent Model Specification Test\n")
+  writeLines(strwrap(paste("Parametric null model: ", x$pcall, sep=""),exdent=26,width=80))
+  cat("Number of regressors: ", length(x$bws$bw),"\n",
       if(x$pdistribution == "Bootstrap"){
         paste(x$pmethod, " Bootstrap ",
               "(", x$boot.num, " replications)",sep="")
@@ -71,7 +72,7 @@ print.cmstest <- function(x, ...){
       "\n\nTest Statistic ",sQuote(ifelse(x$pivot,"Jn","In")), ": ",
       format(ifelse(x$pivot, x$Jn, x$In)), "\tP Value: ", format.pval(x$P)," ", x$reject,
       "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
-      ifelse(x$reject == '', "\nFail to reject the null of correct specification at the 10% level",
+      ifelse(x$reject == ' ', "\nFail to reject the null of correct specification at the 10% level",
              paste("\nNull of correct specification is rejected at the ", x$rejectNum, "% level", sep="")),
       "\n\n", sep="")
 }
