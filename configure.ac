@@ -262,7 +262,7 @@ fi dnl end of 'paths not specified'
 AC_CHECK_LIB(util, openpty, [ MPI_LIBS="$MPI_LIBS -lutil" ])
 AC_CHECK_LIB(pthread, main, [ MPI_LIBS="$MPI_LIBS -lpthread" ])
 
-if test "$MPITYPE" = "OPENMPI" -o "$MPITYPE" = "LAM" -o "$MPITYPE" = "MPICH2" -o "$MPITYPE" = "INTELMPI" -o "$MPITYPE" = "CRAY"; then
+if test "$MPITYPE" = "OPENMPI" -o "$MPITYPE" = "LAM" -o "$MPITYPE" = "MPICH" -o "$MPITYPE" = "MPICH2" -o "$MPITYPE" = "INTELMPI" -o "$MPITYPE" = "CRAY"; then
   MPI_DEFS="-DMPI2"
 fi
 
@@ -276,7 +276,7 @@ case "$MPITYPE" in
     PKG_LIBS="-L${MPI_LIBPATH} -lmpi -llam ${MPI_LIBS}"
     ;;
   MPICH)
-    PKG_LIBS="-L${MPI_LIBPATH} -lmpich -lmpl -lopa ${MPI_LIBS}"
+    PKG_LIBS="-L${MPI_LIBPATH} -lmpi ${MPI_LIBS}"
     ;;
   MPICH2)
     PKG_LIBS="-L${MPI_LIBPATH} -lmpich -lmpl -lopa ${MPI_LIBS}"
