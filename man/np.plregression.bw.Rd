@@ -80,7 +80,7 @@ npplregbw(\dots)
   
   \item{call}{
     the original function call. This is passed internally by
-    \code{\link{np}} when a bandwidth search has been implied by a call to
+    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
     another function. It is not recommended that the user set this.
   }
 
@@ -203,7 +203,7 @@ npplregbw(\dots)
  specified in the data frame \code{zdat} using
  \code{\link{ordered}}). Data can be entered in an arbitrary order and
  data types will be detected automatically by the routine (see
- \code{\link{np}} for details).
+ \code{\link{npRmpi}} for details).
 
  Data for which bandwidths are to be estimated may be specified
  symbolically. A typical description has the form \code{dependent}

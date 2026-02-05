@@ -106,7 +106,7 @@ npindex(bws, \dots)
 
   \item{y.eval}{
     If \code{newdata} contains dependent data and \code{y.eval = TRUE},
-    \code{\link{np}} will compute goodness of fit statistics on these
+    \code{\link{npRmpi}} will compute goodness of fit statistics on these
     data and return them. Defaults to \code{FALSE}.
   }
 

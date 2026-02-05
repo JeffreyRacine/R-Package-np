@@ -141,7 +141,7 @@
   to generate the generalized product kernels that underlie the kernel
   estimators implemented in the \code{npRmpi} package. In a nutshell, the
   generalized kernel functions that underlie the kernel estimators in
-  \code{np} are formed by taking the product of univariate kernels such
+  \code{npRmpi} are formed by taking the product of univariate kernels such
   as those listed below. When you cast your data as a particular type
   (continuous, factor, or ordered factor) in a data frame or formula,
   the routines will automatically recognize the type of variable being
@@ -243,7 +243,7 @@
   \eqn{x_{i2}}{x2[i]}, and \eqn{x_{i1}}{x1[i]} was continuous while
   \eqn{x_{i2}}{x2[i]} was, say, binary (0/1), and you created a data
   frame of the form \code{X <- data.frame(x1,factor(x2))}, then the
-  kernel function used by \code{np} would be
+  kernel function used by \code{npRmpi} would be
   \eqn{K(\cdot)=k(\cdot)\times l(\cdot)}{K(.)=k(.)*l(.)} where the
   particular kernel functions \eqn{k(\cdot)}{k(.)} and
   \eqn{l(\cdot)}{l(.)} would be, say, the second order Gaussian

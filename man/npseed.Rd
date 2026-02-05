@@ -14,13 +14,13 @@ npseed(seed)
 }
 \description{
   \code{npseed} is a function which sets the random seed in the
-  \code{\link{np}} C backend, resetting the random number generator.
+  \code{\link{npRmpi}} C backend, resetting the random number generator.
 }
 
 \details{
   \code{npseed} provides an interface for setting the random seed (and
   resetting the random number generator) used
-  by \code{\link{np}}. The random number generator is used during the
+  by \code{\link{npRmpi}}. The random number generator is used during the
   bandwidth search procedure to set the search starting point, and in
   subsequent searches when using multistarting, to avoid being trapped
   in local minima if the objective function is not globally concave.
@@ -48,7 +48,7 @@ npseed(seed)
 }
 
 \section{Note}{
-  This method currently only supports objects from the \code{\link{np}} library.
+  This method currently only supports objects from the \code{\link{npRmpi}} library.
 }
 \examples{
 npseed(712)

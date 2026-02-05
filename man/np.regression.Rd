@@ -68,7 +68,7 @@ FALSE, \dots)
 
   \item{y.eval}{
     If \code{newdata} contains dependent data and \code{y.eval = TRUE},
-    \code{\link{np}} will compute goodness of fit statistics on these
+    \code{\link{npRmpi}} will compute goodness of fit statistics on these
     data and return them. Defaults to \code{FALSE}.
   }
   
@@ -157,7 +157,7 @@ FALSE, \dots)
   (to be specified in the data frame \code{txdat} using
   \code{\link{ordered}}). Data can be entered in an arbitrary order and
   data types will be detected automatically by the routine (see
-  \code{\link{np}} for details).
+  \code{\link{npRmpi}} for details).
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth

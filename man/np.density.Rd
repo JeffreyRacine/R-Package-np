@@ -124,7 +124,7 @@ npudens(bws, \dots)
   command), and ordered discrete (to be specified in the data frame
   \code{tdat} using the \code{\link{ordered}} command). Data can be
   entered in an arbitrary order and data types will be detected
-  automatically by the routine (see \code{\link{np}} for details).
+  automatically by the routine (see \code{\link{npRmpi}} for details).
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and

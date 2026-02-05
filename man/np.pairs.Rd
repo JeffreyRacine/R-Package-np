@@ -38,7 +38,7 @@ scatterplots and smoothers.
 }
 \examples{
 \dontrun{
-  library(np)
+  library(npRmpi)
   y_vars <- c("Murder", "UrbanPop")
   names(y_vars) <- c("Murder Arrests per 100K", "Pop. Percent Urban")
   pair_list <- np.pairs(y_vars = y_vars, y_dat = USArrests,

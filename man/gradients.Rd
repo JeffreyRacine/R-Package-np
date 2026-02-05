@@ -41,7 +41,7 @@ gradients(x, \dots)
 \seealso{
   \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},
   and \code{\link{se}}, for related methods;
-  \code{\link{np}} for supported objects. 
+  \code{\link{npRmpi}} for supported objects. 
 }
 \references{
   See the references for the method being interrogated via
@@ -54,7 +54,7 @@ gradients(x, \dots)
 }
 
 \section{Note}{
-  This method currently only supports objects from the \code{\link{np}} library.
+  This method currently only supports objects from the \code{\link{npRmpi}} library.
 }
 \examples{
 x <- runif(10)

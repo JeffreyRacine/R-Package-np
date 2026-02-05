@@ -154,7 +154,7 @@ npksum(\dots)
     a logical specifying whether or not to return a separate result for
     each unordered and ordered dimension, where the product kernel term
     for that dimension is evaluated at an appropriate reference
-    category. This is used primarily in \code{np} to compute ordered and
+    category. This is used primarily in \code{npRmpi} to compute ordered and
     unordered categorical gradients. See details.
   }
 
@@ -216,7 +216,7 @@ npksum(\dots)
   \code{\link{factor}} command), and ordered discrete (to be specified
   in the data frame \code{txdat} using the \code{\link{ordered}}
   command). Data can be entered in an arbitrary order and data types
-  will be detected automatically by the routine (see \code{\link{np}}
+  will be detected automatically by the routine (see \code{\link{npRmpi}}
   for details).
 
   Data for which bandwidths are to be estimated may be specified
@@ -232,7 +232,7 @@ npksum(\dots)
   eighth order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of
-  the Wang and van Ryzin (1981) kernel (see \code{\link{np}} for
+  the Wang and van Ryzin (1981) kernel (see \code{\link{npRmpi}} for
   details).
 
   The option \code{operator=} can be used to \sQuote{mix and match}

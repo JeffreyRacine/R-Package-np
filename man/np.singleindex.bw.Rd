@@ -91,7 +91,7 @@ npindexbw(\dots)
   
   \item{call}{
     the original function call. This is passed internally by
-    \code{\link{np}} when a bandwidth search has been implied by a call to
+    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
     another function. It is not recommended that the user set this.
   }
 
@@ -227,7 +227,7 @@ npindexbw(\dots)
   passed directly to the function via the \code{xdat} and \code{ydat}
   parameters. Use of these two interfaces is \bold{mutually exclusive}.
   
-  Note that, unlike most other bandwidth methods in the \code{np}
+  Note that, unlike most other bandwidth methods in the \code{npRmpi}
   package, this implementation uses the R \code{\link{optim}} nonlinear
   minimization routines and \code{\link{npksum}}. We have implemented
   multistarting and strongly encourage its use in practice. For
