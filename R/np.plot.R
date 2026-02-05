@@ -1222,7 +1222,7 @@ npplot.rbandwidth <-
         xi.factor = is.factor(xdat[,i])
 
         if (xi.factor){
-          ei = bws$xdati$all.ulev[[i]]
+          ei = levels(xdat[,i])
           xi.neval = length(ei)
         } else {
           xi.neval = neval
@@ -2183,28 +2183,18 @@ npplot.plbandwidth <-
                names(bws$call), nomatch = 0)
 
       tmf.xf <- tmf.x <- tmf <- bws$call[c(1,m)]
-      tmf.x[[1]] <- as.name("model.matrix")
       tmf.xf[[1]] <- tmf[[1]] <- as.name("model.frame")
       tmf[["formula"]] <- tt
       umf <- tmf <- eval(tmf, envir = environment(tt))
 
       bronze <- lapply(bws$chromoly, paste, collapse = " + ")
 
-      tmf.x[["object"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                      env = environment(formula))
-      tmf.x <- eval(tmf.x,parent.frame())
-
       tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
                                       env = environment(formula))
       tmf.xf <- eval(tmf.xf,parent.frame())
       
       ydat <- model.response(tmf)
-      xdat <- as.data.frame(tmf.x[,-1, drop = FALSE])
-      
-      cc <- attr(tmf.x,'assign')[-1]
-    
-      for(i in 1:length(cc))
-        xdat[,i] <- cast(xdat[,i], tmf.xf[,cc[i]], same.levels = FALSE)
+      xdat <- tmf.xf
 
       zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
     } else {
@@ -2467,8 +2457,9 @@ npplot.plbandwidth <-
 
       maxneval = max(c(sapply(xdat,nlevels), sapply(zdat,nlevels), neval))
 
-      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$xndim))
-      ezdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$zndim))
+      ## Preserve original data types (e.g., factors) for evaluation data
+      exdat = xdat[rep(1, maxneval), , drop = FALSE]
+      ezdat = zdat[rep(1, maxneval), , drop = FALSE]
 
       for (i in 1:bws$xndim)
         exdat[,i] = x.ev[1,i]
@@ -2671,7 +2662,7 @@ npplot.plbandwidth <-
         xi.factor = all.isFactor[plot.index]
         
         if (xi.factor){
-          ei = bws$zdati$all.ulev[[i]]
+          ei = levels(zdat[,i])
           xi.neval = length(ei)
         } else {
           xi.neval = neval
