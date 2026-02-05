@@ -31,7 +31,7 @@
 #include <dlfcn.h>
 #endif
 
-static MPI_Comm	*comm;
+MPI_Comm	*comm;
 static MPI_Status *status;
 static MPI_Datatype *datatype;
 static MPI_Info *info;
