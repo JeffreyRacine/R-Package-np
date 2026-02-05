@@ -1,8 +1,8 @@
 %% $Id: np_faq.tex,v 1.99 2018/03/16 14:22:41 jracine Exp jracine $
-%\VignetteIndexEntry{Frequently Asked Questions (np)}
-%\VignetteDepends{np}
+%\VignetteIndexEntry{Frequently Asked Questions (npRmpi)}
+%\VignetteDepends{npRmpi}
 %\VignetteKeywords{nonparametric, kernel, categorical}
-%\VignettePackage{np}
+%\VignettePackage{npRmpi}
 
 \documentclass[12pt]{amsart}
 
@@ -18,7 +18,7 @@
 \setlength{\oddsidemargin}{.0in} \setlength{\evensidemargin}{.0in}
 \setlength{\textwidth}{6.5in} \setlength{\footskip}{.5in}
 
-\title{Package \texttt{np} FAQ} \date{\today} \author{Jeffrey S.~Racine}
+\title{Package \texttt{npRmpi} FAQ} \date{\today} \author{Jeffrey S.~Racine}
 
 \begin{document}
 

@@ -1,8 +1,8 @@
-\name{np}
-\alias{np}
-\alias{np-package}
+\name{npRmpi}
+\alias{npRmpi}
+\alias{npRmpi-package}
 \docType{package}
-\title{Nonparametric Kernel Smoothing Methods for Mixed Data Types}
+\title{Parallel Nonparametric Kernel Smoothing Methods for Mixed Data Types}
 \description{
 
 	This package provides a variety of nonparametric and semiparametric
@@ -10,15 +10,15 @@
 	and ordered factor data types (unordered and ordered factors are often
 	referred to as \sQuote{nominal} and \sQuote{ordinal} categorical
 	variables respectively). A vignette containing many of the examples
-	found in the help files accompanying the \pkg{np} package that is
+	found in the help files accompanying the \pkg{npRmpi} package that is
 	intended to serve as a gentle introduction to this package can be
 	accessed via \code{vignette("npRmpi", package="npRmpi")}.
 
-  For a listing of all routines in the \pkg{np} package type:
-  \sQuote{library(help="np")}.  
+  For a listing of all routines in the \pkg{npRmpi} package type:
+  \sQuote{library(help="npRmpi")}.  
 
   Bandwidth selection is a key aspect of sound nonparametric and
-  semiparametric kernel estimation. \code{np} is designed from the
+  semiparametric kernel estimation. \code{npRmpi} is designed from the
   ground up to make bandwidth selection the focus of attention. To this
   end, one typically begins by creating a \sQuote{bandwidth object}
   which embodies all aspects of the method, including specific kernel
@@ -30,8 +30,8 @@
   \code{npplot}) can work with the bandwidth object directly without
   having to do the subsequent companion function evaluation.
 
-  As of \code{np} version 0.20-0, we allow the user to combine these
-  steps. When using \code{np} versions 0.20-0 and higher, if the first
+  As of \code{npRmpi} version 0.20-0, we allow the user to combine these
+  steps. When using \code{npRmpi} versions 0.20-0 and higher, if the first
   step (bandwidth selection) is not performed explicitly then the second
   step will automatically call the omitted first step bandwidth selector
   using defaults unless otherwise specified, and the bandwidth object
@@ -47,7 +47,7 @@
   conditional cumulative distribution estimate).
   
   There are two ways in which you can interact with functions in
-  \code{np}, either i) using data frames, or ii) using a formula
+  \code{npRmpi}, either i) using data frames, or ii) using a formula
   interface, where appropriate.
 
   To some, it may be natural to use the data frame interface.  The R
@@ -57,7 +57,7 @@
   create a data frame casting data according to their type (i.e., one of
   continuous (default, \code{\link{numeric}}), \code{\link{factor}},
   \code{\link{ordered}}). Then you would simply pass this data frame to
-  the appropriate \code{np} function, for example
+  the appropriate \code{npRmpi} function, for example
   \code{npudensbw(dat=data)}.
 
   To others, however, it may be natural to use the formula interface
@@ -66,11 +66,11 @@
   would proceed as you would using \code{\link{lm}} (e.g., \code{bw <-
   npregbw(y~factor(x1)+x2))} except that you would of course not need to
   specify, e.g., polynomials in variables, interaction terms, or create
-  a number of dummy variables for a factor.  Every function in np
+  a number of dummy variables for a factor.  Every function in npRmpi
   supports both interfaces, where appropriate.
 
   Note that if your factor is in fact a character string such as, say,
-	\code{X} being either \code{"MALE"} or \code{"FEMALE"}, np will handle
+	\code{X} being either \code{"MALE"} or \code{"FEMALE"}, npRmpi will handle
 	this directly, i.e., there is no need to map the string values into
 	unique integers such as (0,1). Once the user casts a variable as a
 	particular data type (i.e., \code{\link{factor}},
@@ -123,12 +123,12 @@
 	one to deploy this software in a clustered computing environment to
 	facilitate computation involving large datasets.
 
-  To cite the \code{np} package, type \code{citation("np")} from within
+  To cite the \code{npRmpi} package, type \code{citation("npRmpi")} from within
   \code{R} for details.
 
 }
 
-\details{ The kernel methods in \code{np} employ the so-called
+\details{ The kernel methods in \code{npRmpi} employ the so-called
 	\sQuote{generalized product kernels} found in Hall, Racine,
 	and Li (2004), Li, Lin, and Racine (2013), Li, Ouyang, and
 	Racine (2013), Li and Racine (2003), Li and Racine (2004), Li
@@ -139,7 +139,7 @@
 
   We briefly describe the particulars of various univariate kernels used
   to generate the generalized product kernels that underlie the kernel
-  estimators implemented in the \code{np} package. In a nutshell, the
+  estimators implemented in the \code{npRmpi} package. In a nutshell, the
   generalized kernel functions that underlie the kernel estimators in
   \code{np} are formed by taking the product of univariate kernels such
   as those listed below. When you cast your data as a particular type
