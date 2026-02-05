@@ -1,20 +1,20 @@
 #!/bin/bash
 
-mkdir n_2
+mkdir -p n_2
 cd n_2
-cp ~/R/npRmpi/inst/Rprofile .Rprofile
+cp ../../inst/Rprofile .Rprofile
 make -f ../makefile.openmpi np=2
 cd ../
 
-mkdir n_3
+mkdir -p n_3
 cd n_3
-cp ~/R/npRmpi/inst/Rprofile .Rprofile
+cp ../../inst/Rprofile .Rprofile
 make -f ../makefile.openmpi np=3
 cd ../
 
-mkdir n_4
+mkdir -p n_4
 cd n_4
-cp ~/R/npRmpi/inst/Rprofile .Rprofile
+cp ../../inst/Rprofile .Rprofile
 make -f ../makefile.openmpi np=4
 cd ../
 
