@@ -43,3 +43,16 @@ mpi.quit()
   This skips MPI initialization during package load for the build stage only.
 - If you previously used OpenMPI, ensure MPICH is active via `port select --set mpi mpich-mp-fortran`.
 - The build expects MPI2 support. The configure script now adds `-DMPI2` for MPICH and links against `-lmpi`.
+
+## If mpiexec fails to bind ports (Hydra PMI error)
+On some macOS setups, `mpiexec` cannot open PMI ports (e.g. `HYDU_sock_listen: failed to bind`).
+A reliable workaround is to run demos from an interactive R session using
+`mpi.spawn.Rslaves()` instead of `mpiexec`.
+
+Example:
+```r
+library(npRmpi)
+library(Rmpi)
+mpi.spawn.Rslaves(nslaves=1)
+source("demo/npregllls_npRmpi.R")
+```
