@@ -23,6 +23,10 @@
 #define Free(x) R_Free(x)
 #endif
 
+#ifndef Realloc
+#define Realloc(p, n, type) ((type *) R_Realloc((p), (n), type))
+#endif
+
 #ifdef OPENMPI
 #include <dlfcn.h>
 #endif
