@@ -179,7 +179,7 @@ npudensbw.bandwidth <-
                          bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
                          fval = double(2), fval.history = double(max(1,nmulti)),
                          timing = double(1),
-                         PACKAGE="npRmpi" )[c("bw","fval","fval.history","timing")])[1]
+                         PACKAGE="np" )[c("bw","fval","fval.history","timing")])[1]
       } else {
         nbw = double(ncol)
         if (bws$ncon > 0){

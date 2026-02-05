@@ -295,7 +295,7 @@ npcdistbw.condbandwidth <-
                bws$xbw[bws$ixuno],bws$xbw[bws$ixord]),
              fval = double(2),fval.history = double(max(1,nmulti)),
              timing = double(1),
-             PACKAGE="npRmpi" )[c("bw","fval","fval.history","timing")])[1]
+             PACKAGE="np" )[c("bw","fval","fval.history","timing")])[1]
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon

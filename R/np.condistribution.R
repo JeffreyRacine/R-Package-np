@@ -263,7 +263,7 @@ npcdist.condbandwidth <-
          congrad = double(enrow*bws$xndim),
          congerr = double(enrow*bws$xndim),
          log_likelihood = double(1),
-         PACKAGE="npRmpi" )[c("condist", "conderr", "congrad", "congerr", "log_likelihood")]
+         PACKAGE="np" )[c("condist", "conderr", "congrad", "congerr", "log_likelihood")]
 
     if(gradients){
       myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 

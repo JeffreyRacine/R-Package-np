@@ -310,7 +310,7 @@ npreg.rbandwidth <-
          g = double(ifelse(gradients,enrow*ncol,0)),
          gerr = double(ifelse(gradients,enrow*ncol,0)),
          xtra = double(6),
-         PACKAGE="npRmpi" )[c("mean","merr", "g", "gerr", "xtra")]
+         PACKAGE="np" )[c("mean","merr", "g", "gerr", "xtra")]
 
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 

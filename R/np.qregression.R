@@ -245,7 +245,7 @@ npqreg.condbandwidth <-
          yq = double(enrow),
          yqerr = double(enrow),
          yqgrad = double(enrow*bws$xndim*gradients),
-         PACKAGE="npRmpi" )[c("yq","yqerr", "yqgrad")]
+         PACKAGE="np" )[c("yq","yqerr", "yqgrad")]
 
     ##need to untangle yqgrad
 

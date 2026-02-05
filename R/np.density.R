@@ -173,7 +173,7 @@ npudens.bandwidth <-
        dens = double(enrow),
        derr = double(enrow),
        log_likelihood = double(1),
-       PACKAGE="npRmpi" )[c("dens","derr", "log_likelihood")]
+       PACKAGE="np" )[c("dens","derr", "log_likelihood")]
 
   ## For purely categorical density with zero bandwidths, the variance of
   ## the sample proportion is p(1-p)/n. The C routine returns p/n; fix here.

@@ -263,7 +263,7 @@ npcdens.conbandwidth <- function(bws,
        congrad = double(enrow*bws$xndim),
        congerr = double(enrow*bws$xndim),
        log_likelihood = double(1),
-       PACKAGE="npRmpi" )[c("condens", "conderr", "congrad", "congerr", "log_likelihood")]
+       PACKAGE="np" )[c("condens", "conderr", "congrad", "congerr", "log_likelihood")]
 
   if(gradients){
     myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
