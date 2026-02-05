@@ -1,0 +1,346 @@
+# Diff vs CRAN np_0.60-19
+
+This report provides a brief narrative of what changed in each file compared to the CRAN posted package.
+
+- CRAN posted: /Users/jracine/Development/np_0.60-19_CRAN_posted
+- Current: /Users/jracine/Development/np-npRmpi
+
+## Summary
+
+Added files: 244
+Removed files: 6
+Changed files: 62
+
+## Added
+
+- `.Rhistory`: Added in the current codebase (new file).
+- `BUILD.md`: Build instructions added.
+- `BUILD_MPICH.md`: MPICH build notes added (if present). (last change: 2026-02-04 | Document mpiexec port workaround)
+- `CRAN_DIFF.html`: Added in the current codebase (new file).
+- `CRAN_DIFF.md`: Added in the current codebase (new file).
+- `R/Rcoll.R`: Added in the current codebase (new file). (last change: 2014-05-29 | merged latest version of rmpi)
+- `R/Rcomm.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `R/Rmpi.R`: Added in the current codebase (new file). (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `R/Rng.R`: Added in the current codebase (new file). (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `R/Rparutilities.R`: Added in the current codebase (new file). (last change: 2014-05-29 | merged latest version of rmpi)
+- `R/np.pairs.R`: Added cross‑validated pairs plotting utilities (np.pairs / np.pairs.plot) for quick bivariate diagnostics. (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `R/npmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `WORKTREES.md`: Added in the current codebase (new file).
+- `autom4te.cache/output.0`: Added in the current codebase (new file).
+- `autom4te.cache/requests`: Added in the current codebase (new file).
+- `autom4te.cache/traces.0`: Added in the current codebase (new file).
+- `config.log`: Added in the current codebase (new file).
+- `config.status`: Added in the current codebase (new file).
+- `configure`: Modernized configure script (MPI detection and flags). (last change: 2026-02-05 | Modernize MPI detection in configure)
+- `configure.ac`: Modernized autoconf definitions (MPI detection paths). (last change: 2026-02-05 | Modernize MPI detection in configure)
+- `configure~`: Added in the current codebase (new file).
+- `demo/.Rprofile`: Added in the current codebase (new file).
+- `demo/Readme`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/makefile`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/makefile.openmpi`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/makefile.serial`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/makefile.serial.sharcnet`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/makefile.sharcnet`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/npcdensls_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npcdensls_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npcdensml_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npcdensml_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npcdistls_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-04-12 | Removed extra carriage return from npRmpi, updated demos)
+- `demo/npcdistls_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npcmstest_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npcmstest_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npconmode_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npconmode_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npcopula_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npcopula_serial.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npdeneqtest_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npdeneqtest_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npdeptest_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npdeptest_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npglpreg_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npglpreg_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npindexich_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npindexich_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npindexks_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npindexks_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npplreg_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npplreg_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npqreg_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npqreg_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npregiv_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-05-24 | Added mean absolute deviation/1.4826 to mix of robust scale elements)
+- `demo/npregiv_serial.R`: Added in the current codebase (new file). (last change: 2014-05-24 | Added mean absolute deviation/1.4826 to mix of robust scale elements)
+- `demo/npreglcaic_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npreglcaic_serial.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npreglcls_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npreglcls_serial.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npreglcls_serial.Rout`: Added in the current codebase (new file).
+- `demo/npregllaic_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npregllaic_serial.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npregllls_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npregllls_serial.R`: Added in the current codebase (new file). (last change: 2014-05-31 | Updated defaults in demos, version number bumped to 0.60-0, updated np_faq.Rnw, freezing features for pending release)
+- `demo/npscoef_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npscoef_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npsdeptest_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npsdeptest_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npsigtest_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npsigtest_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npsymtest_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npsymtest_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npudensls_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npudensls_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npudensml_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npudensml_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npudistcdf_npRmpi.R`: Added in the current codebase (new file). (last change: 2014-05-30 | Added list of changes since previous release to CHANGELOG, modified demo)
+- `demo/npudistcdf_serial.R`: Added in the current codebase (new file). (last change: 2014-05-30 | Added list of changes since previous release to CHANGELOG, modified demo)
+- `demo/npunitest_npRmpi.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/npunitest_serial.R`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `demo/runall`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/runall_npRmpi`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/runall_serial`: Added in the current codebase (new file). (last change: 2026-02-05 | Added serial only runall*)
+- `demo/serial/npcdensls_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npcdensml_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npcdistls_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npcmstest_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npconmode_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npcopula_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npdeneqtest_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npdeptest_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npglpreg_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npindexich_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npindexks_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npplreg_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npqreg_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npregiv_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npreglcaic_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npreglcls_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npregllaic_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npregllls_serial.Rout`: Added in the current codebase (new file).
+- `demo/serial/npscoef_serial.Rout`: Added in the current codebase (new file).
+- `demo/timing`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `demo/timing.aux`: Added in the current codebase (new file).
+- `demo/timing.fdb_latexmk`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/timing.fls`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/timing.log`: Added in the current codebase (new file).
+- `demo/timing_n_2.dat`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/timing_n_2.tex`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/timing_n_3.dat`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/timing_n_3.tex`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/timing_n_4.dat`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `demo/timing_n_4.tex`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
+- `inst/MacR64slaves.sh`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/Rprofile`: MPI runtime profile updated for stable slave startup and shutdown. (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `inst/Rslaves.sh`: Rmpi slave launcher updated (adds --vanilla and compatibility tweaks). (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `inst/Rslaves32.cmd`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/Rslaves64.cmd`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/compile_npRmpi_MS_Windows.txt`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/cslavePI.c`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/install_npRmpi_MS_Windows.txt`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/install_npRmpi_SHARCNET.txt`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/install_npRmpi_mac_os.txt`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/merge.sh`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `inst/slavedaemon.R`: Slave daemon flow updated for current Rmpi usage. (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `inst/sleep.c`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `issue_notes/Readme`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_10_npcdens_gradients_abort.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_13_npudens_avar_categorical.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_16_npregbw_rule_of_thumb.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_18_npregiv_multidim_instruments.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_26_formula_eval_explodepipe.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_3_local_linear_high_order.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_44_npindex_bvcov_recycling.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_4_npcdensbw_cvls_cvml_segfault.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_4_npcdensbw_segfault_cvml.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_50_np_pairs_plot.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_51_npregiv_exogenous_w.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_5_npqreg_tau_validation.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_6_npindexbw_bwtype.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_7_uocquantile_factor_subset.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `issue_notes/issue_notes_missing.md`: Added in the current codebase (new file). (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `issue_notes/verified_issue_repros.R`: Added in the current codebase (new file). (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `man/.gitattributes`: Added in the current codebase (new file). (last change: 2014-05-05 | more ga)
+- `man/hosts.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/internal.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.abort.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.apply.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.barrier.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.bcast.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.bcast.Robj.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.bcast.cmd.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.cart.coords.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.cart.create.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.cart.get.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.cart.rank.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.cart.shift.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.cartdim.get.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.comm.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.comm.disconnect.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.comm.free.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.comm.inter.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.comm.set.errhandler.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.comm.spawn.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.const.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.dims.create.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.exit.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.finalize.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.gather.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.gather.Robj.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.get.count.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.get.processor.name.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.get.sourcetag.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.iapply.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.info.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.intercomm.merge.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.parSim.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.parapply.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.probe.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.realloc.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.reduce.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.remote.exec.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.scatter.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.scatter.Robj.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.send.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.send.Robj.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.sendrecv.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.setup.rng.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.spawn.Rslaves.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.universe.size.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/mpi.wait.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/np.mpi.initialize.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Add legacy npRmpi docs and demo artifacts)
+- `man/np.pairs.Rd`: Added in the current codebase (new file). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `npRmpi_0.60-21.tar.gz`: Added in the current codebase (new file).
+- `src/Makevars`: Added in the current codebase (new file). (last change: 2013-10-31 | mistakenly added this in previous commit)
+- `src/Makevars.in`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
+- `src/Rmpi.c`: Rmpi C bindings updated (argument signatures, MPI call compatibility). (last change: 2026-02-05 | Fix Rmpi init registration conflict)
+- `src/Rmpi.h`: Rmpi header sync to match updated C bindings. (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `src/Rmpi.o`: Added in the current codebase (new file).
+- `src/RuniqueCombs.o`: Added in the current codebase (new file).
+- `src/bspline.o`: Added in the current codebase (new file).
+- `src/conversion.c`: Rmpi conversion helpers updated for current API. (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `src/conversion.o`: Added in the current codebase (new file).
+- `src/gsl_bspline.o`: Added in the current codebase (new file).
+- `src/hash.o`: Added in the current codebase (new file).
+- `src/internal.c`: Rmpi internal error handling updated for stability. (last change: 2026-02-05 | Fix Rmpi init registration conflict)
+- `src/internal.o`: Added in the current codebase (new file).
+- `src/jksum.o`: Added in the current codebase (new file).
+- `src/kernel.o`: Added in the current codebase (new file).
+- `src/kernelb.o`: Added in the current codebase (new file).
+- `src/kernelcv.o`: Added in the current codebase (new file).
+- `src/kernele.o`: Added in the current codebase (new file).
+- `src/kernelw.o`: Added in the current codebase (new file).
+- `src/mat_vec.o`: Added in the current codebase (new file).
+- `src/matrix.o`: Added in the current codebase (new file).
+- `src/msmpi.def`: Added in the current codebase (new file). (last change: 2014-05-29 | merged latest version of rmpi)
+- `src/np.o`: Added in the current codebase (new file).
+- `src/npRmpi.so`: Added in the current codebase (new file).
+- `src/np_init.o`: Added in the current codebase (new file).
+- `src/nr.o`: Added in the current codebase (new file).
+- `src/statmods.o`: Added in the current codebase (new file).
+- `src/tree.o`: Added in the current codebase (new file).
+- `tests/testthat.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-extra.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-misc.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Expand unit test coverage to include distribution, copula, quantile regression, tests of independence/specification, and boundary/shape-constrained methods)
+- `tests/testthat/test-npcdens.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-npcdist.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-npcopula.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Expand unit test coverage to include distribution, copula, quantile regression, tests of independence/specification, and boundary/shape-constrained methods)
+- `tests/testthat/test-npdeptest.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Expand unit test coverage to include distribution, copula, quantile regression, tests of independence/specification, and boundary/shape-constrained methods)
+- `tests/testthat/test-npindex.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-npplreg.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-npqreg.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Expand unit test coverage to include distribution, copula, quantile regression, tests of independence/specification, and boundary/shape-constrained methods)
+- `tests/testthat/test-npreg.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-npregiv.R`: Added in the current codebase (new file). (last change: 2026-02-02 | Update unit tests and fix documentation mismatches for npregiv/npregivderiv)
+- `tests/testthat/test-npscoef.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-npsigtest.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-nptests.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Expand unit test coverage to include distribution, copula, quantile regression, tests of independence/specification, and boundary/shape-constrained methods)
+- `tests/testthat/test-npudens.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `tests/testthat/test-npudist.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Expand unit test coverage to include distribution, copula, quantile regression, tests of independence/specification, and boundary/shape-constrained methods)
+- `tests/testthat/test-npuniden.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Expand unit test coverage to include distribution, copula, quantile regression, tests of independence/specification, and boundary/shape-constrained methods)
+- `tests/testthat/test-utils.R`: Added in the current codebase (new file). (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `vignettes/npRmpi.Rnw`: Added in the current codebase (new file). (last change: 2014-08-18 | Located more recent version of npRmpi.Rnw, updated)
+- `vignettes/npRmpi.bib`: Added in the current codebase (new file). (last change: 2014-10-26 | Aded bibtex file)
+
+## Removed
+
+- `demo/constrained.R`: Removed from the current codebase. (no local commit date available)
+- `demo/tree.R`: Removed from the current codebase. (no local commit date available)
+- `vignettes/entropy_np.Rnw`: Removed from the current codebase. (no local commit date available)
+- `vignettes/entropy_np.bib`: Removed from the current codebase. (no local commit date available)
+- `vignettes/np.Rnw`: Removed from the current codebase. (no local commit date available)
+- `vignettes/np.bib`: Removed from the current codebase. (no local commit date available)
+
+## Changed
+
+- `.Rbuildignore`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update issue notes and ignore in build)
+- `CHANGELOG`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `DESCRIPTION`: Version/metadata updates. (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `NAMESPACE`: Export/method registration updates for new/changed functions. (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.condensity.R`: Minor conditional density adjustments for updated workflows. (last change: 2014-05-05 | Merge branch 'master' into npRmpi)
+- `R/np.condensity.bw.R`: Minor conditional density bandwidth selection fix (consistency with updated inputs). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.condistribution.R`: Updated relative to CRAN (see file for details). (last change: 2014-05-05 | Merge branch 'master' into npRmpi)
+- `R/np.condistribution.bw.R`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.density.R`: Density estimation tweaks and guardrails (minor logic adjustments for stability/consistency). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.density.bw.R`: Updated relative to CRAN (see file for details). (last change: 2014-06-27 | Merge branch 'master' into npRmpi)
+- `R/np.distribution.R`: Updated relative to CRAN (see file for details). (last change: 2014-05-05 | Merge branch 'master' into npRmpi)
+- `R/np.distribution.bw.R`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.kernel.R`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.plot.R`: Plotting updates to align with revised outputs and defaults. (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `R/np.qregression.R`: Quantile regression path adjusted for consistency with updated bandwidth/fit handling. (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.regression.R`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/np.regression.bw.R`: Updated relative to CRAN (see file for details). (last change: 2014-06-24 | Merge branch 'master' into npRmpi)
+- `R/np.sigtest.R`: Adjusted significance test workflow and guardrails (fixes error when training/eval data frames are not aligned; supports updated regression calls). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
+- `R/np.singleindex.R`: Single‑index model updates (minor logic/guard changes). (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `R/np.singleindex.bw.R`: Bandwidth selection updates for single‑index models (consistency checks and defaults). (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `R/npregiv.R`: Instrumental variables regression updates (fixes/guards in evaluation and fit paths). (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `R/npregivderiv.R`: npregiv derivative computation and summaries aligned with updated argument ordering. (last change: 2026-02-03 | Add bandwidth details to npregiv summaries)
+- `R/util.R`: Utility updates and numerical safeguards (NZD helpers and related checks) aligned with newer codepaths. (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `R/zzz.R`: Startup/initialization tweaks (package message and load behavior alignment). (last change: 2026-02-04 | Allow skipping MPI init via NP_RMPI_SKIP_INIT)
+- `README.md`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `cleanup`: Updated relative to CRAN (see file for details). (last change: 2014-08-18 | Reinstated npRmpi.Rnw vignette...)
+- `demo/00Index`: Updated relative to CRAN (see file for details). (last change: 2013-12-19 | Merge branch 'master' into npRmpi)
+- `demo/Engel95.R`: Demo updates for Engel95 dataset usage. (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `demo/npregiv.R`: Demo updates for npregiv usage. (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `man/data-Engel95.Rd`: Engel95 dataset documentation updates. (last change: 2026-02-01 | Add unit tests using testthat and clean up phihat to phi in npregiv*)
+- `man/gradients.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np-package.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.condensity.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.condensity.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.condistribution.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.condistribution.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.density.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.density.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.distribution.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.distribution.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.kernelsum.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.plot.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.plregression.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.plregression.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.regression.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.regression.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.regressioniv.Rd`: npregiv documentation updates. (last change: 2026-02-02 | Update unit tests and fix documentation mismatches for npregiv/npregivderiv)
+- `man/np.regressionivderiv.Rd`: npregivderiv documentation updates. (last change: 2026-02-02 | Reorder npregivderiv arguments alphabetically after fixed ones)
+- `man/np.singleindex.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.singleindex.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.smoothcoef.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.smoothcoef.bw.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/np.symtest.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/npseed.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/nptgauss.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `man/se.Rd`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Update man page package references to npRmpi)
+- `npver`: Version tracking file updated. (last change: 2026-02-04 | Bumped up version # to 0.60-21 in anticipation of moving to open issues)
+- `src/Makevars.win`: Windows MPI build configuration added/updated. (last change: 2014-05-29 | merged latest version of rmpi)
+- `src/np.c`: C core updates (logic tweaks and stability fixes in computation kernels). (last change: 2026-02-04 | Fix np issues 4/6/7/13/18/26/51 and add np.pairs utilities)
+- `src/np_init.c`: Updated native routine registrations (alignment with package name and updated symbols). (last change: 2026-02-04 | Merge master updates into npRmpi)
+- `vignettes/np_faq.Rnw`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Restore npRmpi helpers and revert np_faq source)
+- `vignettes/np_faq.bib`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Restore npRmpi helpers and revert np_faq source)
+
+## Issue Mapping (Best-Effort)
+
+The following issues appear to be addressed by changes in this tree:
+
+- `#4` (npcdensbw cv.ls -> cv.ml segfault): addressed in C/R core updates (see `src/np.c` and related bandwidth logic).
+- `#6` (npindexbw bwtype option): addressed in `R/np.singleindex.bw.R` and `R/np.singleindex.R`.
+- `#7` (uocquantile subset of factor): addressed in `R/util.R`.
+- `#13` (npudens categorical variance): addressed in `R/np.density.R`.
+- `#18` (npregiv Tikhonov multi‑instrument): addressed in `R/npregiv.R`.
+- `#50` (cross‑validated pairs plot): addressed by `R/np.pairs.R`.
+
+If any of these are not fully resolved, treat this as a pointer to where the relevant changes landed.
