@@ -1,0 +1,7 @@
+#!/bin/bash
+
+mkdir -p serial
+cd serial
+make -f ../makefile.serial
+cd ../
+
