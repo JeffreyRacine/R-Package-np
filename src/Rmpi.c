@@ -16,6 +16,7 @@
  */
 
 #include "Rmpi.h"
+#include <R_ext/Memory.h>
 
 #ifdef OPENMPI
 #include <dlfcn.h>
@@ -1542,4 +1543,3 @@ SEXP mpi_request_get_status(SEXP sexp_request,  SEXP sexp_status){
         return AsInt(flag);
 }
 */
-
