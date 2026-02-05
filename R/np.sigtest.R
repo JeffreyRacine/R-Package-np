@@ -196,7 +196,14 @@ npsigtest.rbandwidth <- function(bws,
       ## xdat[,i] constant at its median (numeric) or mode
       ## (factor/ordered) using uocquantile()
 
-      for(i in index) xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
+      for(i in index) {
+        xq <- uocquantile(xdat[,i], 0.5)
+        if (is.factor(xdat[,i]) || is.ordered(xdat[,i])) {
+          xdat.eval[,i] <- cast(xq, xdat[,i], same.levels = TRUE)
+        } else {
+          xdat.eval[,i] <- xq
+        }
+      }
       
       mhat.xi <-  npreg(txdat = xdat,
                         tydat = ydat,
@@ -398,7 +405,12 @@ npsigtest.rbandwidth <- function(bws,
         ## xdat[,i] constant at its median (numeric) or mode
         ## (factor/ordered) using uocquantile()
         
-        xdat.eval[,i] <- uocquantile(xdat[,i], 0.5)
+        xq <- uocquantile(xdat[,i], 0.5)
+        if (is.factor(xdat[,i]) || is.ordered(xdat[,i])) {
+          xdat.eval[,i] <- cast(xq, xdat[,i], same.levels = TRUE)
+        } else {
+          xdat.eval[,i] <- xq
+        }
         
         mhat.xi <-  npreg(txdat = xdat,
                           tydat = ydat,
@@ -626,4 +638,3 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   environment(ev$call) <- parent.frame()
   return(ev)
 }
-

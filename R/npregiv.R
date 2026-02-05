@@ -247,6 +247,10 @@ npregiv <- function(y,
       if(deriv<0||deriv>2)
           stop(paste("Error: deriv= (integer) is invalid\n[min = ", 0, ", max = ",  p, "]\n",sep=""))
 
+      if(length(p) != 1) {
+          p <- p[1]
+      }
+
       if(p < 0)
           stop(paste("Error: p (order of polynomial) must be a non-negative integer\np is (", p, ")\n",sep=""))
 
@@ -426,7 +430,8 @@ npregiv <- function(y,
     if(is.null(txdat)) stop("Error: You must provide X data")
     if(is.null(bws)) stop("Error: You must provide a bandwidth object")
     if(is.null(degree) | any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
-    if(p>0 && (deriv<0||deriv>degree)) stop("deriv must lie between 0 and degree")
+    if(p>0 && (any(deriv < 0) || any(deriv > degree)))
+      stop("deriv must lie between 0 and degree")
 
     miss.ex = missing(exdat)
 

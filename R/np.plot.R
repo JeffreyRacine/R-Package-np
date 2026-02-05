@@ -786,18 +786,20 @@ uocquantile <- function(x, prob) {
   if(any(prob < 0 | prob > 1)) stop("'prob' outside [0,1]")
   if(any(is.na(x) | is.nan(x))) stop("missing values and NaN's not allowed")
   if (is.ordered(x)){
+    x <- droplevels(x)
     tq = unclass(table(x))
     tq = tq / sum(tq)
     tq[length(tq)] <- 1.0
-    bscape <- sort(unique(x))
+    bscape <- levels(x)
     tq <- sapply(1:length(tq), function(y){ sum(tq[1:y]) })
     j <- sapply(prob, function(p){ which(tq >= p)[1] })
     bscape[j]
   } else if (is.factor(x)) {
     ## just returns mode
+    x <- droplevels(x)
     tq = unclass(table(x))
     j = which(tq == max(tq))[1]
-    sort(unique(x))[j]
+    levels(x)[j]
   } else {
     quantile(x, probs = prob)
   }

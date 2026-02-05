@@ -88,6 +88,9 @@ npqreg.condbandwidth <-
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
 
+    if (!is.numeric(tau) || length(tau) != 1 || is.na(tau) || tau <= 0 || tau >= 1)
+      stop("'tau' must be a single numeric value in (0,1)")
+
     if (dim(tydat)[2] != 1)
       stop("'tydat' has more than one column")
 
@@ -242,7 +245,7 @@ npqreg.condbandwidth <-
          yq = double(enrow),
          yqerr = double(enrow),
          yqgrad = double(enrow*bws$xndim*gradients),
-         PACKAGE="np" )[c("yq","yqerr", "yqgrad")]
+         PACKAGE="npRmpi" )[c("yq","yqerr", "yqgrad")]
 
     ##need to untangle yqgrad
 
@@ -327,4 +330,3 @@ npqreg.default <- function(bws, txdat, tydat, ...){
   
   eval(parse(text=paste("npqreg(bws = tbw", tx.str, ty.str, ",...)")))
 }
-

@@ -117,7 +117,7 @@ matrix.sd <- function(x, na.rm=FALSE) {
 }
 
 npseed <- function(seed){
-  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "np")
+  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "npRmpi")
   invisible()
 }
 
@@ -149,8 +149,8 @@ nptgauss <- function(b){
   a1 <- -(a2*erf(b/sqrt(2)) + c0)/(2*b)
 
   int.kernels[CKER_TGAUSS + 1] <- k
-
-  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "np"))
+  
+  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "npRmpi"))
 
 }
 
@@ -327,6 +327,8 @@ explodeFormula <- function(formula){
 
 
 explodePipe <- function(formula){
+  if (!inherits(formula, "formula"))
+    formula <- eval(formula, parent.frame())
   tf <- as.character(formula)  
   tf <- tf[length(tf)]
 

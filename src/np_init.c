@@ -39,8 +39,9 @@ static const R_CMethodDef CEntries[] = {
     {NULL, NULL, 0}
 };
 
-void R_init_np(DllInfo *dll)
+void R_init_npRmpi(DllInfo *dll)
 {
     R_registerRoutines(dll, CEntries, NULL, NULL, NULL);
-    R_useDynamicSymbols(dll, FALSE);
+    /* npRmpi relies on dynamic symbol lookup for Rmpi bindings */
+    R_useDynamicSymbols(dll, TRUE);
 }

@@ -173,7 +173,14 @@ npudens.bandwidth <-
        dens = double(enrow),
        derr = double(enrow),
        log_likelihood = double(1),
-       PACKAGE="np" )[c("dens","derr", "log_likelihood")]
+       PACKAGE="npRmpi" )[c("dens","derr", "log_likelihood")]
+
+  ## For purely categorical density with zero bandwidths, the variance of
+  ## the sample proportion is p(1-p)/n. The C routine returns p/n; fix here.
+  if (bws$ncon == 0 && bws$nord == 0 && bws$nuno > 0 && all(bws$bw[bws$iuno] == 0)) {
+    p <- pmin(pmax(myout$dens, 0), 1)
+    myout$derr <- sqrt(p * (1 - p) / tnrow)
+  }
 
   ev <- npdensity(bws=bws, eval=teval, dens = myout$dens,
                   derr = myout$derr, ll = myout$log_likelihood,
@@ -226,4 +233,3 @@ npudens.default <- function(bws, tdat, ...){
                       ifelse(tdat.named, ",tdat = tdat",",tdat")),
                ",...)")))
 }
-
