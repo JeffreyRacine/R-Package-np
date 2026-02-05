@@ -75,7 +75,7 @@ mpi.universe.size <- function(){
 		#out<-.mpi.universe.size
 	    #else {
 			if (.Platform$OS=="windows") {
-				require(parallel)
+				#require(parallel)
 		    	out <- detectCores()
 			}
 	    #}		
@@ -83,8 +83,8 @@ mpi.universe.size <- function(){
 	if (.Call("mpidist",PACKAGE = "npRmpi") == 2)
 	    out <- out-length(grep("no_schedule",system("lamnodes",TRUE,ignore.stderr=TRUE)))
 	if (.Call("mpidist",PACKAGE = "npRmpi") == 1 && out == 1){
-		if (length(unlist(strsplit(.Platform$pkgType,"mac"))) ==2)
-			out <- as.integer(unlist(strsplit(system("sysctl hw.ncpu",TRUE,ignore.stderr=TRUE),":"))[2])
+		if (grepl("darwin", R.version$os))
+			out <- as.integer(unlist(strsplit(system("/usr/sbin/sysctl hw.ncpu",TRUE,ignore.stderr=TRUE),":"))[2])
 	}
 	#if (.Call("mpidist",PACKAGE = "npRmpi") == 1 && out > 1)
 	#	if (.Platform$OS!="windows")

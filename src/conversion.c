@@ -28,7 +28,7 @@ SEXP AsInt (int x)
     return sexp_x;
 }
 
-SEXP pid(){
+SEXP pid(void){
 	return AsInt(getpid());
 }
 

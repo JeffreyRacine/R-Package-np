@@ -1,5 +1,5 @@
 mpi.setup.rngstream <- function(iseed=NULL, comm = 1){
-	require(parallel)
+	#require(parallel)
     commsize <- mpi.comm.size(comm)
     if (commsize < 3)
         stop("There is no slave or only one slave")

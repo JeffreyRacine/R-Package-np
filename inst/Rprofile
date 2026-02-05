@@ -12,8 +12,10 @@
 
 # Cannot be used as Rprofile.site because it will not work
 
-# If no CPU consumptions of slaves while waiting are desirable, change 
+# If no CPU consumptions of slaves while waiting are desirable, change
 # nonblocak=FALSE to nonblock=TRUE and change sleep time accordingly
+.nonblock=TRUE
+.sleep=0.1
 
 # Following system libraries are not loaded automatically. So manual loads are 
 # needed.
@@ -42,11 +44,16 @@ if (mpi.comm.rank(0) >0){
     options(echo=FALSE)
     .comm <- 1
     mpi.barrier(0)
-    repeat 
-		try(eval(mpi.bcast.cmd(rank=0,comm=.comm, nonblock=FALSE, sleep=0.1)),TRUE)
-	if (is.loaded("mpi_comm_disconnect")) 
-        mpi.comm.disconnect(.comm)
-    else mpi.comm.free(.comm)
+    repeat {
+		tmp.message=mpi.bcast.cmd(rank=0,comm=.comm, nonblock=.nonblock, sleep=.sleep)
+		if (is.character(tmp.message) && tmp.message=="kaerb")
+			break
+    	try(eval(tmp.message,envir=.GlobalEnv),TRUE)
+	}
+	#if (is.loaded("mpi_comm_disconnect"))
+    #    mpi.comm.disconnect(.comm)
+    #else 
+	mpi.comm.free(.comm)
     mpi.quit()
 }
     
@@ -64,6 +71,6 @@ if (mpi.comm.rank(0)==0) {
             mpi.close.Rslaves(comm=1)
     	}
     }
-    print("Please use mpi.quit() to quit R")
-    mpi.quit()
+	if (is.loaded("mpi_initialize"))
+       .Call("mpi_finalize",PACKAGE = "npRmpi")
 }

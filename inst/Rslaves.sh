@@ -14,7 +14,7 @@ fi
 
 if  [ "$3" = "needlog" ]; then
 	hn=`hostname -s`
-	$R_HOME/bin/R --no-init-file --slave --no-save -f  $1 > $hn.$2.$$.log 2>&1
+	$R_HOME/bin/R --vanilla -f  $1 > $hn.$2.$$.log 2>&1
 else
-	$R_HOME/bin/R --no-init-file --slave --no-save -f  $1 > /dev/null 2>&1
+	$R_HOME/bin/R --vanilla -f  $1 > /dev/null 2>&1
 fi
