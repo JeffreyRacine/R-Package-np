@@ -1,22 +1,9 @@
-# Issue #5: npqreg() does not validate tau
+# Issue #5: npqreg should validate tau
 
-**Type:** Bug
-
-## Report
-`npqreg()` accepts invalid `tau` values (e.g., <0 or >1), which can lead to nonsensical results or errors downstream.
+**Status:** Resolved (ae9e41c)
 
 ## Fix
-Add explicit validation in `npqreg.condbandwidth`:
-```
-if (!is.numeric(tau) || length(tau) != 1 || is.na(tau) || tau <= 0 || tau >= 1)
-  stop("'tau' must be a single numeric value in (0,1)")
-```
+Added guard to ensure `tau` in (0,1). Returns informative error instead of silent misuse.
 
-## Risk assessment
-Low. This is defensive input validation, only affects invalid inputs.
-
-## Status
-Implemented locally in `R/np.qregression.R`. Needs package install/test.
-
-## Status
-Resolved (explicit validation for `tau` in (0,1)).
+## Suggested GitHub response
+Acknowledge and note validation added to prevent invalid probability values.

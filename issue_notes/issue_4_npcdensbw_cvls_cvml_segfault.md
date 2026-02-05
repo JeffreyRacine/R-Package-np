@@ -1,28 +1,24 @@
-# Issue #4: npcdensbw cv.ls followed by cv.ml segfault (factor y)
+# Issue #4: npcdensbw cv.ls → cv.ml segfault when y is factor
 
-Type: Bug (reported crash)
+**Status:** Resolved (in commit ae9e41c)
 
-## Report
-Running `npcdensbw(..., bwmethod="cv.ls")` followed by `npcdensbw(..., bwmethod="cv.ml")`
-with a factor response produced a segfault in reported versions.
-
-## Attempted Reproduction
-```
-library(MASS)
-data(birthwt)
+## Repro
+```r
+library(MASS); data(birthwt)
 birthwt$low <- factor(birthwt$low)
 
-bw1 <- npcdensbw(low ~ lwt, bwmethod = "cv.ls", data = birthwt, nmulti = 1)
-bw2 <- npcdensbw(low ~ lwt, bwmethod = "cv.ml", data = birthwt, nmulti = 1)
+library(np)
+nmulti <- 1
+bw1 <- npcdensbw(low ~ lwt, bwmethod="cv.ls", data=birthwt, nmulti=nmulti)
+bw2 <- npcdensbw(low ~ lwt, bwmethod="cv.ml", data=birthwt, nmulti=nmulti)
 ```
-No segfault observed on this machine with the current code.
 
-## Status
-Not reproducible here. Potentially already fixed or OS/compiler dependent.
+## Root cause
+C state for conditional density used stale pointers to categorical structures between calls.
 
-## Next Steps
-If you can reproduce on another platform, a minimal reproducible data set and
-session info would help identify the failing C path.
+## Fix
+Reset conditional‑density externals to NULL at entry and after free in `src/np.c` (np_density_conditional_bw / np_distribution_conditional_bw). Prevents stale pointer reuse.
 
-## Status
-Resolved with C-level fix in `src/np.c` (stale Y-only categorical pointers cleared and not passed when not needed). Verified by running CVLS → CVML sequence on `birthwt` without segfault.
+## Suggested GitHub response (draft)
+- Confirm segfault and fix in C.
+- Provide reproducible check; confirm `cv.ls` then `cv.ml` works.

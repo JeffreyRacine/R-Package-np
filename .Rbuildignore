@@ -6,3 +6,5 @@ man/sed_dontrun.scr
 man/sed_run.scr
 ^issue_notes$
 ^issue_notes/.*$
+^issue_notes/.*$
+^issue_notes$
