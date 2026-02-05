@@ -145,7 +145,7 @@ bs.des     <- function(x,
 										as.double(knots),
 										as.integer(knots.int),
 										Bx = double(n*ncol),
-										PACKAGE="np" )
+										PACKAGE="npRmpi" )
 
 		} else {
 
@@ -161,7 +161,7 @@ bs.des     <- function(x,
 										as.double(knots),                
 										as.integer(knots.int),
 										Bx = double(n*ncol),
-										PACKAGE="np" )
+										PACKAGE="npRmpi" )
 
 		}
 

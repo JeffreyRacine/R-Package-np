@@ -1145,7 +1145,7 @@ npplot.rbandwidth <-
 
       maxneval = max(c(sapply(xdat,nlevels),neval))
 
-      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$ndim))
+      exdat = xdat[rep(1, maxneval), , drop = FALSE]
 
       for (i in 1:bws$ndim)
         exdat[,i] = ev[1,i]
@@ -1736,7 +1736,7 @@ npplot.scbandwidth <-
       for (i in 1:bws$xndim)
         x.ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
 
-      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$xndim))
+      exdat = xdat[rep(1, maxneval), , drop = FALSE]
 
       for (i in 1:bws$xndim)
         exdat[,i] = x.ev[1,i]
@@ -1747,7 +1747,7 @@ npplot.scbandwidth <-
         for (i in 1:bws$zndim)
           z.ev[1,i] = uocquantile(zdat[,i], prob=zq[i])
 
-        ezdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$zndim))
+        ezdat = zdat[rep(1, maxneval), , drop = FALSE]
 
         for (i in 1:bws$zndim)
           ezdat[,i] = z.ev[1,i]
@@ -1847,7 +1847,8 @@ npplot.scbandwidth <-
         xi.factor = all.isFactor[plot.index]
         
         if (xi.factor){
-          ei = bws$xdati$all.ulev[[i]]
+          ei = levels(xdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
@@ -1952,7 +1953,8 @@ npplot.scbandwidth <-
           xi.factor = all.isFactor[plot.index]
           
           if (xi.factor){
-            ei = bws$zdati$all.ulev[[i]]
+            ei = levels(zdat[,i])
+          ei = factor(ei, levels = ei)
             xi.neval = length(ei)
           } else {
             xi.neval = neval
@@ -2554,7 +2556,8 @@ npplot.plbandwidth <-
         xi.factor = all.isFactor[plot.index]
         
         if (xi.factor){
-          ei = bws$xdati$all.ulev[[i]]
+          ei = levels(xdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
@@ -3123,7 +3126,7 @@ npplot.bandwidth <-
 
       maxneval = max(c(sapply(xdat,nlevels),neval))
 
-      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$ndim))
+      exdat = xdat[rep(1, maxneval), , drop = FALSE]
 
       for (i in 1:bws$ndim)
         exdat[,i] = ev[1,i]
@@ -3214,7 +3217,8 @@ npplot.bandwidth <-
         xi.factor = is.factor(xdat[,i])
 
         if (xi.factor){
-          ei = bws$xdati$all.ulev[[i]]
+          ei = levels(xdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
@@ -3630,7 +3634,7 @@ npplot.dbandwidth <-
 
       maxneval = max(c(sapply(xdat,nlevels),neval))
 
-      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$ndim))
+      exdat = xdat[rep(1, maxneval), , drop = FALSE]
 
       for (i in 1:bws$ndim)
         exdat[,i] = ev[1,i]
@@ -3714,7 +3718,8 @@ npplot.dbandwidth <-
         xi.factor = is.factor(xdat[,i])
 
         if (xi.factor){
-          ei = bws$xdati$all.ulev[[i]]
+          ei = levels(xdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
@@ -4223,7 +4228,7 @@ npplot.conbandwidth <-
 
       maxneval = max(c(sapply(xdat,nlevels), sapply(ydat,nlevels), neval))
 
-      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$xndim))
+      exdat = xdat[rep(1, maxneval), , drop = FALSE]
       eydat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$yndim))
 
       for (i in 1:bws$xndim)
@@ -4321,7 +4326,8 @@ npplot.conbandwidth <-
         xi.factor = all.isFactor[plot.index]
         
         if (xi.factor){
-          ei = bws$xdati$all.ulev[[i]]
+          ei = levels(xdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
@@ -5002,7 +5008,7 @@ npplot.condbandwidth <-
 
       maxneval = max(c(sapply(xdat,nlevels), sapply(ydat,nlevels), neval))
 
-      exdat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$xndim))
+      exdat = xdat[rep(1, maxneval), , drop = FALSE]
       eydat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$yndim))
 
       for (i in 1:bws$xndim)
@@ -5100,7 +5106,8 @@ npplot.condbandwidth <-
         xi.factor = all.isFactor[plot.index]
         
         if (xi.factor){
-          ei = bws$xdati$all.ulev[[i]]
+          ei = levels(xdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
