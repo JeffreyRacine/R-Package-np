@@ -170,10 +170,10 @@ npscoefbw(\dots)
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
     c[j]*sigma[j]*n^(-1/(2*P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
     adaptive measure of spread of continuous variable \eqn{j} defined as
-    min(standard deviation, mean absolute deviation/1.4826,
-    interquartile range/1.349), \eqn{n} the number of observations,
-    \eqn{P}{P} the order of the kernel, and \eqn{l}{l} the number of
-    continuous variables. For discrete data types, \eqn{c_j}{c[j]} and
+    min(standard deviation, mean absolute deviation, interquartile
+    range/1.349), \eqn{n} the number of observations, \eqn{P}{P} the
+    order of the kernel, and \eqn{l}{l} the number of continuous
+    variables. For discrete data types, \eqn{c_j}{c[j]} and
     \eqn{h_j}{h[j]} are related by the formula \eqn{h_j =
     c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))}, where here
     \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.  Defaults to
@@ -441,53 +441,25 @@ npscoefbw(\dots)
 \seealso{
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA):
+set.seed(42)
 
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
-
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
-
-n <- 500
-
+n <- 100
 x <- runif(n)
 z <- runif(n, min=-2, max=2)
 y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
-mydat <- data.frame(x,y,z)
-rm(x,y,z)
-
-mpi.bcast.Robj2slave(mydat)
-
-## A smooth coefficient model example
-
-mpi.bcast.cmd(bw <- npscoefbw(y~x|z,data=mydat),
-              caller.execute=TRUE)
-
+bw <- npscoefbw(formula=y~x|z)
 summary(bw)
 
-mpi.bcast.cmd(model <- npscoef(bws=bw, gradients=TRUE),
-              caller.execute=TRUE)
+# EXAMPLE 1 (INTERFACE=DATA FRAME): 
 
-summary(model)
-
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
-
-mpi.close.Rslaves()
-
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
-
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest     
+n <- 100
+x <- runif(n)
+z <- runif(n, min=-2, max=2)
+y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
+bw <- npscoefbw(xdat=x, ydat=y, zdat=z)
+summary(bw)
+} % enddontrun
 }
 \keyword{nonparametric}

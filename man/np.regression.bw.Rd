@@ -165,22 +165,22 @@ npregbw(\dots)
   }
 
   \item{bwscaling}{ a logical value that when set to \code{TRUE} the
-    supplied bandwidths are interpreted as `scale factors'
+    supplied bandwidths are interpreted as \sQuote{scale factors}
     (\eqn{c_j}{c[j]}), otherwise when the value is \code{FALSE} they are
-    interpreted as `raw bandwidths' (\eqn{h_j}{h[j]} for continuous data
-    types, \eqn{\lambda_j}{lambda[j]} for discrete data types). For
-    continuous data types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are
-    related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
-    c[j]*sigma[j]*n^(-1/(2*P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
-    adaptive measure of spread of continuous variable \eqn{j} defined as
-    min(standard deviation, mean absolute deviation/1.4826,
-    interquartile range/1.349), \eqn{n} the number of observations,
-    \eqn{P}{P} the order of the kernel, and \eqn{l}{l} the number of
-    continuous variables. For discrete data types, \eqn{c_j}{c[j]} and
-    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j =
-    c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))}, where here
-    \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.  Defaults to
-    \code{FALSE}.  }
+    interpreted as \sQuote{raw bandwidths} (\eqn{h_j}{h[j]} for
+    continuous data types, \eqn{\lambda_j}{lambda[j]} for discrete data
+    types). For continuous data types, \eqn{c_j}{c[j]} and
+    \eqn{h_j}{h[j]} are related by the formula \eqn{h_j = c_j \sigma_j
+    n^{-1/(2P+l)}}{h[j] = c[j]*sigma[j]*n^(-1/(2*P+l))}, where
+    \eqn{\sigma_j}{sigma[j]} is an adaptive measure of spread of
+    continuous variable \eqn{j} defined as min(standard deviation, mean
+    absolute deviation/1.4826, interquartile range/1.349), \eqn{n} the
+    number of observations, \eqn{P}{P} the order of the kernel, and
+    \eqn{l}{l} the number of continuous variables. For discrete data
+    types, \eqn{c_j}{c[j]} and \eqn{h_j}{h[j]} are related by the
+    formula \eqn{h_j = c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))},
+    where here \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.
+    Defaults to \code{FALSE}.  }
 
   \item{bwtype}{
     character string used for the continuous variable bandwidth type,
@@ -293,11 +293,10 @@ npregbw(\dots)
 
 }
 \details{
-
-  \code{npregbw} implements a variety of methods for choosing bandwidths
-  for multivariate (\eqn{p}-variate) regression data defined over a set
-  of possibly continuous and/or discrete (unordered, ordered) data. The
-  approach is based on Li and Racine (2003) who employ
+  \code{npregbw} implements a variety of methods for choosing
+  bandwidths for multivariate (\eqn{p}-variate) regression data defined
+  over a set of possibly continuous and/or discrete (unordered, ordered)
+  data. The approach is based on Li and Racine (2003) who employ
   \sQuote{generalized product kernels} that admit a mix of continuous
   and discrete data types.
 
@@ -310,15 +309,16 @@ npregbw(\dots)
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
-  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating
-  the density at the point \eqn{x}. Generalized nearest-neighbor
-  bandwidths change with the point at which the density is estimated,
-  \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
+  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating the
+  density at the point \eqn{x}. Generalized nearest-neighbor bandwidths change
+  with the point at which the density is estimated, \eqn{x}. Fixed bandwidths
+  are constant over the support of \eqn{x}.
 
   \code{npregbw} may be invoked \emph{either} with a formula-like
-  symbolic description of variables on which bandwidth selection is to
-  be performed \emph{or} through a simpler interface whereby data is
-  passed directly to the function via the \code{xdat} and \code{ydat}
+  symbolic 
+  description of variables on which bandwidth selection is to be
+  performed \emph{or} through a simpler interface whereby data is passed
+  directly to the function via the \code{xdat} and \code{ydat}
   parameters. Use of these two interfaces is \bold{mutually exclusive}.
 
   Data contained in the data frame \code{xdat} may be a mix of
@@ -331,14 +331,15 @@ npregbw(\dots)
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data
-  ~ explanatory data}, where \code{dependent data} is a univariate
-  response, and \code{explanatory data} is a series of variables
-  specified by name, separated by the separation character '+'. For
-  example, \code{ y1 ~ x1 + x2 } specifies that the bandwidths for the
-  regression of response \code{y1} and nonparametric regressors
-  \code{x1} and \code{x2} are to be estimated.  See below for further
-  examples.
-
+    ~ explanatory data},
+  where \code{dependent data} is a univariate response, and
+  \code{explanatory data} is a
+  series of variables specified by name, separated by 
+  the separation character '+'. For example, \code{ y1 ~ x1 + x2 }
+  specifies that the bandwidths for the regression of response \code{y1}
+  and 
+  nonparametric regressors \code{x1} and \code{x2} are to be estimated.
+  See below for further examples. 
 
   A variety of kernels may be specified by the user. Kernels implemented
   for continuous data types include the second, fourth, sixth, and eighth
@@ -346,6 +347,14 @@ npregbw(\dots)
   kernel. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  The use of compactly supported kernels or the occurrence of small
+  bandwidths during cross-validation can lead to numerical problems for
+  the local linear estimator when computing the locally weighted least
+  squares solution. To overcome this problem we rely on a form or
+  \sQuote{ridging} proposed by Cheng, Hall, and Titterington (1997),
+  modified so that we solve the problem pointwise rather than globally
+  (i.e. only when it is needed).
 
   The optimizer invoked for search is Powell's conjugate direction
   method which requires the setting of (non-random) initial values and
@@ -363,7 +372,9 @@ npregbw(\dots)
   modifying \code{nmulti}). Further refinement for difficult cases can
   be achieved by modifying these sets of parameters. However, these
   parameters are intended more for the authors of the package to enable
-  \sQuote{tuning} for various methods rather than for the user themselves.
+  \sQuote{tuning} for various methods rather than for the user
+  themselves.
+
 }
 \value{
   \code{npregbw} returns a \code{rbandwidth} object, with the
@@ -389,6 +400,10 @@ npregbw(\dots)
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
+
+  Cheng, M.-Y. and P. Hall and D.M. Titterington (1997), \dQuote{On the
+  shrinkage of local linear curve estimators,} Statistics and Computing,
+  7, 11-17.
 
   Hall, P. and Q. Li and J.S. Racine (2007), \dQuote{Nonparametric
   estimation of regression functions in the presence of irrelevant
@@ -454,51 +469,94 @@ npregbw(\dots)
   \code{\link{npreg}}
 }
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
+# Bivariate nonparametric regression estimate for Giovanni Baiocchi's
+# Italian income panel (see Italy for details)
 
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+data("Italy")
+attach(Italy)
 
-set.seed(42)
+# Compute the least-squares cross-validated bandwidths for the local
+# constant estimator (default)
 
-n <- 250
-
-x <- runif(n)
-z1 <- rbinom(n,1,.5)
-z2 <- rbinom(n,1,.5)
-y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
-z1 <- factor(z1)
-z2 <- factor(z2)
-mydat <- data.frame(y,x,z1,z2)
-rm(x,y,z1,z2)
-
-mpi.bcast.Robj2slave(mydat)
-
-mpi.bcast.cmd(bw <- npregbw(y~x+z1+z2,
-                            regtype="lc",
-                            bwmethod="cv.ls",
-                            data=mydat),
-              caller.execute=TRUE)
+bw <- npregbw(formula=gdp~ordered(year))
 
 summary(bw)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Sleep for 5 seconds so that we can examine the output...
 
-mpi.close.Rslaves()
+Sys.sleep(5)
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+# Supply your own bandwidth...
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest     
+bw <- npregbw(formula=gdp~ordered(year), bws=c(0.75),
+              bandwidth.compute=FALSE)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Treat year as continuous and supply your own scaling factor c in
+# c sigma n^{-1/(2p+q)}
+
+bw <- npregbw(formula=gdp~year, bws=c(1.06),
+              bandwidth.compute=FALSE, 
+              bwscaling=TRUE)
+
+summary(bw)
+
+# Note - see also the example for npudensbw() for more extensive
+# multiple illustrations of how to change the kernel function, kernel
+# order, bandwidth type and so forth.
+
+detach(Italy)
+
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
+# Bivariate nonparametric regression estimate for Giovanni Baiocchi's
+# Italian income panel (see Italy for details)
+
+data("Italy")
+attach(Italy)
+
+# Compute the least-squares cross-validated bandwidths for the local
+# constant estimator (default)
+
+bw <- npregbw(xdat=ordered(year), ydat=gdp)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Supply your own bandwidth...
+
+bw <- npregbw(xdat=ordered(year), ydat=gdp, bws=c(0.75),
+              bandwidth.compute=FALSE)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Treat year as continuous and supply your own scaling factor c in
+# c sigma n^{-1/(2p+q)}
+
+bw <- npregbw(xdat=year, ydat=gdp, bws=c(1.06),
+              bandwidth.compute=FALSE, 
+              bwscaling=TRUE)
+
+summary(bw)
+
+# Note - see also the example for npudensbw() for more extensive
+# multiple illustrations of how to change the kernel function, kernel
+# order, bandwidth type and so forth.
+
+detach(Italy)
+} % enddontrun
 }
 \keyword{nonparametric}

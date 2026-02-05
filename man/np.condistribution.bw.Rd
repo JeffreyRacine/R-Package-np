@@ -160,15 +160,15 @@ npcdistbw(\dots)
   \item{bws}{
     a bandwidth specification. This can be set as a \code{condbandwidth}
     object returned from a previous invocation, or as a \eqn{p+q}-vector
-    of bandwidths, with each element \eqn{i} up to \eqn{i=p}
-    corresponding to the bandwidth for column \eqn{i} in \code{xdat}, 
-    and each element \eqn{i} from \eqn{i=p+1} to \eqn{i=p+q} corresponding to the
-    bandwidth for column \eqn{i-p} in \code{ydat}. In either case, the
-    bandwidth supplied will serve as a starting point in the numerical
-    search for optimal bandwidths. If specified as a vector, then
-    additional arguments will need to be supplied as necessary to
-    specify the bandwidth type, kernel types, selection methods, and so
-    on. This can be left unset.
+    of bandwidths, with each element \eqn{i} up to \eqn{i=q}
+    corresponding to the bandwidth for column \eqn{i} in \code{ydat},
+    and each element \eqn{i} from \eqn{i=q+1} to \eqn{i=p+q}
+    corresponding to the bandwidth for column \eqn{i-q} in
+    \code{xdat}. In either case, the bandwidth supplied will serve as a
+    starting point in the numerical search for optimal bandwidths. If
+    specified as a vector, then additional arguments will need to be
+    supplied as necessary to specify the bandwidth type, kernel types,
+    selection methods, and so on. This can be left unset.
   }
 
   \item{\dots}{
@@ -200,10 +200,10 @@ npcdistbw(\dots)
     related by the formula \eqn{h_j = c_j \sigma_j n^{-1/(2P+l)}}{h[j] =
     c[j]*sigma[j]*n^(-1/(2*P+l))}, where \eqn{\sigma_j}{sigma[j]} is an
     adaptive measure of spread of continuous variable \eqn{j} defined as
-    min(standard deviation, mean absolute deviation/1.4826,
-    interquartile range/1.349), \eqn{n} the number of observations,
-    \eqn{P}{P} the order of the kernel, and \eqn{l}{l} the number of
-    continuous variables. For discrete data types, \eqn{c_j}{c[j]} and
+    min(standard deviation, mean absolute deviation/1.4826, interquartile
+    range/1.349), \eqn{n} the number of observations, \eqn{P}{P} the
+    order of the kernel, and \eqn{l}{l} the number of continuous
+    variables. For discrete data types, \eqn{c_j}{c[j]} and
     \eqn{h_j}{h[j]} are related by the formula \eqn{h_j =
     c_jn^{-2/(2P+l)}}{h[j] = c[j]*n^(-2/(2*P+l))}, where here
     \eqn{j}{[j]} denotes discrete variable \eqn{j}{j}.  Defaults to
@@ -373,15 +373,15 @@ npcdistbw(\dots)
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
   each sample realization in the set, \eqn{x_i}{x[i]}, when estimating
-  the cumulative distribution at the point \eqn{x}. Generalized
-  nearest-neighbor bandwidths change with the point at which the
-  cumulative distribution is estimated, \eqn{x}. Fixed bandwidths are
-  constant over the support of \eqn{x}.
+  the cumulative distribution at the point \eqn{x}. Generalized nearest-neighbor
+  bandwidths change with the point at which the cumulative distribution is estimated,
+  \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
   \code{npcdistbw} may be invoked \emph{either} with a formula-like
-  symbolic description of variables on which bandwidth selection is to
-  be performed \emph{or} through a simpler interface whereby data is
-  passed directly to the function via the \code{xdat} and \code{ydat}
+  symbolic 
+  description of variables on which bandwidth selection is to be
+  performed \emph{or} through a simpler interface whereby data is passed
+  directly to the function via the \code{xdat} and \code{ydat}
   parameters. Use of these two interfaces is \bold{mutually exclusive}.
 
   Data contained in the data frame \code{xdat} may be a mix of
@@ -528,38 +528,51 @@ npcdistbw(\dots)
 }
 
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
-
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
 
 data("Italy")
+attach(Italy)
 
-mpi.bcast.Robj2slave(Italy)
+bw <- npcdistbw(formula=gdp~ordered(year))
 
-mpi.bcast.cmd(bw <- npcdistbw(formula=gdp~ordered(year),
-                              data=Italy),
-              caller.execute=TRUE)
+# The object bw can be used for further estimation using
+# npcdist(), plotting using plot() etc. Entering the name of
+# the object provides useful summary information, and names() will also
+# provide useful information.
 
 summary(bw)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Note - see the example for npudensbw() for multiple illustrations
+# of how to change the kernel function, kernel order, and so forth.
 
-mpi.close.Rslaves()
+detach(Italy)
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute the
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest
+data("Italy")
+attach(Italy)
+
+bw <- npcdistbw(xdat=ordered(year), ydat=gdp)
+
+# The object bw can be used for further estimation using npcdist(),
+# plotting using plot() etc. Entering the name of the object provides
+# useful summary information, and names() will also provide useful
+# information.
+
+summary(bw)
+
+# Note - see the example for npudensbw() for multiple illustrations
+# of how to change the kernel function, kernel order, and so forth.
+
+detach(Italy)
+} % enddontrun
 }
 \keyword{nonparametric}
+

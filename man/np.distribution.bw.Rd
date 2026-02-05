@@ -302,13 +302,13 @@ npudistbw(\dots)
     kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
     Details}
 
-    \item{memfac}{
+  \item{memfac}{
     The algorithm to compute the least-squares objective function uses
     a block-based algorithm to eliminate or minimize redundant kernel
     evaluations. Due to memory, hardware and software constraints, a
     maximum block size must be imposed by the algorithm. This block size
     is roughly equal to memfac*10^5 elements. Empirical tests on
-    modern hardware find that a memfac of around 500 performs well. If
+    modern hardware find that a memfac of 500 performs well. If
     you experience out of memory errors, or strange behaviour for
     large data sets (>100k elements) setting memfac to a lower value may
     fix the problem.
@@ -395,7 +395,8 @@ npudistbw(\dots)
   modifying \code{nmulti}). Further refinement for difficult cases can
   be achieved by modifying these sets of parameters. However, these
   parameters are intended more for the authors of the package to enable
-  \sQuote{tuning} for various methods rather than for the user themselves.
+  \sQuote{tuning} for various methods rather than for the user them
+  self.
 
 }
 \value{
@@ -498,38 +499,215 @@ npudistbw(\dots)
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}},  \code{\link{hist}},
   \code{\link{npudist}}, \code{\link{npudist}} }
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
-
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
+# Baiocchi's Italian GDP panel (see Italy for details), then create a
+# data frame in which year is an ordered factor, GDP is continuous.
 
 data("Italy")
+attach(Italy)
 
-mpi.bcast.Robj2slave(Italy)
+data <- data.frame(ordered(year), gdp)
 
-mpi.bcast.cmd(bw <- npudistbw(formula=~ordered(year)+gdp,
-                              data=Italy),
-              caller.execute=TRUE)
+# We compute bandwidths for the kernel cumulative distribution estimator
+# using the normal-reference rule-of-thumb. Otherwise, we use the
+# defaults (second order Gaussian kernel, fixed bandwidths). Note that
+# the bandwidth object you compute inherits all properties of the
+# estimator (kernel type, kernel order, estimation method) and can be
+# fed directly into the plotting utility plot() or into the npudist()
+# function.
+
+bw <- npudistbw(formula=~ordered(year)+gdp, bwmethod="normal-reference")
 
 summary(bw)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Sleep for 5 seconds so that we can examine the output...
 
-mpi.close.Rslaves()
+Sys.sleep(5)
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+# Next, specify a value for the bandwidths manually (0.5 for the first
+# variable, 1.0 for the second)...
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0.5, 1.0),
+                bandwidth.compute=FALSE)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Next, if you wanted to use the 1.587 sigma n^{-1/(2p+q)} rule-of-thumb
+# for the bandwidth for the continuous variable and, say, no smoothing
+# for the discrete variable, you would use the bwscaling=TRUE argument
+# and feed in the values 0 for the first variable (year) and 1.587 for
+# the second (gdp). Note that in the printout it reports the `scale
+# factors' rather than the `bandwidth' as reported in some of the
+# previous examples.
+
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0, 1.587),
+                bwscaling=TRUE, 
+                bandwidth.compute=FALSE)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# If you wished to use, say, an eighth-order Epanechnikov kernel for the
+# continuous variables and specify your own bandwidths, you could do
+# that as follows.
+
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(0.5, 1.0),
+                bandwidth.compute=FALSE, 
+                ckertype="epanechnikov",
+                ckerorder=8)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# If you preferred, say, nearest-neighbor bandwidths and a generalized
+# kernel estimator for the continuous variable, you would use the
+# bwtype="generalized_nn" argument.
+
+bw <- npudistbw(formula=~ordered(year)+gdp, bwtype = "generalized_nn")
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Next, compute bandwidths using cross-validation, fixed bandwidths, and
+# a second-order Gaussian kernel for the continuous variable (default).
+# Note - this may take a few minutes depending on the speed of your
+# computer.
+
+bw <- npudistbw(formula=~ordered(year)+gdp)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Finally, if you wish to use initial values for numerical search, you
+# can either provide a vector of bandwidths as in bws=c(...) or a
+# bandwidth object from a previous run, as in
+
+bw <- npudistbw(formula=~ordered(year)+gdp, bws=c(1, 1))
+
+summary(bw)
+
+detach(Italy)
+
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
+# Baiocchi's Italian GDP panel (see Italy for details), then create a
+# data frame in which year is an ordered factor, GDP is continuous.
+
+data("Italy")
+attach(Italy)
+
+data <- data.frame(ordered(year), gdp)
+
+# We compute bandwidths for the kernel cumulative distribution estimator
+# using the normal-reference rule-of-thumb. Otherwise, we use the
+# defaults (second-order Gaussian kernel, fixed bandwidths). Note that
+# the bandwidth object you compute inherits all properties of the
+# estimator (kernel type, kernel order, estimation method) and can be
+# fed directly into the plotting utility plot() or into the npudist()
+# function.
+
+bw <- npudistbw(dat=data, bwmethod="normal-reference")
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Next, specify a value for the bandwidths manually (0.5 for the first
+# variable, 1.0 for the second)...
+
+bw <- npudistbw(dat=data, bws=c(0.5, 1.0), bandwidth.compute=FALSE)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Next, if you wanted to use the 1.587 sigma n^{-1/(2p+q)} rule-of-thumb
+# for the bandwidth for the continuous variable and, say, no smoothing
+# for the discrete variable, you would use the bwscaling=TRUE argument
+# and feed in the values 0 for the first variable (year) and 1.587 for
+# the second (gdp). Note that in the printout it reports the `scale
+# factors' rather than the `bandwidth' as reported in some of the
+# previous examples.
+
+bw <- npudistbw(dat=data, bws=c(0, 1.587),
+                bwscaling=TRUE, 
+                bandwidth.compute=FALSE)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# If you wished to use, say, an eighth-order Epanechnikov kernel for the
+# continuous variables and specify your own bandwidths, you could do
+# that as follows:
+
+bw <- npudistbw(dat=data, bws=c(0.5, 1.0),
+                bandwidth.compute=FALSE, 
+                ckertype="epanechnikov",
+                ckerorder=8)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# If you preferred, say, nearest-neighbor bandwidths and a generalized
+# kernel estimator for the continuous variable, you would use the
+# bwtype="generalized_nn" argument.
+
+bw <- npudistbw(dat=data, bwtype = "generalized_nn")
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Next, compute bandwidths using cross-validation, fixed bandwidths, and
+# a second order Gaussian kernel for the continuous variable (default).
+# Note - this may take a few minutes depending on the speed of your
+# computer.
+
+bw <- npudistbw(dat=data)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Finally, if you wish to use initial values for numerical search, you
+# can either provide a vector of bandwidths as in bws=c(...) or a
+# bandwidth object from a previous run, as in
+
+bw <- npudistbw(dat=data, bws=c(1, 1))
+
+summary(bw)
+
+detach(Italy)
+} % enddontrun
 }
 \keyword{nonparametric}

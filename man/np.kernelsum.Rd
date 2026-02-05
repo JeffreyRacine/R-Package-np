@@ -163,6 +163,7 @@ npksum(\dots)
     generalized product kernel weights. Defaults to \code{FALSE}. See
     details.
     }
+
 }
 \details{
   \code{npksum}
@@ -173,28 +174,28 @@ npksum(\dots)
   say, the least squares cross-validation function for kernel density
   estimation.
   
-  \code{npksum} uses highly-optimized C code that strives
-  to minimize its \sQuote{memory footprint}, while there is low overhead
-  involved when using repeated calls to this function (see, by way of
+  \code{npksum} uses highly-optimized C code that strives to minimize
+  its \sQuote{memory footprint}, while there is low overhead involved
+  when using repeated calls to this function (see, by way of
   illustration, the example below that conducts leave-one-out
   cross-validation for a local constant regression estimator via calls
   to the \code{R} function \code{\link{nlm}}, and compares this to the
   \code{\link{npregbw}} function).
 
-  \code{npksum} implements a variety
-  of methods for computing
-  multivariate kernel sums (\eqn{p}-variate) defined over a set of possibly
-  continuous and/or discrete (unordered, ordered) data. The approach is
-  based on Li and Racine (2003) who employ \sQuote{generalized product kernels}
-  that admit a mix of continuous and discrete data types.
+  \code{npksum} implements a variety of methods for computing
+  multivariate kernel sums (\eqn{p}-variate) defined over a set of
+  possibly continuous and/or discrete (unordered, ordered) data. The
+  approach is based on Li and Racine (2003) who employ
+  \sQuote{generalized product kernels} that admit a mix of continuous
+  and discrete data types.
 
   Three classes of kernel estimators for the continuous data types are
   available: fixed, adaptive nearest-neighbor, and generalized
   nearest-neighbor. Adaptive nearest-neighbor bandwidths change with
-  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating the
-  kernel sum at the point \eqn{x}. Generalized nearest-neighbor bandwidths change
-  with the point at which the sum is computed, \eqn{x}. Fixed bandwidths
-  are constant over the support of \eqn{x}.
+  each sample realization in the set, \eqn{x_i}{x[i]}, when estimating
+  the kernel sum at the point \eqn{x}. Generalized nearest-neighbor
+  bandwidths change with the point at which the sum is computed,
+  \eqn{x}. Fixed bandwidths are constant over the support of \eqn{x}.
 
   \code{npksum} computes \eqn{\sum_{j=1}^{n}{W_j^\prime Y_j
   K(X_j)}}{sum(t(W[j]) \%*\% Y[j] * K(X[j]))}, where \eqn{W_j}{W[j]}
@@ -211,26 +212,25 @@ npksum(\dots)
 
   Data contained in the data frame \code{txdat} (and also \code{exdat})
   may be a mix of continuous (default), unordered discrete (to be
-  specified in the data frame \code{txdat} using the \code{\link{factor}} command),
-  and ordered discrete (to be specified in the data frame \code{txdat}
-  using the \code{\link{ordered}} command). Data can be entered in an arbitrary
-  order and data types will be detected automatically by the routine
-  (see \code{\link{np}} for details).
+  specified in the data frame \code{txdat} using the
+  \code{\link{factor}} command), and ordered discrete (to be specified
+  in the data frame \code{txdat} using the \code{\link{ordered}}
+  command). Data can be entered in an arbitrary order and data types
+  will be detected automatically by the routine (see \code{\link{np}}
+  for details).
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data
-  ~ explanatory data},
-  where \code{dependent data} and \code{explanatory data} are both
-  series of variables specified by name, separated by 
-  the separation character '+'. For example, \code{ y1 ~ x1 + x2 }
-  specifies that \code{y1} is to be kernel-weighted by \code{x1} and 
-  \code{x2} throughout the sum. See below for further examples. 
+  ~ explanatory data}, where \code{dependent data} and \code{explanatory
+  data} are both series of variables specified by name, separated by the
+  separation character '+'. For example, \code{ y1 ~ x1 + x2 } specifies
+  that \code{y1} is to be kernel-weighted by \code{x1} and \code{x2}
+  throughout the sum. See below for further examples.
 
   A variety of kernels may be specified by the user. Kernels implemented
-  for continuous data types include the second, fourth, sixth, and eighth
-  order Gaussian and Epanechnikov kernels, and the uniform
+  for continuous data types include the second, fourth, sixth, and
+  eighth order Gaussian and Epanechnikov kernels, and the uniform
   kernel. Unordered discrete data types use a variation on Aitchison and
-
   Aitken's (1976) kernel, while ordered data types use a variation of
   the Wang and van Ryzin (1981) kernel (see \code{\link{np}} for
   details).
@@ -290,6 +290,8 @@ npksum(\dots)
 
   \item{eval}{ the evaluation points }
   \item{ksum}{ the sum at the evaluation points }
+  \item{kw}{ the kernel weights (when \code{return.kernel.weights=TRUE}
+  is specified)}
 }
 \references{
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{ Multivariate binary
@@ -328,44 +330,237 @@ npksum(\dots)
 }
 
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
-
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+\dontrun{
+# EXAMPLE 1: For this example, we generate 100,000 observations from a
+# N(0, 1) distribution, then evaluate the kernel density on a grid of 50
+# equally spaced points using the npksum() function, then compare
+# results with the (identical) npudens() function output
 
 n <- 100000
 x <- rnorm(n)
 x.eval <- seq(-4, 4, length=50)
 
-mpi.bcast.Robj2slave(x)
-mpi.bcast.Robj2slave(x.eval)
+# Compute the bandwidth with the normal-reference rule-of-thumb
 
-mpi.bcast.cmd(bw <- npudensbw(dat=x, bwmethod="normal-reference"),
-              caller.execute=TRUE)
+bw <- npudensbw(dat=x, bwmethod="normal-reference")
 
-mpi.bcast.cmd(den.ksum <- npksum(txdat=x, exdat=x.eval, bws=bw$bw,
-                   bandwidth.divide=TRUE)$ksum/n,
-              caller.execute=TRUE)
+# Compute the univariate kernel density estimate using the 100,000
+# training data points evaluated on the 50 evaluation data points, 
+# i.e., 1/nh times the sum of the kernel function evaluated at each of
+# the 50 points
 
-den.ksum
+den.ksum <- npksum(txdat=x, exdat=x.eval, bws=bw$bw)$ksum/(n*bw$bw[1])
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Note that, alternatively (easier perhaps), you could use the
+# bandwidth.divide=TRUE argument and drop the *bw$bw[1] term in the
+# denominator, as in
+# npksum(txdat=x, exdat=x.eval, bws=bw$bw, bandwidth.divide=TRUE)$ksum/n
 
-mpi.close.Rslaves()
+# Compute the density directly with the npudens() function...
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+den <- fitted(npudens(tdat=x, edat=x.eval, bws=bw$bw))
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest     
+# Plot the true DGP, the npksum()/(nh) estimate and (identical)
+# npudens() estimate
+
+plot(x.eval, dnorm(x.eval), xlab="X", ylab="Density", type="l")
+points(x.eval, den.ksum, col="blue")
+points(x.eval, den, col="red", cex=0.2)
+legend(1, .4, 
+       c("DGP", "npksum()", 
+       "npudens()"), 
+       col=c("black", "blue", "red"), 
+       lty=c(1, 1, 1))
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# EXAMPLE 2: For this example, we first obtain residuals from a
+# parametric regression model, then compute a vector of leave-one-out
+# kernel weighted sums of squared residuals where the kernel function is
+# raised to the power 2. Note that this returns a vector of kernel
+# weighted sums, one for each element of the error vector. Note also
+# that you can specify the bandwidth type, kernel function, kernel order
+# etc.
+
+data("cps71")
+attach(cps71)
+
+error <- residuals(lm(logwage~age+I(age^2)))
+
+bw <- npreg(error~age)
+
+ksum <- npksum(txdat=age, 
+               tydat=error^2, 
+               bws=bw$bw,
+               leave.one.out=TRUE, 
+               kernel.pow=2)
+
+ksum
+
+# Obviously, if we wanted the sum of these weighted kernel sums then, 
+# trivially, 
+
+sum(ksum$ksum)
+
+detach(cps71)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Note that weighted leave-one-out sums of squared residuals are used to
+# construct consistent model specification tests. In fact, the
+# npcmstest() routine in this package is constructed purely from calls
+# to npksum(). You can type npcmstest to see the npcmstest()
+# code and also examine some examples of the many uses of
+# npksum().
+
+# EXAMPLE 3: For this example, we conduct local-constant (i.e., 
+# Nadaraya-Watson) kernel regression. We shall use cross-validated
+# bandwidths using npregbw() by way of example. Note we extract
+# the kernel sum from npksum() via the `$ksum' argument in both
+# the numerator and denominator.
+
+data("cps71")
+attach(cps71)
+
+bw <- npregbw(xdat=age, ydat=logwage)
+
+fit.lc <- npksum(txdat=age, tydat=logwage, bws=bw$bw)$ksum/
+          npksum(txdat=age, bws=bw$bw)$ksum
+
+plot(age, logwage, xlab="Age", ylab="log(wage)")
+lines(age, fit.lc)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# If you wished to compute the kernel sum for a set of evaluation points, 
+# you first generate the set of points then feed this to npksum, 
+# e.g., for the set (20, 30, ..., 60) we would use
+
+age.seq <- seq(20, 60, 10)
+
+fit.lc <- npksum(txdat=age, exdat=age.seq, tydat=logwage, bws=bw$bw)$ksum/
+          npksum(txdat=age, exdat=age.seq, bws=bw$bw)$ksum
+
+# Note that now fit.lc contains the 5 values of the local constant
+# estimator corresponding to age.seq...
+
+fit.lc
+
+detach(cps71)
+
+# EXAMPLE 4: For this example, we conduct least-squares cross-validation
+# for the local-constant regression estimator. We first write an R
+# function `ss' that computes the leave-one-out sum of squares using the
+# npksum() function, and then feed this function, along with
+# random starting values for the bandwidth vector, to the nlm() routine
+# in R (nlm = Non-Linear Minimization). Finally, we compare results with
+# the function npregbw() that is written solely in C and calls
+# a tightly coupled C-level search routine.  Note that one could make
+# repeated calls to nlm() using different starting values for h (highly
+# recommended in general).
+
+# Increase the number of digits printed out by default in R and avoid
+# using scientific notation for this example (we wish to compare
+# objective function minima)
+
+options(scipen=100, digits=12)
+
+# Generate 100 observations from a simple DGP where one explanatory
+# variable is irrelevant.
+
+n <- 100
+
+x1 <- runif(n)
+x2 <- rnorm(n)
+x3 <- runif(n)
+
+txdat <- data.frame(x1, x2, x3)
+
+# Note - x3 is irrelevant
+
+tydat <- x1 + sin(x2) + rnorm(n)
+
+# Write an R function that returns the average leave-one-out sum of
+# squared residuals for the local constant estimator based upon
+# npksum(). This function accepts one argument and presumes that
+# txdat and tydat have been defined already.
+
+ss <- function(h) {
+
+# Test for valid (non-negative) bandwidths - return infinite penalty
+# when this occurs
+
+  if(min(h)<=0) {
+
+    return(.Machine$double.xmax)
+
+  } else {
+
+    mean <-  npksum(txdat, 
+                    tydat, 
+                    leave.one.out=TRUE, 
+                    bandwidth.divide=TRUE, 
+                    bws=h)$ksum/
+             npksum(txdat, 
+                    leave.one.out=TRUE, 
+                    bandwidth.divide=TRUE, 
+                    bws=h)$ksum
+  
+    return(sum((tydat-mean)^2)/length(tydat))
+
+  }
+
+}
+
+# Now pass this function to R's nlm() routine along with random starting
+# values and place results in `nlm.return'.
+
+nlm.return <- nlm(ss, runif(length(txdat)))
+
+bw <- npregbw(xdat=txdat, ydat=tydat)
+
+# Bandwidths from nlm()
+
+nlm.return$estimate
+
+# Bandwidths from npregbw()
+
+bw$bw
+
+# Function value (minimum) from nlm()
+
+nlm.return$minimum
+
+# Function value (minimum) from npregbw()
+
+bw$fval
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# EXAMPLE 5: For this example, we use npksum() to plot the kernel
+# function itself. Our `training data' is the singleton, 0, and our
+# evaluation data a grid in [-4,4], while we use a bandwidth of 1. By
+# way of example we plot a sixth order Gaussian kernel (note that this
+# kernel function can assume negative values)
+
+x <- 0
+x.eval <- seq(-4,4,length=500)
+
+kernel <- npksum(txdat=x,exdat=x.eval,bws=1,
+                 bandwidth.divide=TRUE,
+                 ckertype="gaussian",
+                 ckerorder=6)$ksum
+
+plot(x.eval,kernel,type="l",xlab="X",ylab="Kernel Function") 
+abline(0,0)
+} % enddontrun
 }
 \keyword{ nonparametric }

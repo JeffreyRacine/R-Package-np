@@ -8,9 +8,15 @@
 \title{Semiparametric Single Index Model Parameter and Bandwidth Selection}
 
 \description{
-  \code{npindexbw} computes a \code{npindexbw} bandwidth
-  specification using the model \eqn{Y = G(X\beta) + \epsilon}{Y = G(XB)
-    + epsilon}. The bandwidth object contains parameters for the single
+  \code{npindexbw} computes a \code{npindexbw} bandwidth specification
+  using the model \eqn{Y = G(X\beta) + \epsilon}{Y = G(XB) +
+  epsilon}. For continuous \eqn{Y}, the approach is that of Hardle, Hall
+  and Ichimura (1993) which jointly minimizes a least-squares
+  cross-validation function with respect to the parameters and
+  bandwidth. For binary \eqn{Y}, a likelihood-based cross-validation
+  approach is employed which jointly maximizes a likelihood
+  cross-validation function with respect to the parameters and
+  bandwidth. The bandwidth object contains parameters for the single
   index model and the (scalar) bandwidth for the index function.
 }
 
@@ -269,6 +275,10 @@ npindexbw(\dots)
   Aitchison, J. and C.G.G. Aitken (1976), \dQuote{Multivariate binary
     discrimination by the kernel method,} Biometrika, 63, 413-420.
 
+  Hardle, W. and P. Hall and H. Ichimura (1993), \dQuote{Optimal
+  Smoothing in Single-Index Models,} The Annals of Statistics, 21,
+  157-178.
+
   Ichimura, H., (1993), \dQuote{Semiparametric least squares (SLS) and
   weighted SLS estimation of single-index models,} Journal of
   Econometrics, 58, 71-120.
@@ -319,49 +329,100 @@ npindexbw(\dots)
   large datasets.  }
 
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): Generate a simple linear model then
+# compute coefficients and the bandwidth using Ichimura's nonlinear
+# least squares approach.
 
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+set.seed(12345)
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
-
-n <- 500
+n <- 100
 
 x1 <- runif(n, min=-1, max=1)
 x2 <- runif(n, min=-1, max=1)
+
 y <- x1 - x2 + rnorm(n)
-mydat <- data.frame(x1,x2,y)
-rm(y,x1,x2)
 
-mpi.bcast.Robj2slave(mydat)
+# Note - this may take a minute or two depending on the speed of your
+# computer. Note also that the first element of the vector beta is
+# normalized to one for identification purposes, and that X must contain
+# at least one continuous variable.
 
-## Ichimura, continuous y
-
-mpi.bcast.cmd(bw <- npindexbw(formula=y~x1+x2,
-                              data=mydat),
-              caller.execute=TRUE)
+bw <- npindexbw(formula=y~x1+x2, method="ichimura")
 
 summary(bw)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Sleep for 5 seconds so that we can examine the output...
 
-mpi.close.Rslaves()
+Sys.sleep(5)
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+# EXAMPLE 1 (INTERFACE=DATA FRAME): Generate a simple linear model then
+# compute coefficients and the bandwidth using Ichimura's nonlinear
+# least squares approach.
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest     
+set.seed(12345)
+
+n <- 100
+
+x1 <- runif(n, min=-1, max=1)
+x2 <- runif(n, min=-1, max=1)
+
+y <- x1 - x2 + rnorm(n)
+
+X <- cbind(x1, x2)
+
+# Note - this may take a minute or two depending on the speed of your
+# computer. Note also that the first element of the vector beta is
+# normalized to one for identification purposes, and that X must contain
+# at least one continuous variable.
+
+bw <- npindexbw(xdat=X, ydat=y, method="ichimura")
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# EXAMPLE 2 (INTERFACE=DATA FRAME): Generate a simple binary outcome
+# model then compute coefficients and the bandwidth using Klein and
+# Spady's likelihood-based approach.
+
+n <- 100
+
+x1 <- runif(n, min=-1, max=1)
+x2 <- runif(n, min=-1, max=1)
+
+y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
+
+# Note that the first element of the vector beta is normalized to one
+# for identification purposes, and that X must contain at least one
+# continuous variable.
+
+bw <- npindexbw(formula=y~x1+x2, method="kleinspady")
+
+summary(bw)
+
+# EXAMPLE 2 (INTERFACE=DATA FRAME): Generate a simple binary outcome
+# model then compute coefficients and the bandwidth using Klein and
+# Spady's likelihood-based approach.
+
+n <- 100
+
+x1 <- runif(n, min=-1, max=1)
+x2 <- runif(n, min=-1, max=1)
+
+y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
+
+X <- cbind(x1, x2)
+
+# Note that the first element of the vector beta is normalized to one
+# for identification purposes, and that X must contain at least one
+# continuous variable.
+
+bw <- npindexbw(xdat=X, ydat=y, method="kleinspady")
+
+summary(bw)
+} % enddontrun
 }
 \keyword{nonparametric}

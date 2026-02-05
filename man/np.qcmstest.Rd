@@ -1,5 +1,3 @@
-
-% $Id: np.qcmstest.Rd,v 1.41 2006/11/09 11:43:39 jracine Exp $
 \name{npqcmstest}
 \alias{npqcmstest}
 \title{ Kernel Consistent Quantile Regression Model Specification Test
@@ -185,52 +183,49 @@ npqcmstest(formula,
 }
 
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+\dontrun{
+# EXAMPLE 1: For this example, we conduct a consistent quantile regression
+# model specification test for a parametric wage quantile regression
+# model that is quadratic in age. The work of Murphy and Welch (1990)
+# would suggest that this parametric quantile regression model is
+# misspecified.
 
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+library("quantreg")
 
-mpi.bcast.cmd(library("quantreg"),
-              caller.execute=TRUE)
+data("cps71")
+attach(cps71)
 
-mpi.bcast.cmd(data("cps71"),
-              caller.execute=TRUE)
-mpi.bcast.cmd(attach(cps71),
-              caller.execute=TRUE)
+model <- rq(logwage~age+I(age^2), tau=0.5, model=TRUE)
 
-mpi.bcast.cmd(model <- rq(logwage~age+I(age^2), tau=0.5, model=TRUE),
-              caller.execute=TRUE)
+plot(age, logwage)
+lines(age, fitted(model))
 
-mpi.bcast.cmd(X <- data.frame(age),
-              caller.execute=TRUE)
+X <- data.frame(age)
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-mpi.bcast.cmd(output <- npqcmstest(model=model, xdat=X,
-                                   ydat=logwage, tau=0.5,
-                                   boot.num=99),
-              caller.execute=TRUE)
+npqcmstest(model = model, xdat = X, ydat = logwage, tau=0.5)
 
-summary(output)
+# Sleep for 5 seconds so that we can examine the output...
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+Sys.sleep(5)
 
-mpi.close.Rslaves()
+# Next try Murphy & Welch's (1990) suggested quintic specification.
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+model <- rq(logwage~age+I(age^2)+I(age^3)+I(age^4)+I(age^5), model=TRUE)
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest     
+plot(age, logwage)
+lines(age, fitted(model))
+
+X <- data.frame(age)
+
+# Note - this may take a few minutes depending on the speed of your
+# computer...
+
+npqcmstest(model = model, xdat = X, ydat = logwage, tau=0.5)
+
+detach(cps71)
+} % enddontrun
 }
 \keyword{ nonparametric }

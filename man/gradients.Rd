@@ -53,41 +53,12 @@ gradients(x, \dots)
   Tristen Hayfield \email{tristen.hayfield@gmail.com}, Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
-\section{Note}{ This method currently only supports objects from the
-  \code{\link{np}} library.  }
-
+\section{Note}{
+  This method currently only supports objects from the \code{\link{np}} library.
+}
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
-
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
-
 x <- runif(10)
 y <- x + rnorm(10, sd = 0.1)
-
-mpi.bcast.Robj2slave(x)
-mpi.bcast.Robj2slave(y)
-mpi.bcast.cmd(gradients(npreg(y~x, gradients=TRUE)),
-              caller.execute=TRUE)
-
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
-
-mpi.close.Rslaves()
-
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
-
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest  
+gradients(npreg(y~x, gradients=TRUE))
 }
-
 \keyword{nonparametric}

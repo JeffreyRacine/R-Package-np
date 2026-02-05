@@ -141,15 +141,15 @@ npcdensbw(\dots)
   \item{bws}{
     a bandwidth specification. This can be set as a \code{conbandwidth}
     object returned from a previous invocation, or as a \eqn{p+q}-vector
-    of bandwidths, with each element \eqn{i} up to \eqn{i=p}
-    corresponding to the bandwidth for column \eqn{i} in \code{xdat}, 
-    and each element \eqn{i} from \eqn{i=p+1} to \eqn{i=p+q} corresponding to the
-    bandwidth for column \eqn{i-p} in \code{ydat}. In either case, the
-    bandwidth supplied will serve as a starting point in the numerical
-    search for optimal bandwidths. If specified as a vector, then
-    additional arguments will need to be supplied as necessary to
-    specify the bandwidth type, kernel types, selection methods, and so
-    on. This can be left unset.
+    of bandwidths, with each element \eqn{i} up to \eqn{i=q}
+    corresponding to the bandwidth for column \eqn{i} in \code{ydat},
+    and each element \eqn{i} from \eqn{i=q+1} to \eqn{i=p+q}
+    corresponding to the bandwidth for column \eqn{i-q} in
+    \code{xdat}. In either case, the bandwidth supplied will serve as a
+    starting point in the numerical search for optimal bandwidths. If
+    specified as a vector, then additional arguments will need to be
+    supplied as necessary to specify the bandwidth type, kernel types,
+    selection methods, and so on. This can be left unset.
   }
 
   \item{\dots}{
@@ -330,6 +330,7 @@ npcdensbw(\dots)
 }
 
 \details{
+
   \code{npcdensbw} implements a variety of methods for choosing
   bandwidths for multivariate distributions (\eqn{p+q}-variate) defined
   over a set of possibly continuous and/or discrete (unordered, ordered)
@@ -490,39 +491,51 @@ npcdensbw(\dots)
 }
 
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
+# likelihood cross-validated bandwidths (default) using a second-order
+# Gaussian kernel (default). Note - this may take a minute or two
+# depending on the speed of your computer.
 
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+data("Italy")
+attach(Italy)
 
-mpi.bcast.cmd(data("Italy"),
-              caller.execute=TRUE)
-mpi.bcast.cmd(attach(Italy),
-              caller.execute=TRUE)
+bw <- npcdensbw(formula=gdp~ordered(year))
 
-mpi.bcast.cmd(bw <- npcdensbw(formula=gdp~ordered(year)),
-              caller.execute=TRUE)
+# The object bw can be used for further estimation using
+# npcdens(), plotting using plot() etc. Entering the name of
+# the object provides useful summary information, and names() will also
+# provide useful information.
 
 summary(bw)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Note - see the example for npudensbw() for multiple illustrations
+# of how to change the kernel function, kernel order, and so forth.
 
-mpi.close.Rslaves()
+detach(Italy)
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute the
+# likelihood cross-validated bandwidths (default) using a second-order
+# Gaussian kernel (default). Note - this may take a minute or two
+# depending on the speed of your computer.
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest     
+data("Italy")
+attach(Italy)
+
+bw <- npcdensbw(xdat=ordered(year), ydat=gdp)
+
+# The object bw can be used for further estimation using
+# npcdens(), plotting using plot() etc. Entering the name of
+# the object provides useful summary information, and names() will also
+# provide useful information.
+
+summary(bw)
+
+# Note - see the example for npudensbw() for multiple illustrations
+# of how to change the kernel function, kernel order, and so forth.
+
+detach(Italy)
+} % enddontrun
 }
 \keyword{nonparametric}
 

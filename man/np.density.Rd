@@ -193,42 +193,201 @@ npudens(bws, \dots)
 \seealso{ \code{\link{npudensbw}} , \code{\link{density}} }
 
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
+# Baiocchi's Italian GDP panel (see Italy for details), then create a
+# data frame in which year is an ordered factor, GDP is continuous,
+# compute bandwidths using likelihood cross-validation, then create a
+# grid of data on which the density will be evaluated for plotting
+# purposes.
 
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+data("Italy")
+attach(Italy)
 
-mpi.bcast.cmd(data("Italy"),
-              caller.execute=TRUE)
-mpi.bcast.cmd(attach(Italy),
-              caller.execute=TRUE)
+# Compute bandwidths using likelihood cross-validation (default).
 
-mpi.bcast.cmd(bw <- npudensbw(formula=~year+gdp),
-              caller.execute=TRUE)
+bw <- npudensbw(formula=~ordered(year)+gdp)
 
-mpi.bcast.cmd(fhat <- npudens(bws=bw),
-              caller.execute=TRUE)
+# At this stage you could use npudens() to do a variety of
+# things. Here we compute the npudens() object and place it in fhat.
+
+fhat <- npudens(bws=bw)
+
+# Note that simply typing the name of the object returns some useful
+# information. For more info, one can call summary: 
 
 summary(fhat)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Next, we illustrate how to create a grid of `evaluation data' and feed
+# it to the perspective plotting routines in R, among others.
 
-mpi.close.Rslaves()
+# Create an evaluation data matrix
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+year.seq <- sort(unique(year))
+gdp.seq <- seq(1,36,length=50)
+data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest
+# Generate the estimated density computed for the evaluation data
+
+fhat <- fitted(npudens(bws=bw, newdata=data.eval))
+
+# Coerce the data into a matrix for plotting with persp()
+
+f <- matrix(fhat, length(unique(year)), 50)
+
+# Next, create a 3D perspective plot of the PDF f, and a 2D
+# contour plot.
+
+persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
+      ticktype="detailed", ylab="GDP", xlab="Year", zlab="Density",
+      theta=300, phi=50)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+contour(as.integer(levels(year.seq)), 
+        gdp.seq, 
+        f, 
+        xlab="Year", 
+        ylab="GDP", 
+        main = "Density Contour Plot", 
+        col=topo.colors(100))
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Alternatively, you could use the plot() command (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows
+# systems).
+
+plot(bw)
+
+detach(Italy)
+
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
+# Baiocchi's Italian GDP panel (see Italy for details), then create a
+# data frame in which year is an ordered factor, GDP is continuous,
+# compute bandwidths using likelihood cross-validation, then create a
+# grid of data on which the density will be evaluated for plotting
+# purposes.
+
+data("Italy")
+attach(Italy)
+
+data <- data.frame(year=ordered(year), gdp)
+
+# Compute bandwidths using likelihood cross-validation (default).
+
+bw <- npudensbw(dat=data)
+
+# At this stage you could use npudens() to do a variety of
+# things. Here we compute the npudens() object and place it in fhat.
+
+fhat <- npudens(bws=bw)
+
+# Note that simply typing the name of the object returns some useful
+# information. For more info, one can call summary: 
+
+summary(fhat)
+
+# Next, we illustrate how to create a grid of `evaluation data' and feed
+# it to the perspective plotting routines in R, among others.
+
+# Create an evaluation data matrix
+
+year.seq <- sort(unique(year))
+gdp.seq <- seq(1,36,length=50)
+data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
+
+# Generate the estimated density computed for the evaluation data
+
+fhat <- fitted(npudens(edat = data.eval, bws=bw))
+
+# Coerce the data into a matrix for plotting with persp()
+
+f <- matrix(fhat, length(unique(year)), 50)
+
+# Next, create a 3D perspective plot of the PDF f, and a 2D
+# contour plot.
+
+persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
+      ticktype="detailed", ylab="GDP", xlab="Year", zlab="Density",
+      theta=300, phi=50)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+contour(as.integer(levels(year.seq)),
+        gdp.seq, 
+        f, 
+        xlab="Year", 
+        ylab="GDP", 
+        main = "Density Contour Plot", 
+        col=topo.colors(100))
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Alternatively, you could use the plot() command (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows
+# systems).
+
+plot(bw)
+
+detach(Italy)
+
+# EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
+# faithful geyser data and compute the density and distribution
+# functions.
+
+library("datasets")
+data("faithful")
+attach(faithful)
+
+# Note - this may take a few minutes depending on the speed of your
+# computer...
+
+bw <- npudensbw(formula=~eruptions+waiting)
+
+summary(bw)
+
+# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
+# <esc> will interrupt on MS Windows systems). Note that we use xtrim =
+# -0.2 to extend the plot outside the support of the data (i.e., extend
+# the tails of the estimate to meet the horizontal axis).
+
+plot(bw, xtrim=-0.2)
+
+detach(faithful)
+
+# EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
+# faithful geyser data and compute the density and distribution
+# functions.
+
+library("datasets")
+data("faithful")
+attach(faithful)
+
+# Note - this may take a few minutes depending on the speed of your
+# computer...
+
+bw <- npudensbw(dat=faithful)
+
+summary(bw)
+
+# Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
+# <esc> will interrupt on MS Windows systems). Note that we use xtrim =
+# -0.2 to extend the plot outside the support of the data (i.e., extend
+# the tails of the estimate to meet the horizontal axis).
+
+plot(bw, xtrim=-0.2)
+
+detach(faithful)
+} % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
 

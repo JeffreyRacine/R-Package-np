@@ -41,10 +41,10 @@ npcdist(bws, \dots)
     a bandwidth specification. This can be set as a \code{condbandwidth}
     object returned from a previous invocation of
     \code{\link{npcdistbw}}, or as a \eqn{p+q}-vector of bandwidths,
-    with each element \eqn{i} up to \eqn{i=p} corresponding to the
-    bandwidth for column \eqn{i} in \code{txdat}, and each element
-    \eqn{i} from \eqn{i=p+1} to \eqn{i=p+q} corresponding to the
-    bandwidth for column \eqn{i-p} in \code{tydat}. If specified as a
+    with each element \eqn{i} up to \eqn{i=q} corresponding to the
+    bandwidth for column \eqn{i} in \code{tydat}, and each element
+    \eqn{i} from \eqn{i=q+1} to \eqn{i=p+q} corresponding to the
+    bandwidth for column \eqn{i-q} in \code{txdat}. If specified as a
     vector, then additional arguments will need to be supplied as
     necessary to specify the bandwidth type, kernel types, training
     data, and so on.
@@ -217,41 +217,128 @@ npcdist(bws, \dots)
   \code{\link{npudens}}
 }
 \examples{
-\donttest{
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
-
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+\dontrun{
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
+# Baiocchi's Italian GDP panel (see Italy for details), and compute the
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
 
 data("Italy")
+attach(Italy)
 
-mpi.bcast.Robj2slave(Italy)
+# First, compute the bandwidths.
 
-mpi.bcast.cmd(bw <- npcdistbw(formula=gdp~ordered(year),
-                              data=Italy),
-              caller.execute=TRUE)
+bw <- npcdistbw(formula=gdp~ordered(year))
 
-mpi.bcast.cmd(F <- npcdist(bws=bw),
-              caller.execute=TRUE)
+# Next, compute the condistribution object...
 
-summary(F)
+Fhat <- npcdist(bws=bw)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# The object Fhat now contains results such as the estimated cumulative
+# conditional distribution function (Fhat$condist) and so on...
 
-mpi.close.Rslaves()
+summary(Fhat)
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+# Call the plot() function to visualize the results (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows
+# systems).
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddonttest
+plot(bw)
+
+detach(Italy)
+
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
+# Baiocchi's Italian GDP panel (see Italy for details), and compute the
+# cross-validated bandwidths (default) using a second-order Gaussian
+# kernel (default). Note - this may take a minute or two depending on
+# the speed of your computer.
+
+data("Italy")
+attach(Italy)
+
+# First, compute the bandwidths.
+
+# Note - we cast `X' and `y' as data frames so that plot() can
+# automatically grab names (this looks like overkill, but in
+# multivariate settings you would do this anyway, so may as well get in
+# the habit).
+
+X <- data.frame(year=ordered(year))
+y <- data.frame(gdp)
+
+bw <- npcdistbw(xdat=X, ydat=y)
+
+# Next, compute the condistribution object...
+
+Fhat <- npcdist(bws=bw)
+
+# The object Fhat now contains results such as the estimated cumulative
+# conditional distribution function (Fhat$condist) and so on...
+
+summary(Fhat)
+
+# Call the plot() function to visualize the results (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows systems).
+
+plot(bw)
+
+detach(Italy)
+
+# EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
+# faithful geyser data from the R `datasets' library and compute the
+# conditional distribution function.
+
+library("datasets")
+data("faithful")
+attach(faithful)
+
+# Note - this may take a few minutes depending on the speed of your
+# computer...
+
+bw <- npcdistbw(formula=eruptions~waiting)
+
+summary(bw)
+
+# Plot the conditional cumulative distribution function (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows
+# systems).
+
+plot(bw)
+
+detach(faithful)
+
+# EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
+# faithful geyser data from the R `datasets' library and compute the
+# cumulative conditional distribution function.
+
+library("datasets")
+data("faithful")
+attach(faithful)
+
+# Note - this may take a few minutes depending on the speed of your
+# computer...
+
+# Note - we cast `X' and `y' as data frames so that plot() can
+# automatically grab names (this looks like overkill, but in
+# multivariate settings you would do this anyway, so may as well get in
+# the habit).
+
+X <- data.frame(waiting)
+y <- data.frame(eruptions)
+
+bw <- npcdistbw(xdat=X, ydat=y)
+
+summary(bw)
+
+# Plot the conditional cumulative distribution function (<ctrl>-C will
+# interrupt on *NIX systems, <esc> will interrupt on MS Windows systems)
+
+plot(bw)
+
+detach(faithful)
+
+} % enddontrun
 }
 \keyword{nonparametric}
+
