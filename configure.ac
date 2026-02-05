@@ -1,6 +1,7 @@
 dnl Process this file with autoconf to produce a configure script.
 
-AC_INIT(DESCRIPTION)
+AC_INIT
+AC_CONFIG_SRCDIR([DESCRIPTION])
 
 ## One way is to specify both include and lib paths
 AC_ARG_WITH([Rmpi-include],
@@ -80,8 +81,26 @@ CC="gcc -std=gnu99"
 fi
 
 if test -z "$MPI_ROOT" ; then
-  for d in /opt/lib /usr/lib /usr /usr/local/lib /usr/local \
-          /usr/lib64/mpi/gcc/openmpi; do
+	# Use pkg-config to find OpenMPI if available
+	AC_PATH_PROG([PKG_CONFIG], [pkg-config])
+
+	if test -n "${PKG_CONFIG}"; then
+		AC_MSG_CHECKING([if pkg-config knows about OpenMPI])
+		if "${PKG_CONFIG}" --exists ompi; then
+			AC_MSG_RESULT([yes])
+			MPITYPE="OPENMPI"
+			MPI_ROOT="NONEED"
+			OMPI_INCLUDE_PATH=`"${PKG_CONFIG}" --cflags ompi`
+			OMPI_LIBS=`"${PKG_CONFIG}" --libs ompi`
+		else
+			AC_MSG_RESULT([no])
+		fi
+	fi
+fi
+
+if test -z "$MPI_ROOT" ; then
+  for d in /opt/lib /usr/lib /usr /usr/lib/x86_64-linux-gnu/openmpi \
+          /usr/local/lib /usr/local /usr/lib64/mpi/gcc/openmpi; do
     if test -f $d/include/mpi.h && test -d $d/lib/openmpi; then
       echo "I am here $d and it is OpenMPI"
       MPI_ROOT=$d
@@ -148,7 +167,8 @@ if test -z "$MPI_ROOT" ; then
   done
 fi
 
-if test -n "$MPI_ROOT"; then
+if test "$MPI_ROOT" != "NONEED"; then
+	if test -n "$MPI_ROOT"; then
 	#guess MPITYPE if it is unknown and user supplies MPI_ROOT
 	if test $MPITYPE = "UNKNOWN" ; then
 		if test -d ${MPI_ROOT}/openmpi; then
@@ -184,9 +204,9 @@ if test -n "$MPI_ROOT"; then
          echo "Please use --with-mpi=/path/to/mpi or specify the environment variable MPI_ROOT"
          exit 1
     fi
-else
-    AC_CHECK_HEADER(mpi.h,, AC_MSG_ERROR(["Cannot find mpi.h header file"]))
-fi 
+	else
+    	AC_CHECK_HEADER(mpi.h,, AC_MSG_ERROR(["Cannot find mpi.h header file"]))
+	fi 
 
 echo "Trying to find libmpi.so or libmpich.a ..."
 if test -f ${MPI_ROOT}/lib/libmpi.so; then
@@ -223,17 +243,21 @@ elif test -f ${MPI_ROOT}/lib64/libmpich.a; then
         MPI_LIBPATH="${MPI_ROOT}/lib64"
 	AC_CHECK_DECLS([MPICH2, MPICH2],[  MPI_DEFS="-DMPI2" ],, 
 		[#include <mpi.h>])
-else
-    AC_CHECK_LIB(mpi, main, MPI_LIBPATH="${MPI_ROOT}/lib",
-    	[   echo "libmpi not found. exiting..."
-        	exit 1  ]
-)
+	else
+    	AC_CHECK_LIB(mpi, main, MPI_LIBPATH="${MPI_ROOT}/lib",
+    		[   echo "libmpi not found. exiting..."
+        		exit 1  ]
+		)
+	fi
 fi
 
 if test "$MPITYPE" = "OPENMPI" ; then
    AC_CHECK_PROG(ORTED, orted, yes, no)
+   AC_CHECK_PROG(PRTED, prted, yes, no)
    if test "$ORTED" = no ; then
-       AC_MSG_ERROR(Cannot find orted. Rmpi needs orted to run.)
+	if test "$PRTED" = no ; then
+       	AC_MSG_ERROR(Cannot find orted or prted. Rmpi needs orted or prted to run.)
+   	fi
    fi
 fi
 
@@ -266,11 +290,19 @@ if test "$MPITYPE" = "OPENMPI" -o "$MPITYPE" = "LAM" -o "$MPITYPE" = "MPICH" -o 
   MPI_DEFS="-DMPI2"
 fi
 
-PKG_CPPFLAGS="-I${MPI_INCLUDE_PATH} ${MPI_INCL2} ${MPI_DEFS} -D${MPITYPE}"
+if test "$MPI_ROOT" = "NONEED"; then
+	PKG_CPPFLAGS="${OMPI_INCLUDE_PATH} ${MPI_DEFS} -D${MPITYPE}"
+else
+	PKG_CPPFLAGS="-I${MPI_INCLUDE_PATH} ${MPI_INCL2} ${MPI_DEFS} -D${MPITYPE}"
+fi
 
 case "$MPITYPE" in
   OPENMPI)
-    PKG_LIBS="-L${MPI_LIBPATH} -lmpi ${MPI_LIBS}"
+    if test "$MPI_ROOT" = "NONEED"; then
+		PKG_LIBS="${OMPI_LIBS} ${MPI_LIBS}"
+	else
+		PKG_LIBS="-L${MPI_LIBPATH} -lmpi ${MPI_LIBS}"
+	fi
     ;;
   LAM)
     PKG_LIBS="-L${MPI_LIBPATH} -lmpi -llam ${MPI_LIBS}"
