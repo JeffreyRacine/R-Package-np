@@ -18,6 +18,11 @@
 #include "Rmpi.h"
 #include <R_ext/Memory.h>
 
+#ifndef Calloc
+#define Calloc(n, type) ((type *) R_Calloc((n), type))
+#define Free(x) R_Free(x)
+#endif
+
 #ifdef OPENMPI
 #include <dlfcn.h>
 #endif
