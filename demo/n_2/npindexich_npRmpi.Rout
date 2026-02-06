@@ -1,0 +1,114 @@
+
+R version 4.5.2 (2025-10-31) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21) + Rmpi 0.6-5
+[vignette("np_faq",package="npRmpi") provides answers to frequently asked questions]
+[vignette("npRmpi",package="npRmpi") an overview]
+[vignette("entropy_np",package="npRmpi") an overview of entropy-based methods]
+master (rank 0, comm 1) of size 2 is running on: M2Studio 
+slave1 (rank 1, comm 1) of size 2 is running on: M2Studio 
+> ## Make sure you have the .Rprofile file from npRmpi/inst/ in your
+> ## current directory or home directory. It is necessary.
+> 
+> ## To run this on systems with OPENMPI installed and working, try
+> ## mpirun -np 2 R CMD BATCH npindexich_npRmpi. Check the time in the
+> ## output file foo.Rout (the name of this file with extension .Rout),
+> ## then try with, say, 4 processors and compare run time.
+> 
+> ## Initialize master and slaves.
+> 
+> mpi.bcast.cmd(np.mpi.initialize(),
++               caller.execute=TRUE)
+> 
+> ## Turn off progress i/o as this clutters the output file (if you want
+> ## to see search progress you can comment out this command)
+> 
+> mpi.bcast.cmd(options(np.messages=FALSE),
++               caller.execute=TRUE)
+> 
+> ## Generate some data and broadcast it to all slaves (it will be known
+> ## to the master node so no need to broadcast it)
+> 
+> mpi.bcast.cmd(set.seed(42),
++               caller.execute=TRUE)
+> 
+> n <- 5000
+> 
+> x1 <- runif(n, min=-1, max=1)
+> x2 <- runif(n, min=-1, max=1)
+> y <- x1 - x2 + rnorm(n)
+> mydat <- data.frame(x1,x2,y)
+> rm(y,x1,x2)
+> 
+> mpi.bcast.Robj2slave(mydat)
+> 
+> ## A single index model example (Ichimura, continuous y)
+> 
+> t <- system.time(mpi.bcast.cmd(bw <- npindexbw(formula=y~x1+x2,
++                                                data=mydat),
++                                caller.execute=TRUE))
+> 
+> summary(bw)
+
+Single Index Model
+Regression data (5000 observations, 2 variable(s)):
+
+      x1         x2
+Beta:  1 -0.9692335
+Bandwidth:  0.1378902
+Optimisation Method:  Nelder-Mead
+Regression Type: Local-Constant
+Bandwidth Selection Method: Ichimura
+Formula: y ~ x1 + x2
+Bandwidth Type: Fixed
+Objective Function Value: 1.017243 (achieved on multistart 1)
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Explanatory Vars.: 1
+Estimation Time: 8.635 seconds
+
+> 
+> t <- t + system.time(mpi.bcast.cmd(model <- npindex(bws=bw,
++                                                     gradients=TRUE),
++                                    caller.execute=TRUE))
+> 
+> summary(model)
+
+Single Index Model
+Regression Data: 5000 training points, in 2 variable(s)
+
+      x1         x2
+Beta:  1 -0.9692335
+Bandwidth: 0.1378902
+Kernel Regression Estimator: Local-Constant
+
+Residual standard error: 1.006324
+R-squared: 0.3948122
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Explanatory Vars.: 1
+
+> 
+> cat("Elapsed time =", t[3], "\n")
+Elapsed time = 9.666 
+> 
+> ## Clean up properly then quit()
+> 
+> mpi.bcast.cmd(mpi.quit(),
++               caller.execute=TRUE)

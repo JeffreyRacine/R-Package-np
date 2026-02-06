@@ -1,0 +1,89 @@
+
+R version 4.5.2 (2025-10-31) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21) + Rmpi 0.6-5
+[vignette("np_faq",package="npRmpi") provides answers to frequently asked questions]
+[vignette("npRmpi",package="npRmpi") an overview]
+[vignette("entropy_np",package="npRmpi") an overview of entropy-based methods]
+master (rank 0, comm 1) of size 2 is running on: M2Studio 
+slave1 (rank 1, comm 1) of size 2 is running on: M2Studio 
+> ## Make sure you have the .Rprofile file from npRmpi/inst/ in your
+> ## current directory or home directory. It is necessary.
+> 
+> ## To run this on systems with OPENMPI installed and working, try
+> ## mpirun -np 2 R CMD BATCH npqreg_npRmpi. Check the time in the
+> ## output file foo.Rout (the name of this file with extension .Rout),
+> ## then try with, say, 4 processors and compare run time.
+> 
+> ## Initialize master and slaves.
+> 
+> mpi.bcast.cmd(np.mpi.initialize(),
++               caller.execute=TRUE)
+> 
+> ## Turn off progress i/o as this clutters the output file (if you want
+> ## to see search progress you can comment out this command)
+> 
+> mpi.bcast.cmd(options(np.messages=FALSE),
++              caller.execute=TRUE)
+> 
+> data("Italy")
+> n <- nrow(Italy)
+> mpi.bcast.Robj2slave(Italy)
+> 
+> ## A quantile regression example
+> 
+> t <- system.time(mpi.bcast.cmd(bw <- npcdistbw(gdp~ordered(year),data=Italy),
++                                caller.execute=TRUE))
+> 
+> summary(bw)
+
+Conditional distribution data (1008 observations, 2 variable(s))
+(1 dependent variable(s), and 1 explanatory variable(s))
+
+Bandwidth Selection Method: Least Squares Cross-Validation
+Formula: gdp ~ ordered(year)
+Bandwidth Type: Fixed
+Objective Function Value: 0.08860405 (achieved on multistart 2)
+
+Exp. Var. Name: ordered(year) Bandwidth: 0.6879268   Lambda Max: 1 
+
+Dep. Var. Name: gdp           Bandwidth: 0.3073675 Scale Factor: 0.1728525
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Dependent Vars.: 1
+
+Ordered Categorical Kernel Type: Li and Racine
+No. Ordered Categorical Explanatory Vars.: 1
+Estimation Time: 12.087 seconds
+
+> 
+> t <- t + system.time(mpi.bcast.cmd(model.q0.25 <- npqreg(bws=bw, tau=0.25),
++                                    caller.execute=TRUE))
+> t <- t + system.time(mpi.bcast.cmd(model.q0.50 <- npqreg(bws=bw, tau=0.50),
++                                    caller.execute=TRUE))
+> t <- t + system.time(mpi.bcast.cmd(model.q0.75 <- npqreg(bws=bw, tau=0.75),
++                                    caller.execute=TRUE))
+> 
+> cat("Elapsed time =", t[3], "\n")
+Elapsed time = 14.23 
+> 
+> ## Clean up properly then quit()
+> 
+> mpi.bcast.cmd(mpi.quit(),
++               caller.execute=TRUE)

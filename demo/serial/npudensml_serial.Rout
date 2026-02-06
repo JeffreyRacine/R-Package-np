@@ -1,0 +1,67 @@
+
+R version 4.5.2 (2025-10-31) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ## This is the serial version of npudensml_npRmpi.R for comparison
+> ## purposes (bandwidth ought to be identical, timing may
+> ## differ). Study the differences between this file and its MPI
+> ## counterpart for insight about your own problems.
+> 
+> library(np)
+Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21)
+[vignette("np_faq",package="np") provides answers to frequently asked questions]
+[vignette("np",package="np") an overview]
+[vignette("entropy_np",package="np") an overview of entropy-based methods]
+> options(np.messages=FALSE)
+> 
+> ## Generate some data
+> 
+> set.seed(42)
+> 
+> n <- 10000
+> 
+> mydat <- data.frame(x=rnorm(n))
+> 
+> ## A simple example with likelihood cross-validation
+> 
+> t <- system.time(bw <- npudensbw(~x,
++                                  bwmethod="cv.ml",
++                                  data=mydat))
+> 
+> summary(bw)
+
+Data (10000 observations, 1 variable(s)):
+
+Bandwidth Selection Method: Maximum Likelihood Cross-Validation
+Formula: ~x
+Bandwidth Type: Fixed
+Objective Function Value: -14268.84 (achieved on multistart 1)
+
+Var. Name: x Bandwidth: 0.2194471 Scale Factor: 1.381611
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Vars.: 1
+Estimation Time: 38.766 seconds
+
+> 
+> cat("Elapsed time =", t[3], "\n")
+Elapsed time = 39.007 
+> 
+> proc.time()
+   user  system elapsed 
+ 39.320   0.227  39.544 

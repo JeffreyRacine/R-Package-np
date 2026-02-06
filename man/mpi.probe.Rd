@@ -1,5 +1,5 @@
 \name{mpi.probe}
-\title{MPI\_Probe and MPI\_Iprobe APIs}
+\title{MPI_Probe and MPI_Iprobe APIs}
 \usage{
 mpi.probe(source, tag, comm = 1, status = 0)
 mpi.iprobe(source, tag, comm = 1, status = 0)

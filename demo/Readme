@@ -1,0 +1,23 @@
+March 19 2013
+
+Due to small sample sizes many of these demos do not show appreciable
+gains with respect to increasing the number of cores. Therefore,
+bumping up sample sizes substantially to take runs from 10-20 seconds
+to 50-100 seconds in the hopes that the larger sample sizes will show
+expected scaling benefits.
+
+Note - conmode, cmstest, and qreg use actual datasets so these are restricted
+unless we wish to go with fully simulated data.
+
+npcdensls only uses 1000 observations but is dog slow so want to stay
+with a sufficient number of observations
+
+May 13 2010
+
+added command line args to makefiles so on the mac
+
+make npconmode np=2
+
+and on sharcnet
+
+make -f makefile.sharcnet n=2

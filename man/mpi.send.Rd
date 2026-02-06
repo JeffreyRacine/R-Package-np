@@ -1,5 +1,5 @@
 \name{mpi.send}
-\title{MPI\_Send, MPI\_Isend, MPI\_Recv, and MPI\_Irecv APIs}
+\title{MPI_Send, MPI_Isend, MPI_Recv, and MPI_Irecv APIs}
 \alias{mpi.send}
 \alias{mpi.isend}
 \alias{mpi.recv}

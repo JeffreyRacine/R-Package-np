@@ -1,5 +1,5 @@
 \name{mpi.get.count}
-\title{MPI\_Get\_count API}
+\title{MPI_Get_count API}
 \usage{
 mpi.get.count(type, status = 0)
 }

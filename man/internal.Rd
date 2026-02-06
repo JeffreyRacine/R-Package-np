@@ -4,7 +4,7 @@
 \title{Internal functions}
 \description{ Internal functions used by other MPI functions.
 
-\code{mpi.comm.is.null} is used to test if a comm is MPI\_COMM\_NULL (empty 
+\code{mpi.comm.is.null} is used to test if a comm is MPI_COMM_NULL (empty 
 members).
 
 \code{string} create a string (empty space character) buffer.

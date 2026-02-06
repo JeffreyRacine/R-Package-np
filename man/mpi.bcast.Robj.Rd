@@ -1,5 +1,5 @@
 \name{mpi.bcast.Robj}
-\title{Extensions of MPI\_Bcast API}
+\title{Extensions of MPI_Bcast API}
 \alias{mpi.bcast.Robj}
 \alias{mpi.bcast.Robj2slave}
 \alias{mpi.bcast.Rfun2slave}

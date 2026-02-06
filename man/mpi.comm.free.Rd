@@ -1,5 +1,5 @@
 \name{mpi.comm.free}
-\title{MPI\_Comm\_free API}
+\title{MPI_Comm_free API}
 \usage{
   mpi.comm.free(comm=1)
 }
@@ -9,7 +9,7 @@
 }
 \description{
   \code{mpi.comm.free}  deallocates a communicator so it 
-  points to MPI\_COMM\_NULL.
+  points to MPI_COMM_NULL.
 }
 \details{
   When members associated with a communicator finish jobs or exit, they have to 

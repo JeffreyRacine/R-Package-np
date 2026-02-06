@@ -1,5 +1,5 @@
 \name{mpi.scatter.Robj}
-\title{Extensions of MPI\_ SCATTER and MPI\_SCATTERV }
+\title{Extensions of MPI_ SCATTER and MPI_SCATTERV }
 \alias{mpi.scatter.Robj}
 \alias{mpi.scatter.Robj2slave}
 \description{

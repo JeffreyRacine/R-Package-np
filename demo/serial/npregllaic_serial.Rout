@@ -1,0 +1,101 @@
+
+R version 4.5.2 (2025-10-31) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ## This is the serial version of npregllaic_npRmpi.R for comparison
+> ## purposes (bandwidth ought to be identical, timing may
+> ## differ). Study the differences between this file and its MPI
+> ## counterpart for insight about your own problems.
+> 
+> library(np)
+Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21)
+[vignette("np_faq",package="np") provides answers to frequently asked questions]
+[vignette("np",package="np") an overview]
+[vignette("entropy_np",package="np") an overview of entropy-based methods]
+> options(np.messages=FALSE)
+> 
+> set.seed(42)
+> 
+> n <- 5000
+> 
+> x <- runif(n)
+> z1 <- rbinom(n,1,.5)
+> z2 <- rbinom(n,1,.5)
+> y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
+> z1 <- factor(z1)
+> z2 <- factor(z2)
+> mydat <- data.frame(y,x,z1,z2)
+> rm(x,y,z1,z2)
+> 
+> ## A regression example (local linear, aic cross-validation)
+> 
+> t <- system.time(bw <- npregbw(y~x+z1+z2,
++                                regtype="ll",
++                                bwmethod="cv.aic",
++                                data=mydat))
+> 
+> summary(bw)
+
+Regression Data (5000 observations, 3 variable(s)):
+
+Regression Type: Local-Linear
+Bandwidth Selection Method: Expected Kullback-Leibler Cross-Validation
+Formula: y ~ x + z1 + z2
+Bandwidth Type: Fixed
+Objective Function Value: -1.743471 (achieved on multistart 1)
+
+Exp. Var. Name: x  Bandwidth: 0.02647916   Scale Factor: 0.4997103
+Exp. Var. Name: z1 Bandwidth: 0.0006043332   Lambda Max: 0.5      
+Exp. Var. Name: z2 Bandwidth: 0.4999999      Lambda Max: 0.5      
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Explanatory Vars.: 1
+
+Unordered Categorical Kernel Type: Aitchison and Aitken
+No. Unordered Categorical Explanatory Vars.: 2
+Estimation Time: 91.845 seconds
+
+> 
+> t <- t + system.time(model <- npreg(bws=bw,
++                                     data=mydat))
+> 
+> summary(model)
+
+Regression Data: 5000 training points, in 3 variable(s)
+                       x           z1        z2
+Bandwidth(s): 0.02647916 0.0006043332 0.4999999
+
+Kernel Regression Estimator: Local-Linear
+Bandwidth Type: Fixed
+Residual standard error: 0.2519402
+R-squared: 0.9223852
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Explanatory Vars.: 1
+
+Unordered Categorical Kernel Type: Aitchison and Aitken
+No. Unordered Categorical Explanatory Vars.: 2
+
+> 
+> cat("Elapsed time =", t[3], "\n")
+Elapsed time = 92.916 
+> 
+> 
+> proc.time()
+   user  system elapsed 
+ 92.987   0.507  93.512 

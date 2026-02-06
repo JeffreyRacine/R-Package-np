@@ -3,7 +3,7 @@
 \alias{mpi.info.free}
 \alias{mpi.info.get}
 \alias{mpi.info.set}
-\title{MPI\_Info\_create, MPI\_Info\_free, MPI\_Info\_get, MPI\_Info\_set APIs}
+\title{MPI_Info_create, MPI_Info_free, MPI_Info_get, MPI_Info_set APIs}
 \description{
 Many MPI APIs take an info argument for additional information passing. An info 
 is an object which consists of many (key,value) pairs. Rmpi uses an internal 
@@ -11,7 +11,7 @@ memory to store an info object.
 
 \code{mpi.info.create} creates a new info object.
 
-\code{mpi.info.free} frees an info object and sets it to MPI\_INFO\_NULL.
+\code{mpi.info.free} frees an info object and sets it to MPI_INFO_NULL.
 
 \code{mpi.info.get}  retrieves the value associated with key in an info.
 

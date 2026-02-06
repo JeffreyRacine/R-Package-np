@@ -1,5 +1,5 @@
 \name{mpi.gather}
-\title{MPI\_Gather, MPI\_Gatherv, MPI\_Allgather, and MPI\_Allgatherv APIs}
+\title{MPI_Gather, MPI_Gatherv, MPI_Allgather, and MPI_Allgatherv APIs}
 \alias{mpi.gather}
 \alias{mpi.gatherv}
 \alias{mpi.allgather}

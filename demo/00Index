@@ -50,4 +50,5 @@ npudistcdf_npRmpi	sample program for np (_serial) and npRmpi (_npRmpi)
 npudistcdf_serial	sample program for np (_serial) and npRmpi (_npRmpi)
 npunitest_npRmpi	sample program for np (_serial) and npRmpi (_npRmpi)
 npunitest_serial	sample program for np (_serial) and npRmpi (_npRmpi)
-
+npregiv     R example for npregiv
+Engel95     R example for Engel 1995 data

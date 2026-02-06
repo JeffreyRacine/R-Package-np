@@ -1,5 +1,5 @@
 \name{mpi.cartdim.get}
-\title{MPI\_Cartdim\_get}
+\title{MPI_Cartdim_get}
 \alias{mpi.cartdim.get}
 \description{
  \code{mpi.cartdim.get} gets dim information about a Cartesian topology. 

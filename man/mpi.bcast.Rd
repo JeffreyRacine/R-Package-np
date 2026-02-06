@@ -1,5 +1,5 @@
 \name{mpi.bcast}
-\title{MPI\_Bcast API}
+\title{MPI_Bcast API}
 \alias{mpi.bcast}
 \description{
   \code{mpi.bcast} is a collective call among all members in a comm. It 

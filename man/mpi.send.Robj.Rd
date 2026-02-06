@@ -1,5 +1,5 @@
 \name{mpi.send.Robj}
-\title{Extensions of MPI\_Send and MPI\_Recv APIs}
+\title{Extensions of MPI_Send and MPI_Recv APIs}
 \alias{mpi.send.Robj}
 \alias{mpi.isend.Robj}
 \alias{mpi.recv.Robj}

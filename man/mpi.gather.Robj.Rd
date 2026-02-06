@@ -1,5 +1,5 @@
 \name{mpi.gather.Robj}
-\title{Extentions of MPI\_Gather and MPI\_Allgather APIs}
+\title{Extentions of MPI_Gather and MPI_Allgather APIs}
 \alias{mpi.gather.Robj}
 \alias{mpi.allgather.Robj}
 \description{

@@ -1,5 +1,5 @@
 \name{mpi.cart.create}
-\title{MPI\_Cart\_create}
+\title{MPI_Cart_create}
 \alias{mpi.cart.create}
 \description{
  \code{mpi.cart.create} creates a Cartesian structure of arbitrary dimension.

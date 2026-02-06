@@ -4,6 +4,7 @@ importFrom("grDevices", "boxplot.stats", "extendrange", "grey", "n2mfrow", "rgb"
 importFrom("graphics", "axis", "lines", "mtext", "par", "persp", "plot", "plot.new", "plot.window", "points", "polygon")
 importFrom("utils", "combn", "flush.console")
 importFrom("methods", "is")
+importFrom("parallel", "nextRNGStream", "detectCores")
 importFrom("quantreg", "rq")
 importFrom("quadprog", "solve.QP")
 export(b.star

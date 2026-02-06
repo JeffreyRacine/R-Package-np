@@ -1,5 +1,5 @@
 \name{mpi.intercomm.merge}
-\title{MPI\_Intercomm\_merge API}
+\title{MPI_Intercomm_merge API}
 \usage{
 mpi.intercomm.merge(intercomm=2, high=0, comm=1)
 }

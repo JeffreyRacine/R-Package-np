@@ -1,5 +1,5 @@
 \name{mpi.reduce}
-\title{MPI\_Reduce and MPI\_Allreduce APIs}
+\title{MPI_Reduce and MPI_Allreduce APIs}
 \alias{mpi.allreduce}
 \alias{mpi.reduce}
 \description{

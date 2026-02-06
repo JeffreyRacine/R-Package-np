@@ -1,0 +1,91 @@
+
+R version 4.5.2 (2025-10-31) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ## This is the serial version of npregiv_npRmpi.R for comparison
+> ## purposes (bandwidth ought to be identical, timing may
+> ## differ). Study the differences between this file and its MPI
+> ## counterpart for insight about your own problems.
+> 
+> library(np)
+Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21)
+[vignette("np_faq",package="np") provides answers to frequently asked questions]
+[vignette("np",package="np") an overview]
+[vignette("entropy_np",package="np") an overview of entropy-based methods]
+> options(np.messages=FALSE)
+> 
+> ## Generate some data
+> 
+> set.seed(42)
+> n <- 2500
+> 
+> ## The DGP is as follows:
+> 
+> ## 1) y = phi(z) + u
+> 
+> ## 2) E(u|z) != 0 (endogeneity present)
+> 
+> ## 3) Suppose there exists an instrument w such that z = f(w) + v and
+> ## E(u|w) = 0
+> 
+> ## 4) We generate v, w, and generate u such that u and z are
+> ## correlated. To achieve this we express u as a function of v (i.e. u =
+> ## gamma v + eps)
+> 
+> v <- rnorm(n,mean=0,sd=0.27)
+> eps <- rnorm(n,mean=0,sd=0.05)
+> u <- -0.5*v + eps
+> w <- rnorm(n,mean=0,sd=1)
+> 
+> ## In Darolles et al (2011) there exist two DGPs. The first is
+> ## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
+> ## discontinuous and has a kink at zero).
+> 
+> fun1 <- function(z) { z^2 }
+> fun2 <- function(z) { exp(-abs(z)) }
+> 
+> z <- 0.2*w + v
+> 
+> ## Generate two y vectors for each function.
+> 
+> y1 <- fun1(z) + u
+> y2 <- fun2(z) + u
+> 
+> ## You set y to be either y1 or y2 (ditto for phi) depending on which
+> ## DGP you are considering:
+> 
+> y <- y1
+> phi <- fun1
+> 
+> ## Sort on z (for plotting)
+> 
+> ivdata <- data.frame(y,z,w)
+> ivdata <- ivdata[order(ivdata$z),]
+> rm(y,z,w)
+> attach(ivdata)
+> 
+> t <- system.time(model.iv <- npregiv(y=y,z=z,w=w))
+> 
+> cat("Elapsed time =", t[3], "\n")
+Elapsed time = 132.419 
+> 
+> ## Clean up properly then quit()
+> 
+> proc.time()
+   user  system elapsed 
+130.677   2.278 132.961 

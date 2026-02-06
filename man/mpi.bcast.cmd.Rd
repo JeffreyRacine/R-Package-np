@@ -1,5 +1,5 @@
 \name{mpi.bcast.cmd}
-\title{Extension of MPI\_Bcast API}
+\title{Extension of MPI_Bcast API}
 \alias{mpi.bcast.cmd}
 \description{
   \code{mpi.bcast.cmd} is an extension of \code{\link{mpi.bcast}}. 

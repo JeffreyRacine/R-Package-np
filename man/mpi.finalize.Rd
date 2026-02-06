@@ -1,6 +1,6 @@
 \name{mpi.finalize}
 \alias{mpi.finalize}
-\title{MPI\_Finalize API}
+\title{MPI_Finalize API}
 \description{
   Terminates MPI execution environment. 
 }

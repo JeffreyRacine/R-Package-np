@@ -1,0 +1,11 @@
+# Fdb version 4
+["pdflatex"] 1770308482.40843 "timing" "timing.pdf" "timing" 1770308485.66179 2
+  "/opt/local/etc/texmf/texmf.cnf" 1758301686.58032 40069 1d7999e87c4750504080f9f624dba674 ""
+  "/opt/local/var/db/texmf/web2c/pdftex/pdflatex.fmt" 1763914059 3139028 4da633f382b4e75d327c861416213e46 ""
+  "timing" 1770304470.71614 3192 a3e1d9fb74ae1c584501254bdc0418ff ""
+  "timing.aux" 1770308482.40795 32 3985256e7290058c681f74d7a3565a19 "pdflatex"
+  (generated)
+  "timing.aux"
+  "timing.log"
+  "timing.pdf"
+  (rewritten before read)

@@ -1,5 +1,5 @@
 \name{mpi.get.processor.name}
-\title{MPI\_Get\_processor\_name API}
+\title{MPI_Get_processor_name API}
 \usage{
   mpi.get.processor.name(short = TRUE)
 }

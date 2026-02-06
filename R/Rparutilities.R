@@ -321,7 +321,7 @@ mpi.close.Rslaves <- function(dellog=TRUE, comm=1){
     err <-paste("It seems no slaves running on comm", comm)
     stop(err)
     }
-    mpi.bcast.cmd(cmd=break, rank=0, comm=comm)
+    mpi.bcast.cmd(cmd=quote(break), rank=0, comm=comm)
     if (.Platform$OS!="windows"){
         if (dellog && mpi.comm.size(0) < mpi.comm.size(comm)){
         tmp <- paste(Sys.getpid(),"+",comm,sep="")  

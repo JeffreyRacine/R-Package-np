@@ -1,12 +1,12 @@
 \name{mpi.comm.spawn}
 \alias{mpi.comm.spawn}
-\title{MPI\_Comm\_spawn API }
+\title{MPI_Comm_spawn API }
 \description{
 \code{mpi.comm.spawn} tries to start \code{nslaves} identical copies of 
 \code{slaves}, establishing communication with them and returning an 
 intercommunicator. The spawned slaves are referred to as children, and the 
 process that spawned them is called the parent (master). The children have 
-their own MPI\_COMM\_WORLD represented by comm 0. To make communication 
+their own MPI_COMM_WORLD represented by comm 0. To make communication 
 possible among master and slaves, all slaves should use 
 \code{\link{mpi.comm.get.parent}} to find their parent and use 
 \code{\link{mpi.intercomm.merge}} to merger an intercomm to a comm.

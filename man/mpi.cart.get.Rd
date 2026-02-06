@@ -1,5 +1,5 @@
 \name{mpi.cart.get}
-\title{MPI\_Cart\_get}
+\title{MPI_Cart_get}
 \alias{mpi.cart.get}
 \description{
  \code{mpi.cart.get} provides the user with information on the Cartesian topology

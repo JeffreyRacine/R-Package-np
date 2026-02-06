@@ -1,5 +1,5 @@
 \name{mpi.scatter}
-\title{MPI\_Scatter and MPI\_Scatterv APIs}
+\title{MPI_Scatter and MPI_Scatterv APIs}
 \alias{mpi.scatter}
 \alias{mpi.scatterv}
 \description{

@@ -1,5 +1,5 @@
 \name{mpi.comm.size}
-\title{MPI\_Comm\_c2f, MPI\_Comm\_dup, MPI\_Comm\_rank, and MPI\_Comm\_size APIs}
+\title{MPI_Comm_c2f, MPI_Comm_dup, MPI_Comm_rank, and MPI_Comm_size APIs}
 \usage{
   mpi.comm.c2f(comm=1)
   mpi.comm.dup(comm, newcomm)

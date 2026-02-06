@@ -66,19 +66,19 @@ contain corresponding information that can be retrieved by
 otherwise. If TRUE, it is the same as \code{mpi.waitall}.
 
 \code{mpi.waitsome} returns a list: count--- number of requests that have
-been completed; indices---an integer vector of size \$count of those 
+been completed; indices---an integer vector of size \code{count} of those 
 completed request numbers (in  0, 1 ,..., count-1). In addition, statuses 
-0, 1, ..., \$count-1 contain corresponding information that can be 
+0, 1, ..., \code{count}-1 contain corresponding information that can be 
 retrieved by \code{mpi.get.count} and \code{mpi.get.sourcetag}.  
 
-\code{mpi.testsome} is the same as \code{mpi.waitsome} except that \$count 
-may be 0 and in this case \$indices is no use.
+\code{mpi.testsome} is the same as \code{mpi.waitsome} except that \code{count} 
+may be 0 and in this case \code{indices} is no use.
 }
 \details{
 \code{mpi.wait} and \code{mpi.test} are used to complete a nonblocking 
 send and receive request: use the same request number by \code{mpi.isend} 
 or \code{mpi.irecv}. Once completed, the associated request is set to 
-MPI\_REQUEST\_NULL and status contains information such as source, tag, 
+MPI_REQUEST_NULL and status contains information such as source, tag, 
 and length of message.
 
 If multiple nonblocking sends or receives are initiated, the following 

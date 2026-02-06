@@ -1,5 +1,5 @@
 \name{mpi.cart.coords}
-\title{MPI\_Cart\_coords}
+\title{MPI_Cart_coords}
 \alias{mpi.cart.coords}
 \description{
  \code{mpi.cart.coords} translates a rank to its Cartesian topology coordinate.

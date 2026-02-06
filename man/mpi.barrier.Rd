@@ -1,5 +1,5 @@
 \name{mpi.barrier}
-\title{MPI\_Barrier API}
+\title{MPI_Barrier API}
 \usage{
   mpi.barrier(comm = 1)
 }

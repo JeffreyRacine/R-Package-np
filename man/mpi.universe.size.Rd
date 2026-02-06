@@ -1,5 +1,5 @@
 \name{mpi.universe.size}
-\title{MPI\_Universe\_size API}
+\title{MPI_Universe_size API}
 \usage{
   mpi.universe.size()
 }

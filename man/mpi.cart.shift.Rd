@@ -1,5 +1,5 @@
 \name{mpi.cart.shift}
-\title{MPI\_Cart\_shift}
+\title{MPI_Cart_shift}
 \alias{mpi.cart.shift}
 \description{
  \code{mpi.cart.shift} shifts the Cartesian topology in both manners, displacement

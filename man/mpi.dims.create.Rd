@@ -1,5 +1,5 @@
 \name{mpi.dims.create}
-\title{MPI\_Dims\_create}
+\title{MPI_Dims_create}
 \alias{mpi.dims.create}
 \description{
  \code{mpi.dims.create} Create a Cartesian dimension used by \code{mpi.cart.create}.

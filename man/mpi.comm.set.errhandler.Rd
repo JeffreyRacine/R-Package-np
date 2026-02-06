@@ -1,5 +1,5 @@
 \name{mpi.comm.set.errhandler}
-\title{MPI\_Comm\_set\_errhandler API}
+\title{MPI_Comm_set_errhandler API}
 \usage{
 mpi.comm.set.errhandler(comm = 1)
 }
@@ -8,12 +8,12 @@ mpi.comm.set.errhandler(comm = 1)
   \item{comm}{a communicator number}
 }
 \description{
-  \code{mpi.comm.set.errhandler} sets a communicator to MPI\_ERRORS\_RETURN 
+  \code{mpi.comm.set.errhandler} sets a communicator to MPI_ERRORS_RETURN 
 instead of  
-MPI\_ERRORS\_ARE\_FATAL (default) which crashes R on any type of MPI errors.  
+MPI_ERRORS_ARE_FATAL (default) which crashes R on any type of MPI errors.  
 Almost all MPI API calls return errcodes which can map to specific MPI error 
 messages. All MPI related error messages come from predefined 
-MPI\_Error\_string. 
+MPI_Error_string. 
 }
 \value{
   1 if success. Otherwise 0. 

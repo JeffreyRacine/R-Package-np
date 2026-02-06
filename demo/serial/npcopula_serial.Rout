@@ -1,0 +1,83 @@
+
+R version 4.5.2 (2025-10-31) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ## This is the serial version of npudistml_npRmpi.R for comparison
+> ## purposes (bandwidth ought to be identical, timing may
+> ## differ). Study the differences between this file and its MPI
+> ## counterpart for insight about your own problems.
+> 
+> library(np)
+Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21)
+[vignette("np_faq",package="np") provides answers to frequently asked questions]
+[vignette("np",package="np") an overview]
+[vignette("entropy_np",package="np") an overview of entropy-based methods]
+> library(MASS)
+> options(np.messages=FALSE)
+> 
+> ## Generate some data
+> 
+> set.seed(42)
+> 
+> require(MASS)
+> 
+> set.seed(42)
+> 
+> n <- 2500
+> n.eval <- 25
+> rho <- 0.95
+> mu <- c(0,0)
+> Sigma <- matrix(c(1,rho,rho,1),2,2)
+> mydat <- mvrnorm(n=n, mu, Sigma)
+> mydat <- data.frame(x=mydat[,1],y=mydat[,2])
+> 
+> q.minm <- 0.0
+> q.max <- 1.0
+> grid.seq <- seq(q.minm,q.max,length=n.eval)
+> grid.dat <- cbind(grid.seq,grid.seq)
+> 
+> ## Estimate the copula
+> 
+> t.0 <- system.time(bw <- npudistbw(~x+y,data=mydat))
+> t.1 <- system.time(copula <- npcopula(bws=bw,data=mydat,u=grid.dat))
+> 
+> t <- t.0+t.1
+> 
+> summary(bw)
+
+Data (2500 observations, 2 variable(s)):
+
+Bandwidth Selection Method: Least Squares Cross-Validation
+Formula: ~x + y
+Bandwidth Type: Fixed
+Objective Function Value: 0.1636001 (achieved on multistart 1)
+
+Var. Name: x Bandwidth: 0.03881588 Scale Factor: 0.528974
+Var. Name: y Bandwidth: 0.05543593 Scale Factor: 0.759897
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Vars.: 2
+Estimation Time: 2.088 seconds
+
+> 
+> cat("Elapsed time =", t[3], "\n")
+Elapsed time = 2.48 
+> 
+> proc.time()
+   user  system elapsed 
+  3.001   0.106   3.104 

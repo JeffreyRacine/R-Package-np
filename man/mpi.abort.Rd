@@ -1,5 +1,5 @@
 \name{mpi.abort}
-\title{MPI\_Abort API}
+\title{MPI_Abort API}
 \usage{
   mpi.abort(comm = 1)
 }

@@ -1,5 +1,5 @@
 \name{mpi.sendrecv}
-\title{MPI\_Sendrecv and MPI\_Sendrecv\_replace APIs}
+\title{MPI_Sendrecv and MPI_Sendrecv_replace APIs}
 \alias{mpi.sendrecv}
 \alias{mpi.sendrecv.replace}
 \description{

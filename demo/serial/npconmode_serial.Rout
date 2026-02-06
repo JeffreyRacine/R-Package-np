@@ -1,0 +1,132 @@
+
+R version 4.5.2 (2025-10-31) -- "[Not] Part in a Rumble"
+Copyright (C) 2025 The R Foundation for Statistical Computing
+Platform: aarch64-apple-darwin20
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+  Natural language support but running in an English locale
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> ## This is the serial version of npconmode_npRmpi.R for comparison
+> ## purposes (bandwidth ought to be identical, timing may
+> ## differ). Study the differences between this file and its MPI
+> ## counterpart for insight about your own problems.
+> 
+> library(np)
+Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21)
+[vignette("np_faq",package="np") provides answers to frequently asked questions]
+[vignette("np",package="np") an overview]
+[vignette("entropy_np",package="np") an overview of entropy-based methods]
+> options(np.messages=FALSE)
+> 
+> library(MASS)
+> data(birthwt)
+> n <- nrow(birthwt)
+> 
+> birthwt$low <- factor(birthwt$low)
+> birthwt$smoke <- factor(birthwt$smoke)
+> birthwt$race <- factor(birthwt$race)
+> birthwt$ht <- factor(birthwt$ht)
+> birthwt$ui <- factor(birthwt$ui)
+> birthwt$ftv <- ordered(birthwt$ftv)
+> 
+> ## A conditional mode example
+> 
+> t <- system.time(bw <- npcdensbw(low~
++                                  smoke+ 
++                                  race+ 
++                                  ht+ 
++                                  ui+    
++                                  ftv+  
++                                  age+           
++                                  lwt,
++                                  data=birthwt))
+> 
+> summary(bw)
+
+Conditional density data (189 observations, 8 variable(s))
+(1 dependent variable(s), and 7 explanatory variable(s))
+
+Bandwidth Selection Method: Maximum Likelihood Cross-Validation
+Formula: low ~ smoke + race + ht + ui + ftv + age + lwt
+Bandwidth Type: Fixed
+Objective Function Value: -107.4568 (achieved on multistart 3)
+
+Exp. Var. Name: smoke Bandwidth: 0.4914167    Lambda Max: 0.5      
+Exp. Var. Name: race  Bandwidth: 0.6666665    Lambda Max: 0.6666667
+Exp. Var. Name: ht    Bandwidth: 0.0269176    Lambda Max: 0.5      
+Exp. Var. Name: ui    Bandwidth: 0.04193822   Lambda Max: 0.5      
+Exp. Var. Name: ftv   Bandwidth: 0.3793579    Lambda Max: 1        
+Exp. Var. Name: age   Bandwidth: 5.453795   Scale Factor: 2.517772 
+Exp. Var. Name: lwt   Bandwidth: 5.631123   Scale Factor: 0.6499101 
+
+Dep. Var. Name: low   Bandwidth: 0.03971371   Lambda Max: 0.5
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Explanatory Vars.: 2
+
+Unordered Categorical Kernel Type: Aitchison and Aitken
+No. Unordered Categorical Explanatory Vars.: 4
+No. Unordered Categorical Dependent Vars.: 1
+
+Ordered Categorical Kernel Type: Li and Racine
+No. Ordered Categorical Explanatory Vars.: 1
+Estimation Time: 8.304 seconds
+
+> 
+> t <- t + system.time(model <- npconmode(bws=bw))
+> 
+> summary(model)
+
+Conditional Mode data: 189 training points, in 8 variable(s)
+(1 dependent variable(s), and 7 explanatory variable(s))
+
+                               low
+Dep. Var. Bandwidth(s): 0.03971371
+                            smoke      race        ht         ui       ftv
+Exp. Var. Bandwidth(s): 0.4914167 0.6666665 0.0269176 0.04193822 0.3793579
+                             age      lwt
+Exp. Var. Bandwidth(s): 5.453795 5.631123
+
+Bandwidth Type: Fixed
+
+Confusion Matrix
+      Predicted
+Actual   0   1
+     0 127   3
+     1  27  32
+
+Overall Correct Classification Ratio:  0.8412698
+Correct Classification Ratio By Outcome:
+        0         1 
+0.9769231 0.5423729 
+
+McFadden-Puig-Kerschner performance measure:  0.8206097
+
+Continuous Kernel Type: Second-Order Gaussian
+No. Continuous Explanatory Vars.: 2
+
+Unordered Categorical Kernel Type: Aitchison and Aitken
+No. Unordered Categorical Explanatory Vars.: 4
+No. Unordered Categorical Dependent Vars.: 1
+
+Ordered Categorical Kernel Type: Li and Racine
+No. Ordered Categorical Explanatory Vars.: 1
+
+> 
+> cat("Elapsed time =", t[3], "\n")
+Elapsed time = 8.466 
+> 
+> proc.time()
+   user  system elapsed 
+  8.953   0.137   9.093 

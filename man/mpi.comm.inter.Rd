@@ -1,5 +1,5 @@
 \name{mpi.comm.get.parent}
-\title{MPI\_Comm\_get\_parent, MPI\_Comm\_remote\_size, MPI\_Comm\_test\_inter 
+\title{MPI_Comm_get_parent, MPI_Comm_remote_size, MPI_Comm_test_inter 
 APIs}
 \usage{
   mpi.comm.get.parent(comm = 2)
