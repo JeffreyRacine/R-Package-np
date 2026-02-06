@@ -43,4 +43,4 @@ R CMD INSTALL npRmpi_0.60-21.tar.gz
 
 See `BUILD.md` and `WORKTREES.md` in this repo for local build details.
 
-For more information on this project please visit the maintainer's website (https://www.economics.mcmaster.ca/faculty/racinej).
+For more information on this project please visit the maintainer's website (https://experts.mcmaster.ca/people/racinej).
