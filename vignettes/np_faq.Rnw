@@ -1,8 +1,8 @@
 %% $Id: np_faq.tex,v 1.99 2018/03/16 14:22:41 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
-%\VignetteDepends{np}
+%\VignetteDepends{npRmpi}
 %\VignetteKeywords{nonparametric, kernel, categorical}
-%\VignettePackage{np}
+%\VignettePackage{npRmpi}
 
 \documentclass[12pt]{amsart}
 
@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-19. Kindly update your version should you not be using the most
+is 0.60-20. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -1818,6 +1818,64 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 \clearpage
 
 \appendix
+
+\section*{Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]}
+
+\begin{itemize}
+
+\item Fixed np issues 4/6/7/13/18/26/51 and added np.pairs utilities
+
+\item Merged all bug fixes and modifications present in the np package since the previous update of the npRmpi package (0.60-2 [27-Jun-2014]) in to the npRmpi package, updated MPI functionality to reflect those in the most recent Rmpi version (0.7-3.3).
+
+\item Major enhancements to npregiv() and npregivderiv():
+
+\begin{itemize}
+
+  \item Implemented warm-start strategy for improved convergence
+  \item Aligned multistart strategy with crsiv/crsivderiv for consistency
+  \item Performance optimizations: pre-allocated matrices/lists in iterative loops,
+    optimized trapezoidal integration, improved Tikhonov and Ridge calculations
+  \item Added S3 methods (print, summary, plot) for better integration with R workflow
+  \item Enhanced summaries with bandwidth details and estimation timing information
+  \item Alphabetized function arguments for consistency
+  \item Fixed initialization of bw.mu.w in npregivderiv
+  \item Cleaned up naming convention (phihat to phi throughout)
+
+\end{itemize}
+
+\item Testing improvements:
+
+\begin{itemize}
+
+  \item Added comprehensive unit tests using testthat framework
+  \item Expanded test coverage to include distribution, copula, quantile regression,
+    tests of independence/specification, and boundary/shape-constrained methods
+
+\end{itemize}
+
+\item Build and maintenance updates:
+
+\begin{itemize}
+
+  \item Refined .Rbuildignore regexes to correctly exclude .git and build artifacts
+  \item Added missing imports (graphics, grDevices) to NAMESPACE to resolve global
+    function notes
+  \item Restored dontrun blocks in documentation to expedite package checks
+  \item Suppressed build warnings for non-standard man directory files
+
+\end{itemize}
+
+\item Bug fixes:
+
+\begin{itemize}
+
+  \item Fixed np.plot categorical predictor evaluation
+  \item Fixed np package registrations after sync
+  \item Synced non-MPI code fixes from npRmpi
+
+\end{itemize}
+
+\end{itemize}
 
 \section*{Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]}
 
