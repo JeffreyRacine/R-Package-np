@@ -130,38 +130,22 @@ npsymtest(data = NULL,
 }
 
 \examples{
-\dontrun{
-set.seed(1234)
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-n <- 100
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-## Asymmetric discrete probability distribution function
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
 
-x <- factor(rbinom(n,2,.8))
-npsymtest(x,boot.num=99)
-
-Sys.sleep(5)
-
-## Symmetric discrete probability distribution function
-
-x <- factor(rbinom(n,2,.5))
-npsymtest(x,boot.num=99)
-
-Sys.sleep(5)
-
-## Asymmetric continuous distribution function
-
-y <- rchisq(n,df=2)
-npsymtest(y,boot.num=99)
-
-Sys.sleep(5)
-
-## Symmetric continuous distribution function
-
-y <- rnorm(n)
-npsymtest(y,boot.num=99)
-
-## Time-series bootstrap
+## A function to create a time series
 
 ar.series <- function(phi,epsilon) {
   n <- length(epsilon)
@@ -173,18 +157,35 @@ ar.series <- function(phi,epsilon) {
   return(series)
 }
 
-## Asymmetric time-series
+n <- 250
 
-yt <- ar.series(0.5,rchisq(n,df=3))
-npsymtest(yt,boot.num=99,boot.method="geom")
-
-## Symmetric time-series
+## Stationary persistent symmetric time-series
 
 yt <- ar.series(0.5,rnorm(n))
-npsymtest(yt,boot.num=99,boot.method="geom")
 
-} % enddontrun
+mpi.bcast.Robj2slave(yt)
 
+## A simple example of the test for symmetry
+
+mpi.bcast.cmd(output <- npsymtest(yt,
+                                  boot.num=99,
+                                  boot.method="geom",
+                                  method="summation"),
+              caller.execute=TRUE)
+
+summary(output)
+
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+mpi.close.Rslaves()
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest     
 }
 \keyword{ univar }
 \keyword{ nonparametric }

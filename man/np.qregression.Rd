@@ -243,78 +243,43 @@ npqreg(bws, \dots)
 \seealso{ \pkg{quantreg} }
 
 \examples{
-\dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
-# bivariate nonparametric quantile regression estimate for Giovanni
-# Baiocchi's Italian income panel (see Italy for details)
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
 data("Italy")
-attach(Italy)
+mpi.bcast.Robj2slave(Italy)
 
-# First, compute the cross-validated bandwidths.  Note - this may take a
-# few minutes depending on the speed of your computer...
+## A quantile regression example
 
-bw <- npcdistbw(formula=gdp~ordered(year))
+mpi.bcast.cmd(bw <- npcdistbw(gdp~ordered(year),data=Italy),
+              caller.execute=TRUE)
 
-# Note - numerical search for computing the quantiles may take a minute
-# or so...
+summary(bw)
 
-model.q0.25 <- npqreg(bws=bw, tau=0.25)
-model.q0.50 <- npqreg(bws=bw, tau=0.50)
-model.q0.75 <- npqreg(bws=bw, tau=0.75)
+mpi.bcast.cmd(model <- npqreg(bws=bw, tau=0.50),
+              caller.execute=TRUE)
 
-# Plot the resulting quantiles manually...
+summary(model)
 
-plot(ordered(year), gdp, 
-     main="CDF Quantile Estimates for the Italian Income Panel", 
-     xlab="Year", 
-     ylab="GDP Quantiles")
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-lines(ordered(year), model.q0.25$quantile, col="red", lty=2)
-lines(ordered(year), model.q0.50$quantile, col="blue", lty=3)
-lines(ordered(year), model.q0.75$quantile, col="red", lty=2)
+mpi.close.Rslaves()
 
-legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"), 
-       lty=c(2, 3, 2), col=c("red", "blue", "red"))
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-detach(Italy)
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
-# bivariate nonparametric quantile regression estimate for Giovanni
-# Baiocchi's Italian income panel (see Italy for details)
-
-data("Italy")
-attach(Italy)
-data <- data.frame(ordered(year), gdp)
-
-# First, compute the likelihood cross-validation bandwidths (default).
-# Note - this may take a few minutes depending on the speed of your
-# computer...
-
-bw <- npcdistbw(xdat=ordered(year), ydat=gdp)
-
-# Note - numerical search for computing the quantiles will take a
-# minute or so...
-
-model.q0.25 <- npqreg(bws=bw, tau=0.25)
-model.q0.50 <- npqreg(bws=bw, tau=0.50)
-model.q0.75 <- npqreg(bws=bw, tau=0.75)
-
-# Plot the resulting quantiles manually...
-
-plot(ordered(year), gdp, 
-     main="CDF Quantile Estimates for the Italian Income Panel", 
-     xlab="Year", 
-     ylab="GDP Quantiles")
-
-lines(ordered(year), model.q0.25$quantile, col="red", lty=2)
-lines(ordered(year), model.q0.50$quantile, col="blue", lty=3)
-lines(ordered(year), model.q0.75$quantile, col="red", lty=2)
-
-legend(ordered(1951), 32, c("tau = 0.25", "tau = 0.50", "tau = 0.75"), 
-       lty=c(2, 3, 2), col=c("red", "blue", "red"))
-
-detach(Italy)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest     
 }
 \keyword{nonparametric}

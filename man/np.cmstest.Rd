@@ -176,83 +176,41 @@ npcmstest(formula,
 }
 
 \examples{
-\dontrun{
-# EXAMPLE 1: For this example, we conduct a consistent model
-# specification test for a parametric wage regression model that is
-# quadratic in age. The work of Murphy and Welch (1990) would suggest
-# that this parametric regression model is misspecified.
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-data("cps71")
-attach(cps71)
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-model <- lm(logwage~age+I(age^2), x=TRUE, y=TRUE)
+mpi.bcast.cmd(data(cps71),
+              caller.execute=TRUE)
 
-plot(age, logwage)
-lines(age, fitted(model))
+mpi.bcast.cmd(attach(cps71),
+              caller.execute=TRUE)
 
-# Note - this may take a few minutes depending on the speed of your
-# computer...
+mpi.bcast.cmd(model <- lm(logwage~age+I(age^2), x=TRUE, y=TRUE),
+              caller.execute=TRUE)
 
-npcmstest(model = model, xdat = age, ydat = logwage)
+mpi.bcast.cmd(npcmstest(model = model, xdat = age, ydat = logwage,
+              boot.num = 99),
+              caller.execute=TRUE)
 
-# Sleep for 5 seconds so that we can examine the output...
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-Sys.sleep(5)
+mpi.close.Rslaves()
 
-# Next try Murphy & Welch's (1990) suggested quintic specification.
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-model <- lm(logwage~age+I(age^2)+I(age^3)+I(age^4)+I(age^5), x=TRUE, y=TRUE)
-
-plot(age, logwage)
-lines(age, fitted(model))
-
-X <- data.frame(age)
-
-# Note - this may take a few minutes depending on the speed of your
-# computer...
-
-npcmstest(model = model, xdat = age, ydat = logwage)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Note - you can pass in multiple arguments to this function. For
-# instance, to use local linear rather than local constant regression, 
-# you would use npcmstest(model, X, regtype="ll"), while you could also
-# change the kernel type (default is second order Gaussian), numerical
-# search tolerance, or feed in your own vector of bandwidths and so
-# forth.
-
-detach(cps71)
-
-# EXAMPLE 2: For this example, we replicate the application in Maasoumi,
-# Racine, and Stengos (2007) (see oecdpanel for details). We
-# estimate a parametric model that is used in the literature, then
-# subject it to the model specification test.
-
-data("oecdpanel")
-attach(oecdpanel)
-
-model <- lm(growth ~ oecd +
-            factor(year) +
-            initgdp +
-            I(initgdp^2) +
-            I(initgdp^3) +
-            I(initgdp^4) +
-            popgro +
-            inv +
-            humancap +
-            I(humancap^2) +
-            I(humancap^3) - 1, 
-            x=TRUE, 
-            y=TRUE)
-
-X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
-
-npcmstest(model = model, xdat = X, ydat = growth)
-
-detach(oecdpanel)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest
 }
 \keyword{ nonparametric }

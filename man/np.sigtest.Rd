@@ -221,74 +221,55 @@ npsigtest(bws, \dots)
 }
 
 \examples{
-\dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we simulate 100 draws
-# from a DGP in which z, the first column of X, is an irrelevant
-# discrete variable
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-set.seed(12345)
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-n <- 100
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
 
-z <- rbinom(n,1,.5)
+## Significance testing with z irrelevant
+
+n <- 250
+
+z <- factor(rbinom(n,1,.5))
 x1 <- rnorm(n)
 x2 <- runif(n,-2,2)
-
 y <- x1 + x2 + rnorm(n)
+mydat <- data.frame(z,x1,x2,y)
+rm(z,x1,x2,y)
 
-# Next, we must compute bandwidths for our regression model. In this
-# case we conduct local linear regression. Note - this may take a few
-# minutes depending on the speed of your computer...
+mpi.bcast.Robj2slave(mydat)
 
-bw <- npregbw(formula=y~factor(z)+x1+x2,regtype="ll",bwmethod="cv.aic")
+mpi.bcast.cmd(model <- npreg(y~z+x1+x2,
+                             regtype="ll",
+                             bwmethod="cv.aic",
+                             data=mydat),
+              caller.execute=TRUE)
 
-# We then compute a vector of tests corresponding to the columns of
-# X. Note - this may take a few minutes depending on the speed of your
-# computer... we have to generate the null distribution of the statistic
-# for each variable whose significance is being tested using 399
-# bootstrap replications for each...
+mpi.bcast.cmd(output <- npsigtest(model,boot.num=99),
+              caller.execute=TRUE)
 
-npsigtest(bws=bw)
+summary(output)
 
-# If you wished, you could conduct the test for, say, variables 1 and 3
-# only, as in
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-npsigtest(bws=bw,index=c(1,3))
+mpi.close.Rslaves()
 
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we simulate 100
-# draws from a DGP in which z, the first column of X, is an irrelevant
-# discrete variable
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-set.seed(12345)
-
-n <- 100
-
-z <- rbinom(n,1,.5)
-x1 <- rnorm(n)
-x2 <- runif(n,-2,2)
-
-X <- data.frame(factor(z),x1,x2)
-
-y <- x1 + x2 + rnorm(n)
-
-# Next, we must compute bandwidths for our regression model. In this
-# case we conduct local linear regression. Note - this may take a few
-# minutes depending on the speed of your computer...
-
-bw <- npregbw(xdat=X,ydat=y,regtype="ll",bwmethod="cv.aic")
-
-# We then compute a vector of tests corresponding to the columns of
-# X. Note - this may take a few minutes depending on the speed of your
-# computer... we have to generate the null distribution of the statistic
-# for each variable whose significance is being tested using 399
-# bootstrap replications for each...
-
-npsigtest(bws=bw)
-
-# If you wished, you could conduct the test for, say, variables 1 and 3
-# only, as in
-
-npsigtest(bws=bw,index=c(1,3))
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest     
 }
 \keyword{ nonparametric }

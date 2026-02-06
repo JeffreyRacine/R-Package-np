@@ -247,11 +247,17 @@ FALSE, \dots)
 \seealso{
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-\dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we simulate an
-# example for a partially linear model and compare the coefficient
-# estimates from the partially linear model with those from a correctly
-# specified parametric model...
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
 set.seed(42)
 
@@ -264,135 +270,33 @@ z2 <- rnorm(n)
 
 y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
 
-# First, compute data-driven bandwidths. This may take a few minutes
-# depending on the speed of your computer...
+x2 <- factor(x2)
+z1 <- factor(z1)
 
-bw <- npplregbw(formula=y~x1+factor(x2)|factor(z1)+z2)
+mpi.bcast.Robj2slave(x1)
+mpi.bcast.Robj2slave(x2)
+mpi.bcast.Robj2slave(z1)
+mpi.bcast.Robj2slave(z2)
+mpi.bcast.Robj2slave(y)
 
-# Next, compute the partially linear fit
+mpi.bcast.cmd(bw <- npplregbw(formula=y~x1+x2|z1+z2),
+              caller.execute=TRUE)
 
-pl <- npplreg(bws=bw)
-
-# Print a summary of the model...
-
-summary(pl)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Retrieve the coefficient estimates and their standard errors...
-
-coef(pl)
-coef(pl, errors = TRUE)
-
-# Compare the partially linear results to those from a correctly
-# specified model's coefficients for x1 and x2
-
-ols <- lm(y~x1+factor(x2)+factor(z1)+I(sin(z2)))
-
-# The intercept is coef()[1], and those for x1 and x2 are coef()[2] and
-# coef()[3]. The standard errors are the square root of the diagonal of
-# the variance-covariance matrix (elements 2 and 3)
-
-coef(ols)[2:3]
-sqrt(diag(vcov(ols)))[2:3]
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Plot the regression surfaces via plot() (i.e., plot the `partial
-# regression surface plots').
-
-plot(bw)
-
-# Note - to plot regression surfaces with variability bounds constructed
-# from bootstrapped standard errors, use the following (note that this
-# may take a minute or two depending on the speed of your computer as
-# the bootstrapping is done in real time, and note also that we override
-# the default number of bootstrap replications (399) reducing them to 25
-# in order to quickly compute standard errors in this instance - don't
-# of course do this in general)
-
-plot(bw,
-     plot.errors.boot.num=25, 
-     plot.errors.method="bootstrap")
-
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we simulate an
-# example for a partially linear model and compare the coefficient
-# estimates from the partially linear model with those from a correctly
-# specified parametric model...
-
-set.seed(42)
-
-n <- 250
-x1 <- rnorm(n)
-x2 <- rbinom(n, 1, .5)
-
-z1 <- rbinom(n, 1, .5)
-z2 <- rnorm(n)
-
-y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
-
-X <- data.frame(x1, factor(x2))
-Z <- data.frame(factor(z1), z2)
-
-# First, compute data-driven bandwidths. This may take a few minutes
-# depending on the speed of your computer...
-
-bw <- npplregbw(xdat=X, zdat=Z, ydat=y)
-
-# Next, compute the partially linear fit
-
-pl <- npplreg(bws=bw)
-
-# Print a summary of the model...
+mpi.bcast.cmd(pl <- npplreg(bws=bw),
+              caller.execute=TRUE)
 
 summary(pl)
 
-# Sleep for 5 seconds so that we can examine the output...
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-Sys.sleep(5)
+mpi.close.Rslaves()
 
-# Retrieve the coefficient estimates and their standard errors...
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-coef(pl)
-coef(pl, errors = TRUE)
-
-# Compare the partially linear results to those from a correctly
-# specified model's coefficients for x1 and x2
-
-ols <- lm(y~x1+factor(x2)+factor(z1)+I(sin(z2)))
-
-# The intercept is coef()[1], and those for x1 and x2 are coef()[2] and
-# coef()[3]. The standard errors are the square root of the diagonal of
-# the variance-covariance matrix (elements 2 and 3)
-
-coef(ols)[2:3]
-sqrt(diag(vcov(ols)))[2:3]
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Plot the regression surfaces via plot() (i.e., plot the `partial
-# regression surface plots').
-
-plot(bw)
-
-# Note - to plot regression surfaces with variability bounds constructed
-# from bootstrapped standard errors, use the following (note that this
-# may take a minute or two depending on the speed of your computer as
-# the bootstrapping is done in real time, and note also that we override
-# the default number of bootstrap replications (399) reducing them to 25
-# in order to quickly compute standard errors in this instance - don't
-# of course do this in general)
-
-plot(bw,
-     plot.errors.boot.num=25, 
-     plot.errors.method="bootstrap")
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest     
 }
 \keyword{nonparametric}

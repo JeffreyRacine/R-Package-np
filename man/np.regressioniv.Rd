@@ -430,94 +430,119 @@ This function should be considered to be in \sQuote{beta test} status until furt
 \code{\link{npregivderiv},\link{npreg}}
 }
 \examples{
-\dontrun{
-## This illustration was made possible by Samuele Centorrino
-## <samuele.centorrino@univ-tlse1.fr>
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-set.seed(42)
-n <- 500
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-## The DGP is as follows:
+# ## This illustration was made possible by Samuele Centorrino
+# ## <samuele.centorrino@univ-tlse1.fr>
+# 
+# set.seed(42)
+# n <- 1500
+# 
+# ## The DGP is as follows:
+# 
+# ## 1) y = phi(z) + u
+# 
+# ## 2) E(u|z) != 0 (endogeneity present)
+# 
+# ## 3) Suppose there exists an instrument w such that z = f(w) + v and
+# ## E(u|w) = 0
+# 
+# ## 4) We generate v, w, and generate u such that u and z are
+# ## correlated. To achieve this we express u as a function of v (i.e. u =
+# ## gamma v + eps)
+# 
+# v <- rnorm(n,mean=0,sd=0.27)
+# eps <- rnorm(n,mean=0,sd=0.05)
+# u <- -0.5*v + eps
+# w <- rnorm(n,mean=0,sd=1)
+# 
+# ## In Darolles et al (2011) there exist two DGPs. The first is
+# ## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
+# ## discontinuous and has a kink at zero).
+# 
+# fun1 <- function(z) { z^2 }
+# fun2 <- function(z) { exp(-abs(z)) }
+# 
+# z <- 0.2*w + v
+# 
+# ## Generate two y vectors for each function.
+# 
+# y1 <- fun1(z) + u
+# y2 <- fun2(z) + u
+# 
+# ## You set y to be either y1 or y2 (ditto for phi) depending on which
+# ## DGP you are considering:
+# 
+# y <- y1
+# phi <- fun1
+# 
+# ## Sort on z (for plotting)
+# 
+# ivdata <- data.frame(y,z,w)
+# ivdata <- ivdata[order(ivdata$z),]
+# rm(y,z,w)
+# 
+# mpi.bcast.Robj2slave(ivdata)
+# mpi.bcast.cmd(attach(ivdata),
+#               caller.execute=TRUE)
+# 
+# mpi.bcast.cmd(model.iv <- npregiv(y=y,z=z,w=w),
+#               caller.execute=TRUE)
+# phi.iv <- model.iv$phi
+# 
+# ## Now the non-iv local linear estimator of E(y|z)
+# 
+# mpi.bcast.cmd(ll.mean <- fitted(npreg(y~z,regtype="ll")),
+#               caller.execute=TRUE)
+# 
+# ## For the plots, restrict focal attention to the bulk of the data
+# ## (i.e. for the plotting area trim out 1/4 of one percent from each
+# ## tail of y and z)
+# 
+# trim <- 0.0025
+# 
+# curve(phi,min(z),max(z),
+#       xlim=quantile(z,c(trim,1-trim)),
+#       ylim=quantile(y,c(trim,1-trim)),
+#       ylab="Y",
+#       xlab="Z",
+#       main="Nonparametric Instrumental Kernel Regression",
+#       lwd=2,lty=1)
+# 
+# points(z,y,type="p",cex=.25,col="grey")
+# 
+# lines(z,phi.iv,col="blue",lwd=2,lty=2)
+# 
+# lines(z,ll.mean,col="red",lwd=2,lty=4)
+# 
+# legend(quantile(z,trim),quantile(y,1-trim),
+#        c(expression(paste(varphi(z))),
+#          expression(paste("Nonparametric ",hat(varphi)(z))),
+#          "Nonparametric E(y|z)"),
+#        lty=c(1,2,4),
+#        col=c("black","blue","red"),
+#        lwd=c(2,2,2))
+# 
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-## 1) y = phi(z) + u
+mpi.close.Rslaves()
 
-## 2) E(u|z) != 0 (endogeneity present)
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-## 3) Suppose there exists an instrument w such that z = f(w) + v and
-## E(u|w) = 0
-
-## 4) We generate v, w, and generate u such that u and z are
-## correlated. To achieve this we express u as a function of v (i.e. u =
-## gamma v + eps)
-
-v <- rnorm(n,mean=0,sd=0.27)
-eps <- rnorm(n,mean=0,sd=0.05)
-u <- -0.5*v + eps
-w <- rnorm(n,mean=0,sd=1)
-
-## In Darolles et al (2011) there exist two DGPs. The first is
-## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-## discontinuous and has a kink at zero).
-
-fun1 <- function(z) { z^2 }
-fun2 <- function(z) { exp(-abs(z)) }
-
-z <- 0.2*w + v
-
-## Generate two y vectors for each function.
-
-y1 <- fun1(z) + u
-y2 <- fun2(z) + u
-
-## You set y to be either y1 or y2 (ditto for phi) depending on which
-## DGP you are considering:
-
-y <- y1
-phi <- fun1
-
-## Sort on z (for plotting)
-
-ivdata <- data.frame(y,z,w)
-ivdata <- ivdata[order(ivdata$z),]
-rm(y,z,w)
-attach(ivdata)
-
-model.iv <- npregiv(y=y,z=z,w=w)
-phi.iv <- model.iv$phi
-
-## Now the non-iv local linear estimator of E(y|z)
-
-ll.mean <- fitted(npreg(y~z,regtype="ll"))
-
-## For the plots, restrict focal attention to the bulk of the data
-## (i.e. for the plotting area trim out 1/4 of one percent from each
-## tail of y and z)
-
-trim <- 0.0025
-
-curve(phi,min(z),max(z),
-      xlim=quantile(z,c(trim,1-trim)),
-      ylim=quantile(y,c(trim,1-trim)),
-      ylab="Y",
-      xlab="Z",
-      main="Nonparametric Instrumental Kernel Regression",
-      lwd=2,lty=1)
-
-points(z,y,type="p",cex=.25,col="grey")
-
-lines(z,phi.iv,col="blue",lwd=2,lty=2)
-
-lines(z,ll.mean,col="red",lwd=2,lty=4)
-
-legend("topright",
-       c(expression(paste(varphi(z))),
-         expression(paste("Nonparametric ",hat(varphi)(z))),
-         "Nonparametric E(y|z)"),
-       lty=c(1,2,4),
-       col=c("black","blue","red"),
-       lwd=c(2,2,2),
-       bty="n")
-       
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)       
+} % enddonttest     
 }
 \keyword{ instrument }

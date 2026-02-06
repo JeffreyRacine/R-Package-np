@@ -58,8 +58,13 @@ npquantile(x = NULL,
 
   Typical usage is
   \preformatted{
+    mpi.spawn.Rslaves(nslaves=1)
+    mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+    set.seed(42)
     x <- rchisq(100,df=10)
-    npquantile(x)
+    mpi.bcast.Robj2slave(x)
+    mpi.bcast.cmd(npquantile(x),caller.execute=TRUE)
+    mpi.close.Rslaves()
   }
 
   The quantile function \eqn{q_\tau} is defined to be the

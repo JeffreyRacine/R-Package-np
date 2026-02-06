@@ -134,59 +134,50 @@ npdeptest(data.x = NULL,
 }
 
 \examples{
-\dontrun{
-set.seed(1234)
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-## Test/measure lack of fit between y and its fitted value from a
-## regression model when x is relevant using the `summation' version.
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
 
 n <- 100
+
 x <- rnorm(n)
 y <- 1 + x + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
+     
+mpi.bcast.Robj2slave(y)
+mpi.bcast.Robj2slave(y.fit)
 
-npdeptest(y,y.fit,boot.num=99,method="summation")
+mpi.bcast.cmd(output <- npdeptest(y,
+                                  y.fit,
+                                  boot.num=99,
+                                  method="summation"),
+              caller.execute=TRUE)
 
-Sys.sleep(5)
+summary(output)
 
-## Test/measure lack of fit between y and its fitted value from a
-## regression model when x is irrelevant using the `summation' version.
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-n <- 100
-x <- runif(n,-2,2)
-y <- 1 + rnorm(n)
-model <- lm(y~x)
-y.fit <- fitted(model)
+mpi.close.Rslaves()
 
-npdeptest(y,y.fit,boot.num=99,method="summation")
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-## Test/measure lack of fit between y and its fitted value from a
-## regression model when x is relevant using the `integration'
-## version (default, slower than summation version).
-
-n <- 100
-x <- rnorm(n)
-y <- 1 + x + rnorm(n)
-model <- lm(y~x)
-y.fit <- fitted(model)
-
-npdeptest(y,y.fit,boot.num=99)
-
-Sys.sleep(5)
-
-## Test/measure lack of fit between y and its fitted value from a
-## regression model when x is irrelevant using the `integration'
-## version (default, slower than summation version).
-
-n <- 100
-x <- runif(n,-2,2)
-y <- 1 + rnorm(n)
-model <- lm(y~x)
-y.fit <- fitted(model)
-
-npdeptest(y,y.fit,boot.num=99)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest     
 }
 \keyword{ univar }
 \keyword{ nonparametric }

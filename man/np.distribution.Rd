@@ -84,21 +84,39 @@ npudist(bws, \dots)
     Usage 1: first compute the bandwidth object via npudistbw and then
     compute the cumulative distribution:
     
-    bw <- npudistbw(~y)
-    Fhat <- npudist(bw)
+    mpi.spawn.Rslaves(nslaves=1)
+    mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+    mpi.bcast.Robj2slave(y)
+    mpi.bcast.cmd(bw <- npudistbw(~y),caller.execute=TRUE)
+    mpi.bcast.cmd(Fhat <- npudist(bw),caller.execute=TRUE)
+    mpi.close.Rslaves()
     
     Usage 2: alternatively, compute the bandwidth object indirectly:
     
-    Fhat <- npudist(~y)
+    mpi.spawn.Rslaves(nslaves=1)
+    mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+    mpi.bcast.Robj2slave(y)
+    mpi.bcast.cmd(Fhat <- npudist(~y),caller.execute=TRUE)
+    mpi.close.Rslaves()
     
     Usage 3: modify the default kernel and order:
     
-    Fhat <- npudist(~y, ckertype="epanechnikov", ckerorder=4)
+    mpi.spawn.Rslaves(nslaves=1)
+    mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+    mpi.bcast.Robj2slave(y)
+    mpi.bcast.cmd(Fhat <- npudist(~y, ckertype="epanechnikov", ckerorder=4),
+                  caller.execute=TRUE)
+    mpi.close.Rslaves()
 
     Usage 4: use the data frame interface rather than the formula
     interface:
 
-    Fhat <- npudist(tdat = y, ckertype="epanechnikov", ckerorder=4)
+    mpi.spawn.Rslaves(nslaves=1)
+    mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+    mpi.bcast.Robj2slave(y)
+    mpi.bcast.cmd(Fhat <- npudist(tdat = y, ckertype="epanechnikov", ckerorder=4),
+                  caller.execute=TRUE)
+    mpi.close.Rslaves()
   }
 
   \code{npudist} implements a variety of methods for estimating
@@ -193,202 +211,42 @@ npudist(bws, \dots)
 \seealso{ \code{\link{npudistbw}} , \code{\link{density}} }
 
 \examples{
-\dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
-# Baiocchi's Italian GDP panel (see Italy for details), then create a
-# data frame in which year is an ordered factor, GDP is continuous,
-# compute bandwidths using cross-validation, then create a grid of data
-# on which the cumulative distribution will be evaluated for plotting
-# purposes.
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
 data("Italy")
-attach(Italy)
 
-# Compute bandwidths using cross-validation (default).
+mpi.bcast.Robj2slave(Italy)
 
-bw <- npudistbw(formula=~ordered(year)+gdp)
+mpi.bcast.cmd(bw <- npudistbw(formula=~ordered(year)+gdp,
+                              data=Italy),
+              caller.execute=TRUE)
 
-# At this stage you could use npudist() to do a variety of things. Here
-# we compute the npudist() object and place it in Fhat.
+mpi.bcast.cmd(F <- npudist(bws=bw),
+              caller.execute=TRUE)
 
-Fhat <- npudist(bws=bw)
+summary(F)
 
-# Note that simply typing the name of the object returns some useful
-# information. For more info, one can call summary:
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-summary(Fhat)
+mpi.close.Rslaves()
 
-# Next, we illustrate how to create a grid of `evaluation data' and feed
-# it to the perspective plotting routines in R, among others.
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-# Create an evaluation data matrix
-
-year.seq <- sort(unique(year))
-gdp.seq <- seq(1,36,length=50)
-data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
-
-# Generate the estimated cumulative distribution computed for the
-# evaluation data
-
-Fhat <- fitted(npudist(bws=bw, newdata=data.eval))
-
-# Coerce the data into a matrix for plotting with persp()
-
-F <- matrix(Fhat, length(unique(year)), 50)
-
-# Next, create a 3D perspective plot of the CDF F, and a 2D
-# contour plot.
-
-persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
-      ticktype="detailed", ylab="GDP", xlab="Year", zlab="Density",
-      theta=300, phi=50)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-contour(as.integer(levels(year.seq)), 
-        gdp.seq, 
-        F, 
-        xlab="Year", 
-        ylab="GDP", 
-        main = "Cumulative Distribution Contour Plot", 
-        col=topo.colors(100))
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Alternatively, you could use the plot() command (<ctrl>-C will
-# interrupt on *NIX systems, <esc> will interrupt on MS Windows
-# systems).
-
-plot(bw)
-
-detach(Italy)
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we load Giovanni
-# Baiocchi's Italian GDP panel (see Italy for details), then create a
-# data frame in which year is an ordered factor, GDP is continuous,
-# compute bandwidths using cross-validation, then create a grid of data
-# on which the cumulative distribution will be evaluated for plotting
-# purposes.
-
-data("Italy")
-attach(Italy)
-
-data <- data.frame(year=ordered(year), gdp)
-
-# Compute bandwidths using cross-validation (default).
-
-bw <- npudistbw(dat=data)
-
-# At this stage you could use npudist() to do a variety of
-# things. Here we compute the npudist() object and place it in Fhat.
-
-Fhat <- npudist(bws=bw)
-
-# Note that simply typing the name of the object returns some useful
-# information. For more info, one can call summary:
-
-summary(Fhat)
-
-# Next, we illustrate how to create a grid of `evaluation data' and feed
-# it to the perspective plotting routines in R, among others.
-
-# Create an evaluation data matrix
-
-year.seq <- sort(unique(year))
-gdp.seq <- seq(1,36,length=50)
-data.eval <- expand.grid(year=year.seq,gdp=gdp.seq)
-
-# Generate the estimated cumulative distribution computed for the
-# evaluation data
-
-Fhat <- fitted(npudist(edat = data.eval, bws=bw))
-
-# Coerce the data into a matrix for plotting with persp()
-
-F <- matrix(Fhat, length(unique(year)), 50)
-
-# Next, create a 3D perspective plot of the CDF F, and a 2D
-# contour plot.
-
-persp(as.integer(levels(year.seq)), gdp.seq, F, col="lightblue",
-      ticktype="detailed", ylab="GDP", xlab="Year",
-      zlab="Cumulative Distribution",
-      theta=300, phi=50)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-contour(as.integer(levels(year.seq)),
-        gdp.seq, 
-        F, 
-        xlab="Year", 
-        ylab="GDP", 
-        main = "Cumulative Distribution Contour Plot", 
-        col=topo.colors(100))
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Alternatively, you could use the plot() command (<ctrl>-C will
-# interrupt on *NIX systems, <esc> will interrupt on MS Windows
-# systems).
-
-plot(bw)
-
-detach(Italy)
-
-# EXAMPLE 2 (INTERFACE=FORMULA): For this example, we load the old
-# faithful geyser data and compute the cumulative distribution function.
-
-library("datasets")
-data("faithful")
-attach(faithful)
-
-# Note - this may take a few minutes depending on the speed of your
-# computer...
-
-bw <- npudistbw(formula=~eruptions+waiting)
-
-summary(bw)
-
-# Plot the cumulative distribution function (<ctrl>-C will interrupt on
-# *NIX systems, <esc> will interrupt on MS Windows systems). Note that
-# we use xtrim = -0.2 to extend the plot outside the support of the data
-# (i.e., extend the tails of the estimate to meet the horizontal axis).
-
-plot(bw, xtrim=-0.2)
-
-detach(faithful)
-
-# EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we load the old
-# faithful geyser data and compute the cumulative distribution function.
-
-library("datasets")
-data("faithful")
-attach(faithful)
-
-# Note - this may take a few minutes depending on the speed of your
-# computer...
-
-bw <- npudistbw(dat=faithful)
-
-summary(bw)
-
-# Plot the cumulative distribution function (<ctrl>-C will interrupt on
-# *NIX systems, <esc> will interrupt on MS Windows systems). Note that
-# we use xtrim = -0.2 to extend the plot outside the support of the data
-# (i.e., extend the tails of the estimate to meet the horizontal axis).
-
-plot(bw, xtrim=-0.2)
-
-detach(faithful)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
 

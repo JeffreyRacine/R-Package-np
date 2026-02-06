@@ -234,76 +234,102 @@ npregivderiv(y,
 \code{\link{npregiv},\link{npreg}}
 }
 \examples{
-\dontrun{
-## This illustration was made possible by Samuele Centorrino
-## <samuele.centorrino@univ-tlse1.fr>
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-set.seed(42)
-n <- 1500
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
-## For trimming the plot (trim .5\% from each tail)
+# ## This illustration was made possible by Samuele Centorrino
+# ## <samuele.centorrino@univ-tlse1.fr>
+# 
+# set.seed(42)
+# n <- 1500
+# 
+# ## For trimming the plot (trim .5\% from each tail)
+# 
+# trim <- 0.005
+# 
+# ## The DGP is as follows:
+# 
+# ## 1) y = phi(z) + u
+# 
+# ## 2) E(u|z) != 0 (endogeneity present)
+# 
+# ## 3) Suppose there exists an instrument w such that z = f(w) + v and
+# ## E(u|w) = 0
+# 
+# ## 4) We generate v, w, and generate u such that u and z are
+# ## correlated. To achieve this we express u as a function of v (i.e. u =
+# ## gamma v + eps)
+# 
+# v <- rnorm(n,mean=0,sd=0.27)
+# eps <- rnorm(n,mean=0,sd=0.05)
+# u <- -0.5*v + eps
+# w <- rnorm(n,mean=0,sd=1)
+# 
+# ## In Darolles et al (2011) there exist two DGPs. The first is
+# ## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
+# ## discontinuous and has a kink at zero).
+# 
+# fun1 <- function(z) { z^2 }
+# fun2 <- function(z) { exp(-abs(z)) }
+# 
+# z <- 0.2*w + v
+# 
+# ## Generate two y vectors for each function.
+# 
+# y1 <- fun1(z) + u
+# y2 <- fun2(z) + u
+# 
+# ## You set y to be either y1 or y2 (ditto for phi) depending on which
+# ## DGP you are considering:
+# 
+# y <- y1
+# phi <- fun1
+# 
+# ## Sort on z (for plotting)
+# 
+# ivdata <- data.frame(y,z,w,u,v)
+# ivdata <- ivdata[order(ivdata$z),]
+# rm(y,z,w,u,v)
+# 
+# mpi.bcast.Robj2slave(ivdata)
+# mpi.bcast.cmd(attach(ivdata),
+#               caller.execute=TRUE)
+# 
+# mpi.bcast.cmd(model.ivderiv <- npregivderiv(y=y,z=z,w=w),
+#               caller.execute=TRUE)
+# 
+# ylim <-c(quantile(model.ivderiv$phi.prime,trim),
+#          quantile(model.ivderiv$phi.prime,1-trim))
+# 
+# plot(z,model.ivderiv$phi.prime,
+#      xlim=quantile(z,c(trim,1-trim)),
+#      main="",
+#      ylim=ylim,
+#      xlab="Z",
+#      ylab="Derivative",
+#      type="l",
+#      lwd=2)
+# rug(z)     
+# 
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-trim <- 0.005
+mpi.close.Rslaves()
 
-## The DGP is as follows:
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-## 1) y = phi(z) + u
-
-## 2) E(u|z) != 0 (endogeneity present)
-
-## 3) Suppose there exists an instrument w such that z = f(w) + v and
-## E(u|w) = 0
-
-## 4) We generate v, w, and generate u such that u and z are
-## correlated. To achieve this we express u as a function of v (i.e. u =
-## gamma v + eps)
-
-v <- rnorm(n,mean=0,sd=0.27)
-eps <- rnorm(n,mean=0,sd=0.05)
-u <- -0.5*v + eps
-w <- rnorm(n,mean=0,sd=1)
-
-## In Darolles et al (2011) there exist two DGPs. The first is
-## phi(z)=z^2 and the second is phi(z)=exp(-abs(z)) (which is
-## discontinuous and has a kink at zero).
-
-fun1 <- function(z) { z^2 }
-fun2 <- function(z) { exp(-abs(z)) }
-
-z <- 0.2*w + v
-
-## Generate two y vectors for each function.
-
-y1 <- fun1(z) + u
-y2 <- fun2(z) + u
-
-## You set y to be either y1 or y2 (ditto for phi) depending on which
-## DGP you are considering:
-
-y <- y1
-phi <- fun1
-
-## Sort on z (for plotting)
-
-ivdata <- data.frame(y,z,w,u,v)
-ivdata <- ivdata[order(ivdata$z),]
-rm(y,z,w,u,v)
-attach(ivdata)
-
-model.ivderiv <- npregivderiv(y=y,z=z,w=w)
-
-ylim <-c(quantile(model.ivderiv$phi.prime,trim),
-         quantile(model.ivderiv$phi.prime,1-trim))
-
-plot(z,model.ivderiv$phi.prime,
-     xlim=quantile(z,c(trim,1-trim)),
-     main="",
-     ylim=ylim,
-     xlab="Z",
-     ylab="Derivative",
-     type="l",
-     lwd=2)
-rug(z)     
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest
 }
 \keyword{ instrument }

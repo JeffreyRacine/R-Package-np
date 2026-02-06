@@ -441,25 +441,53 @@ npscoefbw(\dots)
 \seealso{
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-\dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA):
-set.seed(42)
+\donttest{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-n <- 100
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
+n <- 500
+
 x <- runif(n)
 z <- runif(n, min=-2, max=2)
 y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
-bw <- npscoefbw(formula=y~x|z)
+mydat <- data.frame(x,y,z)
+rm(x,y,z)
+
+mpi.bcast.Robj2slave(mydat)
+
+## A smooth coefficient model example
+
+mpi.bcast.cmd(bw <- npscoefbw(y~x|z,data=mydat),
+              caller.execute=TRUE)
+
 summary(bw)
 
-# EXAMPLE 1 (INTERFACE=DATA FRAME): 
+mpi.bcast.cmd(model <- npscoef(bws=bw, gradients=TRUE),
+              caller.execute=TRUE)
 
-n <- 100
-x <- runif(n)
-z <- runif(n, min=-2, max=2)
-y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
-bw <- npscoefbw(xdat=x, ydat=y, zdat=z)
-summary(bw)
-} % enddontrun
+summary(model)
+
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+mpi.close.Rslaves()
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddonttest     
 }
 \keyword{nonparametric}
