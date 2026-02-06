@@ -1,8 +1,8 @@
-%% $Id: np_faq.tex,v 1.90 2014/06/27 14:22:06 jracine Exp jracine $
+%% $Id: np_faq.tex,v 1.99 2018/03/16 14:22:41 jracine Exp jracine $
 %\VignetteIndexEntry{Frequently Asked Questions (np)}
-%\VignetteDepends{npRmpi}
+%\VignetteDepends{np}
 %\VignetteKeywords{nonparametric, kernel, categorical}
-%\VignettePackage{npRmpi}
+%\VignettePackage{np}
 
 \documentclass[12pt]{amsart}
 
@@ -35,7 +35,7 @@ are encountering unexpected or undesired behavior when trying to use
 the \texttt{np} package.
 
 Many of the underlying C routines have been extensively tested over
-the past two decades. However, the \texttt{R} `hooks' needed to call
+the past two decades. However, the \texttt{R} 'hooks' needed to call
 these routines along with processing of the data required for a
 seamless user experience may produce unexpected or undesired results
 in some settings.
@@ -59,7 +59,7 @@ to others, kindly email me the relevant information and I will
 incorporate it into this FAQ.
 
 This FAQ refers to the most recent version, which as of this writing
-is 0.60-2. Kindly update your version should you not be using the most
+is 0.60-19. Kindly update your version should you not be using the most
 current (from within R, \texttt{update.packages()} ought to do it,
 though also see \ref{update} below.). See the appendix in this file
 for cumulative changes between this and previous versions of the
@@ -80,9 +80,8 @@ you will be presented with the following information.
 
 To cite np in publications use:
 
-  Tristen Hayfield and Jeffrey S. Racine (2008). Nonparametric
-  Econometrics: The np Package. Journal of Statistical Software
-  27(5). URL http://www.jstatsoft.org/v27/i05/.
+  Tristen Hayfield and Jeffrey S. Racine (2008). Nonparametric Econometrics: The
+  np Package. Journal of Statistical Software 27(5). DOI 10.18637/jss.v027.i05
 
 A BibTeX entry for LaTeX users is
 
@@ -93,8 +92,11 @@ A BibTeX entry for LaTeX users is
     year = {2008},
     volume = {27},
     number = {5},
-    url = {http://www.jstatsoft.org/v27/i05/},
+    url = {https://www.jstatsoft.org/index.php/jss/article/view/v027i05},
+    doi = {10.18637/jss.v027.i05},
+    pages = {1-32},
   }
+
 \end{verbatim}
   \end{singlespacing}
 
@@ -103,14 +105,14 @@ A BibTeX entry for LaTeX users is
 
   There are many excellent introductions to the \texttt{R} environment
   with more on the way. First, I would recommend going directly to the
-  \texttt{R} website (\url{http://www.r-project.org}) and looking under
-  Documentation/Manuals (\url{http://cran.r-project.org/manuals.html})
+  \texttt{R} website (\url{https://www.r-project.org}) and looking under
+  Documentation/Manuals (\url{https://cran.r-project.org/manuals.html})
   where you will discover a wealth of documentation for \texttt{R} users
   of all levels. See also the \texttt{R} task views summary page
-  (\url{http://cran.nedmirror.nl/web/views/index.html}) for
+  (\url{https://cran.r-project.org/web/views/}) for
   information grouped under field of interest. A few documents that I
   mention to my students which are tailored to econometricians include
-  \url{http://cran.r-project.org/doc/contrib/Verzani-SimpleR.pdf},
+  \url{https://cran.r-project.org/doc/contrib/Verzani-SimpleR.pdf},
   Cribari-Neto \& Zarkos (1999) \cite{CRIBARI_NETO_ZARKOS:1999},
   Racine \& Hyndman (2002) \cite{RACINE_HYNDMAN:2002} and Farnsworth
   (2006) \cite{FARNSWORTH:2006}, to name but a few.
@@ -119,9 +121,9 @@ A BibTeX entry for LaTeX users is
   the \texttt{np} package are directed to the \texttt{Ecdat} \cite{Ecdat}
   and \texttt{AER} \cite{AER} packages.
 
-  I maintain a `Gallery' to provide a forum for users to share code
+  I maintain a 'Gallery' to provide a forum for users to share code
   and discover examples and illustrations which can be found at
-  \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
+  \url{https://jeffreyracine.github.io/gallery/}.
 
   Often the best resource is right down the hall. Ask a colleague
   whether they use or know anyone who uses R, then offer to buy that
@@ -145,14 +147,15 @@ A BibTeX entry for LaTeX users is
   Certainly. The Comprehensive R Archive Network (CRAN) is a network
   of ftp and web servers around the world that store identical,
   up-to-date, versions of code and documentation for \texttt{R}.  The
-  CRAN `task view' for computational econometrics might be of
+  CRAN 'task view' for computational econometrics might be of
   particular interest to econometricians.  The econometric task view
   provides an excellent summary of both parametric and nonparametric
   econometric packages that exist for the R environment and provides
   one-stop installation for these packages.
 
 See
-\href{http://cran.r-project.org/web/views/Econometrics.html}{cran.r-project.org/web/views/Econometrics.html} for further information.
+\href{https://CRAN.R-project.org/view=Econometrics}{https://CRAN.R-project.org/view=Econometricsl} for further information.
+
 
 To automatically install a task view, the \texttt{ctv} package first
 needs to be installed and loaded, i.e.,
@@ -173,11 +176,11 @@ or
 update.views("Econometrics")
 \end{verbatim}
 
-\subsection{Is there a `gentle guide' to the \texttt{np} package that
+\subsection{Is there a 'gentle guide' to the \texttt{np} package that
     contains some easy to follow examples?}
 
   Perhaps the most gentle introduction is contained in the \texttt{np}
-  package itself in the form of a `vignette'. To view the vignette run
+  package itself in the form of a 'vignette'. To view the vignette run
   R, install the \texttt{np} package (\texttt{install.packages("np")}), then
   type \texttt{vignette("np",package="np")} to view or print the vignette
   (this vignette is essentially the article that appeared in the
@@ -201,7 +204,7 @@ update.views("Econometrics")
     modified, fixed etc?}
 
   See the CHANGELOG on the CRAN site
-  (\url{http://cran.r-project.org/web/packages/np/ChangeLog}), or go
+  (\url{https://CRAN.R-project.org/package=np/ChangeLog}), or go
   to the end of this document where the CHANGELOG is provided for your
   convenience.
 
@@ -276,24 +279,50 @@ as one could always do with, say, \texttt{read.table()}.
 
   This is the most common complaint from frustrated users coming to
   terms with numerically demanding statistical methods.  I am fond of
-  saying `if you want the wrong answer, I can give it to you right
+  saying 'if you want the wrong answer, I can give it to you right
   away', but this wears thin quickly.
 
   \begin{enumerate}
 
-  \item Some background may be in order. Cross-validation methods have
-    run times that are proportional to the square of the number of
-    observations (of computational order $n^2$ hence a doubling of the
-    sample size will increase run time by a factor of four). The
-    solution I favor is to run the code in a parallel computing
-    environment. The underlying C code for \texttt{np} is MPI-aware
-    (MPI denotes the `message passing interface', a popular parallel
-    programming library that is an international standard), and a
-    version of the \texttt{np} package titled `\texttt{npRmpi}' exists
-    for running jobs in a parallel environment that leverages the
-    \texttt{Rmpi} package (\cite{Rmpi}).\footnote{We are extremely
-      grateful to Hao Yu for providing the MPI functionality contained
-      in the \texttt{Rmpi} package.}
+  \item Some background may be in order.  Suppose, by way of
+    illustration, that you are conducting nonparametric regression
+    (local constant or local linear) for a \textsl{given} bandwidth
+    vector (nonparametric kernel regression is simply locally weighted
+    least squares estimation). Let $g(x)$ denote the true conditional
+    mean at some point $x$, and $\hat g(x)$ some estimate. To solve
+    this problem requires computing weighted least squares not once
+    (as would be the case for parametric regression), but $n$ times
+    (the weights are local to the point at which you construct the
+    regression model, $x_i$, $i=1,\dots,n$). That is, to compute
+    $\hat g(x_i)$, $i=1,\dots,n$ requires an order of magnitude
+    ($O(n)$) times more computation than that for parametric
+    regression. So, for a \textsl{given} bandwidth, we require $O(n)$
+    more computation than parametric regression. But to determine the
+    appropriate bandwidth vector, we minimize, say, a cross-validation
+    function numerically, which requires a large number of evaluations
+    of some objective function, say the delete-one least squares
+    criterion function $CV=n^{-1}\sum_{i=1}^n(y_i-\hat g_{-i}(x_i))^2$
+    where $\hat g_{-i}(x_i)$ is the leave-one-out estimator of
+    $g(x_i)$. This takes a problem that is already an order of
+    magnitude more computationally involved than parametric regression
+    and again increases the computational burden by potentially
+    another order of magnitude. It is evident that as $n$ increases
+    the computational burden associated with optimal bandwidth
+    selection will increase exponentially.
+
+    In general, cross-validation methods have run times that are
+    proportional to the square of the number of observations (of
+    computational order $n^2$ hence a doubling of the sample size will
+    increase run time by a factor of four). The solution I currently
+    favor is to run the code in a parallel computing environment. The
+    underlying C code for \texttt{np} is MPI-aware (MPI denotes the
+    'message passing interface', a popular parallel programming
+    library that is an international standard), and a version of the
+    \texttt{np} package titled '\texttt{npRmpi}' exists for running
+    jobs in a parallel environment that leverages the \texttt{Rmpi}
+    package (\cite{Rmpi}).\footnote{We are extremely grateful to Hao
+      Yu for providing the MPI functionality contained in the
+      \texttt{Rmpi} package.}
 
     With respect to the \texttt{npRmpi} package, kindly note that I
     cannot assist with issues surrounding installation and setup due
@@ -314,7 +343,7 @@ as one could always do with, say, \texttt{read.table()}.
 
   \item Alternatively, you can use the method outlined in Racine
     (1993) \cite{RACINE:1993}. The method is based on the fact that
-    the unknown constant $c_j$ (the `scale factor') in the formula
+    the unknown constant $c_j$ (the 'scale factor') in the formula
     $c_j\sigma_j n^{-1/(2p+r)}$ is independent of the sample size, so
     one can conduct bandwidth selection on random subsets and do this
     for a large number of subsets then take the mean/median over these
@@ -474,55 +503,19 @@ plot(bw,xtrim=.01)
       delivers the linear OLS fit to the data.}) to admit categorical
     predictors (see references for papers with Yang and Ma in the
     \texttt{crs} package). Because regression splines involve simple
-    least-squares fits, they scale much better with respect to the
-    sample size so for large sample sizes you may wish to instead
-    consider this approach (kindly see my webpage for further
-    details). You can run cross-validation with hundreds of thousands
-    of observations on a decent desktop in far less time than that
-    required for cross-validated kernel estimates.
+    (i.e., 'global' as opposed to local) least-squares fits, they
+    scale much better with respect to the sample size so for large
+    sample sizes you may wish to instead consider this approach
+    (kindly see my webpage for further details). You can run
+    cross-validation with hundreds of thousands of observations on a
+    decent desktop in far less time than that required for
+    cross-validated kernel estimates. Be forewarned, however, that the
+    presence of categorical predictors can lead to increased execution
+    time unless the option \texttt{kernel=FALSE} is invoked (the
+    default is to use local kernel weighting in the presence of
+    categorical predictors).
 
   \end{enumerate}
-
-\subsection{I estimated a parametric model using the
-  \texttt{lm()} function. How can I compare the cross-validation score
-  from the \texttt{npreg()} approach with that for the parametric
-  model?}
-
-This can be readily achieved for the parametric model as follows:
-\begin{verbatim}
-data(wage1)
-model.lm <- lm(lwage ~ married + female + nonwhite + educ +
-                       exper + tenure, data = wage1)
-cv.lm <-mean(residuals(model.lm)^2/(1-hatvalues(model.lm))^2)                                      
-cv.lm
-\end{verbatim}
-You can then compare \verb+cv.lm+ with the cross-validation score for
-the \verb+npreg+ object as follows: if your model is named \verb+foo+
-(i.e.\ you ran something like \verb^foo <- npreg(y~x1+x2)^) then
-\verb+summary(foo$bws)+ will give you a summary of the model's
-bandwidth object (the value of the objective function is the
-cross-validation score), while \verb+foo$bws$fval+ will give you the
-function value, i.e.\ the value of the cross-validation function, {\em
-  provided} that the model was estimated via least-squares
-cross-validation (default, \verb+bwmethod="cv.ls"+). If the
-cross-validation score is lower for one model, that indicates that the
-model possessing the lowest score is to be preferred.
-
-\subsection{Where can I get some examples of R code for the np
-  package in addition to the examples in the help files?}
-
-Start \texttt{R} then type \verb+demo(package="np")+ and you will be
-presented with a list of demos for constrained estimation, inference,
-and so forth. To run one of these demos type, for example,
-\verb+demo(npregiv)+ (note that you must first install the \texttt{rgl} package to run this particular demo).
-
-To find the location of a demo type
-\verb+system.file("demo","npregiv.R",package="np")+ for example,
-then you can take the source code for this demo and modify it for your
-particular application.
-
-You can also find examples and illustrations at the `Gallery' located
-at \url{http://socserv.mcmaster.ca/racinej/Gallery/Home.html}.
 
 \subsection{Is
     there a way to figure out roughly how long
@@ -586,53 +579,28 @@ plot(n.seq.aug,time.fcst/3600,type="b",
 \end{verbatim}
   \end{singlespacing}
 
+\subsection{Where can I get some examples of R code for the np
+  package in addition to the examples in the help files?}
+
+Start \texttt{R} then type \verb+demo(package="np")+ and you will be
+presented with a list of demos for constrained estimation, inference,
+and so forth. To run one of these demos type, for example,
+\verb+demo(npregiv)+ (note that you must first install the \texttt{rgl} package to run this particular demo).
+
+To find the location of a demo type
+\verb+system.file("demo","npregiv.R",package="np")+ for example,
+then you can take the source code for this demo and modify it for your
+particular application.
+
+You can also find examples and illustrations at the 'Gallery' located
+at \url{https://jeffreyracine.github.io/gallery/}.
+
 \subsection{I need to apply a boundary correction for a univariate
   density estimate - how can I do this?}
 
-You could do this using `data-reflection' (see the description in
-\cite[Page 30]{SILVERMAN:1986}, as the following illustration
-demonstrates.
-
-\begin{verbatim}
-## Use trees to speed up estimation 
-options(np.tree=TRUE)
-
-## Generate data where there is an asymptote at the left boundary
-
-set.seed(42)
-n <- 10000
-x <- sort(rexp(n))
-
-## Compute the bandwidth for the original data
-
-bw <- npudensbw(~x,ckertype="epanechnikov")
-
-## Construct the standard (i.e. no boundary correction) kernel estimate
-
-f.hat <- fitted(npudens(~x,bws=bw$bw,ckertype="epanechnikov"))
-
-## Reflect the data, compute the reflected density then take the estimator which
-## is 2 times the reflected density estimate for x >= 0 (see Silverman (1986,
-## page 30))
-
-x.reflect <- c(x,-x)
-f.reflect <- npudens(~x.reflect,bws=bw$bw,ckertype="epanechnikov")
-f.boundary <- 2*predict(f.reflect,newdata=data.frame(x.reflect=x))
-
-## Plot the nonsmooth histogram, the standard estimator, then the
-## boundary-corrected estimator
-
-hist(x,breaks=100,lty=3,freq=FALSE,ylim=c(0,1),main="")
-rug(x)
-lines(x,f.hat,col=1,lwd=2,lty=1)
-lines(x,f.boundary,col=2,lwd=2,lty=2)
-legend("topright",
-       c("Standard Kernel Estimator (no boundary correction)",
-         "Data-reflected Kernel Estimator (boundary correction)"),
-       lty=1:2,
-       col=1:2,
-       bty="n")
-\end{verbatim}
+As of version 0.60.5, you can use either \texttt{npuniden.boundary}
+(boundary kernel functions) or \texttt{npuniden.reflect} (data
+reflection).
 
 \subsection{I notice your density estimator supports manual bandwidths,
     the normal-reference rule-of-thumb, likelihood cross-validation
@@ -686,7 +654,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   function for syntax issues etc.
 
   If you are convinced that the problem lies with \texttt{np} (there
-  certainly will be undiscovered `features', i.e., bugs), then kindly
+  certainly will be undiscovered 'features', i.e., bugs), then kindly
   send me your code and data so that I can replicate and help resolve
   the issue.
 
@@ -703,12 +671,12 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     platforms.}  experience. 
 
   But also note that there is a platform-independent interface that
-  does not suffer from this limitation called `RStudio' that you might
-  prefer to existing interfaces (\url{http://www.rstudio.org}).
+  does not suffer from this limitation called 'RStudio' that you might
+  prefer to existing interfaces (\url{https://posit.co/}).
 
 \subsection{When some routines are running under MS Windows, \texttt{R}
-    appears to be `not responding.' It appears that the program is not
-    `hung', rather is simply computing. The previous stand-alone
+    appears to be 'not responding.' It appears that the program is not
+    'hung', rather is simply computing. The previous stand-alone
     program (N \copyright) always displayed useful information\dots}
 
   This should no longer occur for np versions 0.30-0 and up. For
@@ -720,7 +688,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   ``When using Rgui the output to the console seems to be delayed.
   This is deliberate: the console output is buffered and re-written in
   chunks to be faster and less distracting. You can turn buffering off
-  or on from the `Misc' menu or the right-click menu: \verb+<Ctrl-W>+
+  or on from the 'Misc' menu or the right-click menu: \verb+<Ctrl-W>+
   toggles the setting.''
 
 \subsection{Some results take a while, and my MS Windows computer is
@@ -758,7 +726,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   to switch from one to another and overwrite existing graphics
   windows should you so choose.
 
-  Alternately, you can use RStudio (\url{http://www.rstudio.org})
+  Alternately, you can use RStudio (\url{https://posit.co/})
   where the plot window is such that previous plots can be recalled on
   the fly, resized, saved in various formats etc.
 
@@ -772,8 +740,8 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 
   \texttt{data <- data.frame(year=ordered(year),gdp)}
 
-  \noindent so that the ordered factor appears as `year' and not
-  `ordered.year'
+  \noindent so that the ordered factor appears as 'year' and not
+  'ordered.year'
 
 \subsection{Sometimes \texttt{plot()} appends my variable names with
     .ordered or .factor\dots}
@@ -785,7 +753,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     selection. However, when I try to plot the resulting object, it
     complains with the following message:}
 
-    \texttt{Error in eval(expr, envir, enclos) : object "variable" not
+    \texttt{Error in eval(expr, envir, enclos) : object ``variable'' not
       found\dots}
 
   This arises because \texttt{plot()} (\texttt{npplot()}) tries to retrieve
@@ -822,7 +790,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   variable is simply year, which equals 2006, 2007, and so forth.
 
   In \texttt{np} (and \texttt{R} in general), you get to economize by
-  just telling the function that the variable `year' is ordered, as in
+  just telling the function that the variable 'year' is ordered, as in
   ordered(year), where year is a vector containing elements 2006, 2007
   etc. Of course, seasoned R users would appreciate that this is in
   fact the simple way to do it with a parametric model as well.
@@ -830,7 +798,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   You would {\em never}, therefore, just pass dummy variables to an
   \texttt{np} function as you would for linear parametric models. The
   {\em only} exception is where you have only one 0/1 dummy for one
-  variable, say `\texttt{sex}', and in this case you still would have
+  variable, say '\texttt{sex}', and in this case you still would have
   to enter this as \texttt{factor(sex)} so that the \texttt{np}
   function recognizes this as a factor (otherwise it would treat it as
   continuous and use a kernel function that is inappropriate for a
@@ -846,9 +814,9 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
 \end{verbatim}
 
   Presuming your variable is not in fact a constant (i.e., is not in
-  fact a `variable'), this can only occur in the case where a variable
-  is `pathological' in that it has \texttt{IQR=0} but \texttt{std>0}
-  (see the section titled `Changes from Version 0.30-1 to 0.30-2
+  fact a 'variable'), this can only occur in the case where a variable
+  is 'pathological' in that it has \texttt{IQR=0} but \texttt{std>0}
+  (see the section titled 'Changes from Version 0.30-1 to 0.30-2
   [19-Apr-2009]' for further details).  This should no longer occur
   for np versions 0.30-2 and up.
 
@@ -890,11 +858,11 @@ legend(20,15,
 
 \subsection{\label{partial grad q}When I estimate my gradients and
     there are two or more covariates and then extract them with the
-    \texttt{gradients()} function, they are not `smooth', though if I
+    \texttt{gradients()} function, they are not 'smooth', though if I
     plot a model with the \texttt{gradients=TRUE} option, they are. The
     \texttt{gradients()} function must be broken\dots}
 
-  The function \texttt{plot()} (\texttt{npplot()}) plots `partial'
+  The function \texttt{plot()} (\texttt{npplot()}) plots 'partial'
   means and gradients. In other words, it plots $x_1$ versus $\hat
   g(x_1,\bar x_2)$ for the partial mean, where $\bar x_2$ is, say, the
   median/modal value of $x_2$. It also plots $x_1$ versus
@@ -1091,7 +1059,7 @@ legend(20,-0.05,c("Numerical","Analytic"),col=c("blue","red"),lty=c(1,2))
   \end{singlespacing}
 
   A slightly better way (as discussed in Li \& Wang (1998)
-  \cite{LI_WANG:1998}) would be to use a `mixed' residual, i.e., $\hat
+  \cite{LI_WANG:1998}) would be to use a 'mixed' residual, i.e., $\hat
   u_i = y_i - X_i'\tilde \beta - Z_i'\hat \gamma$ in the test, where
   $\tilde\beta$ is the semiparametric estimator of $\beta$ (based on
   the semiparametric partially linear model), and $\hat \gamma$ is the
@@ -1142,7 +1110,7 @@ ckerorder=8)$ksum,type="l",main="Epanechnikov [order = 8]")
 \end{verbatim}
   \end{singlespacing}
 
-\subsection{In version 0.20-0 and up I can `combine' steps such as
+\subsection{In version 0.20-0 and up I can 'combine' steps such as
     bandwidth selection and estimation. But when I do \texttt{summary(model)} I don't get the same summary that I would
     get from, say, \texttt{summary(bw)} and then \texttt{summary(model)}. How do I get bandwidth object summaries
     when combining steps?}
@@ -1239,15 +1207,15 @@ Z
   \end{enumerate}
 
 \subsection{When I run \texttt{R} in batch mode via \texttt{R CMD BATCH
-      filename.R} unwanted status messages (e.g., ```Multistart 1 of
-    10''') crowd out desired output. How can I turn off these unwanted
+      filename.R} unwanted status messages (e.g., ``Multistart 1 of
+    10'') crowd out desired output. How can I turn off these unwanted
     status messages?}
 
   After loading the np library add the line
   \texttt{options(np.messages=FALSE)} and all such messages will be
   disabled.
 
-\subsection{I am getting an `unable to allocate...' message after
+\subsection{I am getting an 'unable to allocate...' message after
     repeatedly interrupting large jobs.}
 
   Repeated interruption of large jobs can reduce available memory
@@ -1259,7 +1227,7 @@ Z
   issue simply restart R (i.e., exit then run a fresh R session).
 
 \subsection{I have a large number of variables, and when using the
-    formula interface I get an error message stating `invoked with
+    formula interface I get an error message stating 'invoked with
     improper formula'. I have double checked and everything looks
     fine. Furthermore, it works fine with the data frame interface.}
 
@@ -1277,7 +1245,7 @@ variables). The \texttt{gam} package function \texttt{gam()} (the
 \texttt{mgcv} package also contains a similar function by the same
 name) uses iteratively reweighted least squares and either smoothing
 splines (\texttt{s($\cdot$)}) or local polynomial regression fitting
-(\texttt{`loess', lo($\cdot$)}, with default manual `span' of 0.75,
+(\texttt{'loess', lo($\cdot$)}, with default manual 'span' of 0.75,
 the parameter which controls the degree of smoothing). The following
 code snippet demonstrates the capabilities of the \texttt{gam()}
 function via the \verb+wage1+ dataset included in the \texttt{np}
@@ -1296,7 +1264,7 @@ detach(wage1)
 The \texttt{mgcv} package also has an implementation of generalized
 additive models via the identical function name, \texttt{gam()}. The
 biggest difference is that this uses generalized cross validation to
-select the `span' (rather than manually) hence the degree of smoothing
+select the 'span' (rather than manually) hence the degree of smoothing
 becomes part of the method (as is the case for all functions in the
 \texttt{np} package). The following code snippet demonstrates the
 \texttt{mgcv} implementation of the \texttt{gam()} function.
@@ -1322,7 +1290,7 @@ that installation can proceed.
 By way of illustration, the following environment variables need to be
 set for the MacPorts version of OpenMPI (www.macports.org) running on
 Mac OS X 10.8.3 (the environment commands listed below are for those
-using the `bash' shell):
+using the 'bash' shell):
 
 \begin{verbatim}
 export LD_LIBRARY_PATH=/opt/local/lib
@@ -1342,7 +1310,7 @@ resolved by someone with familiarity of the local installation.
     
   \subsection{I am using the \texttt{npRmpi} package but when I launch
     one of the demo parallel jobs I get the error \texttt{Error: could
-      not find function "mpi.bcast.cmd"}}
+      not find function ``mpi.bcast.cmd''}}
 
 When your demo program stops at the following point in your file
 \begin{verbatim}
@@ -1404,7 +1372,7 @@ model <- npplreg(y~x1+factor(x2)|factor(z1)+z2,regtype="ll")
 
 ## Next, subtract the fitted parametric component from y so that we
 ## have y-xbetahat. Since we can have factors we need to create the
-## `model matrix' but make sure we don't keep the intercept generated
+## 'model matrix' but make sure we don't keep the intercept generated
 ## by model.matrix hence the [,-1]. This gives us the numeric matrix X
 ## which we multiply by the coefficient vector to obtain xbetahat which
 ## we can subtract from y.
@@ -1423,7 +1391,7 @@ model.sub <- npreg(y.sub~factor(z1)+z2,regtype="ll",gradients=TRUE)
 plot(model.sub,gradients=TRUE)
 \end{verbatim}
 
-\subsection{The R function `lag()' does not work as I expect it
+\subsection{The R function 'lag()' does not work as I expect it
   to. How can I create the $l$th lag of a numeric variable in R to be
   fed to functions in the \texttt{np} package?}
 
@@ -1448,7 +1416,7 @@ object since \texttt{lynx} was itself a \texttt{ts} object).
 
 Or, you can use the \texttt{embed} function to accomplish
 this task. Here is a simple function that might work more along the
-lines that you expect. By default we `pad' the vector with NAs but you
+lines that you expect. By default we 'pad' the vector with NAs but you
 can switch this to \texttt{FALSE} if you prefer. The function will
 return a vector of the same length as the original vector with NA's
 padded for the missing values.
@@ -1467,7 +1435,7 @@ x.lag.1 <- lag.numeric(x,1)
 \subsection{Can I provide sample weights to be used by functions in
   the \texttt{np} package?}
 
-Unfortunately, at this stage the answer is `no', at least not directly
+Unfortunately, at this stage the answer is 'no', at least not directly
 with many of the functions as they stand. However, the function
 \texttt{npksum} underlies many of the functions in the \texttt{np}
 package and it supports passing of weights, so you may be able to use
@@ -1486,7 +1454,7 @@ extreme values as well). The reason for this is because numerical
 methods are used to invert the CDF. This must be done for each
 predictor observation requiring the solution to $n$ (or $neval$)
 optimization problems. An alternative is to compute the
-`pseudo-inverse' via a `lookup method'. In essence, one computes the
+'pseudo-inverse' via a 'lookup method'. In essence, one computes the
 conditional CDF for a range of $y$ values, and then computes the
 pseudo-inverse which is defined as
 \begin{align*}
@@ -1558,7 +1526,7 @@ legend(min(year),max(gdp.tau,gdp),
 This can be accomplished by picking a sample realization, uniformly at
 random, then drawing from the kernel distribution centered on that
 training point with scale equal to the bandwidth. Below is a
-demonstration for the `Old Faithful' data where we draw a random
+demonstration for the 'Old Faithful' data where we draw a random
 sample of size $n=1,000$ where a Gaussian kernel was used for the
 density estimator.
 
@@ -1587,12 +1555,14 @@ x2.boot <- rnorm(n.boot,x2[i.boot],bw$bw[2])
 plot(npudens(~x1.boot+x2.boot,bws=bw$bw),view="fixed",xtrim=-.2,neval=100)
 \end{verbatim}
 
+%% See page 294 and up in cosma_resampling_ch15.pdf in ~/R/
+
 \subsection{Some of my variables are measured with an unusually large
   number of digits\dots should I rescale?}
 
 In general there should be no need to rescale data for one's
 statistical analysis. However, occasionally one can encounter issues
-with numerical accuracy (e.g.\ numerical `overflow') regardless of the
+with numerical accuracy (e.g.\ numerical 'overflow') regardless of the
 method used. It is therefore prudent to be aware of this issue. For
 instance, if your dependent variable represents housing prices in a
 particular currency and entries are recorded as e.g.\
@@ -1606,7 +1576,7 @@ difference. See \texttt{?scale} for a function whose default method
 centers and/or scales the columns of a numeric matrix.
 
 \subsection{The local linear gradient estimates appear to be somewhat
-  `off' in that they do not correspond to the first derivative of the
+  'off' in that they do not correspond to the first derivative of the
   estimated regression function.}
 
 It is perhaps not a widely known fact that the local linear partial
@@ -1660,6 +1630,187 @@ model.np <- suppressWarnings(npreg(y~x+z))
 ought to produce no console I/O whatsoever in the call to
 \texttt{npreg}.
 
+\subsection{Is there a way to exploit the sparse nature of the design
+  matrix when all predictors are categorical and reduce computation
+  time, particularly for cross-validation?}
+
+Certainly. This would occur if, for instance, you had 4 predictors
+each of which was binary 0/1, so there are only $2^4=16$ possible
+unique rows in the design matrix. The following conducts kernel
+regression with exclusively binary predictors by way of illustration.
+\begin{verbatim}
+## This routine exploits a sparse design matrix when computing the
+## kernel estimator of a conditional mean presuming unordered
+## categorical predictors. Numerical optimization is undertaken, and
+## this function can be much faster than that ignoring the sparse
+## structure for large n and small k (the function npreg() currently
+## does not attempt to exploit this structure).
+
+rm(list=ls())
+
+## Set the number of observations and number of binary predictors
+
+n <- 1000
+k <- 4
+
+## Create data/DGP
+
+z <- matrix(rbinom(n*k,1,.5),n,k)
+y <- rowSums(z) + rnorm(n)
+
+## Fire up uniquecombs() on a matrix of discrete support predictors.
+## We call the crs() variant of uniquecombs (the function is taken
+## from mgcv(), but mgcv() has serious load time overhead, and I don't
+## want to rely on other packages unnecessarily).
+
+z.unique <- crs:::uniquecombs(as.matrix(z))
+num.z <- ncol(z.unique)
+ind <-  attr(z.unique,"index")
+ind.vals <-  unique(ind)
+c <- nrow(z.unique)
+if(c == n) stop("design is not sparse (no repeated rows)")
+
+## Kernel function (li-racine unordered kernel)
+
+kernel <- function(X,x,lambda) ifelse(X==x,1,lambda)
+
+## Least-squares cross-validation objective function
+
+cv.ls.uniquecombs <- function(lambda,y,z,z.unique,ind,ind.vals,num.z,c) {
+    g <- numeric()
+    for(i in 1:c) {
+        zz <- ind == ind.vals[i]
+        L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
+                                                      z.unique[ind.vals[i],j],
+                                                      lambda[j])}),1,prod)
+        g[zz] <- (sum(y*L)-(y*L)[zz])/np:::NZD(sum(L)-L[zz])
+    }
+    return(mean((y-g)^2))
+}
+
+## Start timing for comparison with npreg()
+
+ptm <- proc.time()
+
+## Numerical optimization via optim() - could be faster if we also
+## used fn.gradient (not done here)
+
+optim.out <- optim(runif(num.z),
+                   fn=cv.ls.uniquecombs,
+                   method="L-BFGS-B",
+                   lower=rep(0,num.z),
+                   upper=rep(1,num.z),
+                   y=y,
+                   z=z,
+                   z.unique=z.unique,
+                   ind=ind,
+                   ind.vals=ind.vals,
+                   num.z=num.z,
+                   c=c)
+
+## Extract least-squares cross-validation optimal bandwidths
+
+lambda.opt <- optim.out$par
+
+## Compute the estimator using the optimal bandwidths
+
+g <- numeric()
+for(i in 1:c) {
+    zz <- ind == ind.vals[i]
+    L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
+                                                  z.unique[ind.vals[i],j],
+                                                  lambda.opt[j])}),1,prod)
+    g[zz] <- sum(y*L)/np:::NZD(sum(L))
+}
+
+## Save execution time for optimization and estimation
+
+t.uniquecombs <- proc.time() - ptm
+
+## Compare timing and results with npreg() (comment out the following
+## for general use)
+
+library(np)
+g.Formula <- "y ~"
+for (p in 1:k) {
+  g.Formula <- paste(g.Formula," + factor(z[,",p,"])")
+}
+g.Formula <- formula(g.Formula)
+t.npreg <- system.time(g.npreg <- npreg(g.Formula,
+                                        ukertype="liracine",
+                                        nmulti=1))
+
+## Compare fitted values for first 10 observations
+
+cbind(g[1:10],fitted(g.npreg)[1:10])
+
+## Compare bandwidths
+
+cbind(lambda.opt,g.npreg$bws$bw)
+
+## Compare objective function values
+
+cbind(optim.out$value,g.npreg$bws$fval)
+
+## Compare computation time in seconds
+
+cbind(t.uniquecombs[1],t.npreg[1])
+\end{verbatim}
+
+\subsection{I want to bootstrap the standard errors for the
+  coefficients in a varying coefficient specification. Is there a
+  simple way to accomplish this?}
+
+The code below presents one way to accomplish this. For this example
+the model is
+\begin{equation*}
+Y_i=\alpha(Z_i)+X_i\beta(Z_i)+\epsilon_i,
+\end{equation*}
+where $X_i$ is experience and $Z_i$ is tenure. The estimated slope
+vector $\beta(Z_i)$ is therefore a function of tenure. We bootstrap
+its standard error and then plot the resulting estimate and 95\%
+asymptotic confidence bounds.
+
+\begin{verbatim}
+library(np)
+data(wage1)
+## Fit the model
+model <- with(wage1,npscoef(tydat=lwage,
+                            txdat=exper,
+                            tzdat=tenure,
+                            betas=TRUE))
+beta2 <- coef(model)[,2]
+## Bootstrap the standard error for the slope coefficient (there
+## will be two coefficient vectors, the intercept and slope 
+## for exper, which vary with tenure)
+B <- 100
+coef.mat <- matrix(NA,nrow(wage1),B)
+for(b in 1:B) {
+    ## Bootstrap the training data, evaluate on the original
+    ## sample realizations, hold the bandwidth constant at
+    ## that for the original model/training data
+    wage1.boot <- wage1[sample(1:nrow(wage1),replace=TRUE),]
+    model.boot <- with(wage1.boot,npscoef(tydat=lwage,
+                                          txdat=exper,
+                                          tzdat=tenure,
+                                          exdat=wage1$exper,
+                                          ezdat=wage1$tenure,
+                                          betas=TRUE,
+                                          bws=model$bw))
+    coef.mat[,b] <- coef(model.boot)[,2]
+}
+
+se.beta2 <- apply(coef.mat,1,sd)
+ci.l <- beta2-1.96*se.beta2
+ci.u <- beta2+1.96*se.beta2
+
+ylim <- range(c(beta2,ci.l,ci.u))
+with(wage1,plot(tenure,beta2,ylim=ylim))
+with(wage1,points(tenure,ci.l,col=2))
+with(wage1,points(tenure,ci.u,col=2))
+legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
+\end{verbatim}
+
 \bibliographystyle{plain} 
 
 \bibliography{np_faq}
@@ -1667,6 +1818,271 @@ ought to produce no console I/O whatsoever in the call to
 \clearpage
 
 \appendix
+
+\section*{Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]}
+
+\begin{itemize}
+
+\item Added crs to Suggests field in DESCRIPTION per CRAN requirements
+
+\item Utility functions \texttt{integrate.trapezoidal()}, \texttt{NZD()}, \texttt{NZD\_pos()} (new, affect npregiv() and npregivderiv())
+
+\item Miscellaneous typos fixed
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-17 to 0.60-18 [09-Dec-2024]}
+
+\begin{itemize}
+
+\item Patched issue with \texttt{as.double(data)} when data is a NULL object
+  reported by Brian Ripley
+
+\item Merged rng pull request \texttt{https://github.com/JeffreyRacine/R-Package-np/pull/48}
+
+\item Incorporated Kurt Hornik's kind suggestion ``If indeed intended as a
+  package overview help file, please add \texttt{{\textbackslash}alias\{np-package\}} to file
+  \texttt{'np/man/np-package.Rd'}''
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-16 to 0.60-17 [12-Mar-2023]}
+
+\begin{itemize}
+
+\item Fixed warning
+
+\begin{verbatim}
+  Check: S3 generic/method consistency Result: WARN
+  compute.bootstrap.errors: function(..., bws)
+  compute.bootstrap.errors.*} triggered potentially by lack of
+  \texttt{...,bw} in functions called
+\end{verbatim}
+
+(thanks to Kurt Hornik for assistance!)
+
+\item Updated \texttt{inst/CITATIONS} to get rid of old-style cit and
+  bib entries
+  
+\end{itemize}
+
+\section*{Changes from Version 0.60-15 to 0.60-16 [18-Oct-2022]}
+
+\begin{itemize}
+
+\item Fixed \texttt{warning: a function definition without a prototype is
+  deprecated in all versions of C and is not supported in C2x
+  [-Wdeprecated-non-prototype]} (thanks Zhenghua!)
+
+\end{itemize}
+  
+\section*{Changes from Version 0.60-14 to 0.60-15 [09-Oct-2022]}
+
+\begin{itemize}
+
+\item Explicit acknowledgment in \texttt{DESCRIPTION} of code
+  \texttt{gsl\_bspline.c/.h} adapted from the GNU GSL library with
+  further details appended to \texttt{gsl\_bspline.c/.h} (thanks to
+  Professor Brian Ripley for noting this oversight).
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-13 to 0.60-14 [22-Aug-2022]}
+
+\begin{itemize}
+
+\item Added logspline and ks to DESCRIPTION to address NOTE on some system
+  builds stating \texttt{Undeclared packages logspline, ks in Rd xrefs}
+
+\item Zhenghua Nie kindly addressed the clang-UBSAN issue in jksum.c
+  causing \texttt{runtime error: applying non-zero offset 8 to null pointer}
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-12 to 0.60-13 [15-Aug-2022]}
+
+\begin{itemize}
+
+\item Minor changes to np.Rnw vignette viz Sweave options and class
+	(redundancies commented out)
+
+\item Fixed issues relating to new NOTE ``Found if() conditions
+  comparing class() to string [..] Use inherits() (or maybe is())
+  instead.'' Addressed by using \texttt{isa()}
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-11 to 0.60-12 [12-Aug-2022]}
+
+\begin{itemize}
+
+\item JSS issues corrected in vignette/*.bib and inst/CITATION (use of DOI,
+  etc., thanks to Achim Zeileis)
+
+\item Issues with utf8x in entropy\_np.Rnw and np.Rnw corrected (utf8x
+  changed to utf8, etc.)
+
+\end{itemize}  
+
+\section*{Changes from Version 0.60-10 to 0.60-11 [04-Jun-2021]}
+
+\begin{itemize}
+
+\item \texttt{npuniden.boundary()} uses empirical support for
+  \texttt{a} and \texttt{b} (previously was \texttt{[0,1]}, now
+  \texttt{[min(X),max(X)]})
+
+\item Corrected potential issue with \texttt{malloc} failing on null vector
+  in C function \texttt{sort\_unique()} detected by development version of
+  \texttt{gcc11} (thanks to Professor Brian Ripley for pointing this out
+  and for his assistance)
+
+\item Corrected outdated URLs  
+
+\end{itemize}    
+
+\section*{Changes from Version 0.60-9 to 0.60-10 [5-Feb-2020]}
+
+\begin{itemize}
+
+\item Corrected issue \texttt{Documented arguments not in usage in documentation object se: \dots}
+
+\item Removal of directed quotes in some Rd documents, replacement
+  with \verb+\sQuote{}+
+
+\item Fixed issue causing rebuilding of vignettes to crash (\texttt{uocquantile()} was the culprit)
+  
+  
+\end{itemize}  
+
+\section*{Changes from Version 0.60-8 to 0.60-9 [24-Oct-2018]}
+
+\begin{itemize}
+
+\item Added support for character expansion to \texttt{npplot()} (which is invoked by calling \texttt{plot()} on an np object) - will take defaults from the environment \texttt{par()} or can be set directly, e.g., \texttt{plot(foo,cex.main=0.8)}
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-7 to 0.60-8 [04-Jun-2018]}
+
+\begin{itemize}
+
+\item Used patch suggested by Scott Thompson for issue https://github.com/JeffreyRacine/R-Package-np/issues/8 regarding \texttt{npcdens()/npcdist()} and formulas
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-6 to 0.60-7 [01-May-2018]}
+
+\begin{itemize}
+
+\item Fix for \texttt{switch()} and zero length character strings that
+  affected summary output for certain tests
+  
+\item Added function for shape constrained bounded univariate PDF and
+  CDF estimation (\texttt{npuniden.sc()})
+
+\item Added option for renormalizing improper bounded density
+  estimates than can arise from the use of asymmetric negative edge
+  kernel functions (\texttt{proper=TRUE},
+  \texttt{npuniden.boundary()})
+
+\item Fixed issues with CDF estimation in the presence of large
+  bandwidths for bounded density estimates
+  (\texttt{npuniden.boundary()})
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-5 to 0.60-6 [12-Jan-2018]}
+
+\begin{itemize}
+
+\item Added more edge kernel functions for
+  \texttt{npuniden.boundary()}, some glitches addressed
+
+\item Added asymptotic standard errors and integrated density (CDF) to
+  \texttt{npuniden.boundary()} and \texttt{npuniden.reflect()} plus
+  additional examples
+
+\item Added least squares cross-validation to
+  \texttt{npuniden.boundary()} (default for boundary kernel functions)
+  
+\end{itemize}
+
+\section*{Changes from Version 0.60-4 to 0.60-5 [04-Jan-2018]}
+
+\begin{itemize}
+
+\item Added two basic functions for univariate bounded kernel density
+  estimation, \texttt{npuniden.boundary} and \texttt{npuniden.reflect}
+
+\item More plotting routines accept more passable parameters
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-3 to 0.60-4 [03-Dec-2017]}
+
+\begin{itemize}
+
+\item Default \texttt{plot.errors.style} changed to \texttt{"band"}
+
+\item Using \texttt{wrapLines(strwrap(...))} for summary output for
+  model specification test to automatically wrap long formula lines
+
+\item \texttt{plot()} calls \texttt{npplot()} and \texttt{npplot()}
+  behaves better when most passable parameters are fed (\texttt{col
+    =}, \texttt{lty =}, \texttt{xlab =}, etc.) but there may still be
+  room for improvement
+
+\item Added option \texttt{plot.par.mfrow=TRUE/FALSE} to
+  \texttt{npplot()} so that the automated setting of
+  \texttt{par(mfrow=c(,))} in plot is disabled and the user can do
+  this manually if desired
+
+\item Option \texttt{plot.par.mfrow=TRUE/FALSE} can be overridden by
+  setting \texttt{options(plot.par.mfrow=TRUE/FALSE)}
+
+\end{itemize}
+
+\section*{Changes from Version 0.60-2 to 0.60-3 [29-Apr-2017]}
+
+\begin{itemize}
+
+\item Fixed the 'cannot find function \texttt{is()}' glitch that just surfaced with R 3.4.0
+
+\item Fixed glitch in \texttt{npconmode()} when randomizing if all probabilities
+  are equal
+
+\item Migrated some code from crs (which I wrote) to avoid \texttt{crs:::}
+
+\item Fixed	outstanding glitch in \texttt{npscoef()} with \texttt{tydat}
+
+\item Option \texttt{leave.one.out} not properly implemented in \texttt{npscoef()}, corrected
+
+\item Using pmin/pmax in NZD (parallel min/max more efficient with vectors)
+
+\item Improved screen i/o when \texttt{smooth.residuals=TRUE/FALSE}
+
+\item Corrected glitch in \texttt{npregiv()} where multivariate z would halt with error
+
+\item \texttt{npregiv()} with \texttt{method="Landweber-Fridman"} no longer passes back lists
+
+\item Fixed glitch in \texttt{Kmat.lp} with p=0 and derivatives
+
+\item Tikhonov regularization in \texttt{npregiv()} now supports evaluation data
+
+\item Updated \texttt{npregiv()} (was sorely lacking, did not support eval etc.)
+
+\item Use of \texttt{.onLoad} suggested (by Bernd Bischl)
+
+\item Added \texttt{vignette("entropy\_np",package="np")} to startup message
+
+\item In \texttt{np.distribution.bw.R} default for \texttt{do.full.integral} changed to FALSE
+
+\item Fixed the CDF objective function when averaging over the training data
+
+\item Fixed crash error with \texttt{npcdistbw()} and adaptive bandwidths
+
+\end{itemize}
 
 \section*{Changes from Version 0.60-1 to 0.60-2 [27-Jun-2014]}
 
@@ -1817,7 +2233,7 @@ ought to produce no console I/O whatsoever in the call to
 
 \item Using .onUnload rather than .Last.lib in zzz.R
 
-\item Fixed glitch in \texttt{npreg()} summary where `Residual
+\item Fixed glitch in \texttt{npreg()} summary where 'Residual
   standard error' was reporting residual variance
 
 \item \texttt{npksum()} functionality extended
@@ -1868,7 +2284,7 @@ ought to produce no console I/O whatsoever in the call to
   (multistarting, parameters passed to \texttt{optim()} for
   cross-validation)
 
-\item Changes to code to improve compliance with R `Writing portable
+\item Changes to code to improve compliance with R 'Writing portable
   packages' guidelines and correct partial argument matches
 
 \end{itemize}
@@ -1949,7 +2365,7 @@ ought to produce no console I/O whatsoever in the call to
   (2011, Econometrica) and Horowitz (2011, Econometrica). Note that
   this function currently returns the fitted $\varphi(z)$ (i.e.\ lacks
   much functionality relative to other \texttt{np} functions) and is in
-  `beta status' until further notice.
+  'beta status' until further notice.
 
 \item Added a new dataset \texttt{Engel95} that allows one to estimate
   Engel curves using the new nonparametric instrumental regression
@@ -2191,16 +2607,16 @@ ought to produce no console I/O whatsoever in the call to
 \begin{itemize}
 
 \item Added basic user-interrupt checking for all underlying C code so
-  that either \verb+<Ctrl-C>+ (Rterm) or the `STOP' icon (Rgui) will
+  that either \verb+<Ctrl-C>+ (Rterm) or the 'STOP' icon (Rgui) will
   interrupt all running processes. This has a number of desirable side
   effects in addition to being able to interrupt C-based processes
-  including i) R no longer showing up as `not responding' under the
+  including i) R no longer showing up as 'not responding' under the
   task manager (Windows) or the activity monitor (Mac OS X) and ii)
   buffered output now being correctly displayed when using Rgui under
   Windows and Mac OS X
 
   Note that repeated interruption of large jobs can reduce available
-  memory under R - if this becomes an issue (i.e., you get a `cannot
+  memory under R - if this becomes an issue (i.e., you get a 'cannot
   allocate...' error under R) simply restart R (i.e., exit then run a
   fresh R session)
 
@@ -2337,7 +2753,7 @@ ought to produce no console I/O whatsoever in the call to
 \item \texttt{example(foobar)} now works again. This was disabled in
   0.14-1 at the request of the \texttt{R} maintainers in order to shorten
   the duration of \texttt{R CMD check}. All examples remained in the help
-  files but due to the presence of `dontrun' they were not run when
+  files but due to the presence of 'dontrun' they were not run when
   \texttt{example(foobar)} is requested. Now a limited subset is run
   while the full set of examples remain in the documents
 
