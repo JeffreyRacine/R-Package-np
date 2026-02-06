@@ -39,7 +39,7 @@ total.
 \keyword{datasets}
 
 \examples{
-\donttest{
+\dontrun{
 ## Example - compute nonparametric instrumental regression using
 ## Landweber-Fridman iteration of Fredholm integral equations of the
 ## first kind.
@@ -117,5 +117,5 @@ mpi.close.Rslaves()
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-} % enddonttest
+} % enddontrun
 }

@@ -326,18 +326,20 @@ mpi.close.Rslaves <- function(dellog=TRUE, comm=1){
         if (dellog && mpi.comm.size(0) < mpi.comm.size(comm)){
         tmp <- paste(Sys.getpid(),"+",comm,sep="")  
         logfile <- paste("*.",tmp,".*.log", sep="")
-        if (length(system(paste("ls", logfile),TRUE,ignore.stderr=TRUE) )>=1)
-            system(paste("rm", logfile))
+        logfiles <- Sys.glob(logfile)
+        if (length(logfiles) >= 1)
+            unlink(logfiles)
         }
     }
 #     mpi.barrier(comm)
     if (comm >0){
         if (is.loaded("mpi_comm_disconnect"))
-            mpi.comm.disconnect(comm) 
+            res <- mpi.comm.disconnect(comm) 
         else
-            mpi.comm.free(comm)
+            res <- mpi.comm.free(comm)
     }
 #   mpi.comm.set.errhandler(0)
+    invisible(res)
 }
 
 tailslave.log <- function(nlines=3,comm=1){
@@ -345,7 +347,8 @@ tailslave.log <- function(nlines=3,comm=1){
     stop ("It seems no slaves running")
     tmp <- paste(Sys.getpid(),"+",comm,sep="")  
     logfile <- paste("*.",tmp,".*.log", sep="")
-    if (length(system(paste("ls", logfile),TRUE,ignore.stderr=TRUE))==0)
+    logfiles <- Sys.glob(logfile)
+    if (length(logfiles) == 0)
     stop("It seems no slave log files.")
     system(paste("tail -",nlines," ", logfile,sep=""))
 }

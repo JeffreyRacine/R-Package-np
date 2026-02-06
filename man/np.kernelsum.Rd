@@ -330,7 +330,7 @@ npksum(\dots)
 }
 
 \examples{
-\donttest{
+\dontrun{
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
 ## (master and slave).  Kindly see the batch examples in the demos
@@ -368,6 +368,6 @@ mpi.close.Rslaves()
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-} % enddonttest     
+} % enddontrun     
 }
 \keyword{ nonparametric }
