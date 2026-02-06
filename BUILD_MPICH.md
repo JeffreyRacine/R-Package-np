@@ -28,7 +28,6 @@ R CMD INSTALL npRmpi_0.60-21.tar.gz
 ## 4) Quick runtime sanity check
 ```r
 library(npRmpi)
-library(Rmpi)
 mpi.spawn.Rslaves(nslaves=1)
 mpi.remote.exec(paste("Hello from", mpi.comm.rank()))
 mpi.close.Rslaves()
@@ -52,7 +51,6 @@ A reliable workaround is to run demos from an interactive R session using
 Example:
 ```r
 library(npRmpi)
-library(Rmpi)
 mpi.spawn.Rslaves(nslaves=1)
 source("demo/npregllls_npRmpi.R")
 ```
