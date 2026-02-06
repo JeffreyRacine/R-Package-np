@@ -32,6 +32,7 @@ mpi.bcast.Robj2slave(mydat)
 
 t <- system.time(mpi.bcast.cmd(bw <- npudistbw(~x,
                                                bwmethod="cv.cdf",
+                                               do.full.integral = TRUE,
                                                data=mydat),
                                caller.execute=TRUE))
 

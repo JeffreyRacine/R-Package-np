@@ -18,6 +18,7 @@ mydat <- data.frame(x=rnorm(n))
 
 t <- system.time(bw <- npudistbw(~x,
                                  bwmethod="cv.cdf",
+                                 do.full.integral = TRUE,
                                  data=mydat))
 
 summary(bw)

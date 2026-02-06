@@ -22,7 +22,7 @@ mpi.bcast.cmd(data("oecdpanel"),
 mpi.bcast.cmd(attach(oecdpanel),
               caller.execute=TRUE)
 
-n <- nrow(oecdpanel)
+n <- 616 # n <- nrow(oecdpanel)
 
 oecd <- factor(oecd)
 year <- factor(year)

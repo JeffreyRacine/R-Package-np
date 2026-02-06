@@ -8,7 +8,7 @@ options(np.messages=FALSE)
 
 data("Italy")
 
-n <- nrow(Italy)
+n <- 1008 # n <- nrow(Italy)
 
 ## A quantile regression example
 
