@@ -1,6 +1,6 @@
 Package: npRmpi
-Version: 0.60-21
-Date: 2026-02-04
+Version: 0.60-20
+Date: 2026-02-06
 Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel
 Suggests: crs, MASS, logspline, ks, testthat, np
 Title: Parallel Nonparametric Kernel Smoothing Methods for Mixed Data Types

@@ -1,3 +1,118 @@
+Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
+
+* npRmpi-specific updates and improvements:
+
+  - Wrapped examples in \dontrun{} and updated run/dontrun scripts for
+    better MPI compatibility
+
+  - Fixed 'break used in wrong context' byte-compilation error in
+    Rparutilities.R
+
+  - Corrected unnecessarily escaped LaTeX symbols (\_) and incorrectly
+    formatted code tags ($count) in .Rd files
+
+  - Synchronized np.plot categorical predictor evaluation fix from master
+    branch (resolves npplreg plot with categorical predictor issue)
+
+  - Updated DESCRIPTION and NAMESPACE to properly handle 'parallel' package
+    imports and 'np' suggestion
+
+  - Fixed CRLF line endings in configure.ac and incomplete final line in
+    demo/00Index
+
+  - Expanded .Rbuildignore to exclude .git and additional build/demo
+    artifacts
+
+  - Removed legacy makefile.openmpi
+
+  - Modernized MPI detection in configure
+
+  - Fixed Rmpi init registration conflict
+
+  - Synchronized partial Rmpi 0.7-3.3 updates
+
+  - Fixed npsigtest eval casting and added demo run/timing helpers
+
+  - Added demo runall scripts for easier testing
+
+  - Documented mpiexec port workaround
+
+  - Added MPICH build/run notes for npRmpi
+
+  - Allowed skipping MPI init via NP_RMPI_SKIP_INIT environment variable
+
+  - Defined Realloc, Calloc, and Free macros for MPICH build
+
+  - Included R memory macros in Rmpi.c
+
+  - Fixed MPICH build flags for npRmpi
+
+  - Updated man page package references to npRmpi
+
+  - Synchronized man pages with np master
+
+  - Restored npRmpi helpers and updated documentation
+
+  - Aligned npRmpi docs and removed non-CRAN artifacts
+
+  - Added legacy npRmpi docs and demo artifacts
+
+  - Fixed np issues 4/6/7/13/18/26/51 and added np.pairs utilities
+
+  - Removed superfluous library(Rmpi) calls
+
+  - Fixed log cleanup warning and silenced mpi.close output
+
+  - Switched donttest to dontrun in Rd examples for MPI awareness
+
+  - Updated documentation examples to use MPI-aware code
+
+  - Updated Rmpi base version (0.7-3.3) to reflect version in startup
+    message
+
+  - Updated np_faq vignettes with npRmpi-specific content
+
+* Incorporated all updates from np master package through version 0.60-19:
+
+  - Added bandwidth details to npregiv summaries
+
+  - Added estimation timing and ensured alphabetical argument order in np
+    IV functions
+
+  - Reordered npregivderiv arguments alphabetically after fixed ones
+
+  - Updated unit tests and fixed documentation mismatches for
+    npregiv/npregivderiv
+
+  - Implemented S3 methods (print, summary, plot) for npregiv and
+    npregivderiv
+
+  - Updated documentation for npregiv/npregivderiv warm-start strategy
+
+  - Aligned npregiv/npregivderiv multistart strategy with crsiv/crsivderiv
+
+  - Fixed initialization of bw.mu.w in npregivderiv for warm-start strategy
+
+  - Implemented warm-start strategy in npregiv and npregivderiv
+
+  - Expanded unit test coverage to include distribution, copula, quantile
+    regression, tests of independence/specification, and
+    boundary/shape-constrained methods
+
+  - Added unit tests using testthat and cleaned up phihat to phi in
+    npregiv*
+
+  - Optimized npregiv and npregivderiv for performance: pre-allocated
+    matrices and lists in iterative loops to avoid redundant memory
+    allocation (cbind/rbind); optimized trapezoidal integration in
+    npregivderiv by pre-calculating sort orders and differences; improved
+    efficiency of Tikhonov and Ridge calculations; alphabetized arguments
+    in function signatures and updated documentation (Rd files) to match
+
+  - Updated URLs to resolve CRAN check warnings
+
+  - Updated McMaster website URL to https://experts.mcmaster.ca/people/racinej
+
 Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]
 
 * Added crs to Suggests field in DESCRIPTION per CRAN requirements
