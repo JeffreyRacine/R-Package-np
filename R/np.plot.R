@@ -1223,6 +1223,7 @@ npplot.rbandwidth <-
 
         if (xi.factor){
           ei = levels(xdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
@@ -2666,6 +2667,7 @@ npplot.plbandwidth <-
         
         if (xi.factor){
           ei = levels(zdat[,i])
+          ei = factor(ei, levels = ei)
           xi.neval = length(ei)
         } else {
           xi.neval = neval
