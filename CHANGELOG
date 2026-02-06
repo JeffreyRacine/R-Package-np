@@ -1,3 +1,39 @@
+Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
+
+* Major enhancements to npregiv() and npregivderiv():
+  - Implemented warm-start strategy for improved convergence
+  - Aligned multistart strategy with crsiv/crsivderiv for consistency
+  - Performance optimizations: pre-allocated matrices/lists in iterative loops,
+    optimized trapezoidal integration, improved Tikhonov and Ridge calculations
+  - Added S3 methods (print, summary, plot) for better integration with R workflow
+  - Enhanced summaries with bandwidth details and estimation timing information
+  - Alphabetized function arguments for consistency
+  - Fixed initialization of bw.mu.w in npregivderiv
+  - Cleaned up naming convention (phihat to phi throughout)
+
+* Testing improvements:
+  - Added comprehensive unit tests using testthat framework
+  - Expanded test coverage to include distribution, copula, quantile regression,
+    tests of independence/specification, and boundary/shape-constrained methods
+
+* Build and maintenance updates:
+  - Refined .Rbuildignore regexes to correctly exclude .git and build artifacts
+  - Added missing imports (graphics, grDevices) to NAMESPACE to resolve global
+    function notes
+  - Restored \dontrun blocks in documentation to expedite package checks
+  - Suppressed build warnings for non-standard man directory files
+
+* Bug fixes:
+  - Fixed np.plot categorical predictor evaluation
+  - Fixed np package registrations after sync
+  - Synced non-MPI code fixes from npRmpi
+
+* Documentation updates:
+  - Updated URLs to resolve CRAN check warnings
+  - Updated McMaster website URL to https://experts.mcmaster.ca/people/racinej
+  - Added build notes, worktrees documentation, and CRAN diff summary
+  - Fixed documentation mismatches for npregiv/npregivderiv
+
 Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]
 
 * Added crs to Suggests field in DESCRIPTION per CRAN requirements
