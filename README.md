@@ -46,4 +46,4 @@ of the package (i.e. the package `npRmpi`), you can add the option
 system has a working MPI subsystem installed. See `WORKTREES.md` and
 `BUILD.md` in this repo for local build details.
 
-For more information on this project please visit the maintainer's website (https://www.socialsciences.mcmaster.ca/people/racinej).
+For more information on this project please visit the maintainer's website (https://experts.mcmaster.ca/people/racinej).
