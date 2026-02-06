@@ -33,7 +33,9 @@ se(x)
   This method currently only supports objects from the \code{\link{npRmpi}} library.
 }
 \examples{
+\dontrun{
 x <- rnorm(10)
 se(npudens(npudensbw(~x)))
+} % enddontrun
 }
 \keyword{nonparametric}

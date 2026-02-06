@@ -49,10 +49,12 @@ dataset \code{"wage"} plus additional objects \code{"bw.all"} and
 }
 \source{ Jeffrey M. Wooldridge }
 \examples{
+\dontrun{
 data("wage1")
 attach(wage1)
 summary(wage1)
 detach(wage1)
+} % enddontrun
 }
 
 

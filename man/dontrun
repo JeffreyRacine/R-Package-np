@@ -6,7 +6,7 @@ sed -i bak -f sed_dontrun.scr data-italy.Rd
 sed -i bak -f sed_dontrun.scr data-oecd.Rd
 sed -i bak -f sed_dontrun.scr data-wage1.Rd
 sed -i bak -f sed_dontrun.scr gradients.Rd
-sed -i bak -f sed_dontrun.scr np-package.Rd
+sed -i bak -f sed_dontrun.scr nptgauss.Rd
 sed -i bak -f sed_dontrun.scr np.cmstest.Rd
 sed -i bak -f sed_dontrun.scr np.condensity.Rd
 sed -i bak -f sed_dontrun.scr np.condistribution.Rd
@@ -21,6 +21,7 @@ sed -i bak -f sed_dontrun.scr np.density.bw.Rd
 sed -i bak -f sed_dontrun.scr np.distribution.bw.Rd
 sed -i bak -f sed_dontrun.scr np.deptest.Rd
 sed -i bak -f sed_dontrun.scr np.kernelsum.Rd
+sed -i bak -f sed_dontrun.scr np.pairs.Rd
 sed -i bak -f sed_dontrun.scr np.plot.Rd
 sed -i bak -f sed_dontrun.scr np.plregression.Rd
 sed -i bak -f sed_dontrun.scr np.plregression.bw.Rd

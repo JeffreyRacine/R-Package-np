@@ -57,8 +57,10 @@ gradients(x, \dots)
   This method currently only supports objects from the \code{\link{npRmpi}} library.
 }
 \examples{
+\dontrun{
 x <- runif(10)
 y <- x + rnorm(10, sd = 0.1)
 gradients(npreg(y~x, gradients=TRUE))
+} % enddontrun
 }
 \keyword{nonparametric}

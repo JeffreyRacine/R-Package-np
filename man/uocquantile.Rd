@@ -31,8 +31,10 @@ uocquantile(x, prob)
 }
 
 \examples{
+\dontrun{
 x <- rbinom(n = 100, size = 10, prob = 0.5)
 uocquantile(x, 0.5)
+} % enddontrun
 }
 
 \keyword{univar}
