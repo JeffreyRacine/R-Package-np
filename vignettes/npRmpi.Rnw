@@ -401,7 +401,7 @@ The run times reported in Table \ref{run table} were generated using R
 2.11-0 and Open MPI 1.2.8 on a MacBook laptop running Snow Leopard
 10.6.3 on a 2.4 GHz Intel Core 2 Duo (a completely stock
 installation). The ratios reported in Table \ref{run saw table} were
-run on the SHARCNET cluster `saw' (\url{www.sharcnet.ca}) using R
+run on the SHARCNET cluster `saw' (\url{https://sharcnet.ca/}) using R
 2.11-0 and Open MPI 1.4.2.\footnote{`saw' is an HP cluster with 2,704
   cores running Red Hat Enterprise Linux version 5.1 with InfiniBand
   interconnects, 16 GB RAM/node, 2 sockets x 4 cores per socket
