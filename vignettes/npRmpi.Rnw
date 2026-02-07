@@ -106,7 +106,7 @@ of multiple cores in desktop and laptop machines, leveraging the
 solution to the often lengthy computation times associated with
 nonparametric kernel methods.
 
-The code has been tested in the Mac OS X and Linux environments which
+The code has been tested in the macOS and Linux environments which
 allow the user to compile \proglang{R} packages on the fly (presuming
 of course that a C compiler exists on your system). Users running MS
 Windows will have to consult local tech support personnel and may also
@@ -127,7 +127,7 @@ run (see Section \ref{sec example} below for a detailed example), and
 finally you will run the job using either \code{mpirun} or,
 indirectly, via a batch scheduler on your cluster such as \code{sqsub}
 (kindly consult your local support personnel for assistance on using
-batch queueing systems on your local cluster).
+batch queueing systems on your cluster).
 
 Note that, since the data has to be broadcast to the slave notes, it
 is a good idea to put it in a dataframe first and it is always a good
@@ -139,8 +139,8 @@ Installation will depend on your hardware and software configuration
 and will vary widely across platforms. If you are not familiar with
 parallel computing you are strongly advised to seek local advice.
 
-That being said, if you have current versions of \proglang{R} and Open
-\proglang{MPI} properly installed on your system, installation of the
+That being said, if you have current versions of \proglang{R} and
+\proglang{MPI} (e.g., MPICH or Open MPI) properly installed on your system, installation of the
 \pkg{npRmpi} package can be done in the standard manner from within
 \proglang{R} via
 \begin{verbatim}
@@ -160,8 +160,8 @@ following by way of illustration (for this illustration we use the
 Intel compiler suite and need to set \proglang{MPI} library paths and
 \proglang{MPI} root directories):
 \begin{verbatim}
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/sharcnet/openmpi/current/intel/lib
-export MPI_ROOT=/opt/sharcnet/openmpi/current/intel 
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/opt/sharcnet/mpich/current/intel/lib
+export MPI_ROOT=/opt/sharcnet/mpich/current/intel 
 \end{verbatim}
 where again foo is the version number. 
 
@@ -177,8 +177,8 @@ To run a parallel \pkg{np} job having successfully installed the
 \code{.Rprofile}).\footnote{You will need to download the \pkg{npRmpi}
   source code and unpack it in order to get Rprofile from the
   npRmpi/inst directory.} Then to run the batch code in the file
-\code{npudensml_npRmpi.R} using two processors on an Open \proglang{MPI}
-system you will enter something like
+\code{npudensml_npRmpi.R} using two processors on an
+\proglang{MPI} system you will enter something like
 
 \begin{verbatim}
 mpirun -np 2 R CMD BATCH npudensml_npRmpi.R
@@ -311,7 +311,7 @@ Below is the same code modified to run in parallel using the
     \item There are a number of example files (including that above
       and below) in the \code{npRmpi/demo} directory that you may wish
       to examine. Each of these runs and has been deployed in a range
-      of environments (Mac OS X, Linux).
+      of environments (macOS, Linux).
         
 \end{enumerate}
 
@@ -320,7 +320,8 @@ Below is the same code modified to run in parallel using the
 ## Make sure you have the .Rprofile file from npRmpi/inst/ in your
 ## current directory or home directory. It is necessary.
 
-## To run this on systems with OPENMPI installed and working, try
+## To run this on systems with an MPI implementation (e.g. MPICH) 
+## installed and working, try
 ## mpirun -np 2 R CMD BATCH npudensml_npRmpi.R. Check the time in the
 ## output file npudensml_npRmpi.Rout (the name of this file with extension
 ## .Rout), then try with, say, 4 processors and compare run time.
@@ -384,9 +385,9 @@ processor, ten in one tenth and so forth.\footnote{There is minor
   for sufficiently large samples.} Though installation of a working
 \proglang{MPI} implementation requires some familiarity with computer
 systems, local expertise exists for many and help is to be found
-there. That being said, the Mac OS X operating system comes stock with
-a fully functioning version of Open \proglang{MPI} so there is zero
-additional effort required for the user in order to get up and running
+there. That being said, the macOS operating system can readily use
+fully functioning versions of \proglang{MPI} (e.g. MPICH or Open MPI) so there is
+minimal additional effort required for the user in order to get up and running
 in this environment. Finally, any feedback for improvements for this
 document, reporting of errors and bugs and so forth is always
 encouraged and much appreciated.
