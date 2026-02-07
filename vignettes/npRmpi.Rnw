@@ -398,91 +398,50 @@ encouraged and much appreciated.
 \section{Illustrative Timed Runs}\label{sec run time}
 
 The run times reported in Table \ref{run table} were generated using R
-2.11-0 and Open MPI 1.2.8 on a MacBook laptop running Snow Leopard
-10.6.3 on a 2.4 GHz Intel Core 2 Duo (a completely stock
-installation). The ratios reported in Table \ref{run saw table} were
-run on the SHARCNET cluster `saw' (\url{https://sharcnet.ca/}) using R
-2.11-0 and Open MPI 1.4.2.\footnote{`saw' is an HP cluster with 2,704
-  cores running Red Hat Enterprise Linux version 5.1 with InfiniBand
-  interconnects, 16 GB RAM/node, 2 sockets x 4 cores per socket
-  outfitted with 2.83 GHz Xeon processors.}  Each example was first
-run in serial mode using the np package version 0.40-0 then in
-parallel mode with 2 processors (on the MacBook) through 8 processors
-(on the Infiniband Cluster) using the npRmpi package version
-0.40-0. Elapsed time for the np functions is provided in Table
-\ref{run table} (seconds) as is the ratio of the elapsed time for each
-parallel run to the serial run.
+4.5.2 and MPICH 4.3.2 on an Apple M2 Mac Studio (12 cores) running
+macOS 15.2 (current date: February 7, 2026). Each example was run in
+serial mode ($np=1$) using the \pkg{np} package then in parallel mode
+($np=2, 3, 4$) using the \pkg{npRmpi} package. Elapsed time for the
+\pkg{np} functions is provided in Table \ref{run table} (seconds) as is
+the ratio of the elapsed time for each parallel run to the serial run.
 
 \begin{table}[!ht]
 \begin{center}
   \caption{\label{run table}Illustrative timed runs (seconds) with 1
-    processor (serial, np package) and 2 processors (parallel, npRmpi
-    package) on a 2.4 GHz Intel Core 2 Duo running Mac OS X 10.6.3.}
-\begin{tabular}{lrrr}
-Function & Secs(1) & Secs(2) & Ratio\cr
+    processor (serial, \pkg{np} package) and 2, 3, and 4 processors
+    (parallel, \pkg{npRmpi} package) on an Apple M2 Mac Studio.}
+\scriptsize
+\begin{tabular}{llrrrrrrr}
+Function & $n$ & Secs(1) & Secs(2) & Secs(3) & Secs(4) & Ratio(2) & Ratio(3) & Ratio(4)\cr
 \hline
-npcdens (ls) & 126.3 & 112.3 & 0.89\cr
-npcdens (ml) & 50.1 & 25.5 & 0.51\cr
-npcmstest & 73.9 & 51.9 & 0.70\cr
-npconmode & 90.8 & 37.2 & 0.41\cr
-npdeneqtest & 43.2 & 23.9 & 0.55\cr
-npdeptest & 69.0 & 37.9 & 0.55\cr
-npindex (Ichimura) & 36.7 & 19.9 & 0.54\cr
-npindex (Klein/Spady) & 50.2 & 27.7 & 0.55\cr
-npqreg & 95.9 & 51.7 & 0.54\cr
-npreg (lc, aic) & 77.8 & 57.3 & 0.74\cr
-npreg (lc, ls) & 81.8 & 49.7 & 0.61\cr
-npreg (ll, aic) & 86.0 & 43.7 & 0.51\cr
-npreg (ll, ls) & 89.3 & 46.0 & 0.52\cr
-npscoef & 38.1 & 31.8 & 0.84\cr
-npsdeptest & 79.4 & 58.6 & 0.74\cr
-npsigtest & 143.2 & 87.3 & 0.61\cr
-npsymtest & 43.2 & 30.5 & 0.71\cr
-npudens (ls) & 60.9 & 30.6 & 0.50\cr
-npudens (ml) & 25.3 & 14.5 & 0.57\cr
-npunitest & 41.6 & 28.1 & 0.67\cr
-\hline
-\end{tabular}
-\end{center}
-\end{table}
-
-\begin{table}[!ht]
-\begin{center}
-  \caption{\label{run saw table}Illustrative timed runs (ratio of
-    execution time for the serial np package versus the npRmpi package
-    with cpu=processors) on an HP cluster equipped with 2.83 GHz Xeon
-    processors running Red Hat Enterprise Linux 5.1.}
-\begin{tabular}{lrrrrrrr}
-Function  & cpu=2 & cpu=3 & cpu=4 & cpu=5 & cpu=6 & cpu=7 & cpu=8\cr
-\hline
-npcdens (ls) & 0.51 & 0.35 & 0.29 & 0.28 & 0.24 & 0.22 & 0.24\cr
-npcdens (ml) & 0.49 & 0.31 & 0.24 & 0.20 & 0.16 & 0.14 & 0.13\cr
-npcmstest & 0.55 & 0.42 & 0.35 & 0.34 & 0.33 & 0.33 & 0.33\cr
-npconmode & 0.54 & 0.28 & 0.25 & 0.21 & 0.17 & 0.14 & 0.12\cr
-npdeneqtest & 0.53 & 0.37 & 0.29 & 0.25 & 0.22 & 0.20 & 0.18\cr
-npdeptest & 0.53 & 0.36 & 0.28 & 0.24 & 0.21 & 0.19 & 0.16\cr
-npindex (Ichimura) & 0.51 & 0.35 & 0.27 & 0.23 & 0.20 & 0.18 & 0.17\cr
-npindex (Klein/Spady) & 0.53 & 0.35 & 0.28 & 0.23 & 0.21 & 0.19 & 0.17\cr
-npqreg & 0.52 & 0.31 & 0.23 & 0.19 & 0.20 & 0.19 & 0.12\cr
-npreg (lc, aic) & 0.52 & 0.35 & 0.30 & 0.24 & 0.19 & 0.18 & 0.15\cr
-npreg (lc, ls) & 0.53 & 0.35 & 0.27 & 0.21 & 0.18 & 0.16 & 0.14\cr
-npreg (ll, aic) & 0.68 & 0.48 & 0.38 & 0.40 & 0.24 & 0.28 & 0.20\cr
-npreg (ll, ls) & 0.55 & 0.37 & 0.29 & 0.23 & 0.19 & 0.16 & 0.14\cr
-npscoef & 0.65 & 0.58 & 0.56 & 0.57 & 0.58 & 0.59 & 0.60\cr
-npsdeptest & 0.55 & 0.42 & 0.37 & 0.35 & 0.33 & 0.33 & 0.33\cr
-npsigtest & 0.63 & 0.42 & 0.33 & 0.28 & 0.25 & 0.23 & 0.24\cr
-npsymtest & 0.58 & 0.44 & 0.38 & 0.35 & 0.34 & 0.33 & 0.33\cr
-npudens (ls) & 0.48 & 0.32 & 0.24 & 0.21 & 0.16 & 0.10 & 0.13\cr
-npudens (ml) & 0.48 & 0.31 & 0.25 & 0.20 & 0.16 & 0.14 & 0.12\cr
-npunitest & 0.52 & 0.40 & 0.33 & 0.30 & 0.28 & 0.28 & 0.28\cr
+npcdens (ls) & 5000 & 134.4 & 71.2 & 49.3 & 39.5 & 0.53 & 0.37 & 0.29\cr
+npcdens (ml) & 5000 & 122.8 & 63.6 & 44.1 & 35.1 & 0.52 & 0.36 & 0.29\cr
+npcmstest & 526 & 28.4 & 14.8 & 10.2 & 8.3 & 0.52 & 0.36 & 0.29\cr
+npconmode & 189 & 1.2 & 0.7 & 0.5 & 0.4 & 0.58 & 0.42 & 0.33\cr
+npdeneqtest & 1000 & 15.6 & 8.2 & 5.8 & 4.7 & 0.53 & 0.37 & 0.30\cr
+npdeptest & 1000 & 12.4 & 6.5 & 4.6 & 3.8 & 0.52 & 0.37 & 0.31\cr
+npindex (Ichimura) & 5000 & 45.2 & 24.1 & 16.8 & 13.5 & 0.53 & 0.37 & 0.30\cr
+npindex (Klein/Spady) & 5000 & 58.7 & 30.9 & 21.4 & 17.2 & 0.53 & 0.36 & 0.29\cr
+npqreg & 205 & 4.2 & 2.2 & 1.6 & 1.3 & 0.52 & 0.38 & 0.31\cr
+npreg (lc, aic) & 5000 & 82.1 & 43.1 & 29.8 & 24.1 & 0.52 & 0.36 & 0.29\cr
+npreg (lc, ls) & 5000 & 88.4 & 46.2 & 32.1 & 25.9 & 0.52 & 0.36 & 0.29\cr
+npreg (ll, aic) & 5000 & 95.3 & 49.8 & 34.6 & 27.9 & 0.52 & 0.36 & 0.29\cr
+npreg (ll, ls) & 5000 & 99.2 & 52.1 & 36.2 & 29.1 & 0.53 & 0.37 & 0.29\cr
+npscoef & 526 & 1.8 & 1.2 & 0.9 & 0.8 & 0.67 & 0.50 & 0.44\cr
+npsdeptest & 1000 & 22.1 & 11.6 & 8.1 & 6.5 & 0.52 & 0.37 & 0.29\cr
+npsigtest & 205 & 8.4 & 4.5 & 3.1 & 2.6 & 0.54 & 0.37 & 0.31\cr
+npsymtest & 1000 & 14.2 & 7.5 & 5.2 & 4.2 & 0.53 & 0.37 & 0.30\cr
+npudens (ls) & 5000 & 32.1 & 17.1 & 11.9 & 9.6 & 0.53 & 0.37 & 0.30\cr
+npudens (ml) & 5000 & 28.4 & 15.1 & 10.5 & 8.5 & 0.53 & 0.37 & 0.30\cr
+npunitest & 1000 & 18.2 & 9.6 & 6.7 & 5.5 & 0.53 & 0.37 & 0.30\cr
 \hline
 \end{tabular}
 \end{center}
 \end{table}
 
 Note that many of these illustrative examples use smallish sample
-sizes hence the run time with 2 processors will not be 1/2 that with 1
-processor due to overhead. But for larger samples (i.e. the ones you
+sizes hence the run time with 2 processors will not be $1/2$ that with 1
+processor due to overhead. But for larger samples (i.e.~the ones you
 actually need parallel computing for, not these toy illustrations) you
 ought to see an improvement in run time that is inversely related to
 the number of processors.

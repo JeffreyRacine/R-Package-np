@@ -27,6 +27,12 @@
 
 \section*{Timing Results, number of cores $1,\dots,4$}
 
+The run times reported in Table \ref{run table} were generated using R
+4.5.2 and MPICH 4.3.2 on an Apple M2 Mac Studio (12 cores) running
+macOS 15.2 (current date: February 7, 2026). Each example was run in
+serial mode (np=1) using the np package then in parallel mode (np=2, 3,
+4) using the npRmpi package.
+
 Due to small sample sizes some demos may not show appreciable gains
 with respect to increasing the number of cores. Where possible we have
 bumped up sample sizes in the hopes that the larger sample sizes will
@@ -50,19 +56,16 @@ show expected scaling benefits.
 \end{enumerate}
 
 The table below presents Seconds with respect to the number of cores
-followed by the ratio (Secs(1) versus Secs(2) for instance). Note that
+followed by the ratio (Secs(np)/Secs(1)). Note that
 an entry of $n=0$ indicates the example uses a dataset hence the
 number of observations cannot be modified.
 
 \begin{table}[!ht]
 \scriptsize
-\input timing_n_2
-\input timing_n_3
-\end{table}
-
-\begin{table}[!ht]
-\scriptsize
-\input timing_n_4
+\caption{\label{run table}Illustrative timed runs (seconds) with 1
+  processor (serial, np package) and 2, 3, and 4 processors (parallel,
+  npRmpi package) on an Apple M2 Mac Studio.}
+\input timing_all
 \end{table}
 
 \end{document}
