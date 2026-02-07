@@ -7,14 +7,14 @@ These are based on those given in https://www.stats.uwo.ca/faculty/yu/Rmpi/
 
 INSTALLATION:
 
-1) Download and install MPICH2 for Windows (32-bit) from
-   https://www.mpich.org/ Version 1.3rc1.
+1) Download and install MPICH for Windows from
+   https://www.mpich.org/
 
-   Before installing MPICH2, you may need Microsoft .Net 2.0 .NET
-   Framework Version 2.0 Redistributable Package and Visual C++ 2010
+   Before installing MPICH, you may need Microsoft .NET
+   Framework and Visual C++ 2010
    Redistributable Package (x86).
 
-2) After installation, add the MPICH2 bin directory to your PATH
+2) After installation, add the MPICH bin directory to your PATH
    environment variables. This is very important. Otherwise npRmpi
    will not run properly.
 
@@ -25,15 +25,15 @@ INSTALLATION:
    variable "PATH" (it is version dependent. Either User or System
    variables will be fine). Click Edit to get a new window.
 
-   At end of Variable value, add ";C:\Program Files (x86)\MPICH2\bin" for
-   32bit windows. (Remove the double quotations).
+   At end of Variable value, add ";C:\Program Files\MPICH\bin" (for example).
+   (Remove the double quotations).
 
 3) Next launch wmpiconfig.exe from the Start menu. First it will ask
    you for your account name and password. Enter your account name and
-   password. Click "Register" and then "OK". After that MPICH2
+   password. Click "Register" and then "OK". After that MPICH
    Configurable Settings will show up. Click "Get Settings" on the
    right upper corner. If your machine name gets a green color on the
-   left hosts panel, then MPICH2 is running properly. Otherwise open
+   left hosts panel, then MPICH is running properly. Otherwise open
    "Command Prompt" as the administrator. At the prompt, type
 
     smpd -install -phrase mypassword

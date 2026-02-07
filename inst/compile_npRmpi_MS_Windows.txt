@@ -12,28 +12,27 @@ https://www.stats.uwo.ca/faculty/yu/Rmpi/
 
    a. Rtools30.exe: http://cran.r-project.org/bin/windows/Rtools/Rtools30.exe
 
-   b. mpich2-1.4.1p1-win-ia32.msi:
+   b. mpich-win-ia32.msi:
 
-http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-ia32.msi
+https://www.mpich.org/static/tarballs/mpich-win-ia32.msi
 
-   c. mpich2-1.4.1p1-win-x86-64.msi:
+   c. mpich-win-x86-64.msi:
 
-http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-x86-64.msi
+https://www.mpich.org/static/tarballs/mpich-win-x86-64.msi
 
-   d. R-2.15.3-win.exe: http://cran.r-project.org/mirrors.html
+   d. R-latest-win.exe: https://R-project.org/mirrors.html
 
-   e. npRmpi_0.50-1.tar.gz: http://cran.r-project.org/web/packages/npRmpi/
+   e. npRmpi_0.60-20.tar.gz: https://cran.r-project.org/web/packages/npRmpi/
 
 2. Run and install the following programs:
 
    a. Install (a) in the previous step, and make sure your system Path
-   starts with: “c:\Rtools\bin;c:\Rtools\MinGW\bin;C:\Program
-   Files\R\R- 2.15.3\bin\i386;...”
+   starts with the appropriate Rtools and R bin paths.
 
    b. Run and install (b). Do not change the Passphrase (i.e. behappy)
-   and use the default directory: “C:\Program Files (x86)\MPICH2\”
+   and use the default directory: “C:\Program Files\MPICH\” (for example)
 
-       i. Go to “Start” -> “All Programs” -> “MPICH2” -> “wmpiregister.exe”
+       i. Go to “Start” -> “All Programs” -> “MPICH” -> “wmpiregister.exe”
           and enter your PC username and password (the one you use to log in).
 
       ii. Open "Command Prompt" with administrator. At prompt,
@@ -48,9 +47,9 @@ http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-x86-64.msi
       setup properly.
 
    c. Run and install (c). Do not change the Passphrase (i.e. behappy)
-   and use the default directory: “C:\Program Files\MPICH2\”
+   and use the default directory: “C:\Program Files\MPICH\” (for example)
 
-       i. Go to “Start” -> “All Programs” -> “MPICH2” ->
+       i. Go to “Start” -> “All Programs” -> “MPICH” ->
        “wmpiregister” and enter your PC username and password (the one
        you use to log in).
 
@@ -66,7 +65,7 @@ http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-x86-64.msi
        setup properly.
 
    d. Install (d) in the previous step, and make sure the installation
-   directory is: “C:\Program Files\R\R-2.15.3\”
+   directory is correct.
 
        i. Go to “Start” -> “run” and type “cmd”. Then type
        “R”. ii. From inside R, run
@@ -75,7 +74,7 @@ http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-x86-64.msi
 
        Select your mirror and let it run. Close the window. 
 
-3. Add MPICH2 bin directory to PATH environment variables as follows:
+3. Add MPICH bin directory to PATH environment variables as follows:
 
    a. Right click "My Computer" and choose "Properties". Click
    "Advanced system settings" to get a new window.  ￼￼￼￼￼￼￼￼￼
@@ -85,7 +84,7 @@ http://www.mpich.org/static/tarballs/1.4.1p1/mpich2-1.4.1p1-win-x86-64.msi
    variables will be fine). Click Edit to get a new window.
 
    c. At end of Variable value, add: ";C:\Program
-   Files\MPICH2\bin;C:\Program Files (x86)\MPICH2\bin" (Remove the
+   Files\MPICH\bin;" (Remove the
    double quotations).
 
 4. npRmpi Installation:
