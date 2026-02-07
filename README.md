@@ -18,11 +18,11 @@ decompress and run `R CMD INSTALL` on it.
 
 Alternatively, you can install the development version but before
 doing so Windows users have to first install
-[Rtools](https://cran.r-project.org/bin/windows/Rtools/), while OS X
+[Rtools](https://cran.r-project.org/bin/windows/Rtools/), while macOS
 users have to first install
 [Xcode](https://apps.apple.com/us/app/xcode/id497799835?mt=12) and the
-command line tools (in OS X 10.9 or higher, once you have Xcode
-installed, open a terminal and run xcode-select --install). Note also
+command line tools (once you have Xcode
+installed, open a terminal and run `xcode-select --install`). Note also
 that versions of e.g. Rtools are paired with versions of R so ensure
 you have the latest version of R installed prior to commencing this
 process.

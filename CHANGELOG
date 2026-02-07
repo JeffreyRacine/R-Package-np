@@ -17,6 +17,8 @@ Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
     tests of independence/specification, and boundary/shape-constrained methods
 
 * Build and maintenance updates:
+  - Resolved -Wfree-nonheap-object compiler warnings in nr.c by implementing 
+    a safe 0-based allocation strategy for 1-based indexing compatibility
   - Refined .Rbuildignore regexes to correctly exclude .git and build artifacts
   - Added missing imports (graphics, grDevices) to NAMESPACE to resolve global
     function notes
