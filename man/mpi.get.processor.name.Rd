@@ -18,8 +18,8 @@ a base host name if \code{short = TRUE} and a full host name otherwise.
 Hao Yu
 }
 \references{
-  \url{http://www.lam-mpi.org/}, 
-  \url{http://www-unix.mcs.anl.gov/mpi/www/www3/}
+  \url{https://www.lam-mpi.org/}, 
+  \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 %\examples{
 %}

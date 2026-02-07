@@ -38,8 +38,8 @@ use \code{mpi.realloc.comm}, \code{mpi.realloc.request} and
   Hao Yu
 }
 \references{
-  \url{http://www.lam-mpi.org/},  
-  \url{http://www-unix.mcs.anl.gov/mpi/www/www3/}
+  \url{https://www.lam-mpi.org/},  
+  \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 %\examples{
 %}

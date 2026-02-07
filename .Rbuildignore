@@ -36,3 +36,6 @@ mknpkg.sh
 ^demo/.*\\.aux$
 ^demo/.*\\.fls$
 ^demo/.*\\.fdb_latexmk$
+^tests
+^tests/testthat
+^tests/testthat/.*\\.R$

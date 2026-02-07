@@ -36,8 +36,8 @@ for all members.
 Hao Yu and Wei Xia
 }
 \references{
-  \url{http://www.lam-mpi.org/},
-  \url{http://www-unix.mcs.anl.gov/mpi/www/www3/}
+  \url{https://www.lam-mpi.org/},
+  \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \seealso{
   \code{\link{mpi.gather}}, \code{\link{mpi.allgatherv}}.
