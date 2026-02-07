@@ -232,14 +232,14 @@ double *vector(int nl,int nh)
 {
     double *v;
 
-    v=(double *)malloc((unsigned) (nh-nl+1)*sizeof(double));
+    v=(double *)malloc((unsigned) (nh+1)*sizeof(double));
     if (!v) nrerror("allocation failure in vector()");
-    return(v-nl);
+    return(v);
 }
 
 void free_vector(double *v, int nl)
 {
-    free((char*) (v+nl));
+    free((char*) v);
 }
 
 int ncom=0;                                       /* defining declarations */
