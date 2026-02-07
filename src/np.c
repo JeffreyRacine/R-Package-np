@@ -1649,37 +1649,37 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     for(i = 0; i < num_obs_train_extern; i++)
       matrix_XY_continuous_train_extern[j][i]=c_con[(j-num_reg_continuous_extern)*num_obs_train_extern+i];
 
-    if(int_TREE_XY == NP_TREE_TRUE){
+  if(int_TREE_XY == NP_TREE_TRUE){
 
-      build_kdtree(matrix_XY_continuous_train_extern, num_obs_train_extern, num_all_cvar, 
-                   4*num_all_cvar, ipt_XY, &kdt_extern_XY);
+    build_kdtree(matrix_XY_continuous_train_extern, num_obs_train_extern, num_all_cvar, 
+                 4*num_all_cvar, ipt_XY, &kdt_extern_XY);
 
-      // put data into tree-order
-      for(j = 0; j < num_reg_unordered_extern; j++)
-        for(i = 0; i < num_obs_train_extern; i++)
-          matrix_XY_unordered_train_extern[j][i]=u_uno[j*num_obs_train_extern+ipt_XY[i]];
+    // put data into tree-order
+    for(j = 0; j < num_reg_unordered_extern; j++)
+      for(i = 0; i < num_obs_train_extern; i++)
+        matrix_XY_unordered_train_extern[j][i]=u_uno[j*num_obs_train_extern+ipt_XY[i]];
 
-      for(j = num_reg_unordered_extern; j < num_all_uvar; j++)
-        for(i = 0; i < num_obs_train_extern; i++)
-          matrix_XY_unordered_train_extern[j][i]=c_uno[(j-num_reg_unordered_extern)*num_obs_train_extern+ipt_XY[i]];
-
-
-      for(j = 0; j < num_reg_ordered_extern; j++)
-        for(i = 0; i < num_obs_train_extern; i++)
-          matrix_XY_ordered_train_extern[j][i]=u_ord[j*num_obs_train_extern+ipt_XY[i]];
-
-      for(j = num_reg_ordered_extern; j < num_all_ovar; j++)
-        for(i = 0; i < num_obs_train_extern; i++)
-          matrix_XY_ordered_train_extern[j][i]=c_ord[(j-num_reg_ordered_extern)*num_obs_train_extern+ipt_XY[i]];
+    for(j = num_reg_unordered_extern; j < num_all_uvar; j++)
+      for(i = 0; i < num_obs_train_extern; i++)
+        matrix_XY_unordered_train_extern[j][i]=c_uno[(j-num_reg_unordered_extern)*num_obs_train_extern+ipt_XY[i]];
 
 
-      for(j = 0; j < num_reg_continuous_extern; j++)
-        for(i = 0; i < num_obs_train_extern; i++)
-          matrix_XY_continuous_train_extern[j][i]=u_con[j*num_obs_train_extern+ipt_XY[i]];
+    for(j = 0; j < num_reg_ordered_extern; j++)
+      for(i = 0; i < num_obs_train_extern; i++)
+        matrix_XY_ordered_train_extern[j][i]=u_ord[j*num_obs_train_extern+ipt_XY[i]];
 
-      for(j = num_reg_continuous_extern; j < num_all_cvar; j++)
-        for(i = 0; i < num_obs_train_extern; i++)
-          matrix_XY_continuous_train_extern[j][i]=c_con[(j-num_reg_continuous_extern)*num_obs_train_extern+ipt_XY[i]];
+    for(j = num_reg_ordered_extern; j < num_all_ovar; j++)
+      for(i = 0; i < num_obs_train_extern; i++)
+        matrix_XY_ordered_train_extern[j][i]=c_ord[(j-num_reg_ordered_extern)*num_obs_train_extern+ipt_XY[i]];
+
+
+    for(j = 0; j < num_reg_continuous_extern; j++)
+      for(i = 0; i < num_obs_train_extern; i++)
+        matrix_XY_continuous_train_extern[j][i]=u_con[j*num_obs_train_extern+ipt_XY[i]];
+
+    for(j = num_reg_continuous_extern; j < num_all_cvar; j++)
+      for(i = 0; i < num_obs_train_extern; i++)
+        matrix_XY_continuous_train_extern[j][i]=c_con[(j-num_reg_continuous_extern)*num_obs_train_extern+ipt_XY[i]];
 
     for(i = 0; i < num_obs_train_extern; i++){
       ipt_lookup_XY[ipt_XY[i]] = i;
