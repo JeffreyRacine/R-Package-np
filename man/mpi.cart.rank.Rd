@@ -25,7 +25,7 @@ Alek Hunchak and Hao Yu
 \code{\link{mpi.cart.coords}}
 }
 \references{
-  \url{https://www.lam-mpi.org/},
+  \url{https://www.mpich.org/},
   \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \examples{

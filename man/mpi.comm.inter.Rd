@@ -34,7 +34,7 @@ group in an intercomm.
 Hao Yu
 }
 \references{
-  \url{https://www.lam-mpi.org/}, 
+  \url{https://www.mpich.org/}, 
   \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \seealso{

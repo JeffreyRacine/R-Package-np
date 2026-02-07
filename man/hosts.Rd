@@ -7,7 +7,7 @@
 \description{
 \code{lamhosts} finds the host name associated with its node number. Can be used 
 by \code{\link{mpi.spawn.Rslaves}} to spawn R slaves on selected hosts. This is 
-a LAM-MPI specific function.
+a MPI implementation specific function.
 
 \code{mpi.is.master} checks if it is running on master or slaves.
 

@@ -31,7 +31,7 @@ can use \code{\link{mpi.comm.test.inter}} to test if a
 Hao Yu
 }
 \references{
-  \url{https://www.lam-mpi.org}, \url{https://www.mpich.org/static/docs/latest/www3/}
+  \url{https://www.mpich.org}, \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \seealso{
  \code{\link{mpi.comm.test.inter}}
