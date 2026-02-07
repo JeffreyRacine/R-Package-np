@@ -7045,8 +7045,6 @@ double *SIGN){
     operator[i] = OP_NORMAL;
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
-
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   int num_obs_eval_alloc = stride_e*iNum_Processors;
 
@@ -7443,7 +7441,6 @@ double *SIGN){
       }
     }
 
-    int Sentinel = 1;
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
 
