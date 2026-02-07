@@ -37,20 +37,20 @@ npreg.formula <-
       if (!y.eval){
         tt <- delete.response(tt)
 
-        orig.class <- sapply(eval(attr(tt, "variables"), newdata, environment(tt)),class)
+        orig.ts <- sapply(eval(attr(tt, "variables"), newdata, environment(tt)), inherits, "ts")
         
         ## delete.response clobbers predvars, which is used for timeseries objects
         ## so we need to reconstruct it
 
-        if(all(orig.class == "ts")){
+        if(all(orig.ts)){
           args <- (as.list(attr(tt, "variables"))[-1])
           attr(tt, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-        }else if(any(orig.class == "ts")){
+        }else if(any(orig.ts)){
           arguments <- (as.list(attr(tt, "variables"))[-1])
-          arguments.normal <- arguments[which(orig.class != "ts")]
-          arguments.timeseries <- arguments[which(orig.class == "ts")]
+          arguments.normal <- arguments[which(!orig.ts)]
+          arguments.timeseries <- arguments[which(orig.ts)]
 
-          ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+          ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
           attr(tt, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
         }else{
           attr(tt, "predvars") <- attr(tt, "variables")
@@ -146,11 +146,9 @@ npreg.rbandwidth <-
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
     ccon = unlist(lapply(txdat[,bws$icon, drop = FALSE],class))
-    if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
-        (any(bws$iord) && !all(unlist(lapply(txdat[,bws$iord, drop = FALSE],class)) ==
-                               class(ordered(0)))) ||
-        (any(bws$iuno) && !all(unlist(lapply(txdat[,bws$iuno, drop = FALSE],class)) ==
-                               class(factor(0)))))
+    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
+        (any(bws$iord) && !all(sapply(txdat[,bws$iord, drop = FALSE],inherits, "ordered"))) ||
+        (any(bws$iuno) && !all(sapply(txdat[,bws$iuno, drop = FALSE],inherits, "factor"))))
       stop("supplied bandwidths do not match 'txdat' in type")
 
     if (dim(txdat)[1] != length(tydat))

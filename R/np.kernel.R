@@ -135,11 +135,9 @@ npksum.default <-
     poperator.num <- PERMUTATION_OPERATORS[permutation.operator]
     
     ccon = unlist(lapply(txdat[,bws$icon,drop=FALSE],class))
-    if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
-        (any(bws$iord) && !all(unlist(lapply(txdat[,bws$iord, drop=FALSE],class)) ==
-                               class(ordered(0)))) ||
-        (any(bws$iuno) && !all(unlist(lapply(txdat[,bws$iuno, drop=FALSE],class)) ==
-                               class(factor(0)))))
+    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
+        (any(bws$iord) && !all(sapply(txdat[,bws$iord, drop = FALSE],inherits, "ordered"))) ||
+        (any(bws$iuno) && !all(sapply(txdat[,bws$iuno, drop = FALSE],inherits, "factor"))))
       stop("supplied bandwidths do not match 'txdat' in type")
 
     if (!miss.ty && (nrow(txdat) != nrow(tydat)))

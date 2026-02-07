@@ -19,7 +19,7 @@ npplregbw.formula <-
     if(!missing(call) && is.call(call)){
       ## rummage about in the call for the original formula
       for(i in 1:length(call)){
-        if(tryCatch(class(eval(call[[i]])) == "formula",
+        if(tryCatch(inherits(eval(call[[i]]), "formula"),
                     error = function(e) FALSE))
           break;
       }
@@ -50,9 +50,9 @@ npplregbw.formula <-
     formula.all <- terms(as.formula(paste(" ~ ",bronze[[1]]," + ",bronze[[2]], " + ",bronze[[3]]),
                                   env = environment(formula)))
 
-    orig.class <- if (missing(data))
-      sapply(eval(attr(formula.all, "variables"), environment(formula.all)),class)
-    else sapply(eval(attr(formula.all, "variables"), data, environment(formula.all)),class)
+    orig.ts <- if (missing(data))
+      sapply(eval(attr(formula.all, "variables"), environment(formula.all)), inherits, "ts")
+    else sapply(eval(attr(formula.all, "variables"), data, environment(formula.all)), inherits, "ts")
 
     arguments.mfx <- chromoly[[2]]
     arguments.mf <- c(chromoly[[1]],chromoly[[3]])
@@ -60,16 +60,16 @@ npplregbw.formula <-
     mf[["formula"]] <- terms(mf[["formula"]])
     mf.xf[["formula"]] <- terms(mf.xf[["formula"]])
     
-    if(all(orig.class == "ts")){
+    if(all(orig.ts)){
       arguments <- (as.list(attr(formula.all, "variables"))[-1])
       attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mf,arguments)),drop = FALSE])
       attr(mf.xf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mfx,arguments)),drop = FALSE])
-    }else if(any(orig.class == "ts")){
+    }else if(any(orig.ts)){
       arguments <- (as.list(attr(formula.all, "variables"))[-1])
-      arguments.normal <- arguments[which(orig.class != "ts")]
-      arguments.timeseries <- arguments[which(orig.class == "ts")]
+      arguments.normal <- arguments[which(!orig.ts)]
+      arguments.timeseries <- arguments[which(orig.ts)]
 
-      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       attr(mf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mf,arguments)),drop = FALSE])
       attr(mf.xf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
     }

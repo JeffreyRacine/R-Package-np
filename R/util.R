@@ -339,12 +339,13 @@ explodePipe <- function(formula){
 }
 
 "%~%" <- function(a,b) {
-  all(class(a) == class(b)) && (length(a) == length(b)) &&
+  identical(class(a), class(b)) && (length(a) == length(b)) &&
   all(unlist(lapply(a,coarseclass)) == unlist(lapply(b,coarseclass)))
 }
 
 coarseclass <- function(a) {
-  ifelse(class(a) == "integer", "numeric", class(a))
+  if (inherits(a, "integer")) return("numeric")
+  return(class(a)[1])
 }
 
 toFrame <- function(frame) {
@@ -478,8 +479,8 @@ toMatrix <- function(data) {
 ## could fail without the response too, but then the calling routine is about
 ## to die a noisy death anyhow ...
 succeedWithResponse <- function(tt, frame){
-  !any(class(try(eval(expr = attr(tt, "variables"),
-                      envir = frame, enclos = NULL), silent = TRUE)) == "try-error")
+  !inherits(try(eval(expr = attr(tt, "variables"),
+                     envir = frame, enclos = NULL), silent = TRUE), "try-error")
 }
 
 ## determine whether a bandwidth

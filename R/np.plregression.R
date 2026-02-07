@@ -51,21 +51,21 @@ npplreg.formula <-
         formula.xz <- terms(as.formula(paste(" ~ ",bronze[[2]], " + ",bronze[[3]]),
                                        env = environment(bws$formula)))
 
-        orig.class <- sapply(eval(attr(formula.xz, "variables"), newdata, environment(formula.xz)),class)
+        orig.ts <- sapply(eval(attr(formula.xz, "variables"), newdata, environment(formula.xz)), inherits, "ts")
 
         arguments.mfx <- bws$chromoly[[2]]
         arguments.mf <- bws$chromoly[[3]]
 
-        if(all(orig.class == "ts")){
+        if(all(orig.ts)){
           arguments <- (as.list(attr(formula.xz, "variables"))[-1])
           attr(tt, "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mf,arguments)),drop = FALSE])
           attr(tt.xf, "predvars") <- bquote(.(as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments)))))[,.(match(arguments.mfx,arguments)),drop = FALSE])
-        }else if(any(orig.class == "ts")){
+        }else if(any(orig.ts)){
           arguments <- (as.list(attr(formula.xz, "variables"))[-1])
-          arguments.normal <- arguments[which(orig.class != "ts")]
-          arguments.timeseries <- arguments[which(orig.class == "ts")]
+          arguments.normal <- arguments[which(!orig.ts)]
+          arguments.timeseries <- arguments[which(orig.ts)]
 
-          ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+          ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
           attr(tt, "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mf,arguments)),drop = FALSE])
           attr(tt.xf, "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
         }else{

@@ -114,11 +114,9 @@ npqreg.condbandwidth <-
       stop("'tydat' is not continuous")
     
     xccon = unlist(lapply(txdat[,bws$ixcon, drop = FALSE],class))
-    if ((any(bws$ixcon) && !all((xccon == class(integer(0))) | (xccon == class(numeric(0))))) ||
-        (any(bws$ixord) && !all(unlist(lapply(txdat[,bws$ixord, drop = FALSE],class)) ==
-                                class(ordered(0)))) ||
-        (any(bws$ixuno) && !all(unlist(lapply(txdat[,bws$ixuno, drop = FALSE],class)) ==
-                                class(factor(0)))))
+    if ((any(bws$ixcon) && !all((xccon == "integer") | (xccon == "numeric"))) ||
+        (any(bws$ixord) && !all(sapply(txdat[,bws$ixord, drop = FALSE],inherits, "ordered"))) ||
+        (any(bws$ixuno) && !all(sapply(txdat[,bws$ixuno, drop = FALSE],inherits, "factor"))))
       stop("supplied bandwidths do not match 'txdat' in type")
 
     ## catch and destroy NA's

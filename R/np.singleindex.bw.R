@@ -12,9 +12,9 @@ npindexbw <-
 
 npindexbw.formula <-
   function(formula, data, subset, na.action, call, ...){
-    orig.class <- if (missing(data))
-      sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
-    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)),class)
+    orig.ts <- if (missing(data))
+      sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
+    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)), inherits, "ts")
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -23,17 +23,17 @@ npindexbw.formula <-
 
     mf[[1]] <- as.name("model.frame")
 
-    if(all(orig.class == "ts")){
+    if(all(orig.ts)){
       args <- (as.list(attr(terms(formula), "variables"))[-1])
       formula <- terms(formula)
       attr(formula, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
       mf[["formula"]] <- formula
-    }else if(any(orig.class == "ts")){
+    }else if(any(orig.ts)){
       arguments <- (as.list(attr(terms(formula), "variables"))[-1])
-      arguments.normal <- arguments[which(orig.class != "ts")]
-      arguments.timeseries <- arguments[which(orig.class == "ts")]
+      arguments.normal <- arguments[which(!orig.ts)]
+      arguments.timeseries <- arguments[which(orig.ts)]
 
-      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       formula <- terms(formula)
       attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
       mf[["formula"]] <- formula
