@@ -1,3 +1,9 @@
+February 7 2026
+
+Timing results updated using an Apple M2 Mac Studio (12 cores) running
+macOS 15.2 and MPICH 4.3.2. Consolidated results for np=1, 2, 3, 4
+can be found in timing.pdf.
+
 March 19 2013
 
 Due to small sample sizes many of these demos do not show appreciable

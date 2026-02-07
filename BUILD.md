@@ -14,17 +14,15 @@ export CXX=mpicxx
 ## Build Tarball
 
 ```bash
-cd /Users/jracine/Development/np-npRmpi
-R CMD build np
+R CMD build .
 ```
 
-This produces `npRmpi_0.60-21.tar.gz` in the same directory.
+This produces `npRmpi_0.60-20.tar.gz` in the same directory.
 
 ## Install
 
 ```bash
-cd /Users/jracine/Development/np-npRmpi
-R CMD INSTALL npRmpi_0.60-21.tar.gz
+R CMD INSTALL npRmpi_0.60-20.tar.gz
 ```
 
 ## Quick Load Check

@@ -38,7 +38,7 @@ Then build/install from the repo:
 
 ```bash
 R CMD build .
-R CMD INSTALL npRmpi_0.60-21.tar.gz
+R CMD INSTALL npRmpi_0.60-20.tar.gz
 ```
 
 See `BUILD.md` and `WORKTREES.md` in this repo for local build details.

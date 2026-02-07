@@ -49,6 +49,12 @@ Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
 
   - Updated man page package references to npRmpi
 
+  - Resolved -Wfree-nonheap-object compiler warnings in nr.c by implementing 
+    a safe 0-based allocation strategy for 1-based indexing compatibility
+
+  - Modernized documentation and vignettes: replaced 'Open MPI' with 'MPICH' 
+    references and updated benchmarks for Apple M2 Mac Studio
+
   - Synchronized man pages with np master
 
   - Restored npRmpi helpers and updated documentation
