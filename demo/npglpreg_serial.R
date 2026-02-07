@@ -4,24 +4,17 @@
 ## counterpart for insight about your own problems.
 
 library(np)
-options(np.messages=FALSE)
-
-rm(list=ls())
+library(crs)
+options(np.messages=FALSE,crs.messages=FALSE)
 
 set.seed(42)
-
-n <-  1000
-
-degree.max <- 20
-
-library(crs)
-
+n <-  1500
 x1 <- runif(n)
 x2 <- runif(n)
 dgp <- cos(8*pi*x1)
 y <- dgp+rnorm(n,sd=0.1)
   
-t <- system.time(model.glp <- npglpreg(y~x1+x2,degree.max=degree.max))
+t <- system.time(model.glp <- npglpreg(y~x1+x2))
 
 summary(model.glp)
 
