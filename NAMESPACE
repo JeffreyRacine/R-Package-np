@@ -401,6 +401,7 @@ S3method(npksum, default)
 S3method(npqreg, formula)
 S3method(npqreg, call)
 S3method(npqreg, default)
+S3method(npqreg, conbandwidth)
 S3method(npqreg, condbandwidth)
 
 S3method(npconmode, formula)
