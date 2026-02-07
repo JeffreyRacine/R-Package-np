@@ -8,7 +8,17 @@ importFrom("parallel", "nextRNGStream", "detectCores")
 importFrom("quantreg", "rq")
 importFrom("quadprog", "solve.QP")
 export(b.star
+       ,.docall
+       ,.force.type
+       ,.mpi.undefined
+       ,.simplify
+       ,.splitIndices
+       ,.typeindex
        ,lamhosts
+       ,.mpi.worker.exec
+       ,.mpi.worker.apply
+       ,.mpi.worker.sim
+       ,.mpi.worker.applyLB
        ,mpi.abort
        ,mpi.allgather
        ,mpi.allgather.Robj
