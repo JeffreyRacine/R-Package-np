@@ -46,7 +46,7 @@
   McMaster University\\
   Hamilton, Ontario, Canada, L8S 4L8\\
   E-mail: \email{racinej@mcmaster.ca}\\
-  URL: \url{http://www.economics.mcmaster.ca/faculty/racinej}\\
+  URL: \url{https://experts.mcmaster.ca/people/racinej}\\
 }
 
 \begin{document}

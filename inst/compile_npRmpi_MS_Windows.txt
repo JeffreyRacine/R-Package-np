@@ -6,7 +6,7 @@ Author: David T. Jacho-Chavez (djachocha@emory.edu)
 
 These are based on those given in
 
-http://www.stats.uwo.ca/faculty/yu/Rmpi/
+https://www.stats.uwo.ca/faculty/yu/Rmpi/
 
 1. Download the following files:
 

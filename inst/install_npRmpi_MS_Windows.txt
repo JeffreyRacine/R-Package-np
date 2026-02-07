@@ -3,12 +3,12 @@ Title: Installing the npRmpi binary package for MS Windows 7 (32-bit/64-bit)
 Date: 07/14/2011
 Author: David T. Jacho-Chavez (djachocha@emory.edu)
 
-These are based on those given in http://www.stats.uwo.ca/faculty/yu/Rmpi/
+These are based on those given in https://www.stats.uwo.ca/faculty/yu/Rmpi/
 
 INSTALLATION:
 
 1) Download and install MPICH2 for Windows (32-bit) from
-   http://www-unix.mcs.anl.gov/mpi/mpich2 Version 1.3rc1.
+   https://www.mpich.org/ Version 1.3rc1.
 
    Before installing MPICH2, you may need Microsoft .Net 2.0 .NET
    Framework Version 2.0 Redistributable Package and Visual C++ 2010

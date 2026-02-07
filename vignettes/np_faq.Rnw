@@ -240,7 +240,7 @@ mydat <- read.dta("datafile.dta"),
   making for more portable code. For instance, one could do something
   like
 \begin{verbatim}
-mydat <- read.dta(file="http://www.principlesofeconometrics.com/stata/mroz.dta")
+mydat <- read.dta(file="https://www.principlesofeconometrics.com/stata/mroz.dta")
 \end{verbatim}
 as one could always do with, say, \texttt{read.table()}.
 
