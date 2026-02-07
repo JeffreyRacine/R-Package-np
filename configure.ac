@@ -5,8 +5,7 @@ AC_CONFIG_SRCDIR([DESCRIPTION])
 
 ## One way is to specify both include and lib paths
 AC_ARG_WITH([Rmpi-include],
-            AC_HELP_STRING([--with-Rmpi-include=INCLUDE_PATH],
-                           [location of MPI header files]),
+            AS_HELP_STRING([--with-Rmpi-include=INCLUDE_PATH],[location of MPI header files]),
             [mpi_include_path=$withval])
 if test -n "${mpi_include_path}" ; then
    MPI_INCLUDE_PATH="${mpi_include_path}"
@@ -24,8 +23,7 @@ else
 fi
 
 AC_ARG_WITH([Rmpi-libpath],
-            AC_HELP_STRING([--with-Rmpi-libpath=LIB_PATH],
-                           [location of MPI library files]),
+            AS_HELP_STRING([--with-Rmpi-libpath=LIB_PATH],[location of MPI library files]),
             [mpi_lib_path=$withval])
 if test -n "${mpi_lib_path}" ; then
    MPI_LIBPATH="${mpi_lib_path}"
@@ -46,8 +44,7 @@ fi
 MPITYPE="UNKNOWN"
 
 AC_ARG_WITH([Rmpi-type],
-            AC_HELP_STRING([--with-Rmpi-type=MPI_TYPE],
-                           [the type of MPI: OPENMPI,LAM,MPICH,MPICH2, or CRAY]),
+            AS_HELP_STRING([--with-Rmpi-type=MPI_TYPE],[the type of MPI: OPENMPI,LAM,MPICH,MPICH2, or CRAY]),
             [mpi_type=$withval])
 if test -n "${mpi_type}" ; then
    MPITYPE="${mpi_type}"
@@ -62,8 +59,7 @@ dnl 'paths not specified'
 
 ## another way is to specify MPI_ROOT, perhaps via --with-mpi
 AC_ARG_WITH(mpi,
-            AC_HELP_STRING([--with-mpi=LIB_PATH],
-                           [location of top-level MPI directory]),
+            AS_HELP_STRING([--with-mpi=LIB_PATH],[location of top-level MPI directory]),
 [   if test "${withval}" != "no"; then
         MPI_ROOT=${withval}
         MPI_INCLUDE_PATH="${MPI_ROOT}/include"
@@ -327,4 +323,5 @@ esac
 AC_SUBST(PKG_CPPFLAGS)
 AC_SUBST(PKG_LIBS)
 
-AC_OUTPUT(src/Makevars)
+AC_CONFIG_FILES([src/Makevars])
+AC_OUTPUT
