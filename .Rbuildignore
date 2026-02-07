@@ -22,3 +22,4 @@ mknpkg.sh
 ^tests
 ^tests/testthat
 ^tests/testthat/.*\\.R$
+^audit_report\.md$
