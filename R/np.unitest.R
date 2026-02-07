@@ -15,7 +15,7 @@ npunitest <- function(data.x = NULL,
 
   if(is.null(data.x) || is.null(data.y)) stop(" you must enter data vectors for x and y")
   if(is.data.frame(data.x) || is.data.frame(data.y)) stop(" you must enter data vectors (not data frames)")
-  if(class(data.x) != class(data.y)) stop(" data vectors must be of same data type")
+  if(!identical(class(data.x), class(data.y))) stop(" data vectors must be of same data type")
   if((ncol(data.frame(data.x)) != 1) ||( ncol(data.frame(data.y)) != 1)) stop(" data vectors must have one dimension only")
   if(boot.num < 9) stop(" number of bootstrap replications must be >= 9")
   if(is.numeric(data.x) && (max(data.x) < min(data.y) || max(data.y) < min(data.x))) warning("non-overlapping empirical distributions (see `Details' in ?npunidist)")

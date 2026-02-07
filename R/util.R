@@ -339,12 +339,12 @@ explodePipe <- function(formula){
 }
 
 "%~%" <- function(a,b) {
-  all(class(a) == class(b)) && (length(a) == length(b)) &&
+  identical(class(a), class(b)) && (length(a) == length(b)) &&
   all(unlist(lapply(a,coarseclass)) == unlist(lapply(b,coarseclass)))
 }
 
 coarseclass <- function(a) {
-  ifelse(class(a) == "integer", "numeric", class(a))
+  ifelse(inherits(a, "integer"), "numeric", class(a))
 }
 
 toFrame <- function(frame) {
