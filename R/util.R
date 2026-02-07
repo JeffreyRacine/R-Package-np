@@ -317,7 +317,11 @@ validateBandwidthTF <- function(bws){
 }
 
 
-explodeFormula <- function(formula){
+explodeFormula <- function(formula, data=NULL){
+  if(any(grepl("\\.",deparse(formula)))) {
+      if(is.null(data)) stop("'.' in formula and no 'data' argument")
+      formula <- terms(formula, data=data)
+  }
   res <- strsplit(strsplit(paste(deparse(formula), collapse=""),
                            " *[~] *")[[1]], " *[+] *")
   stopifnot(all(sapply(res,length) > 0))
@@ -326,9 +330,9 @@ explodeFormula <- function(formula){
 }
 
 
-explodePipe <- function(formula){
+explodePipe <- function(formula, env = parent.frame()){
   if (!inherits(formula, "formula"))
-    formula <- eval(formula, parent.frame())
+    formula <- eval(formula, env)
   tf <- as.character(formula)  
   tf <- tf[length(tf)]
 

@@ -3,7 +3,7 @@ npscoefbw <-
     args = list(...)
     if (is(args[[1]],"formula"))
       UseMethod("npscoefbw",args[[1]])
-    else if (!is.null(args$formula))
+    else if (!is.null(args$formula) && is(args$formula,"formula"))
       UseMethod("npscoefbw",args$formula)
     else
       UseMethod("npscoefbw",args[[which(names(args)=="bws")[1]]])
@@ -13,7 +13,7 @@ npscoefbw.formula <-
   function(formula, data, subset, na.action, call, ...){
     orig.ts <- if (missing(data))
       sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
-    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)), inherits, "ts")
+    else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)), inherits, "ts")
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -32,7 +32,8 @@ npscoefbw.formula <-
 
     mf[[1]] <- as.name("model.frame")
 
-    chromoly <- explodePipe(mf[["formula"]])
+    formula_to_explode <- eval(mf[["formula"]], parent.frame())
+    chromoly <- explodePipe(formula_to_explode, env = environment(formula))
 
     bronze <- sapply(chromoly, paste, collapse = " + ")
     mf[["formula"]] <-

@@ -3,7 +3,7 @@ npcdistbw <-
     args = list(...)
     if (is(args[[1]],"formula"))
       UseMethod("npcdistbw",args[[1]])
-    else if (!is.null(args$formula))
+    else if (!is.null(args$formula) && is(args$formula,"formula"))
       UseMethod("npcdistbw",args$formula)
     else
       UseMethod("npcdistbw",args[[which(names(args)=="bws")[1]]])
@@ -11,9 +11,11 @@ npcdistbw <-
 
 npcdistbw.formula <-
   function(formula, data, subset, na.action, call, gdata = NULL, ...){
-    orig.ts <- if (missing(data))
-      sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
-    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)), inherits, "ts")
+    orig.ts <- tryCatch({
+        if (missing(data))
+            sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
+        else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)), inherits, "ts")
+    }, error = function(e) FALSE)
 
     has.gval <- !is.null(gdata)
     
@@ -47,7 +49,7 @@ npcdistbw.formula <-
         mf[["formula"]] = eval(mf[[m[1]]], parent.frame())
     }
     
-    variableNames <- explodeFormula(mf[["formula"]])
+    variableNames <- if(m[2] > 0) explodeFormula(mf[["formula"]], data = data) else explodeFormula(mf[["formula"]])
     
     ## make formula evaluable, then eval
     varsPlus <- lapply(variableNames, paste, collapse=" + ")
