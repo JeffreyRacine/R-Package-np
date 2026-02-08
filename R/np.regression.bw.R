@@ -3,7 +3,7 @@ npregbw <-
     args = list(...)
     if (is(args[[1]],"formula"))
       UseMethod("npregbw",args[[1]])
-    else if (!is.null(args$formula))
+    else if (!is.null(args$formula) && is(args$formula,"formula"))
       UseMethod("npregbw",args$formula)
     else
       UseMethod("npregbw",args[[which(names(args)=="bws")[1]]])
@@ -12,9 +12,11 @@ npregbw <-
 npregbw.formula <-
   function(formula, data, subset, na.action, call, ...){
 
-    orig.class <- if (missing(data))
-      sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
-    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)),class)
+    orig.class <- tryCatch({
+        if (missing(data))
+            sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
+        else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)),class)
+    }, error = function(e) "numeric")
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),

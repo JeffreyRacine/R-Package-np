@@ -3,7 +3,7 @@ npplregbw <-
     args = list(...)
     if (is(args[[1]],"formula"))
       UseMethod("npplregbw",args[[1]])
-    else if (!is.null(args$formula))
+    else if (!is.null(args$formula) && is(args$formula,"formula"))
       UseMethod("npplregbw",args$formula)
     else
       UseMethod("npplregbw",args[[which(names(args)=="bws")[1]]])
@@ -19,7 +19,7 @@ npplregbw.formula <-
     if(!missing(call) && is.call(call)){
       ## rummage about in the call for the original formula
       for(i in 1:length(call)){
-        if(tryCatch(class(eval(call[[i]])) == "formula",
+        if(tryCatch(inherits(eval(call[[i]], parent.frame()), "formula"),
                     error = function(e) FALSE))
           break;
       }
@@ -33,7 +33,8 @@ npplregbw.formula <-
     mf.xf[[1]] <- as.name("model.frame")
     
     ## mangle formula ...
-    chromoly <- explodePipe(mf[["formula"]])
+    formula_to_explode <- eval(mf[["formula"]], parent.frame())
+    chromoly <- explodePipe(formula_to_explode, env = environment(formula))
 
     if (length(chromoly) != 3) ## stop if malformed formula
       stop("invoked with improper formula, please see npplregbw documentation for proper use")
@@ -47,12 +48,19 @@ npplregbw.formula <-
     mf[["formula"]] <- as.formula(paste(bronze[[1]]," ~ ", bronze[[3]]),
                                   env = environment(formula))
 
-    formula.all <- terms(as.formula(paste(" ~ ",bronze[[1]]," + ",bronze[[2]], " + ",bronze[[3]]),
+    formula.all <- if(missing(data)) {
+        terms(as.formula(paste(" ~ ",bronze[[1]]," + ",bronze[[2]], " + ",bronze[[3]]),
                                   env = environment(formula)))
+    } else {
+        terms(as.formula(paste(" ~ ",bronze[[1]]," + ",bronze[[2]], " + ",bronze[[3]]),
+                                  env = environment(formula)), data = data)
+    }
 
-    orig.class <- if (missing(data))
-      sapply(eval(attr(formula.all, "variables"), environment(formula.all)),class)
-    else sapply(eval(attr(formula.all, "variables"), data, environment(formula.all)),class)
+    orig.class <- tryCatch({
+        if (missing(data))
+            sapply(eval(attr(formula.all, "variables"), environment(formula.all)),class)
+        else sapply(eval(attr(formula.all, "variables"), data, environment(formula.all)),class)
+    }, error = function(e) "numeric")
 
     arguments.mfx <- chromoly[[2]]
     arguments.mf <- c(chromoly[[1]],chromoly[[3]])
