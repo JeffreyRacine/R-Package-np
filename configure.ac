@@ -34,10 +34,10 @@ else
   fi
 fi
 
-if test -n "${MPI_INCLUDE_PATH}" -a -z "${MPI_LIBPATH}" ; then
+if test -n "${MPI_INCLUDE_PATH}" && test -z "${MPI_LIBPATH}" ; then
   AC_MSG_ERROR([Must specify both the include and lib paths])
 fi
-if test -z "${MPI_INCLUDE_PATH}" -a -n "${MPI_LIBPATH}" ; then
+if test -z "${MPI_INCLUDE_PATH}" && test -n "${MPI_LIBPATH}" ; then
   AC_MSG_ERROR([Must specify both the include and lib paths])
 fi
 
@@ -282,7 +282,7 @@ fi dnl end of 'paths not specified'
 AC_CHECK_LIB(util, openpty, [ MPI_LIBS="$MPI_LIBS -lutil" ])
 AC_CHECK_LIB(pthread, main, [ MPI_LIBS="$MPI_LIBS -lpthread" ])
 
-if test "$MPITYPE" = "OPENMPI" -o "$MPITYPE" = "LAM" -o "$MPITYPE" = "MPICH" -o "$MPITYPE" = "MPICH2" -o "$MPITYPE" = "INTELMPI" -o "$MPITYPE" = "CRAY"; then
+if test "$MPITYPE" = "OPENMPI" || test "$MPITYPE" = "LAM" || test "$MPITYPE" = "MPICH" || test "$MPITYPE" = "MPICH2" || test "$MPITYPE" = "INTELMPI" || test "$MPITYPE" = "CRAY"; then
   MPI_DEFS="-DMPI2"
 fi
 
