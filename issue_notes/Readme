@@ -1,0 +1,36 @@
+Resolved / Implemented (in ae9e41c)
+
+#4 (npcdensbw cv.ls → cv.ml segfault)
+Fixed by resetting conditional-density externals in C before each call (prevents stale pointers).
+#6 (bwtype option for npindexbw/npindex)
+Passed through + documented in .Rd.
+#7 (uocquantile with factor subset)
+Fixed by dropping unused levels before mode selection.
+#13 (npudens variance for categorical only)
+Corrected variance to p(1−p)/n.
+#5 (npqreg tau validity)
+Added validation for tau ∈ (0,1).
+#26 (stored/dynamic formula parsing)
+explodePipe() evaluates formula to handle stored calls.
+#51 (npregiv with exogenous w)
+Vector‑safe derivative check (length‑safe conditional).
+#18 (Tikhonov multi‑instrument)
+Fixed p handling so multi‑dim instruments work.
+#50 (np.pairs / np.pairs.plot)
+Added functions + docs + NAMESPACE export.
+Docs updated for bwtype in semiparametric .Rd (plregression/smoothcoef/singleindex).
+Investigated but not kept (reverted)
+
+#44 (Bvcov in npindex.sibandwidth)
+Reverted — regression risk; left for co‑author.
+#3 (local linear + higher‑order kernels)
+Explored multiple stabilizers; nothing clean. Left as “possibly feature, not bug.”
+Still open / not fully addressed
+
+#10 (npcdens gradients abort)
+Not reproducible in your latest test.
+#16 (npregbw rule of thumb)
+Concluded not feasible in general; guidance only.
+#18 now fixed (see above).
+#44 open (needs deeper theoretical check).
+#3 open (behavior likely inherent to higher‑order kernel LL).

@@ -23,3 +23,4 @@ mknpkg.sh
 ^tests/testthat
 ^tests/testthat/.*\\.R$
 ^audit_report\.md$
+^issue_notes
