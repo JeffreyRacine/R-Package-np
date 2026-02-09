@@ -2,7 +2,7 @@ context("MPI Examples")
 
 test_that("MPI examples from man pages work correctly", {
   # Skip if Rmpi is not functional in this environment
-  skip_on_cran()
+  # skip_on_cran()
   
   if (!requireNamespace("Rmpi", quietly = TRUE)) {
     skip("Rmpi package not available")

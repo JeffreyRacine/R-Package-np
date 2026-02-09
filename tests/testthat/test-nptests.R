@@ -1,5 +1,5 @@
 test_that("npcmstest basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
@@ -22,7 +22,7 @@ test_that("npcmstest basic functionality works", {
 })
 
 test_that("npqcmstest basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   mpi.bcast.cmd(library(quantreg), caller.execute=TRUE)
@@ -45,7 +45,7 @@ test_that("npqcmstest basic functionality works", {
 })
 
 test_that("npdeneqtest basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
@@ -64,7 +64,7 @@ test_that("npdeneqtest basic functionality works", {
 })
 
 test_that("npsymtest basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
@@ -80,7 +80,7 @@ test_that("npsymtest basic functionality works", {
 })
 
 test_that("npunitest basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)

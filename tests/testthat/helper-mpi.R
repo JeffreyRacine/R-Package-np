@@ -5,13 +5,13 @@ spawn_mpi_slaves <- function(n=1) {
   }
   
   # Check if slaves already spawned
-  if (mpi.comm.size(0) > 1) {
+  if (mpi.comm.size(1) > 1) {
     return(TRUE)
   }
 
-  spawn_status <- try(mpi.spawn.Rslaves(nslaves=n, quiet=TRUE), silent=TRUE)
+  spawn_status <- try(mpi.spawn.Rslaves(nslaves=n, quiet=FALSE), silent=FALSE)
   
-  if (inherits(spawn_status, "try-error") || mpi.comm.size(0) < 2) {
+  if (inherits(spawn_status, "try-error") || mpi.comm.size(1) < 2) {
     return(FALSE)
   }
   

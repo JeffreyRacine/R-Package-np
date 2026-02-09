@@ -1,5 +1,5 @@
 test_that("npudist basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   data("faithful")
@@ -20,7 +20,7 @@ test_that("npudist basic functionality works", {
 })
 
 test_that("npudist works with formula and factors", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   data("Italy")

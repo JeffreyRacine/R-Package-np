@@ -1,5 +1,5 @@
 test_that("npreg basic functionality works", {
-  skip_on_cran()
+  # # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   data("cps71")
@@ -27,7 +27,7 @@ test_that("npreg basic functionality works", {
 })
 
 test_that("npreg works with formula and mixed data", {
-  skip_on_cran()
+  # # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   data("Italy")

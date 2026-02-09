@@ -1,5 +1,5 @@
 test_that("npdeptest basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
@@ -19,7 +19,7 @@ test_that("npdeptest basic functionality works", {
 })
 
 test_that("npsdeptest basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)

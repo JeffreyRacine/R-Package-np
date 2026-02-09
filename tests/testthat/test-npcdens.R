@@ -1,5 +1,5 @@
 test_that("npcdens basic functionality works", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   data("faithful")
@@ -20,7 +20,7 @@ test_that("npcdens basic functionality works", {
 })
 
 test_that("npcdens works with formula", {
-  skip_on_cran()
+  # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   data("Italy")

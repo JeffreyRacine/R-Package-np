@@ -1,5 +1,5 @@
 test_that("npksum basic functionality works", {
-  skip_on_cran()
+  # # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   
   data("cps71")
@@ -15,7 +15,7 @@ test_that("npksum basic functionality works", {
 })
 
 test_that("npseed works", {
-  skip_on_cran()
+  # # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   
   # npseed sets seed for C backend

@@ -1,16 +1,9 @@
 context("MPI Comprehensive Examples")
 
 test_that("Comprehensive MPI examples work correctly", {
-  skip_on_cran()
+  # # skip_on_cran()
   
-  if (!requireNamespace("Rmpi", quietly = TRUE)) {
-    skip("Rmpi package not available")
-  }
-
-  # Attempt to spawn slaves
-  spawn_status <- try(mpi.spawn.Rslaves(nslaves=1, quiet=TRUE), silent=TRUE)
-  
-  if (inherits(spawn_status, "try-error") || mpi.comm.size(0) < 2) {
+  if (!spawn_mpi_slaves()) {
     skip("Could not spawn MPI slaves for testing")
   }
 
@@ -70,7 +63,9 @@ test_that("Comprehensive MPI examples work correctly", {
     y <- 1 + x1 + as.numeric(x2) + as.numeric(z1) + sin(z2) + rnorm(n)
     mydat <- data.frame(y,x1,x2,z1,z2)
     mpi.bcast.Robj2slave(mydat)
-    mpi.bcast.cmd(bw <- npplregbw(formula=y~x1+x2|z1+z2, data=mydat, bwmethod="normal-reference"), caller.execute=TRUE)
+    # bwmethod normal-reference not allowed for npplregbw (it uses npregbw internally which might but scbandwidth doesn't)
+    # npregbw default is cv.ls
+    mpi.bcast.cmd(bw <- npplregbw(formula=y~x1+x2|z1+z2, data=mydat, bandwidth.compute=FALSE, bws=matrix(0.1, 5, 2)), caller.execute=TRUE)
     mpi.bcast.cmd(pl <- npplreg(bws=bw), caller.execute=TRUE)
     expect_s3_class(pl, "plregression")
   })
@@ -84,7 +79,7 @@ test_that("Comprehensive MPI examples work correctly", {
     mydat <- data.frame(x1,x2,y)
     mpi.bcast.Robj2slave(mydat)
     # Use small nmulti for speed
-    mpi.bcast.cmd(bw <- npindexbw(formula=y~x1+x2, data=mydat, nmulti=1), caller.execute=TRUE)
+    mpi.bcast.cmd(bw <- npindexbw(formula=y~x1+x2, data=mydat, nmulti=1, bandwidth.compute=FALSE, bws=c(1, 1, 0.1)), caller.execute=TRUE)
     mpi.bcast.cmd(model <- npindex(bws=bw), caller.execute=TRUE)
     expect_s3_class(model, "singleindex")
   })
@@ -97,7 +92,8 @@ test_that("Comprehensive MPI examples work correctly", {
     y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
     mydat <- data.frame(x,y,z)
     mpi.bcast.Robj2slave(mydat)
-    mpi.bcast.cmd(bw <- npscoefbw(y~x|z, data=mydat, bwmethod="normal-reference"), caller.execute=TRUE)
+    # bwmethod="normal-reference" not allowed for scbandwidth
+    mpi.bcast.cmd(bw <- npscoefbw(y~x|z, data=mydat, bandwidth.compute=FALSE, bws=0.1), caller.execute=TRUE)
     mpi.bcast.cmd(model <- npscoef(bws=bw), caller.execute=TRUE)
     expect_s3_class(model, "smoothcoefficient")
   })
@@ -110,8 +106,8 @@ test_that("Comprehensive MPI examples work correctly", {
     y <- x1 + rnorm(n)
     mydat <- data.frame(z,x1,y)
     mpi.bcast.Robj2slave(mydat)
-    mpi.bcast.cmd(model <- npreg(y~z+x1, data=mydat, bwmethod="normal-reference"), caller.execute=TRUE)
-    mpi.bcast.cmd(output <- npsigtest(model, boot.num=2), caller.execute=TRUE)
+    mpi.bcast.cmd(model <- npreg(y~z+x1, data=mydat, bws=c(0.1, 0.1), bandwidth.compute=FALSE), caller.execute=TRUE)
+    mpi.bcast.cmd(output <- npsigtest(model, boot.num=9), caller.execute=TRUE)
     expect_s3_class(output, "sigtest")
   })
 
@@ -122,7 +118,7 @@ test_that("Comprehensive MPI examples work correctly", {
     y <- x + rnorm(n)
     mpi.bcast.Robj2slave(x)
     mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(output <- npdeptest(x, y, boot.num=2, method="summation"), caller.execute=TRUE)
+    mpi.bcast.cmd(output <- npdeptest(x, y, boot.num=9, method="summation"), caller.execute=TRUE)
     expect_s3_class(output, "deptest")
   })
 
@@ -131,7 +127,7 @@ test_that("Comprehensive MPI examples work correctly", {
     n <- 50
     x <- rnorm(n)
     mpi.bcast.Robj2slave(x)
-    mpi.bcast.cmd(output <- npsymtest(x, boot.num=2, method="summation"), caller.execute=TRUE)
+    mpi.bcast.cmd(output <- npsymtest(x, boot.num=9, method="summation"), caller.execute=TRUE)
     expect_s3_class(output, "symtest")
   })
 
@@ -142,7 +138,7 @@ test_that("Comprehensive MPI examples work correctly", {
     y <- rnorm(n)
     mpi.bcast.Robj2slave(x)
     mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(output <- npunitest(x, y, boot.num=2, method="summation"), caller.execute=TRUE)
+    mpi.bcast.cmd(output <- npunitest(x, y, boot.num=9, method="summation"), caller.execute=TRUE)
     expect_s3_class(output, "unitest")
   })
 
@@ -154,7 +150,7 @@ test_that("Comprehensive MPI examples work correctly", {
     mydat <- data.frame(x,y)
     mpi.bcast.Robj2slave(mydat)
     mpi.bcast.cmd(model <- lm(y~x, data=mydat, x=TRUE, y=TRUE), caller.execute=TRUE)
-    mpi.bcast.cmd(output <- npcmstest(model = model, xdat = mydat$x, ydat = mydat$y, boot.num = 2), caller.execute=TRUE)
+    mpi.bcast.cmd(output <- npcmstest(model = model, xdat = mydat$x, ydat = mydat$y, boot.num = 9), caller.execute=TRUE)
     expect_s3_class(output, "cmstest")
   })
 
@@ -162,8 +158,10 @@ test_that("Comprehensive MPI examples work correctly", {
   test_that("npconmode works in parallel", {
     data("Italy")
     Italy_sub <- Italy[1:50, ]
+    # npconmode requires TYDAT to be discrete
+    Italy_sub$gdp_cat <- factor(ifelse(Italy_sub$gdp > median(Italy_sub$gdp), "high", "low"))
     mpi.bcast.Robj2slave(Italy_sub)
-    mpi.bcast.cmd(bw <- npcdensbw(gdp~ordered(year), data=Italy_sub, bwmethod="normal-reference"), caller.execute=TRUE)
+    mpi.bcast.cmd(bw <- npcdensbw(gdp_cat~ordered(year), data=Italy_sub, bwmethod="normal-reference"), caller.execute=TRUE)
     mpi.bcast.cmd(model <- npconmode(bws=bw), caller.execute=TRUE)
     expect_s3_class(model, "conmode")
   })
