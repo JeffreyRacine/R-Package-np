@@ -20,7 +20,14 @@ npRmpi.session.info <- function(comm=1){
   reuse <- isTRUE(getOption("npRmpi.reuse.slaves", FALSE))
   env_no_reuse <- Sys.getenv("NP_RMPI_NO_REUSE_SLAVES", unset="")
 
-  mpi_ver <- try(mpi.get.version(), silent=TRUE)
+  mpi_ver <- try({
+    if (requireNamespace("Rmpi", quietly = TRUE) &&
+        exists("mpi.get.version", envir = asNamespace("Rmpi"), inherits = FALSE)) {
+      get("mpi.get.version", envir = asNamespace("Rmpi"))()
+    } else {
+      NA
+    }
+  }, silent = TRUE)
   comm_size <- try(mpi.comm.size(comm), silent=TRUE)
   comm_rank <- try(mpi.comm.rank(comm), silent=TRUE)
   proc <- try(mpi.get.processor.name(), silent=TRUE)
@@ -57,4 +64,3 @@ npRmpi.session.info <- function(comm=1){
 
   invisible(info)
 }
-
