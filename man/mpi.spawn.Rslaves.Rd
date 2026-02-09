@@ -29,7 +29,7 @@ mpi.spawn.Rslaves(Rscript=system.file("slavedaemon.R", package="npRmpi"),
                   nonblock=TRUE,
                   sleep=0.1)
 
-mpi.close.Rslaves(dellog = TRUE, comm = 1)
+mpi.close.Rslaves(dellog = TRUE, comm = 1, force = FALSE)
 tailslave.log(nlines = 3, comm = 1)
 }
 \arguments{
@@ -51,13 +51,18 @@ they will consume none or little CPUs while waiting.}
 are, the more CPUs consume.}
   \item{dellog}{a logical specifying if R slave's log files are deleted or 
 not.}
+  \item{force}{a logical. If \code{TRUE}, force a hard shutdown of slave daemons.
+  When \code{options(npRmpi.reuse.slaves=TRUE)} and \code{force=FALSE},
+  \code{mpi.close.Rslaves()} performs a soft-close (i.e., keeps daemons alive for reuse).}
   \item{nlines}{number of lines to view from tail in R slave's log files.}
 }
 \value{
  Unless \code{quiet = TRUE}, \code{mpi.spawn.Rslaves} prints to stdio how many 
 slaves are successfully spawned and where they are running.
 
- \code{mpi.close.Rslaves} return 1 if success and 0 otherwise.
+ \code{mpi.close.Rslaves} returns a status code. When \code{options(npRmpi.reuse.slaves=TRUE)}
+ and \code{force=FALSE}, this may be a no-op (soft-close) so that spawned daemons
+ can be reused within the same R session.
 
 \code{tailslave.log} returns last lines of R slave's log files.
 }
@@ -76,6 +81,12 @@ if the default Rscript is replaced). If additional sets of R slaves are
 needed, please use `comm = 3', `comm = 4', etc to spawn them. At most a 
 comm number up to 10 can be used. Notice that the default comm number for 
 R slaves (using slavedaemon.R) is always 1 which is saved as .comm.  
+
+On some systems (notably macOS+MPICH), repeatedly spawning and tearing down
+slaves in the same R session can lead to hangs/crashes. To avoid this,
+npRmpi may reuse an existing slave pool when \code{options(npRmpi.reuse.slaves=TRUE)}.
+In this mode, \code{mpi.spawn.Rslaves()} becomes idempotent and
+\code{mpi.close.Rslaves(force=FALSE)} performs a soft-close.
   
 To spawn R slaves to specific hosts, please use the argument \code{hosts} 
 with a list of those node numbers (an integer vector). Total node numbers 
