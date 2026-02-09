@@ -25,8 +25,8 @@ mpi.spawn.Rslaves(Rscript=system.file("slavedaemon.R", package="npRmpi"),
                   hosts = NULL,
                   needlog = FALSE,
                   mapdrive=TRUE,
-                  quiet = FALSE, 
-		              nonblock=TRUE,
+                  quiet = FALSE,
+                  nonblock=TRUE,
                   sleep=0.1)
 
 mpi.close.Rslaves(dellog = TRUE, comm = 1)
@@ -79,13 +79,13 @@ R slaves (using slavedaemon.R) is always 1 which is saved as .comm.
   
 To spawn R slaves to specific hosts, please use the argument \code{hosts} 
 with a list of those node numbers (an integer vector). Total node numbers 
-along their host names can be found by using \code{\link{lamhosts}}.
+along their host names can be found by using \code{\link{mpi.hostinfo}}.
 Notice that this is MPI implementation specific. 
 } 
 
 \seealso{
   \code{\link{mpi.comm.spawn}},
-  \code{\link{lamhosts}}.
+  \code{\link{mpi.hostinfo}}.
 }
 \author{
 Hao Yu
