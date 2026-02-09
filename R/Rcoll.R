@@ -159,7 +159,7 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 		#mpi.bcast(x=length(cmd), type=1, rank=rank, comm=comm)
 		#invisible(mpi.bcast(x=cmd, type=4, rank=rank, comm=comm))
 		
-		for (i in 0:commsize) {
+		for (i in 0:(commsize - 1)) {
 			if (i != rank)
 				invisible(mpi.send(x=scmd.arg, type=4, dest=i, tag=50000+i, comm=comm))
 			}
