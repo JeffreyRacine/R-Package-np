@@ -1,4 +1,4 @@
 library(testthat)
-library(np)
+library(npRmpi)
 
-test_check("np")
+test_check("npRmpi")
