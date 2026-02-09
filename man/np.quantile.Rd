@@ -163,6 +163,19 @@ npquantile(x = NULL,
 
 \examples{
 \dontrun{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
+set.seed(42)
+
 ## Simulate data from a chi-square distribution
 df <- 50
 x <- rchisq(100,df=df)
@@ -170,14 +183,31 @@ x <- rchisq(100,df=df)
 ## Vector of quantiles desired
 tau <- c(0.01,0.05,0.25,0.50,0.75,0.95,0.99)
 
+mpi.bcast.Robj2slave(x)
+mpi.bcast.Robj2slave(tau)
+
 ## Compute kernel smoothed sample quantiles
-npquantile(x,tau)
+mpi.bcast.cmd(q <- npquantile(x,tau),
+              caller.execute=TRUE)
+
+q
 
 ## Compute sample quantiles using the default method in R (Type 7)
 quantile(x,tau)
 
 ## True quantiles based on known distribution
 qchisq(tau,df=df)
+
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+mpi.close.Rslaves()
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS

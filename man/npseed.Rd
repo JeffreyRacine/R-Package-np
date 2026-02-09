@@ -52,10 +52,42 @@ npseed(seed)
 }
 \examples{
 \dontrun{
-npseed(712)
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
+mpi.bcast.cmd(npseed(712),
+              caller.execute=TRUE)
+
 x <- runif(10)
 y <- x + rnorm(10, sd = 0.1)
-bw <- npregbw(y~x)
+mydat <- data.frame(x,y)
+rm(x,y)
+
+mpi.bcast.Robj2slave(mydat)
+
+mpi.bcast.cmd(bw <- npregbw(y~x, data=mydat),
+              caller.execute=TRUE)
+
+summary(bw)
+
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+mpi.close.Rslaves()
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
 } % enddontrun
 }
 \keyword{nonparametric}

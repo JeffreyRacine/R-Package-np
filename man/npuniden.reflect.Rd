@@ -93,14 +93,35 @@ The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link
 }
 \examples{
 \dontrun{
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
 ## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
 ## unadjusted density, and DGP
-set.seed(42)
+
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
 n <- 100
 X <- sort(rbeta(n,5,1))
 dgp <- dbeta(X,5,1)
-model <- npuniden.reflect(X)
-model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
+
+mpi.bcast.Robj2slave(X)
+
+mpi.bcast.cmd(model <- npuniden.reflect(X),
+              caller.execute=TRUE)
+
+mpi.bcast.cmd(model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf),
+              caller.execute=TRUE)
+
 ylim <- c(0,max(c(dgp,model$f,model.unadjusted$f)))
 plot(X,model$f,ylab="Density",ylim=ylim,type="l")
 lines(X,model.unadjusted$f,lty=2,col=2)
@@ -110,9 +131,17 @@ legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n"
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
 ## asymptotic point-wise confidence intervals
-set.seed(42)
+
+mpi.bcast.cmd(set.seed(42),
+              caller.execute=TRUE)
+
 X <- sort(rbeta(100,5,3))
-model <- npuniden.reflect(X)
+
+mpi.bcast.Robj2slave(X)
+
+mpi.bcast.cmd(model <- npuniden.reflect(X),
+              caller.execute=TRUE)
+
 par(mfrow=c(1,2))
 ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
 plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
@@ -132,15 +161,29 @@ legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
 
 ## Example 3: Age for working age males in the cps71 data set bounded
 ## below by 21 and above by 65
-data(cps71)
-attach(cps71)
-model <- npuniden.reflect(age,a=21,b=65)
+
+mpi.bcast.cmd(data(cps71),
+              caller.execute=TRUE)
+
+mpi.bcast.cmd(model <- npuniden.reflect(cps71$age,a=21,b=65),
+              caller.execute=TRUE)
+
 par(mfrow=c(1,1))
-hist(age,prob=TRUE,main="",ylim=c(0,max(model$f)))
-lines(age,model$f)
-lines(density(age,bw=model$h),col=2)
+hist(cps71$age,prob=TRUE,main="",ylim=c(0,max(model$f)))
+lines(cps71$age,model$f)
+lines(density(cps71$age,bw=model$h),col=2)
 legend("topright",c("Data-Reflection","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
-detach(cps71)
+
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+mpi.close.Rslaves()
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
 } % enddontrun
 }
 \keyword{ nonparametric }

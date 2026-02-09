@@ -38,13 +38,42 @@ scatterplots and smoothers.
 }
 \examples{
 \dontrun{
-  library(npRmpi)
-  y_vars <- c("Murder", "UrbanPop")
-  names(y_vars) <- c("Murder Arrests per 100K", "Pop. Percent Urban")
-  pair_list <- np.pairs(y_vars = y_vars, y_dat = USArrests,
-                        ckertype = "epanechnikov", bwscaling = TRUE)
-  np.pairs.plot(pair_list)
-}
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
+
+mpi.spawn.Rslaves(nslaves=1)
+mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+
+data("USArrests")
+y_vars <- c("Murder", "UrbanPop")
+names(y_vars) <- c("Murder Arrests per 100K", "Pop. Percent Urban")
+
+mpi.bcast.Robj2slave(USArrests)
+mpi.bcast.Robj2slave(y_vars)
+
+mpi.bcast.cmd(pair_list <- np.pairs(y_vars = y_vars, y_dat = USArrests,
+                                    ckertype = "epanechnikov", 
+                                    bwscaling = TRUE),
+              caller.execute=TRUE)
+
+np.pairs.plot(pair_list)
+
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+mpi.close.Rslaves()
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun
 }
 \seealso{\code{\link{npudens}}, \code{\link{npreg}}}
 \keyword{hplot}

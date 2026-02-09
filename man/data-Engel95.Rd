@@ -69,7 +69,8 @@ data(Engel95)
 Engel95 <- Engel95[order(Engel95$logexp),] 
 mpi.bcast.Robj2slave(Engel95)
 
-attach(Engel95)
+mpi.bcast.cmd(attach(Engel95),
+              caller.execute=TRUE)
 
 mpi.bcast.cmd(model.iv <- npregiv(y=food,z=logexp,w=logwages,method="Landweber-Fridman"),
               caller.execute=TRUE)
