@@ -2379,40 +2379,150 @@ void np_ckernelv(const int KERNEL,
      and return a double
   */
 
-  int i,j; 
+  int i; 
   const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   const double sgn = swap_xxt ? -1.0 : 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8, //ordinary kernels
-                                   np_epan2, np_epan4, np_epan6, np_epan8, 
-                                   np_rect, np_tgauss2, 
-                                   np_econvol_gauss2, np_econvol_gauss4, np_econvol_gauss6, np_econvol_gauss8, // convolution kernels
-                                   np_econvol_epan2, np_econvol_epan4, np_econvol_epan6, np_econvol_epan8,
-                                   np_econvol_rect, np_econvol_tgauss2,
-                                   np_deriv_gauss2, np_deriv_gauss4, np_deriv_gauss6, np_deriv_gauss8, // derivative kernels
-                                   np_deriv_epan2, np_deriv_epan4, np_deriv_epan6, np_deriv_epan8, 
-                                   np_deriv_rect, np_deriv_tgauss2,
-                                   np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8, // cdfative kernels
-                                   np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8, 
-                                   np_cdf_rect, np_cdf_tgauss2 };
+  /*
+    Hot path: avoid indirect function-pointer calls and avoid branching on
+    do_xw/xl inside the innermost kernel loop. This improves CPU efficiency
+    without changing the numerical kernel functions.
+  */
 
-  if(xl == NULL)
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*k[KERNEL]((x-xt[i])*sgn/h);
-    }
-  else{
-    for (int m = 0; m < xl->n; m++){
-      const int istart = xl->istart[m];
-      const int nlev = xl->nlev[m];
-      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        if(xw[j] == 0.0) continue;
-        result[i] = xw[j]*k[KERNEL]((x-xt[i])*sgn/h);
+#define NP_CKERNELV_APPLY(fn)                                                      \
+  do {                                                                             \
+    if(xl == NULL){                                                                \
+      if(!bin_do_xw){                                                              \
+        for(i = 0; i < num_xt; i++){                                               \
+          result[i] = fn((x-xt[i])*sgn/h);                                         \
+        }                                                                          \
+      } else {                                                                     \
+        for(i = 0; i < num_xt; i++){                                               \
+          if(xw[i] == 0.0) continue;                                               \
+          result[i] = xw[i]*fn((x-xt[i])*sgn/h);                                   \
+        }                                                                          \
+      }                                                                            \
+    } else {                                                                       \
+      if(!bin_do_xw){                                                              \
+        for(int m = 0; m < xl->n; m++){                                            \
+          const int istart = xl->istart[m];                                        \
+          const int nlev = xl->nlev[m];                                            \
+          for(i = istart; i < istart+nlev; i++){                                   \
+            result[i] = fn((x-xt[i])*sgn/h);                                       \
+          }                                                                        \
+        }                                                                          \
+      } else {                                                                     \
+        for(int m = 0; m < xl->n; m++){                                            \
+          const int istart = xl->istart[m];                                        \
+          const int nlev = xl->nlev[m];                                            \
+          for(i = istart; i < istart+nlev; i++){                                   \
+            if(xw[i] == 0.0) continue;                                             \
+            result[i] = xw[i]*fn((x-xt[i])*sgn/h);                                 \
+          }                                                                        \
+        }                                                                          \
+      }                                                                            \
+    }                                                                              \
+  } while(0)
+
+  switch(KERNEL){
+    case 0: NP_CKERNELV_APPLY(np_gauss2); break;
+    case 1: NP_CKERNELV_APPLY(np_gauss4); break;
+    case 2: NP_CKERNELV_APPLY(np_gauss6); break;
+    case 3: NP_CKERNELV_APPLY(np_gauss8); break;
+
+    case 4: NP_CKERNELV_APPLY(np_epan2); break;
+    case 5: NP_CKERNELV_APPLY(np_epan4); break;
+    case 6: NP_CKERNELV_APPLY(np_epan6); break;
+    case 7: NP_CKERNELV_APPLY(np_epan8); break;
+
+    case 8: NP_CKERNELV_APPLY(np_rect); break;
+    case 9: NP_CKERNELV_APPLY(np_tgauss2); break;
+
+    case 10: NP_CKERNELV_APPLY(np_econvol_gauss2); break;
+    case 11: NP_CKERNELV_APPLY(np_econvol_gauss4); break;
+    case 12: NP_CKERNELV_APPLY(np_econvol_gauss6); break;
+    case 13: NP_CKERNELV_APPLY(np_econvol_gauss8); break;
+
+    case 14: NP_CKERNELV_APPLY(np_econvol_epan2); break;
+    case 15: NP_CKERNELV_APPLY(np_econvol_epan4); break;
+    case 16: NP_CKERNELV_APPLY(np_econvol_epan6); break;
+    case 17: NP_CKERNELV_APPLY(np_econvol_epan8); break;
+
+    case 18: NP_CKERNELV_APPLY(np_econvol_rect); break;
+    case 19: NP_CKERNELV_APPLY(np_econvol_tgauss2); break;
+
+    case 20: NP_CKERNELV_APPLY(np_deriv_gauss2); break;
+    case 21: NP_CKERNELV_APPLY(np_deriv_gauss4); break;
+    case 22: NP_CKERNELV_APPLY(np_deriv_gauss6); break;
+    case 23: NP_CKERNELV_APPLY(np_deriv_gauss8); break;
+
+    case 24: NP_CKERNELV_APPLY(np_deriv_epan2); break;
+    case 25: NP_CKERNELV_APPLY(np_deriv_epan4); break;
+    case 26: NP_CKERNELV_APPLY(np_deriv_epan6); break;
+    case 27: NP_CKERNELV_APPLY(np_deriv_epan8); break;
+
+    case 28: NP_CKERNELV_APPLY(np_deriv_rect); break;
+    case 29: NP_CKERNELV_APPLY(np_deriv_tgauss2); break;
+
+    case 30: NP_CKERNELV_APPLY(np_cdf_gauss2); break;
+    case 31: NP_CKERNELV_APPLY(np_cdf_gauss4); break;
+    case 32: NP_CKERNELV_APPLY(np_cdf_gauss6); break;
+    case 33: NP_CKERNELV_APPLY(np_cdf_gauss8); break;
+
+    case 34: NP_CKERNELV_APPLY(np_cdf_epan2); break;
+    case 35: NP_CKERNELV_APPLY(np_cdf_epan4); break;
+    case 36: NP_CKERNELV_APPLY(np_cdf_epan6); break;
+    case 37: NP_CKERNELV_APPLY(np_cdf_epan8); break;
+
+    case 38: NP_CKERNELV_APPLY(np_cdf_rect); break;
+    case 39: NP_CKERNELV_APPLY(np_cdf_tgauss2); break;
+
+    default: {
+      // Defensive: preserve behavior for unexpected kernel codes.
+      double (* const k[])(double) = { np_gauss2, np_gauss4, np_gauss6, np_gauss8,
+                                       np_epan2, np_epan4, np_epan6, np_epan8,
+                                       np_rect, np_tgauss2,
+                                       np_econvol_gauss2, np_econvol_gauss4, np_econvol_gauss6, np_econvol_gauss8,
+                                       np_econvol_epan2, np_econvol_epan4, np_econvol_epan6, np_econvol_epan8,
+                                       np_econvol_rect, np_econvol_tgauss2,
+                                       np_deriv_gauss2, np_deriv_gauss4, np_deriv_gauss6, np_deriv_gauss8,
+                                       np_deriv_epan2, np_deriv_epan4, np_deriv_epan6, np_deriv_epan8,
+                                       np_deriv_rect, np_deriv_tgauss2,
+                                       np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8,
+                                       np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8,
+                                       np_cdf_rect, np_cdf_tgauss2 };
+
+      if(xl == NULL){
+        if(!bin_do_xw){
+          for(i = 0; i < num_xt; i++)
+            result[i] = k[KERNEL]((x-xt[i])*sgn/h);
+        } else {
+          for(i = 0; i < num_xt; i++){
+            if(xw[i] == 0.0) continue;
+            result[i] = xw[i]*k[KERNEL]((x-xt[i])*sgn/h);
+          }
+        }
+      } else {
+        for(int m = 0; m < xl->n; m++){
+          const int istart = xl->istart[m];
+          const int nlev = xl->nlev[m];
+          if(!bin_do_xw){
+            for(i = istart; i < istart+nlev; i++)
+              result[i] = k[KERNEL]((x-xt[i])*sgn/h);
+          } else {
+            for(i = istart; i < istart+nlev; i++){
+              if(xw[i] == 0.0) continue;
+              result[i] = xw[i]*k[KERNEL]((x-xt[i])*sgn/h);
+            }
+          }
+        }
       }
     }
   }
+
+#undef NP_CKERNELV_APPLY
 
 }
 
@@ -2555,28 +2665,82 @@ void np_ukernelv(const int KERNEL,
   */
 
   int i; 
-  int j, bin_do_xw = do_xw > 0;
+  const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
-                                             np_econvol_uaa, np_econvol_unli_racine };
+#define NP_UKERNELV_APPLY(fn)                                                      \
+  do {                                                                             \
+    if(xl == NULL){                                                                \
+      if(!bin_do_xw){                                                              \
+        for(i = 0; i < num_xt; i++){                                               \
+          result[i] = fn((xt[i]==x), lambda, ncat);                                \
+        }                                                                          \
+      } else {                                                                     \
+        for(i = 0; i < num_xt; i++){                                               \
+          if(xw[i] == 0.0) continue;                                               \
+          result[i] = xw[i]*fn((xt[i]==x), lambda, ncat);                          \
+        }                                                                          \
+      }                                                                            \
+    } else {                                                                       \
+      if(!bin_do_xw){                                                              \
+        for(int m = 0; m < xl->n; m++){                                            \
+          const int istart = xl->istart[m];                                        \
+          const int nlev = xl->nlev[m];                                            \
+          for(i = istart; i < istart+nlev; i++){                                   \
+            result[i] = fn((xt[i]==x), lambda, ncat);                              \
+          }                                                                        \
+        }                                                                          \
+      } else {                                                                     \
+        for(int m = 0; m < xl->n; m++){                                            \
+          const int istart = xl->istart[m];                                        \
+          const int nlev = xl->nlev[m];                                            \
+          for(i = istart; i < istart+nlev; i++){                                   \
+            if(xw[i] == 0.0) continue;                                             \
+            result[i] = xw[i]*fn((xt[i]==x), lambda, ncat);                        \
+          }                                                                        \
+        }                                                                          \
+      }                                                                            \
+    }                                                                              \
+  } while(0)
 
-  if(xl == NULL){
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
-    }
-  } else {
-    for (int m = 0; m < xl->n; m++){
-      const int istart = xl->istart[m];
-      const int nlev = xl->nlev[m];
-      for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        if(xw[j] == 0.0) continue;
-        result[i] = xw[j]*k[KERNEL]((xt[i]==x), lambda, ncat);
+  switch(KERNEL){
+    case 0: NP_UKERNELV_APPLY(np_uaa); break;
+    case 1: NP_UKERNELV_APPLY(np_unli_racine); break;
+    case 2: NP_UKERNELV_APPLY(np_econvol_uaa); break;
+    case 3: NP_UKERNELV_APPLY(np_econvol_unli_racine); break;
+    default: {
+      double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
+                                                 np_econvol_uaa, np_econvol_unli_racine };
+      if(xl == NULL){
+        if(!bin_do_xw){
+          for(i = 0; i < num_xt; i++)
+            result[i] = k[KERNEL]((xt[i]==x), lambda, ncat);
+        } else {
+          for(i = 0; i < num_xt; i++){
+            if(xw[i] == 0.0) continue;
+            result[i] = xw[i]*k[KERNEL]((xt[i]==x), lambda, ncat);
+          }
+        }
+      } else {
+        for(int m = 0; m < xl->n; m++){
+          const int istart = xl->istart[m];
+          const int nlev = xl->nlev[m];
+          if(!bin_do_xw){
+            for(i = istart; i < istart+nlev; i++)
+              result[i] = k[KERNEL]((xt[i]==x), lambda, ncat);
+          } else {
+            for(i = istart; i < istart+nlev; i++){
+              if(xw[i] == 0.0) continue;
+              result[i] = xw[i]*k[KERNEL]((xt[i]==x), lambda, ncat);
+            }
+          }
+        }
       }
     }
   }
+
+#undef NP_UKERNELV_APPLY
 }
 
 void np_convol_okernelv(const int KERNEL, 
@@ -2588,19 +2752,19 @@ void np_convol_okernelv(const int KERNEL,
                         const int swap_xxt){
 
   int i; 
-  int j, bin_do_xw = do_xw > 0;
+  const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
   if(!swap_xxt){
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_ordered_convolution(KERNEL, xt[i], x, lambda, ncat, cat);
+    for (i = 0; i < num_xt; i++){
+      if(xw[bin_do_xw ? i : 0] == 0.0) continue;
+      result[i] = xw[bin_do_xw ? i : 0]*kernel_ordered_convolution(KERNEL, xt[i], x, lambda, ncat, cat);
     }
   } else {
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_ordered_convolution(KERNEL, x, xt[i], lambda, ncat, cat);
+    for (i = 0; i < num_xt; i++){
+      if(xw[bin_do_xw ? i : 0] == 0.0) continue;
+      result[i] = xw[bin_do_xw ? i : 0]*kernel_ordered_convolution(KERNEL, x, xt[i], lambda, ncat, cat);
     }
   }
 
@@ -2740,53 +2904,149 @@ void np_okernelv(const int KERNEL,
   */
 
   int i; 
-  int j, bin_do_xw = do_xw > 0;
+  const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
-
-  double (* const k[])(double, double, double, double, double) = { 
-    np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
-    np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-    np_onull, np_onull, np_onull,
-    np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
-  };
 
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
 
-  if(!swap_xxt){
-    if(xl == NULL){
-      for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-        if(xw[j] == 0.0) continue;
-        result[i] = xw[j]*k[KERNEL](xt[i], x, lambda, cl, ch);
-      }
-    } else {
-      for (int m = 0; m < xl->n; m++){
-        const int istart = xl->istart[m];
-        const int nlev = xl->nlev[m];
-        for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-          if(xw[j] == 0.0) continue;
-          result[i] = xw[j]*k[KERNEL](xt[i], x, lambda, cl, ch);
+
+#define NP_OKERNELV_APPLY(fn)                                                      \
+  do {                                                                             \
+    if(!swap_xxt){                                                                 \
+      if(xl == NULL){                                                              \
+        if(!bin_do_xw){                                                            \
+          for(i = 0; i < num_xt; i++)                                              \
+            result[i] = fn(xt[i], x, lambda, cl, ch);                              \
+        } else {                                                                   \
+          for(i = 0; i < num_xt; i++){                                             \
+            if(xw[i] == 0.0) continue;                                             \
+            result[i] = xw[i]*fn(xt[i], x, lambda, cl, ch);                        \
+          }                                                                        \
+        }                                                                          \
+      } else {                                                                     \
+        for(int m = 0; m < xl->n; m++){                                            \
+          const int istart = xl->istart[m];                                        \
+          const int nlev = xl->nlev[m];                                            \
+          if(!bin_do_xw){                                                          \
+            for(i = istart; i < istart+nlev; i++)                                  \
+              result[i] = fn(xt[i], x, lambda, cl, ch);                            \
+          } else {                                                                 \
+            for(i = istart; i < istart+nlev; i++){                                 \
+              if(xw[i] == 0.0) continue;                                           \
+              result[i] = xw[i]*fn(xt[i], x, lambda, cl, ch);                      \
+            }                                                                      \
+          }                                                                        \
+        }                                                                          \
+      }                                                                            \
+    } else {                                                                       \
+      if(xl == NULL){                                                              \
+        if(!bin_do_xw){                                                            \
+          for(i = 0; i < num_xt; i++)                                              \
+            result[i] = fn(x, xt[i], lambda, cl, ch);                              \
+        } else {                                                                   \
+          for(i = 0; i < num_xt; i++){                                             \
+            if(xw[i] == 0.0) continue;                                             \
+            result[i] = xw[i]*fn(x, xt[i], lambda, cl, ch);                        \
+          }                                                                        \
+        }                                                                          \
+      } else {                                                                     \
+        for(int m = 0; m < xl->n; m++){                                            \
+          const int istart = xl->istart[m];                                        \
+          const int nlev = xl->nlev[m];                                            \
+          if(!bin_do_xw){                                                          \
+            for(i = istart; i < istart+nlev; i++)                                  \
+              result[i] = fn(x, xt[i], lambda, cl, ch);                            \
+          } else {                                                                 \
+            for(i = istart; i < istart+nlev; i++){                                 \
+              if(xw[i] == 0.0) continue;                                           \
+              result[i] = xw[i]*fn(x, xt[i], lambda, cl, ch);                      \
+            }                                                                      \
+          }                                                                        \
+        }                                                                          \
+      }                                                                            \
+    }                                                                              \
+  } while(0)
+
+  switch(KERNEL){
+    case 0: NP_OKERNELV_APPLY(np_owang_van_ryzin); break;
+    case 1: NP_OKERNELV_APPLY(np_oli_racine); break;
+    case 2: NP_OKERNELV_APPLY(np_onli_racine); break;
+    case 3: NP_OKERNELV_APPLY(np_econvol_owang_van_ryzin); break;
+    case 4: NP_OKERNELV_APPLY(np_onull); break;
+    case 5: NP_OKERNELV_APPLY(np_econvol_onli_racine); break;
+    case 6: NP_OKERNELV_APPLY(np_onull); break;
+    case 7: NP_OKERNELV_APPLY(np_onull); break;
+    case 8: NP_OKERNELV_APPLY(np_onull); break;
+    case 9: NP_OKERNELV_APPLY(np_cdf_owang_van_ryzin); break;
+    case 10: NP_OKERNELV_APPLY(np_cdf_oli_racine); break;
+    case 11: NP_OKERNELV_APPLY(np_cdf_onli_racine); break;
+    default: {
+      double (* const k[])(double, double, double, double, double) = {
+        np_owang_van_ryzin, np_oli_racine, np_onli_racine,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
+        np_onull, np_onull, np_onull,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+      };
+
+      if(!swap_xxt){
+        if(xl == NULL){
+          if(!bin_do_xw){
+            for(i = 0; i < num_xt; i++)
+              result[i] = k[KERNEL](xt[i], x, lambda, cl, ch);
+          } else {
+            for(i = 0; i < num_xt; i++){
+              if(xw[i] == 0.0) continue;
+              result[i] = xw[i]*k[KERNEL](xt[i], x, lambda, cl, ch);
+            }
+          }
+        } else {
+          for(int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
+            if(!bin_do_xw){
+              for(i = istart; i < istart+nlev; i++)
+                result[i] = k[KERNEL](xt[i], x, lambda, cl, ch);
+            } else {
+              for(i = istart; i < istart+nlev; i++){
+                if(xw[i] == 0.0) continue;
+                result[i] = xw[i]*k[KERNEL](xt[i], x, lambda, cl, ch);
+              }
+            }
+          }
         }
-      }
-    }
-  } else {
-    if(xl == NULL){
-      for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-        if(xw[j] == 0.0) continue;
-        result[i] = xw[j]*k[KERNEL](x, xt[i], lambda, cl, ch);
-      }
-    } else {
-      for (int m = 0; m < xl->n; m++){
-        const int istart = xl->istart[m];
-        const int nlev = xl->nlev[m];
-        for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-          if(xw[j] == 0.0) continue;
-          result[i] = xw[j]*k[KERNEL](x, xt[i], lambda, cl, ch);
+      } else {
+        if(xl == NULL){
+          if(!bin_do_xw){
+            for(i = 0; i < num_xt; i++)
+              result[i] = k[KERNEL](x, xt[i], lambda, cl, ch);
+          } else {
+            for(i = 0; i < num_xt; i++){
+              if(xw[i] == 0.0) continue;
+              result[i] = xw[i]*k[KERNEL](x, xt[i], lambda, cl, ch);
+            }
+          }
+        } else {
+          for(int m = 0; m < xl->n; m++){
+            const int istart = xl->istart[m];
+            const int nlev = xl->nlev[m];
+            if(!bin_do_xw){
+              for(i = istart; i < istart+nlev; i++)
+                result[i] = k[KERNEL](x, xt[i], lambda, cl, ch);
+            } else {
+              for(i = istart; i < istart+nlev; i++){
+                if(xw[i] == 0.0) continue;
+                result[i] = xw[i]*k[KERNEL](x, xt[i], lambda, cl, ch);
+              }
+            }
+          }
         }
       }
     }
   }
+
+#undef NP_OKERNELV_APPLY
 }
 
 // W = A
