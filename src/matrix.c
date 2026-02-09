@@ -5,12 +5,6 @@
 
 #include <R.h>
 
-#ifdef RCSID
-static char rcsid[] = "$Id: matrix.c,v 1.4 2006/11/02 19:50:13 tristen Exp $";
-#endif
-
-
-
 /*
  *-----------------------------------------------------------------------------
  * file: matadd.c

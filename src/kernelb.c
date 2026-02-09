@@ -43,10 +43,6 @@ int int_SIMULATION;
 int int_WEIGHTS;
 */
 
-#ifdef RCSID
-static char rcsid[] = "$Id: kernelb.c,v 1.4 2006/11/02 16:56:49 tristen Exp $";
-#endif
-
 /* Overloaded these modules to handle conditional distributions */
 
 int kernel_bandwidth(int KERNEL,

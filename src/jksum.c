@@ -60,10 +60,6 @@ int int_TAYLOR;
 int int_WEIGHTS;
 */
 
-#ifdef RCSID
-static char rcsid[] = "$Id: jksum.c,v 1.16 2006/11/02 16:56:49 tristen Exp $";
-#endif
-
 /* Some externals for numerical routines */
 
 extern int num_obs_train_extern;

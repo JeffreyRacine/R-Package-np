@@ -119,10 +119,6 @@ extern int cdfontrain_extern;
 // timing
 extern double timing_extern;
 
-#ifdef RCSID
-static char rcsid[] = "$Id: kernelcv.c,v 1.9 2006/11/02 16:56:49 tristen Exp $";
-#endif
-
 #define RBWM_CVAIC 0
 #define RBWM_CVLS 1
 

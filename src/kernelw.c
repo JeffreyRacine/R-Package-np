@@ -9,10 +9,6 @@
 
 #include "headers.h"
 
-#ifdef RCSID
-static char rcsid[] = "$Id: kernelw.c,v 1.4 2006/11/02 16:56:49 tristen Exp $";
-#endif
-
 int kernel_weights_conditional_convolution_cv(
 int int_WEIGHTS,
 int KERNEL_den,

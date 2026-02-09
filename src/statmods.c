@@ -8,10 +8,6 @@
 #include "headers.h"
 #include "matrix.h"
 
-#ifdef RCSID
-static char rcsid[] = "$Id: statmods_Rprintf_all_random.c,v 1.4 2014/05/13 17:02:42 jracine Exp jracine $";
-#endif
-
 #ifdef MPI2
 
 #include "mpi.h"
