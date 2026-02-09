@@ -4543,6 +4543,11 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
 
+  int use_tree = 0;
+  int allocated_X_train = 1, allocated_X_eval = 1;
+  int allocated_Y = 1, allocated_W = 1;
+  int ksum_is_output = 0, pksum_is_output = 0, kw_is_output = 0;
+
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
   int ** matrix_ordered_indices = NULL;
@@ -4597,6 +4602,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   sum_element_length = (no_y ? 1 : ncol_Y)*(no_weights ? 1 : ncol_W);
 
+  use_tree = (int_TREE_X == NP_TREE_TRUE);
+
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
 #else
@@ -4610,31 +4617,89 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   /* allocate */
 
-  matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
-  matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
-  matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  if(use_tree){
+    matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
+    matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
+    matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  } else {
+    allocated_X_train = 0;
+    matrix_X_unordered_train_extern = (num_reg_unordered_extern > 0) ?
+      (double **)R_alloc((size_t)num_reg_unordered_extern, sizeof(double*)) : NULL;
+    matrix_X_ordered_train_extern = (num_reg_ordered_extern > 0) ?
+      (double **)R_alloc((size_t)num_reg_ordered_extern, sizeof(double*)) : NULL;
+    matrix_X_continuous_train_extern = (num_reg_continuous_extern > 0) ?
+      (double **)R_alloc((size_t)num_reg_continuous_extern, sizeof(double*)) : NULL;
+
+    for(j = 0; j < num_reg_unordered_extern; j++)
+      matrix_X_unordered_train_extern[j] = tuno + j*num_obs_train_extern;
+    for(j = 0; j < num_reg_ordered_extern; j++)
+      matrix_X_ordered_train_extern[j] = tord + j*num_obs_train_extern;
+    for(j = 0; j < num_reg_continuous_extern; j++)
+      matrix_X_continuous_train_extern[j] = tcon + j*num_obs_train_extern;
+  }
   
   /* for the moment we will just allocate a vector of ones */
   /* vector_Y_extern = (no_y)?NULL:alloc_vecd(num_obs_train_extern); */
 
-  matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, ncol_Y);
-  matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, ncol_W);
+  if(use_tree){
+    matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, ncol_Y);
+    matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, ncol_W);
+  } else {
+    allocated_Y = 0;
+    allocated_W = 0;
+    matrix_Y_continuous_train_extern = (ncol_Y > 0) ?
+      (double **)R_alloc((size_t)ncol_Y, sizeof(double*)) : NULL;
+    matrix_Y_ordered_train_extern = (ncol_W > 0) ?
+      (double **)R_alloc((size_t)ncol_W, sizeof(double*)) : NULL;
+
+    for(j = 0; j < ncol_Y; j++)
+      matrix_Y_continuous_train_extern[j] = ty + j*num_obs_train_extern;
+    for(j = 0; j < ncol_W; j++)
+      matrix_Y_ordered_train_extern[j] = weights + j*num_obs_train_extern;
+  }
 
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
 
   vector_scale_factor = alloc_vecd(num_var + 1);
-  ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length);
+  if(!use_tree && (num_obs_eval_alloc == num_obs_eval_extern)){
+    ksum = weighted_sum;
+    ksum_is_output = 1;
+  } else {
+    ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length);
+  }
 
   if((p_operator != OP_NOOP) || do_ocg){
     p_nvar = ((p_operator != OP_NOOP) ? num_reg_continuous_extern : 0) + ((do_score || do_ocg) ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
-    p_ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length*p_nvar);
+    if(!use_tree && (num_obs_eval_alloc == num_obs_eval_extern)){
+      p_ksum = weighted_p_sum;
+      pksum_is_output = 1;
+    } else {
+      p_ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length*p_nvar);
+    }
   }
 
   if(!train_is_eval){
-    matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
-    matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
-    matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
+    if(use_tree){
+      matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
+      matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
+      matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
+    } else {
+      allocated_X_eval = 0;
+      matrix_X_unordered_eval_extern = (num_reg_unordered_extern > 0) ?
+        (double **)R_alloc((size_t)num_reg_unordered_extern, sizeof(double*)) : NULL;
+      matrix_X_ordered_eval_extern = (num_reg_ordered_extern > 0) ?
+        (double **)R_alloc((size_t)num_reg_ordered_extern, sizeof(double*)) : NULL;
+      matrix_X_continuous_eval_extern = (num_reg_continuous_extern > 0) ?
+        (double **)R_alloc((size_t)num_reg_continuous_extern, sizeof(double*)) : NULL;
+
+      for(j = 0; j < num_reg_unordered_extern; j++)
+        matrix_X_unordered_eval_extern[j] = euno + j*num_obs_eval_extern;
+      for(j = 0; j < num_reg_ordered_extern; j++)
+        matrix_X_ordered_eval_extern[j] = eord + j*num_obs_eval_extern;
+      for(j = 0; j < num_reg_continuous_extern; j++)
+        matrix_X_continuous_eval_extern[j] = econ + j*num_obs_eval_extern;
+    }
   } else {
     matrix_X_unordered_eval_extern = matrix_X_unordered_train_extern;
     matrix_X_ordered_eval_extern = matrix_X_ordered_train_extern;
@@ -4643,27 +4708,29 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   /* train */
 
-  for( j=0;j<num_reg_unordered_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+i];
+  if(use_tree){
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+i];
 
-  for( j=0;j<num_reg_ordered_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+i];
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+i];
 
-  for( j=0;j<num_reg_continuous_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+i];
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+i];
 
-  for( j = 0; j < ncol_Y; j++ )
-    for( i = 0; i < num_obs_train_extern; i++ )
-      matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+i];
+    for( j = 0; j < ncol_Y; j++ )
+      for( i = 0; i < num_obs_train_extern; i++ )
+        matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+i];
 
-  for( j = 0; j < ncol_W; j++ )
-    for( i = 0; i < num_obs_train_extern; i++ )
-      matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+i];
+    for( j = 0; j < ncol_W; j++ )
+      for( i = 0; i < num_obs_train_extern; i++ )
+        matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+i];
+  }
 
-  if(!train_is_eval){
+  if(use_tree && !train_is_eval){
     for( j=0;j<num_reg_unordered_extern;j++)
       for( i=0;i<num_obs_eval_extern;i++ )
         matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+i];
@@ -4677,24 +4744,29 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
         matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+i];
   }
 
-  ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt != NULL))
-    error("!(ipt != NULL)");
+  if(use_tree){
+    ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+    if(!(ipt != NULL))
+      error("!(ipt != NULL)");
 
-  for(i = 0; i < num_obs_train_extern; i++){
-    ipt[i] = i;
-  }
+    for(i = 0; i < num_obs_train_extern; i++){
+      ipt[i] = i;
+    }
 
-  if(!train_is_eval) {
-    ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
-    if(!(ipe != NULL))
-      error("!(ipe != NULL)");
+    if(!train_is_eval) {
+      ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+      if(!(ipe != NULL))
+        error("!(ipe != NULL)");
 
-    for(i = 0; i < num_obs_eval_extern; i++){
-      ipe[i] = i;
+      for(i = 0; i < num_obs_eval_extern; i++){
+        ipe[i] = i;
+      }
+    } else {
+      ipe = ipt;
     }
   } else {
-    ipe = ipt;
+    ipt = NULL;
+    ipe = NULL;
   }
 
   // attempt tree build, if enabled 
@@ -4811,7 +4883,12 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(return_kernel_weights){
-    kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
+    if(!use_tree && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (num_obs_eval_alloc == num_obs_eval_extern)){
+      kw = kernel_weights;
+      kw_is_output = 1;
+    } else {
+      kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
+    }
   }
   
   kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous_extern);
@@ -4829,6 +4906,21 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   for(i = 0; i < num_reg_ordered_extern; i++)
     kernel_o[i] = KERNEL_reg_ordered_extern;
 
+  int *bpso = NULL;
+  {
+    const int bpso_len = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+    if(bpso_len > 0){
+      const int do_perm = (p_operator != OP_NOOP);
+      const int doscoreocg = (do_score || do_ocg);
+
+      bpso = (int *)R_alloc((size_t)bpso_len, sizeof(int));
+      for(i = 0; i < num_reg_continuous_extern; i++)
+        bpso[i] = do_perm;
+      for(i = num_reg_continuous_extern; i < bpso_len; i++)
+        bpso[i] = doscoreocg;
+    }
+  }
+  
   
   if((npks_err=kernel_weighted_sum_np(kernel_c,
                                       kernel_u,
@@ -4852,7 +4944,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       p_operator,
                                       do_score,
                                       do_ocg, // no ocg (for now)
-                                      NULL,
+                                      bpso,
                                       0, // don't explicity suppress parallel
                                       ncol_Y,
                                       ncol_W,
@@ -4884,53 +4976,65 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
 
   if(!npks_err){
-    for(j = 0; j < num_obs_eval_extern; j++)
-      for(i = 0; i < sum_element_length; i++)
-        weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
+    if(use_tree){
+      for(j = 0; j < num_obs_eval_extern; j++)
+        for(i = 0; i < sum_element_length; i++)
+          weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
+    }
 
     if(return_kernel_weights){
-      if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
-        for(j = 0; j < num_obs_eval_extern; j++)
-          for(i = 0; i < num_obs_train_extern; i++)
-            kernel_weights[ipe[j]*num_obs_train_extern + ipt[i]] = kw[j*num_obs_train_extern + i];
-      } else {
-        for(j = 0; j < num_obs_train_extern; j++)
-          for(i = 0; i < num_obs_eval_extern; i++)
-            kernel_weights[ipe[i]*num_obs_train_extern + ipt[j]] = kw[j*num_obs_eval_extern + i];      
+      if(use_tree || (BANDWIDTH_reg_extern == BW_ADAP_NN) || !kw_is_output){
+        if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
+          for(j = 0; j < num_obs_eval_extern; j++)
+            for(i = 0; i < num_obs_train_extern; i++)
+              kernel_weights[ipe[j]*num_obs_train_extern + ipt[i]] = kw[j*num_obs_train_extern + i];
+        } else {
+          for(j = 0; j < num_obs_train_extern; j++)
+            for(i = 0; i < num_obs_eval_extern; i++)
+              kernel_weights[ipe[i]*num_obs_train_extern + ipt[j]] = kw[j*num_obs_eval_extern + i];      
+        }
       }
     }
 
     if(p_nvar > 0){
-      for(k = 0; k < p_nvar; k++){
-        const int kidx = k*num_obs_eval_extern*sum_element_length;
-        for(j = 0; j < num_obs_eval_extern; j++)
-          for(i = 0; i < sum_element_length; i++)
-            weighted_p_sum[kidx + ipe[j]*sum_element_length + i] = p_ksum[kidx + j*sum_element_length + i];
+      if(use_tree){
+        for(k = 0; k < p_nvar; k++){
+          const int kidx = k*num_obs_eval_extern*sum_element_length;
+          for(j = 0; j < num_obs_eval_extern; j++)
+            for(i = 0; i < sum_element_length; i++)
+              weighted_p_sum[kidx + ipe[j]*sum_element_length + i] = p_ksum[kidx + j*sum_element_length + i];
+        }
       }
     }
 
   }
   /* clean up */
 
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  if(allocated_X_train){
+    free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+    free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+    free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  }
   
-  if(!train_is_eval){
+  if(!train_is_eval && allocated_X_eval){
     free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
     free_mat(matrix_X_ordered_eval_extern, num_reg_ordered_extern);
     free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
   }
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
-  free_mat(matrix_Y_continuous_train_extern, ncol_Y);
-  free_mat(matrix_Y_ordered_train_extern, ncol_W);
+  if(allocated_Y)
+    free_mat(matrix_Y_continuous_train_extern, ncol_Y);
+  if(allocated_W)
+    free_mat(matrix_Y_ordered_train_extern, ncol_W);
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
-  safe_free(ksum);
+  if(!ksum_is_output)
+    safe_free(ksum);
 
-  safe_free(kw);
+  if(!kw_is_output)
+    safe_free(kw);
 
   safe_free(ipt);
 
@@ -4947,7 +5051,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(p_nvar > 0){
-    safe_free(p_ksum);
+    if(!pksum_is_output)
+      safe_free(p_ksum);
   }
 
   if(do_ocg && (num_reg_ordered_extern > 0)){

@@ -28,9 +28,13 @@ npksum.formula <-
       exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
     }
 
-    tobj <- eval(parse(text=paste("npksum(txdat = txdat,",
-                         ifelse(!is.null(tydat), "tydat = tydat,", ""),
-                         ifelse(!miss.new,"exdat = exdat,",""), "...)")))
+    call_args <- list(txdat = txdat)
+    if (!is.null(tydat))
+      call_args$tydat <- tydat
+    if (!miss.new)
+      call_args$exdat <- exdat
+
+    tobj <- do.call(npksum, c(call_args, list(...)))
 
     tobj$formula <- formula
     tobj$na.action <- attr(mf, "na.action")
@@ -52,24 +56,53 @@ npksum.numeric <-
            ...){
 
     txdat <- toFrame(txdat)
+    if (!missing(exdat)) {
+      exdat_was_df <- is.data.frame(exdat)
+      exdat_was_matrix <- is.matrix(exdat)
+      exdat <- toFrame(exdat)
+      # Preserve historical naming: `npksum.numeric()` used to forward `exdat=exdat`
+      # into `npksum.default()`, so one-dimensional evaluation data typically carried
+      # the column name "exdat" regardless of the caller's symbol.
+      if (!exdat_was_df && !exdat_was_matrix && ncol(exdat) == 1L)
+        names(exdat) <- "exdat"
+    }
 
-    
-    tbw <- eval(parse(text=paste("kbandwidth(bw = bws,",
-                        "xdati = untangle(txdat),",
-                        ifelse(missing(tydat),"","ydati = untangle(as.data.frame(tydat)),"),
-                        "xnames = names(txdat), ...)")))
+    kbw_args <- list(
+      bw = bws,
+      xdati = untangle(txdat),
+      xnames = names(txdat)
+    )
+    if (!missing(tydat))
+      kbw_args$ydati <- untangle(as.data.frame(tydat))
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("tydat", "exdat", "weights", "leave.one.out", "kernel.pow", "bandwidth.divide",
-               "operator", "permutation.operator", "compute.score", "compute.ocg", "return.kernel.weights")
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
+    kbw_args <- c(kbw_args, list(...))
+    tbw <- do.call(kbandwidth, kbw_args)
 
+    call_args <- list(txdat = txdat, bws = tbw)
+    if (!missing(tydat))
+      call_args$tydat <- tydat
+    if (!missing(exdat))
+      call_args$exdat <- exdat
+    if (!missing(weights))
+      call_args$weights <- weights
+    if (!missing(leave.one.out))
+      call_args$leave.one.out <- leave.one.out
+    if (!missing(kernel.pow))
+      call_args$kernel.pow <- kernel.pow
+    if (!missing(bandwidth.divide))
+      call_args$bandwidth.divide <- bandwidth.divide
+    if (!missing(operator))
+      call_args$operator <- operator
+    if (!missing(permutation.operator))
+      call_args$permutation.operator <- permutation.operator
+    if (!missing(compute.score))
+      call_args$compute.score <- compute.score
+    if (!missing(compute.ocg))
+      call_args$compute.ocg <- compute.ocg
+    if (!missing(return.kernel.weights))
+      call_args$return.kernel.weights <- return.kernel.weights
 
-    eval(parse(text=paste("npksum.default(txdat=txdat, bws=tbw",
-                          ifelse(any.m, ",",""),
-                          paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                          ")")))
+    do.call(npksum.default, call_args)
   }
     
 npksum.default <- 
