@@ -1,13 +1,18 @@
 test_that("npqreg basic functionality works", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
   data("cps71")
   cps71_sub <- cps71[1:50, ]
+  mpi.bcast.Robj2slave(cps71_sub)
   
   # Quantile regression needs a condbandwidth object
-  bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
-                  bws=c(0.5, 5), bandwidth.compute=FALSE)
+  mpi.bcast.cmd(bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
+                                bws=c(0.5, 5), bandwidth.compute=FALSE),
+                caller.execute=TRUE)
   
   # Median regression
-  model <- npqreg(bws=bw, tau=0.5)
+  mpi.bcast.cmd(model <- npqreg(bws=bw, tau=0.5), caller.execute=TRUE)
   
   expect_s3_class(model, "qregression")
   expect_type(predict(model), "double")
@@ -18,15 +23,17 @@ test_that("npqreg basic functionality works", {
 })
 
 test_that("npqreg works with multiple taus", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
   data("cps71")
   cps71_sub <- cps71[1:30, ]
-  bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
-                  bws=c(0.5, 5), bandwidth.compute=FALSE)
+  mpi.bcast.Robj2slave(cps71_sub)
+
+  mpi.bcast.cmd(bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
+                                bws=c(0.5, 5), bandwidth.compute=FALSE),
+                caller.execute=TRUE)
   
-  # npqreg only takes a single tau at a time according to some versions, 
-  # but let's see if it works as extra arg or in bws.
-  # Actually, npqreg usage says tau is an argument.
-  
-  model_q25 <- npqreg(bws=bw, tau=0.25)
+  mpi.bcast.cmd(model_q25 <- npqreg(bws=bw, tau=0.25), caller.execute=TRUE)
   expect_equal(model_q25$tau, 0.25)
 })

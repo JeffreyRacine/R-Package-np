@@ -16,21 +16,34 @@ test_that("nptgauss basic functionality works", {
 })
 
 test_that("npplot basic functionality works", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
   data("faithful")
-  bw <- npudensbw(dat=faithful, bws=c(0.5, 5), bandwidth.compute=FALSE)
+  mpi.bcast.Robj2slave(faithful)
+
+  mpi.bcast.cmd(bw <- npudensbw(dat=faithful, bws=c(0.5, 5), bandwidth.compute=FALSE),
+                caller.execute=TRUE)
   
   # Use pdf(NULL) to avoid opening a window
   pdf(NULL)
   on.exit(dev.off())
   
-  expect_silent(npplot(bws=bw))
+  mpi.bcast.cmd(npplot(bws=bw), caller.execute=TRUE)
 })
 
 test_that("se and gradients methods work", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
   data("cps71")
   cps71_sub <- cps71[1:50, ]
-  bw <- npregbw(logwage~age, data=cps71_sub, bws=1.0, bandwidth.compute=FALSE)
-  model <- npreg(bws=bw, gradients=TRUE)
+  mpi.bcast.Robj2slave(cps71_sub)
+
+  mpi.bcast.cmd(bw <- npregbw(logwage~age, data=cps71_sub, bws=1.0, bandwidth.compute=FALSE),
+                caller.execute=TRUE)
+  mpi.bcast.cmd(model <- npreg(bws=bw, gradients=TRUE),
+                caller.execute=TRUE)
   
   expect_type(se(model), "double")
   expect_length(se(model), 50)
