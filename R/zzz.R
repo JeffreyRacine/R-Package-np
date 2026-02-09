@@ -14,6 +14,15 @@
   if (!is.loaded("mpi_initialize"))
     stop("Probably npRmpi has been detached. Please quit R.")
 
+  # On macOS with MPICH, repeated spawn/close cycles have been observed to
+  # destabilize subsequent MPI collectives. Default to reusing spawned slaves
+  # (keep them alive) unless the user explicitly disables it.
+  if (is.null(getOption("npRmpi.reuse.slaves")) &&
+      identical(Sys.info()[["sysname"]], "Darwin") &&
+      !nzchar(Sys.getenv("NP_RMPI_NO_REUSE_SLAVES"))) {
+    options(npRmpi.reuse.slaves = TRUE)
+  }
+
   if (nzchar(Sys.getenv("NP_RMPI_SKIP_INIT"))) {
     if(is.null(options('np.messages')$np.messages))
       options(np.messages = TRUE)

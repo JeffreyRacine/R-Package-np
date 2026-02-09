@@ -3625,6 +3625,20 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   int_MINIMIZE_IO = myopti[RBW_MINIOI];
 
   int_ll_extern = myopti[RBW_LL];
+#ifdef MPI2
+  {
+    int ll_min = 0, ll_max = 0;
+    MPI_Allreduce(&int_ll_extern, &ll_min, 1, MPI_INT, MPI_MIN, comm[1]);
+    MPI_Allreduce(&int_ll_extern, &ll_max, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(ll_min != ll_max){
+      if(my_rank == 0){
+        REprintf("\n[npRmpi] Warning: inconsistent regression type across ranks (min=%d max=%d). Forcing all ranks to min.\n", ll_min, ll_max);
+        R_FlushConsole();
+      }
+      int_ll_extern = ll_min;
+    }
+  }
+#endif
 
   int_TREE_X = myopti[RBW_DOTREEI];
   scale_cat = myopti[RBW_SCATI];
@@ -4126,6 +4140,20 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   do_grad = myopti[REG_GRAD];
   int_ll_extern = myopti[REG_LL];
+#ifdef MPI2
+  {
+    int ll_min = 0, ll_max = 0;
+    MPI_Allreduce(&int_ll_extern, &ll_min, 1, MPI_INT, MPI_MIN, comm[1]);
+    MPI_Allreduce(&int_ll_extern, &ll_max, 1, MPI_INT, MPI_MAX, comm[1]);
+    if(ll_min != ll_max){
+      if(my_rank == 0){
+        REprintf("\n[npRmpi] Warning: inconsistent regression type across ranks (min=%d max=%d). Forcing all ranks to min.\n", ll_min, ll_max);
+        R_FlushConsole();
+      }
+      int_ll_extern = ll_min;
+    }
+  }
+#endif
 
   max_lev = myopti[REG_MLEVI];
   pad_num = *padnum;

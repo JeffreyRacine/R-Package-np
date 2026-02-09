@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <math.h>
 #include <float.h>
 #include <errno.h>
@@ -3800,6 +3801,31 @@ double * const kw){
     // gather_scatter is only used for the local-linear cv
     // note: ll cv + adaptive_nn does not work in parallel
 #ifdef MPI2
+    {
+      const char *dbg = getenv("NP_RMPI_MPI_DEBUG_COUNTS");
+      static int dbg_mode = -1; // -1 unknown, 0 off, 1 anomalies, 2 all
+      if(dbg_mode < 0){
+        if(dbg == NULL || dbg[0] == '\0'){
+          dbg_mode = 0;
+        } else if(!strcmp(dbg, "all")){
+          dbg_mode = 2;
+        } else {
+          dbg_mode = 1;
+        }
+      }
+
+      if(dbg_mode > 0 && (dbg_mode == 2 || ncol_Y != 2 || ncol_W != 0)){
+        int comm_rank = -1, comm_size = -1;
+        MPI_Comm_rank(comm[1], &comm_rank);
+        MPI_Comm_size(comm[1], &comm_size);
+        REprintf("[NP_RMPI_MPI_DEBUG_COUNTS] rank=%d/%d cached_rank=%d cached_size=%d stride=%d sum_element_length=%d num_obs_eval=%d num_obs_eval_alloc=%d js=%d je=%d BANDWIDTH_reg=%d ncol_Y=%d ncol_W=%d p_nvar=%d gather_scatter=%d suppress_parallel=%d nws=%d\n",
+                 comm_rank, comm_size, my_rank, iNum_Processors, stride, sum_element_length,
+                 num_obs_eval, num_obs_eval_alloc, js, je, BANDWIDTH_reg, ncol_Y, ncol_W,
+                 p_nvar, gather_scatter, suppress_parallel, nws);
+        R_FlushConsole();
+      }
+    }
+
     if(!nws){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
         MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);

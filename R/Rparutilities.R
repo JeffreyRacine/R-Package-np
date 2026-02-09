@@ -82,7 +82,23 @@ mpi.spawn.Rslaves <-
 	sleep=0.1) {
     if (!is.loaded("mpi_comm_spawn"))
         stop("You cannot use MPI_Comm_spawn API")   
-    if (mpi.comm.size(comm) > 0){
+    if (mpi.comm.size(comm) > 1){
+         if (isTRUE(getOption("npRmpi.reuse.slaves", FALSE))) {
+             existing <- mpi.comm.size(comm) - 1L
+             if (!missing(nslaves) && length(nslaves) == 1 && is.finite(nslaves)) {
+                 requested <- as.integer(nslaves)
+                 if (!is.na(requested) && requested != existing) {
+                     warning(paste0(
+                         "npRmpi is reusing an existing slave pool (", existing,
+                         " slave(s)) but nslaves=", requested, " was requested. ",
+                         "To change the number of slaves, call mpi.close.Rslaves(force=TRUE) ",
+                         "and then mpi.spawn.Rslaves(nslaves=...)."
+                     ), call. = FALSE)
+                 }
+             }
+             if (!quiet) slave.hostinfo(comm)
+             return(invisible(existing))
+         }
          err <-paste("It seems there are some slaves running on comm ", comm)
          stop(err)
     }
@@ -316,12 +332,21 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     }
 }
 
-mpi.close.Rslaves <- function(dellog=TRUE, comm=1){
+mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
     if (mpi.comm.size(comm) < 2){
     err <-paste("It seems no slaves running on comm", comm)
     stop(err)
     }
-    mpi.bcast.cmd(cmd=quote(break), rank=0, comm=comm)
+    if (isTRUE(getOption("npRmpi.reuse.slaves", FALSE)) && !isTRUE(force)) {
+        # Soft-close: keep the slave daemons alive for reuse in this session.
+        # This avoids repeated spawn/merge/teardown cycles that can hang/crash
+        # on some MPI stacks (notably MPICH on macOS).
+        return(invisible(0L))
+    }
+    # Tell slaves to exit their daemon loop cleanly.
+    # The spawned slave daemon (`inst/slavedaemon.R`) treats the character
+    # token "kaerb" as a shutdown signal.
+    mpi.bcast.cmd(cmd="kaerb", rank=0, comm=comm)
     if (.Platform$OS!="windows"){
         if (dellog && mpi.comm.size(0) < mpi.comm.size(comm)){
         tmp <- paste(Sys.getpid(),"+",comm,sep="")  
@@ -332,11 +357,18 @@ mpi.close.Rslaves <- function(dellog=TRUE, comm=1){
         }
     }
 #     mpi.barrier(comm)
-    if (comm >0){
-        if (is.loaded("mpi_comm_disconnect"))
-            res <- mpi.comm.disconnect(comm) 
-        else
+    if (comm > 0){
+        # `comm` is an intracommunicator created via `MPI_Intercomm_merge()`.
+        # Using `MPI_Comm_disconnect()` here has been observed to destabilize
+        # subsequent spawn/merge cycles with MPICH; `MPI_Comm_free()` is the
+        # correct teardown for an intracommunicator.
+        if (is.loaded("mpi_comm_free")) {
             res <- mpi.comm.free(comm)
+        } else if (is.loaded("mpi_comm_disconnect")) {
+            res <- mpi.comm.disconnect(comm)
+        } else {
+            res <- mpi.comm.free(comm)
+        }
     }
 #   mpi.comm.set.errhandler(0)
     invisible(res)

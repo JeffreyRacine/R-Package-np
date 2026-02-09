@@ -19,6 +19,17 @@ repeat {
     try(eval(tmp.message,envir=.GlobalEnv),TRUE)
 }
 print("Done")
-#invisible(mpi.comm.disconnect(.comm))
+if (mpi.comm.size(.comm) > 0) {
+    # `.comm` is an intracommunicator (created via `MPI_Intercomm_merge()`).
+    # Prefer `MPI_Comm_free()`; `MPI_Comm_disconnect()` can destabilize
+    # subsequent spawn/merge cycles with MPICH.
+    if (is.loaded("mpi_comm_free")) {
+        invisible(mpi.comm.free(.comm))
+    } else if (is.loaded("mpi_comm_disconnect")) {
+        invisible(mpi.comm.disconnect(.comm))
+    } else {
+        invisible(mpi.comm.free(.comm))
+    }
+}
 invisible(mpi.comm.set.errhandler(0))
 mpi.quit()

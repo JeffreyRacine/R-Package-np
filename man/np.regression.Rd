@@ -118,6 +118,10 @@ FALSE, \dots)
     Usage 1: first compute the bandwidth object via npregbw and then
     compute the conditional mean:
     
+    ## Spawn slaves for interactive execution. If slaves are already running and
+    ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
+    ## reuse the existing pool instead of respawning. To change the number of
+    ## slaves, call `mpi.close.Rslaves(force=TRUE)` then respawn.
     mpi.spawn.Rslaves(nslaves=1)
     mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
     mpi.bcast.Robj2slave(x)
@@ -128,6 +132,10 @@ FALSE, \dots)
     
     Usage 2: alternatively, compute the bandwidth object indirectly:
     
+    ## Spawn slaves for interactive execution. If slaves are already running and
+    ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
+    ## reuse the existing pool instead of respawning. To change the number of
+    ## slaves, call `mpi.close.Rslaves(force=TRUE)` then respawn.
     mpi.spawn.Rslaves(nslaves=1)
     mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
     mpi.bcast.Robj2slave(x)
@@ -137,6 +145,10 @@ FALSE, \dots)
     
     Usage 3: modify the default kernel and order:
     
+    ## Spawn slaves for interactive execution. If slaves are already running and
+    ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
+    ## reuse the existing pool instead of respawning. To change the number of
+    ## slaves, call `mpi.close.Rslaves(force=TRUE)` then respawn.
     mpi.spawn.Rslaves(nslaves=1)
     mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
     mpi.bcast.Robj2slave(x)
@@ -148,6 +160,10 @@ FALSE, \dots)
     Usage 4: use the data frame interface rather than the formula
     interface:
 
+    ## Spawn slaves for interactive execution. If slaves are already running and
+    ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
+    ## reuse the existing pool instead of respawning. To change the number of
+    ## slaves, call `mpi.close.Rslaves(force=TRUE)` then respawn.
     mpi.spawn.Rslaves(nslaves=1)
     mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
     mpi.bcast.Robj2slave(x)
@@ -290,6 +306,10 @@ FALSE, \dots)
 ## vignette for further details on running parallel np programs via
 ## vignette("npRmpi",package="npRmpi").
 
+## Spawn slaves for interactive execution. If slaves are already running and
+## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
+## reuse the existing pool instead of respawning. To change the number of
+## slaves, call `mpi.close.Rslaves(force=TRUE)` then respawn.
 mpi.spawn.Rslaves(nslaves=1)
 mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
 
@@ -325,7 +345,14 @@ summary(model)
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
 
-mpi.close.Rslaves()
+## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
+## tearing down slaves in the same R session can lead to hangs/crashes.
+## npRmpi may therefore keep slave daemons alive by default and
+## `mpi.close.Rslaves()` becomes a "soft close". Use `force=TRUE` to
+## actually shut down the slaves.
+
+mpi.close.Rslaves()          ## soft close (may keep slaves alive)
+## mpi.close.Rslaves(force=TRUE)  ## hard close
 
 ## Note that in order to exit npRmpi properly avoid quit(), and instead
 ## use mpi.quit() as follows.
@@ -335,4 +362,3 @@ mpi.close.Rslaves()
 } % enddontrun     
 }
 \keyword{nonparametric}
-
