@@ -96,6 +96,27 @@ These timings measure **estimation calls only** (manual bandwidths; bandwidth se
 | `npcdens()` | 8000 | 1.85x (+45.9%) | 1.87x (+46.6%) |
 | `npcdens()` | 16000 | 2.07x (+51.7%) | 2.07x (+51.7%) |
 
+### Ordered-kernel optimization (ordered-factor power fast path)
+
+These results isolate the ordered-kernel optimization in `jksum.c` (replacing a generic power call with a small-integer fast path). Benchmarks use **fixed bandwidths** (no CV), `times = 100`, and mixed data including ordered factors.
+
+Baseline: pre-ordered-kernel change (`c7825d0`); Current: ordered-kernel change (`bb6bb45`).
+
+| function | n | mean (ms) baseline → current | mean speedup | median (ms) baseline → current | median speedup |
+|---|---:|---:|---:|---:|---:|
+| `npcdens()` | 1000 | 23.971 → 22.199 | 1.08x (+7.40%) | 23.783 → 21.987 | 1.08x (+7.55%) |
+| `npcdens()` | 2000 | 98.634 → 88.521 | 1.11x (+10.25%) | 98.145 → 88.301 | 1.11x (+10.03%) |
+| `npcdens()` | 4000 | 441.832 → 399.326 | 1.11x (+9.62%) | 441.159 → 398.488 | 1.11x (+9.67%) |
+| `npcdist()` | 1000 | 30.647 → 28.609 | 1.07x (+6.65%) | 30.318 → 28.551 | 1.06x (+5.83%) |
+| `npcdist()` | 2000 | 124.528 → 114.667 | 1.09x (+7.92%) | 124.465 → 114.721 | 1.08x (+7.83%) |
+| `npcdist()` | 4000 | 548.156 → 505.053 | 1.09x (+7.86%) | 547.238 → 504.767 | 1.08x (+7.76%) |
+| `npreg()` | 1000 | 11.114 → 10.149 | 1.10x (+8.69%) | 11.116 → 10.063 | 1.10x (+9.47%) |
+| `npreg()` | 2000 | 44.998 → 39.723 | 1.13x (+11.72%) | 45.051 → 39.685 | 1.14x (+11.91%) |
+| `npreg()` | 4000 | 200.442 → 181.020 | 1.11x (+9.69%) | 200.375 → 180.739 | 1.11x (+9.80%) |
+| `npudens()` | 1000 | 10.370 → 9.506 | 1.09x (+8.34%) | 10.366 → 9.463 | 1.10x (+8.71%) |
+| `npudens()` | 2000 | 42.556 → 37.694 | 1.13x (+11.42%) | 42.533 → 37.687 | 1.13x (+11.39%) |
+| `npudens()` | 4000 | 193.619 → 171.545 | 1.13x (+11.40%) | 193.669 → 171.502 | 1.13x (+11.45%) |
+
 ## Notes on inheritance of improvements
 
 Many higher-level `np*` functions inherit these improvements automatically, because they ultimately dispatch into the same `jksum.c` kernel evaluators (`np_ckernelv`, `np_ukernelv`, `np_okernelv`) in the “new” (non-legacy) C code paths.
