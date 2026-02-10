@@ -1,6 +1,7 @@
 ^\.git
 ^BUILD\.md
 ^CRAN_DIFF\.md
+^OPTIMIZATION\.md
 ^WORKTREES\.md
 ^man/dontrun
 ^man/run
