@@ -8,6 +8,7 @@
 #include <time.h>
 
 #include <R.h>
+#include <R_ext/Arith.h>
 #include <stdint.h>
 
 #ifdef MPI2
@@ -112,6 +113,159 @@ double **matrix_XY_ordered_eval_extern;
 int * ipt_extern_X;
 int * ipt_extern_Y;
 int * ipt_extern_XY;
+
+static double (*bwmfunc_raw)(double *) = NULL;
+static double bwm_eval_count = 0.0;
+static double bwm_invalid_count = 0.0;
+static int bwm_use_transform = 0;
+static int bwm_num_reg_continuous = 0;
+static int bwm_num_reg_unordered = 0;
+static int bwm_num_reg_ordered = 0;
+static int bwm_kernel_unordered = 0;
+static int *bwm_kernel_unordered_vec = NULL;
+static int bwm_kernel_unordered_len = 0;
+static int *bwm_num_categories = NULL;
+static double *bwm_transform_buf = NULL;
+static int bwm_transform_buf_len = 0;
+static int bwm_penalty_mode = 0;
+static double bwm_penalty_value = DBL_MAX;
+
+static void bwm_reset_counters(void)
+{
+  bwm_eval_count = 0.0;
+  bwm_invalid_count = 0.0;
+}
+
+static double bwm_sigmoid(double x)
+{
+  if (x >= 0.0) {
+    double z = exp(-x);
+    return 1.0/(1.0+z);
+  } else {
+    double z = exp(x);
+    return z/(1.0+z);
+  }
+}
+
+static double bwm_safe_exp(double x)
+{
+  if (x > 700.0) return DBL_MAX/2.0;
+  if (x < -700.0) return 0.0;
+  return exp(x);
+}
+
+static double bwm_logit(double p)
+{
+  const double eps = 1e-12;
+  if (p < eps) p = eps;
+  if (p > 1.0 - eps) p = 1.0 - eps;
+  return log(p/(1.0-p));
+}
+
+static void bwm_apply_transform(const double *p, double *out, int n)
+{
+  int i;
+  int idx;
+
+  for (i = 1; i <= n; i++)
+    out[i] = p[i];
+
+  for (i = 1; i <= bwm_num_reg_continuous; i++)
+    out[i] = bwm_safe_exp(out[i]);
+
+  for (i = 0; i < bwm_num_reg_unordered; i++) {
+    idx = bwm_num_reg_continuous + 1 + i;
+    if (bwm_num_categories != NULL) {
+      int kern = (bwm_kernel_unordered_vec != NULL && i < bwm_kernel_unordered_len) ?
+        bwm_kernel_unordered_vec[i] : bwm_kernel_unordered;
+      double maxbw = max_unordered_bw(bwm_num_categories[i], kern);
+      out[idx] = bwm_sigmoid(out[idx]) * maxbw;
+    } else {
+      out[idx] = bwm_sigmoid(out[idx]);
+    }
+  }
+
+  for (i = 0; i < bwm_num_reg_ordered; i++) {
+    idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
+    out[idx] = bwm_sigmoid(out[idx]);
+  }
+}
+
+static void bwm_to_unconstrained(double *p, int n)
+{
+  int i;
+  int idx;
+  const double eps = 1e-12;
+
+  if (!bwm_use_transform)
+    return;
+
+  for (i = 1; i <= n; i++)
+    bwm_transform_buf[i] = p[i];
+
+  for (i = 1; i <= bwm_num_reg_continuous; i++) {
+    double v = bwm_transform_buf[i];
+    if (v <= 0.0) v = eps;
+    p[i] = log(v);
+  }
+
+  for (i = 0; i < bwm_num_reg_unordered; i++) {
+    idx = bwm_num_reg_continuous + 1 + i;
+    int kern = (bwm_kernel_unordered_vec != NULL && i < bwm_kernel_unordered_len) ?
+      bwm_kernel_unordered_vec[i] : bwm_kernel_unordered;
+    double maxbw = (bwm_num_categories != NULL) ? max_unordered_bw(bwm_num_categories[i], kern) : 1.0;
+    double v = bwm_transform_buf[idx];
+    if (maxbw <= 0.0) {
+      p[idx] = 0.0;
+    } else {
+      double frac = v / maxbw;
+      p[idx] = bwm_logit(frac);
+    }
+  }
+
+  for (i = 0; i < bwm_num_reg_ordered; i++) {
+    idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
+    p[idx] = bwm_logit(bwm_transform_buf[idx]);
+  }
+}
+
+static void bwm_to_constrained(double *p, int n)
+{
+  int i;
+  if (!bwm_use_transform)
+    return;
+
+  bwm_apply_transform(p, bwm_transform_buf, n);
+  for (i = 1; i <= n; i++)
+    p[i] = bwm_transform_buf[i];
+}
+
+static double bwmfunc_wrapper(double *p)
+{
+  double val;
+  double *use_p = p;
+
+  bwm_eval_count += 1.0;
+  if (bwm_use_transform) {
+    int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
+    if (bwm_transform_buf_len < n + 1) {
+      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
+      bwm_transform_buf_len = n + 1;
+    }
+    bwm_apply_transform(p, bwm_transform_buf, n);
+    use_p = bwm_transform_buf;
+  }
+
+  val = bwmfunc_raw(use_p);
+
+  if (!R_FINITE(val) || val == DBL_MAX) {
+    bwm_invalid_count += 1.0;
+    if (bwm_penalty_mode == 1 && R_FINITE(bwm_penalty_value))
+      return bwm_penalty_value;
+  }
+
+  return val;
+}
 
 int * ipt_lookup_extern_X;
 int * ipt_lookup_extern_Y;
@@ -248,7 +402,10 @@ void np_mpi_init(int * mpi_status){
 
 
 void np_density_bw(double * myuno, double * myord, double * mycon, 
-                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
+                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
+                   double * objective_function_values, double * objective_function_evals,
+                   double * objective_function_invalid, double * timing,
+                   int * penalty_mode, double * penalty_mult){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -302,6 +459,16 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   old_bw=myopti[BW_OLDBW];
   int_TREE_X = myopti[BW_DOTREEI];
   scale_cat = myopti[BW_SCATI];
+  bwm_use_transform = myopti[BW_TBNDI];
+  if (BANDWIDTH_den_extern != BW_FIXED)
+    bwm_use_transform = 0;
+  if (bwm_use_transform) {
+    int n = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+    if (bwm_transform_buf_len < n + 1) {
+      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
+      bwm_transform_buf_len = n + 1;
+    }
+  }
 
   ftol=myoptd[BW_FTOLD];
   tol=myoptd[BW_TOLD];
@@ -511,9 +678,55 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   }
 
+  if (bwm_use_transform)
+    bwm_to_unconstrained(vector_scale_factor, num_var);
+
   spinner(0);
 
-  fret_best = bwmfunc(vector_scale_factor);
+  bwmfunc_raw = bwmfunc;
+  bwm_num_reg_continuous = num_reg_continuous_extern;
+  bwm_num_reg_unordered = num_reg_unordered_extern;
+  bwm_num_reg_ordered = num_reg_ordered_extern;
+  bwm_kernel_unordered = KERNEL_den_unordered_extern;
+  bwm_kernel_unordered_vec = NULL;
+  bwm_kernel_unordered_len = 0;
+  bwm_num_categories = num_categories_extern;
+  bwm_reset_counters();
+  bwm_penalty_mode = 0;
+  bwm_penalty_value = DBL_MAX;
+  if (penalty_mode[0] == 1) {
+    double pmult = penalty_mult[0];
+    double baseline;
+    if (pmult < 1.0) pmult = 1.0;
+    baseline = bwmfunc_raw(vector_scale_factor);
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      double *tmp = alloc_vecd(num_var + 1);
+      for (i = 1; i <= num_var; i++)
+        tmp[i] = vector_scale_factor[i];
+      for (i = 1; i <= num_reg_continuous_extern; i++)
+        tmp[i] *= 2.0;
+      for (i = 0; i < num_reg_unordered_extern; i++) {
+        int idx = num_reg_continuous_extern + 1 + i;
+        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+        tmp[idx] = 0.5*maxbw;
+      }
+      for (i = 0; i < num_reg_ordered_extern; i++) {
+        int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
+        tmp[idx] = 0.5;
+      }
+      baseline = bwmfunc_raw(tmp);
+      safe_free(tmp);
+    }
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      bwm_penalty_value = pmult * 1.0e6;
+    } else {
+      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
+    }
+    if (R_FINITE(bwm_penalty_value))
+      bwm_penalty_mode = 1;
+  }
+
+  fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
 
   powell(0,
@@ -528,7 +741,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
          itmax,
          &iter,
          &fret,
-         bwmfunc);
+         bwmfunc_wrapper);
 
   /* int_RESTART_FROM_MIN needs to be set */
 
@@ -565,7 +778,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
            itmax,
            &iter,
            &fret,
-           bwmfunc);
+           bwmfunc_wrapper);
   }
 
   iImproved = (fret < fret_best);
@@ -573,6 +786,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
   /* When multistarting save initial minimum of objective function and scale factors */
   objective_function_values[0]=-fret;
+  objective_function_evals[0]=bwm_eval_count;
+  objective_function_invalid[0]=bwm_invalid_count;
 
   if(iMultistart == IMULTI_TRUE){
     fret_best = fret;
@@ -633,6 +848,11 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
       /* Conduct direction set search */
 
+      if (bwm_use_transform)
+        bwm_to_unconstrained(vector_scale_factor, num_var);
+
+      bwm_reset_counters();
+
       powell(0,
              0,
              vector_scale_factor,
@@ -645,7 +865,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
              itmax,
              &iter,
              &fret,
-             bwmfunc);
+             bwmfunc_wrapper);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
         initialize_nr_directions(BANDWIDTH_den_extern,
@@ -679,7 +899,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                itmax,
                &iter,
                &fret,
-               bwmfunc);
+               bwmfunc_wrapper);
       }
        			
       /* If this run resulted in an improved minimum save information */
@@ -693,6 +913,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
       objective_function_values[iMs_counter]=-fret;
+      objective_function_evals[iMs_counter]=bwm_eval_count;
+      objective_function_invalid[iMs_counter]=bwm_invalid_count;
     }
 
     /* Save best for estimation */
@@ -705,6 +927,9 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     free(vector_scale_factor_multistart);
 
   }
+
+  if (bwm_use_transform)
+    bwm_to_constrained(vector_scale_factor, num_var);
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -755,7 +980,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
 void np_distribution_bw(double * myuno, double * myord, double * mycon, 
                         double * myeuno, double * myeord, double * myecon, double * mysd,
-                        int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
+                        int * myopti, double * myoptd, double * myans, double * fval,
+                        double * objective_function_values, double * objective_function_evals,
+                        double * objective_function_invalid, double * timing,
+                        int * penalty_mode, double * penalty_mult){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -813,6 +1041,16 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   int_TREE_X = myopti[DBW_DOTREEI];
   scale_cat = myopti[DBW_SCATI];
+  bwm_use_transform = myopti[DBW_TBNDI];
+  if (BANDWIDTH_den_extern != BW_FIXED)
+    bwm_use_transform = 0;
+  if (bwm_use_transform) {
+    int n = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+    if (bwm_transform_buf_len < n + 1) {
+      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
+      bwm_transform_buf_len = n + 1;
+    }
+  }
 
   ftol=myoptd[DBW_FTOLD];
   tol=myoptd[DBW_TOLD];
@@ -1069,9 +1307,55 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     error("np.c: invalid bandwidth selection method."); break;
   }
 
+  if (bwm_use_transform)
+    bwm_to_unconstrained(vector_scale_factor, num_var);
+
   spinner(0);
 
-  fret_best = bwmfunc(vector_scale_factor);
+  bwmfunc_raw = bwmfunc;
+  bwm_num_reg_continuous = num_reg_continuous_extern;
+  bwm_num_reg_unordered = num_reg_unordered_extern;
+  bwm_num_reg_ordered = num_reg_ordered_extern;
+  bwm_kernel_unordered = KERNEL_den_unordered_extern;
+  bwm_kernel_unordered_vec = NULL;
+  bwm_kernel_unordered_len = 0;
+  bwm_num_categories = num_categories_extern;
+  bwm_reset_counters();
+  bwm_penalty_mode = 0;
+  bwm_penalty_value = DBL_MAX;
+  if (penalty_mode[0] == 1) {
+    double pmult = penalty_mult[0];
+    double baseline;
+    if (pmult < 1.0) pmult = 1.0;
+    baseline = bwmfunc_raw(vector_scale_factor);
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      double *tmp = alloc_vecd(num_var + 1);
+      for (i = 1; i <= num_var; i++)
+        tmp[i] = vector_scale_factor[i];
+      for (i = 1; i <= num_reg_continuous_extern; i++)
+        tmp[i] *= 2.0;
+      for (i = 0; i < num_reg_unordered_extern; i++) {
+        int idx = num_reg_continuous_extern + 1 + i;
+        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+        tmp[idx] = 0.5*maxbw;
+      }
+      for (i = 0; i < num_reg_ordered_extern; i++) {
+        int idx = num_reg_continuous_extern + num_reg_unordered_extern + 1 + i;
+        tmp[idx] = 0.5;
+      }
+      baseline = bwmfunc_raw(tmp);
+      safe_free(tmp);
+    }
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      bwm_penalty_value = pmult * 1.0e6;
+    } else {
+      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
+    }
+    if (R_FINITE(bwm_penalty_value))
+      bwm_penalty_mode = 1;
+  }
+
+  fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
 
   powell(0,
@@ -1086,7 +1370,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
          itmax,
          &iter,
          &fret,
-         bwmfunc);
+         bwmfunc_wrapper);
 
   /* int_RESTART_FROM_MIN needs to be set */
 
@@ -1122,13 +1406,15 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
            itmax,
            &iter,
            &fret,
-           bwmfunc);
+           bwmfunc_wrapper);
   }
 
   iImproved = (fret < fret_best);
   *timing = timing_extern;
 
   objective_function_values[0]=fret;
+  objective_function_evals[0]=bwm_eval_count;
+  objective_function_invalid[0]=bwm_invalid_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
   if(iMultistart == IMULTI_TRUE){
@@ -1187,6 +1473,11 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
       /* Conduct direction set search */
 
+      if (bwm_use_transform)
+        bwm_to_unconstrained(vector_scale_factor, num_var);
+
+      bwm_reset_counters();
+
       powell(0,
              0,
              vector_scale_factor,
@@ -1199,7 +1490,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
              itmax,
              &iter,
              &fret,
-             bwmfunc);
+             bwmfunc_wrapper);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
@@ -1232,7 +1523,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                itmax,
                &iter,
                &fret,
-               bwmfunc);
+               bwmfunc_wrapper);
       }
        			
       /* If this run resulted in an improved minimum save information */
@@ -1246,6 +1537,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
       objective_function_values[iMs_counter]=fret;
+      objective_function_evals[iMs_counter]=bwm_eval_count;
+      objective_function_invalid[iMs_counter]=bwm_invalid_count;
     }
 
     /* Save best for estimation */
@@ -1258,6 +1551,9 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     free(vector_scale_factor_multistart);
 
   }
+
+  if (bwm_use_transform)
+    bwm_to_constrained(vector_scale_factor, num_var);
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -1315,7 +1611,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                double * u_uno, double * u_ord, double * u_con,
                                double * mysd,
-                               int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
+                               int * myopti, double * myoptd, double * myans, double * fval,
+                               double * objective_function_values, double * objective_function_evals,
+                               double * objective_function_invalid, double * timing,
+                               int * penalty_mode, double * penalty_mult){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y = NULL;
@@ -1387,6 +1686,18 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   scale_cat = myopti[CBW_SCATI];
   
   ibwmfunc = myopti[CBW_MI];
+  bwm_use_transform = myopti[CBW_TBNDI];
+  if (BANDWIDTH_den_extern != BW_FIXED)
+    bwm_use_transform = 0;
+  if (bwm_use_transform) {
+    int n = num_var_continuous_extern + num_reg_continuous_extern +
+      num_var_unordered_extern + num_reg_unordered_extern +
+      num_var_ordered_extern + num_reg_ordered_extern;
+    if (bwm_transform_buf_len < n + 1) {
+      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
+      bwm_transform_buf_len = n + 1;
+    }
+  }
 
   ftol=myoptd[CBW_FTOLD];
   tol=myoptd[CBW_TOLD];
@@ -1808,9 +2119,64 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     }
   }
 
+  if (bwm_use_transform)
+    bwm_to_unconstrained(vector_scale_factor, num_all_var);
+
   spinner(0);
 
-  fret_best = bwmfunc(vector_scale_factor);
+  bwmfunc_raw = bwmfunc;
+  bwm_num_reg_continuous = num_var_continuous_extern + num_reg_continuous_extern;
+  bwm_num_reg_unordered = num_var_unordered_extern + num_reg_unordered_extern;
+  bwm_num_reg_ordered = num_var_ordered_extern + num_reg_ordered_extern;
+  bwm_kernel_unordered = KERNEL_den_unordered_extern;
+  bwm_kernel_unordered_len = bwm_num_reg_unordered;
+  if (bwm_kernel_unordered_len > 0) {
+    bwm_kernel_unordered_vec = alloc_vecu(bwm_kernel_unordered_len);
+    for (i = 0; i < num_var_unordered_extern; i++)
+      bwm_kernel_unordered_vec[i] = KERNEL_den_unordered_extern;
+    for (i = 0; i < num_reg_unordered_extern; i++)
+      bwm_kernel_unordered_vec[num_var_unordered_extern + i] = KERNEL_reg_unordered_extern;
+  } else {
+    bwm_kernel_unordered_vec = NULL;
+  }
+  bwm_num_categories = num_categories_extern;
+  bwm_reset_counters();
+  bwm_penalty_mode = 0;
+  bwm_penalty_value = DBL_MAX;
+  if (penalty_mode[0] == 1) {
+    double pmult = penalty_mult[0];
+    double baseline;
+    if (pmult < 1.0) pmult = 1.0;
+    baseline = bwmfunc_raw(vector_scale_factor);
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      double *tmp = alloc_vecd(num_all_var + 1);
+      for (i = 1; i <= num_all_var; i++)
+        tmp[i] = vector_scale_factor[i];
+      for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
+        tmp[i] *= 2.0;
+      for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
+        int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
+        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+        tmp[idx] = 0.5*maxbw;
+      }
+      for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
+        int idx = num_var_continuous_extern + num_reg_continuous_extern +
+          num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
+        tmp[idx] = 0.5;
+      }
+      baseline = bwmfunc_raw(tmp);
+      safe_free(tmp);
+    }
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      bwm_penalty_value = pmult * 1.0e6;
+    } else {
+      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
+    }
+    if (R_FINITE(bwm_penalty_value))
+      bwm_penalty_mode = 1;
+  }
+
+  fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
 
   powell(0,
@@ -1825,7 +2191,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
          itmax,
          &iter,
          &fret,
-         bwmfunc);
+         bwmfunc_wrapper);
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
@@ -1859,7 +2225,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
            itmax,
            &iter,
            &fret,
-           bwmfunc);
+           bwmfunc_wrapper);
 
   }
 
@@ -1867,6 +2233,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   *timing = timing_extern;
 
   objective_function_values[0]=-fret;
+  objective_function_evals[0]=bwm_eval_count;
+  objective_function_invalid[0]=bwm_invalid_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -1925,6 +2293,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                matrix_Y_continuous_train_extern);
 
       /* Conduct direction set search */
+
+      if (bwm_use_transform)
+        bwm_to_unconstrained(vector_scale_factor, num_all_var);
+
+      bwm_reset_counters();
       
       powell(0,
              0,
@@ -1938,7 +2311,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
              itmax,
              &iter,
              &fret,
-             bwmfunc);
+             bwmfunc_wrapper);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
@@ -1971,7 +2344,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                itmax,
                &iter,
                &fret,
-               bwmfunc);
+               bwmfunc_wrapper);
       }
 				
       /* If this run resulted in an improved minimum save information */
@@ -1985,6 +2358,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
       objective_function_values[iMs_counter]=-fret;
+      objective_function_evals[iMs_counter]=bwm_eval_count;
+      objective_function_invalid[iMs_counter]=bwm_invalid_count;
     }
 
     /* Save best for estimation */
@@ -1994,6 +2369,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
     free(vector_scale_factor_multistart);
   }
+
+  if (bwm_use_transform)
+    bwm_to_constrained(vector_scale_factor, num_all_var);
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -2025,6 +2403,9 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   safe_free(num_categories_extern_XY);
   safe_free(num_categories_extern_X);
   safe_free(num_categories_extern_Y);
+  safe_free(bwm_kernel_unordered_vec);
+  bwm_kernel_unordered_vec = NULL;
+  bwm_kernel_unordered_len = 0;
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
@@ -2083,7 +2464,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con, 
                                     double * u_uno, double * u_ord, double * u_con,
                                     double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
-                                    int * myopti, double * myoptd, double * myans, double * fval, double * objective_function_values, double * timing){
+                                    int * myopti, double * myoptd, double * myans, double * fval,
+                                    double * objective_function_values, double * objective_function_evals,
+                                    double * objective_function_invalid, double * timing,
+                                    int * penalty_mode, double * penalty_mult){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -2156,6 +2540,18 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
 
   scale_cat = myopti[CDBW_SCATI];
+  bwm_use_transform = myopti[CDBW_TBNDI];
+  if (BANDWIDTH_den_extern != BW_FIXED)
+    bwm_use_transform = 0;
+  if (bwm_use_transform) {
+    int n = num_var_continuous_extern + num_reg_continuous_extern +
+      num_var_unordered_extern + num_reg_unordered_extern +
+      num_var_ordered_extern + num_reg_ordered_extern;
+    if (bwm_transform_buf_len < n + 1) {
+      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
+      bwm_transform_buf_len = n + 1;
+    }
+  }
 
   ftol=myoptd[CDBW_FTOLD];
   tol=myoptd[CDBW_TOLD];
@@ -2569,9 +2965,64 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     error("np.c: invalid bandwidth selection method."); break;
   }
 
+  if (bwm_use_transform)
+    bwm_to_unconstrained(vector_scale_factor, num_all_var);
+
   spinner(0);
 
-  fret_best = bwmfunc(vector_scale_factor);
+  bwmfunc_raw = bwmfunc;
+  bwm_num_reg_continuous = num_var_continuous_extern + num_reg_continuous_extern;
+  bwm_num_reg_unordered = num_var_unordered_extern + num_reg_unordered_extern;
+  bwm_num_reg_ordered = num_var_ordered_extern + num_reg_ordered_extern;
+  bwm_kernel_unordered = KERNEL_den_unordered_extern;
+  bwm_kernel_unordered_len = bwm_num_reg_unordered;
+  if (bwm_kernel_unordered_len > 0) {
+    bwm_kernel_unordered_vec = alloc_vecu(bwm_kernel_unordered_len);
+    for (i = 0; i < num_var_unordered_extern; i++)
+      bwm_kernel_unordered_vec[i] = KERNEL_den_unordered_extern;
+    for (i = 0; i < num_reg_unordered_extern; i++)
+      bwm_kernel_unordered_vec[num_var_unordered_extern + i] = KERNEL_reg_unordered_extern;
+  } else {
+    bwm_kernel_unordered_vec = NULL;
+  }
+  bwm_num_categories = num_categories_extern;
+  bwm_reset_counters();
+  bwm_penalty_mode = 0;
+  bwm_penalty_value = DBL_MAX;
+  if (penalty_mode[0] == 1) {
+    double pmult = penalty_mult[0];
+    double baseline;
+    if (pmult < 1.0) pmult = 1.0;
+    baseline = bwmfunc_raw(vector_scale_factor);
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      double *tmp = alloc_vecd(num_all_var + 1);
+      for (i = 1; i <= num_all_var; i++)
+        tmp[i] = vector_scale_factor[i];
+      for (i = 1; i <= (num_var_continuous_extern + num_reg_continuous_extern); i++)
+        tmp[i] *= 2.0;
+      for (i = 0; i < (num_var_unordered_extern + num_reg_unordered_extern); i++) {
+        int idx = num_var_continuous_extern + num_reg_continuous_extern + 1 + i;
+        double maxbw = max_unordered_bw(num_categories_extern[i], KERNEL_den_unordered_extern);
+        tmp[idx] = 0.5*maxbw;
+      }
+      for (i = 0; i < (num_var_ordered_extern + num_reg_ordered_extern); i++) {
+        int idx = num_var_continuous_extern + num_reg_continuous_extern +
+          num_var_unordered_extern + num_reg_unordered_extern + 1 + i;
+        tmp[idx] = 0.5;
+      }
+      baseline = bwmfunc_raw(tmp);
+      safe_free(tmp);
+    }
+    if (!R_FINITE(baseline) || baseline == DBL_MAX) {
+      bwm_penalty_value = pmult * 1.0e6;
+    } else {
+      bwm_penalty_value = baseline + (fabs(baseline) + 1.0) * pmult;
+    }
+    if (R_FINITE(bwm_penalty_value))
+      bwm_penalty_mode = 1;
+  }
+
+  fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
 
   powell(0,
@@ -2586,7 +3037,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
          itmax,
          &iter,
          &fret,
-         bwmfunc);
+         bwmfunc_wrapper);
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
     initialize_nr_directions(BANDWIDTH_den_extern,
@@ -2618,7 +3069,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
            itmax,
            &iter,
            &fret,
-           bwmfunc);
+           bwmfunc_wrapper);
 
   }
 
@@ -2626,6 +3077,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   *timing = timing_extern;
 
   objective_function_values[0]=fret;
+  objective_function_evals[0]=bwm_eval_count;
+  objective_function_invalid[0]=bwm_invalid_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -2685,6 +3138,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
 
       /* Conduct direction set search */
+
+      bwm_reset_counters();
       
       powell(0,
              0,
@@ -2698,7 +3153,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
              itmax,
              &iter,
              &fret,
-             bwmfunc);
+             bwmfunc_wrapper);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
 
@@ -2732,7 +3187,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                itmax,
                &iter,
                &fret,
-               bwmfunc);
+               bwmfunc_wrapper);
       }
 				
       /* If this run resulted in an improved minimum save information */
@@ -2746,6 +3201,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
       objective_function_values[iMs_counter]=fret;
+      objective_function_evals[iMs_counter]=bwm_eval_count;
+      objective_function_invalid[iMs_counter]=bwm_invalid_count;
     }
 
     /* Save best for estimation */
@@ -2755,6 +3212,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       vector_scale_factor[i] = (double) vector_scale_factor_multistart[i];
     free(vector_scale_factor_multistart);
   }
+
+  if (bwm_use_transform)
+    bwm_to_constrained(vector_scale_factor, num_all_var);
 
   /* return data to R */
   if (BANDWIDTH_den_extern == BW_GEN_NN || 
@@ -2793,6 +3253,9 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   safe_free(num_categories_extern_X);
   safe_free(num_categories_extern_Y);
   safe_free(num_categories_extern_XY);
+  safe_free(bwm_kernel_unordered_vec);
+  bwm_kernel_unordered_vec = NULL;
+  bwm_kernel_unordered_len = 0;
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
@@ -3570,7 +4033,10 @@ void np_density(double * tuno, double * tord, double * tcon,
 
 
 void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval, double * objective_function_values, double * timing){
+                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
+                      double * objective_function_values, double * objective_function_evals,
+                      double * objective_function_invalid, double * timing,
+                      int * penalty_mode, double * penalty_mult){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -3642,6 +4108,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   int_TREE_X = myopti[RBW_DOTREEI];
   scale_cat = myopti[RBW_SCATI];
+  bwm_use_transform = myopti[RBW_TBNDI];
+  if (BANDWIDTH_reg_extern != BW_FIXED)
+    bwm_use_transform = 0;
 
   ftol=myoptd[RBW_FTOLD];
   tol=myoptd[RBW_TOLD];
@@ -3718,6 +4187,35 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   /* response variable */
   for( i=0;i<num_obs_train_extern;i++ )
     vector_Y_extern[i] = y[i];
+
+  bwm_penalty_mode = 0;
+  bwm_penalty_value = DBL_MAX;
+  if (penalty_mode[0] == 1) {
+    double pmult = penalty_mult[0];
+    double y_mean = 0.0;
+    double mse0 = 0.0;
+    if (pmult < 1.0) pmult = 1.0;
+    for (i = 0; i < num_obs_train_extern; i++)
+      y_mean += vector_Y_extern[i];
+    y_mean /= (double) num_obs_train_extern;
+    for (i = 0; i < num_obs_train_extern; i++) {
+      const double dy = vector_Y_extern[i] - y_mean;
+      mse0 += dy*dy;
+    }
+    mse0 /= (double) num_obs_train_extern;
+    if (mse0 <= 0.0) mse0 = DBL_MIN;
+    if (myopti[RBW_MI] == RBWM_CVAIC) {
+      const double denom = 1.0 - 2.0/((double) num_obs_train_extern);
+      if (denom > 0.0) {
+        const double base_aic = log(mse0) + (1.0/denom);
+        bwm_penalty_value = base_aic + log(pmult);
+      }
+    } else {
+      bwm_penalty_value = pmult * mse0;
+    }
+    if (R_FINITE(bwm_penalty_value))
+      bwm_penalty_mode = 1;
+  }
 
   // initialize permutation arrays
   ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
@@ -3855,7 +4353,22 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   spinner(0);
 
-  fret_best = bwmfunc(vector_scale_factor);
+  bwmfunc_raw = bwmfunc;
+  bwm_num_reg_continuous = num_reg_continuous_extern;
+  bwm_num_reg_unordered = num_reg_unordered_extern;
+  bwm_num_reg_ordered = num_reg_ordered_extern;
+  bwm_kernel_unordered = KERNEL_reg_unordered_extern;
+  bwm_num_categories = num_categories_extern;
+  if (bwm_use_transform) {
+    int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
+    if (bwm_transform_buf_len < n + 1) {
+      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
+      bwm_transform_buf_len = n + 1;
+    }
+  }
+  bwm_reset_counters();
+
+  fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
 
   powell(0,
@@ -3870,7 +4383,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
          itmax,
          &iter,
          &fret,
-         bwmfunc);
+         bwmfunc_wrapper);
 
 
   if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
@@ -3905,7 +4418,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
            itmax,
            &iter,
            &fret,
-           bwmfunc);
+           bwmfunc_wrapper);
 
   }
 
@@ -3913,6 +4426,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   *timing = timing_extern;
 
   objective_function_values[0]=fret;
+  objective_function_evals[0]=bwm_eval_count;
+  objective_function_invalid[0]=bwm_invalid_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -3974,6 +4489,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
       /* Conduct direction set search */
 
+      bwm_reset_counters();
+
       powell(0,
              0,
              vector_scale_factor,
@@ -3986,7 +4503,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
              itmax,
              &iter,
              &fret,
-             bwmfunc);
+             bwmfunc_wrapper);
 
       if(int_RESTART_FROM_MIN == RE_MIN_TRUE)	{
 						
@@ -4020,7 +4537,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                itmax,
                &iter,
                &fret,
-               bwmfunc);
+               bwmfunc_wrapper);
 
       }
 
@@ -4035,6 +4552,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
           vector_scale_factor_multistart[i] = (double) vector_scale_factor[i];
       }
       objective_function_values[iMs_counter]=fret;
+      objective_function_evals[iMs_counter]=bwm_eval_count;
+      objective_function_invalid[iMs_counter]=bwm_invalid_count;
 
     }
 
@@ -4048,6 +4567,9 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
     free(vector_scale_factor_multistart);
 
   }
+
+  if (bwm_use_transform)
+    bwm_to_constrained(vector_scale_factor, num_var);
 
   /* return data to R */
   if (BANDWIDTH_reg_extern == BW_GEN_NN || 
