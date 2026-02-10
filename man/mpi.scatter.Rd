@@ -45,7 +45,7 @@ Hao Yu
   \code{\link{mpi.gather}}, \code{\link{mpi.gatherv}}.
 }
 \examples{
-\dontrun{
+\donttest{
 #Need 3 slaves to run properly
 #Or run  mpi.spawn.Rslaves(nslaves=3)
   num="123456789abcd"

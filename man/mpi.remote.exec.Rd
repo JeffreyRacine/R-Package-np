@@ -42,7 +42,7 @@ with `x' as master variable, use mpi.remote.exec(cmd=myfun, x).}
 Hao Yu
 }
 \examples{
-\dontrun{
+\donttest{
 mpi.remote.exec(mpi.comm.rank())
  x=5
 mpi.remote.exec(rnorm,x)

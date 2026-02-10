@@ -35,7 +35,7 @@ Hao Yu  and   Wei Xia
   \code{\link{mpi.gather.Robj}},
 }
 \examples{
-\dontrun{
+\donttest{
 #assume that there are three slaves running
 mpi.bcast.cmd(x<-mpi.scatter.Robj())
 

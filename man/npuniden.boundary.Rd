@@ -211,7 +211,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.reflect}}.
 }
 \examples{
-\dontrun{
+\donttest{
 ## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
 ## unadjusted density, and DGP
 set.seed(42)
@@ -246,6 +246,7 @@ legend("topleft",c("DGP",
 set.seed(42)
 X <- sort(rbeta(100,5,3))
 model <- npuniden.boundary(X)
+oldpar <- par(no.readonly = TRUE)
 par(mfrow=c(1,2))
 ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
 plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
@@ -273,7 +274,8 @@ lines(age,model$f)
 lines(density(age,bw=model$h),col=2)
 legend("topright",c("Boundary Kernel","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 detach(cps71)
-} % enddontrun
+par(oldpar)
+} % enddonttest
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

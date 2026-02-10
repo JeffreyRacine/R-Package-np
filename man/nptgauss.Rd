@@ -15,6 +15,10 @@ nptgauss(b)
     Truncation radius of the kernel.
   }
 }
+\value{
+No return value, called for side effects (sets kernel constants in the
+\pkg{npRmpi} C backend).
+}
 
 \details{
   \code{nptgauss} allows one to set the truncation radius of the truncated Gaussian kernel used by \pkg{npRmpi}, which defaults to 3. It automatically computes the constants describing the truncated gaussian kernel for the user.
@@ -47,8 +51,8 @@ where \eqn{a_0}{a0} is determined by the normalisation condition on H,
 }
 
 \examples{
-\dontrun{
+\donttest{
 ## The default kernel, a gaussian truncated at +- 3
 nptgauss(b = 3.0)
-} % enddontrun
+} % enddonttest
 }

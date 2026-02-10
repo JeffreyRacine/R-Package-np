@@ -32,7 +32,7 @@ slave, corresponding error message will be returned in the returning list.  }
 Hao Yu
 }
 \examples{
-\dontrun{
+\donttest{
 #Assume that there are at least 5 slaves running
 #Otherwise run mpi.spawn.Rslaves(nslaves=5)
 x=c(10,20)

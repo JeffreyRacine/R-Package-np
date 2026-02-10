@@ -85,7 +85,7 @@ Hao Yu
   \code{\link{mpi.get.sourcetag}}. 
 } 
 \examples{ 
-\dontrun{
+\donttest{
 #on a slave
 mpi.send(1:10,1,0,0)
 

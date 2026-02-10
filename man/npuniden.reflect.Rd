@@ -92,7 +92,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.boundary}}.
 }
 \examples{
-\dontrun{
+\donttest{
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
 ## (master and slave).  Kindly see the batch examples in the demos
@@ -145,6 +145,7 @@ mpi.bcast.Robj2slave(X)
 mpi.bcast.cmd(model <- npuniden.reflect(X),
               caller.execute=TRUE)
 
+oldpar <- par(no.readonly = TRUE)
 par(mfrow=c(1,2))
 ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
 plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
@@ -177,6 +178,8 @@ lines(cps71$age,model$f)
 lines(density(cps71$age,bw=model$h),col=2)
 legend("topright",c("Data-Reflection","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 
+par(oldpar)
+
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
 
@@ -198,7 +201,7 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-} % enddontrun
+} % enddonttest
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

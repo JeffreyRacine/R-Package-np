@@ -17,6 +17,14 @@ arrays respectively.
 status arrays to \code{newmaxsize} respectively if \code{newmaxsize} is 
 bigger than the original maximum size. 
 }
+\value{
+\itemize{
+  \item \code{mpi.realloc.comm}, \code{mpi.realloc.request}, \code{mpi.realloc.status}:
+        no return value (called for side effects).
+  \item \code{mpi.comm.maxsize}, \code{mpi.request.maxsize}, \code{mpi.status.maxsize}:
+        integer size limits.
+}
+}
 \usage{
 mpi.realloc.comm(newmaxsize)
 mpi.realloc.request(newmaxsize)

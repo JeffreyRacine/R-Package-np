@@ -59,6 +59,11 @@ suitable for running small jobs on slave nodes. If anticipated computing time fo
 relatively long, e.g., minutes or hours, setting sleep to be 1 second or longer will further 
 reduce load on master (only slightly).
  }
+\value{
+Returns an object with the same structure as the corresponding base or
+`mpi.par*` apply call (typically a list or simplified vector/array when
+`simplify = TRUE`).
+}
 \seealso{
 \code{\link{mpi.iapply}}
 }

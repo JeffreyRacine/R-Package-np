@@ -38,7 +38,7 @@ platform, and MPI/communicator details to aid reproducibility and bug
 reports.
 }
 \examples{
-\dontrun{
+\donttest{
 ## Start once, run many examples, then stop.
 npRmpi.start(nslaves=1)
 

@@ -885,6 +885,9 @@ npplot.rbandwidth <-
            ...,
            random.seed){
 
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
+
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
         plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
       
@@ -1426,6 +1429,9 @@ npplot.scbandwidth <-
            plot.par.mfrow = TRUE,
            ...,
            random.seed){
+
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
 
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
         plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
@@ -2170,6 +2176,9 @@ npplot.plbandwidth <-
            ...,
            random.seed){
 
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
+
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
         plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
       
@@ -2875,6 +2884,9 @@ npplot.bandwidth <-
            ...,
            random.seed){
 
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
+
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
         plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
       
@@ -3391,6 +3403,9 @@ npplot.dbandwidth <-
            ...,
            random.seed){
 
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
+
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
         plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
 
@@ -3896,6 +3911,9 @@ npplot.conbandwidth <-
            plot.par.mfrow = TRUE,
            ...,
            random.seed){
+
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
 
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
         plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
@@ -4680,6 +4698,9 @@ npplot.condbandwidth <-
            ...,
            random.seed){
 
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
+
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
         plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
       
@@ -5443,6 +5464,9 @@ npplot.sibandwidth <-
            plot.par.mfrow = TRUE,
            ...,
            random.seed){
+
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar), add = TRUE)
 
     miss.xy = c(missing(xdat),missing(ydat))
     

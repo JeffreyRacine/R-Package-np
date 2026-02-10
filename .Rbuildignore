@@ -35,6 +35,7 @@
 ^man/sed_dontrun\.scr
 ^man/sed_run\.scr
 ^npRmpi_.*\\.tar\\.gz$
+^OPTIMIZATION\.md
 ^tests
 ^tests/testthat
 ^tests/testthat/.*\\.R$

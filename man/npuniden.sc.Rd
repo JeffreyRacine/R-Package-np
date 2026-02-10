@@ -160,7 +160,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
   and the function \code{\link{npuniden.boundary}}.
 }
 \examples{
-\dontrun{
+\donttest{
 n <- 100
 set.seed(42)
 
@@ -183,6 +183,7 @@ h <- npuniden.boundary(X)$h
 
 foo <- npuniden.sc(X=X,h=h,constraint=c("mono.incr"))
 
+oldpar <- par(no.readonly = TRUE)
 par(mfrow=c(1,2))
 ylim <- range(c(foo$f.sc,foo$f))
 plot(X,foo$f.sc,type="l",ylim=ylim,xlab="X",ylab="Density")
@@ -284,7 +285,8 @@ lines(X,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
-} % enddontrun
+par(oldpar)
+} % enddonttest
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

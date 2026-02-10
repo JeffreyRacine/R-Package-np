@@ -48,6 +48,22 @@ string(length)
   \item{nx}{number of elements.}
   \item{ncl}{number of clusters.}
 }
+\value{
+Internal helpers; return values vary by function:
+\itemize{
+  \item \code{mpi.comm.is.null}: logical indicator.
+  \item \code{string}: character string of requested length.
+  \item \code{.docall}: result of calling \code{fun} with \code{args}.
+  \item \code{.force.type}: coerced object of the requested type.
+  \item \code{.mpi.undefined}: integer constant used by MPI.
+  \item \code{.mpi.worker.apply}, \code{.mpi.worker.applyLB},
+        \code{.mpi.worker.exec}, \code{.mpi.worker.sim}: internal worker
+        results (typically lists or vectors).
+  \item \code{.simplify}: simplified result (vector, matrix, or list).
+  \item \code{.splitIndices}: list of index vectors.
+  \item \code{.typeindex}: integer type code.
+}
+}
 \details{
   These functions are required for internal MPI communication and slave execution.
 }

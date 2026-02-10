@@ -3,11 +3,34 @@ Version: 0.60-20
 Date: 2026-02-07
 Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel
 Suggests: crs, MASS, logspline, ks, testthat, np, Rmpi
-Title: Parallel Nonparametric Kernel Smoothing Methods for Mixed Data Types
-Authors@R: c(person(given = "Jeffrey S.", family = "Racine", role = c("aut","cre"), email = "racinej@mcmaster.ca"),
-             person(given = "Tristen", family = "Hayfield", role = c("aut"), email = "tristen.hayfield@gmail.com"))
+Title: Parallel Nonparametric Kernel Smoothing Methods for Mixed Data Types Using 'MPI'
+Authors@R: c(
+    person(given = "Jeffrey S.", family = "Racine", role = c("aut","cre"),
+           email = "racinej@mcmaster.ca"),
+    person(given = "Tristen", family = "Hayfield", role = c("aut"),
+           email = "tristen.hayfield@gmail.com"),
+    person(given = "Hao", family = "Yu", role = c("ctb","cph"),
+           email = "hyu@stats.uwo.ca"),
+    person(given = "The", family = "GSL Team", role = "cph"),
+    person(family = "Numerical Recipes Software", role = "cph")
+ )
 Maintainer: Jeffrey S. Racine <racinej@mcmaster.ca>
-Description: Nonparametric (and semiparametric) kernel methods that seamlessly handle a mix of continuous, unordered, and ordered factor data types. This package is a parallel implementation of the np package based on the MPI specification that incorporates the Rmpi package (Hao Yu <hyu@stats.uwo.ca>) with minor modifications and we are extremely grateful to Hao Yu for his contributions to the R community. We would like to gratefully acknowledge support from the Natural Sciences and Engineering Research Council of Canada (NSERC, <https://www.nserc-crsng.gc.ca/>), the Social Sciences and Humanities Research Council of Canada (SSHRC, <https://www.sshrc-crsh.gc.ca/>), and the Shared Hierarchical Academic Research Computing Network (SHARCNET, <https://sharcnet.ca/>). We would also like to acknowledge the contributions of the GNU GSL authors. In particular, we adapt the GNU GSL B-spline routine gsl_bspline.c adding automated support for quantile knots (in addition to uniform knots), providing missing functionality for derivatives, and for extending the splines beyond their endpoints.
+Description: Nonparametric (and semiparametric) kernel methods that seamlessly
+    handle a mix of continuous, unordered, and ordered factor data types. This
+    package is a parallel implementation of the 'np' package based on the 'MPI'
+    specification that incorporates the 'Rmpi' package (Hao Yu
+    <hyu@stats.uwo.ca>) with minor modifications and we are extremely grateful
+    to Hao Yu for his contributions to the 'R' community. We would like to
+    gratefully acknowledge support from the Natural Sciences and Engineering
+    Research Council of Canada (NSERC, <https://www.nserc-crsng.gc.ca/>), the
+    Social Sciences and Humanities Research Council of Canada (SSHRC,
+    <https://www.sshrc-crsh.gc.ca/>), and the Shared Hierarchical Academic
+    Research Computing Network (SHARCNET, <https://sharcnet.ca/>). We would
+    also like to acknowledge the contributions of the 'GNU GSL' authors. In
+    particular, we adapt the 'GNU GSL' B-spline routine 'gsl_bspline.c' adding
+    automated support for quantile knots (in addition to uniform knots),
+    providing missing functionality for derivatives, and for extending the
+    splines beyond their endpoints.
 License: GPL
 URL: https://github.com/JeffreyRacine/R-Package-np
 BugReports: https://github.com/JeffreyRacine/R-Package-np/issues

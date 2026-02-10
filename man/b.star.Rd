@@ -69,7 +69,7 @@ b.star(data,
 }
 
 \examples{
-\dontrun{
+\donttest{
 set.seed(12345)
 
 # Function to generate an AR(1) series
@@ -89,7 +89,7 @@ b.star(yt,round=TRUE)
 
 yt <- ar.series(0.9,rnorm(10000))
 b.star(yt,round=TRUE)
-} % enddontrun
+} % enddonttest
 }
 
 \keyword{univar}

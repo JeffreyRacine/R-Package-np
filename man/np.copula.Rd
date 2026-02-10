@@ -131,7 +131,7 @@ npcopula(bws,
 }
 
 \examples{
-\dontrun{
+\donttest{
 ## Example 1: Bivariate Mixed Data
 
 ## The following example is adapted for interactive parallel execution
@@ -334,7 +334,7 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-} % enddontrun
+} % enddonttest
 }
 
 \keyword{ nonparametric }

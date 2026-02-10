@@ -21,6 +21,14 @@ used as the communicator in external FORTRAN code. \code{mpi.comm.dup} duplicate
 returns its rank in a comm. \code{mpi.comm.size} returns 
 the total number of members in a comm. 
 }
+\value{
+\itemize{
+  \item \code{mpi.comm.c2f}: integer communicator for use in FORTRAN code.
+  \item \code{mpi.comm.dup}: integer identifier of the duplicated communicator.
+  \item \code{mpi.comm.rank}: integer rank within the communicator.
+  \item \code{mpi.comm.size}: integer size of the communicator.
+}
+}
 \author{
 Hao Yu
 }
@@ -29,7 +37,7 @@ Hao Yu
   \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \examples{
-\dontrun{
+\donttest{
 #Assume that there are some slaves running
 mpi.comm.size(comm=1)
 mpi.comm.size(comm=0)

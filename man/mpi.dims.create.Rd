@@ -34,7 +34,7 @@ Hao Yu
   \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \examples{
-\dontrun{
+\donttest{
 #What is the dim numbers of 2 dim Cartersian topology under a grid of 36 nodes
 mpi.dims.create(36,2)	#return c(6,6)
 #Constrained dim numbers

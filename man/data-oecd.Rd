@@ -48,12 +48,12 @@
 }
 \source{ Thanasis Stengos }
 \examples{
-\dontrun{
+\donttest{
 data("oecdpanel")
 attach(oecdpanel)
 summary(oecdpanel)
 detach(oecdpanel)
-} % enddontrun
+} % enddonttest
 }
 \references{
 
