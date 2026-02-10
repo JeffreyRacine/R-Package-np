@@ -659,20 +659,22 @@ double np_score_owang_van_ryzin(const double x, const double y, const double lam
 }
 
 double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  return R_pow_di(lambda, (int)fabs(x-y));
+  return ipow(lambda, (int)fabs(x-y));
 }
 
 double np_score_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  return (fabs(x-y)*R_pow_di(lambda, (int)fabs(x-y)-1));
+  const int cxy = (int)fabs(x-y);
+  if (cxy == 0) return 0.0;
+  return (cxy * ipow(lambda, cxy - 1));
 }
 
 double np_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
-  return R_pow_di(lambda, (int)fabs(x-y))*(1.0 - lambda)/(1.0 + lambda);
+  return ipow(lambda, (int)fabs(x-y))*(1.0 - lambda)/(1.0 + lambda);
 }
 
 double np_score_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
   const int cxy = (int)fabs(x-y);
-  return ((cxy != 0) || (lambda != 0.0)) ? R_pow_di(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0 *lambda) : -2.0;
+  return ((cxy != 0) || (lambda != 0.0)) ? ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0 *lambda) : -2.0;
 }
 
 // not so simple truncated gaussian convolution kernels
