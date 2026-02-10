@@ -268,7 +268,7 @@ double max_unordered_bw(int num_categories,
 int is_valid_unordered_bw(double lambda,
                           int num_categories,
                           int kernel){
-  return ((lambda >= 0.0) || (lambda <= max_unordered_bw(num_categories, kernel)));
+  return ((lambda >= 0.0) && (lambda <= max_unordered_bw(num_categories, kernel)));
 }
 
 /* Population variance, double precision */
