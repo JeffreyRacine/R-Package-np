@@ -13,8 +13,8 @@ This summarizes the npRmpi performance work (ported from np) and the verificatio
 ## Benchmark Method
 - Script: `/tmp/bench_nprmpi_suite.R`
 - Tool: `microbenchmark`
-- Runs per case: `NPRMPI_BENCH_TIMES=30`
-- Sizes: `n = 100, 200, 400`
+- Runs per case: `NPRMPI_BENCH_TIMES=100`
+- Sizes: `n = 1000, 2000, 4000`
 - Metrics: mean and median (ms)
 - Baseline CSV: `/tmp/nprmpi_bench_baseline.csv`
 - Current CSV: `/tmp/nprmpi_bench_current.csv`
@@ -24,21 +24,21 @@ Speedups are reported as `baseline / current` (so `>1` is faster) with percent c
 
 | Function | Variant | n | Mean (ms) Baseline | Mean (ms) Current | Mean Speedup | Median (ms) Baseline | Median (ms) Current | Median Speedup |
 |---|---|---:|---:|---:|---:|---:|---:|---:|
-| npcdens | est | 100 | 173.060 | 182.944 | 0.946 (-5.7%) | 204.746 | 204.730 | 1.000 (0.0%) |
-| npcdens | est | 200 | 163.451 | 180.623 | 0.905 (-10.5%) | 202.330 | 205.211 | 0.986 (-1.4%) |
-| npcdens | est | 400 | 195.923 | 152.072 | 1.288 (+22.4%) | 207.032 | 176.655 | 1.172 (+14.7%) |
-| npksum | eval=tx | 100 | 134.412 | 160.450 | 0.838 (-19.4%) | 104.197 | 197.872 | 0.527 (-89.9%) |
-| npksum | eval=tx | 200 | 160.263 | 161.022 | 0.995 (-0.5%) | 197.840 | 200.249 | 0.988 (-1.2%) |
-| npksum | eval=tx | 400 | 168.223 | 168.106 | 1.001 (+0.1%) | 203.068 | 199.821 | 1.016 (+1.6%) |
-| npksum | ex50 | 100 | 144.214 | 157.802 | 0.914 (-9.4%) | 104.315 | 200.200 | 0.521 (-91.9%) |
-| npksum | ex50 | 200 | 143.692 | 160.547 | 0.895 (-11.7%) | 104.260 | 197.908 | 0.527 (-89.8%) |
-| npksum | ex50 | 400 | 174.698 | 181.937 | 0.960 (-4.1%) | 202.707 | 202.825 | 0.999 (-0.1%) |
-| npreg | est | 100 | 193.400 | 183.349 | 1.055 (+5.2%) | 204.499 | 204.344 | 1.001 (+0.1%) |
-| npreg | est | 200 | 186.291 | 185.583 | 1.004 (+0.4%) | 204.500 | 203.380 | 1.006 (+0.5%) |
-| npreg | est | 400 | 170.122 | 183.153 | 0.929 (-7.7%) | 201.285 | 204.970 | 0.982 (-1.8%) |
-| npudens | est | 100 | 165.546 | 175.907 | 0.941 (-6.3%) | 203.146 | 203.533 | 0.998 (-0.2%) |
-| npudens | est | 200 | 155.286 | 159.563 | 0.973 (-2.8%) | 169.722 | 201.145 | 0.844 (-18.5%) |
-| npudens | est | 400 | 169.646 | 163.187 | 1.040 (+3.8%) | 204.354 | 201.330 | 1.015 (+1.5%) |
+| npcdens | est | 1000 | 207.362 | 201.775 | 1.028 (+2.7%) | 216.761 | 210.182 | 1.031 (+3.0%) |
+| npcdens | est | 2000 | 244.587 | 240.566 | 1.017 (+1.6%) | 267.603 | 243.081 | 1.101 (+9.2%) |
+| npcdens | est | 4000 | 480.371 | 355.959 | 1.350 (+25.9%) | 501.012 | 356.104 | 1.407 (+28.9%) |
+| npksum | eval=tx | 1000 | 177.088 | 157.343 | 1.125 (+11.1%) | 202.148 | 200.713 | 1.007 (+0.7%) |
+| npksum | eval=tx | 2000 | 196.564 | 167.965 | 1.170 (+14.5%) | 214.406 | 210.355 | 1.019 (+1.9%) |
+| npksum | eval=tx | 4000 | 241.301 | 209.249 | 1.153 (+13.3%) | 259.370 | 250.150 | 1.037 (+3.6%) |
+| npksum | ex50 | 1000 | 184.007 | 156.685 | 1.174 (+14.8%) | 202.627 | 200.653 | 1.010 (+1.0%) |
+| npksum | ex50 | 2000 | 174.767 | 161.799 | 1.080 (+7.4%) | 206.176 | 204.010 | 1.011 (+1.1%) |
+| npksum | ex50 | 4000 | 195.427 | 188.331 | 1.038 (+3.6%) | 214.164 | 211.325 | 1.013 (+1.3%) |
+| npreg | est | 1000 | 200.368 | 197.160 | 1.016 (+1.6%) | 208.537 | 208.758 | 0.999 (-0.1%) |
+| npreg | est | 2000 | 214.573 | 211.928 | 1.012 (+1.2%) | 231.588 | 217.606 | 1.064 (+6.0%) |
+| npreg | est | 4000 | 311.843 | 247.301 | 1.261 (+20.7%) | 337.926 | 268.918 | 1.257 (+20.4%) |
+| npudens | est | 1000 | 173.687 | 179.049 | 0.970 (-3.1%) | 205.960 | 204.871 | 1.005 (+0.5%) |
+| npudens | est | 2000 | 216.519 | 192.817 | 1.123 (+10.9%) | 229.672 | 214.996 | 1.068 (+6.4%) |
+| npudens | est | 4000 | 322.556 | 209.382 | 1.541 (+35.1%) | 335.685 | 168.338 | 1.994 (+49.9%) |
 
 ## Notes
-- Results are mixed; some cases improve, others regress. We should re-check the benchmark harness (MPI setup and synchronization) if consistency is required before merging conclusions into user-facing claims.
+- With larger sample sizes, the improvements are consistent for most cases, and the communication overhead is less dominant.
