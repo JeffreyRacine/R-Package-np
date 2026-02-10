@@ -47,44 +47,55 @@ Hardware/software notes:
 - Machine: Apple Silicon (M2Studio)
 - Benchmark tool: `microbenchmark`
 - Settings: `options(np.tree = FALSE, np.messages = FALSE)`
+- Inputs: `ex50` uses `exdat` length 50; `eval=tx` omits `exdat` (evaluates at training points).
+- Data sizes: `n = 1000, 2000, 4000, 8000, 16000`.
 
-### `npksum()` kernel-sum microbenchmarks
+### `npksum()` kernel-sum microbenchmarks (larger sample sizes)
 
-Each case uses `times=200` and reports mean + median time in milliseconds.
+Each case reports mean + median time in milliseconds for the larger `n` runs.
 
 #### Variant A: `exdat` length 50 (`ex50`)
 
 | n | mean (ms) baseline → current | mean speedup | median (ms) baseline → current | median speedup |
 |---:|---:|---:|---:|---:|
-| 100 | 0.422 → 0.390 | 1.08x (+8.2%) | 0.399 → 0.366 | 1.09x (+9.0%) |
-| 200 | 0.468 → 0.429 | 1.09x (+9.1%) | 0.447 → 0.407 | 1.10x (+9.8%) |
-| 400 | 0.552 → 0.499 | 1.11x (+10.6%) | 0.524 → 0.474 | 1.11x (+10.5%) |
+| 1000 | 7.437 → 6.641 | 1.12x (+10.7%) | 7.421 → 6.595 | 1.12x (+11.1%) |
+| 2000 | 14.412 → 12.936 | 1.11x (+10.2%) | 14.314 → 12.845 | 1.11x (+10.3%) |
+| 4000 | 28.596 → 25.492 | 1.12x (+10.9%) | 28.539 → 25.355 | 1.13x (+11.2%) |
+| 8000 | 56.558 → 51.630 | 1.10x (+8.7%) | 56.520 → 51.460 | 1.10x (+9.0%) |
+| 16000 | 116.027 → 100.039 | 1.16x (+13.8%) | 115.572 → 99.753 | 1.16x (+13.7%) |
 
 #### Variant B: evaluation at training points (`eval=tx`, `exdat` missing)
 
 | n | mean (ms) baseline → current | mean speedup | median (ms) baseline → current | median speedup |
 |---:|---:|---:|---:|---:|
-| 100 | 0.423 → 0.374 | 1.13x (+13.1%) | 0.394 → 0.355 | 1.11x (+11.0%) |
-| 200 | 0.687 → 0.563 | 1.22x (+22.0%) | 0.626 → 0.547 | 1.14x (+14.4%) |
-| 400 | 1.567 → 1.348 | 1.16x (+16.2%) | 1.528 → 1.335 | 1.14x (+14.5%) |
+| 1000 | 7.332 → 6.554 | 1.12x (+10.6%) | 7.286 → 6.503 | 1.12x (+10.7%) |
+| 2000 | 28.279 → 25.291 | 1.12x (+10.6%) | 28.159 → 25.150 | 1.12x (+10.7%) |
+| 4000 | 112.608 → 100.655 | 1.12x (+10.6%) | 112.663 → 100.100 | 1.13x (+11.2%) |
+| 8000 | 447.165 → 409.841 | 1.09x (+8.3%) | 447.241 → 410.268 | 1.09x (+8.3%) |
+| 16000 | 1801.918 → 1587.634 | 1.13x (+11.9%) | 1799.025 → 1586.508 | 1.13x (+11.8%) |
 
-### Higher-level estimator calls (estimation only)
+### Higher-level estimator calls (estimation only, larger sample sizes)
 
-These timings measure **estimation calls only** (manual bandwidths; bandwidth selection excluded), using `times=100`:
+These timings measure **estimation calls only** (manual bandwidths; bandwidth selection excluded).
 
 | function | n | mean speedup | median speedup |
 |---|---:|---:|---:|
-| `npreg()` | 100 | 1.05x (+4.7%) | 1.05x (+4.6%) |
-| `npreg()` | 200 | 1.07x (+6.9%) | 1.07x (+6.6%) |
-| `npreg()` | 400 | 1.13x (+12.5%) | 1.14x (+13.7%) |
-| `npudens()` | 100 | 1.04x (+4.2%) | 1.05x (+5.1%) |
-| `npudens()` | 200 | 1.11x (+10.6%) | 1.09x (+9.4%) |
-| `npudens()` | 400 | 1.17x (+17.4%) | 1.17x (+17.4%) |
-| `npcdens()` | 100 | 1.04x (+4.1%) | 1.06x (+6.4%) |
-| `npcdens()` | 200 | 1.10x (+10.5%) | 1.11x (+10.9%) |
-| `npcdens()` | 400 | 1.09x (+9.0%) | 1.12x (+12.0%) |
+| `npreg()` | 1000 | 1.37x (+26.9%) | 1.37x (+26.9%) |
+| `npreg()` | 2000 | 1.70x (+41.2%) | 1.71x (+41.6%) |
+| `npreg()` | 4000 | 1.99x (+49.7%) | 1.99x (+49.7%) |
+| `npreg()` | 8000 | 1.96x (+48.9%) | 1.96x (+49.0%) |
+| `npreg()` | 16000 | 2.22x (+55.0%) | 2.20x (+54.5%) |
+| `npudens()` | 1000 | 1.41x (+29.2%) | 1.42x (+29.7%) |
+| `npudens()` | 2000 | 1.76x (+43.3%) | 1.77x (+43.5%) |
+| `npudens()` | 4000 | 2.06x (+51.4%) | 2.06x (+51.3%) |
+| `npudens()` | 8000 | 1.99x (+49.8%) | 2.01x (+50.2%) |
+| `npudens()` | 16000 | 2.27x (+56.0%) | 2.27x (+56.0%) |
+| `npcdens()` | 1000 | 1.37x (+26.8%) | 1.38x (+27.3%) |
+| `npcdens()` | 2000 | 1.63x (+38.8%) | 1.64x (+38.9%) |
+| `npcdens()` | 4000 | 1.89x (+47.2%) | 1.89x (+47.0%) |
+| `npcdens()` | 8000 | 1.85x (+45.9%) | 1.87x (+46.6%) |
+| `npcdens()` | 16000 | 2.07x (+51.7%) | 2.07x (+51.7%) |
 
 ## Notes on inheritance of improvements
 
 Many higher-level `np*` functions inherit these improvements automatically, because they ultimately dispatch into the same `jksum.c` kernel evaluators (`np_ckernelv`, `np_ukernelv`, `np_okernelv`) in the “new” (non-legacy) C code paths.
-
