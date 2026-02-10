@@ -4565,6 +4565,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
+  int ksum_is_output = 0, pksum_is_output = 0, kw_is_output = 0;
 
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
@@ -4647,11 +4648,21 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
 
   vector_scale_factor = alloc_vecd(num_var + 1);
-  ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length);
+  if(!int_TREE_X && (num_obs_eval_alloc == num_obs_eval_extern)){
+    ksum = weighted_sum;
+    ksum_is_output = 1;
+  } else {
+    ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length);
+  }
 
   if((p_operator != OP_NOOP) || do_ocg){
     p_nvar = ((p_operator != OP_NOOP) ? num_reg_continuous_extern : 0) + ((do_score || do_ocg) ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
-    p_ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length*p_nvar);
+    if(!int_TREE_X && (num_obs_eval_alloc == num_obs_eval_extern)){
+      p_ksum = weighted_p_sum;
+      pksum_is_output = 1;
+    } else {
+      p_ksum = alloc_vecd(num_obs_eval_alloc*sum_element_length*p_nvar);
+    }
   }
 
   if(!train_is_eval){
@@ -4834,7 +4845,12 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(return_kernel_weights){
-    kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
+    if(!int_TREE_X && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (num_obs_eval_alloc == num_obs_eval_extern)){
+      kw = kernel_weights;
+      kw_is_output = 1;
+    } else {
+      kw = alloc_vecd(num_obs_train_extern*num_obs_eval_extern);
+    }
   }
   
   kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous_extern);
@@ -4852,6 +4868,21 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   for(i = 0; i < num_reg_ordered_extern; i++)
     kernel_o[i] = KERNEL_reg_ordered_extern;
 
+  int *bpso = NULL;
+  {
+    const int bpso_len = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+    if(bpso_len > 0){
+      const int do_perm = (p_operator != OP_NOOP);
+      const int doscoreocg = (do_score || do_ocg);
+
+      bpso = (int *)R_alloc((size_t)bpso_len, sizeof(int));
+      for(i = 0; i < num_reg_continuous_extern; i++)
+        bpso[i] = do_perm;
+      for(i = num_reg_continuous_extern; i < bpso_len; i++)
+        bpso[i] = doscoreocg;
+    }
+  }
+  
   
   if((npks_err=kernel_weighted_sum_np(kernel_c,
                                       kernel_u,
@@ -4875,7 +4906,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       p_operator,
                                       do_score,
                                       do_ocg, // no ocg (for now)
-                                      NULL,
+                                      bpso,
                                       0, // don't explicity suppress parallel
                                       ncol_Y,
                                       ncol_W,
@@ -4907,28 +4938,34 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
 
   if(!npks_err){
-    for(j = 0; j < num_obs_eval_extern; j++)
-      for(i = 0; i < sum_element_length; i++)
-        weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
+    if(int_TREE_X){
+      for(j = 0; j < num_obs_eval_extern; j++)
+        for(i = 0; i < sum_element_length; i++)
+          weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
+    }
 
     if(return_kernel_weights){
-      if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
-        for(j = 0; j < num_obs_eval_extern; j++)
-          for(i = 0; i < num_obs_train_extern; i++)
-            kernel_weights[ipe[j]*num_obs_train_extern + ipt[i]] = kw[j*num_obs_train_extern + i];
-      } else {
-        for(j = 0; j < num_obs_train_extern; j++)
-          for(i = 0; i < num_obs_eval_extern; i++)
-            kernel_weights[ipe[i]*num_obs_train_extern + ipt[j]] = kw[j*num_obs_eval_extern + i];      
+      if(!kw_is_output){
+        if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
+          for(j = 0; j < num_obs_eval_extern; j++)
+            for(i = 0; i < num_obs_train_extern; i++)
+              kernel_weights[ipe[j]*num_obs_train_extern + ipt[i]] = kw[j*num_obs_train_extern + i];
+        } else {
+          for(j = 0; j < num_obs_train_extern; j++)
+            for(i = 0; i < num_obs_eval_extern; i++)
+              kernel_weights[ipe[i]*num_obs_train_extern + ipt[j]] = kw[j*num_obs_eval_extern + i];      
+        }
       }
     }
 
     if(p_nvar > 0){
-      for(k = 0; k < p_nvar; k++){
-        const int kidx = k*num_obs_eval_extern*sum_element_length;
-        for(j = 0; j < num_obs_eval_extern; j++)
-          for(i = 0; i < sum_element_length; i++)
-            weighted_p_sum[kidx + ipe[j]*sum_element_length + i] = p_ksum[kidx + j*sum_element_length + i];
+      if(int_TREE_X){
+        for(k = 0; k < p_nvar; k++){
+          const int kidx = k*num_obs_eval_extern*sum_element_length;
+          for(j = 0; j < num_obs_eval_extern; j++)
+            for(i = 0; i < sum_element_length; i++)
+              weighted_p_sum[kidx + ipe[j]*sum_element_length + i] = p_ksum[kidx + j*sum_element_length + i];
+        }
       }
     }
 
@@ -4951,9 +4988,11 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
-  safe_free(ksum);
+  if(!ksum_is_output)
+    safe_free(ksum);
 
-  safe_free(kw);
+  if(!kw_is_output)
+    safe_free(kw);
 
   safe_free(ipt);
 
@@ -4970,7 +5009,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(p_nvar > 0){
-    safe_free(p_ksum);
+    if(!pksum_is_output)
+      safe_free(p_ksum);
   }
 
   if(do_ocg && (num_reg_ordered_extern > 0)){
