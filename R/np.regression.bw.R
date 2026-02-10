@@ -303,6 +303,9 @@ npregbw.default <-
            lbc.init, hbc.init, cfac.init, 
            lbd.init, hbd.init, dfac.init,
            scale.init.categorical.sample,
+           transform.bounds = FALSE,
+           invalid.penalty = c("baseline","dbmax"),
+           penalty.multiplier = 10,
            ## dummy arguments for later passing into rbandwidth()
            regtype, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ukertype, okertype,

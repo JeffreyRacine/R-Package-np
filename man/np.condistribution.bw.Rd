@@ -56,6 +56,9 @@ npcdistbw(\dots)
           hbd.init = 0.9,
           dfac.init = 0.375, 
           scale.init.categorical.sample = FALSE,
+          transform.bounds = FALSE,
+          invalid.penalty = c("baseline","dbmax"),
+          penalty.multiplier = 10,
           \dots)
 
 \method{npcdistbw}{default}(xdat = stop("data 'xdat' missing"),
@@ -87,6 +90,9 @@ npcdistbw(\dots)
           hbd.init,
           dfac.init,
           scale.init.categorical.sample,
+          transform.bounds,
+          invalid.penalty,
+          penalty.multiplier,
           bwmethod,
           bwscaling,
           bwtype,
@@ -340,6 +346,21 @@ npcdistbw(\dots)
     kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
     Details}
 
+  \item{transform.bounds}{ a logical value that when set to \code{TRUE}
+    applies an internal transformation that maps the unconstrained
+    search to the feasible bandwidth domain. Defaults to
+    \code{FALSE}.}
+
+  \item{invalid.penalty}{ a character string specifying the penalty
+    used when the optimizer encounters invalid bandwidths.
+    \code{"baseline"} returns a finite penalty based on a baseline
+    objective; \code{"dbmax"} returns \code{DBL\_MAX}. Defaults to
+    \code{"baseline"}.}
+
+  \item{penalty.multiplier}{ a numeric multiplier applied to the
+    baseline penalty when \code{invalid.penalty="baseline"}.
+    Defaults to \code{10}.}
+
   \item{memfac}{
     The algorithm to compute the least-squares objective function uses
     a block-based algorithm to eliminate or minimize redundant kernel
@@ -575,4 +596,3 @@ detach(Italy)
 } % enddontrun
 }
 \keyword{nonparametric}
-
