@@ -5460,7 +5460,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
 
   if(!npks_err){
-    if(int_TREE_X){
+    if(int_TREE_X || !ksum_is_output){
       for(j = 0; j < num_obs_eval_extern; j++)
         for(i = 0; i < sum_element_length; i++)
           weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
@@ -5481,7 +5481,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     }
 
     if(p_nvar > 0){
-      if(int_TREE_X){
+      if(int_TREE_X || !pksum_is_output){
         for(k = 0; k < p_nvar; k++){
           const int kidx = k*num_obs_eval_extern*sum_element_length;
           for(j = 0; j < num_obs_eval_extern; j++)
