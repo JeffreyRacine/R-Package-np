@@ -37,20 +37,13 @@ Hao Yu
   \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \examples{
-\donttest{
-#Assume that there are some slaves running
-mpi.comm.size(comm=1)
+% \dontrun{
+## Not run in checks when toggled to dontrun: communicator examples are
+## documented for manual MPI sessions.
+mpi.comm.rank(comm=0)
 mpi.comm.size(comm=0)
-
-mpi.remote.exec(mpi.comm.rank(comm=1))
-mpi.remote.exec(mpi.comm.rank(comm=0))
-
-mpi.remote.exec(mpi.comm.size(comm=1))
-mpi.remote.exec(mpi.comm.size(comm=0))
-
-mpi.bcast.cmd(mpi.comm.dup(comm=1,newcomm=5))
-mpi.comm.dup(comm=1,newcomm=5)
-}
+mpi.comm.dup(comm=0, newcomm=5)
+% } % enddontrun
 }
 \keyword{interface}
  

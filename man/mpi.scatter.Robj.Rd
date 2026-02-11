@@ -35,7 +35,8 @@ Hao Yu  and   Wei Xia
   \code{\link{mpi.gather.Robj}},
 }
 \examples{
-\donttest{
+\dontrun{
+# Not run in checks: requires pre-spawned slaves and a live worker communicator.
 #assume that there are three slaves running
 mpi.bcast.cmd(x<-mpi.scatter.Robj())
 
@@ -53,4 +54,3 @@ mpi.remote.exec(dat2)
 }
 }
 \keyword{utilities}
-

@@ -56,7 +56,9 @@ Hao Yu
   \code{\link{mpi.scatter}}, \code{\link{mpi.scatterv}}.
 }
 \examples{
-\donttest{
+\dontrun{
+# Not run in checks: requires a fixed number of spawned slaves and rank-specific buffers.
+# Running this with a different communicator layout can deadlock.
 #Need 3 slaves to run properly
 #Or use mpi.spawn.Rslaves(nslaves=3)
  mpi.bcast.cmd(id <-mpi.comm.rank(.comm), comm=1)

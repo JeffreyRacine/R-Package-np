@@ -69,7 +69,8 @@ b.star(data,
 }
 
 \examples{
-\donttest{
+% \dontrun{
+## Not run in checks: excluded to keep MPI examples stable and check times short.
 set.seed(12345)
 
 # Function to generate an AR(1) series
@@ -89,7 +90,7 @@ b.star(yt,round=TRUE)
 
 yt <- ar.series(0.9,rnorm(10000))
 b.star(yt,round=TRUE)
-} % enddonttest
+% } % enddontrun
 }
 
 \keyword{univar}

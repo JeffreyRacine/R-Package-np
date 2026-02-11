@@ -45,7 +45,9 @@ Hao Yu
   \code{\link{mpi.gather}}, \code{\link{mpi.gatherv}}.
 }
 \examples{
-\donttest{
+\dontrun{
+# Not run in checks: requires a fixed number of spawned slaves and rank-specific buffers.
+# Running this with a different communicator layout can deadlock.
 #Need 3 slaves to run properly
 #Or run  mpi.spawn.Rslaves(nslaves=3)
   num="123456789abcd"

@@ -1,17 +1,23 @@
 sed -i bak -f sed_run.scr b.star.Rd
 sed -i bak -f sed_run.scr npseed.Rd
-sed -i bak -f sed_run.scr data-Engel95.Rd
+# keep heavy example in \dontrun
+# sed -i bak -f sed_run.scr data-Engel95.Rd
 sed -i bak -f sed_run.scr data-cps71.Rd
 sed -i bak -f sed_run.scr data-italy.Rd
 sed -i bak -f sed_run.scr data-oecd.Rd
 sed -i bak -f sed_run.scr data-wage1.Rd
 sed -i bak -f sed_run.scr gradients.Rd
+sed -i bak -f sed_run.scr mpi.comm.Rd
+sed -i bak -f sed_run.scr mpi.dims.create.Rd
+sed -i bak -f sed_run.scr mpi.sendrecv.Rd
 sed -i bak -f sed_run.scr nptgauss.Rd
 sed -i bak -f sed_run.scr np.cmstest.Rd
 sed -i bak -f sed_run.scr np.condensity.Rd
-sed -i bak -f sed_run.scr np.condistribution.Rd
+# keep heavy example in \dontrun
+# sed -i bak -f sed_run.scr np.condistribution.Rd
 sed -i bak -f sed_run.scr np.condensity.bw.Rd
-sed -i bak -f sed_run.scr np.condistribution.bw.Rd
+# keep heavy example in \dontrun
+# sed -i bak -f sed_run.scr np.condistribution.bw.Rd
 sed -i bak -f sed_run.scr np.conmode.Rd
 sed -i bak -f sed_run.scr np.copula.Rd
 sed -i bak -f sed_run.scr np.deptest.Rd
@@ -19,7 +25,8 @@ sed -i bak -f sed_run.scr np.deneqtest.Rd
 sed -i bak -f sed_run.scr np.density.Rd
 sed -i bak -f sed_run.scr np.distribution.Rd
 sed -i bak -f sed_run.scr np.density.bw.Rd
-sed -i bak -f sed_run.scr np.distribution.bw.Rd
+# keep heavy example in \dontrun
+# sed -i bak -f sed_run.scr np.distribution.bw.Rd
 sed -i bak -f sed_run.scr np.kernelsum.Rd
 sed -i bak -f sed_run.scr np.pairs.Rd
 sed -i bak -f sed_run.scr np.plot.Rd

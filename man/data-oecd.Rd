@@ -48,12 +48,13 @@
 }
 \source{ Thanasis Stengos }
 \examples{
-\donttest{
+% \dontrun{
+## Not run in checks: excluded to keep MPI examples stable and check times short.
 data("oecdpanel")
 attach(oecdpanel)
 summary(oecdpanel)
 detach(oecdpanel)
-} % enddonttest
+% } % enddontrun
 }
 \references{
 

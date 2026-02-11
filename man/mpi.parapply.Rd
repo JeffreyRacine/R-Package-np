@@ -74,7 +74,9 @@ Notice that \code{apply.seq} is useful only if \code{job.num} is bigger than sla
 \code{\link{mpi.apply}}
 }
 \examples{
-\donttest{
+\dontrun{
+# Not run in checks: requires pre-spawned slaves and load-balancing state.
+# A mismatched communicator or apply.seq can deadlock.
 #Assume that there are some slaves running
 
 #mpi.applyLB

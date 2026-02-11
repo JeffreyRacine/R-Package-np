@@ -102,7 +102,9 @@ Notice that this is MPI implementation specific.
 Hao Yu
 }
 \examples{
-\donttest{
+\dontrun{
+# Not run in checks: spawning/tearing down MPI daemons is environment-dependent
+# and can interfere with later examples in the same session.
 mpi.spawn.Rslaves(nslaves=2)
 tailslave.log()
 mpi.remote.exec(rnorm(10))

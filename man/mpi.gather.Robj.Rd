@@ -43,7 +43,8 @@ Hao Yu and Wei Xia
   \code{\link{mpi.gather}}, \code{\link{mpi.allgatherv}}.
 }
 \examples{
-\donttest{
+\dontrun{
+# Not run in checks: requires pre-spawned slaves and a live worker communicator.
 #Assume that there are some slaves running
 mpi.bcast.cmd(id<-mpi.comm.rank())
 mpi.bcast.cmd(x<-rnorm(id))
@@ -59,4 +60,3 @@ mpi.remote.exec(nn)
 }
 }
 \keyword{interface}
-

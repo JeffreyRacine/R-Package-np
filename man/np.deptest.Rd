@@ -134,7 +134,8 @@ npdeptest(data.x = NULL,
 }
 
 \examples{
-\donttest{
+% \dontrun{
+## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
 ## (master and slave).  Kindly see the batch examples in the demos
@@ -164,7 +165,7 @@ mpi.bcast.Robj2slave(y.fit)
 
 mpi.bcast.cmd(output <- npdeptest(y,
                                   y.fit,
-                                  boot.num=99,
+                                  boot.num=29,
                                   method="summation"),
               caller.execute=TRUE)
 
@@ -191,7 +192,7 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-} % enddonttest     
+% } % enddontrun     
 }
 \keyword{ univar }
 \keyword{ nonparametric }

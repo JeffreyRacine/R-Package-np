@@ -39,7 +39,9 @@ total.
 \keyword{datasets}
 
 \examples{
-\donttest{
+\dontrun{
+## Not run in checks: this IV example is computationally expensive and can
+## exceed check time limits in MPI environments.
 ## Example - compute nonparametric instrumental regression using
 ## Landweber-Fridman iteration of Fredholm integral equations of the
 ## first kind.
@@ -132,5 +134,5 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-} % enddonttest
+} % enddontrun
 }

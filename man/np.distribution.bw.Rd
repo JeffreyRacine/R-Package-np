@@ -535,7 +535,9 @@ npudistbw(\dots)
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}},  \code{\link{hist}},
   \code{\link{npudist}}, \code{\link{npudist}} }
 \examples{
-\donttest{
+\dontrun{
+## Not run in checks: data-driven CDF bandwidth selection on this dataset is
+## computationally intensive and can hang/timeout in some MPI setups.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
 ## (master and slave).  Kindly see the batch examples in the demos
@@ -581,6 +583,6 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-} % enddonttest
+} % enddontrun
 }
 \keyword{nonparametric}

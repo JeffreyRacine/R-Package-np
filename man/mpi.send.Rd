@@ -85,7 +85,9 @@ Hao Yu
   \code{\link{mpi.get.sourcetag}}. 
 } 
 \examples{ 
-\donttest{
+\dontrun{
+# Not run in checks: send/recv calls must be paired across ranks.
+# Running one side without a matching peer can deadlock.
 #on a slave
 mpi.send(1:10,1,0,0)
 
@@ -98,4 +100,3 @@ x
 }
 } 
 \keyword{interface}
-

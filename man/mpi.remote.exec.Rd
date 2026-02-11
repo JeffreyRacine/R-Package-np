@@ -42,7 +42,8 @@ with `x' as master variable, use mpi.remote.exec(cmd=myfun, x).}
 Hao Yu
 }
 \examples{
-\donttest{
+\dontrun{
+# Not run in checks: requires pre-spawned slaves and a live worker communicator.
 mpi.remote.exec(mpi.comm.rank())
  x=5
 mpi.remote.exec(rnorm,x)
