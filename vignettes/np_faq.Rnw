@@ -1877,6 +1877,63 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \end{itemize}
 
+\section*{Changes from Version 0.60-29 to 0.60-20 [11-Feb-2026]}
+
+\begin{itemize}
+
+\item Major enhancements to npregiv() and npregivderiv():
+
+\begin{itemize}
+  \item Implemented warm-start strategy for improved convergence
+  \item Aligned multistart strategy with crsiv/crsivderiv for consistency
+  \item Performance optimizations: pre-allocated matrices/lists in iterative loops,
+    optimized trapezoidal integration, improved Tikhonov and Ridge calculations
+  \item Added S3 methods (print, summary, plot) for better integration with R workflow
+  \item Enhanced summaries with bandwidth details and estimation timing information
+  \item Alphabetized function arguments for consistency
+  \item Fixed initialization of bw.mu.w in npregivderiv
+  \item Cleaned up naming convention (phihat to phi throughout)
+\end{itemize}  
+
+\item Testing improvements:
+
+\begin{itemize}
+  \item Added comprehensive unit tests using testthat framework
+  \item Expanded test coverage to include distribution, copula, quantile regression,
+    tests of independence/specification, and boundary/shape-constrained methods
+\end{itemize}
+
+\item Build and maintenance updates:
+
+\begin{itemize}
+  \item Resolved -Wfree-nonheap-object compiler warnings in nr.c by implementing 
+    a safe 0-based allocation strategy for 1-based indexing compatibility
+  \item Refined .Rbuildignore regexes to correctly exclude .git and build artifacts
+  \item Added missing imports (graphics, grDevices) to NAMESPACE to resolve global
+    function notes
+  \item Restored \texttt{dontrun} blocks in documentation to expedite package checks
+  \item Suppressed build warnings for non-standard man directory files
+\end{itemize}  
+
+\item Bug fixes:
+
+\begin{itemize}
+  \item Fixed np.plot categorical predictor evaluation
+  \item Fixed np package registrations after sync
+  \item Synced non-MPI code fixes from npRmpi
+\end{itemize}  
+
+\item Documentation updates:
+
+\begin{itemize}
+  \item Updated URLs to resolve CRAN check warnings
+  \item Updated McMaster website URL to https://experts.mcmaster.ca/people/racinej
+  \item Added build notes, worktrees documentation, and CRAN diff summary
+  \item Fixed documentation mismatches for npregiv/npregivderiv
+\end{itemize}  
+
+\end{itemize}
+
 \section*{Changes from Version 0.60-18 to 0.60-19 [28-Jan-2026]}
 
 \begin{itemize}
