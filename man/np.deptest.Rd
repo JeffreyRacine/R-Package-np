@@ -134,7 +134,7 @@ npdeptest(data.x = NULL,
 }
 
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -192,7 +192,7 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 
 ## mpi.bcast.cmd(mpi.quit(),
 ##               caller.execute=TRUE)
-% } % enddontrun     
+} % enddontrun     
 }
 \keyword{ univar }
 \keyword{ nonparametric }

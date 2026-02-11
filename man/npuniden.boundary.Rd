@@ -211,7 +211,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.reflect}}.
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
 ## unadjusted density, and DGP
@@ -276,7 +276,7 @@ lines(density(age,bw=model$h),col=2)
 legend("topright",c("Boundary Kernel","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 detach(cps71)
 par(oldpar)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

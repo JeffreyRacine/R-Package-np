@@ -104,9 +104,7 @@ INPUT /opt/local/share/texmf-texlive/fonts/tfm/public/amsfonts/symbols/msam10.tf
 INPUT /opt/local/share/texmf-texlive/fonts/tfm/public/amsfonts/symbols/msam7.tfm
 INPUT /opt/local/share/texmf-texlive/fonts/tfm/public/amsfonts/symbols/msbm10.tfm
 INPUT /opt/local/share/texmf-texlive/fonts/tfm/public/amsfonts/symbols/msbm7.tfm
-INPUT timing_n_2.tex
-INPUT timing_n_3.tex
-INPUT timing_n_4.tex
+INPUT timing_all.tex
 OUTPUT timing.pdf
 INPUT /opt/local/var/db/texmf/fonts/map/pdftex/updmap/pdftex.map
 INPUT timing.aux

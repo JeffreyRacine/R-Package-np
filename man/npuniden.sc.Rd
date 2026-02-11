@@ -160,7 +160,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
   and the function \code{\link{npuniden.boundary}}.
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 n <- 100
 set.seed(42)
@@ -287,7 +287,7 @@ abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
 par(oldpar)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025/MacPorts 2025.74524_1) (preloaded format=pdflatex 2025.11.23)  6 FEB 2026 18:24
+This is pdfTeX, Version 3.141592653-2.6-1.40.27 (TeX Live 2025/MacPorts 2025.74524_1) (preloaded format=pdflatex 2025.11.23)  9 FEB 2026 23:28
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -256,24 +256,27 @@ G,.JBIG2,.JB2,.eps]
 File: epstopdf-sys.cfg 2010/07/13 v1.3 Configuration of (r)epstopdf for TeX Liv
 e
 ))
-(./timing_n_2.tex) (./timing_n_3.tex) (./timing_n_4.tex)
+Overfull \hbox (11.94014pt too wide) in paragraph at lines 58--62
+[][]\OT1/cmr/m/n/10 The ta-ble be-low presents Sec-onds with re-spect to the nu
+m-ber of cores fol-lowed by the ra-tio (Secs(np)/Secs(1)).
+ []
 
-[1{/opt/local/var/db/texmf/fonts/map/pdftex/updmap/pdftex.map}]
+(./timing_all.tex)
 
-[2] (./timing.aux)
+[1{/opt/local/var/db/texmf/fonts/map/pdftex/updmap/pdftex.map}] (./timing.aux)
  ***********
 LaTeX2e <2024-11-01> patch level 2
 L3 programming layer <2025-01-18>
  ***********
  ) 
 Here is how much of TeX's memory you used:
- 3801 strings out of 474303
- 58267 string characters out of 5738984
- 477948 words of memory out of 5000000
- 26669 multiletter control sequences out of 15000+600000
+ 3796 strings out of 474303
+ 58198 string characters out of 5738984
+ 468969 words of memory out of 5000000
+ 26670 multiletter control sequences out of 15000+600000
  564597 words of font info for 59 fonts, out of 8000000 for 9000
  591 hyphenation exceptions out of 8191
- 71i,9n,79p,243b,211s stack positions out of 10000i,1000n,20000p,200000b,200000s
+ 71i,9n,79p,288b,224s stack positions out of 10000i,1000n,20000p,200000b,200000s
 </opt/local/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cmbx10.pfb></o
 pt/local/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cmcsc10.pfb></opt/l
 ocal/share/texmf-texlive/fonts/type1/public/amsfonts/cm/cmmi10.pfb></opt/local/
@@ -282,10 +285,10 @@ texmf-texlive/fonts/type1/public/amsfonts/cm/cmr10.pfb></opt/local/share/texmf-
 texlive/fonts/type1/public/amsfonts/cm/cmr7.pfb></opt/local/share/texmf-texlive
 /fonts/type1/public/amsfonts/cm/cmr8.pfb></opt/local/share/texmf-texlive/fonts/
 type1/public/amsfonts/cm/cmti8.pfb>
-Output written on timing.pdf (2 pages, 98314 bytes).
+Output written on timing.pdf (1 page, 98592 bytes).
 PDF statistics:
- 51 PDF objects out of 1000 (max. 8388607)
- 30 compressed objects within 1 object stream
+ 48 PDF objects out of 1000 (max. 8388607)
+ 28 compressed objects within 1 object stream
  0 named destinations out of 1000 (max. 500000)
  1 words of extra memory for PDF output out of 10000 (max. 10000000)
 

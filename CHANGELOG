@@ -1,3 +1,20 @@
+Changes from Version 0.60-20 to 0.60-21 [11-Feb-2026]
+
+* Ported recent core-performance updates from np master (kernel/jksum
+  optimizations) and synchronized behavior across serial/MPI variants.
+
+* Fixed MPI npksum copyback for padded evaluation partitions, eliminating
+  a regression affecting repeated-session workflows (e.g. npcmstest).
+
+* Added robust session-management wrappers (npRmpi.start()/npRmpi.stop()) and
+  slave-reuse controls to improve stability on macOS+MPICH.
+
+* Hardened .Rd example handling for CRAN checks (run/dontrun tooling and MPI
+  example scoping), plus related documentation/check cleanups.
+
+* Guarded fallback kernel-table indexing in jksum.c to avoid GCC/Winbuilder
+  array-bounds warnings.
+
 Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
 
 * npRmpi-specific updates and improvements:

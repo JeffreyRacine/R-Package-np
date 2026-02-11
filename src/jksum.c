@@ -2492,15 +2492,16 @@ void np_ckernelv(const int KERNEL,
                                        np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8,
                                        np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8,
                                        np_cdf_rect, np_cdf_tgauss2 };
+      const int kernel = (KERNEL >= 0 && KERNEL < (int)(sizeof(k)/sizeof(k[0]))) ? KERNEL : 0;
 
       if(xl == NULL){
         if(!bin_do_xw){
           for(i = 0; i < num_xt; i++)
-            result[i] = k[KERNEL]((x-xt[i])*sgn/h);
+            result[i] = k[kernel]((x-xt[i])*sgn/h);
         } else {
           for(i = 0; i < num_xt; i++){
             if(xw[i] == 0.0) continue;
-            result[i] = xw[i]*k[KERNEL]((x-xt[i])*sgn/h);
+            result[i] = xw[i]*k[kernel]((x-xt[i])*sgn/h);
           }
         }
       } else {
@@ -2509,11 +2510,11 @@ void np_ckernelv(const int KERNEL,
           const int nlev = xl->nlev[m];
           if(!bin_do_xw){
             for(i = istart; i < istart+nlev; i++)
-              result[i] = k[KERNEL]((x-xt[i])*sgn/h);
+              result[i] = k[kernel]((x-xt[i])*sgn/h);
           } else {
             for(i = istart; i < istart+nlev; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[KERNEL]((x-xt[i])*sgn/h);
+              result[i] = xw[i]*k[kernel]((x-xt[i])*sgn/h);
             }
           }
         }
@@ -2711,14 +2712,15 @@ void np_ukernelv(const int KERNEL,
     default: {
       double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
                                                  np_econvol_uaa, np_econvol_unli_racine };
+      const int kernel = (KERNEL >= 0 && KERNEL < (int)(sizeof(k)/sizeof(k[0]))) ? KERNEL : 0;
       if(xl == NULL){
         if(!bin_do_xw){
           for(i = 0; i < num_xt; i++)
-            result[i] = k[KERNEL]((xt[i]==x), lambda, ncat);
+            result[i] = k[kernel]((xt[i]==x), lambda, ncat);
         } else {
           for(i = 0; i < num_xt; i++){
             if(xw[i] == 0.0) continue;
-            result[i] = xw[i]*k[KERNEL]((xt[i]==x), lambda, ncat);
+            result[i] = xw[i]*k[kernel]((xt[i]==x), lambda, ncat);
           }
         }
       } else {
@@ -2727,11 +2729,11 @@ void np_ukernelv(const int KERNEL,
           const int nlev = xl->nlev[m];
           if(!bin_do_xw){
             for(i = istart; i < istart+nlev; i++)
-              result[i] = k[KERNEL]((xt[i]==x), lambda, ncat);
+              result[i] = k[kernel]((xt[i]==x), lambda, ncat);
           } else {
             for(i = istart; i < istart+nlev; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[KERNEL]((xt[i]==x), lambda, ncat);
+              result[i] = xw[i]*k[kernel]((xt[i]==x), lambda, ncat);
             }
           }
         }
@@ -2988,16 +2990,17 @@ void np_okernelv(const int KERNEL,
         np_onull, np_onull, np_onull,
         np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
       };
+      const int kernel = (KERNEL >= 0 && KERNEL < (int)(sizeof(k)/sizeof(k[0]))) ? KERNEL : 0;
 
       if(!swap_xxt){
         if(xl == NULL){
           if(!bin_do_xw){
             for(i = 0; i < num_xt; i++)
-              result[i] = k[KERNEL](xt[i], x, lambda, cl, ch);
+              result[i] = k[kernel](xt[i], x, lambda, cl, ch);
           } else {
             for(i = 0; i < num_xt; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[KERNEL](xt[i], x, lambda, cl, ch);
+              result[i] = xw[i]*k[kernel](xt[i], x, lambda, cl, ch);
             }
           }
         } else {
@@ -3006,11 +3009,11 @@ void np_okernelv(const int KERNEL,
             const int nlev = xl->nlev[m];
             if(!bin_do_xw){
               for(i = istart; i < istart+nlev; i++)
-                result[i] = k[KERNEL](xt[i], x, lambda, cl, ch);
+                result[i] = k[kernel](xt[i], x, lambda, cl, ch);
             } else {
               for(i = istart; i < istart+nlev; i++){
                 if(xw[i] == 0.0) continue;
-                result[i] = xw[i]*k[KERNEL](xt[i], x, lambda, cl, ch);
+                result[i] = xw[i]*k[kernel](xt[i], x, lambda, cl, ch);
               }
             }
           }
@@ -3019,11 +3022,11 @@ void np_okernelv(const int KERNEL,
         if(xl == NULL){
           if(!bin_do_xw){
             for(i = 0; i < num_xt; i++)
-              result[i] = k[KERNEL](x, xt[i], lambda, cl, ch);
+              result[i] = k[kernel](x, xt[i], lambda, cl, ch);
           } else {
             for(i = 0; i < num_xt; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[KERNEL](x, xt[i], lambda, cl, ch);
+              result[i] = xw[i]*k[kernel](x, xt[i], lambda, cl, ch);
             }
           }
         } else {
@@ -3032,11 +3035,11 @@ void np_okernelv(const int KERNEL,
             const int nlev = xl->nlev[m];
             if(!bin_do_xw){
               for(i = istart; i < istart+nlev; i++)
-                result[i] = k[KERNEL](x, xt[i], lambda, cl, ch);
+                result[i] = k[kernel](x, xt[i], lambda, cl, ch);
             } else {
               for(i = istart; i < istart+nlev; i++){
                 if(xw[i] == 0.0) continue;
-                result[i] = xw[i]*k[KERNEL](x, xt[i], lambda, cl, ch);
+                result[i] = xw[i]*k[kernel](x, xt[i], lambda, cl, ch);
               }
             }
           }
