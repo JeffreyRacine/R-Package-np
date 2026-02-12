@@ -120,3 +120,31 @@ Baseline: pre-ordered-kernel change (`c7825d0`); Current: ordered-kernel change 
 ## Notes on inheritance of improvements
 
 Many higher-level `np*` functions inherit these improvements automatically, because they ultimately dispatch into the same `jksum.c` kernel evaluators (`np_ckernelv`, `np_ukernelv`, `np_okernelv`) in the “new” (non-legacy) C code paths.
+
+## 2026-02-12 (Profile Caching + Kernel Fast Paths)
+
+### Summary
+Implemented serial optimizations in `src/jksum.c` focused on categorical/ordered kernel hot paths and product-kernel reuse.
+
+### Code Changes
+- Unordered kernel fast path: cached `same/different` values in `np_ukernelv` and `np_p_ukernelv`.
+- Ordered kernel fast path: cached `lambda^d` lookup with direct evaluation for ordered kernels `0/1/2` in `np_okernelv` and `np_p_okernelv`.
+- Tree early exit: skip all downstream kernel work when tree search yields zero continuous-support interactions.
+- Persistent discrete profile ids: build once per `kernel_weighted_sum_np` invocation and reuse across all `j` (tree and non-tree paths under safety conditions).
+
+### Runtime Summary (pre vs post)
+- Real-world `wage1` (`npreg`, `ckertype="epanechnikov"`, `times=8`):
+  - `np.tree=FALSE`: `10927.178 ms` -> `8466.990 ms` (mean, `+22.5%`)
+  - `np.tree=TRUE`: `6033.697 ms` -> `5749.531 ms` (mean, `+4.7%`)
+- Non-tree categorical-only `npreg` (`n=4000`, `times=6`):
+  - `31371.77 ms` -> `20732.23 ms` (mean, `+33.9%`)
+- Non-tree mixed `npreg` (`n=2000`, `times=6`):
+  - `4677.014 ms` -> `3921.773 ms` (mean, `+16.1%`)
+- Tree mixed `npreg` (`n=2000`, `times=6`):
+  - `1189.502 ms` -> `1099.57 ms` (mean, `+7.6%`)
+
+### Numerical Stability
+- `wage1` pre vs post:
+  - non-tree: `max |Δ bw| = 2.759011e-10`, `max |Δ fitted| = 4.730198e-10`
+  - tree: `max |Δ bw| = 1.603712e-04`, `max |Δ fitted| = 1.500707e-05`
+- Synthetic checks: only very small floating-point-level differences consistent with operation reordering.
