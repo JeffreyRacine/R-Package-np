@@ -42,3 +42,30 @@ Speedups are reported as `baseline / current` (so `>1` is faster) with percent c
 
 ## Notes
 - With larger sample sizes, the improvements are consistent for most cases, and the communication overhead is less dominant.
+
+## 2026-02-12: jksum Port Verification (MPI, nslaves=1)
+- Source change under test: `src/jksum.c` port from `np-master` (unordered/ordered kernel fast paths, cached ordered powers, tree empty-support short-circuit, persistent discrete profile cache).
+- Benchmark driver: case-by-case MPI runs using documented `npRmpi.start()/mpi.bcast.cmd(..., caller.execute=TRUE)` pattern.
+- Settings: synthetic mixed data, `n = 500, 1000, 2000`, `times = 10` for each case, `ftol = 1e-02`, `tol = 1e-01`.
+- MPI transport note: `FI_TCP_IFACE=en0` used to avoid intermittent OFI timeout on `utun4` during heavy `npcdens` collectives.
+
+### Pre/Post Results by Sample Size (averaged over `np.tree` on/off)
+`rel = post / pre` (so `< 1.0` is faster post-change)
+
+| Function | n | Mean Rel | Mean % Change | Median Rel | Median % Change |
+|---|---:|---:|---:|---:|---:|
+| npreg | 500 | 0.9153 | -8.47% | 0.8856 | -11.44% |
+| npreg | 1000 | 0.8484 | -15.16% | 0.8715 | -12.85% |
+| npreg | 2000 | 0.7744 | -22.56% | 0.7883 | -21.17% |
+| npcdens | 500 | 0.9584 | -4.16% | 0.9535 | -4.65% |
+| npcdens | 1000 | 0.9660 | -3.40% | 0.9663 | -3.37% |
+| npcdens | 2000 | 0.9781 | -2.19% | 0.9821 | -1.79% |
+| npudens | 500 | 0.9643 | -3.57% | 1.0228 | +2.28% |
+| npudens | 1000 | 0.9920 | -0.80% | 0.9692 | -3.08% |
+| npudens | 2000 | 0.9883 | -1.17% | 0.9924 | -0.76% |
+
+### Brief Interpretation
+- `npreg` shows strong scaling gains with sample size (largest at `n=2000`).
+- `npcdens` shows consistent but smaller gains across sample sizes.
+- `npudens` is modestly better on mean at all sample sizes; median is near-neutral at `n=500` and slightly improved at larger `n`.
+- Across all 18 tree/function/sample cells: 16 mean wins and 15 median wins.

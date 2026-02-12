@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <math.h>
 #include <float.h>
 #include <errno.h>
+#include <string.h>
 
 #include <R.h>
 #include <R_ext/Utils.h>
@@ -60,6 +60,10 @@ int int_SIMULATION;
 int int_TAYLOR;
 int int_WEIGHTS;
 */
+
+#ifdef RCSID
+static char rcsid[] = "$Id: jksum.c,v 1.16 2006/11/02 16:56:49 tristen Exp $";
+#endif
 
 /* Some externals for numerical routines */
 
@@ -672,6 +676,71 @@ double np_onli_racine(const double x, const double y, const double lambda, const
 double np_score_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
   const int cxy = (int)fabs(x-y);
   return ((cxy != 0) || (lambda != 0.0)) ? ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0 *lambda) : -2.0;
+}
+
+static inline double np_ordered_eval_cached012(const int kernel,
+                                               const double x,
+                                               const double y,
+                                               const double lambda,
+                                               const int max_cxy,
+                                               const double * const lpow){
+  const int cxy = (int)fabs(x-y);
+  const double gee = (lpow != NULL && cxy <= max_cxy) ? lpow[cxy] : R_pow_di(lambda, cxy);
+  switch(kernel){
+    case 0:
+      return (cxy == 0) ? (1.0-lambda) : (0.5*(1.0-lambda)*gee);
+    case 1:
+      return gee;
+    case 2:
+      return gee*(1.0-lambda)/(1.0+lambda);
+    default:
+      return 0.0;
+  }
+}
+
+static inline uint64_t np_mix_u64(uint64_t x){
+  x ^= x >> 30;
+  x *= UINT64_C(0xbf58476d1ce4e5b9);
+  x ^= x >> 27;
+  x *= UINT64_C(0x94d049bb133111eb);
+  x ^= x >> 31;
+  return x;
+}
+
+static inline uint64_t np_hash_discrete_profile_idx(const int idx,
+                                                    const int num_reg_unordered,
+                                                    const int num_reg_ordered,
+                                                    double * const * const xtu,
+                                                    double * const * const xto){
+  uint64_t h = UINT64_C(0x9e3779b97f4a7c15);
+  union { double d; uint64_t u; } v;
+
+  for(int u = 0; u < num_reg_unordered; u++){
+    v.d = xtu[u][idx];
+    h ^= np_mix_u64(v.u + UINT64_C(0x9e3779b97f4a7c15) + ((uint64_t)u << 1));
+  }
+
+  for(int o = 0; o < num_reg_ordered; o++){
+    v.d = xto[o][idx];
+    h ^= np_mix_u64(v.u + UINT64_C(0x517cc1b727220a95) + ((uint64_t)o << 1));
+  }
+
+  return h;
+}
+
+static inline int np_same_discrete_profile_idx(const int ia,
+                                               const int ib,
+                                               const int num_reg_unordered,
+                                               const int num_reg_ordered,
+                                               double * const * const xtu,
+                                               double * const * const xto){
+  for(int u = 0; u < num_reg_unordered; u++)
+    if(xtu[u][ia] != xtu[u][ib]) return 0;
+
+  for(int o = 0; o < num_reg_ordered; o++)
+    if(xto[o][ia] != xto[o][ib]) return 0;
+
+  return 1;
 }
 
 // not so simple truncated gaussian convolution kernels
@@ -2272,7 +2341,8 @@ void np_p_ckernelv(const int KERNEL,
                    const XL * const p_xl,
                    const int swap_xxt,
                    const int do_perm,
-                   const int do_score){
+                   const int do_score,
+                   double * const scratch_kbuf){
 
   /* 
      this should be read as:
@@ -2301,11 +2371,12 @@ void np_p_ckernelv(const int KERNEL,
                                    np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8, 
                                    np_cdf_rect, np_cdf_tgauss2 };
 
-  double * kbuf = NULL;
-
-  kbuf = (double *)malloc(num_xt*sizeof(double));
-
-  assert(kbuf != NULL);
+  double *kbuf = scratch_kbuf;
+  const int own_kbuf = (kbuf == NULL);
+  if(own_kbuf){
+    kbuf = (double *)malloc(num_xt*sizeof(double));
+    assert(kbuf != NULL);
+  }
 
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
@@ -2361,7 +2432,8 @@ void np_p_ckernelv(const int KERNEL,
     }
   }
 
-  free(kbuf);
+  if(own_kbuf)
+    free(kbuf);
 }
 
 void np_ckernelv(const int KERNEL, 
@@ -2567,7 +2639,8 @@ void np_p_ukernelv(const int KERNEL,
                    const XL * const xl,
                    const XL * const p_xl,
                    const int swap_xxt,
-                   const int do_ocg){
+                   const int do_ocg,
+                   double * const scratch_kbuf){
 
   /* 
      this should be read as:
@@ -2587,23 +2660,36 @@ void np_p_ukernelv(const int KERNEL,
   double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
                                              np_econvol_uaa, np_econvol_unli_racine,
                                              np_score_uaa, np_score_unli_racine };
+  const int nk = (int)(sizeof(k)/sizeof(k[0]));
+  const int kernel = (KERNEL >= 0 && KERNEL < nk) ? KERNEL : 0;
+  const int p_kernel = (P_KERNEL >= 0 && P_KERNEL < nk) ? P_KERNEL : 0;
 
-  double * kbuf = NULL;
+  /* Unordered kernels depend only on same/different category; cache both values once. */
+  const double kn_same = k[kernel](1, lambda, ncat);
+  const double kn_diff = k[kernel](0, lambda, ncat);
+  const double pkn_same = k[p_kernel](1, lambda, ncat);
+  const double pkn_diff = k[p_kernel](0, lambda, ncat);
+  const int p_iscat_const = (swap_xxt && do_ocg);
+  const int p_iscat_const_val = (cat == x);
 
-  kbuf = (double *)malloc(num_xt*sizeof(double));
-
-  assert(kbuf != NULL);
+  double *kbuf = scratch_kbuf;
+  const int own_kbuf = (kbuf == NULL);
+  if(own_kbuf){
+    kbuf = (double *)malloc(num_xt*sizeof(double));
+    assert(kbuf != NULL);
+  }
 
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      const double kn = k[KERNEL]((xt[i]==x), lambda, ncat);
+      const int is_same = (xt[i] == x);
+      const double kn = is_same ? kn_same : kn_diff;
 
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
 
-      const int iscat = (swap_xxt && do_ocg) ? (cat == x) : (xt[i] == ex);
-
-      p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](iscat, lambda, ncat);
+      const int iscat = p_iscat_const ? p_iscat_const_val : (xt[i] == ex);
+      const double pkn = iscat ? pkn_same : pkn_diff;
+      p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
     }
 
     for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
@@ -2619,7 +2705,8 @@ void np_p_ukernelv(const int KERNEL,
       const int istart = xl->istart[m];
       const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const double kn = k[KERNEL]((xt[i]==x), lambda, ncat);
+        const int is_same = (xt[i] == x);
+        const double kn = is_same ? kn_same : kn_diff;
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -2630,8 +2717,9 @@ void np_p_ukernelv(const int KERNEL,
       const int istart = p_xl->istart[m];
       const int nlev = p_xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const int iscat = (swap_xxt && do_ocg) ? (cat == x) : (xt[i] == ex);
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](iscat, lambda, ncat);
+        const int iscat = p_iscat_const ? p_iscat_const_val : (xt[i] == ex);
+        const double pkn = iscat ? pkn_same : pkn_diff;
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
       }
     }
 
@@ -2648,7 +2736,8 @@ void np_p_ukernelv(const int KERNEL,
     }
   }
 
-  free(kbuf);
+  if(own_kbuf)
+    free(kbuf);
 }
 
 void np_ukernelv(const int KERNEL, 
@@ -2668,80 +2757,40 @@ void np_ukernelv(const int KERNEL,
   const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
+  double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
+                                             np_econvol_uaa, np_econvol_unli_racine };
+  const int nk = (int)(sizeof(k)/sizeof(k[0]));
+  const int kernel = (KERNEL >= 0 && KERNEL < nk) ? KERNEL : 0;
+  const double kn_same = k[kernel](1, lambda, ncat);
+  const double kn_diff = k[kernel](0, lambda, ncat);
 
-#define NP_UKERNELV_APPLY(fn)                                                      \
-  do {                                                                             \
-    if(xl == NULL){                                                                \
-      if(!bin_do_xw){                                                              \
-        for(i = 0; i < num_xt; i++){                                               \
-          result[i] = fn((xt[i]==x), lambda, ncat);                                \
-        }                                                                          \
-      } else {                                                                     \
-        for(i = 0; i < num_xt; i++){                                               \
-          if(xw[i] == 0.0) continue;                                               \
-          result[i] = xw[i]*fn((xt[i]==x), lambda, ncat);                          \
-        }                                                                          \
-      }                                                                            \
-    } else {                                                                       \
-      if(!bin_do_xw){                                                              \
-        for(int m = 0; m < xl->n; m++){                                            \
-          const int istart = xl->istart[m];                                        \
-          const int nlev = xl->nlev[m];                                            \
-          for(i = istart; i < istart+nlev; i++){                                   \
-            result[i] = fn((xt[i]==x), lambda, ncat);                              \
-          }                                                                        \
-        }                                                                          \
-      } else {                                                                     \
-        for(int m = 0; m < xl->n; m++){                                            \
-          const int istart = xl->istart[m];                                        \
-          const int nlev = xl->nlev[m];                                            \
-          for(i = istart; i < istart+nlev; i++){                                   \
-            if(xw[i] == 0.0) continue;                                             \
-            result[i] = xw[i]*fn((xt[i]==x), lambda, ncat);                        \
-          }                                                                        \
-        }                                                                          \
-      }                                                                            \
-    }                                                                              \
-  } while(0)
-
-  switch(KERNEL){
-    case 0: NP_UKERNELV_APPLY(np_uaa); break;
-    case 1: NP_UKERNELV_APPLY(np_unli_racine); break;
-    case 2: NP_UKERNELV_APPLY(np_econvol_uaa); break;
-    case 3: NP_UKERNELV_APPLY(np_econvol_unli_racine); break;
-    default: {
-      double (* const k[])(int, double, int) = { np_uaa, np_unli_racine,
-                                                 np_econvol_uaa, np_econvol_unli_racine };
-      const int kernel = (KERNEL >= 0 && KERNEL < (int)(sizeof(k)/sizeof(k[0]))) ? KERNEL : 0;
-      if(xl == NULL){
-        if(!bin_do_xw){
-          for(i = 0; i < num_xt; i++)
-            result[i] = k[kernel]((xt[i]==x), lambda, ncat);
-        } else {
-          for(i = 0; i < num_xt; i++){
-            if(xw[i] == 0.0) continue;
-            result[i] = xw[i]*k[kernel]((xt[i]==x), lambda, ncat);
-          }
+  if(xl == NULL){
+    if(!bin_do_xw){
+      for(i = 0; i < num_xt; i++){
+        result[i] = (xt[i] == x) ? kn_same : kn_diff;
+      }
+    } else {
+      for(i = 0; i < num_xt; i++){
+        if(xw[i] == 0.0) continue;
+        result[i] = xw[i]*((xt[i] == x) ? kn_same : kn_diff);
+      }
+    }
+  } else {
+    for(int m = 0; m < xl->n; m++){
+      const int istart = xl->istart[m];
+      const int nlev = xl->nlev[m];
+      if(!bin_do_xw){
+        for(i = istart; i < istart+nlev; i++){
+          result[i] = (xt[i] == x) ? kn_same : kn_diff;
         }
       } else {
-        for(int m = 0; m < xl->n; m++){
-          const int istart = xl->istart[m];
-          const int nlev = xl->nlev[m];
-          if(!bin_do_xw){
-            for(i = istart; i < istart+nlev; i++)
-              result[i] = k[kernel]((xt[i]==x), lambda, ncat);
-          } else {
-            for(i = istart; i < istart+nlev; i++){
-              if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[kernel]((xt[i]==x), lambda, ncat);
-            }
-          }
+        for(i = istart; i < istart+nlev; i++){
+          if(xw[i] == 0.0) continue;
+          result[i] = xw[i]*((xt[i] == x) ? kn_same : kn_diff);
         }
       }
     }
   }
-
-#undef NP_UKERNELV_APPLY
 }
 
 void np_convol_okernelv(const int KERNEL, 
@@ -2753,19 +2802,19 @@ void np_convol_okernelv(const int KERNEL,
                         const int swap_xxt){
 
   int i; 
-  int j, bin_do_xw = do_xw > 0;
+  const int bin_do_xw = do_xw > 0;
   double unit_weight = 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
   if(!swap_xxt){
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_ordered_convolution(KERNEL, xt[i], x, lambda, ncat, cat);
+    for (i = 0; i < num_xt; i++){
+      if(xw[bin_do_xw ? i : 0] == 0.0) continue;
+      result[i] = xw[bin_do_xw ? i : 0]*kernel_ordered_convolution(KERNEL, xt[i], x, lambda, ncat, cat);
     }
   } else {
-    for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      if(xw[j] == 0.0) continue;
-      result[i] = xw[j]*kernel_ordered_convolution(KERNEL, x, xt[i], lambda, ncat, cat);
+    for (i = 0; i < num_xt; i++){
+      if(xw[bin_do_xw ? i : 0] == 0.0) continue;
+      result[i] = xw[bin_do_xw ? i : 0]*kernel_ordered_convolution(KERNEL, x, xt[i], lambda, ncat, cat);
     }
   }
 
@@ -2787,7 +2836,8 @@ void np_p_okernelv(const int KERNEL,
                    const int swap_xxt,
                    const int do_ocg,
                    const int * const ordered_indices,
-                   const int swapped_index){
+                   const int swapped_index,
+                   double * const scratch_kbuf){
 
   /* 
      this should be read as:
@@ -2809,11 +2859,12 @@ void np_p_okernelv(const int KERNEL,
     np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
   };
 
-  double * kbuf = NULL;
-
-  kbuf = (double *)malloc(num_xt*sizeof(double));
-
-  assert(kbuf != NULL);
+  double *kbuf = scratch_kbuf;
+  const int own_kbuf = (kbuf == NULL);
+  if(own_kbuf){
+    kbuf = (double *)malloc(num_xt*sizeof(double));
+    assert(kbuf != NULL);
+  }
 
   double s_cat = 0.0;
 
@@ -2823,6 +2874,18 @@ void np_p_okernelv(const int KERNEL,
   
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
+  const int max_cxy = (int)fabs(ch-cl);
+  const int fast_kernel = (KERNEL >= 0 && KERNEL <= 2 && cats != NULL);
+  const int fast_p_kernel = (P_KERNEL >= 0 && P_KERNEL <= 2 && cats != NULL);
+  double *lpow = NULL;
+
+  if((fast_kernel || fast_p_kernel) && max_cxy >= 0){
+    lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
+    assert(lpow != NULL);
+    lpow[0] = 1.0;
+    for(int c = 1; c <= max_cxy; c++)
+      lpow[c] = lpow[c-1]*lambda;
+  }
 
     if(xl == NULL){
       for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
@@ -2831,12 +2894,17 @@ void np_p_okernelv(const int KERNEL,
         const double c2 = swap_xxt ? xt[i] : x;
         const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
-        const double kn = k[KERNEL](c1, c2, lambda, cl, ch);
+        const double kn = fast_kernel
+          ? np_ordered_eval_cached012(KERNEL, c1, c2, lambda, max_cxy, lpow)
+          : k[KERNEL](c1, c2, lambda, cl, ch);
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
 
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](c1, c3, lambda, cl, ch);
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
+          (fast_p_kernel
+            ? np_ordered_eval_cached012(P_KERNEL, c1, c3, lambda, max_cxy, lpow)
+            : k[P_KERNEL](c1, c3, lambda, cl, ch));
       }
 
       for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
@@ -2854,7 +2922,9 @@ void np_p_okernelv(const int KERNEL,
           const double c1 = swap_xxt ? x : xt[i];
           const double c2 = swap_xxt ? xt[i] : x;
 
-          const double kn = k[KERNEL](c1, c2, lambda, cl, ch);
+          const double kn = fast_kernel
+            ? np_ordered_eval_cached012(KERNEL, c1, c2, lambda, max_cxy, lpow)
+            : k[KERNEL](c1, c2, lambda, cl, ch);
 
           result[i] = xw[j]*kn;
           kbuf[i] = kn;
@@ -2869,7 +2939,10 @@ void np_p_okernelv(const int KERNEL,
           const double c1 = swap_xxt ? x : xt[i];
           const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
-          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL](c1, c3, lambda, cl, ch);
+          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
+            (fast_p_kernel
+              ? np_ordered_eval_cached012(P_KERNEL, c1, c3, lambda, max_cxy, lpow)
+              : k[P_KERNEL](c1, c3, lambda, cl, ch));
         }
       }
 
@@ -2886,7 +2959,10 @@ void np_p_okernelv(const int KERNEL,
       }
     }
 
-  free(kbuf);
+  if(own_kbuf)
+    free(kbuf);
+  if(lpow != NULL)
+    free(lpow);
 }
 
 void np_okernelv(const int KERNEL, 
@@ -2911,6 +2987,73 @@ void np_okernelv(const int KERNEL,
 
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
+  const int max_cxy = (int)fabs(ch-cl);
+  const int fast_kernel = (KERNEL >= 0 && KERNEL <= 2 && cats != NULL);
+
+  if(fast_kernel && max_cxy >= 0){
+    double *lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
+    assert(lpow != NULL);
+    lpow[0] = 1.0;
+    for(int c = 1; c <= max_cxy; c++)
+      lpow[c] = lpow[c-1]*lambda;
+
+    if(!swap_xxt){
+      if(xl == NULL){
+        if(!bin_do_xw){
+          for(i = 0; i < num_xt; i++)
+            result[i] = np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+        } else {
+          for(i = 0; i < num_xt; i++){
+            if(xw[i] == 0.0) continue;
+            result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+          }
+        }
+      } else {
+        for(int m = 0; m < xl->n; m++){
+          const int istart = xl->istart[m];
+          const int nlev = xl->nlev[m];
+          if(!bin_do_xw){
+            for(i = istart; i < istart+nlev; i++)
+              result[i] = np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+          } else {
+            for(i = istart; i < istart+nlev; i++){
+              if(xw[i] == 0.0) continue;
+              result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+            }
+          }
+        }
+      }
+    } else {
+      if(xl == NULL){
+        if(!bin_do_xw){
+          for(i = 0; i < num_xt; i++)
+            result[i] = np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+        } else {
+          for(i = 0; i < num_xt; i++){
+            if(xw[i] == 0.0) continue;
+            result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+          }
+        }
+      } else {
+        for(int m = 0; m < xl->n; m++){
+          const int istart = xl->istart[m];
+          const int nlev = xl->nlev[m];
+          if(!bin_do_xw){
+            for(i = istart; i < istart+nlev; i++)
+              result[i] = np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+          } else {
+            for(i = istart; i < istart+nlev; i++){
+              if(xw[i] == 0.0) continue;
+              result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+            }
+          }
+        }
+      }
+    }
+
+    free(lpow);
+    return;
+  }
 
 
 #define NP_OKERNELV_APPLY(fn)                                                      \
@@ -3090,6 +3233,16 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 
   const double db = (bandwidth_divide ? dband : unit_weight);
   double temp = DBL_MAX;
+  double *wbuf = NULL;
+  const int use_wpow = (kpow != 1);
+
+  if(use_wpow){
+    wbuf = (double *)malloc((size_t)num_weights*sizeof(double));
+    assert(wbuf != NULL);
+    for(k = 0; k < num_weights; k++){
+      wbuf[k] = (weights[k] == 0.0) ? 0.0 : ipow(weights[k]/db, kpow);
+    }
+  }
 
   if (do_leave_one_out) {
     temp = weights[which_k];
@@ -3111,7 +3264,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++)
               for (i = 0; i < max_B; i++)
-                result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+                result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*wbuf[k];
           }
         }
       } else { // symmetric
@@ -3129,7 +3282,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++){
               for (i = 0; i <= j; i++){
-                result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+                result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*wbuf[k];
               }
             }
           }
@@ -3156,7 +3309,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++)
               for (i = 0; i < max_B; i++)
-                result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+                result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*wbuf[k];
           }
         }
       } else { // symmetric
@@ -3181,7 +3334,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
             if(weights[k] == 0.0) continue;
             for (j = 0; j < max_A; j++){
               for (i = 0; i <= j; i++){
-                result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*ipow(weights[k]/db, kpow);
+                result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*wbuf[k];
               }
             }
           }
@@ -3219,7 +3372,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
               if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++)
                 for (i = 0; i < max_B; i++)
-                  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+                  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*wbuf[k];
             }
           }
         }
@@ -3247,7 +3400,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
               if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++){
                 for (i = 0; i <= j; i++){
-                  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+                  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*wbuf[k];
                 }
               }
             }
@@ -3284,7 +3437,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
               if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++)
                 for (i = 0; i < max_B; i++)
-                  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*ipow(weights[k]/db, kpow);
+                  result[k*kstride+j*max_B+i] += pmat_A[j][l*have_A]*pmat_B[i][l*have_B]*wbuf[k];
             }
           }
         }
@@ -3319,7 +3472,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
               if(weights[k] == 0.0) continue;
               for (j = 0; j < max_A; j++){
                 for (i = 0; i <= j; i++){
-                  result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*ipow(weights[k]/db, kpow);
+                  result[k*kstride+j*max_B+i] += pmat_A[j][k*have_A]*pmat_B[i][k*have_B]*wbuf[k];
                 }
               }
             }
@@ -3338,6 +3491,8 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 
   if (do_leave_one_out)
     weights[which_k] = temp;
+
+  safe_free(wbuf);
 }
 
 
@@ -3536,6 +3691,12 @@ double * const kw){
 
   double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, **m = NULL;
   double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
+  double *perm_kbuf = NULL;
+  int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
+  int *disc_prof_id = NULL, *disc_prof_rep = NULL, *disc_prof_mark = NULL;
+  int *disc_prof_list = NULL, *disc_active_idx = NULL;
+  uint64_t *disc_prof_hash = NULL;
+  double *disc_prof_val = NULL, *disc_ord_cl = NULL, *disc_ord_ch = NULL;
 
   double * const * const xtc = is_adaptive?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -3630,6 +3791,9 @@ double * const kw){
     assert(p_dband != NULL);
 
     p_ipow = (bandwidth_divide ? 1 : 0) + ((permutation_operator == OP_DERIVATIVE) ? 1 : ((permutation_operator == OP_INTEGRAL) ? -1 : 0));
+
+    perm_kbuf = (double *)malloc((size_t)num_xt*sizeof(double));
+    assert(perm_kbuf != NULL);
 
   }
 
@@ -3811,6 +3975,91 @@ double * const kw){
 #endif
   }
 
+  if((!doscoreocg) && (p_nvar == 0) &&
+     ((num_reg_unordered + num_reg_ordered) > 1) &&
+     (num_xt >= 128)){
+
+    disc_prof_id = (int *)malloc((size_t)num_xt*sizeof(int));
+    disc_prof_rep = (int *)malloc((size_t)num_xt*sizeof(int));
+    disc_prof_hash = (uint64_t *)malloc((size_t)num_xt*sizeof(uint64_t));
+
+    if(disc_prof_id != NULL && disc_prof_rep != NULL && disc_prof_hash != NULL){
+      int tsz = 1;
+      while(tsz < (2*num_xt)) tsz <<= 1;
+      int *htable = (int *)malloc((size_t)tsz*sizeof(int));
+
+      if(htable != NULL){
+        for(i = 0; i < tsz; i++) htable[i] = -1;
+
+        disc_nprof = 0;
+        for(i = 0; i < num_xt; i++){
+          const uint64_t h = np_hash_discrete_profile_idx(i, num_reg_unordered, num_reg_ordered, xtu, xto);
+          int pos = (int)(h & (uint64_t)(tsz - 1));
+          int pid = -1;
+
+          while(1){
+            const int hs = htable[pos];
+            if(hs < 0){
+              pid = disc_nprof++;
+              htable[pos] = pid;
+              disc_prof_rep[pid] = i;
+              disc_prof_hash[pid] = h;
+              break;
+            }
+
+            if(disc_prof_hash[hs] == h &&
+               np_same_discrete_profile_idx(i, disc_prof_rep[hs], num_reg_unordered, num_reg_ordered, xtu, xto)){
+              pid = hs;
+              break;
+            }
+
+            pos = (pos + 1) & (tsz - 1);
+          }
+
+          disc_prof_id[i] = pid;
+        }
+
+        free(htable);
+
+        if((disc_nprof > 0) && (4*disc_nprof <= 3*num_xt)){
+          disc_prof_mark = (int *)calloc((size_t)disc_nprof, sizeof(int));
+          disc_prof_list = (int *)malloc((size_t)disc_nprof*sizeof(int));
+          disc_active_idx = (int *)malloc((size_t)num_xt*sizeof(int));
+          disc_prof_val = (double *)malloc((size_t)disc_nprof*sizeof(double));
+
+          if(num_reg_ordered > 0){
+            disc_ord_cl = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+            disc_ord_ch = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+          }
+
+          if(disc_prof_mark != NULL && disc_prof_list != NULL &&
+             disc_active_idx != NULL && disc_prof_val != NULL &&
+             ((num_reg_ordered == 0) || (disc_ord_cl != NULL && disc_ord_ch != NULL))){
+            for(i = 0; i < num_reg_ordered; i++){
+              const int oi = i + num_reg_unordered;
+              disc_ord_cl[i] = (matrix_categorical_vals != NULL) ? matrix_categorical_vals[oi][0] : 0.0;
+              disc_ord_ch[i] = (matrix_categorical_vals != NULL) ? matrix_categorical_vals[oi][num_categories[oi] - 1] : 0.0;
+            }
+            use_disc_profile_cache = 1;
+          }
+        }
+      }
+    }
+
+    if(!use_disc_profile_cache){
+      if(disc_prof_mark != NULL){ free(disc_prof_mark); disc_prof_mark = NULL; }
+      if(disc_prof_list != NULL){ free(disc_prof_list); disc_prof_list = NULL; }
+      if(disc_active_idx != NULL){ free(disc_active_idx); disc_active_idx = NULL; }
+      if(disc_prof_val != NULL){ free(disc_prof_val); disc_prof_val = NULL; }
+      if(disc_ord_cl != NULL){ free(disc_ord_cl); disc_ord_cl = NULL; }
+      if(disc_ord_ch != NULL){ free(disc_ord_ch); disc_ord_ch = NULL; }
+      if(disc_prof_id != NULL){ free(disc_prof_id); disc_prof_id = NULL; }
+      if(disc_prof_rep != NULL){ free(disc_prof_rep); disc_prof_rep = NULL; }
+      if(disc_prof_hash != NULL){ free(disc_prof_hash); disc_prof_hash = NULL; }
+      disc_nprof = 0;
+    }
+  }
+
   const int leave_or_drop = leave_one_out || (drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN));
   if(drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN)) lod = drop_which_train;
 
@@ -3938,6 +4187,22 @@ double * const kw){
         }
       } 
 
+      /* No continuous support from the tree: all kernel products are zero. */
+      if(xl.n == 0){
+        int any_p_support = 0;
+        for(ii = 0; ii < p_nvar; ii++){
+          any_p_support |= (p_pxl[ii].n > 0);
+        }
+
+        if(!any_p_support){
+          if(kw != NULL){
+            for(i = 0; i < num_xt; i++)
+              kw[j*num_xt + i] = 0.0;
+          }
+          continue;
+        }
+      }
+
     }
     /* continuous first */
 
@@ -3948,7 +4213,7 @@ double * const kw){
         if(p_nvar == 0){
           np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score);
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf);
         }
       }
       else
@@ -3979,43 +4244,132 @@ double * const kw){
       p_dband[ii] = dband;
     }
 
-    /* unordered second */
-
-    for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
-      if(doscoreocg){
-        np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
-                      lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0));
-      } else {
-        np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
-                    lambda[i], num_categories[i], tprod, pxl);
+    if(use_disc_profile_cache){
+      int nactive = 0, nplist = 0;
+      if(num_reg_continuous == 0){
+        for(i = 0; i < num_xt; i++)
+          tprod[i] = 1.0;
       }
-      k += bpso[l];
-    }
 
-    /* ordered third */
-    for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
-      if(!doscoreocg){
-        if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
-          np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
-                      xo[i][j], lambda[num_reg_unordered+i], 
-                      (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
-                      (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                      tprod, pxl, swap_xxt);      
-        } else {
-          np_convol_okernelv(KERNEL_ordered_reg[i], xto[i], num_xt, l,
-                             xo[i][j], lambda[num_reg_unordered+i], 
-                             num_categories[i+num_reg_unordered],
-                             matrix_categorical_vals[i+num_reg_unordered],
-                             tprod, swap_xxt);
+      if(pxl == NULL){
+        for(i = 0; i < num_xt; i++){
+          if(tprod[i] == 0.0) continue;
+          disc_active_idx[nactive++] = i;
         }
       } else {
-        np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel[i], k, p_nvar, xto[i], num_xt, l,
-                      xo[i][j], lambda[num_reg_unordered+i], 
-                      (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
-                      (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
-                      tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0), matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]));
+        for(ii = 0; ii < pxl->n; ii++){
+          const int istart = pxl->istart[ii];
+          const int iend = istart + pxl->nlev[ii];
+          for(i = istart; i < iend; i++){
+            if(tprod[i] == 0.0) continue;
+            disc_active_idx[nactive++] = i;
+          }
+        }
       }
-      k += bpso[l];
+
+      if(disc_mark_token == INT_MAX){
+        memset(disc_prof_mark, 0, (size_t)disc_nprof*sizeof(int));
+        disc_mark_token = 1;
+      } else {
+        disc_mark_token++;
+      }
+
+      for(i = 0; i < nactive; i++){
+        const int pid = disc_prof_id[disc_active_idx[i]];
+        if(disc_prof_mark[pid] == disc_mark_token) continue;
+        disc_prof_mark[pid] = disc_mark_token;
+        disc_prof_list[nplist++] = pid;
+      }
+
+      double (* const ukf[])(int, double, int) = {
+        np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+        np_score_uaa, np_score_unli_racine
+      };
+      double (* const okf[])(double, double, double, double, double) = {
+        np_owang_van_ryzin, np_oli_racine, np_onli_racine,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+      };
+      const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
+      const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
+
+      for(i = 0; i < nplist; i++){
+        const int pid = disc_prof_list[i];
+        const int ridx = disc_prof_rep[pid];
+        double dprod = 1.0;
+
+        for(kk = 0; kk < num_reg_unordered; kk++){
+          const int ku = (KERNEL_unordered_reg_np[kk] >= 0 && KERNEL_unordered_reg_np[kk] < nuk)
+            ? KERNEL_unordered_reg_np[kk] : 0;
+          dprod *= ukf[ku]((xtu[kk][ridx] == xu[kk][j]), lambda[kk], num_categories[kk]);
+          if(dprod == 0.0) break;
+        }
+
+        if(dprod != 0.0){
+          for(kk = 0; kk < num_reg_ordered; kk++){
+            const int ko = (KERNEL_ordered_reg_np[kk] >= 0 && KERNEL_ordered_reg_np[kk] < nok)
+              ? KERNEL_ordered_reg_np[kk] : 0;
+            const double c1 = swap_xxt ? xo[kk][j] : xto[kk][ridx];
+            const double c2 = swap_xxt ? xto[kk][ridx] : xo[kk][j];
+            dprod *= okf[ko](c1, c2, lambda[num_reg_unordered + kk], disc_ord_cl[kk], disc_ord_ch[kk]);
+            if(dprod == 0.0) break;
+          }
+        }
+
+        disc_prof_val[pid] = dprod;
+      }
+
+      for(i = 0; i < nactive; i++){
+        const int idx_i = disc_active_idx[i];
+        tprod[idx_i] *= disc_prof_val[disc_prof_id[idx_i]];
+      }
+
+      for(ii = 0; ii < (num_reg_unordered + num_reg_ordered); ii++){
+        k += bpso[l + ii];
+      }
+      l += (num_reg_unordered + num_reg_ordered);
+      ip += doscoreocg*(num_reg_unordered + num_reg_ordered);
+    } else {
+      /* unordered second */
+      for(i=0; i < num_reg_unordered; i++, l++, ip += doscoreocg){
+        if(doscoreocg){
+          np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
+                        lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0), perm_kbuf);
+        } else {
+          np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
+                      lambda[i], num_categories[i], tprod, pxl);
+        }
+        k += bpso[l];
+      }
+
+      /* ordered third */
+      for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
+        if(!doscoreocg){
+          if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
+            np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
+                        xo[i][j], lambda[num_reg_unordered+i], 
+                        (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
+                        (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
+                        tprod, pxl, swap_xxt);      
+          } else {
+            np_convol_okernelv(KERNEL_ordered_reg[i], xto[i], num_xt, l,
+                               xo[i][j], lambda[num_reg_unordered+i], 
+                               num_categories[i+num_reg_unordered],
+                               matrix_categorical_vals[i+num_reg_unordered],
+                               tprod, swap_xxt);
+          }
+        } else {
+          np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel[i], k, p_nvar, xto[i], num_xt, l,
+                        xo[i][j], lambda[num_reg_unordered+i], 
+                        (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
+                        (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
+                        tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0),
+                        matrix_ordered_indices[i], (swap_xxt ? 0 : matrix_ordered_indices[i][j]),
+                        perm_kbuf);
+        }
+        k += bpso[l];
+      }
     }
 
     /* expand matrix outer product, multiply by kernel weights, etc, do sum */
@@ -4140,6 +4494,7 @@ double * const kw){
 
   if(p_nvar > 0){
     free(tprod_mp);
+    free(perm_kbuf);
 
     if(do_perm)
       free(permutation_kernel);
@@ -4163,6 +4518,16 @@ double * const kw){
 
     free(p_dband);
   }
+
+  if(disc_prof_id != NULL) free(disc_prof_id);
+  if(disc_prof_rep != NULL) free(disc_prof_rep);
+  if(disc_prof_hash != NULL) free(disc_prof_hash);
+  if(disc_prof_mark != NULL) free(disc_prof_mark);
+  if(disc_prof_list != NULL) free(disc_prof_list);
+  if(disc_active_idx != NULL) free(disc_active_idx);
+  if(disc_prof_val != NULL) free(disc_prof_val);
+  if(disc_ord_cl != NULL) free(disc_ord_cl);
+  if(disc_ord_ch != NULL) free(disc_ord_ch);
 
   if(no_bpso)
     free(bpso);
@@ -7332,6 +7697,8 @@ double *SIGN){
     operator[i] = OP_NORMAL;
 
 #ifdef MPI2
+  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
+
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   int num_obs_eval_alloc = stride_e*iNum_Processors;
 
@@ -7728,6 +8095,7 @@ double *SIGN){
       }
     }
 
+    int Sentinel = 1;
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
 
@@ -7818,7 +8186,6 @@ double *SIGN){
       
 #else
 
-      int Sentinel = 1;
 
       for(l = 0; l < num_reg_continuous; l++){
           
