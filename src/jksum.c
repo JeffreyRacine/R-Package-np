@@ -786,6 +786,51 @@ static inline double np_cont_largeh_utol(const int kernel, const double rel_tol)
   }
 }
 
+static inline double np_cont_largeh_rel_tol(void){
+  static int init = 0;
+  static double rt = 1e-3;
+  if(!init){
+    const char *rt_env = getenv("NP_LARGEH_REL_TOL");
+    if(rt_env != NULL && rt_env[0] != '\0'){
+      const double v = atof(rt_env);
+      if(isfinite(v) && v > 0.0 && v < 0.1)
+        rt = v;
+    }
+    init = 1;
+  }
+  return rt;
+}
+
+static inline int np_cont_largeh_is_active(const int kernel,
+                                           const double * const xt,
+                                           const int num_xt,
+                                           const double x,
+                                           const double h,
+                                           const XL * const xl){
+  if((h == 0.0) || !isfinite(h) || !np_cont_largeh_kernel_supported(kernel))
+    return 0;
+
+  const double utol = np_cont_largeh_utol(kernel, np_cont_largeh_rel_tol());
+  if(!(utol > 0.0) || !isfinite(utol))
+    return 0;
+
+  const double maxabs = utol * fabs(h);
+
+  if(xl == NULL){
+    for(int i = 0; i < num_xt; i++)
+      if(fabs(x - xt[i]) > maxabs) return 0;
+  } else {
+    for(int m = 0; m < xl->n; m++){
+      const int istart = xl->istart[m];
+      const int nlev = xl->nlev[m];
+      for(int i = istart; i < istart+nlev; i++)
+        if(fabs(x - xt[i]) > maxabs) return 0;
+    }
+  }
+
+  return 1;
+}
+
 static inline void np_ckernelv_mul_const(const double c,
                                          const int num_xt,
                                          const int do_xw,
@@ -2460,6 +2505,49 @@ void np_p_ckernelv(const int KERNEL,
     assert(kbuf != NULL);
   }
 
+  /* Large-h shortcut for ordinary kernels in both base and permuted path. */
+  const int use_largeh = np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl);
+  const int use_largeh_perm = use_largeh &&
+    (!do_score) &&
+    do_perm &&
+    np_cont_largeh_kernel_supported(P_KERNEL) &&
+    np_cont_largeh_is_active(P_KERNEL, xt, num_xt, x, h, p_xl);
+
+  if(use_largeh){
+    const double kn = np_cont_largeh_k0(KERNEL);
+    np_ckernelv_mul_const(kn, num_xt, do_xw, result, xl);
+
+    if(do_perm){
+      if(use_largeh_perm){
+        const double pkn = np_cont_largeh_k0(P_KERNEL);
+        np_ckernelv_mul_const(pkn, num_xt, do_xw, p_result + P_IDX*num_xt, p_xl);
+      } else {
+        if(p_xl == NULL){
+          for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+          }
+        } else {
+          for (int m = 0; m < p_xl->n; m++){
+            const int istart = p_xl->istart[m];
+            const int nlev = p_xl->nlev[m];
+            for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+            }
+          }
+        }
+      }
+    }
+
+    for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
+      if((l == P_IDX) && do_perm) continue;
+      np_ckernelv_mul_const(kn, num_xt, bin_do_xw, p_result + l*num_xt, xl);
+    }
+
+    if(own_kbuf)
+      free(kbuf);
+    return;
+  }
+
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       const double kn = k[KERNEL]((x-xt[i])*sgn/h);
@@ -2537,6 +2625,11 @@ void np_ckernelv(const int KERNEL,
   double unit_weight = 1.0;
   const double sgn = swap_xxt ? -1.0 : 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
+
+  if(np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl)){
+    np_ckernelv_mul_const(np_cont_largeh_k0(KERNEL), num_xt, do_xw, result, xl);
+    return;
+  }
 
   /*
     Hot path: avoid indirect function-pointer calls and avoid branching on
