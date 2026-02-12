@@ -148,3 +148,45 @@ Implemented serial optimizations in `src/jksum.c` focused on categorical/ordered
   - non-tree: `max |Δ bw| = 2.759011e-10`, `max |Δ fitted| = 4.730198e-10`
   - tree: `max |Δ bw| = 1.603712e-04`, `max |Δ fitted| = 1.500707e-05`
 - Synthetic checks: only very small floating-point-level differences consistent with operation reordering.
+
+## 2026-02-12 (Large-`h` Continuous-Kernel Shortcut)
+
+### Summary
+Added a conservative large-bandwidth shortcut in `src/jksum.c` for ordinary continuous kernels (`KERNEL` codes `0..9`):
+- if `|h| >= h_min` for a continuous regressor, use `K(0)` directly for that regressor instead of per-observation kernel evaluation;
+- `h_min` is derived from data range and a conservative relative-tolerance bound near `u=(x-x_i)/h=0`;
+- applies in both `np.tree=FALSE` and `np.tree=TRUE` paths in `kernel_weighted_sum_np`;
+- default relative tolerance is `1e-3`, configurable via `NP_LARGEH_REL_TOL`.
+
+### Fast Validation Setup
+- DGP: `x1 ~ U(0,1)`, `y ~ N(0,1)` (`x1` irrelevant).
+- Models: `npreg(y~x1)` and `npcdens(y~x1)`.
+- Settings: Gaussian kernels, `nmulti=1`, `ftol=1e-02`, `tol=1e-01`, `times=10`, `n=250,500`.
+- Files:
+  - timing compare: `/tmp/np_largeh_prepost_compare.csv`
+  - bandwidth diagnostics (pre): `/tmp/np_largeh_pre_bw_diag.csv`
+  - bandwidth diagnostics (post): `/tmp/np_largeh_post_bw_diag.csv`
+  - joined timing+bandwidth table: `/tmp/np_largeh_timing_bw_join.csv`
+
+### Runtime (pre -> post)
+| tree | function | n | mean % change | median % change |
+|---|---|---:|---:|---:|
+| FALSE | npreg | 250 | -20.68% | -20.43% |
+| FALSE | npreg | 500 | -0.04% | -0.04% |
+| TRUE | npreg | 250 | +0.22% | +0.22% |
+| TRUE | npreg | 500 | -47.09% | -47.13% |
+| FALSE | npcdens | 250 | -38.77% | -39.02% |
+| FALSE | npcdens | 500 | -34.89% | -35.06% |
+| TRUE | npcdens | 250 | -0.96% | -1.53% |
+| TRUE | npcdens | 500 | -32.91% | -32.99% |
+
+### Bandwidth Evidence (x-side bandwidth vs x-range)
+Selected rows from `/tmp/np_largeh_timing_bw_join.csv`:
+- `npreg, tree=FALSE, n=500`: `median(h/range) ≈ 0.625` (small) -> ~0% speed change.
+- `npreg, tree=TRUE, n=500`: `median(h/range)` very large (`~7.3e5` pre, `~1.08e2` post) -> large speedup (~47%).
+- `npreg, tree=TRUE, n=250`: `median(h/range) ≈ 0.73` (small) -> near-neutral timing.
+- `npcdens` cases with large improvements show larger x-bandwidths in many runs and strong reductions in continuous-kernel workload.
+
+### Interpretation
+- The shortcut behaves as intended: gains are strongest in regimes where CV chooses large continuous bandwidths relative to predictor range.
+- Cases with small/moderate `h/range` show little or no speedup, which is expected for this targeted optimization.

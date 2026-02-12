@@ -743,6 +743,88 @@ static inline int np_same_discrete_profile_idx(const int ia,
   return 1;
 }
 
+/*
+  Large-bandwidth shortcut for ordinary continuous kernels:
+  if max_i |(x - x_i)/h| <= u_tol, replace K((x-x_i)/h) by K(0) to avoid
+  repeated kernel evaluations. This is intentionally conservative and only
+  enabled for ordinary continuous kernels (0..9).
+*/
+static inline int np_cont_largeh_kernel_supported(const int kernel){
+  return (kernel >= 0 && kernel <= 9);
+}
+
+static inline double np_cont_largeh_k0(const int kernel){
+  switch(kernel){
+    case 0: return np_gauss2(0.0);
+    case 1: return np_gauss4(0.0);
+    case 2: return np_gauss6(0.0);
+    case 3: return np_gauss8(0.0);
+    case 4: return np_epan2(0.0);
+    case 5: return np_epan4(0.0);
+    case 6: return np_epan6(0.0);
+    case 7: return np_epan8(0.0);
+    case 8: return np_rect(0.0);
+    case 9: return np_tgauss2(0.0);
+    default: return 0.0;
+  }
+}
+
+static inline double np_cont_largeh_utol(const int kernel, const double rel_tol){
+  const double rt = (rel_tol <= 0.0) ? 1e-3 : rel_tol;
+  switch(kernel){
+    case 0: case 1: case 2: case 3: case 9:
+      /* For Gaussian-like kernels, relative deviation near 0 is ~ u^2/2. */
+      return sqrt(-2.0*log(1.0-rt));
+    case 4: case 5: case 6: case 7:
+      /* For Epanechnikov family, relative deviation near 0 is ~ u^2. */
+      return sqrt(rt);
+    case 8:
+      /* Rectangular kernel is exactly constant for |u| < 1. */
+      return 1.0 - 32.0*DBL_EPSILON;
+    default:
+      return 0.0;
+  }
+}
+
+static inline void np_ckernelv_mul_const(const double c,
+                                         const int num_xt,
+                                         const int do_xw,
+                                         double * const result,
+                                         const XL * const xl){
+  const int bin_do_xw = do_xw > 0;
+  int i;
+
+  if(xl == NULL){
+    if(!bin_do_xw){
+      for(i = 0; i < num_xt; i++)
+        result[i] = c;
+    } else {
+      for(i = 0; i < num_xt; i++){
+        if(result[i] == 0.0) continue;
+        result[i] *= c;
+      }
+    }
+  } else {
+    if(!bin_do_xw){
+      for(int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
+        for(i = istart; i < istart+nlev; i++)
+          result[i] = c;
+      }
+    } else {
+      for(int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
+        for(i = istart; i < istart+nlev; i++){
+          if(result[i] == 0.0) continue;
+          result[i] *= c;
+        }
+      }
+    }
+  }
+}
+
 // not so simple truncated gaussian convolution kernels
 //   In general for our truncated Gaussian kernel the convolution kernel will be a polynomial of the form:
 // z < 0: 
@@ -3697,6 +3779,9 @@ double * const kw){
   int *disc_prof_list = NULL, *disc_active_idx = NULL;
   uint64_t *disc_prof_hash = NULL;
   double *disc_prof_val = NULL, *disc_ord_cl = NULL, *disc_ord_ch = NULL;
+  int *cont_largeh_ok = NULL;
+  double *cont_largeh_hmin = NULL, *cont_largeh_k0 = NULL;
+  double cont_largeh_rel_tol = 1e-3;
 
   double * const * const xtc = is_adaptive?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -3858,6 +3943,61 @@ double * const kw){
       return(KWSNP_ERR_BADBW);
     }
 
+  }
+
+  if(num_reg_continuous > 0){
+    const char *rt_env = getenv("NP_LARGEH_REL_TOL");
+    if(rt_env != NULL && rt_env[0] != '\0'){
+      const double v = atof(rt_env);
+      if(isfinite(v) && v > 0.0 && v < 0.1){
+        cont_largeh_rel_tol = v;
+      }
+    }
+
+    cont_largeh_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+    cont_largeh_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+    cont_largeh_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+
+    if(cont_largeh_ok != NULL && cont_largeh_hmin != NULL && cont_largeh_k0 != NULL){
+      for(i = 0; i < num_reg_continuous; i++){
+        const int kern = KERNEL_reg_np[i];
+        const int ok = np_cont_largeh_kernel_supported(kern);
+        double xmin = DBL_MAX, xmax = -DBL_MAX;
+
+        cont_largeh_ok[i] = 0;
+        cont_largeh_hmin[i] = DBL_MAX;
+        cont_largeh_k0[i] = 0.0;
+
+        if(!ok) continue;
+
+        for(ii = 0; ii < num_obs_train; ii++){
+          const double v = matrix_X_continuous_train[i][ii];
+          if(!isfinite(v)) continue;
+          xmin = MIN(xmin, v);
+          xmax = MAX(xmax, v);
+        }
+
+        for(ii = 0; ii < num_obs_eval; ii++){
+          const double v = matrix_X_continuous_eval[i][ii];
+          if(!isfinite(v)) continue;
+          xmin = MIN(xmin, v);
+          xmax = MAX(xmax, v);
+        }
+
+        if(xmax >= xmin){
+          const double utol = np_cont_largeh_utol(kern, cont_largeh_rel_tol);
+          if(utol > 0.0 && isfinite(utol)){
+            cont_largeh_ok[i] = 1;
+            cont_largeh_hmin[i] = (xmax - xmin)/utol;
+            cont_largeh_k0[i] = np_cont_largeh_k0(kern);
+          }
+        }
+      }
+    } else {
+      if(cont_largeh_ok != NULL){ free(cont_largeh_ok); cont_largeh_ok = NULL; }
+      if(cont_largeh_hmin != NULL){ free(cont_largeh_hmin); cont_largeh_hmin = NULL; }
+      if(cont_largeh_k0 != NULL){ free(cont_largeh_k0); cont_largeh_k0 = NULL; }
+    }
   }
   
   if (leave_one_out && drop_one_train) {
@@ -4211,7 +4351,16 @@ double * const kw){
     for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
+          const int use_largeh = (cont_largeh_ok != NULL) &&
+            cont_largeh_ok[i] &&
+            isfinite(m[i][jbw]) &&
+            (fabs(m[i][jbw]) >= cont_largeh_hmin[i]);
+
+          if(use_largeh){
+            np_ckernelv_mul_const(cont_largeh_k0[i], num_xt, l, tprod, pxl);
+          } else {
+            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
+          }
         } else {
           np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf);
         }
@@ -4503,6 +4652,9 @@ double * const kw){
   if(disc_prof_val != NULL) free(disc_prof_val);
   if(disc_ord_cl != NULL) free(disc_ord_cl);
   if(disc_ord_ch != NULL) free(disc_ord_ch);
+  if(cont_largeh_ok != NULL) free(cont_largeh_ok);
+  if(cont_largeh_hmin != NULL) free(cont_largeh_hmin);
+  if(cont_largeh_k0 != NULL) free(cont_largeh_k0);
 
   if(no_bpso)
     free(bpso);
