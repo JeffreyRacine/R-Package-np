@@ -1,3 +1,20 @@
+Changes from Version 0.60-21 to 0.60-22 [13-Feb-2026]
+
+* Added user-configurable computational tolerances for kernel shortcuts via
+  global options:
+  - options(np.largeh.rel.tol=...) for continuous large-h K(0) shortcut logic
+  - options(np.disc.upper.rel.tol=...) for discrete near-upper-bound
+    (lambda) shortcut logic
+  with fallback support for legacy environment variables.
+
+* Extended large-h and discrete near-constant shortcut handling in jksum.c
+  across core continuous/unordered kernel evaluator paths, improving runtime
+  behavior for bandwidth-search-heavy workloads while preserving numerical
+  stability.
+
+* Added new documentation page np.options.Rd and cross-references from
+  np-package and np.plot man pages; set default option values at package load.
+
 Changes from Version 0.60-20 to 0.60-21 [11-Feb-2026]
 
 * Optimized core kernel-sum code paths in C (including ordered/unordered
