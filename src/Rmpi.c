@@ -187,14 +187,17 @@ SEXP mpi_info_set(SEXP sexp_info, SEXP sexp_key, SEXP sexp_value){
 
 SEXP mpi_info_get(SEXP sexp_info, SEXP sexp_key, SEXP sexp_valuelen){
 	int flag;
-        char *value;
+	int valuelen = INTEGER(sexp_valuelen)[0];
+	char *value;
 	SEXP sexp_value;
 
+	if (valuelen < 0)
+		error("mpi_info_get: valuelen must be non-negative");
     	PROTECT (sexp_value  = allocVector (STRSXP, 1));
- 	value = (char *)Calloc(INTEGER(sexp_valuelen)[0], char);  
+ 	value = (char *)Calloc((size_t)valuelen + 1, char);
 	mpi_errhandler(MPI_Info_get(info[INTEGER(sexp_info)[0]], 
-		CHAR2( STRING_ELT (sexp_key,0)), 
-		INTEGER(sexp_valuelen)[0], value, &flag));
+			CHAR2( STRING_ELT (sexp_key,0)), 
+			valuelen, value, &flag));
         SET_STRING_ELT(sexp_value, 0, mkChar(value));
         UNPROTECT(1); 
 	Free(value);
@@ -207,6 +210,8 @@ SEXP mpi_info_free(SEXP sexp_info){
 
 SEXP mpi_realloc_comm(SEXP sexp_newncomm){
 	int i, newcomm=INTEGER(sexp_newncomm)[0];
+	if (newcomm <= 0)
+		error("mpi_realloc_comm: new size must be positive");
 	if (newcomm > COMM_MAXSIZE){
 		comm=(MPI_Comm *)Realloc(comm, newcomm, MPI_Comm); 	
 		for (i=COMM_MAXSIZE; i < newcomm; comm[i++]=MPI_COMM_NULL);
@@ -221,6 +226,8 @@ SEXP mpi_comm_maxsize(void){
 
 SEXP mpi_realloc_status(SEXP sexp_newnstatus){
 	int newsize=INTEGER(sexp_newnstatus)[0];
+	if (newsize <= 0)
+		error("mpi_realloc_status: new size must be positive");
 	if (newsize > STATUS_MAXSIZE){
 		status=(MPI_Status *)Realloc(status, newsize, MPI_Status); 
 		STATUS_MAXSIZE=newsize;
@@ -234,6 +241,8 @@ SEXP mpi_status_maxsize(void){
 
 SEXP mpi_realloc_request(SEXP sexp_newnrequest){
 	int i, newsize=INTEGER(sexp_newnrequest)[0];
+	if (newsize <= 0)
+		error("mpi_realloc_request: new size must be positive");
 	if (newsize > REQUEST_MAXSIZE){
 		request=(MPI_Request *)Realloc(request, newsize , MPI_Request); 
 		for (i=REQUEST_MAXSIZE; i< newsize; request[i++]=MPI_REQUEST_NULL);	
@@ -247,7 +256,10 @@ SEXP mpi_request_maxsize(void){
 }
 
 SEXP mpi_realloc_datatype(SEXP sexp_newndatatype){
-	datatype=(MPI_Datatype *)Realloc(datatype, INTEGER(sexp_newndatatype)[0], MPI_Datatype); 
+	int newsize = INTEGER(sexp_newndatatype)[0];
+	if (newsize <= 0)
+		error("mpi_realloc_datatype: new size must be positive");
+	datatype=(MPI_Datatype *)Realloc(datatype, newsize, MPI_Datatype); 
 	return AsInt(1);
 }
 
@@ -277,7 +289,7 @@ SEXP mpi_gather(SEXP sexp_sdata,
 		rlen=LENGTH(STRING_ELT(sexp_rdata,0));
 
         	PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-        	rdata = (char *)Calloc(rlen, char);
+        	rdata = (char *)Calloc((size_t)rlen + 1, char);
                 MPI_Gather(CHAR2 (STRING_ELT ((sexp_sdata),0)), len, MPI_CHAR,
                         rdata, len, MPI_CHAR, root, comm[commn]);
         	SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
@@ -340,7 +352,7 @@ SEXP mpi_gatherv(SEXP sexp_sdata,
 		rlen=LENGTH(STRING_ELT(sexp_rdata,0));
         
                 PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc(rlen, char);
+                rdata = (char *)Calloc((size_t)rlen + 1, char);
                 MPI_Gatherv(CHAR2 (STRING_ELT ((sexp_sdata),0)),len,MPI_CHAR,
 		     rdata, INTEGER(sexp_recvcounts),
 		     displs, MPI_CHAR, root, comm[commn]);
@@ -396,7 +408,7 @@ SEXP mpi_scatter(SEXP sexp_sdata,
                 rlen=LENGTH(STRING_ELT(sexp_rdata,0));
 
                 PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc(rlen, char);
+                rdata = (char *)Calloc((size_t)rlen + 1, char);
 		MPI_Scatter(CHAR2(STRING_ELT ((sexp_sdata),0)), len, MPI_CHAR,
                        rdata, len, MPI_CHAR, root, comm[commn]);
                 SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
@@ -460,7 +472,7 @@ SEXP mpi_scatterv(SEXP sexp_sdata,
 
                 PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
                 // rdata = (char *)R_alloc(rlen, sizeof(char));
-                rdata = (char *)Calloc(rlen, char);
+                rdata = (char *)Calloc((size_t)rlen + 1, char);
                 MPI_Scatterv(CHAR2 (STRING_ELT ((sexp_sdata),0)), INTEGER(sexp_sendcounts),displs, 
 			MPI_CHAR,rdata, len, MPI_CHAR, root, comm[commn]);
                 SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
@@ -514,7 +526,7 @@ SEXP mpi_allgather(SEXP sexp_sdata,
                 rlen=LENGTH(STRING_ELT(sexp_rdata,0));
 
                 PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc(rlen, char);
+                rdata = (char *)Calloc((size_t)rlen + 1, char);
                 MPI_Allgather(CHAR2 (STRING_ELT ((sexp_sdata),0)),len,
 			MPI_CHAR,rdata, len, MPI_CHAR, comm[commn]);
                 SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
@@ -573,7 +585,7 @@ SEXP mpi_allgatherv(SEXP sexp_sdata,
                 rlen=LENGTH(STRING_ELT(sexp_rdata,0));
 
                 PROTECT (sexp_rdata2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc(rlen, char);
+                rdata = (char *)Calloc((size_t)rlen + 1, char);
                 MPI_Allgatherv(CHAR2 (STRING_ELT ((sexp_sdata),0)),len, MPI_CHAR, rdata,
 		      INTEGER(sexp_recvcounts), displs, MPI_CHAR, comm[commn]);
                 SET_STRING_ELT(sexp_rdata2, 0, mkChar(rdata));
@@ -629,7 +641,7 @@ SEXP mpi_bcast(SEXP sexp_data,
 				MPI_CHAR, rank, comm[commn]);
 		else {
                 	PROTECT (sexp_data2  = allocVector (STRSXP, 1));
-	               	rdata = (char *)Calloc(slen, char);
+	               	rdata = (char *)Calloc((size_t)slen + 1, char);
                        	MPI_Bcast(rdata, slen, MPI_CHAR, rank, comm[commn]);
 			SET_STRING_ELT(sexp_data2, 0, mkChar(rdata));
 			UNPROTECT(1);
@@ -640,6 +652,8 @@ SEXP mpi_bcast(SEXP sexp_data,
                 errcode=MPI_Bcast(RAW(sexp_data), len, MPI_BYTE, rank, comm[commn]);
                 break;
 	case 5:
+		if (buffunit <= 0)
+			error("mpi_bcast: buffunit must be positive for type=5");
 		MPI_Type_contiguous(buffunit, MPI_DOUBLE, xdouble);
 		MPI_Type_commit(xdouble);
 		if ((xlen % buffunit) > 0) len=1+(xlen/buffunit); else len=xlen/buffunit;
@@ -723,7 +737,7 @@ SEXP mpi_recv(SEXP sexp_data,
 	case 3:
 		slen=LENGTH(STRING_ELT(sexp_data,0));
                 PROTECT (sexp_data2  = allocVector (STRSXP, 1));
-                rdata = (char *)Calloc(slen, char);
+                rdata = (char *)Calloc((size_t)slen + 1, char);
 		MPI_Recv(rdata, slen,MPI_CHAR,source,tag, comm[commn],&status[statusn]);
                 SET_STRING_ELT(sexp_data2, 0, mkChar(rdata));
                 UNPROTECT(1);
@@ -1139,7 +1153,7 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                 case 3:
                     rlen=LENGTH(STRING_ELT(sexp_recvdata,0)); 
                     PROTECT (sexp_recvdata2  = allocVector (STRSXP, 1));
-                    rdata = (char *)Calloc(rlen, char);
+                    rdata = (char *)Calloc((size_t)rlen + 1, char);
                     MPI_Sendrecv(INTEGER(sexp_senddata),sendcount, MPI_INT, dest, sendtag, 
 			rdata, rlen, MPI_CHAR, source, recvtag, comm[commn],  &status[statusn]);
                     SET_STRING_ELT(sexp_recvdata2, 0, mkChar(rdata));
@@ -1171,7 +1185,7 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                 case 3:
                     rlen=LENGTH(STRING_ELT(sexp_recvdata,0)); 
                     PROTECT (sexp_recvdata2  = allocVector (STRSXP, 1));
-                    rdata = (char *)Calloc(rlen, char);
+                    rdata = (char *)Calloc((size_t)rlen + 1, char);
                     MPI_Sendrecv(REAL(sexp_senddata),sendcount, MPI_DOUBLE, dest, sendtag, 
 			rdata, rlen, MPI_CHAR, source, recvtag, comm[commn],  &status[statusn]);
                     SET_STRING_ELT(sexp_recvdata2, 0, mkChar(rdata));
@@ -1206,7 +1220,7 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                 case 3:
                     rlen=LENGTH(STRING_ELT(sexp_recvdata,0));
                     PROTECT (sexp_recvdata2  = allocVector (STRSXP, 1));
-                    rdata = (char *)Calloc(rlen, char);
+                    rdata = (char *)Calloc((size_t)rlen + 1, char);
 
 		    MPI_Sendrecv(CHAR2(STRING_ELT(sexp_senddata,0)),slen, MPI_CHAR, dest, sendtag, 
 			rdata, rlen, MPI_CHAR, source, recvtag, comm[commn], &status[statusn]);
@@ -1240,7 +1254,7 @@ SEXP mpi_sendrecv(SEXP sexp_senddata,
                 case 3:
                     rlen=LENGTH(STRING_ELT(sexp_recvdata,0));
                     PROTECT (sexp_recvdata2  = allocVector (STRSXP, 1));
-                    rdata = (char *)Calloc(rlen, char);
+                    rdata = (char *)Calloc((size_t)rlen + 1, char);
                     MPI_Sendrecv(RAW(sexp_senddata),sendcount, MPI_BYTE, dest, sendtag, 
 			rdata, rlen, MPI_CHAR, source, recvtag, comm[commn],  &status[statusn]);
                     SET_STRING_ELT(sexp_recvdata2, 0, mkChar(rdata));
@@ -1293,7 +1307,7 @@ SEXP mpi_sendrecv_replace(SEXP sexp_data,
         case 3:
                 slen=LENGTH(STRING_ELT(sexp_data,0));
 		PROTECT (sexp_data2  = allocVector (STRSXP, 1));
-		srdata= (char *)Calloc(slen, char);
+		srdata= (char *)Calloc((size_t)slen + 1, char);
 		strcpy(srdata, CHAR(STRING_ELT(sexp_data,0)));
                 MPI_Sendrecv_replace(srdata, slen,MPI_CHAR, dest, sendtag, source, recvtag, 
 				comm[commn], &status[statusn]); 

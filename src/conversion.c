@@ -36,8 +36,11 @@ SEXP mkstr(SEXP sexp_charlen){
 	int i, charlen = INTEGER(sexp_charlen)[0];
 	char *tmp, spchar[1]=" ";
 	SEXP new_strvec;
-	tmp = (char *) R_alloc (charlen, sizeof(char));
+	if (charlen < 0)
+		error("mkstr: charlen must be non-negative");
+	tmp = (char *) R_alloc ((size_t)charlen + 1, sizeof(char));
 	for (i=0; i < charlen; tmp[i++]=spchar[0]);	
+	tmp[charlen] = '\0';
 	PROTECT (new_strvec = allocVector (STRSXP, 1));
 	SET_STRING_ELT(new_strvec, 0, COPY_TO_USER_STRING(tmp));	
 	UNPROTECT(1);
