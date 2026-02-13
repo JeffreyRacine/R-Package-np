@@ -32,6 +32,7 @@
  */
 
 #include "gsl_bspline.h"
+#include <stdint.h>
 
 /*
  * This module contains routines related to calculating B-splines.
@@ -1231,7 +1232,11 @@ gsl_matrix *gsl_matrix_alloc(const size_t n1, const size_t n2)
                         GSL_ENOMEM);
     }
 
-  /* FIXME: n1*n2 could overflow for large dimensions */
+  if (n2 > 0 && n1 > SIZE_MAX / n2)
+    {
+      free(m);
+      GSL_ERROR("matrix dimension overflow", GSL_EINVAL);
+    }
 
   block = gsl_block_alloc (n1 * n2) ;
 
@@ -1342,5 +1347,4 @@ void gsl_matrix_set(gsl_matrix * m, const size_t i, const size_t j, const double
 #endif
   m->data[i * m->tda + j] = x ;
 }
-
 
