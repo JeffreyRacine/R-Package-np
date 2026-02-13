@@ -773,6 +773,12 @@ static inline double np_get_option_double(const char * const name, const double 
   return fallback;
 }
 
+static int np_runtime_tol_cache_ready = 0;
+static double np_largeh_rel_tol_cache = 1e-3;
+static double np_disc_rel_tol_cache = 1e-2;
+
+static inline void np_refresh_runtime_tolerances(void);
+
 static inline double np_cont_largeh_k0(const int kernel){
   switch(kernel){
     case 0: return np_gauss2(0.0);
@@ -807,20 +813,9 @@ static inline double np_cont_largeh_utol(const int kernel, const double rel_tol)
 }
 
 static inline double np_cont_largeh_rel_tol(void){
-  const double dflt = 1e-3;
-  const double optv = np_get_option_double("np.largeh.rel.tol", dflt);
-  if(isfinite(optv) && optv > 0.0 && optv < 0.1)
-    return optv;
-
-  /* fallback for legacy/developer workflows */
-  const char *rt_env = getenv("NP_LARGEH_REL_TOL");
-  if(rt_env != NULL && rt_env[0] != '\0'){
-    const double v = atof(rt_env);
-    if(isfinite(v) && v > 0.0 && v < 0.1)
-      return v;
-  }
-
-  return dflt;
+  if(!np_runtime_tol_cache_ready)
+    np_refresh_runtime_tolerances();
+  return np_largeh_rel_tol_cache;
 }
 
 static inline int np_cont_largeh_is_active(const int kernel,
@@ -859,20 +854,49 @@ static inline int np_cont_largeh_is_active(const int kernel,
   per-observation category checks by a constant multiply.
 */
 static inline double np_disc_rel_tol(void){
-  const double dflt = 1e-2;
-  const double optv = np_get_option_double("np.disc.upper.rel.tol", dflt);
-  if(isfinite(optv) && optv > 0.0 && optv < 0.5)
-    return optv;
+  if(!np_runtime_tol_cache_ready)
+    np_refresh_runtime_tolerances();
+  return np_disc_rel_tol_cache;
+}
 
-  /* fallback for legacy/developer workflows */
-  const char *rt_env = getenv("NP_DISC_UPPER_REL_TOL");
-  if(rt_env != NULL && rt_env[0] != '\0'){
-    const double v = atof(rt_env);
-    if(isfinite(v) && v > 0.0 && v < 0.5)
-      return v;
+static inline void np_refresh_runtime_tolerances(void){
+  const double largeh_dflt = 1e-3;
+  const double largeh_optv = np_get_option_double("np.largeh.rel.tol", largeh_dflt);
+  if(isfinite(largeh_optv) && largeh_optv > 0.0 && largeh_optv < 0.1) {
+    np_largeh_rel_tol_cache = largeh_optv;
+  } else {
+    np_largeh_rel_tol_cache = largeh_dflt;
+    /* fallback for legacy/developer workflows */
+    {
+      const char *rt_env = getenv("NP_LARGEH_REL_TOL");
+      if(rt_env != NULL && rt_env[0] != '\0'){
+        const double v = atof(rt_env);
+        if(isfinite(v) && v > 0.0 && v < 0.1)
+          np_largeh_rel_tol_cache = v;
+      }
+    }
   }
 
-  return dflt;
+  {
+    const double disc_dflt = 1e-2;
+    const double disc_optv = np_get_option_double("np.disc.upper.rel.tol", disc_dflt);
+    if(isfinite(disc_optv) && disc_optv > 0.0 && disc_optv < 0.5) {
+      np_disc_rel_tol_cache = disc_optv;
+    } else {
+      np_disc_rel_tol_cache = disc_dflt;
+      /* fallback for legacy/developer workflows */
+      {
+        const char *rt_env = getenv("NP_DISC_UPPER_REL_TOL");
+        if(rt_env != NULL && rt_env[0] != '\0'){
+          const double v = atof(rt_env);
+          if(isfinite(v) && v > 0.0 && v < 0.5)
+            np_disc_rel_tol_cache = v;
+        }
+      }
+    }
+  }
+
+  np_runtime_tol_cache_ready = 1;
 }
 
 static inline int np_disc_unordered_has_upper(const int kernel){
@@ -3867,6 +3891,8 @@ double * const kw){
   const int no_bpso = (NULL == bpso);
 
   int p_nvar;
+
+  np_refresh_runtime_tolerances();
 
   if(no_bpso){
     bpso = (int *)malloc((num_reg_unordered + num_reg_ordered + num_reg_continuous)*sizeof(int));

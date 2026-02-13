@@ -860,8 +860,24 @@ npregiv <- function(y,
     }
 
     set.seed(random.seed)
+    on.exit({
+      if(exists.seed) {
+        assign(".Random.seed", save.seed, .GlobalEnv)
+      } else if(exists(".Random.seed", .GlobalEnv)) {
+        rm(".Random.seed", envir = .GlobalEnv)
+      }
+    }, add = TRUE)
 
-    if(debug) system("rm optim.debug bandwidth.out optim.out")
+    debug.file.optim <- "optim.debug"
+    debug.file.bandwidth <- "bandwidth.out"
+    debug.file.summary <- "optim.out"
+    if(debug) {
+      debug.dir <- tempfile("npregiv_debug_")
+      dir.create(debug.dir, showWarnings = FALSE, recursive = TRUE)
+      debug.file.optim <- file.path(debug.dir, "optim.debug")
+      debug.file.bandwidth <- file.path(debug.dir, "bandwidth.out")
+      debug.file.summary <- file.path(debug.dir, "optim.out")
+    }
 
     ## Don't think this error checking is robust
 
@@ -892,7 +908,7 @@ npregiv <- function(y,
     ## First initialize initial search values of the vector of
     ## bandwidths to lie in [0,1]
 
-    if(debug) write(c("cv",paste(rep("x",num.bw),seq(1:num.bw),sep="")),file="optim.debug",ncolumns=(num.bw+1))
+    if(debug) write(c("cv",paste(rep("x",num.bw),seq(1:num.bw),sep="")),file=debug.file.optim,ncolumns=(num.bw+1))
 
     ## Pass in the local polynomial weight matrix rather than
     ## recomputing with each iteration.
@@ -912,7 +928,7 @@ npregiv <- function(y,
         lscv <- maxPenalty
       }
 
-      if(debug) write(c(lscv,bw.gamma),file="optim.debug",ncolumns=(num.bw+1),append=TRUE)
+      if(debug) write(c(lscv,bw.gamma),file=debug.file.optim,ncolumns=(num.bw+1),append=TRUE)
       return(lscv)
     }
 
@@ -928,7 +944,7 @@ npregiv <- function(y,
         aicc <- maxPenalty
       }
 
-      if(debug) write(c(aicc,bw.gamma),file="optim.debug",ncolumns=(num.bw+1),append=TRUE)
+      if(debug) write(c(aicc,bw.gamma),file=debug.file.optim,ncolumns=(num.bw+1),append=TRUE)
       return(aicc)
     }
 
@@ -1035,20 +1051,16 @@ npregiv <- function(y,
         best <- iMulti
         if(debug) {
           if(iMulti==1) {
-            write(cbind(iMulti,t(bw.opt)),"bandwidth.out",ncolumns=(1+length(bw.opt)))
-            write(cbind(iMulti,fv),"optim.out",ncolumns=2)
+            write(cbind(iMulti,t(bw.opt)),debug.file.bandwidth,ncolumns=(1+length(bw.opt)))
+            write(cbind(iMulti,fv),debug.file.summary,ncolumns=2)
           } else {
-            write(cbind(iMulti,t(bw.opt)),"bandwidth.out",ncolumns=(1+length(bw.opt)),append=TRUE)
-            write(cbind(iMulti,fv),"optim.out",ncolumns=2,append=TRUE)
+            write(cbind(iMulti,t(bw.opt)),debug.file.bandwidth,ncolumns=(1+length(bw.opt)),append=TRUE)
+            write(cbind(iMulti,fv),debug.file.summary,ncolumns=2,append=TRUE)
           }
         }
       }
 
     }
-
-    ## Restore seed
-
-    if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
 
     return(list(bw=bw.opt,
                 fv=fv,
