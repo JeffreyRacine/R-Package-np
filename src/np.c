@@ -142,6 +142,16 @@ static void bwm_reserve_transform_buf(int needed_len)
   bwm_transform_buf = tmp;
   bwm_transform_buf_len = needed_len;
 }
+
+void np_release_static_buffers(int *unused)
+{
+  (void)unused;
+  if (bwm_transform_buf != NULL) {
+    free(bwm_transform_buf);
+    bwm_transform_buf = NULL;
+  }
+  bwm_transform_buf_len = 0;
+}
 static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
 static int *bwm_kernel_unordered_vec = NULL;
@@ -1835,8 +1845,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     error("!(ipt_X != NULL)");
 
   ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_lookup_X != NULL))
+  if(!(ipt_lookup_X != NULL)){
+    safe_free(ipt_X);
     error("!(ipt_lookup_X != NULL)");
+  }
 
   for(i = 0; i < num_obs_train_extern; i++){
     ipt_lookup_X[i] = ipt_X[i] = i;
@@ -1847,12 +1859,19 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   if(ibwmfunc == CBWM_CVLS){
     ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
-    if(!(ipt_Y != NULL))
+    if(!(ipt_Y != NULL)){
+      safe_free(ipt_X);
+      safe_free(ipt_lookup_X);
       error("!(ipt_Y != NULL)");
+    }
 
     ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
-    if(!(ipt_lookup_Y != NULL))
+    if(!(ipt_lookup_Y != NULL)){
+      safe_free(ipt_X);
+      safe_free(ipt_lookup_X);
+      safe_free(ipt_Y);
       error("!(ipt_lookup_Y != NULL)");
+    }
 
     for(i = 0; i < num_obs_train_extern; i++){
       ipt_lookup_Y[i] = ipt_Y[i] = i;
@@ -1867,12 +1886,27 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   ipt_lookup_extern_Y = ipt_lookup_Y;
 
   ipt_XY = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_XY != NULL))
+  if(!(ipt_XY != NULL)){
+    safe_free(ipt_X);
+    safe_free(ipt_lookup_X);
+    if(ibwmfunc == CBWM_CVLS){
+      safe_free(ipt_Y);
+      safe_free(ipt_lookup_Y);
+    }
     error("!(ipt_XY != NULL)");
+  }
 
   ipt_lookup_XY = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_lookup_XY != NULL))
+  if(!(ipt_lookup_XY != NULL)){
+    safe_free(ipt_X);
+    safe_free(ipt_lookup_X);
+    if(ibwmfunc == CBWM_CVLS){
+      safe_free(ipt_Y);
+      safe_free(ipt_lookup_Y);
+    }
+    safe_free(ipt_XY);
     error("!(ipt_lookup_XY != NULL)");
+  }
 
   for(i = 0; i < num_obs_train_extern; i++){
     ipt_lookup_XY[i] = ipt_XY[i] = i;
@@ -2698,8 +2732,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     error("!(ipt_X != NULL)");
 
   ipt_lookup_X = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_lookup_X != NULL))
+  if(!(ipt_lookup_X != NULL)){
+    safe_free(ipt_X);
     error("!(ipt_lookup_X != NULL)");
+  }
 
   for(i = 0; i < num_obs_train_extern; i++){
     ipt_lookup_X[i] = ipt_X[i] = i;
@@ -2710,12 +2746,19 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
 
   ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_Y != NULL))
+  if(!(ipt_Y != NULL)){
+    safe_free(ipt_X);
+    safe_free(ipt_lookup_X);
     error("!(ipt_Y != NULL)");
+  }
 
   ipt_lookup_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt_lookup_Y != NULL))
+  if(!(ipt_lookup_Y != NULL)){
+    safe_free(ipt_X);
+    safe_free(ipt_lookup_X);
+    safe_free(ipt_Y);
     error("!(ipt_lookup_Y != NULL)");
+  }
 
   for(i = 0; i < num_obs_train_extern; i++){
     ipt_lookup_Y[i] = ipt_Y[i] = i;
@@ -2727,12 +2770,23 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   num_obs_alt = (BANDWIDTH_den_extern != BW_ADAP_NN) ? num_obs_train_extern : 0;
 
   ipt_XY = (int *)malloc(num_obs_alt*sizeof(int));
-  if(!(ipt_XY != NULL))
+  if(!(ipt_XY != NULL)){
+    safe_free(ipt_X);
+    safe_free(ipt_lookup_X);
+    safe_free(ipt_Y);
+    safe_free(ipt_lookup_Y);
     error("!(ipt_XY != NULL)");
+  }
 
   ipt_lookup_XY = (int *)malloc(num_obs_alt*sizeof(int));
-  if(!(ipt_lookup_XY != NULL))
+  if(!(ipt_lookup_XY != NULL)){
+    safe_free(ipt_X);
+    safe_free(ipt_lookup_X);
+    safe_free(ipt_Y);
+    safe_free(ipt_lookup_Y);
+    safe_free(ipt_XY);
     error("!(ipt_lookup_XY != NULL)");
+  }
 
   for(i = 0; i < num_obs_alt; i++){
     ipt_lookup_XY[i] = ipt_XY[i] = i;

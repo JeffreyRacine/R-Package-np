@@ -14,5 +14,6 @@
 }
 
 .onUnload <- function (lpath){
+  try(.C("np_release_static_buffers", as.integer(0), PACKAGE = "np"), silent = TRUE)
   library.dynam.unload("np", libpath=lpath) 
 }
