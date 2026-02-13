@@ -908,6 +908,26 @@ static inline int np_disc_near_const_kernel(const double k_same, const double k_
   return fabs(k_same - k_diff) <= np_disc_rel_tol()*scale;
 }
 
+static inline int np_disc_ordered_has_upper(const int kernel){
+  /* Exclude WvR family; support Li-Racine and transformed variants. */
+  switch(kernel){
+    case 1: case 2: case 5:
+    case 7: case 8:
+    case 10: case 11:
+      return 1;
+    default:
+      return 0;
+  }
+}
+
+static inline int np_disc_ordered_near_upper(const int kernel, const double lambda){
+  if(!isfinite(lambda) || !np_disc_ordered_has_upper(kernel))
+    return 0;
+  const double up = 1.0;
+  const double tol = np_disc_rel_tol()*fmax(1.0, fabs(up));
+  return fabs(lambda - up) <= tol;
+}
+
 static inline void np_ckernelv_mul_const(const double c,
                                          const int num_xt,
                                          const int do_xw,
@@ -2546,7 +2566,9 @@ void np_p_ckernelv(const int KERNEL,
                    const int swap_xxt,
                    const int do_perm,
                    const int do_score,
-                   double * const scratch_kbuf){
+                   double * const scratch_kbuf,
+                   const int use_largeh_pre,
+                   const double largeh_k0_pre){
 
   /* 
      this should be read as:
@@ -2582,8 +2604,8 @@ void np_p_ckernelv(const int KERNEL,
     assert(kbuf != NULL);
   }
 
-  /* Large-h shortcut for ordinary kernels in both base and permuted path. */
-  const int use_largeh = np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl);
+  /* Base-kernel large-h decision is precomputed by caller once per (j,i). */
+  const int use_largeh = use_largeh_pre;
   const int use_largeh_perm = use_largeh &&
     (!do_score) &&
     do_perm &&
@@ -2591,7 +2613,7 @@ void np_p_ckernelv(const int KERNEL,
     np_cont_largeh_is_active(P_KERNEL, xt, num_xt, x, h, p_xl);
 
   if(use_largeh){
-    const double kn = np_cont_largeh_k0(KERNEL);
+    const double kn = largeh_k0_pre;
     np_ckernelv_mul_const(kn, num_xt, do_xw, result, xl);
 
     if(do_perm){
@@ -2689,7 +2711,8 @@ void np_ckernelv(const int KERNEL,
                  const double x, const double h, 
                  double * const result,
                  const XL * const xl,
-                 const int swap_xxt){
+                 const int swap_xxt,
+                 const int skip_largeh_check){
 
   /* 
      this should be read as:
@@ -2703,7 +2726,7 @@ void np_ckernelv(const int KERNEL,
   const double sgn = swap_xxt ? -1.0 : 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
-  if(np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl)){
+  if((!skip_largeh_check) && np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl)){
     np_ckernelv_mul_const(np_cont_largeh_k0(KERNEL), num_xt, do_xw, result, xl);
     return;
   }
@@ -3007,7 +3030,8 @@ void np_ukernelv(const int KERNEL,
                  const int do_xw,
                  const double x, const double lambda, const int ncat,
                  double * const result,
-                 const XL * const xl){
+                 const XL * const xl,
+                 const int skip_upper_gate){
 
   /* 
      this should be read as:
@@ -3025,7 +3049,8 @@ void np_ukernelv(const int KERNEL,
   const int kernel = (KERNEL >= 0 && KERNEL < nk) ? KERNEL : 0;
   const double kn_same = k[kernel](1, lambda, ncat);
   const double kn_diff = k[kernel](0, lambda, ncat);
-  const int use_const_k = np_disc_near_upper(kernel, lambda, ncat) &&
+  const int use_const_k = (!skip_upper_gate) &&
+    np_disc_near_upper(kernel, lambda, ncat) &&
     np_disc_near_const_kernel(kn_same, kn_diff);
   const double kn_const = 0.5*(kn_same + kn_diff);
 
@@ -3962,6 +3987,8 @@ double * const kw){
   int *disc_prof_list = NULL, *disc_active_idx = NULL;
   uint64_t *disc_prof_hash = NULL;
   double *disc_prof_val = NULL, *disc_ord_cl = NULL, *disc_ord_ch = NULL;
+  int *disc_uno_const_ok = NULL, *disc_ord_const_ok = NULL;
+  double *disc_uno_const = NULL, *disc_ord_const = NULL;
   int *cont_largeh_ok = NULL;
   double *cont_largeh_hmin = NULL, *cont_largeh_k0 = NULL;
   double cont_largeh_rel_tol = 1e-3;
@@ -4180,6 +4207,82 @@ double * const kw){
       if(cont_largeh_ok != NULL){ free(cont_largeh_ok); cont_largeh_ok = NULL; }
       if(cont_largeh_hmin != NULL){ free(cont_largeh_hmin); cont_largeh_hmin = NULL; }
       if(cont_largeh_k0 != NULL){ free(cont_largeh_k0); cont_largeh_k0 = NULL; }
+    }
+  }
+
+  if(num_reg_unordered > 0){
+    disc_uno_const_ok = (int *)calloc((size_t)num_reg_unordered, sizeof(int));
+    disc_uno_const = (double *)malloc((size_t)num_reg_unordered*sizeof(double));
+
+    if(disc_uno_const_ok != NULL && disc_uno_const != NULL){
+      double (* const ukf[])(int, double, int) = {
+        np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+        np_score_uaa, np_score_unli_racine
+      };
+      const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
+
+      for(i = 0; i < num_reg_unordered; i++){
+        const int ku = KERNEL_unordered_reg_np[i];
+        const int ncat = (num_categories != NULL) ? num_categories[i] : 0;
+        const double lam = lambda[i];
+
+        disc_uno_const_ok[i] = 0;
+        disc_uno_const[i] = 0.0;
+
+        if(ku < 0 || ku >= nuk) continue;
+        if(!np_disc_near_upper(ku, lam, ncat)) continue;
+
+        const double kn_same = ukf[ku](1, lam, ncat);
+        const double kn_diff = ukf[ku](0, lam, ncat);
+        if(np_disc_near_const_kernel(kn_same, kn_diff)){
+          disc_uno_const_ok[i] = 1;
+          disc_uno_const[i] = 0.5*(kn_same + kn_diff);
+        }
+      }
+    } else {
+      if(disc_uno_const_ok != NULL){ free(disc_uno_const_ok); disc_uno_const_ok = NULL; }
+      if(disc_uno_const != NULL){ free(disc_uno_const); disc_uno_const = NULL; }
+    }
+  }
+
+  if(num_reg_ordered > 0){
+    disc_ord_const_ok = (int *)calloc((size_t)num_reg_ordered, sizeof(int));
+    disc_ord_const = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+
+    if(disc_ord_const_ok != NULL && disc_ord_const != NULL){
+      double (* const okf[])(double, double, double, double, double) = {
+        np_owang_van_ryzin, np_oli_racine, np_onli_racine,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+      };
+      const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
+
+      for(i = 0; i < num_reg_ordered; i++){
+        const int oi = i + num_reg_unordered;
+        const int ko = KERNEL_ordered_reg_np[i];
+        const int ncat = (num_categories != NULL) ? num_categories[oi] : 0;
+        const double lam = lambda[oi];
+
+        disc_ord_const_ok[i] = 0;
+        disc_ord_const[i] = 0.0;
+
+        if(ko < 0 || ko >= nok) continue;
+        if(ncat <= 0 || matrix_categorical_vals == NULL) continue;
+        if(!np_disc_ordered_near_upper(ko, lam)) continue;
+
+        const double cl = matrix_categorical_vals[oi][0];
+        const double ch = matrix_categorical_vals[oi][ncat - 1];
+        const double k0 = okf[ko](cl, cl, lam, cl, ch);
+        const double k1 = okf[ko](cl, ch, lam, cl, ch);
+        if(np_disc_near_const_kernel(k0, k1)){
+          disc_ord_const_ok[i] = 1;
+          disc_ord_const[i] = 0.5*(k0 + k1);
+        }
+      }
+    } else {
+      if(disc_ord_const_ok != NULL){ free(disc_ord_const_ok); disc_ord_const_ok = NULL; }
+      if(disc_ord_const != NULL){ free(disc_ord_const); disc_ord_const = NULL; }
     }
   }
   
@@ -4542,10 +4645,15 @@ double * const kw){
           if(use_largeh){
             np_ckernelv_mul_const(cont_largeh_k0[i], num_xt, l, tprod, pxl);
           } else {
-            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
+            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1);
           }
         } else {
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf);
+          const int use_largeh = (cont_largeh_ok != NULL) &&
+            cont_largeh_ok[i] &&
+            isfinite(m[i][jbw]) &&
+            (fabs(m[i][jbw]) >= cont_largeh_hmin[i]);
+
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf, use_largeh, (use_largeh ? cont_largeh_k0[i] : 0.0));
         }
       }
       else
@@ -4669,8 +4777,12 @@ double * const kw){
           np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
                         lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0), perm_kbuf);
         } else {
-          np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
-                      lambda[i], num_categories[i], tprod, pxl);
+          if(disc_uno_const_ok != NULL && disc_uno_const_ok[i]){
+            np_ckernelv_mul_const(disc_uno_const[i], num_xt, l, tprod, pxl);
+          } else {
+            np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
+                        lambda[i], num_categories[i], tprod, pxl, (disc_uno_const_ok != NULL));
+          }
         }
         k += bpso[l];
       }
@@ -4678,7 +4790,10 @@ double * const kw){
       /* ordered third */
       for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
         if(!doscoreocg){
-          if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
+          if((disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
+             (ps_ok_nli || (operator[l] != OP_CONVOLUTION))){
+            np_ckernelv_mul_const(disc_ord_const[i], num_xt, l, tprod, pxl);
+          } else if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
             np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
                         xo[i][j], lambda[num_reg_unordered+i], 
                         (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
@@ -4835,6 +4950,10 @@ double * const kw){
   if(disc_prof_val != NULL) free(disc_prof_val);
   if(disc_ord_cl != NULL) free(disc_ord_cl);
   if(disc_ord_ch != NULL) free(disc_ord_ch);
+  if(disc_uno_const_ok != NULL) free(disc_uno_const_ok);
+  if(disc_uno_const != NULL) free(disc_uno_const);
+  if(disc_ord_const_ok != NULL) free(disc_ord_const_ok);
+  if(disc_ord_const != NULL) free(disc_ord_const);
   if(cont_largeh_ok != NULL) free(cont_largeh_ok);
   if(cont_largeh_hmin != NULL) free(cont_largeh_hmin);
   if(cont_largeh_k0 != NULL) free(cont_largeh_k0);
@@ -8007,8 +8126,6 @@ double *SIGN){
     operator[i] = OP_NORMAL;
 
 #ifdef MPI2
-  int stride_t = MAX((int)ceil((double) num_obs_train / (double) iNum_Processors),1);
-
   int stride_e = MAX((int)ceil((double) num_obs_eval / (double) iNum_Processors),1);
   int num_obs_eval_alloc = stride_e*iNum_Processors;
 
@@ -8404,8 +8521,6 @@ double *SIGN){
         moo[l] = matrix_ordered_indices[l];
       }
     }
-
-    int Sentinel = 1;
     for(j = 0; j < num_obs_eval; j++){ // main loop
       nepsilon = 0.0;
 
@@ -8556,7 +8671,7 @@ double *SIGN){
                              XTKX,
                              NULL,
                              vsf,
-                             Sentinel,
+                             1,
                              matrix_bandwidth,
                              matrix_bandwidth_eval,
                              lambda,
