@@ -3992,6 +3992,8 @@ double * const kw){
   int *cont_largeh_ok = NULL;
   double *cont_largeh_hmin = NULL, *cont_largeh_k0 = NULL;
   double cont_largeh_rel_tol = 1e-3;
+  int *cont_largeh_active = NULL, *cont_largeh_active_fixed = NULL;
+  int cont_largeh_all_fixed = 0, cont_largeh_fixed_ready = 0;
 
   double * const * const xtc = is_adaptive?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -4207,6 +4209,28 @@ double * const kw){
       if(cont_largeh_ok != NULL){ free(cont_largeh_ok); cont_largeh_ok = NULL; }
       if(cont_largeh_hmin != NULL){ free(cont_largeh_hmin); cont_largeh_hmin = NULL; }
       if(cont_largeh_k0 != NULL){ free(cont_largeh_k0); cont_largeh_k0 = NULL; }
+    }
+  }
+
+  if(num_reg_continuous > 0){
+    cont_largeh_active = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+    if(BANDWIDTH_reg == BW_FIXED){
+      cont_largeh_active_fixed = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+      if(cont_largeh_active != NULL && cont_largeh_active_fixed != NULL){
+        cont_largeh_all_fixed = 1;
+        for(i = 0; i < num_reg_continuous; i++){
+          const int is_largeh = (cont_largeh_ok != NULL) &&
+            cont_largeh_ok[i] &&
+            (operator[i] != OP_CONVOLUTION) &&
+            isfinite(matrix_bandwidth[i][0]) &&
+            (fabs(matrix_bandwidth[i][0]) >= cont_largeh_hmin[i]);
+
+          cont_largeh_active_fixed[i] = is_largeh;
+          cont_largeh_active[i] = is_largeh;
+          cont_largeh_all_fixed &= is_largeh;
+        }
+        cont_largeh_fixed_ready = 1;
+      }
     }
   }
 
@@ -4497,6 +4521,24 @@ double * const kw){
 
     dband = 1.0;
     const int jbw = (BANDWIDTH_reg != BW_FIXED) ? j:0;
+    int all_cont_largeh = (num_reg_continuous > 0);
+
+    if(cont_largeh_fixed_ready){
+      all_cont_largeh = cont_largeh_all_fixed;
+    } else if(cont_largeh_active != NULL){
+      for(i = 0; i < num_reg_continuous; i++){
+        const int is_largeh = (cont_largeh_ok != NULL) &&
+          cont_largeh_ok[i] &&
+          (operator[i] != OP_CONVOLUTION) &&
+          isfinite(m[i][jbw]) &&
+          (fabs(m[i][jbw]) >= cont_largeh_hmin[i]);
+
+        cont_largeh_active[i] = is_largeh;
+        all_cont_largeh &= is_largeh;
+      }
+    } else {
+      all_cont_largeh = 0;
+    }
 
     for (ii = 0; ii < p_nvar; ii++)
       p_dband[ii] = 1.0;
@@ -4520,39 +4562,44 @@ double * const kw){
 
       // reset the interaction node list
       xl.n = 0;
-      if(!do_partial_tree){
-        for(i = 0; i < num_reg_continuous; i++){
-          const double sf = m[i][jbw];
-          if(!is_adaptive){
-            bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
-            bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
-          }else{
-            bb[2*i] = cksup[KERNEL_reg_np[i]][0];
-            bb[2*i+1] = cksup[KERNEL_reg_np[i]][1];
-          }
-          bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
-          bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
-        }
-
-        boxSearchNL(kdt, &nls, bb, NULL, pxl);
+      if(all_cont_largeh){
+        /* Global large-h: all continuous kernels are effectively K(0), so support is full. */
+        merge_end_xl(pxl, &kdt->kdn[0]);
       } else {
-        for(i = 0; i < num_reg_continuous; i++){
-          const double sf = m[i][jbw];
-          if(!is_adaptive){
-            bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
-            bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
-          }else{
-            bb[2*nld[i]] = cksup[KERNEL_reg_np[i]][0];
-            bb[2*nld[i]+1] = cksup[KERNEL_reg_np[i]][1];
+        if(!do_partial_tree){
+          for(i = 0; i < num_reg_continuous; i++){
+            const double sf = m[i][jbw];
+            if(!is_adaptive){
+              bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
+              bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
+            }else{
+              bb[2*i] = cksup[KERNEL_reg_np[i]][0];
+              bb[2*i+1] = cksup[KERNEL_reg_np[i]][1];
+            }
+            bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
+            bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
           }
 
-          bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
-          bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
-        }
-        if(idx == NULL)
-          boxSearchNLPartial(kdt, inl, bb, NULL, pxl, nld, num_reg_continuous);
-        else {
-          boxSearchNLPartialIdx(kdt, inl, bb, NULL, pxl, nld, num_reg_continuous, idx);
+          boxSearchNL(kdt, &nls, bb, NULL, pxl);
+        } else {
+          for(i = 0; i < num_reg_continuous; i++){
+            const double sf = m[i][jbw];
+            if(!is_adaptive){
+              bb[2*nld[i]] = -cksup[KERNEL_reg_np[i]][1];
+              bb[2*nld[i]+1] = -cksup[KERNEL_reg_np[i]][0];
+            }else{
+              bb[2*nld[i]] = cksup[KERNEL_reg_np[i]][0];
+              bb[2*nld[i]+1] = cksup[KERNEL_reg_np[i]][1];
+            }
+
+            bb[2*nld[i]] = (fabs(bb[2*nld[i]]) == DBL_MAX) ? bb[2*nld[i]] : (xc[i][j] + bb[2*nld[i]]*sf);
+            bb[2*nld[i]+1] = (fabs(bb[2*nld[i]+1]) == DBL_MAX) ? bb[2*nld[i]+1] : (xc[i][j] + bb[2*nld[i]+1]*sf);
+          }
+          if(idx == NULL)
+            boxSearchNLPartial(kdt, inl, bb, NULL, pxl, nld, num_reg_continuous);
+          else {
+            boxSearchNLPartialIdx(kdt, inl, bb, NULL, pxl, nld, num_reg_continuous, idx);
+          }
         }
       }
 
@@ -4562,7 +4609,9 @@ double * const kw){
             // reset the interaction node list
             p_pxl[k].n = 0;
 
-            if(!do_partial_tree){
+            if(all_cont_largeh){
+              p_pxl[k] = pxl[0];
+            } else if(!do_partial_tree){
               for(i = 0; i < num_reg_continuous; i++){
                 const int knp = (i == ii) ? permutation_kernel[i] : KERNEL_reg_np[i];
                 if(!is_adaptive){
@@ -4637,10 +4686,7 @@ double * const kw){
     for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          const int use_largeh = (cont_largeh_ok != NULL) &&
-            cont_largeh_ok[i] &&
-            isfinite(m[i][jbw]) &&
-            (fabs(m[i][jbw]) >= cont_largeh_hmin[i]);
+          const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
           if(use_largeh){
             np_ckernelv_mul_const(cont_largeh_k0[i], num_xt, l, tprod, pxl);
@@ -4648,10 +4694,7 @@ double * const kw){
             np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1);
           }
         } else {
-          const int use_largeh = (cont_largeh_ok != NULL) &&
-            cont_largeh_ok[i] &&
-            isfinite(m[i][jbw]) &&
-            (fabs(m[i][jbw]) >= cont_largeh_hmin[i]);
+          const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
           np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf, use_largeh, (use_largeh ? cont_largeh_k0[i] : 0.0));
         }
@@ -4957,6 +5000,8 @@ double * const kw){
   if(cont_largeh_ok != NULL) free(cont_largeh_ok);
   if(cont_largeh_hmin != NULL) free(cont_largeh_hmin);
   if(cont_largeh_k0 != NULL) free(cont_largeh_k0);
+  if(cont_largeh_active != NULL) free(cont_largeh_active);
+  if(cont_largeh_active_fixed != NULL) free(cont_largeh_active_fixed);
 
   if(no_bpso)
     free(bpso);
