@@ -1,5 +1,5 @@
 Package: npRmpi
-Version: 0.60-20
+Version: 0.60-21
 Date: 2026-02-11
 Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel
 Suggests: crs, MASS, logspline, ks, testthat, np, Rmpi

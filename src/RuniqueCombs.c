@@ -76,7 +76,7 @@ void ErrorMessage(char *msg,int fatal)
 #ifdef WINDOWS
   MessageBox(HWND_DESKTOP,msg,"Info!",MB_ICONEXCLAMATION|MB_OK); 
 #else  
-if (fatal) error("%s",msg);else warning("%s",msg);
+if (fatal) Rf_error("%s",msg);else Rf_warning("%s",msg);
 #endif
 }
 
