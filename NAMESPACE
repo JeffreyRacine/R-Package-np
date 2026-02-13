@@ -38,6 +38,8 @@ export(b.star
        ,npindexbw
        ,npqcmstest       
        ,npseed
+       ,np.pairs
+       ,np.pairs.plot
        ,npscoef
        ,npscoefbw
        ,npsigtest

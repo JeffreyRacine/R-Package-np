@@ -247,6 +247,7 @@ set.seed(42)
 X <- sort(rbeta(100,5,3))
 model <- npuniden.boundary(X)
 oldpar <- par(no.readonly = TRUE)
+on.exit(par(oldpar), add = TRUE)
 par(mfrow=c(1,2))
 ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
 plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
@@ -274,7 +275,6 @@ lines(age,model$f)
 lines(density(age,bw=model$h),col=2)
 legend("topright",c("Boundary Kernel","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 detach(cps71)
-par(oldpar)
 } % enddontrun
 }
 \keyword{ nonparametric }
