@@ -326,4 +326,7 @@
   estimators for discrete distributions,} Biometrika, 68, 301-309.
 
 }
+\seealso{
+  \code{\link{np.options}}
+}
 \keyword{package}

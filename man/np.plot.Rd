@@ -761,4 +761,8 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 } % enddontrun     
 }
 
+\seealso{
+  \code{\link{np.options}}
+}
+
 \keyword{nonparametric}

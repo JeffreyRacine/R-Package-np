@@ -1,3 +1,19 @@
+Changes from Version 0.60-21 to 0.60-22 [13-Feb-2026]
+
+* Synchronized jksum.c with np master to inherit the latest kernel-evaluation
+  shortcut enhancements:
+  - option-driven continuous large-h K(0) shortcut logic
+  - option-driven discrete near-upper-bound (lambda) shortcut logic
+  applied across core continuous/unordered evaluator paths.
+
+* Added package-level defaults for:
+  - options(np.largeh.rel.tol=1e-3)
+  - options(np.disc.upper.rel.tol=1e-2)
+  in .onLoad, including the NP_RMPI_SKIP_INIT initialization path.
+
+* Added new np.options.Rd man page and linked it from np-package and np.plot
+  documentation to expose and document global option controls.
+
 Changes from Version 0.60-20 to 0.60-21 [11-Feb-2026]
 
 * Ported recent core-performance updates from np master (kernel/jksum

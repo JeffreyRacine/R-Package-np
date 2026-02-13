@@ -11,6 +11,7 @@
 #include <R.h>
 #include <R_ext/Utils.h>
 #include <Rmath.h>
+#include <Rinternals.h>
 
 #include "headers.h"
 #include "matrix.h"
@@ -741,6 +742,209 @@ static inline int np_same_discrete_profile_idx(const int ia,
     if(xto[o][ia] != xto[o][ib]) return 0;
 
   return 1;
+}
+
+/*
+  Large-bandwidth shortcut for ordinary continuous kernels:
+  if max_i |(x - x_i)/h| <= u_tol, replace K((x-x_i)/h) by K(0) to avoid
+  repeated kernel evaluations. This is intentionally conservative and only
+  enabled for ordinary continuous kernels (0..9).
+*/
+static inline int np_cont_largeh_kernel_supported(const int kernel){
+  return (kernel >= 0 && kernel <= 9);
+}
+
+static inline double np_get_option_double(const char * const name, const double fallback){
+  const SEXP sym = Rf_install(name);
+  const SEXP val = Rf_GetOption1(sym);
+
+  if(val == R_NilValue)
+    return fallback;
+
+  if(TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+    return REAL(val)[0];
+
+  if(TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+    return (double)INTEGER(val)[0];
+
+  if(TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
+    return (double)LOGICAL(val)[0];
+
+  return fallback;
+}
+
+static inline double np_cont_largeh_k0(const int kernel){
+  switch(kernel){
+    case 0: return np_gauss2(0.0);
+    case 1: return np_gauss4(0.0);
+    case 2: return np_gauss6(0.0);
+    case 3: return np_gauss8(0.0);
+    case 4: return np_epan2(0.0);
+    case 5: return np_epan4(0.0);
+    case 6: return np_epan6(0.0);
+    case 7: return np_epan8(0.0);
+    case 8: return np_rect(0.0);
+    case 9: return np_tgauss2(0.0);
+    default: return 0.0;
+  }
+}
+
+static inline double np_cont_largeh_utol(const int kernel, const double rel_tol){
+  const double rt = (rel_tol <= 0.0) ? 1e-3 : rel_tol;
+  switch(kernel){
+    case 0: case 1: case 2: case 3: case 9:
+      /* For Gaussian-like kernels, relative deviation near 0 is ~ u^2/2. */
+      return sqrt(-2.0*log(1.0-rt));
+    case 4: case 5: case 6: case 7:
+      /* For Epanechnikov family, relative deviation near 0 is ~ u^2. */
+      return sqrt(rt);
+    case 8:
+      /* Rectangular kernel is exactly constant for |u| < 1. */
+      return 1.0 - 32.0*DBL_EPSILON;
+    default:
+      return 0.0;
+  }
+}
+
+static inline double np_cont_largeh_rel_tol(void){
+  const double dflt = 1e-3;
+  const double optv = np_get_option_double("np.largeh.rel.tol", dflt);
+  if(isfinite(optv) && optv > 0.0 && optv < 0.1)
+    return optv;
+
+  /* fallback for legacy/developer workflows */
+  const char *rt_env = getenv("NP_LARGEH_REL_TOL");
+  if(rt_env != NULL && rt_env[0] != '\0'){
+    const double v = atof(rt_env);
+    if(isfinite(v) && v > 0.0 && v < 0.1)
+      return v;
+  }
+
+  return dflt;
+}
+
+static inline int np_cont_largeh_is_active(const int kernel,
+                                           const double * const xt,
+                                           const int num_xt,
+                                           const double x,
+                                           const double h,
+                                           const XL * const xl){
+  if((h == 0.0) || !isfinite(h) || !np_cont_largeh_kernel_supported(kernel))
+    return 0;
+
+  const double utol = np_cont_largeh_utol(kernel, np_cont_largeh_rel_tol());
+  if(!(utol > 0.0) || !isfinite(utol))
+    return 0;
+
+  const double maxabs = utol * fabs(h);
+
+  if(xl == NULL){
+    for(int i = 0; i < num_xt; i++)
+      if(fabs(x - xt[i]) > maxabs) return 0;
+  } else {
+    for(int m = 0; m < xl->n; m++){
+      const int istart = xl->istart[m];
+      const int nlev = xl->nlev[m];
+      for(int i = istart; i < istart+nlev; i++)
+        if(fabs(x - xt[i]) > maxabs) return 0;
+    }
+  }
+
+  return 1;
+}
+
+/*
+  Discrete "near upper-bound lambda" shortcut:
+  if unordered same/different kernel values are nearly identical, replace
+  per-observation category checks by a constant multiply.
+*/
+static inline double np_disc_rel_tol(void){
+  const double dflt = 1e-2;
+  const double optv = np_get_option_double("np.disc.upper.rel.tol", dflt);
+  if(isfinite(optv) && optv > 0.0 && optv < 0.5)
+    return optv;
+
+  /* fallback for legacy/developer workflows */
+  const char *rt_env = getenv("NP_DISC_UPPER_REL_TOL");
+  if(rt_env != NULL && rt_env[0] != '\0'){
+    const double v = atof(rt_env);
+    if(isfinite(v) && v > 0.0 && v < 0.5)
+      return v;
+  }
+
+  return dflt;
+}
+
+static inline int np_disc_unordered_has_upper(const int kernel){
+  return (kernel >= 0 && kernel <= 5);
+}
+
+static inline double np_disc_unordered_upper(const int kernel, const int ncat){
+  const double c = (double)ncat;
+  switch(kernel){
+    case 0: /* AA */
+    case 2: /* econvol AA */
+    case 4: /* score AA */
+      return (c > 0.0) ? ((c - 1.0)/c) : 0.0;
+    case 1: /* Li-Racine */
+    case 3: /* econvol Li-Racine */
+    case 5: /* score Li-Racine */
+      return 1.0;
+    default:
+      return 1.0;
+  }
+}
+
+static inline int np_disc_near_upper(const int kernel, const double lambda, const int ncat){
+  if(!isfinite(lambda) || !np_disc_unordered_has_upper(kernel))
+    return 0;
+  const double up = np_disc_unordered_upper(kernel, ncat);
+  const double tol = np_disc_rel_tol()*fmax(1.0, fabs(up));
+  return fabs(lambda - up) <= tol;
+}
+
+static inline int np_disc_near_const_kernel(const double k_same, const double k_diff){
+  const double scale = fmax(1.0, fmax(fabs(k_same), fabs(k_diff)));
+  return fabs(k_same - k_diff) <= np_disc_rel_tol()*scale;
+}
+
+static inline void np_ckernelv_mul_const(const double c,
+                                         const int num_xt,
+                                         const int do_xw,
+                                         double * const result,
+                                         const XL * const xl){
+  const int bin_do_xw = do_xw > 0;
+  int i;
+
+  if(xl == NULL){
+    if(!bin_do_xw){
+      for(i = 0; i < num_xt; i++)
+        result[i] = c;
+    } else {
+      for(i = 0; i < num_xt; i++){
+        if(result[i] == 0.0) continue;
+        result[i] *= c;
+      }
+    }
+  } else {
+    if(!bin_do_xw){
+      for(int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
+        for(i = istart; i < istart+nlev; i++)
+          result[i] = c;
+      }
+    } else {
+      for(int m = 0; m < xl->n; m++){
+        const int istart = xl->istart[m];
+        const int nlev = xl->nlev[m];
+        for(i = istart; i < istart+nlev; i++){
+          if(result[i] == 0.0) continue;
+          result[i] *= c;
+        }
+      }
+    }
+  }
 }
 
 // not so simple truncated gaussian convolution kernels
@@ -2378,6 +2582,49 @@ void np_p_ckernelv(const int KERNEL,
     assert(kbuf != NULL);
   }
 
+  /* Large-h shortcut for ordinary kernels in both base and permuted path. */
+  const int use_largeh = np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl);
+  const int use_largeh_perm = use_largeh &&
+    (!do_score) &&
+    do_perm &&
+    np_cont_largeh_kernel_supported(P_KERNEL) &&
+    np_cont_largeh_is_active(P_KERNEL, xt, num_xt, x, h, p_xl);
+
+  if(use_largeh){
+    const double kn = np_cont_largeh_k0(KERNEL);
+    np_ckernelv_mul_const(kn, num_xt, do_xw, result, xl);
+
+    if(do_perm){
+      if(use_largeh_perm){
+        const double pkn = np_cont_largeh_k0(P_KERNEL);
+        np_ckernelv_mul_const(pkn, num_xt, do_xw, p_result + P_IDX*num_xt, p_xl);
+      } else {
+        if(p_xl == NULL){
+          for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+          }
+        } else {
+          for (int m = 0; m < p_xl->n; m++){
+            const int istart = p_xl->istart[m];
+            const int nlev = p_xl->nlev[m];
+            for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
+              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+            }
+          }
+        }
+      }
+    }
+
+    for(l = 0, r = 0; l < P_NIDX; l++, r += bin_do_xw){
+      if((l == P_IDX) && do_perm) continue;
+      np_ckernelv_mul_const(kn, num_xt, bin_do_xw, p_result + l*num_xt, xl);
+    }
+
+    if(own_kbuf)
+      free(kbuf);
+    return;
+  }
+
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
       const double kn = k[KERNEL]((x-xt[i])*sgn/h);
@@ -2455,6 +2702,11 @@ void np_ckernelv(const int KERNEL,
   double unit_weight = 1.0;
   const double sgn = swap_xxt ? -1.0 : 1.0;
   double * const xw = (bin_do_xw ? result : &unit_weight);
+
+  if(np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl)){
+    np_ckernelv_mul_const(np_cont_largeh_k0(KERNEL), num_xt, do_xw, result, xl);
+    return;
+  }
 
   /*
     Hot path: avoid indirect function-pointer calls and avoid branching on
@@ -2669,6 +2921,12 @@ void np_p_ukernelv(const int KERNEL,
   const double kn_diff = k[kernel](0, lambda, ncat);
   const double pkn_same = k[p_kernel](1, lambda, ncat);
   const double pkn_diff = k[p_kernel](0, lambda, ncat);
+  const int use_const_k = np_disc_near_upper(kernel, lambda, ncat) &&
+    np_disc_near_const_kernel(kn_same, kn_diff);
+  const int use_const_pk = np_disc_near_upper(p_kernel, lambda, ncat) &&
+    np_disc_near_const_kernel(pkn_same, pkn_diff);
+  const double kn_const = 0.5*(kn_same + kn_diff);
+  const double pkn_const = 0.5*(pkn_same + pkn_diff);
   const int p_iscat_const = (swap_xxt && do_ocg);
   const int p_iscat_const_val = (cat == x);
 
@@ -2681,14 +2939,16 @@ void np_p_ukernelv(const int KERNEL,
 
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      const int is_same = (xt[i] == x);
-      const double kn = is_same ? kn_same : kn_diff;
+      const double kn = use_const_k ?
+        kn_const :
+        (((xt[i] == x) ? kn_same : kn_diff));
 
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
 
-      const int iscat = p_iscat_const ? p_iscat_const_val : (xt[i] == ex);
-      const double pkn = iscat ? pkn_same : pkn_diff;
+      const double pkn = use_const_pk ?
+        pkn_const :
+        (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
       p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
     }
 
@@ -2705,8 +2965,9 @@ void np_p_ukernelv(const int KERNEL,
       const int istart = xl->istart[m];
       const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const int is_same = (xt[i] == x);
-        const double kn = is_same ? kn_same : kn_diff;
+        const double kn = use_const_k ?
+          kn_const :
+          (((xt[i] == x) ? kn_same : kn_diff));
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -2717,8 +2978,9 @@ void np_p_ukernelv(const int KERNEL,
       const int istart = p_xl->istart[m];
       const int nlev = p_xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const int iscat = p_iscat_const ? p_iscat_const_val : (xt[i] == ex);
-        const double pkn = iscat ? pkn_same : pkn_diff;
+        const double pkn = use_const_pk ?
+          pkn_const :
+          (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
         p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
       }
     }
@@ -2763,16 +3025,19 @@ void np_ukernelv(const int KERNEL,
   const int kernel = (KERNEL >= 0 && KERNEL < nk) ? KERNEL : 0;
   const double kn_same = k[kernel](1, lambda, ncat);
   const double kn_diff = k[kernel](0, lambda, ncat);
+  const int use_const_k = np_disc_near_upper(kernel, lambda, ncat) &&
+    np_disc_near_const_kernel(kn_same, kn_diff);
+  const double kn_const = 0.5*(kn_same + kn_diff);
 
   if(xl == NULL){
     if(!bin_do_xw){
       for(i = 0; i < num_xt; i++){
-        result[i] = (xt[i] == x) ? kn_same : kn_diff;
+        result[i] = use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff);
       }
     } else {
       for(i = 0; i < num_xt; i++){
         if(xw[i] == 0.0) continue;
-        result[i] = xw[i]*((xt[i] == x) ? kn_same : kn_diff);
+        result[i] = xw[i]*(use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff));
       }
     }
   } else {
@@ -2781,12 +3046,12 @@ void np_ukernelv(const int KERNEL,
       const int nlev = xl->nlev[m];
       if(!bin_do_xw){
         for(i = istart; i < istart+nlev; i++){
-          result[i] = (xt[i] == x) ? kn_same : kn_diff;
+          result[i] = use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff);
         }
       } else {
         for(i = istart; i < istart+nlev; i++){
           if(xw[i] == 0.0) continue;
-          result[i] = xw[i]*((xt[i] == x) ? kn_same : kn_diff);
+          result[i] = xw[i]*(use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff));
         }
       }
     }
@@ -3697,6 +3962,9 @@ double * const kw){
   int *disc_prof_list = NULL, *disc_active_idx = NULL;
   uint64_t *disc_prof_hash = NULL;
   double *disc_prof_val = NULL, *disc_ord_cl = NULL, *disc_ord_ch = NULL;
+  int *cont_largeh_ok = NULL;
+  double *cont_largeh_hmin = NULL, *cont_largeh_k0 = NULL;
+  double cont_largeh_rel_tol = 1e-3;
 
   double * const * const xtc = is_adaptive?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -3858,6 +4126,61 @@ double * const kw){
       return(KWSNP_ERR_BADBW);
     }
 
+  }
+
+  if(num_reg_continuous > 0){
+    const char *rt_env = getenv("NP_LARGEH_REL_TOL");
+    if(rt_env != NULL && rt_env[0] != '\0'){
+      const double v = atof(rt_env);
+      if(isfinite(v) && v > 0.0 && v < 0.1){
+        cont_largeh_rel_tol = v;
+      }
+    }
+
+    cont_largeh_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+    cont_largeh_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+    cont_largeh_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+
+    if(cont_largeh_ok != NULL && cont_largeh_hmin != NULL && cont_largeh_k0 != NULL){
+      for(i = 0; i < num_reg_continuous; i++){
+        const int kern = KERNEL_reg_np[i];
+        const int ok = np_cont_largeh_kernel_supported(kern);
+        double xmin = DBL_MAX, xmax = -DBL_MAX;
+
+        cont_largeh_ok[i] = 0;
+        cont_largeh_hmin[i] = DBL_MAX;
+        cont_largeh_k0[i] = 0.0;
+
+        if(!ok) continue;
+
+        for(ii = 0; ii < num_obs_train; ii++){
+          const double v = matrix_X_continuous_train[i][ii];
+          if(!isfinite(v)) continue;
+          xmin = MIN(xmin, v);
+          xmax = MAX(xmax, v);
+        }
+
+        for(ii = 0; ii < num_obs_eval; ii++){
+          const double v = matrix_X_continuous_eval[i][ii];
+          if(!isfinite(v)) continue;
+          xmin = MIN(xmin, v);
+          xmax = MAX(xmax, v);
+        }
+
+        if(xmax >= xmin){
+          const double utol = np_cont_largeh_utol(kern, cont_largeh_rel_tol);
+          if(utol > 0.0 && isfinite(utol)){
+            cont_largeh_ok[i] = 1;
+            cont_largeh_hmin[i] = (xmax - xmin)/utol;
+            cont_largeh_k0[i] = np_cont_largeh_k0(kern);
+          }
+        }
+      }
+    } else {
+      if(cont_largeh_ok != NULL){ free(cont_largeh_ok); cont_largeh_ok = NULL; }
+      if(cont_largeh_hmin != NULL){ free(cont_largeh_hmin); cont_largeh_hmin = NULL; }
+      if(cont_largeh_k0 != NULL){ free(cont_largeh_k0); cont_largeh_k0 = NULL; }
+    }
   }
   
   if (leave_one_out && drop_one_train) {
@@ -4211,7 +4534,16 @@ double * const kw){
     for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
-          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
+          const int use_largeh = (cont_largeh_ok != NULL) &&
+            cont_largeh_ok[i] &&
+            isfinite(m[i][jbw]) &&
+            (fabs(m[i][jbw]) >= cont_largeh_hmin[i]);
+
+          if(use_largeh){
+            np_ckernelv_mul_const(cont_largeh_k0[i], num_xt, l, tprod, pxl);
+          } else {
+            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt);
+          }
         } else {
           np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf);
         }
@@ -4420,31 +4752,6 @@ double * const kw){
     // gather_scatter is only used for the local-linear cv
     // note: ll cv + adaptive_nn does not work in parallel
 #ifdef MPI2
-    {
-      const char *dbg = getenv("NP_RMPI_MPI_DEBUG_COUNTS");
-      static int dbg_mode = -1; // -1 unknown, 0 off, 1 anomalies, 2 all
-      if(dbg_mode < 0){
-        if(dbg == NULL || dbg[0] == '\0'){
-          dbg_mode = 0;
-        } else if(!strcmp(dbg, "all")){
-          dbg_mode = 2;
-        } else {
-          dbg_mode = 1;
-        }
-      }
-
-      if(dbg_mode > 0 && (dbg_mode == 2 || ncol_Y != 2 || ncol_W != 0)){
-        int comm_rank = -1, comm_size = -1;
-        MPI_Comm_rank(comm[1], &comm_rank);
-        MPI_Comm_size(comm[1], &comm_size);
-        REprintf("[NP_RMPI_MPI_DEBUG_COUNTS] rank=%d/%d cached_rank=%d cached_size=%d stride=%d sum_element_length=%d num_obs_eval=%d num_obs_eval_alloc=%d js=%d je=%d BANDWIDTH_reg=%d ncol_Y=%d ncol_W=%d p_nvar=%d gather_scatter=%d suppress_parallel=%d nws=%d\n",
-                 comm_rank, comm_size, my_rank, iNum_Processors, stride, sum_element_length,
-                 num_obs_eval, num_obs_eval_alloc, js, je, BANDWIDTH_reg, ncol_Y, ncol_W,
-                 p_nvar, gather_scatter, suppress_parallel, nws);
-        R_FlushConsole();
-      }
-    }
-
     if(!nws){
       if (BANDWIDTH_reg == BW_FIXED || BANDWIDTH_reg == BW_GEN_NN){
         MPI_Allgather(MPI_IN_PLACE, stride * sum_element_length, MPI_DOUBLE, weighted_sum, stride * sum_element_length, MPI_DOUBLE, comm[1]);
@@ -4528,6 +4835,9 @@ double * const kw){
   if(disc_prof_val != NULL) free(disc_prof_val);
   if(disc_ord_cl != NULL) free(disc_ord_cl);
   if(disc_ord_ch != NULL) free(disc_ord_ch);
+  if(cont_largeh_ok != NULL) free(cont_largeh_ok);
+  if(cont_largeh_hmin != NULL) free(cont_largeh_hmin);
+  if(cont_largeh_k0 != NULL) free(cont_largeh_k0);
 
   if(no_bpso)
     free(bpso);

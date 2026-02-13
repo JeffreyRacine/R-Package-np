@@ -1,5 +1,5 @@
 .onAttach <- function (lib, pkg) {
-	packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-20) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
+	packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.60-21) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
 }
 
 .onUnload <- function (lpath){
@@ -29,6 +29,10 @@
 
     if(is.null(options('np.tree')$np.tree))
       options(np.tree = FALSE)
+    if(is.null(options('np.largeh.rel.tol')$np.largeh.rel.tol))
+      options(np.largeh.rel.tol = 1e-3)
+    if(is.null(options('np.disc.upper.rel.tol')$np.disc.upper.rel.tol))
+      options(np.disc.upper.rel.tol = 1e-2)
 
     return(invisible())
   }
@@ -52,4 +56,8 @@
 
   if(is.null(options('np.tree')$np.tree))
     options(np.tree = FALSE)
+  if(is.null(options('np.largeh.rel.tol')$np.largeh.rel.tol))
+    options(np.largeh.rel.tol = 1e-3)
+  if(is.null(options('np.disc.upper.rel.tol')$np.disc.upper.rel.tol))
+    options(np.disc.upper.rel.tol = 1e-2)
 }
