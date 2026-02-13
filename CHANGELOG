@@ -1,4 +1,17 @@
-Changes from Version 0.60-21 to 0.60-22 [13-Feb-2026]
+Changes from Version 0.60-20 to 0.60-21 [12-Feb-2026]
+
+* Optimized core kernel-sum code paths in C (including ordered/unordered
+  kernels), yielding substantial speedups for npksum() and downstream
+  estimators.
+
+* Improved bandwidth-search robustness by adding transformed-bounds handling
+  and baseline invalid-penalty behavior for Powell-based optimization.
+
+* Added optimization benchmarking/documentation updates and synced check/docs
+  maintenance changes.
+
+* Guarded fallback kernel-table indexing in jksum.c to avoid GCC/Winbuilder
+  array-bounds warnings.
 
 * Added user-configurable computational tolerances for kernel shortcuts via
   global options:
@@ -14,21 +27,6 @@ Changes from Version 0.60-21 to 0.60-22 [13-Feb-2026]
 
 * Added new documentation page np.options.Rd and cross-references from
   np-package and np.plot man pages; set default option values at package load.
-
-Changes from Version 0.60-20 to 0.60-21 [11-Feb-2026]
-
-* Optimized core kernel-sum code paths in C (including ordered/unordered
-  kernels), yielding substantial speedups for npksum() and downstream
-  estimators.
-
-* Improved bandwidth-search robustness by adding transformed-bounds handling
-  and baseline invalid-penalty behavior for Powell-based optimization.
-
-* Added optimization benchmarking/documentation updates and synced check/docs
-  maintenance changes.
-
-* Guarded fallback kernel-table indexing in jksum.c to avoid GCC/Winbuilder
-  array-bounds warnings.
 
 Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
 
