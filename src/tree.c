@@ -4,6 +4,14 @@
 #include "headers.h"
 #include "tree.h"
 
+static int *realloc_int_or_die(int *ptr, size_t n)
+{
+  int *tmp = (int *)realloc(ptr, n * sizeof(int));
+  if (tmp == NULL)
+    error("realloc_int_or_die: memory allocation failed");
+  return tmp;
+}
+
 /*
   inputs
   p: point coordinate array [dims][obs]
@@ -192,10 +200,7 @@ void boxSearch(KDT * kdt, int node, double * bb, NL * nl){
   if(res == KD_MISS) return;
 
   if(nl->n == nl->nalloc){
-    nl->node = (int *)realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
-    if(!(nl->node != NULL))
-      error("!(nl->node != NULL)");
-    
+    nl->node = realloc_int_or_die(nl->node, (size_t) MAX(10, 2*nl->nalloc));
     nl->nalloc = MAX(10, 2*nl->nalloc);
   }
 
@@ -344,10 +349,7 @@ void boxSearchNLPartialIdx(KDT * restrict kdt, NL * restrict search, double * re
 
 void check_grow_nl(NL * restrict nl){
   if(nl->n == nl->nalloc){
-    nl->node = (int *)realloc(nl->node, MAX(10, 2*nl->nalloc)*sizeof(int));
-    if(!(nl->node != NULL))
-      error("!(nl->node != NULL)");
-    
+    nl->node = realloc_int_or_die(nl->node, (size_t) MAX(10, 2*nl->nalloc));
     nl->nalloc = MAX(10, 2*nl->nalloc);
   }
 }
@@ -376,7 +378,7 @@ void clean_xl(XL * restrict xl){
 
 void mirror_nl(NL * restrict nla, NL * restrict nlb){
   if(nla->n > nlb->nalloc){
-    nlb->node = (int *)realloc(nlb->node, (1+nla->n)*sizeof(int));
+    nlb->node = realloc_int_or_die(nlb->node, (size_t) (1+nla->n));
     nlb->nalloc = nla->n + 1;
   }
 
@@ -388,8 +390,8 @@ void mirror_nl(NL * restrict nla, NL * restrict nlb){
 
 void mirror_xl(XL * restrict xla, XL * restrict xlb){
   if(xla->n > xlb->nalloc){
-    xlb->istart = (int *)realloc(xlb->istart, (1+xla->n)*sizeof(int));
-    xlb->nlev = (int *)realloc(xlb->nlev, (1+xla->n)*sizeof(int));
+    xlb->istart = realloc_int_or_die(xlb->istart, (size_t) (1+xla->n));
+    xlb->nlev = realloc_int_or_die(xlb->nlev, (size_t) (1+xla->n));
     xlb->nalloc = xla->n + 1;
   }
 
@@ -403,8 +405,8 @@ void mirror_xl(XL * restrict xla, XL * restrict xlb){
 
 void merge_end_xl(XL * restrict xl, KDN * restrict kdn){
   if(xl->n == xl->nalloc){
-    xl->istart = (int *)realloc(xl->istart, MAX(10,2*xl->nalloc)*sizeof(int));
-    xl->nlev = (int *)realloc(xl->nlev, MAX(10,2*xl->nalloc)*sizeof(int));
+    xl->istart = realloc_int_or_die(xl->istart, (size_t) MAX(10,2*xl->nalloc));
+    xl->nlev = realloc_int_or_die(xl->nlev, (size_t) MAX(10,2*xl->nalloc));
 
     xl->nalloc = MAX(10, 2*xl->nalloc);
   }
@@ -419,8 +421,8 @@ void merge_end_xl(XL * restrict xl, KDN * restrict kdn){
 
 void merge_end_xl_idx(XL * restrict xl, KDN * restrict kdn, int * restrict idx){
   if(xl->n == xl->nalloc){
-    xl->istart = (int *)realloc(xl->istart, MAX(10,2*xl->nalloc)*sizeof(int));
-    xl->nlev = (int *)realloc(xl->nlev, MAX(10,2*xl->nalloc)*sizeof(int));
+    xl->istart = realloc_int_or_die(xl->istart, (size_t) MAX(10,2*xl->nalloc));
+    xl->nlev = realloc_int_or_die(xl->nlev, (size_t) MAX(10,2*xl->nalloc));
 
     xl->nalloc = MAX(10, 2*xl->nalloc);
   }

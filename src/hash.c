@@ -4,12 +4,14 @@
 
 
 size_t thfhash0(uint64_t key, size_t n){
+  if (n == 0) return 0;
   return (key % n);
 }
 
 
 int thcreate_r(size_t nel, struct th_table * tab){
   int i;
+  if (nel == 0) return TH_ERROR;
   tab->ht = NULL;
   tab->ht = (struct th_entry *)malloc(nel*sizeof(struct th_entry));
   if(tab->ht == NULL) return TH_ERROR;
@@ -34,7 +36,17 @@ int thsearch_r(const struct th_entry * const q, int action, struct th_entry ** r
   size_t it, i;
 
   struct th_entry * ht = NULL;
-  const size_t nel = tab->maxsize;
+  size_t nel = 0;
+
+  if (tab == NULL || tab->ht == NULL) {
+    if (ret != NULL) *ret = NULL;
+    return TH_FAILURE;
+  }
+  nel = tab->maxsize;
+  if (nel == 0) {
+    if (ret != NULL) *ret = NULL;
+    return TH_FAILURE;
+  }
 
   it = thfhash0(q->key.ukey,tab->maxsize);
 

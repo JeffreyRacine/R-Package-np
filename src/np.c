@@ -130,6 +130,18 @@ static int bwm_kernel_unordered = 0;
 static int *bwm_num_categories = NULL;
 static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
+
+static void bwm_reserve_transform_buf(int needed_len)
+{
+  double *tmp = NULL;
+  if (needed_len <= bwm_transform_buf_len)
+    return;
+  tmp = (double *) realloc(bwm_transform_buf, (size_t) needed_len * sizeof(double));
+  if (tmp == NULL)
+    error("bwm_reserve_transform_buf: memory allocation failed");
+  bwm_transform_buf = tmp;
+  bwm_transform_buf_len = needed_len;
+}
 static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
 static int *bwm_kernel_unordered_vec = NULL;
@@ -263,10 +275,7 @@ static double bwmfunc_wrapper(double *p)
   bwm_eval_count += 1.0;
   if (bwm_use_transform) {
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
-    if (bwm_transform_buf_len < n + 1) {
-      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
-      bwm_transform_buf_len = n + 1;
-    }
+    bwm_reserve_transform_buf(n + 1);
     bwm_apply_transform(p, bwm_transform_buf, n);
     use_p = bwm_transform_buf;
   }
@@ -479,10 +488,7 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
     bwm_use_transform = 0;
   if (bwm_use_transform) {
     int n = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-    if (bwm_transform_buf_len < n + 1) {
-      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
-      bwm_transform_buf_len = n + 1;
-    }
+    bwm_reserve_transform_buf(n + 1);
   }
 
   ftol=myoptd[BW_FTOLD];
@@ -1061,10 +1067,7 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
     bwm_use_transform = 0;
   if (bwm_use_transform) {
     int n = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-    if (bwm_transform_buf_len < n + 1) {
-      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
-      bwm_transform_buf_len = n + 1;
-    }
+    bwm_reserve_transform_buf(n + 1);
   }
 
   ftol=myoptd[DBW_FTOLD];
@@ -1709,10 +1712,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
     int n = num_var_continuous_extern + num_reg_continuous_extern +
       num_var_unordered_extern + num_reg_unordered_extern +
       num_var_ordered_extern + num_reg_ordered_extern;
-    if (bwm_transform_buf_len < n + 1) {
-      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
-      bwm_transform_buf_len = n + 1;
-    }
+    bwm_reserve_transform_buf(n + 1);
   }
 
   ftol=myoptd[CBW_FTOLD];
@@ -2563,10 +2563,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
     int n = num_var_continuous_extern + num_reg_continuous_extern +
       num_var_unordered_extern + num_reg_unordered_extern +
       num_var_ordered_extern + num_reg_ordered_extern;
-    if (bwm_transform_buf_len < n + 1) {
-      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
-      bwm_transform_buf_len = n + 1;
-    }
+    bwm_reserve_transform_buf(n + 1);
   }
 
   ftol=myoptd[CDBW_FTOLD];
@@ -4363,10 +4360,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   bwm_num_categories = num_categories_extern;
   if (bwm_use_transform) {
     int n = bwm_num_reg_continuous + bwm_num_reg_unordered + bwm_num_reg_ordered;
-    if (bwm_transform_buf_len < n + 1) {
-      bwm_transform_buf = (double *) realloc(bwm_transform_buf, (n + 1) * sizeof(double));
-      bwm_transform_buf_len = n + 1;
-    }
+    bwm_reserve_transform_buf(n + 1);
   }
   bwm_reset_counters();
 
