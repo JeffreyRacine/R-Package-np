@@ -147,6 +147,7 @@ mpi.bcast.cmd(model <- npuniden.reflect(X),
               caller.execute=TRUE)
 
 oldpar <- par(no.readonly = TRUE)
+on.exit(par(oldpar), add = TRUE)
 par(mfrow=c(1,2))
 ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
 plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
@@ -178,8 +179,6 @@ hist(cps71$age,prob=TRUE,main="",ylim=c(0,max(model$f)))
 lines(cps71$age,model$f)
 lines(density(cps71$age,bw=model$h),col=2)
 legend("topright",c("Data-Reflection","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
-
-par(oldpar)
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
