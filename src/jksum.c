@@ -11,6 +11,7 @@
 #include <R.h>
 #include <R_ext/Utils.h>
 #include <Rmath.h>
+#include <Rinternals.h>
 
 #include "headers.h"
 #include "matrix.h"
@@ -753,6 +754,25 @@ static inline int np_cont_largeh_kernel_supported(const int kernel){
   return (kernel >= 0 && kernel <= 9);
 }
 
+static inline double np_get_option_double(const char * const name, const double fallback){
+  const SEXP sym = Rf_install(name);
+  const SEXP val = Rf_GetOption1(sym);
+
+  if(val == R_NilValue)
+    return fallback;
+
+  if(TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+    return REAL(val)[0];
+
+  if(TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+    return (double)INTEGER(val)[0];
+
+  if(TYPEOF(val) == LGLSXP && XLENGTH(val) > 0)
+    return (double)LOGICAL(val)[0];
+
+  return fallback;
+}
+
 static inline double np_cont_largeh_k0(const int kernel){
   switch(kernel){
     case 0: return np_gauss2(0.0);
@@ -787,18 +807,20 @@ static inline double np_cont_largeh_utol(const int kernel, const double rel_tol)
 }
 
 static inline double np_cont_largeh_rel_tol(void){
-  static int init = 0;
-  static double rt = 1e-3;
-  if(!init){
-    const char *rt_env = getenv("NP_LARGEH_REL_TOL");
-    if(rt_env != NULL && rt_env[0] != '\0'){
-      const double v = atof(rt_env);
-      if(isfinite(v) && v > 0.0 && v < 0.1)
-        rt = v;
-    }
-    init = 1;
+  const double dflt = 1e-3;
+  const double optv = np_get_option_double("np.largeh.rel.tol", dflt);
+  if(isfinite(optv) && optv > 0.0 && optv < 0.1)
+    return optv;
+
+  /* fallback for legacy/developer workflows */
+  const char *rt_env = getenv("NP_LARGEH_REL_TOL");
+  if(rt_env != NULL && rt_env[0] != '\0'){
+    const double v = atof(rt_env);
+    if(isfinite(v) && v > 0.0 && v < 0.1)
+      return v;
   }
-  return rt;
+
+  return dflt;
 }
 
 static inline int np_cont_largeh_is_active(const int kernel,
@@ -829,6 +851,61 @@ static inline int np_cont_largeh_is_active(const int kernel,
   }
 
   return 1;
+}
+
+/*
+  Discrete "near upper-bound lambda" shortcut:
+  if unordered same/different kernel values are nearly identical, replace
+  per-observation category checks by a constant multiply.
+*/
+static inline double np_disc_rel_tol(void){
+  const double dflt = 1e-2;
+  const double optv = np_get_option_double("np.disc.upper.rel.tol", dflt);
+  if(isfinite(optv) && optv > 0.0 && optv < 0.5)
+    return optv;
+
+  /* fallback for legacy/developer workflows */
+  const char *rt_env = getenv("NP_DISC_UPPER_REL_TOL");
+  if(rt_env != NULL && rt_env[0] != '\0'){
+    const double v = atof(rt_env);
+    if(isfinite(v) && v > 0.0 && v < 0.5)
+      return v;
+  }
+
+  return dflt;
+}
+
+static inline int np_disc_unordered_has_upper(const int kernel){
+  return (kernel >= 0 && kernel <= 5);
+}
+
+static inline double np_disc_unordered_upper(const int kernel, const int ncat){
+  const double c = (double)ncat;
+  switch(kernel){
+    case 0: /* AA */
+    case 2: /* econvol AA */
+    case 4: /* score AA */
+      return (c > 0.0) ? ((c - 1.0)/c) : 0.0;
+    case 1: /* Li-Racine */
+    case 3: /* econvol Li-Racine */
+    case 5: /* score Li-Racine */
+      return 1.0;
+    default:
+      return 1.0;
+  }
+}
+
+static inline int np_disc_near_upper(const int kernel, const double lambda, const int ncat){
+  if(!isfinite(lambda) || !np_disc_unordered_has_upper(kernel))
+    return 0;
+  const double up = np_disc_unordered_upper(kernel, ncat);
+  const double tol = np_disc_rel_tol()*fmax(1.0, fabs(up));
+  return fabs(lambda - up) <= tol;
+}
+
+static inline int np_disc_near_const_kernel(const double k_same, const double k_diff){
+  const double scale = fmax(1.0, fmax(fabs(k_same), fabs(k_diff)));
+  return fabs(k_same - k_diff) <= np_disc_rel_tol()*scale;
 }
 
 static inline void np_ckernelv_mul_const(const double c,
@@ -2844,6 +2921,12 @@ void np_p_ukernelv(const int KERNEL,
   const double kn_diff = k[kernel](0, lambda, ncat);
   const double pkn_same = k[p_kernel](1, lambda, ncat);
   const double pkn_diff = k[p_kernel](0, lambda, ncat);
+  const int use_const_k = np_disc_near_upper(kernel, lambda, ncat) &&
+    np_disc_near_const_kernel(kn_same, kn_diff);
+  const int use_const_pk = np_disc_near_upper(p_kernel, lambda, ncat) &&
+    np_disc_near_const_kernel(pkn_same, pkn_diff);
+  const double kn_const = 0.5*(kn_same + kn_diff);
+  const double pkn_const = 0.5*(pkn_same + pkn_diff);
   const int p_iscat_const = (swap_xxt && do_ocg);
   const int p_iscat_const_val = (cat == x);
 
@@ -2856,14 +2939,16 @@ void np_p_ukernelv(const int KERNEL,
 
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      const int is_same = (xt[i] == x);
-      const double kn = is_same ? kn_same : kn_diff;
+      const double kn = use_const_k ?
+        kn_const :
+        (((xt[i] == x) ? kn_same : kn_diff));
 
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
 
-      const int iscat = p_iscat_const ? p_iscat_const_val : (xt[i] == ex);
-      const double pkn = iscat ? pkn_same : pkn_diff;
+      const double pkn = use_const_pk ?
+        pkn_const :
+        (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
       p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
     }
 
@@ -2880,8 +2965,9 @@ void np_p_ukernelv(const int KERNEL,
       const int istart = xl->istart[m];
       const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const int is_same = (xt[i] == x);
-        const double kn = is_same ? kn_same : kn_diff;
+        const double kn = use_const_k ?
+          kn_const :
+          (((xt[i] == x) ? kn_same : kn_diff));
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -2892,8 +2978,9 @@ void np_p_ukernelv(const int KERNEL,
       const int istart = p_xl->istart[m];
       const int nlev = p_xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const int iscat = p_iscat_const ? p_iscat_const_val : (xt[i] == ex);
-        const double pkn = iscat ? pkn_same : pkn_diff;
+        const double pkn = use_const_pk ?
+          pkn_const :
+          (((p_iscat_const ? p_iscat_const_val : (xt[i] == ex)) ? pkn_same : pkn_diff));
         p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*pkn;
       }
     }
@@ -2938,16 +3025,19 @@ void np_ukernelv(const int KERNEL,
   const int kernel = (KERNEL >= 0 && KERNEL < nk) ? KERNEL : 0;
   const double kn_same = k[kernel](1, lambda, ncat);
   const double kn_diff = k[kernel](0, lambda, ncat);
+  const int use_const_k = np_disc_near_upper(kernel, lambda, ncat) &&
+    np_disc_near_const_kernel(kn_same, kn_diff);
+  const double kn_const = 0.5*(kn_same + kn_diff);
 
   if(xl == NULL){
     if(!bin_do_xw){
       for(i = 0; i < num_xt; i++){
-        result[i] = (xt[i] == x) ? kn_same : kn_diff;
+        result[i] = use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff);
       }
     } else {
       for(i = 0; i < num_xt; i++){
         if(xw[i] == 0.0) continue;
-        result[i] = xw[i]*((xt[i] == x) ? kn_same : kn_diff);
+        result[i] = xw[i]*(use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff));
       }
     }
   } else {
@@ -2956,12 +3046,12 @@ void np_ukernelv(const int KERNEL,
       const int nlev = xl->nlev[m];
       if(!bin_do_xw){
         for(i = istart; i < istart+nlev; i++){
-          result[i] = (xt[i] == x) ? kn_same : kn_diff;
+          result[i] = use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff);
         }
       } else {
         for(i = istart; i < istart+nlev; i++){
           if(xw[i] == 0.0) continue;
-          result[i] = xw[i]*((xt[i] == x) ? kn_same : kn_diff);
+          result[i] = xw[i]*(use_const_k ? kn_const : ((xt[i] == x) ? kn_same : kn_diff));
         }
       }
     }
