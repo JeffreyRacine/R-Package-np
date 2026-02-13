@@ -3,6 +3,7 @@
 }
 
 .onUnload <- function (lpath){
+  try(.C("np_release_static_buffers", as.integer(0), PACKAGE = "npRmpi"), silent = TRUE)
   mpi.finalize()
   library.dynam.unload("npRmpi", libpath=lpath) 
 }
@@ -38,7 +39,9 @@
   }
 
   if(.Call("mpidist",PACKAGE="npRmpi") == 2){
-    if (length(try(system("lamnodes",TRUE,ignore.stderr = TRUE))) == 0){
+    auto.lamboot <- isTRUE(getOption("npRmpi.auto.lamboot", FALSE)) ||
+      nzchar(Sys.getenv("NP_RMPI_AUTO_LAMBOOT"))
+    if (auto.lamboot && (length(try(system("lamnodes",TRUE,ignore.stderr = TRUE))) == 0)){
 	    system("lamboot -H",ignore.stderr = TRUE)
     }
   }
@@ -46,11 +49,6 @@
   if(!.Call("mpi_initialize",PACKAGE="npRmpi"))
     stop("Cannot start MPI_Init(). Exit")
   
-  if (exists(".Random.seed") && 
-      round(.Random.seed[1]-5,-1) == .Random.seed[1]-5) {
-    rm(.Random.seed, envir=.GlobalEnv)
-  }
-
   if(is.null(options('np.messages')$np.messages))
     options(np.messages = TRUE)
 
