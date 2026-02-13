@@ -924,5 +924,8 @@ detach(cps71)
 } % enddontrun
 }
 
-\keyword{nonparametric}
+\seealso{
+  \code{\link{np.options}}
+}
 
+\keyword{nonparametric}

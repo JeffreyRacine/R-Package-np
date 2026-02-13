@@ -264,6 +264,10 @@
 
 }
 
+\seealso{
+  \code{\link{np.options}}
+}
+
 \author{
   Tristen Hayfield <tristen.hayfield@gmail.com>, Jeffrey S. Racine
   <racinej@mcmaster.ca>
