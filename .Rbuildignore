@@ -26,3 +26,4 @@ mknpkg.sh
 ^audit_report\.md$
 ^issue_notes
 ^benchmarks
+^AGENTS\.md$
