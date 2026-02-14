@@ -773,6 +773,41 @@ static inline double np_get_option_double(const char * const name, const double 
   return fallback;
 }
 
+static inline int np_get_option_bool(const char * const name, const int fallback){
+  const SEXP sym = Rf_install(name);
+  const SEXP val = Rf_GetOption1(sym);
+
+  if(val == R_NilValue)
+    return fallback;
+
+  if(TYPEOF(val) == LGLSXP && XLENGTH(val) > 0){
+    const int v = LOGICAL(val)[0];
+    if(v == NA_LOGICAL)
+      return fallback;
+    return (v != 0);
+  }
+
+  if(TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
+    return (INTEGER(val)[0] != 0);
+
+  if(TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
+    return (REAL(val)[0] != 0.0);
+
+  return fallback;
+}
+
+static inline int np_groupcv_fast_enabled(void){
+  const int opt = np_get_option_bool("np.groupcv.fast", 0);
+  if(opt)
+    return 1;
+  {
+    const char *ev = getenv("NP_GROUPCV_FAST");
+    if(ev != NULL && ev[0] != '\0')
+      return (atoi(ev) != 0);
+  }
+  return 0;
+}
+
 static int np_runtime_tol_cache_ready = 0;
 static double np_largeh_rel_tol_cache = 1e-3;
 static double np_disc_rel_tol_cache = 1e-2;
@@ -4090,6 +4125,7 @@ double * const kw){
   double *cont_largeh_hmin = NULL, *cont_largeh_k0 = NULL;
   double cont_largeh_rel_tol = 1e-3;
   int *cont_largeh_active = NULL, *cont_largeh_active_fixed = NULL;
+  int *tree_active_dims = NULL;
   int cont_largeh_all_fixed = 0, cont_largeh_fixed_ready = 0;
   int cont_largeh_from_override = 0;
   int disc_uno_from_override = 0, disc_ord_from_override = 0;
@@ -4349,6 +4385,10 @@ double * const kw){
         cont_largeh_fixed_ready = 1;
       }
     }
+  }
+
+  if(np_ks_tree_use && (num_reg_continuous > 0)){
+    tree_active_dims = (int *)malloc((size_t)num_reg_continuous*sizeof(int));
   }
 
   if(num_reg_unordered > 0){
@@ -4674,6 +4714,13 @@ double * const kw){
     int deferred_const_active = 0;
     double deferred_const = 1.0;
     int all_cont_largeh = (num_reg_continuous > 0);
+    int tree_active_n = num_reg_continuous;
+    const int tree_use_active_dims =
+      np_ks_tree_use &&
+      (p_nvar == 0) &&
+      (!do_partial_tree) &&
+      (cont_largeh_active != NULL) &&
+      (tree_active_dims != NULL);
 
     if(cont_largeh_fixed_ready){
       all_cont_largeh = cont_largeh_all_fixed;
@@ -4690,6 +4737,15 @@ double * const kw){
       }
     } else {
       all_cont_largeh = 0;
+    }
+
+    if(tree_use_active_dims){
+      tree_active_n = 0;
+      for(i = 0; i < num_reg_continuous; i++){
+        if(!cont_largeh_active[i]){
+          tree_active_dims[tree_active_n++] = i;
+        }
+      }
     }
 
     for (ii = 0; ii < p_nvar; ii++)
@@ -4714,25 +4770,43 @@ double * const kw){
 
       // reset the interaction node list
       xl.n = 0;
-      if(all_cont_largeh){
+      if(all_cont_largeh || (tree_use_active_dims && (tree_active_n == 0))){
         /* Global large-h: all continuous kernels are effectively K(0), so support is full. */
         merge_end_xl(pxl, &kdt->kdn[0]);
       } else {
         if(!do_partial_tree){
-          for(i = 0; i < num_reg_continuous; i++){
-            const double sf = m[i][jbw];
-            if(!is_adaptive){
-              bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
-              bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
-            }else{
-              bb[2*i] = cksup[KERNEL_reg_np[i]][0];
-              bb[2*i+1] = cksup[KERNEL_reg_np[i]][1];
+          if(tree_use_active_dims && (tree_active_n < num_reg_continuous)){
+            for(kk = 0; kk < tree_active_n; kk++){
+              const int id = tree_active_dims[kk];
+              const double sf = m[id][jbw];
+              if(!is_adaptive){
+                bb[2*id] = -cksup[KERNEL_reg_np[id]][1];
+                bb[2*id+1] = -cksup[KERNEL_reg_np[id]][0];
+              } else {
+                bb[2*id] = cksup[KERNEL_reg_np[id]][0];
+                bb[2*id+1] = cksup[KERNEL_reg_np[id]][1];
+              }
+              bb[2*id] = (fabs(bb[2*id]) == DBL_MAX) ? bb[2*id] : (xc[id][j] + bb[2*id]*sf);
+              bb[2*id+1] = (fabs(bb[2*id+1]) == DBL_MAX) ? bb[2*id+1] : (xc[id][j] + bb[2*id+1]*sf);
             }
-            bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
-            bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
-          }
 
-          boxSearchNL(kdt, &nls, bb, NULL, pxl);
+            boxSearchNLPartial(kdt, &nls, bb, NULL, pxl, tree_active_dims, tree_active_n);
+          } else {
+            for(i = 0; i < num_reg_continuous; i++){
+              const double sf = m[i][jbw];
+              if(!is_adaptive){
+                bb[2*i] = -cksup[KERNEL_reg_np[i]][1];
+                bb[2*i+1] = -cksup[KERNEL_reg_np[i]][0];
+              }else{
+                bb[2*i] = cksup[KERNEL_reg_np[i]][0];
+                bb[2*i+1] = cksup[KERNEL_reg_np[i]][1];
+              }
+              bb[2*i] = (fabs(bb[2*i]) == DBL_MAX) ? bb[2*i] : (xc[i][j] + bb[2*i]*sf);
+              bb[2*i+1] = (fabs(bb[2*i+1]) == DBL_MAX) ? bb[2*i+1] : (xc[i][j] + bb[2*i+1]*sf);
+            }
+
+            boxSearchNL(kdt, &nls, bb, NULL, pxl);
+          }
         } else {
           for(i = 0; i < num_reg_continuous; i++){
             const double sf = m[i][jbw];
@@ -5223,6 +5297,7 @@ double * const kw){
   if((cont_largeh_k0 != NULL) && (!cont_largeh_from_override)) free(cont_largeh_k0);
   if(cont_largeh_active != NULL) free(cont_largeh_active);
   if(cont_largeh_active_fixed != NULL) free(cont_largeh_active_fixed);
+  if(tree_active_dims != NULL) free(tree_active_dims);
 
   if(no_bpso)
     free(bpso);
@@ -5595,6 +5670,300 @@ double *cv){
 // we take advantage of both the quasi-parity, and 
 // of the algebraic transpose symmetry of the aforementioned expression to gain a factor of ~ 4 speed-up
 
+static int np_regression_group_fast_path(
+int int_ll,
+int bwm,
+int num_obs,
+int num_reg_unordered,
+int num_reg_ordered,
+int num_reg_continuous,
+int *kernel_u,
+int *kernel_o,
+double **matrix_X_unordered,
+double **matrix_X_ordered,
+double **matrix_X_continuous,
+double *vector_Y,
+double *lambda,
+int *num_categories,
+double cont_const,
+double aicc,
+double *cv_out,
+double *trace_out){
+
+  int i, j, g, h, l, m;
+  int ok = 0;
+  int G = 0;
+  int *gid = NULL, *grep = NULL, *gcount = NULL;
+  double *gysum = NULL, *gxsum = NULL, *gxxsum = NULL, *gxysum = NULL;
+  double *K = NULL, *Kg_n = NULL, *Kg_y = NULL, *Kg_x = NULL, *Kg_xx = NULL, *Kg_xy = NULL;
+  MATRIX KWM = NULL, XTKXINV = NULL, XTKY = NULL, DELTA = NULL;
+  const double epsilon = (num_obs > 0) ? (1.0/(double)num_obs) : 1.0;
+  double cv = 0.0, traceH = 0.0;
+
+  if((num_obs <= 0) || (cv_out == NULL) || (trace_out == NULL))
+    return 0;
+
+  gid = (int *)malloc((size_t)num_obs*sizeof(int));
+  grep = (int *)malloc((size_t)num_obs*sizeof(int));
+  if((gid == NULL) || (grep == NULL)) goto cleanup;
+
+  for(i = 0; i < num_obs; i++){
+    int found = 0;
+    for(g = 0; g < G; g++){
+      const int r = grep[g];
+      int same = 1;
+      for(j = 0; j < num_reg_unordered; j++){
+        if(matrix_X_unordered[j][i] != matrix_X_unordered[j][r]){
+          same = 0;
+          break;
+        }
+      }
+      for(j = 0; same && (j < num_reg_ordered); j++){
+        if(matrix_X_ordered[j][i] != matrix_X_ordered[j][r]){
+          same = 0;
+          break;
+        }
+      }
+      if(same){
+        found = 1;
+        break;
+      }
+    }
+
+    if(!found){
+      grep[G] = i;
+      g = G;
+      G++;
+    }
+    gid[i] = g;
+  }
+
+  if(((double)G/(double)num_obs) > 0.75)
+    goto cleanup;
+
+  gcount = (int *)calloc((size_t)G, sizeof(int));
+  gysum = (double *)calloc((size_t)G, sizeof(double));
+  if((gcount == NULL) || (gysum == NULL)) goto cleanup;
+
+  if(num_reg_continuous > 0){
+    gxsum = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
+    gxxsum = (double *)calloc((size_t)G*(size_t)num_reg_continuous*(size_t)num_reg_continuous, sizeof(double));
+    gxysum = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
+    if((gxsum == NULL) || (gxxsum == NULL) || (gxysum == NULL)) goto cleanup;
+  }
+
+  for(i = 0; i < num_obs; i++){
+    const int gi = gid[i];
+    const double yi = vector_Y[i];
+
+    gcount[gi]++;
+    gysum[gi] += yi;
+
+    for(l = 0; l < num_reg_continuous; l++){
+      const double xl = matrix_X_continuous[l][i];
+      gxsum[gi*num_reg_continuous + l] += xl;
+      gxysum[gi*num_reg_continuous + l] += xl*yi;
+    }
+
+    for(l = 0; l < num_reg_continuous; l++){
+      const double xl = matrix_X_continuous[l][i];
+      for(m = 0; m < num_reg_continuous; m++){
+        const double xm = matrix_X_continuous[m][i];
+        gxxsum[(gi*num_reg_continuous + l)*num_reg_continuous + m] += xl*xm;
+      }
+    }
+  }
+
+  K = (double *)malloc((size_t)G*(size_t)G*sizeof(double));
+  Kg_n = (double *)calloc((size_t)G, sizeof(double));
+  Kg_y = (double *)calloc((size_t)G, sizeof(double));
+  if((K == NULL) || (Kg_n == NULL) || (Kg_y == NULL)) goto cleanup;
+
+  if(num_reg_continuous > 0){
+    Kg_x = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
+    Kg_xx = (double *)calloc((size_t)G*(size_t)num_reg_continuous*(size_t)num_reg_continuous, sizeof(double));
+    Kg_xy = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
+    if((Kg_x == NULL) || (Kg_xx == NULL) || (Kg_xy == NULL)) goto cleanup;
+  }
+
+  {
+    double (* const ukf[])(int, double, int) = {
+      np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+      np_score_uaa, np_score_unli_racine
+    };
+    double (* const okf[])(double, double, double, double, double) = {
+      np_owang_van_ryzin, np_oli_racine, np_onli_racine,
+      np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
+      np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
+      np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+    };
+    const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
+    const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
+
+    for(g = 0; g < G; g++){
+      for(h = 0; h < G; h++){
+        const int rg = grep[g];
+        const int rh = grep[h];
+        double kv = cont_const;
+
+        for(j = 0; j < num_reg_unordered; j++){
+          const int ku = kernel_u[j];
+          const int ncat = (num_categories != NULL) ? num_categories[j] : 0;
+          if(ku < 0 || ku >= nuk) goto cleanup;
+          kv *= ukf[ku](matrix_X_unordered[j][rg] == matrix_X_unordered[j][rh],
+                        lambda[j], ncat);
+        }
+
+        for(j = 0; j < num_reg_ordered; j++){
+          const int oi = j + num_reg_unordered;
+          const int ko = kernel_o[j];
+          if((matrix_categorical_vals_extern == NULL) || (num_categories == NULL) || (num_categories[oi] <= 0))
+            goto cleanup;
+          if(ko < 0 || ko >= nok) goto cleanup;
+          {
+            const double cl = matrix_categorical_vals_extern[oi][0];
+            const double ch = matrix_categorical_vals_extern[oi][num_categories[oi]-1];
+            kv *= okf[ko](matrix_X_ordered[j][rg], matrix_X_ordered[j][rh], lambda[oi], cl, ch);
+          }
+        }
+
+        K[g*G + h] = kv;
+      }
+    }
+  }
+
+  for(g = 0; g < G; g++){
+    for(h = 0; h < G; h++){
+      const double kgh = K[g*G + h];
+      Kg_n[g] += kgh*(double)gcount[h];
+      Kg_y[g] += kgh*gysum[h];
+
+      for(l = 0; l < num_reg_continuous; l++){
+        Kg_x[g*num_reg_continuous + l] += kgh*gxsum[h*num_reg_continuous + l];
+        Kg_xy[g*num_reg_continuous + l] += kgh*gxysum[h*num_reg_continuous + l];
+      }
+
+      for(l = 0; l < num_reg_continuous; l++){
+        for(m = 0; m < num_reg_continuous; m++){
+          Kg_xx[(g*num_reg_continuous + l)*num_reg_continuous + m] +=
+            kgh*gxxsum[(h*num_reg_continuous + l)*num_reg_continuous + m];
+        }
+      }
+    }
+  }
+
+  if(int_ll == LL_LC){
+    for(i = 0; i < num_obs; i++){
+      const int gi = gid[i];
+      const double yi = vector_Y[i];
+      const double selfk = K[gi*G + gi];
+      const double den = (bwm == RBWM_CVLS) ? (Kg_n[gi] - selfk) : Kg_n[gi];
+      const double num = (bwm == RBWM_CVLS) ? (Kg_y[gi] - selfk*yi) : Kg_y[gi];
+      const double sk = copysign(DBL_MIN, den) + den;
+      const double dy = yi - num/sk;
+
+      cv += dy*dy;
+      if(bwm == RBWM_CVAIC)
+        traceH += aicc/sk;
+    }
+
+    ok = 1;
+    goto cleanup;
+  }
+
+  {
+    const int p = num_reg_continuous + 1;
+
+    KWM = mat_creat(p, p, UNDEFINED);
+    XTKXINV = mat_creat(p, p, UNDEFINED);
+    XTKY = mat_creat(p, 1, UNDEFINED);
+    DELTA = mat_creat(p, 1, UNDEFINED);
+    if((KWM == NULL) || (XTKXINV == NULL) || (XTKY == NULL) || (DELTA == NULL))
+      goto cleanup;
+
+    for(i = 0; i < num_obs; i++){
+      const int gi = gid[i];
+      const double yi = vector_Y[i];
+      const double selfk = K[gi*G + gi];
+      const double S0 = Kg_n[gi] - selfk;
+      const double Wy = Kg_y[gi] - selfk*yi;
+      double nepsilon = 0.0;
+
+      KWM[0][0] = S0;
+      XTKY[0][0] = Wy;
+
+      for(l = 0; l < num_reg_continuous; l++){
+        const double xi = matrix_X_continuous[l][i];
+        const double Wx = Kg_x[gi*num_reg_continuous + l] - selfk*xi;
+        const double Wxy = Kg_xy[gi*num_reg_continuous + l] - selfk*xi*yi;
+        const int ll1 = l + 1;
+
+        KWM[0][ll1] = Wx - xi*S0;
+        KWM[ll1][0] = KWM[0][ll1];
+        XTKY[ll1][0] = Wxy - xi*Wy;
+      }
+
+      for(l = 0; l < num_reg_continuous; l++){
+        const double xil = matrix_X_continuous[l][i];
+        const double Wxl = Kg_x[gi*num_reg_continuous + l] - selfk*xil;
+        const int ll1 = l + 1;
+        for(m = 0; m < num_reg_continuous; m++){
+          const double xim = matrix_X_continuous[m][i];
+          const double Wxm = Kg_x[gi*num_reg_continuous + m] - selfk*xim;
+          const double Wxx = Kg_xx[(gi*num_reg_continuous + l)*num_reg_continuous + m] - selfk*xil*xim;
+          KWM[ll1][m+1] = Wxx - xil*Wxm - Wxl*xim + xil*xim*S0;
+        }
+      }
+
+      if(bwm == RBWM_CVAIC){
+        KWM[0][0] += aicc;
+        XTKY[0][0] += aicc*yi;
+      }
+
+      while(mat_inv(KWM, XTKXINV) == NULL){
+        for(l = 0; l < p; l++)
+          KWM[l][l] += epsilon;
+        nepsilon += epsilon;
+      }
+
+      if(bwm == RBWM_CVAIC)
+        traceH += XTKXINV[0][0]*aicc;
+
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+      cv += (yi - DELTA[0][0])*(yi - DELTA[0][0]);
+    }
+  }
+
+  ok = 1;
+
+ cleanup:
+  if(gid != NULL) free(gid);
+  if(grep != NULL) free(grep);
+  if(gcount != NULL) free(gcount);
+  if(gysum != NULL) free(gysum);
+  if(gxsum != NULL) free(gxsum);
+  if(gxxsum != NULL) free(gxxsum);
+  if(gxysum != NULL) free(gxysum);
+  if(K != NULL) free(K);
+  if(Kg_n != NULL) free(Kg_n);
+  if(Kg_y != NULL) free(Kg_y);
+  if(Kg_x != NULL) free(Kg_x);
+  if(Kg_xx != NULL) free(Kg_xx);
+  if(Kg_xy != NULL) free(Kg_xy);
+  if(KWM != NULL) mat_free(KWM);
+  if(XTKXINV != NULL) mat_free(XTKXINV);
+  if(XTKY != NULL) mat_free(XTKY);
+  if(DELTA != NULL) mat_free(DELTA);
+
+  if(ok){
+    *cv_out = cv;
+    *trace_out = traceH;
+    return 1;
+  }
+  return 0;
+}
+
 
 double np_kernel_estimate_regression_categorical_ls_aic(
 int int_ll,
@@ -5625,6 +5994,7 @@ int *num_categories){
 
   double aicc = 0.0;
   double traceH = 0.0;
+  int all_cont_largeh_fixed = (num_reg_continuous == 0);
 
   int * operator = NULL;
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
@@ -5817,6 +6187,17 @@ int *num_categories){
     }
   }
 
+  if((BANDWIDTH_reg == BW_FIXED) && (num_reg_continuous > 0)){
+    int ok_all = 1;
+    for(i = 0; ok_all && (i < num_reg_continuous); i++){
+      ok_all = (ov_cont_ok != NULL) &&
+        ov_cont_ok[i] &&
+        isfinite(matrix_bandwidth[i][0]) &&
+        (fabs(matrix_bandwidth[i][0]) >= ov_cont_hmin[i]);
+    }
+    all_cont_largeh_fixed = ok_all;
+  }
+
 
   if(bwm == RBWM_CVAIC){
     // compute normalisation constant
@@ -5882,6 +6263,142 @@ int *num_categories){
     int_LARGE_SF = tsf;
 
     //fprintf(stderr,"\n%e\n",aicc);
+  }
+
+  if((BANDWIDTH_reg == BW_FIXED) && all_cont_largeh_fixed && np_groupcv_fast_enabled()){
+    double cont_const = 1.0;
+
+    for(i = 0; i < num_reg_continuous; i++)
+      cont_const *= ov_cont_k0[i];
+
+    if((bwm == RBWM_CVLS) && (num_reg_unordered + num_reg_ordered == 0)){
+      if(int_ll == LL_LC){
+        if(num_obs <= 1){
+          cv = DBL_MAX;
+        } else {
+          double ysum = 0.0;
+          const double nmo = (double)(num_obs - 1);
+
+          for(i = 0; i < num_obs; i++)
+            ysum += vector_Y[i];
+
+          for(i = 0; i < num_obs; i++){
+            const double yhat = (ysum - vector_Y[i]) / nmo;
+            const double dy = vector_Y[i] - yhat;
+            cv += dy*dy;
+          }
+        }
+        goto compute_done;
+      } else {
+        const int p = num_reg_continuous + 1;
+
+        if(num_obs > p){
+          MATRIX XtX = mat_creat(p, p, UNDEFINED);
+          MATRIX XtXinv = mat_creat(p, p, UNDEFINED);
+          MATRIX Xty = mat_creat(p, 1, UNDEFINED);
+          MATRIX beta = mat_creat(p, 1, UNDEFINED);
+          int ll_fast_done = 0;
+
+          for(i = 0; i < p; i++){
+            Xty[i][0] = 0.0;
+            for(j = 0; j < p; j++)
+              XtX[i][j] = 0.0;
+          }
+
+          for(i = 0; i < num_obs; i++){
+            const double yi = vector_Y[i];
+
+            Xty[0][0] += yi;
+            XtX[0][0] += 1.0;
+
+            for(j = 0; j < num_reg_continuous; j++){
+              const double xj = matrix_X_continuous[j][i];
+              const int jj = j + 1;
+              Xty[jj][0] += xj * yi;
+              XtX[0][jj] += xj;
+              XtX[jj][0] += xj;
+            }
+
+            for(j = 0; j < num_reg_continuous; j++){
+              const double xj = matrix_X_continuous[j][i];
+              const int jj = j + 1;
+              for(l = 0; l < num_reg_continuous; l++){
+                const double xl = matrix_X_continuous[l][i];
+                XtX[jj][l+1] += xj * xl;
+              }
+            }
+          }
+
+          if(mat_inv(XtX, XtXinv) != NULL){
+            beta = mat_mul(XtXinv, Xty, beta);
+            ll_fast_done = 1;
+
+            for(i = 0; i < num_obs; i++){
+              double yhat = beta[0][0];
+              double hii = XtXinv[0][0];
+              double xinvx = 0.0;
+
+              for(j = 0; j < num_reg_continuous; j++){
+                const double xj = matrix_X_continuous[j][i];
+                yhat += beta[j+1][0]*xj;
+                hii += 2.0*xj*XtXinv[0][j+1];
+              }
+
+              for(j = 0; j < num_reg_continuous; j++){
+                const double xj = matrix_X_continuous[j][i];
+                for(l = 0; l < num_reg_continuous; l++){
+                  xinvx += xj*XtXinv[j+1][l+1]*matrix_X_continuous[l][i];
+                }
+              }
+              hii += xinvx;
+
+              {
+                const double den = 1.0 - hii;
+                if(fabs(den) <= DBL_EPSILON){
+                  ll_fast_done = 0;
+                  break;
+                }
+                {
+                  const double dy = (vector_Y[i] - yhat)/den;
+                  cv += dy*dy;
+                }
+              }
+            }
+          }
+
+          mat_free(XtX);
+          mat_free(XtXinv);
+          mat_free(Xty);
+          mat_free(beta);
+
+          if(ll_fast_done)
+            goto compute_done;
+
+          cv = 0.0;
+        }
+      }
+    }
+
+    if(np_regression_group_fast_path(int_ll,
+                                     bwm,
+                                     num_obs,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     num_reg_continuous,
+                                     kernel_u,
+                                     kernel_o,
+                                     matrix_X_unordered,
+                                     matrix_X_ordered,
+                                     matrix_X_continuous,
+                                     vector_Y,
+                                     lambda,
+                                     num_categories,
+                                     cont_const,
+                                     aicc,
+                                     &cv,
+                                     &traceH)){
+      goto compute_done;
+    }
   }
 
   // Conduct the estimation 
@@ -6496,6 +7013,7 @@ int *num_categories){
     free_tmat(matrix_bandwidth_eval);
   }
 
+ compute_done:
   free(operator);
   free(kernel_c);
   free(kernel_u);
