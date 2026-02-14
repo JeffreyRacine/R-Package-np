@@ -808,6 +808,51 @@ static inline int np_groupcv_fast_enabled(void){
   return 0;
 }
 
+static inline int np_mat_inv_ridge_grid(MATRIX KWM,
+                                        MATRIX XTKXINV,
+                                        const int p,
+                                        const double fallback_step,
+                                        double * const ridge_added){
+  static const double alpha_grid[] = {0.0, 1.0e-8, 1.0e-6, 1.0e-4, 1.0e-3, 1.0e-2, 1.0e-1, 1.0};
+  const int nalpha = (int)(sizeof(alpha_grid)/sizeof(alpha_grid[0]));
+  const double scale = fmax(DBL_MIN, fabs(KWM[0][0]));
+  const double eps = (fallback_step > 0.0) ? fallback_step : DBL_EPSILON;
+  double *base_diag = (double *)malloc((size_t)p*sizeof(double));
+  int i, a;
+
+  if(base_diag == NULL)
+    return 0;
+
+  for(i = 0; i < p; i++)
+    base_diag[i] = KWM[i][i];
+
+  for(a = 0; a < nalpha; a++){
+    const double tau = alpha_grid[a]*scale;
+    for(i = 0; i < p; i++)
+      KWM[i][i] = base_diag[i] + tau;
+
+    if(mat_inv(KWM, XTKXINV) != NULL){
+      if(ridge_added != NULL) *ridge_added = tau;
+      free(base_diag);
+      return 1;
+    }
+  }
+
+  {
+    double tau = 0.0;
+    do{
+      tau += eps;
+      for(i = 0; i < p; i++)
+        KWM[i][i] = base_diag[i] + tau;
+    } while(mat_inv(KWM, XTKXINV) == NULL);
+
+    if(ridge_added != NULL) *ridge_added = tau;
+  }
+
+  free(base_diag);
+  return 1;
+}
+
 static int np_runtime_tol_cache_ready = 0;
 static double np_largeh_rel_tol_cache = 1e-3;
 static double np_disc_rel_tol_cache = 1e-2;
@@ -5920,11 +5965,7 @@ double *trace_out){
         XTKY[0][0] += aicc*yi;
       }
 
-      while(mat_inv(KWM, XTKXINV) == NULL){
-        for(l = 0; l < p; l++)
-          KWM[l][l] += epsilon;
-        nepsilon += epsilon;
-      }
+      np_mat_inv_ridge_grid(KWM, XTKXINV, p, epsilon, &nepsilon);
 
       if(bwm == RBWM_CVAIC)
         traceH += XTKXINV[0][0]*aicc;
@@ -6967,11 +7008,7 @@ int *num_categories){
         XTKY[0][0] += pnh*aicc*vector_Y[j];
       }
 
-      while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
-        for(int ii = 0; ii < (nrc1); ii++)
-          KWM[ii][ii] += epsilon;
-        nepsilon += epsilon;
-      }
+      np_mat_inv_ridge_grid(KWM, XTKXINV, nrc1, epsilon, &nepsilon);
       
       if(bwm == RBWM_CVAIC)
         traceH += XTKXINV[0][0]*pnh*aicc;
@@ -10440,11 +10477,7 @@ double *SIGN){
         }
       }
 
-      while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
-        for(int ii = 0; ii < (nrc1); ii++)
-          KWM[ii][ii] += epsilon;
-        nepsilon += epsilon;
-      }
+      np_mat_inv_ridge_grid(KWM, XTKXINV, nrc1, epsilon, &nepsilon);
       
       XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
@@ -10476,11 +10509,7 @@ double *SIGN){
           }
 
           nepsilon = 0.0;
-          while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
-            for(int ii = 0; ii < (nrc1); ii++)
-              KWM[ii][ii] += epsilon;
-            nepsilon += epsilon;
-          }
+          np_mat_inv_ridge_grid(KWM, XTKXINV, nrc1, epsilon, &nepsilon);
 
           XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
@@ -10514,11 +10543,7 @@ double *SIGN){
           }
 
           nepsilon = 0.0;
-          while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
-            for(int ii = 0; ii < (nrc1); ii++)
-              KWM[ii][ii] += epsilon;
-            nepsilon += epsilon;
-          }
+          np_mat_inv_ridge_grid(KWM, XTKXINV, nrc1, epsilon, &nepsilon);
 
           XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
