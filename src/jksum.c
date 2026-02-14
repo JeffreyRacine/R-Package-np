@@ -956,6 +956,22 @@ static inline void np_gate_override_clear(void){
   memset(&np_gate_override_ctx, 0, sizeof(np_gate_override_ctx));
 }
 
+static inline int np_gate_int_array_equal(const int * const a,
+                                          const int * const b,
+                                          const int n){
+  int i;
+  if(n <= 0)
+    return 1;
+  if(a == b)
+    return 1;
+  if(a == NULL || b == NULL)
+    return 0;
+  for(i = 0; i < n; i++)
+    if(a[i] != b[i])
+      return 0;
+  return 1;
+}
+
 static inline void np_gate_override_set(const int num_reg_continuous,
                                         const int num_reg_unordered,
                                         const int num_reg_ordered,
@@ -4241,10 +4257,13 @@ double * const kw){
   }
 
   if(num_reg_continuous > 0){
+    const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
     if(np_gate_override_ctx.active &&
        np_gate_override_ctx.num_reg_continuous == num_reg_continuous &&
-       np_gate_override_ctx.kernel_c == KERNEL_reg_np &&
-       np_gate_override_ctx.operator == operator &&
+       np_gate_override_ctx.num_reg_unordered == num_reg_unordered &&
+       np_gate_override_ctx.num_reg_ordered == num_reg_ordered &&
+       np_gate_int_array_equal(np_gate_override_ctx.kernel_c, KERNEL_reg_np, num_reg_continuous) &&
+       np_gate_int_array_equal(np_gate_override_ctx.operator, operator, total_regs) &&
        np_gate_override_ctx.cont_ok != NULL &&
        np_gate_override_ctx.cont_hmin != NULL &&
        np_gate_override_ctx.cont_k0 != NULL){
@@ -4333,10 +4352,13 @@ double * const kw){
   }
 
   if(num_reg_unordered > 0){
+    const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
     if(np_gate_override_ctx.active &&
+       np_gate_override_ctx.num_reg_continuous == num_reg_continuous &&
        np_gate_override_ctx.num_reg_unordered == num_reg_unordered &&
-       np_gate_override_ctx.kernel_u == KERNEL_unordered_reg_np &&
-       np_gate_override_ctx.operator == operator &&
+       np_gate_override_ctx.num_reg_ordered == num_reg_ordered &&
+       np_gate_int_array_equal(np_gate_override_ctx.kernel_u, KERNEL_unordered_reg_np, num_reg_unordered) &&
+       np_gate_int_array_equal(np_gate_override_ctx.operator, operator, total_regs) &&
        np_gate_override_ctx.disc_uno_ok != NULL &&
        np_gate_override_ctx.disc_uno_const != NULL){
       disc_uno_const_ok = (int *)np_gate_override_ctx.disc_uno_ok;
@@ -4381,10 +4403,13 @@ double * const kw){
   }
 
   if(num_reg_ordered > 0){
+    const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
     if(np_gate_override_ctx.active &&
+       np_gate_override_ctx.num_reg_continuous == num_reg_continuous &&
+       np_gate_override_ctx.num_reg_unordered == num_reg_unordered &&
        np_gate_override_ctx.num_reg_ordered == num_reg_ordered &&
-       np_gate_override_ctx.kernel_o == KERNEL_ordered_reg_np &&
-       np_gate_override_ctx.operator == operator &&
+       np_gate_int_array_equal(np_gate_override_ctx.kernel_o, KERNEL_ordered_reg_np, num_reg_ordered) &&
+       np_gate_int_array_equal(np_gate_override_ctx.operator, operator, total_regs) &&
        np_gate_override_ctx.disc_ord_ok != NULL &&
        np_gate_override_ctx.disc_ord_const != NULL){
       disc_ord_const_ok = (int *)np_gate_override_ctx.disc_ord_ok;
