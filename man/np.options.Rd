@@ -1,12 +1,12 @@
 \name{np.options}
 \alias{np.options}
-\title{Global Package Options for \pkg{np}}
+\title{Global Package Options for \pkg{npRmpi}}
 \description{
   Global options controlling selected computational and display behavior
-  for the \pkg{np} package.
+  for the \pkg{npRmpi} package.
 }
 \details{
-  The following options are recognized by \pkg{np}.
+  The following options are recognized by \pkg{npRmpi}.
 
   \itemize{
     \item \code{np.messages} (logical): controls console/progress output.
@@ -39,7 +39,7 @@
 
     \item \code{plot.par.mfrow} (logical): used by \code{\link{npplot}} to
     determine whether plotting layout is automatically managed via
-    \code{par(mfrow=...)}. If \code{NULL} (default behavior), \pkg{np} uses
+    \code{par(mfrow=...)}. If \code{NULL} (default behavior), \pkg{npRmpi} uses
     its internal plotting defaults.
   }
 
@@ -50,7 +50,7 @@
   Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-  \code{\link{np}}, \code{\link{npplot}}, \code{\link{options}}
+  \code{\link{npRmpi}}, \code{\link{npplot}}, \code{\link{options}}
 }
 \examples{
 \dontrun{
