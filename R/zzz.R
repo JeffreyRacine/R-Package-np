@@ -11,6 +11,8 @@
     options(np.largeh.rel.tol = 1e-3)
   if(is.null(options('np.disc.upper.rel.tol')$np.disc.upper.rel.tol))
     options(np.disc.upper.rel.tol = 1e-2)
+  if(is.null(options('np.groupcv.fast')$np.groupcv.fast))
+    options(np.groupcv.fast = TRUE)
 }
 
 .onUnload <- function (lpath){

@@ -29,6 +29,14 @@
     repeated category comparisons. Default is \code{1e-2}. Valid range is
     \code{(0, 0.5)}.
 
+    \item \code{np.groupcv.fast} (logical): enables the grouped
+    \eqn{G \ll n}{G << n} cross-validation fast path for regression bandwidth
+    selection when the all-large-\eqn{h} gate is active and grouped discrete
+    structure can be exploited. This can substantially reduce computation in
+    discrete-heavy settings, while potentially yielding tiny objective-level
+    floating-point differences relative to the legacy accumulation order.
+    Default is \code{TRUE}.
+
     \item \code{plot.par.mfrow} (logical): used by \code{\link{npplot}} to
     determine whether plotting layout is automatically managed via
     \code{par(mfrow=...)}. If \code{NULL} (default behavior), \pkg{np} uses
@@ -50,7 +58,8 @@ old <- options(
   np.tree = TRUE,
   np.messages = FALSE,
   np.largeh.rel.tol = 1e-3,
-  np.disc.upper.rel.tol = 1e-2
+  np.disc.upper.rel.tol = 1e-2,
+  np.groupcv.fast = TRUE
 )
 on.exit(options(old), add = TRUE)
 
