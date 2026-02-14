@@ -4670,6 +4670,9 @@ double * const kw){
 
     dband = 1.0;
     const int jbw = (BANDWIDTH_reg != BW_FIXED) ? j:0;
+    int tprod_has_vals = 0;
+    int deferred_const_active = 0;
+    double deferred_const = 1.0;
     int all_cont_largeh = (num_reg_continuous > 0);
 
     if(cont_largeh_fixed_ready){
@@ -4838,9 +4841,11 @@ double * const kw){
           const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
           if(use_largeh){
-            np_ckernelv_mul_const(cont_largeh_k0[i], num_xt, l, tprod, pxl);
+            deferred_const *= cont_largeh_k0[i];
+            deferred_const_active = 1;
           } else {
-            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1);
+            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1);
+            tprod_has_vals = 1;
           }
         } else {
           const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
@@ -4848,8 +4853,12 @@ double * const kw){
           np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf, use_largeh, (use_largeh ? cont_largeh_k0[i] : 0.0));
         }
       }
-      else
-        np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j], 
+      else if(p_nvar == 0){
+        np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, tprod_has_vals, xc[i][j],
+                           matrix_alt_bandwidth[i], m[i][jbw], tprod, bpow[i]);
+        tprod_has_vals = 1;
+      } else
+        np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j],
                            matrix_alt_bandwidth[i], m[i][jbw], tprod, bpow[i]);
       dband *= ipow(m[i][jbw], bpow[i]);
 
@@ -4878,12 +4887,41 @@ double * const kw){
 
     if(use_disc_profile_cache){
       int nactive = 0, nplist = 0;
-      if(num_reg_continuous == 0){
-        for(i = 0; i < num_xt; i++)
-          tprod[i] = 1.0;
+      double disc_profile_const = 1.0;
+      int disc_profile_const_active = 0;
+      const int profile_base_empty = !tprod_has_vals;
+
+      if(disc_uno_const_ok != NULL){
+        for(kk = 0; kk < num_reg_unordered; kk++){
+          if(!disc_uno_const_ok[kk]) continue;
+          disc_profile_const *= disc_uno_const[kk];
+          disc_profile_const_active = 1;
+        }
       }
 
-      if(pxl == NULL){
+      if(disc_ord_const_ok != NULL){
+        for(kk = 0; kk < num_reg_ordered; kk++){
+          const int opidx = num_reg_continuous + num_reg_unordered + kk;
+          if(!disc_ord_const_ok[kk]) continue;
+          if(!(ps_ok_nli || (operator[opidx] != OP_CONVOLUTION))) continue;
+          disc_profile_const *= disc_ord_const[kk];
+          disc_profile_const_active = 1;
+        }
+      }
+
+      if(profile_base_empty){
+        if(pxl == NULL){
+          for(i = 0; i < num_xt; i++)
+            disc_active_idx[nactive++] = i;
+        } else {
+          for(ii = 0; ii < pxl->n; ii++){
+            const int istart = pxl->istart[ii];
+            const int iend = istart + pxl->nlev[ii];
+            for(i = istart; i < iend; i++)
+              disc_active_idx[nactive++] = i;
+          }
+        }
+      } else if(pxl == NULL){
         for(i = 0; i < num_xt; i++){
           if(tprod[i] == 0.0) continue;
           disc_active_idx[nactive++] = i;
@@ -4932,6 +4970,7 @@ double * const kw){
         double dprod = 1.0;
 
         for(kk = 0; kk < num_reg_unordered; kk++){
+          if((disc_uno_const_ok != NULL) && disc_uno_const_ok[kk]) continue;
           const int ku = (KERNEL_unordered_reg_np[kk] >= 0 && KERNEL_unordered_reg_np[kk] < nuk)
             ? KERNEL_unordered_reg_np[kk] : 0;
           dprod *= ukf[ku]((xtu[kk][ridx] == xu[kk][j]), lambda[kk], num_categories[kk]);
@@ -4940,6 +4979,10 @@ double * const kw){
 
         if(dprod != 0.0){
           for(kk = 0; kk < num_reg_ordered; kk++){
+            const int opidx = num_reg_continuous + num_reg_unordered + kk;
+            if((disc_ord_const_ok != NULL) && disc_ord_const_ok[kk] &&
+               (ps_ok_nli || (operator[opidx] != OP_CONVOLUTION)))
+              continue;
             const int ko = (KERNEL_ordered_reg_np[kk] >= 0 && KERNEL_ordered_reg_np[kk] < nok)
               ? KERNEL_ordered_reg_np[kk] : 0;
             const double c1 = swap_xxt ? xo[kk][j] : xto[kk][ridx];
@@ -4952,9 +4995,22 @@ double * const kw){
         disc_prof_val[pid] = dprod;
       }
 
-      for(i = 0; i < nactive; i++){
-        const int idx_i = disc_active_idx[i];
-        tprod[idx_i] *= disc_prof_val[disc_prof_id[idx_i]];
+      if(profile_base_empty){
+        for(i = 0; i < nactive; i++){
+          const int idx_i = disc_active_idx[i];
+          tprod[idx_i] = disc_prof_val[disc_prof_id[idx_i]];
+        }
+        tprod_has_vals = (nactive > 0);
+      } else {
+        for(i = 0; i < nactive; i++){
+          const int idx_i = disc_active_idx[i];
+          tprod[idx_i] *= disc_prof_val[disc_prof_id[idx_i]];
+        }
+      }
+
+      if(disc_profile_const_active){
+        deferred_const *= disc_profile_const;
+        deferred_const_active = 1;
       }
 
       for(ii = 0; ii < (num_reg_unordered + num_reg_ordered); ii++){
@@ -4969,11 +5025,15 @@ double * const kw){
           np_p_ukernelv(KERNEL_unordered_reg_np[i], ps_ukernel[i], k, p_nvar, xtu[i], num_xt, l, xu[i][j], 
                         lambda[i], num_categories[i], matrix_categorical_vals[i][0], tprod, tprod_mp, pxl, p_pxl + k, swap_xxt, (bpso[l] ? do_ocg : 0), perm_kbuf);
         } else {
-          if(disc_uno_const_ok != NULL && disc_uno_const_ok[i]){
+          if((p_nvar == 0) && (disc_uno_const_ok != NULL) && disc_uno_const_ok[i]){
+            deferred_const *= disc_uno_const[i];
+            deferred_const_active = 1;
+          } else if(disc_uno_const_ok != NULL && disc_uno_const_ok[i]){
             np_ckernelv_mul_const(disc_uno_const[i], num_xt, l, tprod, pxl);
           } else {
-            np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, l, xu[i][j], 
+            np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, tprod_has_vals, xu[i][j], 
                         lambda[i], num_categories[i], tprod, pxl, (disc_uno_const_ok != NULL));
+            tprod_has_vals = 1;
           }
         }
         k += bpso[l];
@@ -4982,21 +5042,28 @@ double * const kw){
       /* ordered third */
       for(i=0; i < num_reg_ordered; i++, l++, ip += doscoreocg){
         if(!doscoreocg){
-          if((disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
+          if((p_nvar == 0) &&
+             (disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
              (ps_ok_nli || (operator[l] != OP_CONVOLUTION))){
+            deferred_const *= disc_ord_const[i];
+            deferred_const_active = 1;
+          } else if((disc_ord_const_ok != NULL) && disc_ord_const_ok[i] &&
+                    (ps_ok_nli || (operator[l] != OP_CONVOLUTION))){
             np_ckernelv_mul_const(disc_ord_const[i], num_xt, l, tprod, pxl);
           } else if(ps_ok_nli || (operator[l] != OP_CONVOLUTION)){
-            np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, l,
+            np_okernelv(KERNEL_ordered_reg_np[i], xto[i], num_xt, tprod_has_vals,
                         xo[i][j], lambda[num_reg_unordered+i], 
                         (matrix_categorical_vals != NULL) ? matrix_categorical_vals[i+num_reg_unordered] : NULL, 
                         (num_categories != NULL) ? num_categories[i+num_reg_unordered] : 0,
                         tprod, pxl, swap_xxt);      
+            tprod_has_vals = 1;
           } else {
-            np_convol_okernelv(KERNEL_ordered_reg[i], xto[i], num_xt, l,
+            np_convol_okernelv(KERNEL_ordered_reg[i], xto[i], num_xt, tprod_has_vals,
                                xo[i][j], lambda[num_reg_unordered+i], 
                                num_categories[i+num_reg_unordered],
                                matrix_categorical_vals[i+num_reg_unordered],
                                tprod, swap_xxt);
+            tprod_has_vals = 1;
           }
         } else {
           np_p_okernelv(KERNEL_ordered_reg_np[i], ps_okernel[i], k, p_nvar, xto[i], num_xt, l,
@@ -5009,6 +5076,11 @@ double * const kw){
         }
         k += bpso[l];
       }
+    }
+
+    if((p_nvar == 0) && deferred_const_active){
+      np_ckernelv_mul_const(deferred_const, num_xt, tprod_has_vals, tprod, pxl);
+      tprod_has_vals = 1;
     }
 
     /* expand matrix outer product, multiply by kernel weights, etc, do sum */
