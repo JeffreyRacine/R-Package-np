@@ -42,3 +42,4 @@
 ^WORKTREES\.md
 mknpkg.sh
 npver
+^AGENTS\.md$
