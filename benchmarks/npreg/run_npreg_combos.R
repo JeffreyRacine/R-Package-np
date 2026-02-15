@@ -5,6 +5,7 @@ parse_args <- function(args) {
     n = 100L,
     times = 1L,
     base_seed = 42L,
+    nmulti = 1L,
     out_dir = "/tmp",
     tag = "",
     show_progress = TRUE
@@ -21,6 +22,7 @@ parse_args <- function(args) {
     if (key == "n") out$n <- as.integer(val)
     else if (key == "times") out$times <- as.integer(val)
     else if (key == "base_seed") out$base_seed <- as.integer(val)
+    else if (key == "nmulti") out$nmulti <- as.integer(val)
     else if (key == "out_dir") out$out_dir <- val
     else if (key == "tag") out$tag <- val
     else if (key == "show_progress") out$show_progress <- as.logical(val)
@@ -39,7 +41,7 @@ repo_hash <- function(repo_dir) {
 mk_run_id <- function(cfg, backend, hash) {
   ts <- format(Sys.time(), "%Y%m%d_%H%M%S")
   tag <- if (nzchar(cfg$tag)) paste0("_", cfg$tag) else ""
-  sprintf("%s_%s_%s_n%d_t%d_s%d%s", backend, hash, ts, cfg$n, cfg$times, cfg$base_seed, tag)
+  sprintf("%s_%s_%s_n%d_t%d_s%d_m%d%s", backend, hash, ts, cfg$n, cfg$times, cfg$base_seed, cfg$nmulti, tag)
 }
 
 main <- function(args = commandArgs(trailingOnly = TRUE)) {
@@ -89,6 +91,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
       sprintf("--n=%d", cfg$n),
       sprintf("--times=%d", cfg$times),
       sprintf("--base_seed=%d", cfg$base_seed),
+      sprintf("--nmulti=%d", cfg$nmulti),
       sprintf("--regtype=%s", row$regtype),
       sprintf("--bwmethod=%s", row$bwmethod),
       sprintf("--ckertype=%s", row$ckertype),
