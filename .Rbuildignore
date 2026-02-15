@@ -27,4 +27,11 @@ mknpkg.sh
 ^issue_notes
 ^benchmarks
 ^benchmarks/npreg
+^benchmarks/npcdens
+^benchmarks/npudens
+^benchmarks/npcdist
+^benchmarks/npudist
+^benchmarks/npplreg
+^benchmarks/npscoef
+^benchmarks/npindex
 ^AGENTS\.md$
