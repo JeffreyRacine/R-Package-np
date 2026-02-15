@@ -63,3 +63,21 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/make_npreg_report.
 ```bash
 Rscript -e 'print(read.csv("/tmp/nprmpi_combo32_t50_timing_compare.csv",stringsAsFactors=FALSE)); print(read.csv("/tmp/nprmpi_combo32_t50_objective_compare.csv",stringsAsFactors=FALSE))'
 ```
+
+## 6) Generate combined np + npRmpi report
+
+After producing the `np` comparison CSV files (see `/Users/jracine/Development/np-master/benchmarks/npreg/REPRODUCE.md`), run:
+
+```bash
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/make_npreg_combined_report.R \
+  --np_timing_csv=/tmp/np_combo32_t50_timing_compare.csv \
+  --np_objective_csv=/tmp/np_combo32_t50_objective_compare.csv \
+  --np_combo_timing_csv=/tmp/np_combo32_t50_combo_timing_compare.csv \
+  --np_combo_objective_csv=/tmp/np_combo32_t50_combo_objective_compare.csv \
+  --nprmpi_timing_csv=/tmp/nprmpi_combo32_t50_timing_compare.csv \
+  --nprmpi_objective_csv=/tmp/nprmpi_combo32_t50_objective_compare.csv \
+  --nprmpi_combo_timing_csv=/tmp/nprmpi_combo32_t50_combo_timing_compare.csv \
+  --nprmpi_combo_objective_csv=/tmp/nprmpi_combo32_t50_combo_objective_compare.csv \
+  --out_md=/tmp/npreg_combo32_t50_combined_report.md \
+  --title="np + npRmpi current vs CRAN (n=100, times=50, 32 combos)"
+```
