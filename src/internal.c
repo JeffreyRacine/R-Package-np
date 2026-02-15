@@ -22,14 +22,18 @@
 
 int mpi_errhandler(int errcode)
 {
-/*	int errmsglen;
+	int errmsglen = 0;
 	char errmsg[MPI_MAX_ERROR_STRING];
 
 	if (errcode != MPI_SUCCESS) {
 		MPI_Error_string(errcode, errmsg, &errmsglen);
-		error(errmsg);
-	} */
-	
+		if (errmsglen >= MPI_MAX_ERROR_STRING) {
+			errmsglen = MPI_MAX_ERROR_STRING - 1;
+		}
+		errmsg[errmsglen] = '\0';
+		Rf_error("%s", errmsg);
+	}
+
 	return errcode;
 }
 

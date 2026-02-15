@@ -51,7 +51,15 @@
 #define RANGECHECK
 #define PAD 1L
 
-#define ROUND(a) ((a)-(int)floor(a)>0.5) ? ((int)floor(a)+1):((int)floor(a))
+#define ROUND(a) ((int)floor((a) + 0.5))
+
+#if defined(__STDC_VERSION__) && (__STDC_VERSION__ >= 201112L)
+#define NP_THREAD_LOCAL _Thread_local
+#elif defined(__GNUC__) || defined(__clang__)
+#define NP_THREAD_LOCAL __thread
+#else
+#define NP_THREAD_LOCAL
+#endif
 
 
 matrix null_mat; /* matrix for passing when you don't actually need to */
@@ -61,6 +69,7 @@ matrix null_mat; /* matrix for passing when you don't actually need to */
 
 
 long memused=0L,matrallocd=0L;
+static NP_THREAD_LOCAL int real_elemcmp_k = 0;
 
 /* the routines */
   
@@ -80,7 +89,6 @@ if (fatal) Rf_error("%s",msg);else Rf_warning("%s",msg);
 #endif
 }
 
-matrix null_mat;
 MREC *top,*bottom;
 
 
@@ -110,10 +118,15 @@ matrix initmat(long rows, long cols) /*long rows,cols;*/
   A.M=(double **)calloc((size_t)(rows+2*pad),sizeof(double *));
   if ((cols==1L)||(rows==1L))
   { if (A.M)
-    A.M[0]=(double *)calloc((size_t)(cols*rows+2*pad),sizeof(double));
-    for (i=1L;i<rows+2*pad;i++)
     {
-	    A.M[i]=A.M[0]+i*cols;
+      A.M[0]=(double *)calloc((size_t)(cols*rows+2*pad),sizeof(double));
+      if (A.M[0])
+        {
+          for (i=1L;i<rows+2*pad;i++)
+            {
+	            A.M[i]=A.M[0]+i*cols;
+            }
+        }
     }
     A.vec=1;
   } else
@@ -124,8 +137,23 @@ matrix initmat(long rows, long cols) /*long rows,cols;*/
   A.mem=rows*cols*sizeof(double);
   memused+=A.mem;matrallocd++;
   A.original_r=A.r=rows;A.original_c=A.c=cols;
-  if (((!A.M)||(!A.M[rows-1+2*pad]))&&(rows*cols>0L))
-  { ErrorMessage("Failed to initialize memory for matrix.",1);}
+  if (rows*cols > 0L)
+  {
+    if (!A.M)
+    { ErrorMessage("Failed to initialize memory for matrix.",1);}
+    if (A.vec)
+    {
+      if (!A.M[0])
+      { ErrorMessage("Failed to initialize memory for matrix.",1);}
+    } else
+    {
+      for (i=0L;i<rows+2*pad;i++)
+      {
+        if (!A.M[i])
+        { ErrorMessage("Failed to initialize memory for matrix.",1);}
+      }
+    }
+  }
   if (pad)  /* This lot is debugging code that checks out matrix errors
 		       on allocation and release */
   { if (A.vec)
@@ -259,7 +287,18 @@ int *Xd_strip(matrix *Xd)
   /*  long Xdor;*/
   double xi,**dum;
   yxindex = (int *)calloc((size_t)Xd->r,sizeof(int));
+  if (!yxindex)
+  {
+    ErrorMessage("Failed to initialize memory for index array.",1);
+    return NULL;
+  }
   dum = (double **)calloc((size_t)Xd->r,sizeof(double *));
+  if (!dum)
+  {
+    free(yxindex);
+    ErrorMessage("Failed to initialize memory for temporary matrix buffer.",1);
+    return NULL;
+  }
   msort(*Xd);
   /*  Xdor=Xd->r;  keep record of original length of Xd */
   start=stop=0;ok=1;
@@ -306,12 +345,11 @@ int Xd_row_comp(double *a,double *b,int k)
 
 int real_elemcmp(const void *a,const void *b,int el)
 
-{ static int k=0;
-  int i;
+{ int i;
   double *na,*nb;
-  if (el>=0) { k=el;return(0);}
+  if (el>=0) { real_elemcmp_k=el;return(0);}
   na=(*(double **)a);nb=(*(double **)b);
-  for (i=0;i<k;i++) 
+  for (i=0;i<real_elemcmp_k;i++) 
   { if (na[i]<nb[i]) return(-1);
     if (na[i]>nb[i]) return(1);
   }
@@ -332,8 +370,8 @@ void msort(matrix a)
    so on.....
 */
 
-{ double z=0.0;
-  real_elemcmp(&z,&z,(int)a.c); 
+{
+  real_elemcmp(NULL,NULL,(int)a.c);
   qsort(a.M,(size_t)a.r,sizeof(a.M[0]),melemcmp);
 }
 
@@ -359,5 +397,4 @@ void RuniqueCombs(double *X,int *ind,int *r, int *c)
   dmalloc_log_unfreed();  dmalloc_verify(NULL);
 #endif 
 }
-
 
