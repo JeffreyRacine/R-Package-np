@@ -54,3 +54,38 @@ Change sample size and repetitions via `--n=` and `--times=`.
 ## Compatibility Note
 
 `num_fval` is extracted from `bw$num.fval` when available. If missing (older versions), it is reported as `NA`.
+
+## Version Comparison Workflow (np)
+
+1. Install each target version into its own library.
+
+```bash
+mkdir -p /tmp/Rlib_np_current /tmp/Rlib_np_cran20
+R CMD INSTALL -l /tmp/Rlib_np_current /Users/jracine/Development/np-master
+R CMD INSTALL -l /tmp/Rlib_np_cran20 /Users/jracine/Development/CRAN/np_0.60-20.tar.gz
+```
+
+2. Run canonical benchmark with each library.
+
+```bash
+R_LIBS=/tmp/Rlib_np_cran20 Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
+  --n=100 --times=5 --out_raw=/tmp/np_cran20_raw.csv --out_summary=/tmp/np_cran20_summary.csv
+
+R_LIBS=/tmp/Rlib_np_current Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
+  --n=100 --times=5 --out_raw=/tmp/np_current_raw.csv --out_summary=/tmp/np_current_summary.csv
+```
+
+3. Compare outputs.
+
+```bash
+Rscript /Users/jracine/Development/np-master/benchmarks/npreg/compare_npreg_versions.R \
+  --raw_a=/tmp/np_cran20_raw.csv --label_a=np_0.60-20 \
+  --raw_b=/tmp/np_current_raw.csv --label_b=np_current \
+  --out_timing=/tmp/np_timing_compare.csv \
+  --out_objective=/tmp/np_objective_compare.csv
+```
+
+Comparison outputs:
+
+- Timing by function (`npregbw`, `npreg`, `npreg_total`) with mean/median and percent change.
+- Objective diagnostics (`fval`, `ifval`, `num_fval`, bandwidth match rate, `ok` match rate).
