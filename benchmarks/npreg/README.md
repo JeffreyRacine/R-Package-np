@@ -1,10 +1,10 @@
 # npreg Benchmark Harness (npRmpi)
 
-This folder provides a parameterized benchmark harness for `npregbw()` + `npreg()` in `npRmpi`.
+This folder provides a parameterized benchmark harness for `npregbw()` + `npreg()` in `npRmpi` using `microbenchmark`.
 
 ## Files
 
-- `bench_npreg_param_nprmpi.R`: run one benchmark configuration (possibly multiple seeds).
+- `bench_npreg_param_nprmpi.R`: run one benchmark configuration with `microbenchmark` repetitions.
 - `run_npreg_combos.R`: run all 32 option combinations (`2x2x2x2x2`) with a shared setup.
 
 ## One-Configuration Run
@@ -48,6 +48,13 @@ Outputs are written to `/tmp` with run IDs in filenames:
 - `seed_policy=varying`
 
 Change sample size and repetitions via `--n=` and `--times=`.
+
+## Timing/Seed Semantics
+
+- `times` is passed to `microbenchmark(times=...)`.
+- One case seed is selected (`--base_seed` unless `--seeds` is given).
+- For `seed_policy=fixed`, each microbenchmark repetition uses the same seed.
+- For `seed_policy=varying`, repetition `i` uses `seed + (i-1)` (deterministic and reproducible across versions).
 
 ## Compatibility Note
 
