@@ -55,8 +55,8 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.blocklen = NULL,
        plot.errors.boot.num = 399,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","quantiles"),
-       plot.errors.quantiles = c(0.025,0.975),
+       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
@@ -105,8 +105,8 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.blocklen = NULL,
        plot.errors.boot.num = 399,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","quantiles"),
-       plot.errors.quantiles = c(0.025,0.975),
+       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
@@ -155,8 +155,8 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.blocklen = NULL,
        plot.errors.boot.num = 399,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","quantiles"),
-       plot.errors.quantiles = c(0.025,0.975),
+       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
@@ -202,8 +202,8 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.method = c("inid", "fixed", "geom"),
        plot.errors.boot.blocklen = NULL,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","quantiles"),
-       plot.errors.quantiles = c(0.025,0.975),
+       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
@@ -252,8 +252,8 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.method = c("inid", "fixed", "geom"),
        plot.errors.boot.blocklen = NULL,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","quantiles"),
-       plot.errors.quantiles = c(0.025,0.975),
+       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = min(neval,25),
@@ -289,8 +289,8 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.method = c("inid", "fixed", "geom"),
        plot.errors.boot.blocklen = NULL,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","quantiles"),
-       plot.errors.quantiles = c(0.025,0.975),
+       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
        plot.errors.bar.num = NULL,
@@ -541,14 +541,20 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
   \item{plot.errors.type}{
     a character string used to specify the type of error to
-    calculate. Can be set as \code{standard} or
-    \code{quantiles}. Defaults to \code{standard}.
+    calculate. Can be set as \code{standard}, \code{pointwise},
+    \code{bonferroni}, \code{simultaneous}, or \code{all}. Defaults
+    to \code{standard}.
   }
 
-  \item{plot.errors.quantiles}{
-    a numeric vector specifying the quantiles of the statistic to
-    calculate for the purpose of error plotting. Defaults to
-    \code{c(0.025,0.975)}.
+  \item{plot.errors.alpha}{
+    a scalar numeric value in \eqn{(0,1)} specifying \eqn{\alpha} for
+    bootstrap quantile bands. For \code{pointwise}, quantiles are
+    \eqn{(\alpha/2, 1-\alpha/2)}. For \code{bonferroni}, quantiles are
+    \eqn{(\alpha/(2m), 1-\alpha/(2m))} where \eqn{m} is the number of
+    evaluation points. For \code{simultaneous}, a rank-based rectangular
+    band is computed at confidence level \eqn{1-\alpha}. With
+    \code{plot.errors.type="all"}, pointwise/bonferroni/simultaneous
+    bands are overlaid with a legend. Defaults to \code{0.05}.
   }
 
   \item{plot.errors.style}{
@@ -806,7 +812,7 @@ plot(bw, gradients=TRUE)
 plot(bw,
      plot.errors.method="bootstrap", 
      plot.errors.center="bias-corrected",
-     plot.errors.type="quantiles")
+     plot.errors.type="simultaneous")
 
 # Note - if you wished to create, say, a postscript graph for inclusion
 # in, say, a latex document, use R's `postscript' command to switch to

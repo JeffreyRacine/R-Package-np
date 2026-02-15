@@ -460,7 +460,7 @@ bw <- npregbw(formula=len~factor(supp)+ordered(dose))
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-plot(bw, plot.errors.method="bootstrap", plot.errors.type="quantile")
+plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
 
 detach(ToothGrowth)
 
@@ -499,7 +499,7 @@ bw <- npregbw(X, y)
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-plot(bw, plot.errors.method="bootstrap", plot.errors.type="quantile")
+plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
 
 detach(ToothGrowth)
 
@@ -602,4 +602,3 @@ persp(xs, zs, fit.mat, xlab="x1", ylab="x2", zlab="y",
 } % enddontrun
 }
 \keyword{nonparametric}
-
