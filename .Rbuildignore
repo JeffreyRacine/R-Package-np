@@ -29,6 +29,7 @@
 ^demo/runall_serial
 ^demo/serial/.*$
 ^demo/timing
+^benchmarks/npreg
 ^issue_notes
 ^man/dontrun
 ^man/run
