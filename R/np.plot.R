@@ -10,12 +10,12 @@ gen.tflabel = function(condition, tlabel, flabel){
   paste(ifelse(condition,tlabel,flabel))
 }
 
-draw.error.bands = function(ex, ely, ehy, lty = 2){
-  lines(ex,ely,lty=lty)
-  lines(ex,ehy,lty=lty)
+draw.error.bands = function(ex, ely, ehy, lty = 2, col = NULL){
+  lines(ex,ely,lty=lty,col=col)
+  lines(ex,ehy,lty=lty,col=col)
 }
 
-draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2){
+draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, col = NULL){
   yy = double(3*length(ex))
   jj = 1:length(ex)*3
 
@@ -28,7 +28,7 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2){
   xx[jj-1] = ex
   xx[jj] = NA
 
-  lines(xx,yy,lty=lty)
+  lines(xx,yy,lty=lty,col=col)
 
   if (hbar){
     ## hbars look silly if they are too wide in relation to their height
@@ -47,12 +47,12 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2){
     ty = yy[jj-1]
     yy[jj-1] = yy[jj-2]
 
-    lines(xx,yy)
+    lines(xx,yy,col=col)
 
     yy[jj-2] = ty
     yy[jj-1] = ty
 
-    lines(xx,yy)
+    lines(xx,yy,col=col)
   }
 }
 
@@ -61,21 +61,53 @@ draw.errors =
            plot.errors.style,
            plot.errors.bar,
            plot.errors.bar.num,
-           lty){
+           lty,
+           col = NULL){
     if (plot.errors.style == "bar"){
       ei = seq(1,length(ex),length.out = min(length(ex),plot.errors.bar.num))
       draw.error.bars(ex = ex[ei],
                       ely = ely[ei],
                       ehy = ehy[ei],
                       hbar = (plot.errors.bar == "I"),
-                      lty = lty)
+                      lty = lty,
+                      col = col)
     } else if (plot.errors.style == "band") {
       draw.error.bands(ex = ex,
                        ely = ely,
                        ehy = ehy,
-                       lty = lty)
+                       lty = lty,
+                       col = col)
     }
   }
+
+draw.all.error.types <- function(ex, center, all.err,
+                                 plot.errors.style, plot.errors.bar, plot.errors.bar.num,
+                                 lty = 2, add.legend = TRUE, legend.loc = "topleft"){
+  if (is.null(all.err)) return(invisible(NULL))
+
+  draw_one <- function(err, col) {
+    if (is.null(err)) return(invisible(NULL))
+    lower <- center - err[,1]
+    upper <- center + err[,2]
+    good <- complete.cases(ex, lower, upper)
+    if (!any(good)) return(invisible(NULL))
+    draw.errors(ex = ex[good], ely = lower[good], ehy = upper[good],
+                plot.errors.style = plot.errors.style,
+                plot.errors.bar = plot.errors.bar,
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = lty, col = col)
+  }
+
+  draw_one(all.err$pointwise, "red")
+  draw_one(all.err$simultaneous, "green3")
+  draw_one(all.err$bonferroni, "blue")
+
+  if (add.legend) {
+    legend(legend.loc,
+           legend = c("Pointwise","Simultaneous","Bonferroni"),
+           lty = 2, col = c("red","green3","blue"), lwd = 2, bty = "n")
+  }
+}
 
 plotFactor <- function(f, y, ...){
   plot(x = f, y = y, lty = "blank", ...)
@@ -87,6 +119,92 @@ plotFactor <- function(f, y, ...){
 
   lines(x = l.f, y = l.y, lty = 2)
   points(x = f, y = y)
+}
+
+## Rank-based simultaneous confidence set helper, vendored from
+## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
+np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {
+  alternative <- match.arg(alternative, choices = c("two.sided", "less", "greater"))
+
+  DataMatrix <- x
+  N <- nrow(DataMatrix)
+  k <- round(conf.level * N, 0)
+  RankDat <- apply(DataMatrix, 2, rank)
+
+  switch(alternative,
+    "two.sided" = {
+      W1 <- apply(RankDat, 1, max)
+      W2 <- N + 1 - apply(RankDat, 1, min)
+
+      Wmat <- cbind(W1, W2)
+      w <- apply(Wmat, 1, max)
+      tstar <- round(sort(w)[k], 0)
+
+      SCI <- function(x) {
+        sortx <- sort(x)
+        cbind(sortx[N + 1 - tstar], sortx[tstar])
+      }
+
+      SCS <- t(apply(DataMatrix, 2, SCI))
+    },
+    "less" = {
+      W1 <- apply(RankDat, 1, max)
+      tstar <- round(sort(W1)[k], 0)
+
+      SCI <- function(x) {
+        sortx <- sort(x)
+        cbind(-Inf, sortx[tstar])
+      }
+
+      SCS <- t(apply(DataMatrix, 2, SCI))
+    },
+    "greater" = {
+      W2 <- N + 1 - apply(RankDat, 1, min)
+      tstar <- round(sort(W2)[k], 0)
+
+      SCI <- function(x) {
+        sortx <- sort(x)
+        cbind(sortx[N + 1 - tstar], Inf)
+      }
+
+      SCS <- t(apply(DataMatrix, 2, SCI))
+    }
+  )
+
+  colnames(SCS) <- c("lower", "upper")
+
+  attr(SCS, which = "k") <- k
+  attr(SCS, which = "N") <- N
+  OUT <- list(conf.int = SCS, conf.level = conf.level, alternative = alternative)
+  return(OUT)
+}
+
+compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type) {
+  neval <- ncol(boot.t)
+
+  if (band.type == "pointwise") {
+    probs <- c(alpha / 2.0, 1.0 - alpha / 2.0)
+    return(t(apply(boot.t, 2, quantile, probs = probs)))
+  }
+
+  if (band.type == "bonferroni") {
+    probs <- c(alpha / (2.0 * neval), 1.0 - alpha / (2.0 * neval))
+    return(t(apply(boot.t, 2, quantile, probs = probs)))
+  }
+
+  if (band.type == "simultaneous") {
+    return(np.plot.SCSrank(boot.t, conf.level = 1.0 - alpha)$conf.int)
+  }
+
+  if (band.type == "all") {
+    return(list(
+      pointwise = compute.bootstrap.quantile.bounds(boot.t, alpha, "pointwise"),
+      bonferroni = compute.bootstrap.quantile.bounds(boot.t, alpha, "bonferroni"),
+      simultaneous = compute.bootstrap.quantile.bounds(boot.t, alpha, "simultaneous")
+    ))
+  }
+
+  stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
 }
 
 
@@ -104,10 +222,11 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
 
@@ -160,17 +279,31 @@ compute.bootstrap.errors.rbandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.scbandwidth =
@@ -183,11 +316,12 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
 
@@ -256,17 +390,31 @@ compute.bootstrap.errors.scbandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.plbandwidth =
@@ -279,10 +427,11 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
 
@@ -344,17 +493,31 @@ compute.bootstrap.errors.plbandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.bandwidth =
@@ -367,10 +530,11 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
 
@@ -424,17 +588,31 @@ compute.bootstrap.errors.bandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.dbandwidth =
@@ -446,10 +624,11 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
 
@@ -499,17 +678,31 @@ compute.bootstrap.errors.dbandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.conbandwidth =
@@ -526,11 +719,12 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
 
     tboo =
       if(quantreg) "quant"
@@ -606,17 +800,31 @@ compute.bootstrap.errors.conbandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.condbandwidth =
@@ -633,11 +841,12 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
 
     tboo =
       if(quantreg) "quant"
@@ -713,17 +922,31 @@ compute.bootstrap.errors.condbandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.sibandwidth =
@@ -734,7 +957,7 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.boot.num,
            plot.errors.center,
            plot.errors.type,
-           plot.errors.quantiles,
+           plot.errors.alpha,
            ...,
            bws){
 
@@ -768,13 +991,27 @@ compute.bootstrap.errors.sibandwidth =
     if (plot.errors.type == "standard") {
       boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
     }
-    else if (plot.errors.type == "quantiles") {
-      boot.err[,1:2] = t(sapply(as.data.frame(boot.out$t),
-                function (y) {
-                  quantile(y,probs = plot.errors.quantiles)
-                }))
-      boot.err[,1] = boot.out$t0 - boot.err[,1]
-      boot.err[,2] = boot.err[,2] - boot.out$t0
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
@@ -874,8 +1111,8 @@ npplot.rbandwidth <-
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
@@ -943,14 +1180,23 @@ npplot.rbandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
 
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
+
     if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type == "quantiles"){
-        warning("quantiles cannot be calculated with asymptotics, calculating standard errors")
+      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
         plot.errors.type = "standard"
       }
 
@@ -1018,7 +1264,7 @@ npplot.rbandwidth <-
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
-          plot.errors.quantiles = plot.errors.quantiles,
+          plot.errors.alpha = plot.errors.alpha,
           bws = bws)[["boot.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
@@ -1156,6 +1402,7 @@ npplot.rbandwidth <-
       if (common.scale){
         data.eval = matrix(data = NA, nrow = maxneval, ncol = bws$ndim)
         data.err = matrix(data = NA, nrow = maxneval, ncol = 3*bws$ndim)
+        data.err.all = vector("list", bws$ndim)
         allei = as.data.frame(matrix(data = NA, nrow = maxneval, ncol = bws$ndim))
         all.bxp = list()
       }
@@ -1258,7 +1505,7 @@ npplot.rbandwidth <-
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,
                       plot.errors.type = plot.errors.type,
-                      plot.errors.quantiles = plot.errors.quantiles,
+                      plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
             temp.err[1:xi.neval,] = temp.boot[["boot.err"]]
             temp.boot <- temp.boot[["bxp"]]
@@ -1419,8 +1666,8 @@ npplot.scbandwidth <-
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
@@ -1513,14 +1760,23 @@ npplot.scbandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
 
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
+
     if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type == "quantiles"){
-        warning("quantiles cannot be calculated with asymptotics, calculating standard errors")
+      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
         plot.errors.type = "standard"
       }
 
@@ -1607,7 +1863,7 @@ npplot.scbandwidth <-
                        'plot.errors.boot.num = plot.errors.boot.num,',
                        'plot.errors.center = plot.errors.center,',
                        'plot.errors.type = plot.errors.type,',
-                       'plot.errors.quantiles = plot.errors.quantiles,',
+                       'plot.errors.alpha = plot.errors.alpha,',
                        'bws = bws)[["boot.err"]]')))
 
         pc = (plot.errors.center == "bias-corrected")
@@ -1887,7 +2143,7 @@ npplot.scbandwidth <-
                                       "plot.errors.boot.num = plot.errors.boot.num,",
                                       "plot.errors.center = plot.errors.center,",
                                       "plot.errors.type = plot.errors.type,",
-                                      "plot.errors.quantiles = plot.errors.quantiles,",
+                                      "plot.errors.alpha = plot.errors.alpha,",
                                       "bws = bws)")))
             temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
             temp.boot <- temp.boot[["bxp"]]
@@ -1997,7 +2253,7 @@ npplot.scbandwidth <-
                                                     plot.errors.boot.num = plot.errors.boot.num,
                                                     plot.errors.center = plot.errors.center,
                                                     plot.errors.type = plot.errors.type,
-                                                    plot.errors.quantiles = plot.errors.quantiles,
+                                                    plot.errors.alpha = plot.errors.alpha,
                                                     bws = bws)
               temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
               temp.boot <- temp.boot[["bxp"]]
@@ -2165,8 +2421,8 @@ npplot.plbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
@@ -2259,10 +2515,19 @@ npplot.plbandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
+
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
 
     if (plot.errors.method == "asymptotic") {
       warning(paste("asymptotic errors are not supported with partially linear regression.\n",
@@ -2329,7 +2594,7 @@ npplot.plbandwidth <-
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
-          plot.errors.quantiles = plot.errors.quantiles,
+          plot.errors.alpha = plot.errors.alpha,
           bws = bws)[["boot.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
@@ -2602,7 +2867,7 @@ npplot.plbandwidth <-
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,
                       plot.errors.type = plot.errors.type,
-                      plot.errors.quantiles = plot.errors.quantiles,
+                      plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
             temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
             temp.boot <- temp.boot[["bxp"]]
@@ -2710,7 +2975,7 @@ npplot.plbandwidth <-
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,
                       plot.errors.type = plot.errors.type,
-                      plot.errors.quantiles = plot.errors.quantiles,
+                      plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
             temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
             temp.boot <- temp.boot[["bxp"]]
@@ -2873,8 +3138,8 @@ npplot.bandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
@@ -2925,14 +3190,23 @@ npplot.bandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
 
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
+
     if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type == "quantiles"){
-        warning("quantiles cannot be calculated with asymptotics, calculating standard errors")
+      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
         plot.errors.type = "standard"
       }
 
@@ -2995,8 +3269,11 @@ npplot.bandwidth <-
       terr = matrix(data = tobj$derr, nrow = nrow(x.eval), ncol = 3)
       terr[,3] = NA
       
+      lerr.all <- NULL
+      herr.all <- NULL
+
       if (plot.errors.method == "bootstrap"){
-        terr <- compute.bootstrap.errors(xdat = xdat, 
+        terr.obj <- compute.bootstrap.errors(xdat = xdat, 
           exdat = x.eval,
           cdf = FALSE,
           slice.index = 0,
@@ -3005,18 +3282,26 @@ npplot.bandwidth <-
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
-          plot.errors.quantiles = plot.errors.quantiles,
-          bws = bws)[["boot.err"]]
+          plot.errors.alpha = plot.errors.alpha,
+          bws = bws)
+        terr <- terr.obj[["boot.err"]]
+        terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
+        center.val <- if (pc) terr[,3] else eval(tcomp)
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {eval(tcomp)}
-          -terr[,1],
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {eval(tcomp)}
-          +terr[,2],
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
 
       } else if (plot.errors.method == "asymptotic") {
         lerr = matrix(data = eval(tcomp) - 2.0*tobj$derr,
@@ -3029,9 +3314,12 @@ npplot.bandwidth <-
 
       if(is.null(zlim)) {
           zlim =
-              if (plot.errors)
-                  c(min(lerr),max(herr))
-              else
+              if (plot.errors){
+                  if (plot.errors.type == "all" && !is.null(lerr.all))
+                  c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+                  else
+                      c(min(lerr), max(herr))
+              } else
                   c(min(eval(tcomp)),max(eval(tcomp)))
       }
           
@@ -3062,24 +3350,48 @@ npplot.bandwidth <-
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
-            persp(x1.eval,
-                  x2.eval,
-                  lerr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
-            par(new = TRUE)
+            if (plot.errors.type == "all" && !is.null(lerr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      lerr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                par(new = TRUE)
+              }
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    lerr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+              par(new = TRUE)
+            }
           }
           
           persp(x1.eval,
@@ -3102,23 +3414,50 @@ npplot.bandwidth <-
 
           if (plot.errors){
             par(new = TRUE)
-            persp(x1.eval,
-                  x2.eval,
-                  herr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            if (plot.errors.type == "all" && !is.null(herr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      herr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                if (bn != "bonferroni") par(new = TRUE)
+              }
+              legend("topleft",
+                     legend = c("Pointwise","Simultaneous","Bonferroni"),
+                     lty = 1, col = c("red","green3","blue"), lwd = 2, bty = "n")
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    herr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            }
           }
 
           Sys.sleep(0.5)
@@ -3148,6 +3487,7 @@ npplot.bandwidth <-
       if (common.scale){
         data.eval = matrix(data = NA, nrow = maxneval, ncol = bws$ndim)
         data.err = matrix(data = NA, nrow = maxneval, ncol = 3*bws$ndim)
+        data.err.all = vector("list", bws$ndim)
         allei = as.data.frame(matrix(data = NA, nrow = maxneval, ncol = bws$ndim))
         all.bxp = list()
       }
@@ -3227,6 +3567,7 @@ npplot.bandwidth <-
         temp.err[,] = NA
         temp.dens[] =  NA
         temp.boot = list()
+        temp.all.err <- NULL
 
         xi.factor = is.factor(xdat[,i])
 
@@ -3252,7 +3593,7 @@ npplot.bandwidth <-
           if (plot.errors.method == "asymptotic")
             temp.err[1:xi.neval,1:2] = replicate(2,2.0*tobj$derr)
           else if (plot.errors.method == "bootstrap"){
-            temp.boot <- compute.bootstrap.errors(
+            temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
                       cdf = FALSE,
@@ -3262,10 +3603,11 @@ npplot.bandwidth <-
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,
                       plot.errors.type = plot.errors.type,
-                      plot.errors.quantiles = plot.errors.quantiles,
+                      plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
-            temp.err[1:xi.neval,] = temp.boot[["boot.err"]]
-            temp.boot <- temp.boot[["bxp"]]
+            temp.err[1:xi.neval,] = temp.boot.raw[["boot.err"]]
+            temp.all.err <- temp.boot.raw[["boot.all.err"]]
+            temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){
               temp.boot$out <- numeric()
               temp.boot$group <- integer()
@@ -3281,6 +3623,7 @@ npplot.bandwidth <-
             all.bxp[[i]] = temp.boot
 
             data.err[,c(3*i-2,3*i-1,3*i)] = temp.err
+            data.err.all[[i]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
@@ -3293,8 +3636,20 @@ npplot.bandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all" && !xi.factor) {
+              draw.all.error.types(
+                ex = as.numeric(ei),
+                center = if (plotOnEstimate) temp.dens else temp.err[,3],
+                all.err = temp.all.err,
+                plot.errors.style = plot.errors.style,
+                plot.errors.bar = plot.errors.bar,
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
           }
         }
 
@@ -3341,8 +3696,20 @@ npplot.bandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all" && !xi.factor) {
+              draw.all.error.types(
+                ex = as.numeric(allei[,i]),
+                center = if (plotOnEstimate) data.eval[,i] else data.err[,3*i],
+                all.err = data.err.all[[i]],
+                plot.errors.style = plot.errors.style,
+                plot.errors.bar = plot.errors.bar,
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
           }
         }
       }
@@ -3392,8 +3759,8 @@ npplot.dbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
@@ -3444,14 +3811,18 @@ npplot.dbandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
 
     if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type == "quantiles"){
-        warning("quantiles cannot be calculated with asymptotics, calculating standard errors")
+      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
         plot.errors.type = "standard"
       }
 
@@ -3512,8 +3883,11 @@ npplot.dbandwidth <-
       terr = matrix(data = tobj$derr, nrow = nrow(x.eval), ncol = 3)
       terr[,3] = NA
       
+      lerr.all <- NULL
+      herr.all <- NULL
+
       if (plot.errors.method == "bootstrap"){
-        terr <- compute.bootstrap.errors(xdat = xdat, 
+        terr.obj <- compute.bootstrap.errors(xdat = xdat, 
           exdat = x.eval,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
@@ -3521,18 +3895,26 @@ npplot.dbandwidth <-
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
-          plot.errors.quantiles = plot.errors.quantiles,
-          bws = bws)[["boot.err"]]
+          plot.errors.alpha = plot.errors.alpha,
+          bws = bws)
+        terr <- terr.obj[["boot.err"]]
+        terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
+        center.val <- if (pc) terr[,3] else tobj$dist
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {tobj$dist}
-          -terr[,1],
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {tobj$dist}
-          +terr[,2],
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
 
       } else if (plot.errors.method == "asymptotic") {
         lerr = matrix(data = tobj$dist - 2.0*tobj$derr,
@@ -3545,9 +3927,12 @@ npplot.dbandwidth <-
 
       if(is.null(zlim)) {
           zlim =
-              if (plot.errors)
-                  c(min(lerr),max(herr))
-              else
+              if (plot.errors){
+                  if (plot.errors.type == "all" && !is.null(lerr.all))
+                  c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+                  else
+                      c(min(lerr),max(herr))
+              } else
                   c(min(tobj$dist),max(tobj$dist))
       }
 
@@ -3573,24 +3958,48 @@ npplot.dbandwidth <-
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
-            persp(x1.eval,
-                  x2.eval,
-                  lerr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
-            par(new = TRUE)
+            if (plot.errors.type == "all" && !is.null(lerr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      lerr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                par(new = TRUE)
+              }
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    lerr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+              par(new = TRUE)
+            }
           }
           
           persp(x1.eval,
@@ -3613,23 +4022,50 @@ npplot.dbandwidth <-
 
           if (plot.errors){
             par(new = TRUE)
-            persp(x1.eval,
-                  x2.eval,
-                  herr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            if (plot.errors.type == "all" && !is.null(herr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      herr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                if (bn != "bonferroni") par(new = TRUE)
+              }
+              legend("topleft",
+                     legend = c("Pointwise","Simultaneous","Bonferroni"),
+                     lty = 1, col = c("red","green3","blue"), lwd = 2, bty = "n")
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    herr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            }
           }
 
           Sys.sleep(0.5)
@@ -3765,7 +4201,7 @@ npplot.dbandwidth <-
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,
                       plot.errors.type = plot.errors.type,
-                      plot.errors.quantiles = plot.errors.quantiles,
+                      plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
             temp.err[1:xi.neval,] = temp.boot[["boot.err"]]
             temp.boot <- temp.boot[["bxp"]]
@@ -3901,8 +4337,8 @@ npplot.conbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
@@ -3978,14 +4414,18 @@ npplot.conbandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
 
     if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type == "quantiles"){
-        warning("quantiles cannot be calculated with asymptotics, calculating standard errors")
+      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
         plot.errors.type = "standard"
       }
 
@@ -4103,7 +4543,7 @@ npplot.conbandwidth <-
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
-          plot.errors.quantiles = plot.errors.quantiles,
+          plot.errors.alpha = plot.errors.alpha,
           bws = bws)[["boot.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
@@ -4410,7 +4850,7 @@ npplot.conbandwidth <-
                         plot.errors.boot.num = plot.errors.boot.num,
                         plot.errors.center = plot.errors.center,
                         plot.errors.type = plot.errors.type,
-                        plot.errors.quantiles = plot.errors.quantiles,
+                        plot.errors.alpha = plot.errors.alpha,
                         bws = bws)
               temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
               temp.boot <- temp.boot[["bxp"]]
@@ -4535,7 +4975,7 @@ npplot.conbandwidth <-
                           plot.errors.boot.num = plot.errors.boot.num,
                           plot.errors.center = plot.errors.center,
                           plot.errors.type = plot.errors.type,
-                          plot.errors.quantiles = plot.errors.quantiles,
+                          plot.errors.alpha = plot.errors.alpha,
                           bws = bws)
                 temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
                 temp.boot <- temp.boot[["bxp"]]
@@ -4687,8 +5127,8 @@ npplot.condbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = min(neval,25),
@@ -4763,14 +5203,18 @@ npplot.condbandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
 
     if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type == "quantiles"){
-        warning("quantiles cannot be calculated with asymptotics, calculating standard errors")
+      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
         plot.errors.type = "standard"
       }
 
@@ -4888,7 +5332,7 @@ npplot.condbandwidth <-
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
-          plot.errors.quantiles = plot.errors.quantiles,
+          plot.errors.alpha = plot.errors.alpha,
           bws = bws)[["boot.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
@@ -5193,7 +5637,7 @@ npplot.condbandwidth <-
                         plot.errors.boot.num = plot.errors.boot.num,
                         plot.errors.center = plot.errors.center,
                         plot.errors.type = plot.errors.type,
-                        plot.errors.quantiles = plot.errors.quantiles,
+                        plot.errors.alpha = plot.errors.alpha,
                         bws = bws)
               temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
               temp.boot <- temp.boot[["bxp"]]
@@ -5318,7 +5762,7 @@ npplot.condbandwidth <-
                           plot.errors.boot.num = plot.errors.boot.num,
                           plot.errors.center = plot.errors.center,
                           plot.errors.type = plot.errors.type,
-                          plot.errors.quantiles = plot.errors.quantiles,
+                          plot.errors.alpha = plot.errors.alpha,
                           bws = bws)
                 temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
                 temp.boot <- temp.boot[["bxp"]]
@@ -5456,8 +5900,8 @@ npplot.sibandwidth <-
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","quantiles"),
-           plot.errors.quantiles = c(0.025,0.975),
+           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
            plot.errors.bar.num = NULL,
@@ -5518,6 +5962,10 @@ npplot.sibandwidth <-
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
+
+    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
+      stop("'plot.errors.alpha' must be a scalar in (0,1)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -5563,7 +6011,7 @@ npplot.sibandwidth <-
                   plot.errors.boot.num = plot.errors.boot.num,
                   plot.errors.center = plot.errors.center,
                   plot.errors.type = plot.errors.type,
-                  plot.errors.quantiles = plot.errors.quantiles,
+                  plot.errors.alpha = plot.errors.alpha,
                   bws = bws)
     }
 
