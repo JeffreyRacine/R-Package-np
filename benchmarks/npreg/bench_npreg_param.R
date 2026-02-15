@@ -9,7 +9,7 @@ parse_args <- function(args) {
     ckertype = "gaussian",
     np_tree = FALSE,
     seed_policy = "varying",
-    times = 5L,
+    times = 50L,
     base_seed = 42L,
     seeds = NULL,
     out_raw = "/tmp/npreg_serial_bench_raw.csv",
