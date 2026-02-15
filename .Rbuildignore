@@ -51,3 +51,5 @@
 mknpkg.sh
 npver
 ^AGENTS\.md$
+
+^benchmarks/oneoff
