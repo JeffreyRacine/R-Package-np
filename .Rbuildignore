@@ -30,6 +30,13 @@
 ^demo/serial/.*$
 ^demo/timing
 ^benchmarks/npreg
+^benchmarks/npcdens
+^benchmarks/npudens
+^benchmarks/npcdist
+^benchmarks/npudist
+^benchmarks/npplreg
+^benchmarks/npscoef
+^benchmarks/npindex
 ^issue_notes
 ^man/dontrun
 ^man/run
