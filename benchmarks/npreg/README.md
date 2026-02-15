@@ -59,3 +59,45 @@ Change sample size and repetitions via `--n=` and `--times=`.
 ## Compatibility Note
 
 `num_fval` is extracted from `bw$num.fval` when available. If missing (older versions), it is reported as `NA`.
+
+## Version Comparison Workflow (npRmpi)
+
+1. Install each target stack into its own library.
+
+```bash
+mkdir -p /tmp/Rlib_nprmpi_current /tmp/Rlib_nprmpi_cran20
+R CMD INSTALL -l /tmp/Rlib_nprmpi_current /Users/jracine/Development/np-master
+R CMD INSTALL --no-test-load -l /tmp/Rlib_nprmpi_current /Users/jracine/Development/np-npRmpi
+
+R CMD INSTALL -l /tmp/Rlib_nprmpi_cran20 /Users/jracine/Development/CRAN/np_0.60-20.tar.gz
+R CMD INSTALL --no-test-load -l /tmp/Rlib_nprmpi_cran20 /Users/jracine/Development/CRAN/npRmpi_0.60-20.tar.gz
+```
+
+2. Run canonical benchmark with each stack.
+
+```bash
+R_LIBS=/tmp/Rlib_nprmpi_cran20 FI_TCP_IFACE=en0 \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
+  --n=100 --times=5 --rslaves=1 \
+  --out_raw=/tmp/nprmpi_cran20_raw.csv --out_summary=/tmp/nprmpi_cran20_summary.csv
+
+R_LIBS=/tmp/Rlib_nprmpi_current FI_TCP_IFACE=en0 \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
+  --n=100 --times=5 --rslaves=1 \
+  --out_raw=/tmp/nprmpi_current_raw.csv --out_summary=/tmp/nprmpi_current_summary.csv
+```
+
+3. Compare outputs.
+
+```bash
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/compare_npreg_versions.R \
+  --raw_a=/tmp/nprmpi_cran20_raw.csv --label_a=npRmpi_0.60-20 \
+  --raw_b=/tmp/nprmpi_current_raw.csv --label_b=npRmpi_current \
+  --out_timing=/tmp/nprmpi_timing_compare.csv \
+  --out_objective=/tmp/nprmpi_objective_compare.csv
+```
+
+Comparison outputs:
+
+- Timing by function (`npregbw`, `npreg`, `npreg_total`) with mean/median and percent change.
+- Objective diagnostics (`fval`, `ifval`, `num_fval`, bandwidth match rate, `ok` match rate).
