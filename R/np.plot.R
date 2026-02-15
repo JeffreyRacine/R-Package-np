@@ -216,6 +216,25 @@ compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type) {
   stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
 }
 
+compute.all.error.range <- function(center, all.err) {
+  if (is.null(all.err)) {
+    return(c(NA_real_, NA_real_))
+  }
+  lower <- c(center - all.err$pointwise[,1],
+             center - all.err$simultaneous[,1],
+             center - all.err$bonferroni[,1])
+  upper <- c(center + all.err$pointwise[,2],
+             center + all.err$simultaneous[,2],
+             center + all.err$bonferroni[,2])
+  c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
+}
+
+compute.default.error.range <- function(center, err) {
+  lower <- c(center - err[,1], err[,3] - err[,1])
+  upper <- c(center + err[,2], err[,3] + err[,2])
+  c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
+}
+
 
 compute.bootstrap.errors = function(...,bws){
   UseMethod("compute.bootstrap.errors",bws)
@@ -3524,8 +3543,9 @@ npplot.bandwidth <-
           ifelse(common.scale,"y = data.eval[,i],", "y = temp.dens,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-              max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors,
+               "ylim = if (plot.errors.type == 'all' && !xi.factor) compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err),",
+               ""))
 
       pxlabE = "xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[i], paste('X', i, sep = ''))),"
 
@@ -3673,7 +3693,26 @@ npplot.bandwidth <-
       if (common.scale & (plot.behavior != "data")){
         jj = 1:bws$ndim*3
 
-        if (plot.errors.center == "estimate" | !plot.errors) {
+        if (plot.errors && plot.errors.type == "all") {
+          y.min <- Inf
+          y.max <- -Inf
+          for (k in 1:bws$ndim) {
+            if (is.factor(xdat[,k])) next
+            center.k <- if (plot.errors.center == "estimate") data.eval[,k] else data.err[,3*k]
+            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            y.min <- min(y.min, range.k[1], na.rm = TRUE)
+            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+          }
+          if (!is.finite(y.min) || !is.finite(y.max)) {
+            if (plot.errors.center == "estimate") {
+              y.max = max(na.omit(as.double(data.eval)) + na.omit(as.double(data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.eval)) - na.omit(as.double(data.err[,jj-2])))
+            } else {
+              y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+            }
+          }
+        } else if (plot.errors.center == "estimate" | !plot.errors) {
           y.max = max(na.omit(as.double(data.eval)) +
             if (plot.errors) na.omit(as.double(data.err[,jj-1]))
             else 0
