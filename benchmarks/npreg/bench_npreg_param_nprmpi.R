@@ -9,7 +9,7 @@ parse_args <- function(args) {
     ckertype = "gaussian",
     np_tree = FALSE,
     seed_policy = "varying",
-    times = 5L,
+    times = 50L,
     base_seed = 42L,
     seeds = NULL,
     nslaves = 1L,
