@@ -5,6 +5,7 @@ parse_args <- function(args) {
     n = 100L,
     regtype = "lc",
     bwmethod = "cv.ls",
+    nmulti = 1L,
     ckertype = "gaussian",
     np_tree = FALSE,
     seed_policy = "varying",
@@ -28,6 +29,7 @@ parse_args <- function(args) {
     if (key == "n") out$n <- as.integer(val)
     else if (key == "regtype") out$regtype <- val
     else if (key == "bwmethod") out$bwmethod <- val
+    else if (key == "nmulti") out$nmulti <- as.integer(val)
     else if (key == "ckertype") out$ckertype <- val
     else if (key == "np_tree" || key == "np.trees" || key == "np_trees") out$np_tree <- as.logical(val)
     else if (key == "seed_policy") out$seed_policy <- val
@@ -43,6 +45,7 @@ parse_args <- function(args) {
 
   if (!out$regtype %in% c("lc", "ll")) stop("regtype must be lc or ll")
   if (!out$bwmethod %in% c("cv.ls", "cv.aic")) stop("bwmethod must be cv.ls or cv.aic")
+  if (!is.finite(out$nmulti) || out$nmulti < 1L) stop("nmulti must be an integer >= 1")
   if (!out$ckertype %in% c("gaussian", "epanechnikov")) stop("ckertype must be gaussian or epanechnikov")
   if (!out$seed_policy %in% c("fixed", "varying")) stop("seed_policy must be fixed or varying")
 
@@ -102,11 +105,12 @@ run_case <- function(seed, cfg) {
           bw <- npregbw(y ~ x1 + x2 + z1 + z2,
                         regtype = REGTYPE,
                         bwmethod = BWMETHOD,
+                        nmulti = NMULTI,
                         ckertype = CKERTYPE,
                         data = d),
           caller.execute = TRUE
         ),
-        list(REGTYPE = cfg$regtype, BWMETHOD = cfg$bwmethod, CKERTYPE = cfg$ckertype)
+        list(REGTYPE = cfg$regtype, BWMETHOD = cfg$bwmethod, NMULTI = cfg$nmulti, CKERTYPE = cfg$ckertype)
       ))
     }, error = function(e) err <<- conditionMessage(e))
   })
@@ -129,6 +133,7 @@ run_case <- function(seed, cfg) {
     n = cfg$n,
     regtype = cfg$regtype,
     bwmethod = cfg$bwmethod,
+    nmulti = cfg$nmulti,
     ckertype = cfg$ckertype,
     np_tree = cfg$np_tree,
     seed_policy = cfg$seed_policy,
@@ -157,6 +162,7 @@ summarize_results <- function(df) {
     n = okdf$n[1],
     regtype = okdf$regtype[1],
     bwmethod = okdf$bwmethod[1],
+    nmulti = okdf$nmulti[1],
     ckertype = okdf$ckertype[1],
     np_tree = okdf$np_tree[1],
     seed_policy = okdf$seed_policy[1],
@@ -201,6 +207,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
         " nslaves=", cfg$nslaves,
         " regtype=", cfg$regtype,
         " bwmethod=", cfg$bwmethod,
+        " nmulti=", cfg$nmulti,
         " ckertype=", cfg$ckertype,
         " np_tree=", cfg$np_tree,
         " seed_policy=", cfg$seed_policy, "\n", sep = "")

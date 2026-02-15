@@ -5,6 +5,7 @@ parse_args <- function(args) {
     n = 100L,
     times = 1L,
     base_seed = 42L,
+    nmulti = 1L,
     nslaves = 1L,
     out_dir = "/tmp",
     fi_tcp_iface = "en0",
@@ -25,6 +26,7 @@ parse_args <- function(args) {
     if (key == "n") out$n <- as.integer(val)
     else if (key == "times") out$times <- as.integer(val)
     else if (key == "base_seed") out$base_seed <- as.integer(val)
+    else if (key == "nmulti") out$nmulti <- as.integer(val)
     else if (key == "nslaves" || key == "rslaves") out$nslaves <- as.integer(val)
     else if (key == "out_dir") out$out_dir <- val
     else if (key == "fi_tcp_iface") out$fi_tcp_iface <- val
@@ -47,7 +49,7 @@ repo_hash <- function(repo_dir) {
 mk_run_id <- function(cfg, backend, hash) {
   ts <- format(Sys.time(), "%Y%m%d_%H%M%S")
   tag <- if (nzchar(cfg$tag)) paste0("_", cfg$tag) else ""
-  sprintf("%s_%s_%s_n%d_t%d_s%d_ns%d%s", backend, hash, ts, cfg$n, cfg$times, cfg$base_seed, cfg$nslaves, tag)
+  sprintf("%s_%s_%s_n%d_t%d_s%d_m%d_ns%d%s", backend, hash, ts, cfg$n, cfg$times, cfg$base_seed, cfg$nmulti, cfg$nslaves, tag)
 }
 
 `%||%` <- function(x, y) if (is.null(x) || length(x) == 0L) y else x
@@ -100,6 +102,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
       sprintf("--n=%d", cfg$n),
       sprintf("--times=%d", cfg$times),
       sprintf("--base_seed=%d", cfg$base_seed),
+      sprintf("--nmulti=%d", cfg$nmulti),
       sprintf("--nslaves=%d", cfg$nslaves),
       sprintf("--regtype=%s", row$regtype),
       sprintf("--bwmethod=%s", row$bwmethod),
