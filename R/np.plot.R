@@ -110,7 +110,16 @@ draw.all.error.types <- function(ex, center, all.err,
 }
 
 plotFactor <- function(f, y, ...){
-  plot(x = f, y = y, lty = "blank", ...)
+  dot.expr <- as.list(substitute(list(...)))[-1L]
+  dot.names <- names(dot.expr)
+  has.user.lty <- !is.null(dot.names) && any(dot.names == "lty")
+
+  if (has.user.lty) {
+    plot.call <- as.call(c(list(quote(plot), x = quote(f), y = quote(y)), dot.expr))
+    eval(plot.call, parent.frame())
+  } else {
+    plot(x = f, y = y, lty = "blank", ...)
+  }
 
   l.f = rep(f, each=3)
   l.f[3*(1:length(f))] = NA
