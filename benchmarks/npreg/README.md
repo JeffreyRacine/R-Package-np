@@ -8,6 +8,7 @@ This folder provides a parameterized benchmark harness for `npregbw()` + `npreg(
 - `run_npreg_combos.R`: run all 32 option combinations (`2x2x2x2x2`) with a shared setup.
 - `compare_npreg_versions.R`: compare two raw outputs and emit overall and combo-specific comparison tables.
 - `make_npreg_report.R`: generate a markdown report from comparison CSV outputs.
+- `make_npreg_combined_report.R`: generate a single markdown report combining `np` and `npRmpi` comparison CSV outputs.
 - `REPRODUCE.md`: end-to-end current-vs-CRAN replication steps.
 
 ## One-Configuration Run
