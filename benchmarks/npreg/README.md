@@ -12,7 +12,7 @@ This folder provides a parameterized benchmark harness for `npregbw()` + `npreg(
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
 Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
-  --n=100 --times=1 --base_seed=42 \
+  --n=100 --times=50 --base_seed=42 \
   --regtype=lc --bwmethod=cv.ls --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
   --rslaves=1 \
@@ -24,7 +24,7 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
 Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/run_npreg_combos.R \
-  --n=100 --times=1 --base_seed=42 --nmulti=1 --rslaves=1 --tag=myrun
+  --n=100 --times=50 --base_seed=42 --nmulti=1 --rslaves=1 --tag=myrun
 ```
 
 Outputs are written to `/tmp` with run IDs in filenames:
@@ -37,7 +37,7 @@ Outputs are written to `/tmp` with run IDs in filenames:
 ## Important Defaults
 
 - `n=100`
-- `times=1`
+- `times=50`
 - `base_seed=42`
 - `nmulti=1`
 - `nslaves=1` (`--rslaves` alias supported)
@@ -78,12 +78,12 @@ R CMD INSTALL --no-test-load -l /tmp/Rlib_nprmpi_cran20 /Users/jracine/Developme
 ```bash
 R_LIBS=/tmp/Rlib_nprmpi_cran20 FI_TCP_IFACE=en0 \
 Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
-  --n=100 --times=5 --rslaves=1 \
+  --n=100 --times=50 --rslaves=1 \
   --out_raw=/tmp/nprmpi_cran20_raw.csv --out_summary=/tmp/nprmpi_cran20_summary.csv
 
 R_LIBS=/tmp/Rlib_nprmpi_current FI_TCP_IFACE=en0 \
 Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
-  --n=100 --times=5 --rslaves=1 \
+  --n=100 --times=50 --rslaves=1 \
   --out_raw=/tmp/nprmpi_current_raw.csv --out_summary=/tmp/nprmpi_current_summary.csv
 ```
 
@@ -94,10 +94,14 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/compare_npreg_vers
   --raw_a=/tmp/nprmpi_cran20_raw.csv --label_a=npRmpi_0.60-20 \
   --raw_b=/tmp/nprmpi_current_raw.csv --label_b=npRmpi_current \
   --out_timing=/tmp/nprmpi_timing_compare.csv \
-  --out_objective=/tmp/nprmpi_objective_compare.csv
+  --out_objective=/tmp/nprmpi_objective_compare.csv \
+  --out_combo_timing=/tmp/nprmpi_combo_timing_compare.csv \
+  --out_combo_objective=/tmp/nprmpi_combo_objective_compare.csv
 ```
 
 Comparison outputs:
 
 - Timing by function (`npregbw`, `npreg`, `npreg_total`) with mean/median and percent change.
 - Objective diagnostics (`fval`, `ifval`, `num_fval`, bandwidth match rate, `ok` match rate).
+- Combo timing table by (`regtype`, `bwmethod`, `ckertype`, `np_tree`, `seed_policy`, `nmulti`) with mean/median percent change.
+- Combo objective diagnostics by the same combination keys.
