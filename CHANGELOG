@@ -28,6 +28,16 @@ Changes from Version 0.60-20 to 0.60-21 [12-Feb-2026]
 * Added new documentation page np.options.Rd and cross-references from
   np-package and np.plot man pages; set default option values at package load.
 
+* Updated bootstrap quantile error-band API in npplot():
+  - replaced `plot.errors.quantiles` with scalar `plot.errors.alpha` (default 0.05)
+  - expanded `plot.errors.type` quantile options to `pointwise`,
+    `bonferroni`, `simultaneous`, and `all` (in addition to `standard`)
+  - simultaneous bands now use a vendored, attributed rank-based
+    `SCSrank` implementation (from MCPAN::SCSrank)
+  - `plot.errors.type="all"` overlays pointwise/bonferroni/simultaneous
+    bands with color coding and legend (`bty="n"`)
+  - updated associated documentation/examples to use the new interface.
+
 Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
 
 * Major enhancements to npregiv() and npregivderiv():
