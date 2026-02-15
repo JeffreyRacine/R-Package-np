@@ -350,6 +350,7 @@ npindexbw.sibandwidth <-
           fval.min <- .Machine$double.xmax
           numimp <- 0
           fval.value <- numeric(nmulti)
+          num.feval.overall <- 0
 
           console <- newLineConsole()
 
@@ -405,6 +406,8 @@ npindexbw.sibandwidth <-
 
             topt <- parse(text=paste("optim(optim.parm,fn=optim.fn,gr=NULL,method=optim.method,control=optim.control", ifelse(only.optimize.beta, ',h)',')')))
             suppressWarnings(optim.return <- eval(topt))
+            if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
+              num.feval.overall <- num.feval.overall + optim.return$counts[1]
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
@@ -427,6 +430,8 @@ npindexbw.sibandwidth <-
               }
               
               suppressWarnings(optim.return <- eval(topt))
+              if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
+                num.feval.overall <- num.feval.overall + optim.return$counts[1]
             }
 
             if(optim.return$convergence != 0)
@@ -450,6 +455,7 @@ npindexbw.sibandwidth <-
           bws$bw <- param[ncol(xdat)]
           bws$fval <- fval.min
           bws$ifval <- best
+          bws$num.feval <- num.feval.overall
           bws$numimp <- numimp
           bws$fval.vector <- fval.value
         }
@@ -472,6 +478,7 @@ npindexbw.sibandwidth <-
                        bwtype = bws$type,
                        fval = bws$fval,
                        ifval = bws$ifval,
+                       num.feval = bws$num.feval,
                        numimp = bws$numimp,
                        fval.vector = bws$fval.vector,
                        nobs = bws$nobs,

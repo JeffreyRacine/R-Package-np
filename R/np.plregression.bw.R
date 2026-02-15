@@ -184,6 +184,13 @@ npplregbw.plbandwidth =
                   bws = bws$bw[[i+1]], nmulti = nmulti, ...)
         }
       })[1]
+    num.feval <- sum(sapply(bws$bw, function(bwi) {
+      if (is.null(bwi$num.feval) || identical(bwi$num.feval, NA)) 0 else bwi$num.feval
+    }))
+    fval <- {
+      fv <- unlist(lapply(bws$bw, function(bwi) bwi$fval))
+      if (length(fv) == 0 || all(!is.finite(fv))) NA else sum(fv[is.finite(fv)])
+    }
     bws <- plbandwidth(bws = bws$bw,
                        regtype = bws$regtype,
                        bwmethod = bws$method,
@@ -200,6 +207,8 @@ npplregbw.plbandwidth =
                        ynames = bws$ynames,
                        znames = bws$znames,
                        nobs = bws$nobs,
+                       fval = fval,
+                       num.feval = num.feval,
                        rows.omit = rows.omit,
                        total.time = total.time)
 
@@ -230,6 +239,13 @@ npplregbw.default =
 
     tbw <- plbandwidth(bws = plband,
                        nobs = dim(xdat)[1],
+                       fval = {
+                         fv <- unlist(lapply(plband, function(bwi) bwi$fval))
+                         if (length(fv) == 0 || all(!is.finite(fv))) NA else sum(fv[is.finite(fv)])
+                       },
+                       num.feval = sum(sapply(plband, function(bwi) {
+                         if (is.null(bwi$num.feval) || identical(bwi$num.feval, NA)) 0 else bwi$num.feval
+                       })),
                        ...,
                        xdati = untangle(xdat),
                        ydati = untangle(data.frame(ydat)),

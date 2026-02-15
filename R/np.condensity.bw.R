@@ -275,6 +275,7 @@ npcdensbw.conbandwidth <-
 
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
+      tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$fval.history <- myout$fval.history
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
@@ -338,6 +339,7 @@ npcdensbw.conbandwidth <-
                         oykertype = tbw$oykertype,
                         fval = tbw$fval,
                         ifval = tbw$ifval,
+                        num.feval = tbw$num.feval,
                         fval.history = tbw$fval.history,
                         eval.history = tbw$eval.history,
                         invalid.history = tbw$invalid.history,

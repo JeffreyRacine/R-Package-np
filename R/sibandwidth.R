@@ -6,6 +6,7 @@ sibandwidth <-
            ckerorder = c(2,4,6,8),
            fval = NA,
            ifval = NA,
+           num.feval = NA,
            numimp = NA,
            fval.vector = NA,
            nobs = NA,
@@ -64,6 +65,7 @@ sibandwidth <-
       "CG" = "CG", "NA"),
     fval = fval,
     ifval = ifval,
+    num.feval = num.feval,
     numimp = numimp,
     fval.vector = fval.vector,
     pscaling = "Bandwidth(s)",
@@ -156,5 +158,4 @@ summary.sibandwidth <- function(object, ...){
   cat(genTimingStr(object))
   cat("\n\n")
 }
-
 
