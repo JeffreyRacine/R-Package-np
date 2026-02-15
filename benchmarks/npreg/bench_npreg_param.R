@@ -51,13 +51,23 @@ parse_args <- function(args) {
 
 make_seeds <- function(cfg) {
   if (!is.null(cfg$seeds)) return(cfg$seeds)
-  if (cfg$seed_policy == "fixed") rep(cfg$base_seed, cfg$times)
-  else cfg$base_seed + seq_len(cfg$times) - 1L
+  cfg$base_seed
 }
 
 load_backend <- function() {
   suppressPackageStartupMessages(library(np))
+  suppressPackageStartupMessages(library(microbenchmark))
   options(np.messages = FALSE)
+}
+
+mk_data <- function(seed, n) {
+  set.seed(seed)
+  x1 <- runif(n)
+  x2 <- runif(n)
+  z1 <- factor(rbinom(n, 3, .5))
+  z2 <- ordered(rbinom(n, 3, .5))
+  y <- cos(2 * pi * x1) + as.numeric(as.character(z1)) + rnorm(n, sd = .25)
+  data.frame(y = y, x1 = x1, x2 = x2, z1 = z1, z2 = z2)
 }
 
 run_case <- function(seed, cfg) {
@@ -76,95 +86,86 @@ run_case <- function(seed, cfg) {
     paste(signif(as.numeric(x), 8), collapse = ";")
   }
 
-  set.seed(seed)
-  n <- cfg$n
+  iter_seeds <- if (cfg$seed_policy == "fixed") rep(seed, cfg$times) else seed + seq_len(cfg$times) - 1L
+  res <- vector("list", cfg$times)
+  idx <- 0L
 
-  # DGP mirrored from np-npRmpi/demo/npreg* scripts.
-  x1 <- runif(n)
-  x2 <- runif(n)
-  z1 <- factor(rbinom(n, 3, .5))
-  z2 <- ordered(rbinom(n, 3, .5))
-  y <- cos(2 * pi * x1) + as.numeric(as.character(z1)) + rnorm(n, sd = .25)
-  dat <- data.frame(y = y, x1 = x1, x2 = x2, z1 = z1, z2 = z2)
+  mb <- microbenchmark::microbenchmark(
+    run = {
+      idx <- idx + 1L
+      s <- iter_seeds[[idx]]
+      out <- tryCatch({
+        dat <- mk_data(s, cfg$n)
 
-  err <- ""
-  ok <- FALSE
+        t0 <- proc.time()[["elapsed"]]
+        bw <- npregbw(y ~ x1 + x2 + z1 + z2,
+                      regtype = cfg$regtype,
+                      bwmethod = cfg$bwmethod,
+                      nmulti = cfg$nmulti,
+                      ckertype = cfg$ckertype,
+                      data = dat)
+        bw_elapsed <- proc.time()[["elapsed"]] - t0
 
-  bw_elapsed <- NA_real_
-  fit_elapsed <- NA_real_
-  total_elapsed <- NA_real_
+        t1 <- proc.time()[["elapsed"]]
+        fit <- npreg(bws = bw, data = dat)
+        fit_elapsed <- proc.time()[["elapsed"]] - t1
 
-  fval <- NA_real_
-  ifval <- NA_real_
-  eval_count <- NA_integer_
-  invalid_count <- NA_integer_
-  num_fval <- NA_real_
-  bw_vec <- ""
-
-  t_total <- system.time({
-    t_bw <- system.time({
-      bw <- tryCatch(
-        npregbw(y ~ x1 + x2 + z1 + z2,
-                regtype = cfg$regtype,
-                bwmethod = cfg$bwmethod,
-                nmulti = cfg$nmulti,
-                ckertype = cfg$ckertype,
-                data = dat),
-        error = function(e) {
-          err <<- conditionMessage(e)
-          NULL
-        }
-      )
-    })
-
-    bw_elapsed <- unname(t_bw[["elapsed"]])
-
-    if (!is.null(bw)) {
-      t_fit <- system.time({
-        fit <- tryCatch(
-          npreg(bws = bw, data = dat),
-          error = function(e) {
-            err <<- conditionMessage(e)
-            NULL
-          }
+        list(
+          ok = !is.null(fit),
+          elapsed_bw = bw_elapsed,
+          elapsed_fit = fit_elapsed,
+          fval = first_num_or_na(bw$fval),
+          ifval = first_num_or_na(bw$ifval),
+          eval_count = count_or_na(bw$eval.history),
+          invalid_count = count_or_na(bw$invalid.history),
+          num_fval = first_num_or_na(bw$num.fval),
+          bw = bw_str_or_empty(bw$bw),
+          error = ""
+        )
+      }, error = function(e) {
+        list(
+          ok = FALSE,
+          elapsed_bw = NA_real_,
+          elapsed_fit = NA_real_,
+          fval = NA_real_,
+          ifval = NA_real_,
+          eval_count = NA_integer_,
+          invalid_count = NA_integer_,
+          num_fval = NA_real_,
+          bw = "",
+          error = conditionMessage(e)
         )
       })
+      res[[idx]] <- out
+      invisible(NULL)
+    },
+    times = cfg$times
+  )
 
-      fit_elapsed <- unname(t_fit[["elapsed"]])
-      ok <- !is.null(fit)
-
-      fval <- first_num_or_na(bw$fval)
-      ifval <- first_num_or_na(bw$ifval)
-      eval_count <- count_or_na(bw$eval.history)
-      invalid_count <- count_or_na(bw$invalid.history)
-      num_fval <- first_num_or_na(bw$num.fval)
-      bw_vec <- bw_str_or_empty(bw$bw)
-    }
-  })
-
-  total_elapsed <- unname(t_total[["elapsed"]])
+  total_secs <- as.numeric(mb$time) / 1e9
 
   data.frame(
-    backend = "np",
-    n = cfg$n,
-    regtype = cfg$regtype,
-    bwmethod = cfg$bwmethod,
-    nmulti = cfg$nmulti,
-    ckertype = cfg$ckertype,
-    np_tree = cfg$np_tree,
-    seed_policy = cfg$seed_policy,
-    seed = seed,
-    ok = ok,
-    elapsed_bw = bw_elapsed,
-    elapsed_fit = fit_elapsed,
-    elapsed_total = total_elapsed,
-    fval = fval,
-    ifval = ifval,
-    eval_count = eval_count,
-    invalid_count = invalid_count,
-    num_fval = num_fval,
-    bw = bw_vec,
-    error = err,
+    backend = rep("np", cfg$times),
+    n = rep(cfg$n, cfg$times),
+    regtype = rep(cfg$regtype, cfg$times),
+    bwmethod = rep(cfg$bwmethod, cfg$times),
+    nmulti = rep(cfg$nmulti, cfg$times),
+    ckertype = rep(cfg$ckertype, cfg$times),
+    np_tree = rep(cfg$np_tree, cfg$times),
+    seed_policy = rep(cfg$seed_policy, cfg$times),
+    seed = iter_seeds,
+    iter = seq_len(cfg$times),
+    ok = vapply(res, function(x) isTRUE(x$ok), logical(1)),
+    elapsed_bw = vapply(res, function(x) x$elapsed_bw, numeric(1)),
+    elapsed_fit = vapply(res, function(x) x$elapsed_fit, numeric(1)),
+    elapsed_total = total_secs,
+    fval = vapply(res, function(x) x$fval, numeric(1)),
+    ifval = vapply(res, function(x) x$ifval, numeric(1)),
+    eval_count = vapply(res, function(x) x$eval_count, integer(1)),
+    invalid_count = vapply(res, function(x) x$invalid_count, integer(1)),
+    num_fval = vapply(res, function(x) x$num_fval, numeric(1)),
+    bw = vapply(res, function(x) x$bw, character(1)),
+    error = vapply(res, function(x) x$error, character(1)),
     stringsAsFactors = FALSE
   )
 }
