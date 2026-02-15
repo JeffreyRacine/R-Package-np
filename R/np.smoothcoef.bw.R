@@ -356,6 +356,7 @@ npscoefbw.scbandwidth <-
           fval.min <- .Machine$double.xmax
           numimp <- 0
           value.overall <- numeric(nmulti)
+          num.feval.overall <- 0
 
           x.scale <- sapply(1:bws$ndim, function(i){
             if (dati$icon[i]){
@@ -392,6 +393,8 @@ npscoefbw.scbandwidth <-
             suppressWarnings(optim.return <- optim(tbw,
                                                    fn = overall.cv.ls,
                                                    control = optim.control))
+            if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
+              num.feval.overall <- num.feval.overall + optim.return$counts[1]
             attempts <- 0
             while((optim.return$convergence != 0) && (attempts <= optim.maxattempts)) {
               attempts <- attempts + 1
@@ -400,6 +403,8 @@ npscoefbw.scbandwidth <-
               suppressWarnings(optim.return <- optim(tbw,
                                                      fn = overall.cv.ls,
                                                      control = optim.control))
+              if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
+                num.feval.overall <- num.feval.overall + optim.return$counts[1]
 
             }
 
@@ -454,6 +459,8 @@ npscoefbw.scbandwidth <-
                                  optim(tbw, fn = partial.cv.ls,
                                        control = optim.control,
                                        partial.index = j))
+                if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
+                  num.feval.overall <- num.feval.overall + optim.return$counts[1]
                 
                 cv.console <- printClear(cv.console)
                 
@@ -504,6 +511,7 @@ npscoefbw.scbandwidth <-
 
           bws$fval = min.overall
           bws$ifval = best.overall
+          bws$num.feval = num.feval.overall
           bws$numimp = numimp.overall
           bws$fval.vector = value.overall
         }
@@ -546,6 +554,7 @@ npscoefbw.scbandwidth <-
                        okertype = bws$okertype,
                        fval = bws$fval,
                        ifval = bws$ifval,
+                       num.feval = bws$num.feval,
                        numimp = bws$numimp,
                        fval.vector = bws$fval.vector,
                        nobs = bws$nobs,
@@ -646,4 +655,3 @@ npscoefbw.default <-
     return(tbw)
     
   }
-

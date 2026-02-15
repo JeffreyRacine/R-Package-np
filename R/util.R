@@ -614,6 +614,16 @@ genRegEstStr <- function(x){
 
 ## bandwidth-related report generating functions
 genBwSelStr <- function(x){
+  fval.str <- ""
+  if (!identical(x$fval, NA)) {
+    fval.str <- if (is.null(x$ifval) || identical(x$ifval, NA)) {
+      paste("\nObjective Function Value: ", format(x$fval), sep = "")
+    } else {
+      paste("\nObjective Function Value: ", format(x$fval),
+            " (achieved on multistart ", x$ifval, ")", sep = "")
+    }
+  }
+
   paste(ifelse(is.null(x$pregtype),"",paste("\nRegression Type:", x$pregtype)),
         ifelse(is.null(x$pmethod),"",paste("\nBandwidth Selection Method:",
                                            x$pmethod)),
@@ -621,9 +631,10 @@ genBwSelStr <- function(x){
                                               paste(deparse(x$formula), collapse="\n")),
         ifelse(is.null(x$ptype), "",
                paste("\nBandwidth Type: ",x$ptype, sep="")),
-        ifelse(identical(x$fval,NA),"",
-               paste("\nObjective Function Value: ", format(x$fval),
-               " (achieved on multistart ", x$ifval, ")", sep="")), sep="")
+        fval.str,
+        ifelse(is.null(x$num.feval) || identical(x$num.feval, NA), "",
+               paste("\nNumber of Function Evaluations: ", format(x$num.feval), sep="")),
+        sep="")
 }
 
 genBwScaleStrs <- function(x){
