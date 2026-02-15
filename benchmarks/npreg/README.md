@@ -11,7 +11,7 @@ This folder provides a parameterized benchmark harness for `npregbw()` + `npreg(
 
 ```bash
 Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
-  --n=100 --times=1 --base_seed=42 \
+  --n=100 --times=50 --base_seed=42 \
   --regtype=lc --bwmethod=cv.ls --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
   --out_raw=/tmp/npreg_one_raw.csv --out_summary=/tmp/npreg_one_summary.csv
@@ -21,7 +21,7 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.
 
 ```bash
 Rscript /Users/jracine/Development/np-master/benchmarks/npreg/run_npreg_combos.R \
-  --n=100 --times=1 --base_seed=42 --nmulti=1 --tag=myrun
+  --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=myrun
 ```
 
 Outputs are written to `/tmp` with run IDs in filenames:
@@ -33,7 +33,7 @@ Outputs are written to `/tmp` with run IDs in filenames:
 ## Important Defaults
 
 - `n=100`
-- `times=1`
+- `times=50`
 - `base_seed=42`
 - `nmulti=1`
 - `regtype=ll`
@@ -69,10 +69,10 @@ R CMD INSTALL -l /tmp/Rlib_np_cran20 /Users/jracine/Development/CRAN/np_0.60-20.
 
 ```bash
 R_LIBS=/tmp/Rlib_np_cran20 Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
-  --n=100 --times=5 --out_raw=/tmp/np_cran20_raw.csv --out_summary=/tmp/np_cran20_summary.csv
+  --n=100 --times=50 --out_raw=/tmp/np_cran20_raw.csv --out_summary=/tmp/np_cran20_summary.csv
 
 R_LIBS=/tmp/Rlib_np_current Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
-  --n=100 --times=5 --out_raw=/tmp/np_current_raw.csv --out_summary=/tmp/np_current_summary.csv
+  --n=100 --times=50 --out_raw=/tmp/np_current_raw.csv --out_summary=/tmp/np_current_summary.csv
 ```
 
 3. Compare outputs.
@@ -82,10 +82,14 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npreg/compare_npreg_vers
   --raw_a=/tmp/np_cran20_raw.csv --label_a=np_0.60-20 \
   --raw_b=/tmp/np_current_raw.csv --label_b=np_current \
   --out_timing=/tmp/np_timing_compare.csv \
-  --out_objective=/tmp/np_objective_compare.csv
+  --out_objective=/tmp/np_objective_compare.csv \
+  --out_combo_timing=/tmp/np_combo_timing_compare.csv \
+  --out_combo_objective=/tmp/np_combo_objective_compare.csv
 ```
 
 Comparison outputs:
 
 - Timing by function (`npregbw`, `npreg`, `npreg_total`) with mean/median and percent change.
 - Objective diagnostics (`fval`, `ifval`, `num_fval`, bandwidth match rate, `ok` match rate).
+- Combo timing table by (`regtype`, `bwmethod`, `ckertype`, `np_tree`, `seed_policy`, `nmulti`) with mean/median percent change.
+- Combo objective diagnostics by the same combination keys.

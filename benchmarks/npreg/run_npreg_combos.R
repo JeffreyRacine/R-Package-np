@@ -3,7 +3,7 @@
 parse_args <- function(args) {
   out <- list(
     n = 100L,
-    times = 1L,
+    times = 50L,
     base_seed = 42L,
     nmulti = 1L,
     out_dir = "/tmp",
