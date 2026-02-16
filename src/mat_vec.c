@@ -162,5 +162,3 @@ int *alloc_vecu(int nobs)
 
 }
 
-/* For pgplot */
-
