@@ -1,3 +1,35 @@
+Changes from Version 0.60-21 to 0.60-22 [16-Feb-2026]
+
+* Added bounded continuous-kernel support across the package with a unified
+  interface for Gaussian-family kernels using per-variable bounds:
+  - bound modes `none`, `range`, and `fixed`
+  - per-variable lower/upper bounds (`*kerlb`, `*kerub`)
+  - compatibility behavior where `(-Inf, Inf)` reproduces standard
+    unbounded Gaussian behavior.
+
+* Plumbed bounded continuous-kernel arguments through core bandwidth and
+  estimator pathways including unconditional density/distribution, conditional
+  density/distribution, regression, and smooth-coefficient workflows.
+
+* Added finite-bound validation and guardrails for bounded kernels:
+  - enforce admissible lower/upper ordering and data-coverage checks for
+    supplied fixed bounds
+  - enforce fixed-bandwidth requirements when finite bounds are requested.
+
+* Updated core C kernel-sum pathways to support bounded continuous-kernel
+  normalization and associated convolution/LS-CV pathways where required.
+
+* Added the ordered kernel option `"racine-li-yan"` to ordered-kernel
+  interfaces (`okertype`, `oxkertype`, `oykertype`) and synchronized kernel
+  mapping in conditional-density/distribution paths.
+
+* Added bounded-kernel regression/CV regression tests for formula/default-path
+  parity and bandwidth-selection smoke coverage.
+
+* Deprecated `bwmethod="cv.ls.np"`: calls are now aliased to `cv.ls` with a
+  one-time per-session warning to preserve backward compatibility while
+  removing a stale legacy selector path.
+
 Changes from Version 0.60-20 to 0.60-21 [12-Feb-2026]
 
 * Optimized core kernel-sum code paths in C (including ordered/unordered
