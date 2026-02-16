@@ -38,6 +38,9 @@ Changes from Version 0.60-20 to 0.60-21 [12-Feb-2026]
     bands with color coding and legend (`bty="n"`)
   - updated associated documentation/examples to use the new interface.
 
+  * Removed unused legacy sources and prototypes (RuniqueCombs, pgplot
+    placeholder) and restored B-spline error handling in bspline.c.
+
 Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
 
 * Major enhancements to npregiv() and npregivderiv():
