@@ -3245,6 +3245,9 @@ void np_convol_ckernelv(const int KERNEL,
                         const double x, 
                         double * xt_h, 
                         const double h, 
+                        const double lb,
+                        const double ub,
+                        const int use_bound_convol,
                         double * const result,
                         const int power){
 
@@ -3260,9 +3263,40 @@ void np_convol_ckernelv(const int KERNEL,
     np_aconvol_rect, np_aconvol_tgauss2
   };
 
+  /* Bounded convolution adjustment:
+     For Gaussian-2 we can adjust the legacy full-support convolution exactly.
+     For other kernels we intentionally fall back to the legacy convolution path. */
   for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
+    double kval;
+    const double hy = xt_h[i];
+
     if(xw[j] == 0.0) continue;
-    result[i] = xw[j]*k[KERNEL](x,xt[i],h,xt_h[i])/ipow(xt_h[i], power);
+
+    kval = k[KERNEL](x, xt[i], h, hy);
+
+    if(use_bound_convol && (KERNEL == 0) && (h > 0.0) && (hy > 0.0)){
+      const double hx2 = h*h;
+      const double hy2 = hy*hy;
+      const double s2 = hx2 + hy2;
+      const double zx_u = isfinite(ub) ? ((ub - x)/h) : R_PosInf;
+      const double zx_l = isfinite(lb) ? ((lb - x)/h) : R_NegInf;
+      const double zy_u = isfinite(ub) ? ((ub - xt[i])/hy) : R_PosInf;
+      const double zy_l = isfinite(lb) ? ((lb - xt[i])/hy) : R_NegInf;
+      const double denx = np_cdf_gauss2(zx_u) - np_cdf_gauss2(zx_l);
+      const double deny = np_cdf_gauss2(zy_u) - np_cdf_gauss2(zy_l);
+
+      if(s2 > 0.0){
+        const double sig = h*hy/sqrt(s2);
+        const double mu = (x*hy2 + xt[i]*hx2)/s2;
+        const double zc_u = isfinite(ub) ? ((ub - mu)/sig) : R_PosInf;
+        const double zc_l = isfinite(lb) ? ((lb - mu)/sig) : R_NegInf;
+        const double cint = np_cdf_gauss2(zc_u) - np_cdf_gauss2(zc_l);
+        const double den = np_nzd_pos(denx)*np_nzd_pos(deny);
+        kval *= np_nzd_pos(cint)/den;
+      }
+    }
+
+    result[i] = xw[j]*kval/ipow(hy, power);
   }
 }
 
@@ -5190,12 +5224,24 @@ double * const kw){
         }
       }
       else if(p_nvar == 0){
+        const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, tprod_has_vals, xc[i][j],
-                           matrix_alt_bandwidth[i], m[i][jbw], tprod, bpow[i]);
+                           matrix_alt_bandwidth[i], m[i][jbw],
+                           use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
+                           use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
+                           use_bound_convol_i,
+                           tprod, bpow[i]);
         tprod_has_vals = 1;
       } else
+      {
+        const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
         np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j],
-                           matrix_alt_bandwidth[i], m[i][jbw], tprod, bpow[i]);
+                           matrix_alt_bandwidth[i], m[i][jbw],
+                           use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
+                           use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
+                           use_bound_convol_i,
+                           tprod, bpow[i]);
+      }
       dband *= ipow(m[i][jbw], bpow[i]);
 
       if(do_perm){
