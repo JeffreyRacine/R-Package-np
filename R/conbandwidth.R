@@ -45,6 +45,14 @@ conbandwidth <-
   yndim = length(ybw)
   
   bwmethod = match.arg(bwmethod)
+  if (identical(bwmethod, "cv.ls.np")) {
+    if (!isTRUE(getOption("np.warned.cv.ls.np.deprecated"))) {
+      warning("'cv.ls.np' is deprecated and will be removed in a future release; using 'cv.ls' instead.",
+              call. = FALSE)
+      options(np.warned.cv.ls.np.deprecated = TRUE)
+    }
+    bwmethod <- "cv.ls"
+  }
   bwtype = match.arg(bwtype)
 
   cxkertype = match.arg(cxkertype)
