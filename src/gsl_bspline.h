@@ -44,7 +44,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdarg.h>
-#include "RuniqueCombs.h"
 
 
 /* *********************************************************** */
@@ -101,8 +100,7 @@ enum {
 } ;
 
 
-/*  void ErrorMessage(char *msg,int fatal);
-*/
+void ErrorMessage(char *msg,int fatal);
 /* ************vector********* */
 
 
