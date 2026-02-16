@@ -3,7 +3,7 @@ npregbw <-
     args = list(...)
     if (is(args[[1]],"formula"))
       UseMethod("npregbw",args[[1]])
-    else if (!is.null(args$formula) && is(args$formula,"formula"))
+    else if (!is.null(args$formula))
       UseMethod("npregbw",args$formula)
     else
       UseMethod("npregbw",args[[which(names(args)=="bws")[1]]])
@@ -12,28 +12,26 @@ npregbw <-
 npregbw.formula <-
   function(formula, data, subset, na.action, call, ...){
 
-    orig.class <- tryCatch({
-        if (missing(data))
-            sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
-        else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)),class)
-    }, error = function(e) "numeric")
+    orig.ts <- if (missing(data))
+      sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
+    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)), inherits, "ts")
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
 
-    if(all(orig.class == "ts")){
+    if(all(orig.ts)){
       args <- (as.list(attr(terms(formula), "variables"))[-1])
       formula <- terms(formula)
       attr(formula, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
       mf[["formula"]] <- formula
-    }else if(any(orig.class == "ts")){
+    }else if(any(orig.ts)){
       arguments <- (as.list(attr(terms(formula), "variables"))[-1])
-      arguments.normal <- arguments[which(orig.class != "ts")]
-      arguments.timeseries <- arguments[which(orig.class == "ts")]
+      arguments.normal <- arguments[which(!orig.ts)]
+      arguments.timeseries <- arguments[which(orig.ts)]
 
-      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       formula <- terms(formula)
       attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
       mf[["formula"]] <- formula
@@ -97,11 +95,11 @@ npregbw.rbandwidth <-
            lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
            lbc.init = 0.1, hbc.init = 2.0, cfac.init = 0.5, 
            lbd.init = 0.1, hbd.init = 0.9, dfac.init = 0.375, 
-           scale.init.categorical.sample = FALSE,
-           transform.bounds = FALSE,
-           invalid.penalty = c("baseline","dbmax"),
-           penalty.multiplier = 10,
-           ...){
+          scale.init.categorical.sample = FALSE,
+          transform.bounds = FALSE,
+          invalid.penalty = c("baseline","dbmax"),
+          penalty.multiplier = 10,
+          ...){
 
     xdat <- toFrame(xdat)
 
@@ -116,11 +114,9 @@ npregbw.rbandwidth <-
       stop("length of bandwidth vector does not match number of columns of 'xdat'")
 
     ccon = unlist(lapply(xdat[,bws$icon, drop = FALSE],class))
-    if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
-        (any(bws$iord) && !all(unlist(lapply(xdat[,bws$iord, drop = FALSE],class)) ==
-                               class(ordered(0)))) ||
-        (any(bws$iuno) && !all(unlist(lapply(xdat[,bws$iuno, drop = FALSE],class)) ==
-                               class(factor(0)))))
+    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
+        (any(bws$iord) && !all(sapply(xdat[,bws$iord, drop = FALSE],inherits, "ordered"))) ||
+        (any(bws$iuno) && !all(sapply(xdat[,bws$iuno, drop = FALSE],inherits, "factor"))))
       stop("supplied bandwidths do not match 'xdat' in type")
 
     if (dim(xdat)[1] != length(ydat))
@@ -207,6 +203,8 @@ npregbw.rbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
 
+        cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+
         total.time <-
           system.time(myout <- 
         .C("np_regression_bw",
@@ -219,6 +217,8 @@ npregbw.rbandwidth <-
            timing = double(1),
            penalty.mode = as.integer(penalty_mode),
            penalty.multiplier = as.double(penalty.multiplier),
+           ckerlb = as.double(cker.bounds.c$lb),
+           ckerub = as.double(cker.bounds.c$ub),
            PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
       
 
@@ -273,6 +273,9 @@ npregbw.rbandwidth <-
                       bwtype = tbw$type,
                       ckertype = tbw$ckertype,
                       ckerorder = tbw$ckerorder,
+                      ckerbound = tbw$ckerbound,
+                      ckerlb = tbw$ckerlb,
+                      ckerub = tbw$ckerub,
                       ukertype = tbw$ukertype,
                       okertype = tbw$okertype,
                       fval = tbw$fval,
@@ -307,14 +310,14 @@ npregbw.default <-
            lbc.dir, dfc.dir, cfac.dir, initc.dir, 
            lbd.dir, hbd.dir, dfac.dir, initd.dir, 
            lbc.init, hbc.init, cfac.init, 
-           lbd.init, hbd.init, dfac.init, 
+           lbd.init, hbd.init, dfac.init,
            scale.init.categorical.sample,
            transform.bounds = FALSE,
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ## dummy arguments for later passing into rbandwidth()
            regtype, bwmethod, bwscaling, bwtype,
-           ckertype, ckerorder, ukertype, okertype,
+           ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
 
     xdat <- toFrame(xdat)
@@ -327,7 +330,7 @@ npregbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("regtype", "bwmethod", "bwscaling", "bwtype",
-               "ckertype", "ckerorder", "ukertype", "okertype")
+               "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

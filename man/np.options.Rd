@@ -45,6 +45,11 @@
 
   Option values can be set globally via \code{\link{options}} and restored
   with \code{\link{on.exit}} in scripts/functions for reproducibility.
+
+  Continuous kernel bounds are not controlled via global options.
+  Use per-call arguments such as \code{ckerbound}/\code{ckerlb}/\code{ckerub}
+  (and conditional counterparts \code{cxker*}, \code{cyker*}) in bandwidth
+  and estimation interfaces.
 }
 \author{
   Jeffrey S. Racine \email{racinej@mcmaster.ca}

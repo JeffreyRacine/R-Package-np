@@ -168,11 +168,9 @@ npksum.default <-
     poperator.num <- PERMUTATION_OPERATORS[permutation.operator]
     
     ccon = unlist(lapply(txdat[,bws$icon,drop=FALSE],class))
-    if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
-        (any(bws$iord) && !all(unlist(lapply(txdat[,bws$iord, drop=FALSE],class)) ==
-                               class(ordered(0)))) ||
-        (any(bws$iuno) && !all(unlist(lapply(txdat[,bws$iuno, drop=FALSE],class)) ==
-                               class(factor(0)))))
+    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
+        (any(bws$iord) && !all(sapply(txdat[,bws$iord, drop = FALSE],inherits, "ordered"))) ||
+        (any(bws$iuno) && !all(sapply(txdat[,bws$iuno, drop = FALSE],inherits, "factor"))))
       stop("supplied bandwidths do not match 'txdat' in type")
 
     if (!miss.ty && (nrow(txdat) != nrow(tydat)))
@@ -252,6 +250,9 @@ npksum.default <-
     if (!miss.ex)
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
 
+    if (!miss.ex)
+      npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
     ## grab the evaluation data before it is converted to numeric
     if(miss.ex)
       teval <- txdat
@@ -284,7 +285,7 @@ npksum.default <-
 
     return.names <- c("ksum","kernel.weights","p.ksum")
       
-    myopti = list(
+	    myopti = list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
       num_uno = bws$nuno,
@@ -317,8 +318,10 @@ npksum.default <-
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
       return.kernel.weights = return.kernel.weights,
       permutation.operator = poperator.num,
-      compute.score = compute.score,
-      compute.ocg = compute.ocg)
+	      compute.score = compute.score,
+	      compute.ocg = compute.ocg)
+
+	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     
    asDouble <- function(data){
 	   if (is.null(data)){
@@ -336,13 +339,15 @@ npksum.default <-
          asDouble(tydat), asDouble(weights),
          asDouble(euno),  asDouble(eord),  asDouble(econ), 
          as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
-         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-         as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
-         as.integer(myopti), as.double(kernel.pow),
-         ksum = double(length.out),
-         p.ksum = double(p.length.out),
-         kernel.weights = double(nkw),
-         PACKAGE="npRmpi" )[return.names]
+	         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+	         as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
+	         as.integer(myopti), as.double(kernel.pow),
+	         ksum = double(length.out),
+	         p.ksum = double(p.length.out),
+	         kernel.weights = double(nkw),
+	         ckerlb = as.double(cker.bounds.c$lb),
+	         ckerub = as.double(cker.bounds.c$ub),
+	         PACKAGE="npRmpi" )[return.names]
 
     if (dim.out[1] > 1){
       dim(myout[["ksum"]]) <- dim.out

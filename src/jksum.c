@@ -76,6 +76,18 @@ extern int num_var_ordered_extern;
 extern int num_reg_continuous_extern;
 extern int num_reg_unordered_extern;
 extern int num_reg_ordered_extern;
+extern int int_cker_bound_extern;
+extern double *vector_ckerlb_extern;
+extern double *vector_ckerub_extern;
+extern int int_cxker_bound_extern;
+extern int int_cyker_bound_extern;
+extern int int_cxyker_bound_extern;
+extern double *vector_cxkerlb_extern;
+extern double *vector_cxkerub_extern;
+extern double *vector_cykerlb_extern;
+extern double *vector_cykerub_extern;
+extern double *vector_cxykerlb_extern;
+extern double *vector_cxykerub_extern;
 extern int *num_categories_extern;
 extern double **matrix_categorical_vals_extern;
 
@@ -1312,6 +1324,78 @@ double np_cdf_epan8(const double z){
 
 double np_cdf_rect(const double z){
   return (z < -1.0) ? 0.0 : (z > 1.0) ? 1.0 : (0.5+0.5*z);
+}
+
+static inline void np_activate_bounds_x(void){
+  int_cker_bound_extern = int_cxker_bound_extern;
+  vector_ckerlb_extern = vector_cxkerlb_extern;
+  vector_ckerub_extern = vector_cxkerub_extern;
+}
+
+static inline void np_activate_bounds_y(void){
+  int_cker_bound_extern = int_cyker_bound_extern;
+  vector_ckerlb_extern = vector_cykerlb_extern;
+  vector_ckerub_extern = vector_cykerub_extern;
+}
+
+static inline void np_activate_bounds_xy(void){
+  int_cker_bound_extern = int_cxyker_bound_extern;
+  vector_ckerlb_extern = vector_cxykerlb_extern;
+  vector_ckerub_extern = vector_cxykerub_extern;
+}
+
+/*
+  Fast positive-only no-zero guard for known-positive denominators.
+  This avoids signed branching in NZD(a) when sign is known a priori.
+*/
+static inline double np_nzd_pos(const double a){
+  return (a > DBL_EPSILON) ? a : DBL_EPSILON;
+}
+
+static inline double np_cker_invnorm(const int kernel,
+                                     const double x,
+                                     const double h,
+                                     const double lb,
+                                     const double ub){
+  static double (* const cdfk[])(double) = {
+    np_cdf_gauss2, np_cdf_gauss4, np_cdf_gauss6, np_cdf_gauss8,
+    np_cdf_epan2, np_cdf_epan4, np_cdf_epan6, np_cdf_epan8,
+    np_cdf_rect, np_cdf_tgauss2
+  };
+  static double (* const kbase[])(double) = {
+    np_gauss2, np_gauss4, np_gauss6, np_gauss8,
+    np_epan2, np_epan4, np_epan6, np_epan8,
+    np_rect, np_tgauss2
+  };
+  int k0 = kernel % 10;
+  double zu, zl, den, du, zmid;
+
+  if(!(h > 0.0) || !isfinite(h))
+    return 1.0;
+  if(!isfinite(lb) && !isfinite(ub))
+    return 1.0;
+
+  if(k0 < 0 || k0 > 9)
+    k0 = 0;
+
+  zu = isfinite(ub) ? ((ub - x)/h) : R_PosInf;
+  zl = isfinite(lb) ? ((lb - x)/h) : R_NegInf;
+  du = zu - zl;
+  zmid = 0.5*(zu + zl);
+
+  if(isfinite(du) && fabs(du) < 1.0e-5) {
+    den = kbase[k0](zmid)*du;
+  } else {
+    den = cdfk[k0](zu) - cdfk[k0](zl);
+  }
+
+  if(!(den > DBL_MIN) && isfinite(du) && (du > 0.0)) {
+    den = fmax(kbase[k0](zmid)*du, kbase[k0](0.0)*du);
+  }
+
+  den = np_nzd_pos(den);
+
+  return 1.0/den;
 }
 
 double np_cdf_owang_van_ryzin(const double y, const double x, const double lambda, const double cl, const double ch){
@@ -2698,7 +2782,9 @@ void np_p_ckernelv(const int KERNEL,
                    const int do_score,
                    double * const scratch_kbuf,
                    const int use_largeh_pre,
-                   const double largeh_k0_pre){
+                   const double largeh_k0_pre,
+                   const double invnorm,
+                   const double p_invnorm){
 
   /* 
      this should be read as:
@@ -2743,24 +2829,24 @@ void np_p_ckernelv(const int KERNEL,
     np_cont_largeh_is_active(P_KERNEL, xt, num_xt, x, h, p_xl);
 
   if(use_largeh){
-    const double kn = largeh_k0_pre;
+    const double kn = largeh_k0_pre*invnorm;
     np_ckernelv_mul_const(kn, num_xt, do_xw, result, xl);
 
     if(do_perm){
       if(use_largeh_perm){
-        const double pkn = np_cont_largeh_k0(P_KERNEL);
+        const double pkn = np_cont_largeh_k0(P_KERNEL)*p_invnorm;
         np_ckernelv_mul_const(pkn, num_xt, do_xw, p_result + P_IDX*num_xt, p_xl);
       } else {
         if(p_xl == NULL){
           for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+            p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
           }
         } else {
           for (int m = 0; m < p_xl->n; m++){
             const int istart = p_xl->istart[m];
             const int nlev = p_xl->nlev[m];
             for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+              p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
             }
           }
         }
@@ -2779,13 +2865,13 @@ void np_p_ckernelv(const int KERNEL,
 
   if(xl == NULL){
     for (i = 0, j = 0; i < num_xt; i++, j += bin_do_xw){
-      const double kn = k[KERNEL]((x-xt[i])*sgn/h);
+      const double kn = invnorm*k[KERNEL]((x-xt[i])*sgn/h);
 
       result[i] = xw[j]*kn;
       kbuf[i] = kn;
       
       if(do_perm)
-        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+        p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
 
     }
 
@@ -2802,7 +2888,7 @@ void np_p_ckernelv(const int KERNEL,
       const int istart = xl->istart[m];
       const int nlev = xl->nlev[m];
       for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-        const double kn = k[KERNEL]((x-xt[i])*sgn/h);
+        const double kn = invnorm*k[KERNEL]((x-xt[i])*sgn/h);
 
         result[i] = xw[j]*kn;
         kbuf[i] = kn;
@@ -2814,7 +2900,7 @@ void np_p_ckernelv(const int KERNEL,
         const int istart = p_xl->istart[m];
         const int nlev = p_xl->nlev[m];
         for (i = istart, j = bin_do_xw*istart; i < istart+nlev; i++, j += bin_do_xw){
-          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
+          p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*p_invnorm*k[P_KERNEL]((x-xt[i])*sgn/h)*(do_score ? ((xt[i]-x)*sgn/h) : 1.0);
         }
       }
     }
@@ -2842,7 +2928,8 @@ void np_ckernelv(const int KERNEL,
                  double * const result,
                  const XL * const xl,
                  const int swap_xxt,
-                 const int skip_largeh_check){
+                 const int skip_largeh_check,
+                 const double invnorm){
 
   /* 
      this should be read as:
@@ -2857,7 +2944,7 @@ void np_ckernelv(const int KERNEL,
   double * const xw = (bin_do_xw ? result : &unit_weight);
 
   if((!skip_largeh_check) && np_cont_largeh_is_active(KERNEL, xt, num_xt, x, h, xl)){
-    np_ckernelv_mul_const(np_cont_largeh_k0(KERNEL), num_xt, do_xw, result, xl);
+    np_ckernelv_mul_const(np_cont_largeh_k0(KERNEL)*invnorm, num_xt, do_xw, result, xl);
     return;
   }
 
@@ -2872,12 +2959,12 @@ void np_ckernelv(const int KERNEL,
     if(xl == NULL){                                                                \
       if(!bin_do_xw){                                                              \
         for(i = 0; i < num_xt; i++){                                               \
-          result[i] = fn((x-xt[i])*sgn/h);                                         \
+          result[i] = invnorm*fn((x-xt[i])*sgn/h);                                 \
         }                                                                          \
       } else {                                                                     \
         for(i = 0; i < num_xt; i++){                                               \
           if(xw[i] == 0.0) continue;                                               \
-          result[i] = xw[i]*fn((x-xt[i])*sgn/h);                                   \
+          result[i] = xw[i]*invnorm*fn((x-xt[i])*sgn/h);                           \
         }                                                                          \
       }                                                                            \
     } else {                                                                       \
@@ -2886,7 +2973,7 @@ void np_ckernelv(const int KERNEL,
           const int istart = xl->istart[m];                                        \
           const int nlev = xl->nlev[m];                                            \
           for(i = istart; i < istart+nlev; i++){                                   \
-            result[i] = fn((x-xt[i])*sgn/h);                                       \
+            result[i] = invnorm*fn((x-xt[i])*sgn/h);                               \
           }                                                                        \
         }                                                                          \
       } else {                                                                     \
@@ -2895,7 +2982,7 @@ void np_ckernelv(const int KERNEL,
           const int nlev = xl->nlev[m];                                            \
           for(i = istart; i < istart+nlev; i++){                                   \
             if(xw[i] == 0.0) continue;                                             \
-            result[i] = xw[i]*fn((x-xt[i])*sgn/h);                                 \
+            result[i] = xw[i]*invnorm*fn((x-xt[i])*sgn/h);                         \
           }                                                                        \
         }                                                                          \
       }                                                                            \
@@ -2974,11 +3061,11 @@ void np_ckernelv(const int KERNEL,
       if(xl == NULL){
         if(!bin_do_xw){
           for(i = 0; i < num_xt; i++)
-            result[i] = k[kernel]((x-xt[i])*sgn/h);
+            result[i] = invnorm*k[kernel]((x-xt[i])*sgn/h);
         } else {
           for(i = 0; i < num_xt; i++){
             if(xw[i] == 0.0) continue;
-            result[i] = xw[i]*k[kernel]((x-xt[i])*sgn/h);
+            result[i] = xw[i]*invnorm*k[kernel]((x-xt[i])*sgn/h);
           }
         }
       } else {
@@ -2987,11 +3074,11 @@ void np_ckernelv(const int KERNEL,
           const int nlev = xl->nlev[m];
           if(!bin_do_xw){
             for(i = istart; i < istart+nlev; i++)
-              result[i] = k[kernel]((x-xt[i])*sgn/h);
+              result[i] = invnorm*k[kernel]((x-xt[i])*sgn/h);
           } else {
             for(i = istart; i < istart+nlev; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*k[kernel]((x-xt[i])*sgn/h);
+              result[i] = xw[i]*invnorm*k[kernel]((x-xt[i])*sgn/h);
             }
           }
         }
@@ -4910,21 +4997,43 @@ double * const kw){
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
     for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
+      const int kbase_i = KERNEL_reg_np[i] % 10;
+      const int p_kbase_i = (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]) % 10;
+      const int use_bounds_i = int_cker_bound_extern &&
+        vector_ckerlb_extern != NULL &&
+        vector_ckerub_extern != NULL &&
+        (kbase_i >= 0 && kbase_i <= 9) &&
+        ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
+         (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
+      const int use_p_bounds_i = int_cker_bound_extern &&
+        vector_ckerlb_extern != NULL &&
+        vector_ckerub_extern != NULL &&
+        (p_kbase_i >= 0 && p_kbase_i <= 9) &&
+        ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
+         (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
+      const double invnorm = use_bounds_i ?
+        np_cker_invnorm(KERNEL_reg_np[i], xc[i][j], m[i][jbw],
+                        vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
+      const double p_invnorm = use_p_bounds_i ?
+        np_cker_invnorm((do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]),
+                        xc[i][j], m[i][jbw],
+                        vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
+
       if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
         if(p_nvar == 0){
           const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
           if(use_largeh){
-            deferred_const *= cont_largeh_k0[i];
+            deferred_const *= cont_largeh_k0[i]*invnorm;
             deferred_const_active = 1;
           } else {
-            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1);
+            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1, invnorm);
             tprod_has_vals = 1;
           }
         } else {
           const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf, use_largeh, (use_largeh ? cont_largeh_k0[i] : 0.0));
+          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf, use_largeh, (use_largeh ? cont_largeh_k0[i] : 0.0), invnorm, p_invnorm);
         }
       }
       else if(p_nvar == 0){
@@ -7908,6 +8017,7 @@ double *cv){
       } else {
         np_gate_override_clear();
       }
+      np_activate_bounds_x();
       kernel_weighted_sum_np(kernel_cx,
                              kernel_ux,
                              kernel_ox,
@@ -7989,6 +8099,7 @@ double *cv){
         } else {
           np_gate_override_clear();
         }
+        np_activate_bounds_y();
         kernel_weighted_sum_np(kernel_cy,
                                kernel_uy,
                                kernel_oy,
@@ -8157,6 +8268,7 @@ double *cv){
       } else {
         np_gate_override_clear();
       }
+      np_activate_bounds_x();
       kernel_weighted_sum_np(kernel_cx,
                              kernel_ux,
                              kernel_ox,
@@ -8237,6 +8349,7 @@ double *cv){
         } else {
           np_gate_override_clear();
         }
+        np_activate_bounds_y();
         kernel_weighted_sum_np(kernel_cy,
                                kernel_uy,
                                kernel_oy,
@@ -9144,6 +9257,7 @@ double *cv){
   } else {
     np_gate_override_clear();
   }
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cxy,
                          kernel_uxy,
                          kernel_oxy,
@@ -9214,6 +9328,7 @@ double *cv){
   } else {
     np_gate_override_clear();
   }
+  np_activate_bounds_x();
   kernel_weighted_sum_np(kernel_cx,
                          kernel_ux,
                          kernel_ox,
@@ -9369,6 +9484,7 @@ double *cv){
       } else {
         np_gate_override_clear();
       }
+      np_activate_bounds_x();
       kernel_weighted_sum_np(kernel_cx,
                              kernel_ux,
                              kernel_ox,
@@ -9480,6 +9596,7 @@ double *cv){
           } else {
             np_gate_override_clear();
           }
+          np_activate_bounds_x();
           kernel_weighted_sum_np(kernel_cx,
                                  kernel_ux,
                                  kernel_ox,
@@ -9556,6 +9673,7 @@ double *cv){
         } else {
           np_gate_override_clear();
         }
+        np_activate_bounds_y();
         kernel_weighted_sum_np(kernel_cy,
                                kernel_uy,
                                kernel_oy,
@@ -11611,6 +11729,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   }
 
   // xy
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cxy,
                          kernel_uxy,
                          kernel_oxy,
@@ -11660,6 +11779,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL); // do not return kernel weights
 
   //x
+  np_activate_bounds_x();
   kernel_weighted_sum_np(kernel_cx,
                          kernel_ux,
                          kernel_ox,
@@ -12009,6 +12129,7 @@ double * log_likelihood
                         NULL, NULL, NULL);
 
   // xy
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cXY,
                          kernel_uXY,
                          kernel_oXY,
@@ -12060,6 +12181,7 @@ double * log_likelihood
   //x - we assume x is in xy tree order
   //  - we also reuse kernels and operators because we can
 
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cXY,
                          kernel_uXY,
                          kernel_oXY,

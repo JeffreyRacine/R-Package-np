@@ -10,26 +10,26 @@ npudistbw <- function(...){
 
 npudistbw.formula <-
   function(formula, data, subset, na.action, call, gdata = NULL, ...){
-    orig.class <- if (missing(data))
-      sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
-    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)),class)
+    orig.ts <- if (missing(data))
+      sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
+    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)), inherits, "ts")
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
                names(mf), nomatch = 0)
     mf <- mf[c(1,m)]
 
-    if(all(orig.class == "ts")){
+    if(all(orig.ts)){
       args <- (as.list(attr(terms(formula), "variables"))[-1])
       formula <- terms(formula)
       attr(formula, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
       mf[["formula"]] <- formula
-    }else if(any(orig.class == "ts")){
+    }else if(any(orig.ts)){
       arguments <- (as.list(attr(terms(formula), "variables"))[-1])
-      arguments.normal <- arguments[which(orig.class != "ts")]
-      arguments.timeseries <- arguments[which(orig.class == "ts")]
+      arguments.normal <- arguments[which(!orig.ts)]
+      arguments.timeseries <- arguments[which(orig.ts)]
 
-      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       formula <- terms(formula)
       attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
       mf[["formula"]] <- formula
@@ -123,11 +123,9 @@ npudistbw.dbandwidth <-
            "'dat'"))
 
     ccon = unlist(lapply(as.data.frame(dat[,bws$icon]),class))
-    if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
-        (any(bws$iord) && !all(unlist(lapply(as.data.frame(dat[,bws$iord]),class)) ==
-                               class(ordered(0)))) ||
-        (any(bws$iuno) && !all(unlist(lapply(as.data.frame(dat[,bws$iuno]),class)) ==
-                               class(factor(0)))))
+    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
+        (any(bws$iord) && !all(sapply(as.data.frame(dat[,bws$iord]),inherits, "ordered"))) ||
+        (any(bws$iuno) && !all(sapply(as.data.frame(dat[,bws$iuno]),inherits, "factor"))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
 
     if(any(bws$iuno))
@@ -237,6 +235,7 @@ npudistbw.dbandwidth <-
         lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac, memfac = memfac)
+      cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
       if (bws$method != "normal-reference"){
         total.time <-
@@ -250,6 +249,8 @@ npudistbw.dbandwidth <-
              timing = double(1),
              penalty.mode = as.integer(penalty_mode),
              penalty.multiplier = as.double(penalty.multiplier),
+             ckerlb = as.double(cker.bounds.c$lb),
+             ckerub = as.double(cker.bounds.c$ub),
              PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
       } else {
         nbw = double(ncol)
@@ -313,6 +314,9 @@ npudistbw.dbandwidth <-
                       bwtype = tbw$type,
                       ckertype = tbw$ckertype,
                       ckerorder = tbw$ckerorder,
+                      ckerbound = tbw$ckerbound,
+                      ckerlb = tbw$ckerlb,
+                      ckerub = tbw$ckerub,
                       ukertype = c("aitchisonaitken"),
                       okertype = tbw$okertype,
                       fval = tbw$fval,
@@ -350,7 +354,7 @@ npudistbw.default <-
            transform.bounds, invalid.penalty, penalty.multiplier,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
-           ckertype, ckerorder, okertype,
+           ckertype, ckerorder, ckerbound, ckerlb, ckerub, okertype,
            ...){
 
     t.names <- NULL
@@ -367,7 +371,7 @@ npudistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
-               "okertype")
+               "ckerbound", "ckerlb", "ckerub", "okertype")
 
 
     m <- match(margs, mc.names, nomatch = 0)

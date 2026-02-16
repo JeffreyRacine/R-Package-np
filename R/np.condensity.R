@@ -100,19 +100,15 @@ npcdens.conbandwidth <- function(bws,
     stop("length of bandwidth vector does not match number of columns of 'tydat'")
 
   xccon = unlist(lapply(txdat[,bws$ixcon, drop = FALSE],class))
-  if ((any(bws$ixcon) && !all((xccon == class(integer(0))) | (xccon == class(numeric(0))))) ||
-      (any(bws$ixord) && !all(unlist(lapply(txdat[,bws$ixord, drop = FALSE],class)) ==
-                             class(ordered(0)))) ||
-      (any(bws$ixuno) && !all(unlist(lapply(txdat[,bws$ixuno, drop = FALSE],class)) ==
-                             class(factor(0)))))
+  if ((any(bws$ixcon) && !all((xccon == "integer") | (xccon == "numeric"))) ||
+      (any(bws$ixord) && !all(sapply(txdat[,bws$ixord, drop = FALSE],inherits, "ordered"))) ||
+      (any(bws$ixuno) && !all(sapply(txdat[,bws$ixuno, drop = FALSE],inherits, "factor"))))
     stop("supplied bandwidths do not match 'txdat' in type")
 
   yccon = unlist(lapply(tydat[,bws$iycon, drop = FALSE],class))
-  if ((any(bws$iycon) && !all((yccon == class(integer(0))) | (yccon == class(numeric(0))))) ||
-      (any(bws$iyord) && !all(unlist(lapply(tydat[,bws$iyord, drop = FALSE],class)) ==
-                             class(ordered(0)))) ||
-      (any(bws$iyuno) && !all(unlist(lapply(tydat[,bws$iyuno, drop = FALSE],class)) ==
-                             class(factor(0)))))
+  if ((any(bws$iycon) && !all((yccon == "integer") | (yccon == "numeric"))) ||
+      (any(bws$iyord) && !all(sapply(tydat[,bws$iyord, drop = FALSE],inherits, "ordered"))) ||
+      (any(bws$iyuno) && !all(sapply(tydat[,bws$iyuno, drop = FALSE],inherits, "factor"))))
     stop("supplied bandwidths do not match 'tydat' in type")
   
   ## catch and destroy NA's
@@ -151,6 +147,8 @@ npcdens.conbandwidth <- function(bws,
   if (!no.exy){
     exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
     eydat <- adjustLevels(eydat, bws$ydati, allowNewCells = TRUE)
+    npKernelBoundsCheckEval(exdat, bws$ixcon, bws$cxkerlb, bws$cxkerub, argprefix = "cxker")
+    npKernelBoundsCheckEval(eydat, bws$iycon, bws$cykerlb, bws$cykerub, argprefix = "cyker")
   }
 
   ## grab the evaluation data before it is converted to numeric
@@ -244,6 +242,9 @@ npcdens.conbandwidth <- function(bws,
       xmcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DENS,
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+
+  cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
+  cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
   
   myout=
     .C("np_density_conditional",
@@ -263,6 +264,10 @@ npcdens.conbandwidth <- function(bws,
        congrad = double(enrow*bws$xndim),
        congerr = double(enrow*bws$xndim),
        log_likelihood = double(1),
+       cxkerlb = as.double(cxker.bounds.c$lb),
+       cxkerub = as.double(cxker.bounds.c$ub),
+       cykerlb = as.double(cyker.bounds.c$lb),
+       cykerub = as.double(cyker.bounds.c$ub),
        PACKAGE="npRmpi" )[c("condens", "conderr", "congrad", "congerr", "log_likelihood")]
 
   if(gradients){
@@ -349,4 +354,3 @@ npcdens.default <- function(bws, txdat, tydat, ...){
   
   eval(parse(text=paste("npcdens(bws = tbw", tx.str, ty.str, ",...)")))
 }
-

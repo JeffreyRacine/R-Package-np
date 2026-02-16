@@ -11,11 +11,11 @@ npcdistbw <-
 
 npcdistbw.formula <-
   function(formula, data, subset, na.action, call, gdata = NULL, ...){
-    orig.class <- tryCatch({
+    orig.ts <- tryCatch({
         if (missing(data))
-            sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
-        else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)),class)
-    }, error = function(e) "numeric")
+            sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
+        else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)), inherits, "ts")
+    }, error = function(e) FALSE)
 
     has.gval <- !is.null(gdata)
     
@@ -31,7 +31,7 @@ npcdistbw.formula <-
     if(!missing(call) && is.call(call)){
       ## rummage about in the call for the original formula
       for(i in 1:length(call)){
-        if(tryCatch(class(eval(call[[i]])) == "formula",
+        if(tryCatch(inherits(eval(call[[i]]), "formula"),
                     error = function(e) FALSE))
           break;
       }
@@ -43,9 +43,13 @@ npcdistbw.formula <-
     mf[[1]] <- as.name("model.frame")
     gmf[[1]] <- as.name("model.frame")
 
-    mf[["formula"]] = eval(mf[[m[1]]], parent.frame())
+    if (m[2] > 0) { # use data as environment
+        mf[["formula"]] = eval(mf[[m[1]]], environment(mf[[m[2]]]))
+    } else { # use parent frame
+        mf[["formula"]] = eval(mf[[m[1]]], parent.frame())
+    }
     
-    variableNames <- if(!missing(data)) explodeFormula(mf[["formula"]], data = data) else explodeFormula(mf[["formula"]])
+    variableNames <- if(m[2] > 0) explodeFormula(mf[["formula"]], data = data) else explodeFormula(mf[["formula"]])
     
     ## make formula evaluable, then eval
     varsPlus <- lapply(variableNames, paste, collapse=" + ")
@@ -55,15 +59,15 @@ npcdistbw.formula <-
     gmf[["formula"]] <- mf[["formula"]]
 
     mf[["formula"]] <- terms(mf[["formula"]])
-    if(all(orig.class == "ts")){
+    if(all(orig.ts)){
       args <- (as.list(attr(mf[["formula"]], "variables"))[-1])
       attr(mf[["formula"]], "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-    }else if(any(orig.class == "ts")){
+    }else if(any(orig.ts)){
       arguments <- (as.list(attr(mf[["formula"]], "variables"))[-1])
-      arguments.normal <- arguments[which(orig.class != "ts")]
-      arguments.timeseries <- arguments[which(orig.class == "ts")]
+      arguments.normal <- arguments[which(!orig.ts)]
+      arguments.timeseries <- arguments[which(orig.ts)]
 
-      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
     }
     
@@ -128,19 +132,15 @@ npcdistbw.condbandwidth <-
       stop(paste("number of rows of", "'ydat'", "does not match", "'xdat'"))
 
     yccon = unlist(lapply(as.data.frame(ydat[,bws$iycon]),class))
-    if ((any(bws$iycon) && !all((yccon == class(integer(0))) | (yccon == class(numeric(0))))) ||
-        (any(bws$iyord) && !all(unlist(lapply(as.data.frame(ydat[,bws$iyord]),class)) ==
-                               class(ordered(0)))) ||
-        (any(bws$iyuno) && !all(unlist(lapply(as.data.frame(ydat[,bws$iyuno]),class)) ==
-                               class(factor(0)))))
+    if ((any(bws$iycon) && !all((yccon == "integer") | (yccon == "numeric"))) ||
+        (any(bws$iyord) && !all(sapply(as.data.frame(ydat[,bws$iyord]),inherits, "ordered"))) ||
+        (any(bws$iyuno) && !all(sapply(as.data.frame(ydat[,bws$iyuno]),inherits, "factor"))))
       stop(paste("supplied bandwidths do not match", "'ydat'", "in type"))
 
     xccon = unlist(lapply(as.data.frame(xdat[,bws$ixcon]),class))
-    if ((any(bws$ixcon) && !all((xccon == class(integer(0))) | (xccon == class(numeric(0))))) ||
-        (any(bws$ixord) && !all(unlist(lapply(as.data.frame(xdat[,bws$ixord]),class)) ==
-                               class(ordered(0)))) ||
-        (any(bws$ixuno) && !all(unlist(lapply(as.data.frame(xdat[,bws$ixuno]),class)) ==
-                               class(factor(0)))))
+    if ((any(bws$ixcon) && !all((xccon == "integer") | (xccon == "numeric"))) ||
+        (any(bws$ixord) && !all(sapply(as.data.frame(xdat[,bws$ixord]),inherits, "ordered"))) ||
+        (any(bws$ixuno) && !all(sapply(as.data.frame(xdat[,bws$ixuno]),inherits, "factor"))))
       stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
 
     ##if (bws$type != 'fixed')
@@ -287,6 +287,9 @@ npcdistbw.condbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
 
+      cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
+      cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+
       if (bws$method != "normal-reference"){
         total.time <-
           system.time(myout <- 
@@ -303,6 +306,10 @@ npcdistbw.condbandwidth <-
              timing = double(1),
              penalty.mode = as.integer(penalty_mode),
              penalty.multiplier = as.double(penalty.multiplier),
+             cxkerlb = as.double(cxker.bounds.c$lb),
+             cxkerub = as.double(cxker.bounds.c$ub),
+             cykerlb = as.double(cyker.bounds.c$lb),
+             cykerub = as.double(cyker.bounds.c$ub),
              PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
       } else {
         nbw = double(yncol+xncol)
@@ -397,19 +404,25 @@ npcdistbw.condbandwidth <-
                          bwtype = tbw$type,
                          cxkertype = tbw$cxkertype,
                          cxkerorder = tbw$cxkerorder,
+                         cxkerbound = tbw$cxkerbound,
+                         cxkerlb = tbw$cxkerlb,
+                         cxkerub = tbw$cxkerub,
                          uxkertype = tbw$uxkertype,
                          oxkertype = tbw$oxkertype,
                          cykertype = tbw$cykertype,
                          cykerorder = tbw$cykerorder,
+                         cykerbound = tbw$cykerbound,
+                         cykerlb = tbw$cykerlb,
+                         cykerub = tbw$cykerub,
                          uykertype = tbw$uykertype,
                          oykertype = tbw$oykertype,
-                        fval = tbw$fval,
-                        ifval = tbw$ifval,
-                        num.feval = tbw$num.feval,
-                        fval.history = tbw$fval.history,
-                        eval.history = tbw$eval.history,
-                        invalid.history = tbw$invalid.history,
-                        nobs = tbw$nobs,
+                         fval = tbw$fval,
+                         ifval = tbw$ifval,
+                         num.feval = tbw$num.feval,
+                         fval.history = tbw$fval.history,
+                         eval.history = tbw$eval.history,
+                         invalid.history = tbw$invalid.history,
+                         nobs = tbw$nobs,
                          xdati = tbw$xdati,
                          ydati = tbw$ydati,      
                          xnames = tbw$xnames,
@@ -470,7 +483,9 @@ npcdistbw.default <-
            ## dummy arguments for condbandwidth() function call
            bwmethod, bwscaling, bwtype,
            cxkertype, cxkerorder,
+           cxkerbound, cxkerlb, cxkerub,
            cykertype, cykerorder,
+           cykerbound, cykerlb, cykerub,
            uxkertype, 
            oxkertype, oykertype,
            ...){
@@ -486,8 +501,9 @@ npcdistbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "cxkertype", "cxkerorder",
-               "cykertype", "cykerorder", "uxkertype", "oxkertype",
-               "oykertype")
+               "cxkerbound", "cxkerlb", "cxkerub",
+               "cykertype", "cykerorder", "cykerbound", "cykerlb", "cykerub",
+               "uxkertype", "oxkertype", "oykertype")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

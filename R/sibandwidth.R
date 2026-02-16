@@ -4,6 +4,9 @@ sibandwidth <-
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
            ckertype = c("gaussian","truncated gaussian","epanechnikov","uniform"), 
            ckerorder = c(2,4,6,8),
+           ckerbound = c("none","range","fixed"),
+           ckerlb = NULL,
+           ckerub = NULL,
            fval = NA,
            ifval = NA,
            num.feval = NA,
@@ -24,6 +27,7 @@ sibandwidth <-
   regtype = "lc"
   method = match.arg(method)
   ckertype = match.arg(ckertype)
+  ckerbound = match.arg(ckerbound)
   bwtype <- match.arg(bwtype)
   
   if(missing(ckerorder))
@@ -40,6 +44,15 @@ sibandwidth <-
     warning("using truncated gaussian of order 2, higher orders not yet implemented")
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
+  cbounds <- npKernelBoundsResolve(
+    dati = xdati,
+    varnames = xnames,
+    kerbound = ckerbound,
+    kerlb = ckerlb,
+    kerub = ckerub,
+    argprefix = "cker")
+  if (bwtype != "fixed" && cbounds$bound != "none")
+    stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
   sumNum <- sfactor
   ##idati <- NA
@@ -76,6 +89,9 @@ sibandwidth <-
       adaptive_nn = "Adaptive Nearest Neighbour" ),
     ckertype = ckertype,    
     ckerorder = ckerorder,
+    ckerbound = cbounds$bound,
+    ckerlb = cbounds$lb,
+    ckerub = cbounds$ub,
     pckertype = switch(ckertype,
       gaussian = paste(porder,"Gaussian"),
       epanechnikov =  paste(porder,"Epanechnikov"),
@@ -104,6 +120,9 @@ sibandwidth <-
   mybw$klist <- list(
     index =
     list(ckertype = ckertype,
+         ckerbound = cbounds$bound,
+         ckerlb = cbounds$lb,
+         ckerub = cbounds$ub,
          pckertype = mybw$pckertype))
 
   if(only.optimize.beta)
@@ -158,4 +177,3 @@ summary.sibandwidth <- function(object, ...){
   cat(genTimingStr(object))
   cat("\n\n")
 }
-

@@ -41,6 +41,11 @@ extern MPI_Comm	*comm;
 // categorical hashing
 #include "hash.h"
 
+
+#ifdef RCSID
+static char rcsid[] = "$Id: np.c,v 1.35 2006/11/02 16:56:49 tristen Exp $";
+#endif
+
 int int_DEBUG;
 int int_VERBOSE;
 int int_TAYLOR;
@@ -72,6 +77,19 @@ int num_var_ordered_extern=0;
 int num_reg_continuous_extern=0;
 int num_reg_unordered_extern=0;
 int num_reg_ordered_extern=0;
+
+int int_cker_bound_extern=0;
+double *vector_ckerlb_extern=NULL;
+double *vector_ckerub_extern=NULL;
+int int_cxker_bound_extern=0;
+int int_cyker_bound_extern=0;
+int int_cxyker_bound_extern=0;
+double *vector_cxkerlb_extern=NULL;
+double *vector_cxkerub_extern=NULL;
+double *vector_cykerlb_extern=NULL;
+double *vector_cykerub_extern=NULL;
+double *vector_cxykerlb_extern=NULL;
+double *vector_cxykerub_extern=NULL;
 
 
 int *num_categories_extern;
@@ -122,8 +140,6 @@ static int bwm_num_reg_continuous = 0;
 static int bwm_num_reg_unordered = 0;
 static int bwm_num_reg_ordered = 0;
 static int bwm_kernel_unordered = 0;
-static int *bwm_kernel_unordered_vec = NULL;
-static int bwm_kernel_unordered_len = 0;
 static int *bwm_num_categories = NULL;
 static double *bwm_transform_buf = NULL;
 static int bwm_transform_buf_len = 0;
@@ -151,6 +167,23 @@ void np_release_static_buffers(int *unused)
 }
 static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
+static int *bwm_kernel_unordered_vec = NULL;
+static int bwm_kernel_unordered_len = 0;
+
+static int np_has_finite_cker_bounds(const double *lb, const double *ub, const int n)
+{
+  int i;
+  const double big = 0.5*DBL_MAX;
+  if(lb == NULL || ub == NULL || n <= 0)
+    return 0;
+  for(i = 0; i < n; i++) {
+    const int lb_fin = isfinite(lb[i]) && (fabs(lb[i]) < big);
+    const int ub_fin = isfinite(ub[i]) && (fabs(ub[i]) < big);
+    if(lb_fin || ub_fin)
+      return 1;
+  }
+  return 0;
+}
 
 static void bwm_reset_counters(void)
 {
@@ -189,27 +222,34 @@ static void bwm_apply_transform(const double *p, double *out, int n)
   int i;
   int idx;
 
+  /* copy */
   for (i = 1; i <= n; i++)
     out[i] = p[i];
 
-  for (i = 1; i <= bwm_num_reg_continuous; i++)
-    out[i] = bwm_safe_exp(out[i]);
+  if (!bwm_use_transform)
+    return;
 
+  /* continuous (positive) */
+  for (i = 1; i <= bwm_num_reg_continuous; i++)
+    out[i] = bwm_safe_exp(p[i]);
+
+  /* unordered categorical */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
     idx = bwm_num_reg_continuous + 1 + i;
     if (bwm_num_categories != NULL) {
-      int kern = (bwm_kernel_unordered_vec != NULL && i < bwm_kernel_unordered_len) ?
-        bwm_kernel_unordered_vec[i] : bwm_kernel_unordered;
-      double maxbw = max_unordered_bw(bwm_num_categories[i], kern);
-      out[idx] = bwm_sigmoid(out[idx]) * maxbw;
+    int kern = (bwm_kernel_unordered_vec != NULL && i < bwm_kernel_unordered_len) ?
+      bwm_kernel_unordered_vec[i] : bwm_kernel_unordered;
+    double maxbw = max_unordered_bw(bwm_num_categories[i], kern);
+      out[idx] = bwm_sigmoid(p[idx]) * maxbw;
     } else {
-      out[idx] = bwm_sigmoid(out[idx]);
+      out[idx] = bwm_sigmoid(p[idx]);
     }
   }
 
+  /* ordered categorical (0..1) */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
     idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
-    out[idx] = bwm_sigmoid(out[idx]);
+    out[idx] = bwm_sigmoid(p[idx]);
   }
 }
 
@@ -225,12 +265,14 @@ static void bwm_to_unconstrained(double *p, int n)
   for (i = 1; i <= n; i++)
     bwm_transform_buf[i] = p[i];
 
+  /* continuous */
   for (i = 1; i <= bwm_num_reg_continuous; i++) {
     double v = bwm_transform_buf[i];
     if (v <= 0.0) v = eps;
     p[i] = log(v);
   }
 
+  /* unordered */
   for (i = 0; i < bwm_num_reg_unordered; i++) {
     idx = bwm_num_reg_continuous + 1 + i;
     int kern = (bwm_kernel_unordered_vec != NULL && i < bwm_kernel_unordered_len) ?
@@ -245,6 +287,7 @@ static void bwm_to_unconstrained(double *p, int n)
     }
   }
 
+  /* ordered */
   for (i = 0; i < bwm_num_reg_ordered; i++) {
     idx = bwm_num_reg_continuous + bwm_num_reg_unordered + 1 + i;
     p[idx] = bwm_logit(bwm_transform_buf[idx]);
@@ -424,7 +467,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
                    double * objective_function_invalid, double * timing,
-                   int * penalty_mode, double * penalty_mult){
+                   int * penalty_mode, double * penalty_mult,
+                   double * ckerlb, double * ckerub){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -457,6 +501,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   num_reg_unordered_extern = myopti[BW_NUNOI];
   num_reg_ordered_extern = myopti[BW_NORDI];
   num_reg_continuous_extern = myopti[BW_NCONI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -862,10 +910,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
 
 
 
-      /* Conduct direction set search */
-
       if (bwm_use_transform)
         bwm_to_unconstrained(vector_scale_factor, num_var);
+
+      /* Conduct direction set search */
 
       bwm_reset_counters();
 
@@ -986,6 +1034,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   return ;
   
 }
@@ -999,7 +1051,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         int * myopti, double * myoptd, double * myans, double * fval,
                         double * objective_function_values, double * objective_function_evals,
                         double * objective_function_invalid, double * timing,
-                        int * penalty_mode, double * penalty_mult){
+                        int * penalty_mode, double * penalty_mult,
+                        double * ckerlb, double * ckerub){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -1033,6 +1086,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   num_reg_unordered_extern = myopti[DBW_NUNOI];
   num_reg_ordered_extern = myopti[DBW_NORDI];
   num_reg_continuous_extern = myopti[DBW_NCONI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -1616,6 +1673,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   return ;
   
 }
@@ -1627,13 +1688,16 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * myopti, double * myoptd, double * myans, double * fval,
                                double * objective_function_values, double * objective_function_evals,
                                double * objective_function_invalid, double * timing,
-                               int * penalty_mode, double * penalty_mult){
+                               int * penalty_mode, double * penalty_mult,
+                               double * cxkerlb, double * cxkerub,
+                               double * cykerlb, double * cykerub){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y = NULL;
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *cxylb = NULL, *cxyub = NULL;
 
   double fret, fret_best;
   double ftol, tol;
@@ -1686,6 +1750,34 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   KERNEL_reg_ordered_extern = myopti[CBW_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CBW_OYKRNEVI];
 
+  vector_cxkerlb_extern = cxkerlb;
+  vector_cxkerub_extern = cxkerub;
+  int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
+
+  vector_cykerlb_extern = cykerlb;
+  vector_cykerub_extern = cykerub;
+  int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    for(i = 0; i < num_reg_continuous_extern; i++){
+      cxylb[i] = (cxkerlb != NULL) ? cxkerlb[i] : DBL_MAX;
+      cxyub[i] = (cxkerub != NULL) ? cxkerub[i] : DBL_MAX;
+    }
+    for(i = 0; i < num_var_continuous_extern; i++){
+      cxylb[num_reg_continuous_extern + i] = (cykerlb != NULL) ? cykerlb[i] : DBL_MAX;
+      cxyub[num_reg_continuous_extern + i] = (cykerub != NULL) ? cykerub[i] : DBL_MAX;
+    }
+    vector_cxykerlb_extern = cxylb;
+    vector_cxykerub_extern = cxyub;
+    int_cxyker_bound_extern = np_has_finite_cker_bounds(cxylb, cxyub, num_reg_continuous_extern + num_var_continuous_extern);
+  } else {
+    vector_cxykerlb_extern = NULL;
+    vector_cxykerub_extern = NULL;
+    int_cxyker_bound_extern = 0;
+  }
+
   int_use_starting_values= myopti[CBW_USTARTI];
   int_LARGE_SF=myopti[CBW_LSFI];
   BANDWIDTH_den_extern=myopti[CBW_DENI];
@@ -1697,6 +1789,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   old_cdens = myopti[CBW_OLDI];
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
   scale_cat = myopti[CBW_SCATI];
+  bwm_use_transform = 0;
   
   ibwmfunc = myopti[CBW_MI];
   bwm_use_transform = myopti[CBW_TBNDI];
@@ -2489,6 +2582,21 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   int_WEIGHTS = 0;
 
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  safe_free(cxylb);
+  safe_free(cxyub);
+
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
@@ -2501,13 +2609,16 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * myopti, double * myoptd, double * myans, double * fval,
                                     double * objective_function_values, double * objective_function_evals,
                                     double * objective_function_invalid, double * timing,
-                                    int * penalty_mode, double * penalty_mult){
+                                    int * penalty_mode, double * penalty_mult,
+                                    double * cxkerlb, double * cxkerub,
+                                    double * cykerlb, double * cykerub){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *cxylb = NULL, *cxyub = NULL;
 
   double fret, fret_best;
   double ftol, tol;
@@ -2562,6 +2673,34 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   KERNEL_reg_ordered_extern = myopti[CDBW_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CDBW_OYKRNEVI];
+
+  vector_cxkerlb_extern = cxkerlb;
+  vector_cxkerub_extern = cxkerub;
+  int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
+
+  vector_cykerlb_extern = cykerlb;
+  vector_cykerub_extern = cykerub;
+  int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    for(i = 0; i < num_reg_continuous_extern; i++){
+      cxylb[i] = (cxkerlb != NULL) ? cxkerlb[i] : DBL_MAX;
+      cxyub[i] = (cxkerub != NULL) ? cxkerub[i] : DBL_MAX;
+    }
+    for(i = 0; i < num_var_continuous_extern; i++){
+      cxylb[num_reg_continuous_extern + i] = (cykerlb != NULL) ? cykerlb[i] : DBL_MAX;
+      cxyub[num_reg_continuous_extern + i] = (cykerub != NULL) ? cykerub[i] : DBL_MAX;
+    }
+    vector_cxykerlb_extern = cxylb;
+    vector_cxykerub_extern = cxyub;
+    int_cxyker_bound_extern = np_has_finite_cker_bounds(cxylb, cxyub, num_reg_continuous_extern + num_var_continuous_extern);
+  } else {
+    vector_cxykerlb_extern = NULL;
+    vector_cxykerub_extern = NULL;
+    int_cxyker_bound_extern = 0;
+  }
 
   int_use_starting_values= myopti[CDBW_USTARTI];
   int_LARGE_SF=myopti[CDBW_LSFI];
@@ -3191,7 +3330,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       /* Conduct direction set search */
 
       bwm_reset_counters();
-      
+
       powell(0,
              0,
              vector_scale_factor,
@@ -3301,12 +3440,12 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   safe_free(vector_scale_factor);
   safe_free(vsfh);
   safe_free(num_categories_extern);
-  safe_free(num_categories_extern_X);
-  safe_free(num_categories_extern_Y);
-  safe_free(num_categories_extern_XY);
   safe_free(bwm_kernel_unordered_vec);
   bwm_kernel_unordered_vec = NULL;
   bwm_kernel_unordered_len = 0;
+  safe_free(num_categories_extern_X);
+  safe_free(num_categories_extern_Y);
+  safe_free(num_categories_extern_XY);
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
@@ -3347,6 +3486,21 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   int_WEIGHTS = 0;
 
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  safe_free(cxylb);
+  safe_free(cxyub);
+
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
@@ -3365,11 +3519,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             int * myopti, 
                             double * cdens, double * cderr, 
                             double * cg, double * cgerr,
-                            double * ll){
+                            double * ll,
+                            double * cxkerlb, double * cxkerub,
+                            double * cykerlb, double * cykerub){
   /* Likelihood bandwidth selection for density estimation */
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
   double ** pdf_deriv = NULL, ** pdf_deriv_stderr = NULL;
+  double *cxylb = NULL, *cxyub = NULL;
   double xpad_num, ypad_num;
 
   int i,j;
@@ -3418,6 +3575,34 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
   KERNEL_reg_ordered_extern = myopti[CD_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CD_OYKRNEVI];
+
+  vector_cxkerlb_extern = cxkerlb;
+  vector_cxkerub_extern = cxkerub;
+  int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
+
+  vector_cykerlb_extern = cykerlb;
+  vector_cykerub_extern = cykerub;
+  int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    for(i = 0; i < num_reg_continuous_extern; i++){
+      cxylb[i] = (cxkerlb != NULL) ? cxkerlb[i] : DBL_MAX;
+      cxyub[i] = (cxkerub != NULL) ? cxkerub[i] : DBL_MAX;
+    }
+    for(i = 0; i < num_var_continuous_extern; i++){
+      cxylb[num_reg_continuous_extern + i] = (cykerlb != NULL) ? cykerlb[i] : DBL_MAX;
+      cxyub[num_reg_continuous_extern + i] = (cykerub != NULL) ? cykerub[i] : DBL_MAX;
+    }
+    vector_cxykerlb_extern = cxylb;
+    vector_cxykerub_extern = cxyub;
+    int_cxyker_bound_extern = np_has_finite_cker_bounds(cxylb, cxyub, num_reg_continuous_extern + num_var_continuous_extern);
+  } else {
+    vector_cxykerlb_extern = NULL;
+    vector_cxykerub_extern = NULL;
+    int_cxyker_bound_extern = 0;
+  }
 
   int_LARGE_SF = myopti[CD_LSFI];
   BANDWIDTH_den_extern = myopti[CD_DENI];
@@ -3760,6 +3945,20 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     int_TREE_XY = NP_TREE_FALSE;
   }
 
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  safe_free(cxylb);
+  safe_free(cxyub);
 
   return;
 }
@@ -3770,7 +3969,8 @@ void np_density(double * tuno, double * tord, double * tcon,
                 double * dbw, 
                 double * mcv, double * padnum, 
                 double * nconfac, double * ncatfac, double * mysd,
-                int * myopti, double * mydens, double * myderr, double * ll){
+                int * myopti, double * mydens, double * myderr, double * ll,
+                double * ckerlb, double * ckerub){
 
 
   double small = 1.0e-16;
@@ -3789,6 +3989,10 @@ void np_density(double * tuno, double * tord, double * tcon,
   num_reg_continuous_extern = myopti[DEN_NCONI];
   num_reg_unordered_extern = myopti[DEN_NUNOI];
   num_reg_ordered_extern = myopti[DEN_NORDI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -4079,6 +4283,10 @@ void np_density(double * tuno, double * tord, double * tcon,
     int_TREE_X = NP_TREE_FALSE;
   }
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   return;
 }
 
@@ -4087,7 +4295,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                       double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
                       double * objective_function_values, double * objective_function_evals,
                       double * objective_function_invalid, double * timing,
-                      int * penalty_mode, double * penalty_mult){
+                      int * penalty_mode, double * penalty_mult,
+                      double * ckerlb, double * ckerub){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -4131,6 +4340,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   KERNEL_reg_unordered_extern = myopti[RBW_UKRNEVI];
   KERNEL_reg_ordered_extern = myopti[RBW_OKRNEVI];
 
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
+
   int_use_starting_values= myopti[RBW_USTARTI];
   int_LARGE_SF=myopti[RBW_LSFI];
 
@@ -4142,20 +4355,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   int_MINIMIZE_IO = myopti[RBW_MINIOI];
 
   int_ll_extern = myopti[RBW_LL];
-#ifdef MPI2
-  {
-    int ll_min = 0, ll_max = 0;
-    MPI_Allreduce(&int_ll_extern, &ll_min, 1, MPI_INT, MPI_MIN, comm[1]);
-    MPI_Allreduce(&int_ll_extern, &ll_max, 1, MPI_INT, MPI_MAX, comm[1]);
-    if(ll_min != ll_max){
-      if(my_rank == 0){
-        REprintf("\n[npRmpi] Warning: inconsistent regression type across ranks (min=%d max=%d). Forcing all ranks to min.\n", ll_min, ll_max);
-        R_FlushConsole();
-      }
-      int_ll_extern = ll_min;
-    }
-  }
-#endif
 
   int_TREE_X = myopti[RBW_DOTREEI];
   scale_cat = myopti[RBW_SCATI];
@@ -4658,6 +4857,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   //fprintf(stderr,"\nNP TOASTY\n");
   return ;
   
@@ -4671,7 +4874,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * nconfac, double * ncatfac, double * mysd,
                    int * myopti, 
                    double * cm, double * cmerr, double * g, double *gerr, 
-                   double * xtra){
+                   double * xtra,
+                   double * ckerlb, double * ckerub){
 
   double * vector_scale_factor, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
   double * lambda, ** matrix_bandwidth;
@@ -4704,26 +4908,16 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   KERNEL_reg_unordered_extern = myopti[REG_UKRNEVI];
   KERNEL_reg_ordered_extern = myopti[REG_OKRNEVI];
 
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
+
   int_LARGE_SF = myopti[REG_LSFI];
   int_MINIMIZE_IO = myopti[REG_MINIOI];
   BANDWIDTH_reg_extern = myopti[REG_BWI];
 
   do_grad = myopti[REG_GRAD];
   int_ll_extern = myopti[REG_LL];
-#ifdef MPI2
-  {
-    int ll_min = 0, ll_max = 0;
-    MPI_Allreduce(&int_ll_extern, &ll_min, 1, MPI_INT, MPI_MIN, comm[1]);
-    MPI_Allreduce(&int_ll_extern, &ll_max, 1, MPI_INT, MPI_MAX, comm[1]);
-    if(ll_min != ll_max){
-      if(my_rank == 0){
-        REprintf("\n[npRmpi] Warning: inconsistent regression type across ranks (min=%d max=%d). Forcing all ranks to min.\n", ll_min, ll_max);
-        R_FlushConsole();
-      }
-      int_ll_extern = ll_min;
-    }
-  }
-#endif
 
   max_lev = myopti[REG_MLEVI];
   pad_num = *padnum;
@@ -5113,6 +5307,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   safe_free(lambda);
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   return;
 }
 
@@ -5124,7 +5322,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                   int * operator,
                   int * myopti, double * kpow, 
                   double * weighted_sum, double * weighted_p_sum,
-                  double * kernel_weights){
+                  double * kernel_weights,
+                  double * ckerlb, double * ckerub){
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
       
@@ -5135,6 +5334,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
+
+  int use_tree = 0;
+  int allocated_X_train = 1, allocated_X_eval = 1;
+  int allocated_Y = 1, allocated_W = 1;
   int ksum_is_output = 0, pksum_is_output = 0, kw_is_output = 0;
 
   struct th_table * otabs = NULL;
@@ -5161,6 +5364,9 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   KERNEL_reg_extern = myopti[KWS_CKRNEVI];
   KERNEL_reg_unordered_extern = myopti[KWS_UKRNEVI];
   KERNEL_reg_ordered_extern = myopti[KWS_OKRNEVI];
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   int_LARGE_SF = myopti[KWS_LSFI];
   int_MINIMIZE_IO = myopti[KWS_MINIOI];
@@ -5191,6 +5397,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   sum_element_length = (no_y ? 1 : ncol_Y)*(no_weights ? 1 : ncol_W);
 
+  use_tree = (int_TREE_X == NP_TREE_TRUE);
+
 #ifdef MPI2
   num_obs_eval_alloc = MAX(ceil((double) num_obs_eval_extern / (double) iNum_Processors),1)*iNum_Processors;
 #else
@@ -5204,21 +5412,52 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   /* allocate */
 
-  matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
-  matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
-  matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  if(use_tree){
+    matrix_X_unordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_unordered_extern);
+    matrix_X_ordered_train_extern = alloc_matd(num_obs_train_extern, num_reg_ordered_extern);
+    matrix_X_continuous_train_extern = alloc_matd(num_obs_train_extern, num_reg_continuous_extern);
+  } else {
+    allocated_X_train = 0;
+    matrix_X_unordered_train_extern = (num_reg_unordered_extern > 0) ?
+      (double **)R_alloc((size_t)num_reg_unordered_extern, sizeof(double*)) : NULL;
+    matrix_X_ordered_train_extern = (num_reg_ordered_extern > 0) ?
+      (double **)R_alloc((size_t)num_reg_ordered_extern, sizeof(double*)) : NULL;
+    matrix_X_continuous_train_extern = (num_reg_continuous_extern > 0) ?
+      (double **)R_alloc((size_t)num_reg_continuous_extern, sizeof(double*)) : NULL;
+
+    for(j = 0; j < num_reg_unordered_extern; j++)
+      matrix_X_unordered_train_extern[j] = tuno + j*num_obs_train_extern;
+    for(j = 0; j < num_reg_ordered_extern; j++)
+      matrix_X_ordered_train_extern[j] = tord + j*num_obs_train_extern;
+    for(j = 0; j < num_reg_continuous_extern; j++)
+      matrix_X_continuous_train_extern[j] = tcon + j*num_obs_train_extern;
+  }
   
   /* for the moment we will just allocate a vector of ones */
   /* vector_Y_extern = (no_y)?NULL:alloc_vecd(num_obs_train_extern); */
 
-  matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, ncol_Y);
-  matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, ncol_W);
+  if(use_tree){
+    matrix_Y_continuous_train_extern = alloc_matd(num_obs_train_extern, ncol_Y);
+    matrix_Y_ordered_train_extern = alloc_matd(num_obs_train_extern, ncol_W);
+  } else {
+    allocated_Y = 0;
+    allocated_W = 0;
+    matrix_Y_continuous_train_extern = (ncol_Y > 0) ?
+      (double **)R_alloc((size_t)ncol_Y, sizeof(double*)) : NULL;
+    matrix_Y_ordered_train_extern = (ncol_W > 0) ?
+      (double **)R_alloc((size_t)ncol_W, sizeof(double*)) : NULL;
+
+    for(j = 0; j < ncol_Y; j++)
+      matrix_Y_continuous_train_extern[j] = ty + j*num_obs_train_extern;
+    for(j = 0; j < ncol_W; j++)
+      matrix_Y_ordered_train_extern[j] = weights + j*num_obs_train_extern;
+  }
 
   num_categories_extern = alloc_vecu(num_reg_unordered_extern+num_reg_ordered_extern);
   matrix_categorical_vals_extern = alloc_matd(max_lev, num_reg_unordered_extern + num_reg_ordered_extern);
 
   vector_scale_factor = alloc_vecd(num_var + 1);
-  if(!int_TREE_X && (num_obs_eval_alloc == num_obs_eval_extern)){
+  if(!use_tree && (num_obs_eval_alloc == num_obs_eval_extern)){
     ksum = weighted_sum;
     ksum_is_output = 1;
   } else {
@@ -5227,7 +5466,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   if((p_operator != OP_NOOP) || do_ocg){
     p_nvar = ((p_operator != OP_NOOP) ? num_reg_continuous_extern : 0) + ((do_score || do_ocg) ? num_reg_unordered_extern + num_reg_ordered_extern : 0);
-    if(!int_TREE_X && (num_obs_eval_alloc == num_obs_eval_extern)){
+    if(!use_tree && (num_obs_eval_alloc == num_obs_eval_extern)){
       p_ksum = weighted_p_sum;
       pksum_is_output = 1;
     } else {
@@ -5236,9 +5475,26 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(!train_is_eval){
-    matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
-    matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
-    matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
+    if(use_tree){
+      matrix_X_unordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_unordered_extern);
+      matrix_X_ordered_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_ordered_extern);
+      matrix_X_continuous_eval_extern = alloc_matd(num_obs_eval_extern, num_reg_continuous_extern);
+    } else {
+      allocated_X_eval = 0;
+      matrix_X_unordered_eval_extern = (num_reg_unordered_extern > 0) ?
+        (double **)R_alloc((size_t)num_reg_unordered_extern, sizeof(double*)) : NULL;
+      matrix_X_ordered_eval_extern = (num_reg_ordered_extern > 0) ?
+        (double **)R_alloc((size_t)num_reg_ordered_extern, sizeof(double*)) : NULL;
+      matrix_X_continuous_eval_extern = (num_reg_continuous_extern > 0) ?
+        (double **)R_alloc((size_t)num_reg_continuous_extern, sizeof(double*)) : NULL;
+
+      for(j = 0; j < num_reg_unordered_extern; j++)
+        matrix_X_unordered_eval_extern[j] = euno + j*num_obs_eval_extern;
+      for(j = 0; j < num_reg_ordered_extern; j++)
+        matrix_X_ordered_eval_extern[j] = eord + j*num_obs_eval_extern;
+      for(j = 0; j < num_reg_continuous_extern; j++)
+        matrix_X_continuous_eval_extern[j] = econ + j*num_obs_eval_extern;
+    }
   } else {
     matrix_X_unordered_eval_extern = matrix_X_unordered_train_extern;
     matrix_X_ordered_eval_extern = matrix_X_ordered_train_extern;
@@ -5247,27 +5503,29 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
   /* train */
 
-  for( j=0;j<num_reg_unordered_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+i];
+  if(use_tree){
+    for( j=0;j<num_reg_unordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_unordered_train_extern[j][i]=tuno[j*num_obs_train_extern+i];
 
-  for( j=0;j<num_reg_ordered_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+i];
+    for( j=0;j<num_reg_ordered_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_ordered_train_extern[j][i]=tord[j*num_obs_train_extern+i];
 
-  for( j=0;j<num_reg_continuous_extern;j++)
-    for( i=0;i<num_obs_train_extern;i++ )
-      matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+i];
+    for( j=0;j<num_reg_continuous_extern;j++)
+      for( i=0;i<num_obs_train_extern;i++ )
+        matrix_X_continuous_train_extern[j][i]=tcon[j*num_obs_train_extern+i];
 
-  for( j = 0; j < ncol_Y; j++ )
-    for( i = 0; i < num_obs_train_extern; i++ )
-      matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+i];
+    for( j = 0; j < ncol_Y; j++ )
+      for( i = 0; i < num_obs_train_extern; i++ )
+        matrix_Y_continuous_train_extern[j][i] = ty[j*num_obs_train_extern+i];
 
-  for( j = 0; j < ncol_W; j++ )
-    for( i = 0; i < num_obs_train_extern; i++ )
-      matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+i];
+    for( j = 0; j < ncol_W; j++ )
+      for( i = 0; i < num_obs_train_extern; i++ )
+        matrix_Y_ordered_train_extern[j][i] = weights[j*num_obs_train_extern+i];
+  }
 
-  if(!train_is_eval){
+  if(use_tree && !train_is_eval){
     for( j=0;j<num_reg_unordered_extern;j++)
       for( i=0;i<num_obs_eval_extern;i++ )
         matrix_X_unordered_eval_extern[j][i]=euno[j*num_obs_eval_extern+i];
@@ -5281,24 +5539,29 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
         matrix_X_continuous_eval_extern[j][i]=econ[j*num_obs_eval_extern+i];
   }
 
-  ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
-  if(!(ipt != NULL))
-    error("!(ipt != NULL)");
+  if(use_tree){
+    ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+    if(!(ipt != NULL))
+      error("!(ipt != NULL)");
 
-  for(i = 0; i < num_obs_train_extern; i++){
-    ipt[i] = i;
-  }
+    for(i = 0; i < num_obs_train_extern; i++){
+      ipt[i] = i;
+    }
 
-  if(!train_is_eval) {
-    ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
-    if(!(ipe != NULL))
-      error("!(ipe != NULL)");
+    if(!train_is_eval) {
+      ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+      if(!(ipe != NULL))
+        error("!(ipe != NULL)");
 
-    for(i = 0; i < num_obs_eval_extern; i++){
-      ipe[i] = i;
+      for(i = 0; i < num_obs_eval_extern; i++){
+        ipe[i] = i;
+      }
+    } else {
+      ipe = ipt;
     }
   } else {
-    ipe = ipt;
+    ipt = NULL;
+    ipe = NULL;
   }
 
   // attempt tree build, if enabled 
@@ -5415,7 +5678,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
 
   if(return_kernel_weights){
-    if(!int_TREE_X && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (num_obs_eval_alloc == num_obs_eval_extern)){
+    if(!use_tree && (BANDWIDTH_reg_extern != BW_ADAP_NN) && (num_obs_eval_alloc == num_obs_eval_extern)){
       kw = kernel_weights;
       kw_is_output = 1;
     } else {
@@ -5508,14 +5771,14 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
 
 
   if(!npks_err){
-    if(int_TREE_X || !ksum_is_output){
+    if(use_tree || !ksum_is_output){
       for(j = 0; j < num_obs_eval_extern; j++)
         for(i = 0; i < sum_element_length; i++)
           weighted_sum[ipe[j]*sum_element_length + i] = ksum[j*sum_element_length+i];
     }
 
     if(return_kernel_weights){
-      if(!kw_is_output){
+      if(use_tree || (BANDWIDTH_reg_extern == BW_ADAP_NN) || !kw_is_output){
         if(BANDWIDTH_reg_extern != BW_ADAP_NN){ // adaptive weights are currently returned transposed...
           for(j = 0; j < num_obs_eval_extern; j++)
             for(i = 0; i < num_obs_train_extern; i++)
@@ -5529,7 +5792,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     }
 
     if(p_nvar > 0){
-      if(int_TREE_X || !pksum_is_output){
+      if(use_tree || !pksum_is_output){
         for(k = 0; k < p_nvar; k++){
           const int kidx = k*num_obs_eval_extern*sum_element_length;
           for(j = 0; j < num_obs_eval_extern; j++)
@@ -5542,19 +5805,23 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
   /* clean up */
 
-  free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
-  free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
-  free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  if(allocated_X_train){
+    free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+    free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+    free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  }
   
-  if(!train_is_eval){
+  if(!train_is_eval && allocated_X_eval){
     free_mat(matrix_X_unordered_eval_extern, num_reg_unordered_extern);
     free_mat(matrix_X_ordered_eval_extern, num_reg_ordered_extern);
     free_mat(matrix_X_continuous_eval_extern, num_reg_continuous_extern);
   }
 
   free_mat(matrix_categorical_vals_extern, num_reg_unordered_extern+num_reg_ordered_extern);
-  free_mat(matrix_Y_continuous_train_extern, ncol_Y);
-  free_mat(matrix_Y_ordered_train_extern, ncol_W);
+  if(allocated_Y)
+    free_mat(matrix_Y_continuous_train_extern, ncol_Y);
+  if(allocated_W)
+    free_mat(matrix_Y_ordered_train_extern, ncol_W);
 
   safe_free(num_categories_extern);
   safe_free(vector_scale_factor);
@@ -5592,6 +5859,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     free(matrix_ordered_indices[0]);
     free(matrix_ordered_indices);
   }
+
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
 
   return;
 }

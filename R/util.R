@@ -117,7 +117,7 @@ matrix.sd <- function(x, na.rm=FALSE) {
 }
 
 npseed <- function(seed){
-  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "npRmpi")
+  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "np")
   invisible()
 }
 
@@ -150,7 +150,7 @@ nptgauss <- function(b){
 
   int.kernels[CKER_TGAUSS + 1] <- k
   
-  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "npRmpi"))
+  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "np"))
 
 }
 
@@ -217,6 +217,20 @@ untangle <- function(frame){
     t.ret
   })
 
+  all.min <- lapply(frame, function(y) {
+    t.ret <- NULL
+    if (is.numeric(y))
+      t.ret <- min(y, na.rm = TRUE)
+    t.ret
+  })
+
+  all.max <- lapply(frame, function(y) {
+    t.ret <- NULL
+    if (is.numeric(y))
+      t.ret <- max(y, na.rm = TRUE)
+    t.ret
+  })
+
   list(iord = iord,
        iuno = iuno,
        icon = icon,
@@ -224,7 +238,154 @@ untangle <- function(frame){
        all.lev = all.lev,
        all.ulev = all.ulev,
        all.dlev = all.dlev,
-       all.nlev = all.nlev)
+       all.nlev = all.nlev,
+       all.min = all.min,
+       all.max = all.max)
+}
+
+npKernelBoundsResolve <- function(dati,
+                                  varnames,
+                                  kerbound = c("none", "range", "fixed"),
+                                  kerlb = NULL,
+                                  kerub = NULL,
+                                  argprefix = "cker") {
+  kerbound <- match.arg(kerbound)
+  icon.idx <- which(dati$icon)
+  ncon <- length(icon.idx)
+  if (is.null(varnames) || length(varnames) != length(dati$icon))
+    varnames <- paste0("V", seq_along(dati$icon))
+
+  full.lb <- rep(-Inf, length(dati$icon))
+  full.ub <- rep(Inf, length(dati$icon))
+
+  if (ncon == 0L) {
+    return(list(bound = "none", lb = full.lb, ub = full.ub))
+  }
+
+  mins <- unlist(dati$all.min[icon.idx], use.names = FALSE)
+  maxs <- unlist(dati$all.max[icon.idx], use.names = FALSE)
+  cnames <- varnames[icon.idx]
+
+  recycleBounds <- function(x, nm) {
+    if (is.null(x))
+      stop(sprintf("'%s' requires '%s' and '%s'.",
+                   paste0(argprefix, "bound"),
+                   paste0(argprefix, "lb"),
+                   paste0(argprefix, "ub")))
+    x <- as.numeric(x)
+    if (!(length(x) %in% c(1L, ncon))) {
+      stop(sprintf("length(%s) must be 1 or equal to the number of continuous variables (%d).",
+                   nm, ncon))
+    }
+    if (length(x) == 1L)
+      rep(x, ncon)
+    else
+      x
+  }
+
+  if (kerbound == "none") {
+    lb <- rep(-Inf, ncon)
+    ub <- rep(Inf, ncon)
+  } else if (kerbound == "range") {
+    lb <- mins
+    ub <- maxs
+  } else {
+    lb <- recycleBounds(kerlb, paste0(argprefix, "lb"))
+    ub <- recycleBounds(kerub, paste0(argprefix, "ub"))
+  }
+
+  if (any(!is.finite(lb) & !is.infinite(lb)) || any(!is.finite(ub) & !is.infinite(ub))) {
+    stop(sprintf("'%s' and '%s' must be finite values or +/-Inf.",
+                 paste0(argprefix, "lb"),
+                 paste0(argprefix, "ub")))
+  }
+
+  if (any(lb >= ub)) {
+    stop(sprintf("Invalid bounds for '%s': require lower < upper for every continuous variable.",
+                 paste0(argprefix, "bound")))
+  }
+
+  bad.cover <- (lb > mins) | (ub < maxs)
+  if (any(bad.cover)) {
+    bad.vars <- paste(cnames[bad.cover], collapse = ", ")
+    stop(sprintf("Invalid bounds for '%s': require lower <= min(training) and upper >= max(training) for each continuous variable. Violations: %s",
+                 paste0(argprefix, "bound"), bad.vars))
+  }
+
+  if (kerbound == "fixed" && all(is.infinite(lb) & (lb < 0)) && all(is.infinite(ub) & (ub > 0))) {
+    kerbound <- "none"
+  }
+
+  full.lb[icon.idx] <- lb
+  full.ub[icon.idx] <- ub
+
+  list(bound = kerbound, lb = full.lb, ub = full.ub)
+}
+
+npKernelBoundsCheckEval <- function(evaldat,
+                                    icon,
+                                    kerlb,
+                                    kerub,
+                                    argprefix = "cker") {
+  if (is.null(evaldat) || is.null(icon) || !any(icon))
+    return(invisible(TRUE))
+
+  if (is.null(kerlb) || is.null(kerub))
+    return(invisible(TRUE))
+
+  icon.idx <- which(icon)
+  ncon <- length(icon.idx)
+  if (ncon == 0L)
+    return(invisible(TRUE))
+
+  lb <- as.numeric(kerlb[icon.idx])
+  ub <- as.numeric(kerub[icon.idx])
+
+  if (all(is.infinite(lb) & lb < 0) && all(is.infinite(ub) & ub > 0))
+    return(invisible(TRUE))
+
+  enames <- names(evaldat)
+  if (is.null(enames) || length(enames) != length(icon))
+    enames <- paste0("V", seq_along(icon))
+  cnames <- enames[icon.idx]
+
+  econ <- as.matrix(evaldat[, icon.idx, drop = FALSE])
+  if (!is.double(econ))
+    storage.mode(econ) <- "double"
+
+  bad.low <- vapply(seq_len(ncon), function(i) {
+    is.finite(lb[i]) && any(econ[, i] < lb[i], na.rm = TRUE)
+  }, logical(1L))
+  bad.high <- vapply(seq_len(ncon), function(i) {
+    is.finite(ub[i]) && any(econ[, i] > ub[i], na.rm = TRUE)
+  }, logical(1L))
+
+  if (any(bad.low) || any(bad.high)) {
+    low.msg <- if (any(bad.low)) {
+      paste(sprintf("%s < %s", cnames[bad.low], format(lb[bad.low], digits = 12)), collapse = ", ")
+    } else {
+      NULL
+    }
+    high.msg <- if (any(bad.high)) {
+      paste(sprintf("%s > %s", cnames[bad.high], format(ub[bad.high], digits = 12)), collapse = ", ")
+    } else {
+      NULL
+    }
+    msg <- paste(c(low.msg, high.msg), collapse = "; ")
+    stop(sprintf("Evaluation data violate '%s' bounds: %s",
+                 paste0(argprefix, "bound"), msg))
+  }
+
+  invisible(TRUE)
+}
+
+npKernelBoundsMarshal <- function(kerlb, kerub) {
+  lb <- as.double(kerlb)
+  ub <- as.double(kerub)
+  big <- .Machine$double.xmax
+  lb[is.infinite(lb) & lb < 0] <- -big
+  ub[is.infinite(ub) & ub > 0] <- big
+  list(lb = lb, ub = ub)
 }
 
 validateBandwidth <- function(bws){
@@ -348,7 +509,8 @@ explodePipe <- function(formula, env = parent.frame()){
 }
 
 coarseclass <- function(a) {
-  ifelse(inherits(a, "integer"), "numeric", class(a))
+  if (inherits(a, "integer")) return("numeric")
+  return(class(a)[1])
 }
 
 toFrame <- function(frame) {
@@ -482,8 +644,8 @@ toMatrix <- function(data) {
 ## could fail without the response too, but then the calling routine is about
 ## to die a noisy death anyhow ...
 succeedWithResponse <- function(tt, frame){
-  !any(class(try(eval(expr = attr(tt, "variables"),
-                      envir = frame, enclos = NULL), silent = TRUE)) == "try-error")
+  !inherits(try(eval(expr = attr(tt, "variables"),
+                     envir = frame, enclos = NULL), silent = TRUE), "try-error")
 }
 
 ## determine whether a bandwidth

@@ -80,11 +80,9 @@ npudens.bandwidth <-
     stop("length of bandwidth vector does not match number of columns of 'tdat'")
 
   ccon = unlist(lapply(as.data.frame(tdat[,bws$icon]),class))
-  if ((any(bws$icon) && !all((ccon == class(integer(0))) | (ccon == class(numeric(0))))) ||
-      (any(bws$iord) && !all(unlist(lapply(as.data.frame(tdat[,bws$iord]),class)) ==
-                             class(ordered(0)))) ||
-      (any(bws$iuno) && !all(unlist(lapply(as.data.frame(tdat[,bws$iuno]),class)) ==
-                             class(factor(0)))))
+  if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
+      (any(bws$iord) && !all(sapply(as.data.frame(tdat[,bws$iord]),inherits, "ordered"))) ||
+      (any(bws$iuno) && !all(sapply(as.data.frame(tdat[,bws$iuno]),inherits, "factor"))))
     stop("supplied bandwidths do not match 'tdat' in type")
 
   tdat <- na.omit(tdat)
@@ -105,6 +103,9 @@ npudens.bandwidth <-
   
   if (!no.e)
     edat <- adjustLevels(edat, bws$xdati, allowNewCells = TRUE)
+
+  if (!no.e)
+    npKernelBoundsCheckEval(edat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
 
   ## grab the evaluation data before it is converted to numeric
   if(no.e)
@@ -159,9 +160,10 @@ npudens.bandwidth <-
       liracine = OKER_NLR),
     no.e = no.e,
     mcv.numRow = attr(bws$xmcv, "num.row"),
-    densOrDist = NP_DO_DENS,
-    old.dens = FALSE,
-    int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+      densOrDist = NP_DO_DENS,
+      old.dens = FALSE,
+      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+  cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
   
   myout=
     .C("np_density", as.double(tuno), as.double(tord), as.double(tcon),
@@ -173,6 +175,8 @@ npudens.bandwidth <-
        dens = double(enrow),
        derr = double(enrow),
        log_likelihood = double(1),
+       ckerlb = as.double(cker.bounds.c$lb),
+       ckerub = as.double(cker.bounds.c$ub),
        PACKAGE="npRmpi" )[c("dens","derr", "log_likelihood")]
 
   ## For purely categorical density with zero bandwidths, the variance of

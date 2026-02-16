@@ -11,11 +11,9 @@ npscoefbw <-
 
 npscoefbw.formula <-
   function(formula, data, subset, na.action, call, ...){
-    orig.class <- tryCatch({
-        if (missing(data))
-            sapply(eval(attr(terms(formula), "variables"), environment(formula)),class)
-        else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)),class)
-    }, error = function(e) "numeric")
+    orig.ts <- if (missing(data))
+      sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
+    else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)), inherits, "ts")
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -25,7 +23,7 @@ npscoefbw.formula <-
     if(!missing(call) && is.call(call)){
       ## rummage about in the call for the original formula
       for(i in 1:length(call)){
-        if(tryCatch(inherits(eval(call[[i]], parent.frame()), "formula"),
+        if(tryCatch(inherits(eval(call[[i]]), "formula"),
                     error = function(e) FALSE))
           break;
       }
@@ -45,15 +43,15 @@ npscoefbw.formula <-
                  env = environment(formula))
 
     mf[["formula"]] <- terms(mf[["formula"]])
-    if(all(orig.class == "ts")){
+    if(all(orig.ts)){
       args <- (as.list(attr(mf[["formula"]], "variables"))[-1])
       attr(mf[["formula"]], "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
-    }else if(any(orig.class == "ts")){
+    }else if(any(orig.ts)){
       arguments <- (as.list(attr(mf[["formula"]], "variables"))[-1])
-      arguments.normal <- arguments[which(orig.class != "ts")]
-      arguments.timeseries <- arguments[which(orig.class == "ts")]
+      arguments.normal <- arguments[which(!orig.ts)]
+      arguments.timeseries <- arguments[which(orig.ts)]
 
-      ix <- sort(c(which(orig.class == "ts"),which(orig.class != "ts")),index.return = TRUE)$ix
+      ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
       attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
     }
     
@@ -550,6 +548,9 @@ npscoefbw.scbandwidth <-
                        bwtype = bws$type,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder,
+                       ckerbound = bws$ckerbound,
+                       ckerlb = bws$ckerlb,
+                       ckerub = bws$ckerub,
                        ukertype = bws$ukertype,
                        okertype = bws$okertype,
                        fval = bws$fval,
@@ -589,7 +590,7 @@ npscoefbw.default <-
            bandwidth.compute = TRUE,
            ## dummy arguments for scbandwidth()
            bwmethod, bwscaling, bwtype,
-           ckertype, ckerorder,
+           ckertype, ckerorder, ckerbound, ckerlb, ckerub,
            ukertype, okertype,
            optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit,
@@ -610,7 +611,7 @@ npscoefbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
-               "ukertype", "okertype")
+               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

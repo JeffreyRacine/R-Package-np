@@ -254,6 +254,15 @@
   eighth order) are derived from the second order kernels given above
   (see Li and Racine (2007) for details).
 
+  For continuous kernels, one can optionally enforce finite support
+  normalization via user-supplied bounds. When finite lower/upper bounds
+  are supplied (e.g., \code{ckerbound="fixed"} with \code{ckerlb} and
+  \code{ckerub}), continuous kernels are normalized on
+  \eqn{[a,b]}{[a,b]} using the corresponding kernel CDF in the denominator.
+  Setting infinite bounds recovers the standard unbounded kernel.
+  This boundary-adaptive normalization is especially useful for
+  unconditional density/distribution estimation on bounded supports.
+
   For particulars on any given method, kindly see the references listed
   for the method in question.
 
@@ -312,6 +321,10 @@
   Racine, J.S. and Q. Li (2004), \dQuote{Nonparametric estimation of
 	regression functions with both categorical and continuous data,}
 	Journal of Econometrics, 119, 99-130.
+
+  Racine, J.S. and Q. Li and Q. Wang (2024), \dQuote{Boundary-Adaptive
+  Kernel Density Estimation: The Case of (Near) Uniform Density,}
+  Journal of Nonparametric Statistics, 36(1), 146-164.
   
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
