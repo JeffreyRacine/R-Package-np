@@ -6463,7 +6463,7 @@ npplot.sibandwidth <-
       if (plot.behavior != "data"){      
         if (plot.errors){
           plot(tobj$index[i.sort], temp.mean[i.sort],
-               ylim = ifelse(!is.null(ylim),ylim,c(ymin,ymax)),
+               ylim = if (!is.null(ylim)) ylim else c(ymin,ymax),
                xlim = xlim,
                cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
@@ -6478,10 +6478,14 @@ npplot.sibandwidth <-
                sub = sub,
                lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
           if (plot.errors.type == "all") {
+            sorted.all.err <- lapply(temp.all.err, function(err) {
+              if (is.null(err)) return(NULL)
+              err[i.sort,,drop = FALSE]
+            })
             draw.all.error.types(
               ex = na.omit(tobj$index[i.sort]),
               center = na.omit(if (plot.errors.center == "estimate") temp.mean[i.sort] else temp.err[i.sort,3]),
-              all.err = temp.all.err,
+              all.err = sorted.all.err,
               plot.errors.style = plot.errors.style,
               plot.errors.bar = plot.errors.bar,
               plot.errors.bar.num = plot.errors.bar.num,
@@ -6533,25 +6537,23 @@ npplot.sibandwidth <-
         bmax = max(bws$beta)
         bmin = min(bws$beta)
 
-        if (plot.errors && plot.errors.type == "all"){
-          yr <- compute.all.error.range(if (plot.errors.center == "estimate") temp.mean else temp.err[,3],
-                                        temp.all.err)
-          ymax = yr[2]
-          ymin = yr[1]
-        } else if (plot.errors){
-          ymax = max(temp.mean + temp.err[,2])
-          ymin = min(temp.mean - temp.err[,1])
+        if (is.null(ylim)) {
+          if (plot.errors && plot.errors.type == "all"){
+            yr <- compute.all.error.range(if (plot.errors.center == "estimate") temp.mean else temp.err[,3],
+                                          temp.all.err)
+            ymax = yr[2]
+            ymin = yr[1]
+          } else if (plot.errors){
+            ymax = max(temp.mean + temp.err[,2], na.rm = TRUE)
+            ymin = min(temp.mean - temp.err[,1], na.rm = TRUE)
+          } else {
+            ymax = max(temp.mean, na.rm = TRUE)
+            ymin = min(temp.mean, na.rm = TRUE)
+          }
+          common.ylim <- c(min(bmin*ymax,bmax*ymin),max(bmax*ymax,bmin*ymin))
         } else {
-          ymax = max(temp.mean)
-          ymin = min(temp.mean)
-        }        
-
-        ylim = c(min(bmin*ymax,bmax*ymin),max(bmax*ymax,bmin*ymin))
-
-        if(!is.null(ylim)){
-          ymin = ylim[1]
-          ymax = ylim[2]
-        } 
+          common.ylim <- ylim
+        }
 
 
         if (plot.behavior != "plot"){
@@ -6563,6 +6565,7 @@ npplot.sibandwidth <-
           plot.out[[1]]$grad = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
           plot.out[[1]]$glerr = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
           plot.out[[1]]$gherr = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
+          plot.out[[1]]$gbias = matrix(data=0,nrow = nrow(xdat), ncol = ncol(xdat))
           
         }
 
@@ -6570,11 +6573,35 @@ npplot.sibandwidth <-
         for (i in 1:ncol(xdat)){
           if (plot.behavior != "data"){
 
-            if(!common.scale)
-              ylim = c(min(temp.mean*bws$beta[i]), max(temp.mean*bws$beta[i]))
+            if (is.null(ylim)) {
+              if (!common.scale) {
+                center.base.i <- if (plot.errors.center == "estimate")
+                  temp.mean[i.sort] else temp.err[i.sort,3]
+                center.i <- bws$beta[i] * center.base.i
+                if (plot.errors && plot.errors.type == "all" && !is.null(temp.all.err)) {
+                  sorted.all.err <- lapply(temp.all.err, function(err) {
+                    if (is.null(err)) return(NULL)
+                    abs(bws$beta[i]) * err[i.sort,,drop = FALSE]
+                  })
+                  panel.range <- compute.all.error.range(center.i, sorted.all.err)
+                } else if (plot.errors) {
+                  lo.i <- bws$beta[i] * (center.base.i - temp.err[i.sort,1])
+                  hi.i <- bws$beta[i] * (center.base.i + temp.err[i.sort,2])
+                  panel.range <- c(min(pmin(lo.i, hi.i), na.rm = TRUE),
+                                   max(pmax(lo.i, hi.i), na.rm = TRUE))
+                } else {
+                  panel.range <- c(min(center.i, na.rm = TRUE), max(center.i, na.rm = TRUE))
+                }
+                panel.ylim <- panel.range
+              } else {
+                panel.ylim <- common.ylim
+              }
+            } else {
+              panel.ylim <- common.ylim
+            }
             
             plot(tobj$index[i.sort], temp.mean[i.sort]*bws$beta[i],
-                 ylim = ylim,
+                 ylim = panel.ylim,
                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
                  cex.lab =  ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
@@ -6592,7 +6619,7 @@ npplot.sibandwidth <-
               if (plot.errors.type == "all") {
                 scaled.all.err <- lapply(temp.all.err, function(err) {
                   if (is.null(err)) return(NULL)
-                  abs(bws$beta[i]) * err
+                  abs(bws$beta[i]) * err[i.sort,,drop = FALSE]
                 })
                 draw.all.error.types(
                   ex = na.omit(tobj$index[i.sort]),
@@ -6603,18 +6630,22 @@ npplot.sibandwidth <-
                   plot.errors.bar.num = plot.errors.bar.num,
                   lty = 2)
               } else if (plot.errors.center == "estimate") {
+                lo.i <- bws$beta[i] * (temp.mean[i.sort] - temp.err[i.sort,1])
+                hi.i <- bws$beta[i] * (temp.mean[i.sort] + temp.err[i.sort,2])
                 draw.errors(ex = na.omit(tobj$index[i.sort]),
-                            ely = na.omit(bws$beta[i]*(temp.mean[i.sort] - temp.err[i.sort,1])),
-                            ehy = na.omit(bws$beta[i]*(temp.mean[i.sort] + temp.err[i.sort,2])),
+                            ely = na.omit(pmin(lo.i, hi.i)),
+                            ehy = na.omit(pmax(lo.i, hi.i)),
                             plot.errors.style = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
                             lty = 2)
               } else if (plot.errors.center == "bias-corrected") {
-                lines(na.omit(tobj$index[i.sort]), na.omit(temp.err[i.sort,3]), lty = 3)
+                lo.i <- bws$beta[i] * (temp.err[i.sort,3] - temp.err[i.sort,1])
+                hi.i <- bws$beta[i] * (temp.err[i.sort,3] + temp.err[i.sort,2])
+                lines(na.omit(tobj$index[i.sort]), na.omit(bws$beta[i] * temp.err[i.sort,3]), lty = 3)
                 draw.errors(ex = na.omit(tobj$index[i.sort]),
-                            ely = na.omit(temp.err[i.sort,3] - temp.err[i.sort,1]),
-                            ehy = na.omit(temp.err[i.sort,3] + temp.err[i.sort,2]),
+                            ely = na.omit(pmin(lo.i, hi.i)),
+                            ehy = na.omit(pmax(lo.i, hi.i)),
                             plot.errors.style  = plot.errors.style,
                             plot.errors.bar = plot.errors.bar,
                             plot.errors.bar.num = plot.errors.bar.num,
@@ -6625,8 +6656,12 @@ npplot.sibandwidth <-
 
           if (plot.behavior != "plot"){
             plot.out[[1]]$grad[,i] = bws$beta[i]*temp.mean[i.sort]
-            plot.out[[1]]$glerr[,i] = bws$beta[i]*temp.err[i.sort,ifelse(bws$beta >= 0.0,1,2)]
-            plot.out[[1]]$gherr[,i] = bws$beta[i]*temp.err[i.sort,ifelse(bws$beta < 0.0,1,2)]
+            center.out.i <- if (plot.errors.center == "estimate")
+              temp.mean[i.sort] else temp.err[i.sort,3]
+            lo.i <- bws$beta[i] * (center.out.i - temp.err[i.sort,1])
+            hi.i <- bws$beta[i] * (center.out.i + temp.err[i.sort,2])
+            plot.out[[1]]$glerr[,i] = pmin(lo.i, hi.i)
+            plot.out[[1]]$gherr[,i] = pmax(lo.i, hi.i)
             plot.out[[1]]$gbias[,i] = bws$beta[i]*temp.err[i.sort,3]
           }
 
@@ -6637,7 +6672,7 @@ npplot.sibandwidth <-
       par(mfrow=c(1,1),cex=par()$cex)
     
     if (plot.behavior != "plot"){
-      names(plot.out) = paste(ifelse(gradients, "si.grad", "si"),1:ncol(xdat),sep="")
+      names(plot.out) = paste(ifelse(gradients, "si.grad", "si"),1:length(plot.out),sep="")
       
       return (plot.out)
     }
