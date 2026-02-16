@@ -29,6 +29,9 @@ Changes from Version 0.60-20 to 0.60-21 [12-Feb-2026]
 * Added new np.options.Rd man page and linked it from np-package and np.plot
   documentation to expose and document global option controls.
 
+* Removed unused legacy sources and prototypes (RuniqueCombs, pgplot
+  placeholder) and restored B-spline error handling in bspline.c.
+
 Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
 
 * npRmpi-specific updates and improvements:
