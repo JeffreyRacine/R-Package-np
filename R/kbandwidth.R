@@ -35,7 +35,7 @@ kbandwidth.numeric <-
            ckerlb = NULL,
            ckerub = NULL,
            ukertype = c("aitchisonaitken", "liracine"),
-           okertype = c("liracine","wangvanryzin", "nliracine"),
+           okertype = c("liracine","wangvanryzin","racine-li-yan","nliracine"),
            nobs = NA,
            xdati = NULL,
            ydati = NULL,

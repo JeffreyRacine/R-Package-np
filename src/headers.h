@@ -293,7 +293,7 @@ double max_unordered_bw(int num_categories,
 static const int OP_CFUN_OFFSETS[4] = { 0, 10, 20, 30 };
 #define OP_NCFUN 40
 static const int OP_UFUN_OFFSETS[4] = { 0, 2, 4, 0 };
-static const int OP_OFUN_OFFSETS[4] = { 0, 3, 6, 9 };
+static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 // these defines are to facilitate accessing the continuous kernels in their various arrays
 
 #define CK_GAUSS2 0

@@ -25,6 +25,10 @@ extern  MPI_Status status;
 
 #include <R.h>
 
+#ifdef RCSID
+static char rcsid[] = "$Id: kernel.c,v 1.3 2006/11/02 16:56:49 tristen Exp $";
+#endif
+
 extern double np_tgauss2_b, np_tgauss2_alpha, np_tgauss2_c0;
 // convolution kernel constants
 extern double np_tgauss2_a0, np_tgauss2_a1, np_tgauss2_a2;
@@ -1148,6 +1152,23 @@ double kernel_ordered(int KERNEL, double x, double y, double lambda)
 
 			break;
 
+		case 2:
+
+			/* Normalized Li-Racine on infinite integer support */
+			return_value = ipow(lambda,(int)fabs(x-y))*(1.0-lambda)/(1.0+lambda);
+
+			break;
+
+		case 3:
+
+			/*
+			  Racine-Li-Yan requires empirical support for exact normalization.
+			  This fallback is used where support is unavailable in this API.
+			*/
+			return_value = ipow(lambda,(int)fabs(x-y))*(1.0-lambda)/(1.0+lambda);
+
+			break;
+
 	}
 
 	return(return_value);
@@ -1170,11 +1191,27 @@ double cdf_kernel_ordered(int KERNEL, double x, double y, double lambda, int c, 
 /* Now going from -max to max in steps of 1 - Ahmad & Cerrito claim that this must */
 /* integrate to onc from -infty to infty - using sample analog */
 
-	for(l = categorical_vals[0]-fabs(categorical_vals[0]-categorical_vals[c-1]); l <= categorical_vals[c-1]; l++)
+	if(KERNEL == 3)
 	{
-		if(l <= x)
+		double den = 0.0;
+		int i;
+		for(i = 0; i < c; i++)
+			den += ipow(lambda,(int)fabs(y-categorical_vals[i]));
+		if(den > 0.0)
 		{
-			return_value += kernel_ordered(KERNEL, l, y, lambda);
+			for(i = 0; i < c; i++)
+				if(categorical_vals[i] <= x)
+					return_value += ipow(lambda,(int)fabs(y-categorical_vals[i]))/den;
+		}
+	}
+	else
+	{
+		for(l = categorical_vals[0]-fabs(categorical_vals[0]-categorical_vals[c-1]); l <= categorical_vals[c-1]; l++)
+		{
+			if(l <= x)
+			{
+				return_value += kernel_ordered(KERNEL, l, y, lambda);
+			}
 		}
 	}
 
@@ -1193,10 +1230,29 @@ double kernel_ordered_convolution(int KERNEL, double x, double y, double lambda,
 
 	double return_value = 0.0;
 
-	for(i=0; i < c; i++)
+	if(KERNEL == 3)
 	{
-		return_value += kernel_ordered(KERNEL, x, *pc_vals, lambda)*kernel_ordered(KERNEL, y, *pc_vals, lambda);
-		pc_vals++;
+		double denx = 0.0;
+		double deny = 0.0;
+		for(i=0; i < c; i++)
+		{
+			denx += ipow(lambda,(int)fabs(x-c_vals[i]));
+			deny += ipow(lambda,(int)fabs(y-c_vals[i]));
+		}
+		if(denx > 0.0 && deny > 0.0)
+		{
+			for(i=0; i < c; i++)
+				return_value += (ipow(lambda,(int)fabs(x-c_vals[i]))/denx)*
+					(ipow(lambda,(int)fabs(y-c_vals[i]))/deny);
+		}
+	}
+	else
+	{
+		for(i=0; i < c; i++)
+		{
+			return_value += kernel_ordered(KERNEL, x, *pc_vals, lambda)*kernel_ordered(KERNEL, y, *pc_vals, lambda);
+			pc_vals++;
+		}
 	}
 
 	return(return_value);

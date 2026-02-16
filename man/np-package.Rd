@@ -237,6 +237,14 @@
       \eqn{1}.
     }
 
+    \item{Racine, Li, and Yan (\eqn{x} is a (discrete) ordered factor)}{
+      \eqn{l(x_i,x,\lambda)=\lambda^{|x_i-x|}/\sum_{z \in D}\lambda^{|x_i-z|}}{l(x[i],x,lambda)=lambda^|x[i]-x|/sum_{z in D}lambda^|x[i]-z|},
+      where \eqn{D} is the ordered support.
+
+      Note that \eqn{\lambda}{lambda} must lie between \eqn{0} and
+      \eqn{1}.
+    }
+
   }
 
   So, if you had two variables, \eqn{x_{i1}}{x1[i]} and
@@ -325,6 +333,10 @@
   Racine, J.S. and Q. Li and Q. Wang (2024), \dQuote{Boundary-Adaptive
   Kernel Density Estimation: The Case of (Near) Uniform Density,}
   Journal of Nonparametric Statistics, 36(1), 146-164.
+
+  Racine, J.S., Q. Li, and K.X. Yan (2020), \dQuote{Kernel Smoothed
+  Probability Mass Functions for Ordered Datatypes,} Journal of
+  Nonparametric Statistics, 32(3), 563-586.
   
   Pagan, A. and A. Ullah (1999), \emph{Nonparametric Econometrics,}
   Cambridge University Press.
