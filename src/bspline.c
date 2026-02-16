@@ -1079,16 +1079,14 @@ _gsl_vector_view gsl_matrix_column(gsl_matrix *m, const size_t j)
 }
 
 /* ******************************************************** */
-/*  
 void ErrorMessage(char *msg,int fatal)
-{ 
+{
 #ifdef WINDOWS
-  MessageBox(HWND_DESKTOP,msg,"Info!",MB_ICONEXCLAMATION|MB_OK); 
-#else  
-if (fatal) error("%s",msg);else warning("%s",msg);
+  MessageBox(HWND_DESKTOP,msg,"Info!",MB_ICONEXCLAMATION|MB_OK);
+#else
+  if (fatal) error("%s",msg); else warning("%s",msg);
 #endif
 }
-*/
 
 /* *******************vecotr & block************** */
 

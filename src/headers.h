@@ -174,7 +174,6 @@ void powell(int RESTRICT, int INTEGER, double *p_restrict, double *p, double **x
 
 void sort(int n, double ra[]);
 
-int pgplot_xy_errorbars(int int_GENERATE, char *output, int num_obs, int num_var_unordered, int num_var_continuous, double *x_categorical_vec, double *x_continuous_vec, double *y_vec, double *y_std, char *x_label, char *y_label, char *title);
 
 int compute_continuous_stddev(int int_LARGE, int num_obs, int num_var_continuous, int num_reg_continuous, double **matrix_Y_continuous, double **matrix_X_continuous, double *vector_continuous_stddev);
 
