@@ -79,6 +79,15 @@ extern int num_reg_ordered_extern;
 extern int int_cker_bound_extern;
 extern double *vector_ckerlb_extern;
 extern double *vector_ckerub_extern;
+extern int int_cxker_bound_extern;
+extern int int_cyker_bound_extern;
+extern int int_cxyker_bound_extern;
+extern double *vector_cxkerlb_extern;
+extern double *vector_cxkerub_extern;
+extern double *vector_cykerlb_extern;
+extern double *vector_cykerub_extern;
+extern double *vector_cxykerlb_extern;
+extern double *vector_cxykerub_extern;
 extern int *num_categories_extern;
 extern double **matrix_categorical_vals_extern;
 
@@ -1315,6 +1324,24 @@ double np_cdf_epan8(const double z){
 
 double np_cdf_rect(const double z){
   return (z < -1.0) ? 0.0 : (z > 1.0) ? 1.0 : (0.5+0.5*z);
+}
+
+static inline void np_activate_bounds_x(void){
+  int_cker_bound_extern = int_cxker_bound_extern;
+  vector_ckerlb_extern = vector_cxkerlb_extern;
+  vector_ckerub_extern = vector_cxkerub_extern;
+}
+
+static inline void np_activate_bounds_y(void){
+  int_cker_bound_extern = int_cyker_bound_extern;
+  vector_ckerlb_extern = vector_cykerlb_extern;
+  vector_ckerub_extern = vector_cykerub_extern;
+}
+
+static inline void np_activate_bounds_xy(void){
+  int_cker_bound_extern = int_cxyker_bound_extern;
+  vector_ckerlb_extern = vector_cxykerlb_extern;
+  vector_ckerub_extern = vector_cxykerub_extern;
 }
 
 /*
@@ -4970,17 +4997,18 @@ double * const kw){
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
     for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
+      const int kbase_i = KERNEL_reg_np[i] % 10;
+      const int p_kbase_i = (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]) % 10;
       const int use_bounds_i = int_cker_bound_extern &&
         vector_ckerlb_extern != NULL &&
         vector_ckerub_extern != NULL &&
-        (KERNEL_reg_np[i] >= 0 && KERNEL_reg_np[i] <= 9) &&
+        (kbase_i >= 0 && kbase_i <= 9) &&
         ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
          (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
       const int use_p_bounds_i = int_cker_bound_extern &&
         vector_ckerlb_extern != NULL &&
         vector_ckerub_extern != NULL &&
-        ((do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]) >= 0 &&
-         (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]) <= 9) &&
+        (p_kbase_i >= 0 && p_kbase_i <= 9) &&
         ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
          (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
       const double invnorm = use_bounds_i ?
@@ -7989,6 +8017,7 @@ double *cv){
       } else {
         np_gate_override_clear();
       }
+      np_activate_bounds_x();
       kernel_weighted_sum_np(kernel_cx,
                              kernel_ux,
                              kernel_ox,
@@ -8070,6 +8099,7 @@ double *cv){
         } else {
           np_gate_override_clear();
         }
+        np_activate_bounds_y();
         kernel_weighted_sum_np(kernel_cy,
                                kernel_uy,
                                kernel_oy,
@@ -8238,6 +8268,7 @@ double *cv){
       } else {
         np_gate_override_clear();
       }
+      np_activate_bounds_x();
       kernel_weighted_sum_np(kernel_cx,
                              kernel_ux,
                              kernel_ox,
@@ -8318,6 +8349,7 @@ double *cv){
         } else {
           np_gate_override_clear();
         }
+        np_activate_bounds_y();
         kernel_weighted_sum_np(kernel_cy,
                                kernel_uy,
                                kernel_oy,
@@ -9225,6 +9257,7 @@ double *cv){
   } else {
     np_gate_override_clear();
   }
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cxy,
                          kernel_uxy,
                          kernel_oxy,
@@ -9295,6 +9328,7 @@ double *cv){
   } else {
     np_gate_override_clear();
   }
+  np_activate_bounds_x();
   kernel_weighted_sum_np(kernel_cx,
                          kernel_ux,
                          kernel_ox,
@@ -9450,6 +9484,7 @@ double *cv){
       } else {
         np_gate_override_clear();
       }
+      np_activate_bounds_x();
       kernel_weighted_sum_np(kernel_cx,
                              kernel_ux,
                              kernel_ox,
@@ -9561,6 +9596,7 @@ double *cv){
           } else {
             np_gate_override_clear();
           }
+          np_activate_bounds_x();
           kernel_weighted_sum_np(kernel_cx,
                                  kernel_ux,
                                  kernel_ox,
@@ -9637,6 +9673,7 @@ double *cv){
         } else {
           np_gate_override_clear();
         }
+        np_activate_bounds_y();
         kernel_weighted_sum_np(kernel_cy,
                                kernel_uy,
                                kernel_oy,
@@ -11692,6 +11729,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
   }
 
   // xy
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cxy,
                          kernel_uxy,
                          kernel_oxy,
@@ -11741,6 +11779,7 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL); // do not return kernel weights
 
   //x
+  np_activate_bounds_x();
   kernel_weighted_sum_np(kernel_cx,
                          kernel_ux,
                          kernel_ox,
@@ -12090,6 +12129,7 @@ double * log_likelihood
                         NULL, NULL, NULL);
 
   // xy
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cXY,
                          kernel_uXY,
                          kernel_oXY,
@@ -12141,6 +12181,7 @@ double * log_likelihood
   //x - we assume x is in xy tree order
   //  - we also reuse kernels and operators because we can
 
+  np_activate_bounds_xy();
   kernel_weighted_sum_np(kernel_cXY,
                          kernel_uXY,
                          kernel_oXY,

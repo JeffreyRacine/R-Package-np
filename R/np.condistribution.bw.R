@@ -287,6 +287,9 @@ npcdistbw.condbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
 
+      cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
+      cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
+
       if (bws$method != "normal-reference"){
         total.time <-
           system.time(myout <- 
@@ -303,6 +306,10 @@ npcdistbw.condbandwidth <-
              timing = double(1),
              penalty.mode = as.integer(penalty_mode),
              penalty.multiplier = as.double(penalty.multiplier),
+             cxkerlb = as.double(cxker.bounds.c$lb),
+             cxkerub = as.double(cxker.bounds.c$ub),
+             cykerlb = as.double(cyker.bounds.c$lb),
+             cykerub = as.double(cyker.bounds.c$ub),
              PACKAGE="np" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
       } else {
         nbw = double(yncol+xncol)

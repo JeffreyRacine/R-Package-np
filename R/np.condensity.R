@@ -242,6 +242,9 @@ npcdens.conbandwidth <- function(bws,
       xmcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DENS,
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+
+  cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
+  cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
   
   myout=
     .C("np_density_conditional",
@@ -261,6 +264,10 @@ npcdens.conbandwidth <- function(bws,
        congrad = double(enrow*bws$xndim),
        congerr = double(enrow*bws$xndim),
        log_likelihood = double(1),
+       cxkerlb = as.double(cxker.bounds.c$lb),
+       cxkerub = as.double(cxker.bounds.c$ub),
+       cykerlb = as.double(cyker.bounds.c$lb),
+       cykerub = as.double(cyker.bounds.c$ub),
        PACKAGE="np" )[c("condens", "conderr", "congrad", "congerr", "log_likelihood")]
 
   if(gradients){

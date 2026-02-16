@@ -81,6 +81,15 @@ int num_reg_ordered_extern=0;
 int int_cker_bound_extern=0;
 double *vector_ckerlb_extern=NULL;
 double *vector_ckerub_extern=NULL;
+int int_cxker_bound_extern=0;
+int int_cyker_bound_extern=0;
+int int_cxyker_bound_extern=0;
+double *vector_cxkerlb_extern=NULL;
+double *vector_cxkerub_extern=NULL;
+double *vector_cykerlb_extern=NULL;
+double *vector_cykerub_extern=NULL;
+double *vector_cxykerlb_extern=NULL;
+double *vector_cxykerub_extern=NULL;
 
 
 int *num_categories_extern;
@@ -1679,13 +1688,16 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                int * myopti, double * myoptd, double * myans, double * fval,
                                double * objective_function_values, double * objective_function_evals,
                                double * objective_function_invalid, double * timing,
-                               int * penalty_mode, double * penalty_mult){
+                               int * penalty_mode, double * penalty_mult,
+                               double * cxkerlb, double * cxkerub,
+                               double * cykerlb, double * cykerub){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y = NULL;
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *cxylb = NULL, *cxyub = NULL;
 
   double fret, fret_best;
   double ftol, tol;
@@ -1737,6 +1749,34 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   KERNEL_reg_ordered_extern = myopti[CBW_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CBW_OYKRNEVI];
+
+  vector_cxkerlb_extern = cxkerlb;
+  vector_cxkerub_extern = cxkerub;
+  int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
+
+  vector_cykerlb_extern = cykerlb;
+  vector_cykerub_extern = cykerub;
+  int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    for(i = 0; i < num_reg_continuous_extern; i++){
+      cxylb[i] = (cxkerlb != NULL) ? cxkerlb[i] : DBL_MAX;
+      cxyub[i] = (cxkerub != NULL) ? cxkerub[i] : DBL_MAX;
+    }
+    for(i = 0; i < num_var_continuous_extern; i++){
+      cxylb[num_reg_continuous_extern + i] = (cykerlb != NULL) ? cykerlb[i] : DBL_MAX;
+      cxyub[num_reg_continuous_extern + i] = (cykerub != NULL) ? cykerub[i] : DBL_MAX;
+    }
+    vector_cxykerlb_extern = cxylb;
+    vector_cxykerub_extern = cxyub;
+    int_cxyker_bound_extern = np_has_finite_cker_bounds(cxylb, cxyub, num_reg_continuous_extern + num_var_continuous_extern);
+  } else {
+    vector_cxykerlb_extern = NULL;
+    vector_cxykerub_extern = NULL;
+    int_cxyker_bound_extern = 0;
+  }
 
   int_use_starting_values= myopti[CBW_USTARTI];
   int_LARGE_SF=myopti[CBW_LSFI];
@@ -2542,6 +2582,21 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   int_WEIGHTS = 0;
 
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  safe_free(cxylb);
+  safe_free(cxyub);
+
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
@@ -2554,13 +2609,16 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * myopti, double * myoptd, double * myans, double * fval,
                                     double * objective_function_values, double * objective_function_evals,
                                     double * objective_function_invalid, double * timing,
-                                    int * penalty_mode, double * penalty_mult){
+                                    int * penalty_mode, double * penalty_mult,
+                                    double * cxkerlb, double * cxkerub,
+                                    double * cykerlb, double * cykerub){
 /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
 
   double *vector_continuous_stddev;
   double *vsfh, *vector_scale_factor, *vector_scale_factor_multistart;
+  double *cxylb = NULL, *cxyub = NULL;
 
   double fret, fret_best;
   double ftol, tol;
@@ -2615,6 +2673,34 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   KERNEL_reg_ordered_extern = myopti[CDBW_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CDBW_OYKRNEVI];
+
+  vector_cxkerlb_extern = cxkerlb;
+  vector_cxkerub_extern = cxkerub;
+  int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
+
+  vector_cykerlb_extern = cykerlb;
+  vector_cykerub_extern = cykerub;
+  int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    for(i = 0; i < num_reg_continuous_extern; i++){
+      cxylb[i] = (cxkerlb != NULL) ? cxkerlb[i] : DBL_MAX;
+      cxyub[i] = (cxkerub != NULL) ? cxkerub[i] : DBL_MAX;
+    }
+    for(i = 0; i < num_var_continuous_extern; i++){
+      cxylb[num_reg_continuous_extern + i] = (cykerlb != NULL) ? cykerlb[i] : DBL_MAX;
+      cxyub[num_reg_continuous_extern + i] = (cykerub != NULL) ? cykerub[i] : DBL_MAX;
+    }
+    vector_cxykerlb_extern = cxylb;
+    vector_cxykerub_extern = cxyub;
+    int_cxyker_bound_extern = np_has_finite_cker_bounds(cxylb, cxyub, num_reg_continuous_extern + num_var_continuous_extern);
+  } else {
+    vector_cxykerlb_extern = NULL;
+    vector_cxykerub_extern = NULL;
+    int_cxyker_bound_extern = 0;
+  }
 
   int_use_starting_values= myopti[CDBW_USTARTI];
   int_LARGE_SF=myopti[CDBW_LSFI];
@@ -3400,6 +3486,21 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   int_WEIGHTS = 0;
 
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  safe_free(cxylb);
+  safe_free(cxyub);
+
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
@@ -3418,11 +3519,14 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                             int * myopti, 
                             double * cdens, double * cderr, 
                             double * cg, double * cgerr,
-                            double * ll){
+                            double * ll,
+                            double * cxkerlb, double * cxkerub,
+                            double * cykerlb, double * cykerub){
   /* Likelihood bandwidth selection for density estimation */
 
   double *vector_scale_factor, *pdf, *pdf_stderr, log_likelihood = 0.0;
   double ** pdf_deriv = NULL, ** pdf_deriv_stderr = NULL;
+  double *cxylb = NULL, *cxyub = NULL;
   double xpad_num, ypad_num;
 
   int i,j;
@@ -3471,6 +3575,34 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
 
   KERNEL_reg_ordered_extern = myopti[CD_OXKRNEVI];
   KERNEL_den_ordered_extern = myopti[CD_OYKRNEVI];
+
+  vector_cxkerlb_extern = cxkerlb;
+  vector_cxkerub_extern = cxkerub;
+  int_cxker_bound_extern = np_has_finite_cker_bounds(cxkerlb, cxkerub, num_reg_continuous_extern);
+
+  vector_cykerlb_extern = cykerlb;
+  vector_cykerub_extern = cykerub;
+  int_cyker_bound_extern = np_has_finite_cker_bounds(cykerlb, cykerub, num_var_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    cxylb = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    cxyub = alloc_vecd(num_reg_continuous_extern + num_var_continuous_extern);
+    for(i = 0; i < num_reg_continuous_extern; i++){
+      cxylb[i] = (cxkerlb != NULL) ? cxkerlb[i] : DBL_MAX;
+      cxyub[i] = (cxkerub != NULL) ? cxkerub[i] : DBL_MAX;
+    }
+    for(i = 0; i < num_var_continuous_extern; i++){
+      cxylb[num_reg_continuous_extern + i] = (cykerlb != NULL) ? cykerlb[i] : DBL_MAX;
+      cxyub[num_reg_continuous_extern + i] = (cykerub != NULL) ? cykerub[i] : DBL_MAX;
+    }
+    vector_cxykerlb_extern = cxylb;
+    vector_cxykerub_extern = cxyub;
+    int_cxyker_bound_extern = np_has_finite_cker_bounds(cxylb, cxyub, num_reg_continuous_extern + num_var_continuous_extern);
+  } else {
+    vector_cxykerlb_extern = NULL;
+    vector_cxykerub_extern = NULL;
+    int_cxyker_bound_extern = 0;
+  }
 
   int_LARGE_SF = myopti[CD_LSFI];
   BANDWIDTH_den_extern = myopti[CD_DENI];
@@ -3813,6 +3945,20 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     int_TREE_XY = NP_TREE_FALSE;
   }
 
+  int_cxker_bound_extern = 0;
+  int_cyker_bound_extern = 0;
+  int_cxyker_bound_extern = 0;
+  vector_cxkerlb_extern = NULL;
+  vector_cxkerub_extern = NULL;
+  vector_cykerlb_extern = NULL;
+  vector_cykerub_extern = NULL;
+  vector_cxykerlb_extern = NULL;
+  vector_cxykerub_extern = NULL;
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+  safe_free(cxylb);
+  safe_free(cxyub);
 
   return;
 }
