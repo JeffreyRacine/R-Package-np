@@ -10,12 +10,12 @@ gen.tflabel = function(condition, tlabel, flabel){
   paste(ifelse(condition,tlabel,flabel))
 }
 
-draw.error.bands = function(ex, ely, ehy, lty = 2, col = NULL){
+draw.error.bands = function(ex, ely, ehy, lty = 2, col = par("col")){
   lines(ex,ely,lty=lty,col=col)
   lines(ex,ehy,lty=lty,col=col)
 }
 
-draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, col = NULL){
+draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, col = par("col")){
   yy = double(3*length(ex))
   jj = 1:length(ex)*3
 
@@ -62,7 +62,7 @@ draw.errors =
            plot.errors.bar,
            plot.errors.bar.num,
            lty,
-           col = NULL){
+           col = par("col")){
     if (plot.errors.style == "bar"){
       ei = seq(1,length(ex),length.out = min(length(ex),plot.errors.bar.num))
       draw.error.bars(ex = ex[ei],
@@ -81,9 +81,17 @@ draw.errors =
   }
 
 draw.all.error.types <- function(ex, center, all.err,
-                                 plot.errors.style, plot.errors.bar, plot.errors.bar.num,
-                                 lty = 2, add.legend = TRUE, legend.loc = "topleft"){
+                                 plot.errors.style = "band",
+                                 plot.errors.bar = "|",
+                                 plot.errors.bar.num = min(length(ex), 25),
+                                 lty = 2, add.legend = TRUE, legend.loc = "topleft",
+                                 xi.factor = FALSE){
   if (is.null(all.err)) return(invisible(NULL))
+
+  if (xi.factor) {
+    plot.errors.style <- "bar"
+    plot.errors.bar <- "I"
+  }
 
   draw_one <- function(err, col) {
     if (is.null(err)) return(invisible(NULL))
@@ -990,6 +998,7 @@ compute.bootstrap.errors.sibandwidth =
            bws){
 
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
+    boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
 
@@ -1043,7 +1052,7 @@ compute.bootstrap.errors.sibandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    boot.err
+    list(boot.err = boot.err, bxp = list(), boot.all.err = boot.all.err)
   }
 
 
@@ -1457,8 +1466,9 @@ npplot.rbandwidth <-
           ifelse(common.scale,"y = data.eval[,i],", "y = temp.mean,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-              max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors,
+               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),",
+               ""))
 
       pxlabE = "xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[i], paste('X', i, sep = ''))),"
       pylabE = "ylab = ifelse(!is.null(ylab),ylab,paste(ifelse(gradients,
@@ -1496,6 +1506,7 @@ npplot.rbandwidth <-
         temp.err[,] = NA
         temp.mean[] =  NA
         temp.boot = list()
+        temp.all.err <- NULL
 
         xi.factor = is.factor(xdat[,i])
 
@@ -1523,7 +1534,7 @@ npplot.rbandwidth <-
           if (plot.errors.method == "asymptotic")
             temp.err[1:xi.neval,1:2] = replicate(2,2.0*(if(gradients) tr$gerr[,i] else tr$merr))
           else if (plot.errors.method == "bootstrap"){
-            temp.boot <- compute.bootstrap.errors(
+            temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat, ydat = ydat,
                       exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
                       gradients = gradients,
@@ -1535,8 +1546,9 @@ npplot.rbandwidth <-
                       plot.errors.type = plot.errors.type,
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
-            temp.err[1:xi.neval,] = temp.boot[["boot.err"]]
-            temp.boot <- temp.boot[["bxp"]]
+            temp.err[1:xi.neval,] = temp.boot.raw[["boot.err"]]
+            temp.all.err <- temp.boot.raw[["boot.all.err"]]
+            temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){
               temp.boot$out <- numeric()
               temp.boot$group <- integer()
@@ -1552,6 +1564,7 @@ npplot.rbandwidth <-
             all.bxp[[i]] = temp.boot
 
             data.err[,c(3*i-2,3*i-1,3*i)] = temp.err
+            data.err.all[[i]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
@@ -1564,8 +1577,20 @@ npplot.rbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(ei)),
+                center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
+                all.err = temp.all.err,
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
           }
                             
         }
@@ -1600,7 +1625,30 @@ npplot.rbandwidth <-
       if (common.scale & (plot.behavior != "data")){
         jj = 1:bws$ndim*3
 
-        if (plot.errors.center == "estimate" | !plot.errors) {
+        if (plot.errors && plot.errors.type == "all") {
+          y.min <- Inf
+          y.max <- -Inf
+          for (k in 1:bws$ndim) {
+            if (is.null(data.err.all[[k]])) next
+            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
+            center.k <- if (plot.errors.center == "estimate")
+              data.eval[1:nkeep.k,k]
+            else
+              data.err[1:nkeep.k,3*k]
+            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            y.min <- min(y.min, range.k[1], na.rm = TRUE)
+            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+          }
+          if (!is.finite(y.min) || !is.finite(y.max)) {
+            if (plot.errors.center == "estimate") {
+              y.max = max(na.omit(as.double(data.eval)) + na.omit(as.double(data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.eval)) - na.omit(as.double(data.err[,jj-2])))
+            } else {
+              y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+            }
+          }
+        } else if (plot.errors.center == "estimate" | !plot.errors) {
           y.max = max(na.omit(as.double(data.eval)) +
             if (plot.errors) na.omit(as.double(data.err[,jj-1]))
             else 0
@@ -1632,8 +1680,20 @@ npplot.rbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(allei[,i]), na.omit(data.err[,3*i]), lty = 3)
             
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(allei[,i])),
+                center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
+                all.err = data.err.all[[i]],
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
           }
         }
       }
@@ -2051,6 +2111,7 @@ npplot.scbandwidth <-
         
         data.err = matrix(data = NA, nrow = maxneval,
           ncol = 3*tot.dim)
+        data.err.all = vector("list", tot.dim)
 
         allei = as.data.frame(matrix(data = NA, nrow = maxneval,
           ncol = tot.dim))
@@ -2082,8 +2143,9 @@ npplot.scbandwidth <-
           ifelse(common.scale,"y = data.eval[,plot.index],", "y = temp.mean,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-              max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors,
+               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),",
+               ""))
 
       pxlabE = expression(paste("xlab = gen.label(bws$",
           xOrZ, "names[i], paste('", toupper(xOrZ),"', i, sep = '')),",sep=''))
@@ -2134,6 +2196,7 @@ npplot.scbandwidth <-
         temp.err[,] = NA
         temp.mean[] =  NA
         temp.boot = list()
+        temp.all.err <- NULL
 
         xi.factor = all.isFactor[plot.index]
         
@@ -2159,7 +2222,7 @@ npplot.scbandwidth <-
           if (plot.errors.method == "asymptotic")
             temp.err[1:xi.neval,1:2] = 2.0*tobj$merr
           else if (plot.errors.method == "bootstrap"){
-            temp.boot <- eval(parse(text = paste("compute.bootstrap.errors(",
+            temp.boot.raw <- eval(parse(text = paste("compute.bootstrap.errors(",
                                       "xdat = xdat, ydat = ydat,",
                                       ifelse(miss.z, "", "zdat = zdat,"),
                                       "exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],",
@@ -2173,8 +2236,9 @@ npplot.scbandwidth <-
                                       "plot.errors.type = plot.errors.type,",
                                       "plot.errors.alpha = plot.errors.alpha,",
                                       "bws = bws)")))
-            temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
-            temp.boot <- temp.boot[["bxp"]]
+            temp.err[1:xi.neval,] <- temp.boot.raw[["boot.err"]]
+            temp.all.err <- temp.boot.raw[["boot.all.err"]]
+            temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){
               temp.boot$out <- numeric()
               temp.boot$group <- integer()
@@ -2190,6 +2254,7 @@ npplot.scbandwidth <-
             all.bxp[[plot.index]] = temp.boot
 
             data.err[, c(3*plot.index-2,3*plot.index-1,3*plot.index)] = temp.err
+            data.err.all[[plot.index]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
@@ -2202,8 +2267,20 @@ npplot.scbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(ei)),
+                center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
+                all.err = temp.all.err,
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
 
           }
         }
@@ -2240,6 +2317,7 @@ npplot.scbandwidth <-
           temp.err[,] = NA
           temp.mean[] =  NA
           temp.boot = list()
+          temp.all.err <- NULL
 
           xi.factor = all.isFactor[plot.index]
           
@@ -2268,7 +2346,7 @@ npplot.scbandwidth <-
             if (plot.errors.method == "asymptotic")
               temp.err[1:xi.neval,1:2] = 2.0*tobj$merr
           else if (plot.errors.method == "bootstrap"){
-              temp.boot <- compute.bootstrap.errors(
+              temp.boot.raw <- compute.bootstrap.errors(
                                                     xdat = xdat,
                                                     ydat = ydat,
                                                     zdat = zdat,
@@ -2283,8 +2361,9 @@ npplot.scbandwidth <-
                                                     plot.errors.type = plot.errors.type,
                                                     plot.errors.alpha = plot.errors.alpha,
                                                     bws = bws)
-              temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
-              temp.boot <- temp.boot[["bxp"]]
+              temp.err[1:xi.neval,] <- temp.boot.raw[["boot.err"]]
+              temp.all.err <- temp.boot.raw[["boot.all.err"]]
+              temp.boot <- temp.boot.raw[["bxp"]]
               if (!plot.bxp.out){
                 temp.boot$out <- numeric()
                 temp.boot$group <- integer()
@@ -2300,6 +2379,7 @@ npplot.scbandwidth <-
               all.bxp[[plot.index]] = temp.boot
 
               data.err[, c(3*plot.index-2,3*plot.index-1,3*plot.index)] = temp.err
+              data.err.all[[plot.index]] = temp.all.err
             }
           } else if (plot.behavior != "data") {
             ## plot evaluation
@@ -2312,8 +2392,20 @@ npplot.scbandwidth <-
               if (!xi.factor && !plotOnEstimate)
                 lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+              if (plot.errors.type == "all") {
+                draw.all.error.types(
+                  ex = as.numeric(na.omit(ei)),
+                  center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
+                  all.err = temp.all.err,
+                  plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                  plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                  plot.errors.bar.num = plot.errors.bar.num,
+                  lty = 2,
+                  add.legend = TRUE)
+              } else {
+                eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                             eval(eehyE), eval(erestE), ")")))
+              }
 
             }
           }
@@ -2348,7 +2440,30 @@ npplot.scbandwidth <-
       if (common.scale & (plot.behavior != "data")){
         jj = 1:(bws$xndim + bws$zndim)*3
         
-        if (plot.errors.center == "estimate" | !plot.errors) {
+        if (plot.errors && plot.errors.type == "all") {
+          y.min <- Inf
+          y.max <- -Inf
+          for (k in 1:(bws$xndim + bws$zndim)) {
+            if (is.null(data.err.all[[k]])) next
+            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
+            center.k <- if (plot.errors.center == "estimate")
+              data.eval[1:nkeep.k,k]
+            else
+              data.err[1:nkeep.k,3*k]
+            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            y.min <- min(y.min, range.k[1], na.rm = TRUE)
+            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+          }
+          if (!is.finite(y.min) || !is.finite(y.max)) {
+            if (plot.errors.center == "estimate") {
+              y.max = max(na.omit(as.double(data.eval)) + na.omit(as.double(data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.eval)) - na.omit(as.double(data.err[,jj-2])))
+            } else {
+              y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+            }
+          }
+        } else if (plot.errors.center == "estimate" | !plot.errors) {
           y.max = max(na.omit(as.double(data.eval)) +
             if (plot.errors) na.omit(as.double(data.err[,jj-1]))
             else 0)
@@ -2385,8 +2500,20 @@ npplot.scbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(allei[,plot.index])),
+                center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,plot.index] else data.err[,3*plot.index])),
+                all.err = data.err.all[[plot.index]],
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
             
 
           }
@@ -2604,7 +2731,7 @@ npplot.plbandwidth <-
         z1.eval <- (bws$zdati$all.dlev[[1]])[as.integer(z1.eval)]
 
       tobj = npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-        exdat = x.eval[,1], ezdat = x.eval[,2], bws = bws)
+        exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE], bws = bws)
 
       terr = matrix(data = NA, nrow = nrow(x.eval), ncol = 3)
       
@@ -2614,7 +2741,7 @@ npplot.plbandwidth <-
       if (plot.errors.method == "bootstrap"){
         terr <- compute.bootstrap.errors(
           xdat = xdat, ydat = ydat, zdat = zdat,
-          exdat = x.eval[,1], ezdat = x.eval[,2],
+          exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],
           gradients = FALSE,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
@@ -2778,6 +2905,7 @@ npplot.plbandwidth <-
         
         data.err = matrix(data = NA, nrow = maxneval,
           ncol = 3*(bws$xndim + bws$zndim))
+        data.err.all = vector("list", bws$xndim + bws$zndim)
 
         allei = as.data.frame(matrix(data = NA, nrow = maxneval,
           ncol = bws$xndim + bws$zndim))
@@ -2811,8 +2939,7 @@ npplot.plbandwidth <-
           ifelse(common.scale,"y = data.eval[,plot.index],", "y = temp.mean,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-              max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors, "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
 
       pxlabE = expression(paste("xlab = gen.label(bws$",
           xOrZ, "names[i], paste('", toupper(xOrZ),"', i, sep = '')),",sep=''))
@@ -2855,6 +2982,7 @@ npplot.plbandwidth <-
         temp.err[,] = NA
         temp.mean[] =  NA
         temp.boot = list()
+        temp.all.err <- NULL
 
         xi.factor = all.isFactor[plot.index]
         
@@ -2898,6 +3026,7 @@ npplot.plbandwidth <-
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
             temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+            temp.all.err <- temp.boot[["boot.all.err"]]
             temp.boot <- temp.boot[["bxp"]]
             if (!plot.bxp.out){
               temp.boot$out <- numeric()
@@ -2914,6 +3043,7 @@ npplot.plbandwidth <-
             all.bxp[[plot.index]] = temp.boot
 
             data.err[, c(3*plot.index-2,3*plot.index-1,3*plot.index)] = temp.err
+            data.err.all[[plot.index]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
@@ -2926,8 +3056,16 @@ npplot.plbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(ei)),
+                center = na.omit(if (plotOnEstimate) temp.mean else temp.err[,3]),
+                all.err = temp.all.err,
+                xi.factor = xi.factor)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
 
           }
         }
@@ -2964,6 +3102,7 @@ npplot.plbandwidth <-
         temp.err[,] = NA
         temp.mean[] =  NA
         temp.boot = list()
+        temp.all.err <- NULL
 
         xi.factor = all.isFactor[plot.index]
         
@@ -3006,6 +3145,7 @@ npplot.plbandwidth <-
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
             temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+            temp.all.err <- temp.boot[["boot.all.err"]]
             temp.boot <- temp.boot[["bxp"]]
             if (!plot.bxp.out){
               temp.boot$out <- numeric()
@@ -3022,6 +3162,7 @@ npplot.plbandwidth <-
             all.bxp[[plot.index]] = temp.boot
 
             data.err[, c(3*plot.index-2,3*plot.index-1,3*plot.index)] = temp.err
+            data.err.all[[plot.index]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
@@ -3034,8 +3175,16 @@ npplot.plbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(ei)),
+                center = na.omit(if (plotOnEstimate) temp.mean else temp.err[,3]),
+                all.err = temp.all.err,
+                xi.factor = xi.factor)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
 
           }
         }
@@ -3069,18 +3218,38 @@ npplot.plbandwidth <-
       }
 
       if (common.scale & (plot.behavior != "data")){
-        jj = 1:(bws$xndim + bws$zndim)*3
-        
-        if (plot.errors.center == "estimate" | !plot.errors) {
-          y.max = max(na.omit(as.double(data.eval)) +
-            if (plot.errors) na.omit(as.double(data.err[,jj-1]))
-            else 0)
-          y.min = min(na.omit(as.double(data.eval)) -
-            if (plot.errors) na.omit(as.double(data.err[,jj-2]))
-            else 0)
-        } else if (plot.errors.center == "bias-corrected") {
-          y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-          y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+        if (plot.errors && plot.errors.type == "all") {
+          y.min <- Inf
+          y.max <- -Inf
+          for (k in 1:(bws$xndim + bws$zndim)) {
+            if (is.null(data.err.all[[k]])) next
+            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
+            if (nkeep.k == 0) next
+            center.k <- if (plot.errors.center == "estimate")
+              na.omit(data.eval[seq_len(nkeep.k), k])
+            else
+              na.omit(data.err[seq_len(nkeep.k), 3*k])
+            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            y.min <- min(y.min, range.k[1], na.rm = TRUE)
+            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+          }
+          if (!is.finite(y.min) || !is.finite(y.max)) {
+            y.min <- min(na.omit(as.double(data.eval)))
+            y.max <- max(na.omit(as.double(data.eval)))
+          }
+        } else {
+          jj = 1:(bws$xndim + bws$zndim)*3
+          if (plot.errors.center == "estimate" | !plot.errors) {
+            y.max = max(na.omit(as.double(data.eval)) +
+              if (plot.errors) na.omit(as.double(data.err[,jj-1]))
+              else 0)
+            y.min = min(na.omit(as.double(data.eval)) -
+              if (plot.errors) na.omit(as.double(data.err[,jj-2]))
+              else 0)
+          } else if (plot.errors.center == "bias-corrected") {
+            y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+            y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+          }
         }
 
         if(!is.null(ylim)){
@@ -3105,11 +3274,22 @@ npplot.plbandwidth <-
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-            if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(allei[,plot.index])),
+                center = if (plotOnEstimate)
+                  na.omit(data.eval[,plot.index])
+                else
+                  na.omit(data.err[,3*plot.index]),
+                all.err = data.err.all[[plot.index]],
+                xi.factor = xi.factor)
+            } else {
+              if (!xi.factor && !plotOnEstimate)
+                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
             
 
           }
@@ -3544,7 +3724,7 @@ npplot.bandwidth <-
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
         ifelse(plot.errors,
-               "ylim = if (plot.errors.type == 'all' && !xi.factor) compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err),",
+               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err),",
                ""))
 
       pxlabE = "xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[i], paste('X', i, sep = ''))),"
@@ -3665,13 +3845,13 @@ npplot.bandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            if (plot.errors.type == "all" && !xi.factor) {
+            if (plot.errors.type == "all") {
               draw.all.error.types(
-                ex = as.numeric(ei),
-                center = if (plotOnEstimate) temp.dens else temp.err[,3],
+                ex = as.numeric(na.omit(ei)),
+                center = as.numeric(na.omit(if (plotOnEstimate) temp.dens else temp.err[,3])),
                 all.err = temp.all.err,
-                plot.errors.style = plot.errors.style,
-                plot.errors.bar = plot.errors.bar,
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2,
                 add.legend = TRUE)
@@ -3697,8 +3877,12 @@ npplot.bandwidth <-
           y.min <- Inf
           y.max <- -Inf
           for (k in 1:bws$ndim) {
-            if (is.factor(xdat[,k])) next
-            center.k <- if (plot.errors.center == "estimate") data.eval[,k] else data.err[,3*k]
+            if (is.null(data.err.all[[k]])) next
+            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
+            center.k <- if (plot.errors.center == "estimate")
+              data.eval[1:nkeep.k,k]
+            else
+              data.err[1:nkeep.k,3*k]
             range.k <- compute.all.error.range(center.k, data.err.all[[k]])
             y.min <- min(y.min, range.k[1], na.rm = TRUE)
             y.max <- max(y.max, range.k[2], na.rm = TRUE)
@@ -3744,13 +3928,13 @@ npplot.bandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            if (plot.errors.type == "all" && !xi.factor) {
+            if (plot.errors.type == "all") {
               draw.all.error.types(
-                ex = as.numeric(allei[,i]),
-                center = if (plotOnEstimate) data.eval[,i] else data.err[,3*i],
+                ex = as.numeric(na.omit(allei[,i])),
+                center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
                 all.err = data.err.all[[i]],
-                plot.errors.style = plot.errors.style,
-                plot.errors.bar = plot.errors.bar,
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
                 plot.errors.bar.num = plot.errors.bar.num,
                 lty = 2,
                 add.legend = TRUE)
@@ -3867,6 +4051,11 @@ npplot.dbandwidth <-
     plot.errors.bar = match.arg(plot.errors.bar)
 
     common.scale = common.scale | (!is.null(ylim))
+
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
 
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
@@ -4143,6 +4332,7 @@ npplot.dbandwidth <-
       if (common.scale){
         data.eval = matrix(data = NA, nrow = maxneval, ncol = bws$ndim)
         data.err = matrix(data = NA, nrow = maxneval, ncol = 3*bws$ndim)
+        data.err.all = vector("list", bws$ndim)
         allei = as.data.frame(matrix(data = NA, nrow = maxneval, ncol = bws$ndim))
         all.bxp = list()
       }
@@ -4170,8 +4360,9 @@ npplot.dbandwidth <-
           ifelse(common.scale,"y = data.eval[,i],", "y = temp.dens,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-              max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors,
+               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),",
+               ""))
 
       pxlabE = "xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[i], paste('X', i, sep = ''))),"
 
@@ -4215,6 +4406,7 @@ npplot.dbandwidth <-
         temp.err[,] = NA
         temp.dens[] =  NA
         temp.boot = list()
+        temp.all.err <- NULL
 
         xi.factor = is.factor(xdat[,i])
 
@@ -4240,7 +4432,7 @@ npplot.dbandwidth <-
           if (plot.errors.method == "asymptotic")
             temp.err[1:xi.neval,1:2] = replicate(2,2.0*tobj$derr)
           else if (plot.errors.method == "bootstrap"){
-            temp.boot <- compute.bootstrap.errors(
+            temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
                       slice.index = i,
@@ -4251,8 +4443,9 @@ npplot.dbandwidth <-
                       plot.errors.type = plot.errors.type,
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
-            temp.err[1:xi.neval,] = temp.boot[["boot.err"]]
-            temp.boot <- temp.boot[["bxp"]]
+            temp.err[1:xi.neval,] = temp.boot.raw[["boot.err"]]
+            temp.all.err <- temp.boot.raw[["boot.all.err"]]
+            temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){
               temp.boot$out <- numeric()
               temp.boot$group <- integer()
@@ -4268,6 +4461,7 @@ npplot.dbandwidth <-
             all.bxp[[i]] = temp.boot
 
             data.err[,c(3*i-2,3*i-1,3*i)] = temp.err
+            data.err.all[[i]] = temp.all.err
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
@@ -4280,8 +4474,20 @@ npplot.dbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(ei)),
+                center = as.numeric(na.omit(if (plotOnEstimate) temp.dens else temp.err[,3])),
+                all.err = temp.all.err,
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
           }
         }
 
@@ -4296,7 +4502,30 @@ npplot.dbandwidth <-
       if (common.scale & (plot.behavior != "data")){
         jj = 1:bws$ndim*3
 
-        if (plot.errors.center == "estimate" | !plot.errors) {
+        if (plot.errors && plot.errors.type == "all") {
+          y.min <- Inf
+          y.max <- -Inf
+          for (k in 1:bws$ndim) {
+            if (is.null(data.err.all[[k]])) next
+            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
+            center.k <- if (plot.errors.center == "estimate")
+              data.eval[1:nkeep.k,k]
+            else
+              data.err[1:nkeep.k,3*k]
+            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            y.min <- min(y.min, range.k[1], na.rm = TRUE)
+            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+          }
+          if (!is.finite(y.min) || !is.finite(y.max)) {
+            if (plot.errors.center == "estimate") {
+              y.max = max(na.omit(as.double(data.eval)) + na.omit(as.double(data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.eval)) - na.omit(as.double(data.err[,jj-2])))
+            } else {
+              y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+            }
+          }
+        } else if (plot.errors.center == "estimate" | !plot.errors) {
           y.max = max(na.omit(as.double(data.eval)) +
             if (plot.errors) na.omit(as.double(data.err[,jj-1]))
             else 0
@@ -4328,8 +4557,20 @@ npplot.dbandwidth <-
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-            eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                         eval(eehyE), eval(erestE), ")")))
+            if (plot.errors.type == "all") {
+              draw.all.error.types(
+                ex = as.numeric(na.omit(allei[,i])),
+                center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,i] else data.err[,3*i])),
+                all.err = data.err.all[[i]],
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
+            } else {
+              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                           eval(eehyE), eval(erestE), ")")))
+            }
           }
         }
       }
@@ -4471,6 +4712,11 @@ npplot.conbandwidth <-
 
     common.scale = common.scale | (!is.null(ylim))
 
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
+
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
         warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
@@ -4557,7 +4803,7 @@ npplot.conbandwidth <-
                                  "dens" = "npcdens"),
                           "(txdat = xdat, tydat = ydat, exdat =",
                           ifelse(quantreg, "x.eval, tau = tau",
-                                 "x.eval[,1], eydat = x.eval[,2]"),
+                                 "x.eval[,1, drop = FALSE], eydat = x.eval[,2, drop = FALSE]"),
                           ", bws = bws)", sep="")))
 
       tcomp = parse(text=paste("tobj$",
@@ -4751,6 +4997,8 @@ npplot.conbandwidth <-
         
         data.err = matrix(data = NA, nrow = maxneval,
           ncol = 3*tot.dim*dsf)
+        data.err.all = vector("list", tot.dim*dsf)
+        data.err.all = vector("list", tot.dim*dsf)
 
         allei = as.data.frame(matrix(data = NA, nrow = maxneval,
           ncol = tot.dim))
@@ -4784,8 +5032,7 @@ npplot.conbandwidth <-
           ifelse(common.scale,"y = data.eval[,plot.index],", "y = temp.dens,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-              max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors, "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
 
       pxlabE = expression(paste("xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$",
           xOrY, "names[i], paste('", toupper(xOrY),"', i, sep = ''))),",sep=''))
@@ -4875,7 +5122,8 @@ npplot.conbandwidth <-
         }
 
         for (j in 1:dsf){
-          temp.boot = list()  
+          temp.boot = list()
+          temp.all.err <- NULL
           temp.dens[1:xi.neval] = eval(tevalexpr) 
           
           if (plot.errors){
@@ -4901,6 +5149,7 @@ npplot.conbandwidth <-
                         plot.errors.alpha = plot.errors.alpha,
                         bws = bws)
               temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+              temp.all.err <- temp.boot[["boot.all.err"]]
               temp.boot <- temp.boot[["bxp"]]
               if (!plot.bxp.out){
                 temp.boot$out <- numeric()
@@ -4917,6 +5166,7 @@ npplot.conbandwidth <-
               all.bxp[[plot.index]] = temp.boot
 
               data.err[,seq(3*((plot.index-1)*dsf+j)-2,length=3)] = temp.err
+              data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
             }
           } else if (plot.behavior != "data") {
             ## plot evaluation
@@ -4926,12 +5176,19 @@ npplot.conbandwidth <-
 
             ## error plotting evaluation
             if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-              if (!xi.factor && !plotOnEstimate)
-                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+              if (plot.errors.type == "all") {
+                draw.all.error.types(
+                  ex = as.numeric(na.omit(ei)),
+                  center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
+                  all.err = temp.all.err,
+                  xi.factor = xi.factor)
+              } else {
+                if (!xi.factor && !plotOnEstimate)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
-
+                eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                             eval(eehyE), eval(erestE), ")")))
+              }
             }
           }
         
@@ -5000,7 +5257,8 @@ npplot.conbandwidth <-
           }
 
           for (j in 1:dsf){
-            temp.boot = list()  
+            temp.boot = list()
+            temp.all.err <- NULL
             temp.dens[1:xi.neval] = eval(tevalexpr) 
             
             if (plot.errors){
@@ -5026,6 +5284,7 @@ npplot.conbandwidth <-
                           plot.errors.alpha = plot.errors.alpha,
                           bws = bws)
                 temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+                temp.all.err <- temp.boot[["boot.all.err"]]
                 temp.boot <- temp.boot[["bxp"]]
                 if (!plot.bxp.out){
                   temp.boot$out <- numeric()
@@ -5042,6 +5301,7 @@ npplot.conbandwidth <-
                 all.bxp[[plot.index]] = temp.boot
 
                 data.err[,seq(3*((plot.index-1)*dsf+j)-2,length=3)] = temp.err
+                data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
               }
             } else if (plot.behavior != "data") {
               ## plot evaluation
@@ -5051,12 +5311,19 @@ npplot.conbandwidth <-
 
               ## error plotting evaluation
               if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-                if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                if (plot.errors.type == "all") {
+                  draw.all.error.types(
+                    ex = as.numeric(na.omit(ei)),
+                    center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
+                    all.err = temp.all.err,
+                    xi.factor = xi.factor)
+                } else {
+                  if (!xi.factor && !plotOnEstimate)
+                    lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-                eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                             eval(eehyE), eval(erestE), ")")))
-
+                  eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                               eval(eehyE), eval(erestE), ")")))
+                }
               }
             }
               
@@ -5076,18 +5343,38 @@ npplot.conbandwidth <-
       }
       
       if (common.scale & (plot.behavior != "data")){
-        jj = 1:(dsf*tot.dim)*3
-        
-        if (plot.errors.center == "estimate" | !plot.errors) {
-          y.max = max(na.omit(as.double(data.eval)) +
-            if (plot.errors) na.omit(as.double(data.err[,jj-1]))
-            else 0)
-          y.min = min(na.omit(as.double(data.eval)) -
-            if (plot.errors) na.omit(as.double(data.err[,jj-2]))
-            else 0)
-        } else if (plot.errors.center == "bias-corrected") {
-          y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-          y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+        if (plot.errors && plot.errors.type == "all") {
+          y.min <- Inf
+          y.max <- -Inf
+          for (k in 1:(tot.dim*dsf)) {
+            if (is.null(data.err.all[[k]])) next
+            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
+            if (nkeep.k == 0) next
+            center.k <- if (plot.errors.center == "estimate")
+              na.omit(data.eval[seq_len(nkeep.k), k])
+            else
+              na.omit(data.err[seq_len(nkeep.k), 3*k])
+            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            y.min <- min(y.min, range.k[1], na.rm = TRUE)
+            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+          }
+          if (!is.finite(y.min) || !is.finite(y.max)) {
+            y.min <- min(na.omit(as.double(data.eval)))
+            y.max <- max(na.omit(as.double(data.eval)))
+          }
+        } else {
+          jj = 1:(dsf*tot.dim)*3
+          if (plot.errors.center == "estimate" | !plot.errors) {
+            y.max = max(na.omit(as.double(data.eval)) +
+              if (plot.errors) na.omit(as.double(data.err[,jj-1]))
+              else 0)
+            y.min = min(na.omit(as.double(data.eval)) -
+              if (plot.errors) na.omit(as.double(data.err[,jj-2]))
+              else 0)
+          } else if (plot.errors.center == "bias-corrected") {
+            y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+            y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+          }
         }
 
         if(!is.null(ylim)){
@@ -5113,12 +5400,23 @@ npplot.conbandwidth <-
 
             ## error plotting evaluation
             if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-              if (!xi.factor && !plotOnEstimate)
-                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+              if (plot.errors.type == "all") {
+                idx <- (plot.index-1)*dsf+j
+                draw.all.error.types(
+                  ex = as.numeric(na.omit(allei[,plot.index])),
+                  center = if (plotOnEstimate)
+                    na.omit(data.eval[,idx])
+                  else
+                    na.omit(data.err[,3*idx]),
+                  all.err = data.err.all[[idx]],
+                  xi.factor = xi.factor)
+              } else {
+                if (!xi.factor && !plotOnEstimate)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
-              
+                eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                             eval(eehyE), eval(erestE), ")")))
+              }
             }
           }
         }
@@ -5260,6 +5558,11 @@ npplot.condbandwidth <-
 
     common.scale = common.scale | (!is.null(ylim))
 
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
+
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
         warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
@@ -5346,7 +5649,7 @@ npplot.condbandwidth <-
                                  "dens" = "npcdens"),
                           "(txdat = xdat, tydat = ydat, exdat =",
                           ifelse(quantreg, "x.eval, tau = tau",
-                                 "x.eval[,1], eydat = x.eval[,2]"),
+                                 "x.eval[,1, drop = FALSE], eydat = x.eval[,2, drop = FALSE]"),
                           ", bws = bws)", sep="")))
 
       tcomp = parse(text=paste("tobj$",
@@ -5571,8 +5874,7 @@ npplot.condbandwidth <-
           ifelse(common.scale,"y = data.eval[,plot.index],", "y = temp.dens,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-              max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors, "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
 
       pxlabE = expression(paste("xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$",
           xOrY, "names[i], paste('", toupper(xOrY),"', i, sep = ''))),",sep=''))
@@ -5662,7 +5964,8 @@ npplot.condbandwidth <-
         }
 
         for (j in 1:dsf){
-          temp.boot = list()  
+          temp.boot = list()
+          temp.all.err <- NULL
           temp.dens[1:xi.neval] = eval(tevalexpr) 
           
           if (plot.errors){
@@ -5688,6 +5991,7 @@ npplot.condbandwidth <-
                         plot.errors.alpha = plot.errors.alpha,
                         bws = bws)
               temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+              temp.all.err <- temp.boot[["boot.all.err"]]
               temp.boot <- temp.boot[["bxp"]]
               if (!plot.bxp.out){
                 temp.boot$out <- numeric()
@@ -5704,6 +6008,7 @@ npplot.condbandwidth <-
               all.bxp[[plot.index]] = temp.boot
 
               data.err[,seq(3*((plot.index-1)*dsf+j)-2,length=3)] = temp.err
+              data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
             }
           } else if (plot.behavior != "data") {
             ## plot evaluation
@@ -5713,11 +6018,19 @@ npplot.condbandwidth <-
 
             ## error plotting evaluation
             if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-              if (!xi.factor && !plotOnEstimate)
-                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+              if (plot.errors.type == "all") {
+                draw.all.error.types(
+                  ex = as.numeric(na.omit(ei)),
+                  center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
+                  all.err = temp.all.err,
+                  xi.factor = xi.factor)
+              } else {
+                if (!xi.factor && !plotOnEstimate)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+                eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                             eval(eehyE), eval(erestE), ")")))
+              }
 
             }
           }
@@ -5787,7 +6100,8 @@ npplot.condbandwidth <-
           }
 
           for (j in 1:dsf){
-            temp.boot = list()  
+            temp.boot = list()
+            temp.all.err <- NULL
             temp.dens[1:xi.neval] = eval(tevalexpr) 
             
             if (plot.errors){
@@ -5813,6 +6127,7 @@ npplot.condbandwidth <-
                           plot.errors.alpha = plot.errors.alpha,
                           bws = bws)
                 temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+                temp.all.err <- temp.boot[["boot.all.err"]]
                 temp.boot <- temp.boot[["bxp"]]
                 if (!plot.bxp.out){
                   temp.boot$out <- numeric()
@@ -5829,6 +6144,7 @@ npplot.condbandwidth <-
                 all.bxp[[plot.index]] = temp.boot
 
                 data.err[,seq(3*((plot.index-1)*dsf+j)-2,length=3)] = temp.err
+                data.err.all[[(plot.index-1)*dsf+j]] = temp.all.err
               }
             } else if (plot.behavior != "data") {
               ## plot evaluation
@@ -5838,11 +6154,19 @@ npplot.condbandwidth <-
 
               ## error plotting evaluation
               if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-                if (!xi.factor && !plotOnEstimate)
-                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+                if (plot.errors.type == "all") {
+                  draw.all.error.types(
+                    ex = as.numeric(na.omit(ei)),
+                    center = na.omit(if (plotOnEstimate) temp.dens else temp.err[,3]),
+                    all.err = temp.all.err,
+                    xi.factor = xi.factor)
+                } else {
+                  if (!xi.factor && !plotOnEstimate)
+                    lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-                eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                             eval(eehyE), eval(erestE), ")")))
+                  eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                               eval(eehyE), eval(erestE), ")")))
+                }
 
               }
             }
@@ -5863,18 +6187,38 @@ npplot.condbandwidth <-
       }
       
       if (common.scale & (plot.behavior != "data")){
-        jj = 1:(dsf*tot.dim)*3
-        
-        if (plot.errors.center == "estimate" | !plot.errors) {
-          y.max = max(na.omit(as.double(data.eval)) +
-            if (plot.errors) na.omit(as.double(data.err[,jj-1]))
-            else 0)
-          y.min = min(na.omit(as.double(data.eval)) -
-            if (plot.errors) na.omit(as.double(data.err[,jj-2]))
-            else 0)
-        } else if (plot.errors.center == "bias-corrected") {
-          y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-          y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+        if (plot.errors && plot.errors.type == "all") {
+          y.min <- Inf
+          y.max <- -Inf
+          for (k in 1:(tot.dim*dsf)) {
+            if (is.null(data.err.all[[k]])) next
+            nkeep.k <- nrow(data.err.all[[k]]$pointwise)
+            if (nkeep.k == 0) next
+            center.k <- if (plot.errors.center == "estimate")
+              na.omit(data.eval[seq_len(nkeep.k), k])
+            else
+              na.omit(data.err[seq_len(nkeep.k), 3*k])
+            range.k <- compute.all.error.range(center.k, data.err.all[[k]])
+            y.min <- min(y.min, range.k[1], na.rm = TRUE)
+            y.max <- max(y.max, range.k[2], na.rm = TRUE)
+          }
+          if (!is.finite(y.min) || !is.finite(y.max)) {
+            y.min <- min(na.omit(as.double(data.eval)))
+            y.max <- max(na.omit(as.double(data.eval)))
+          }
+        } else {
+          jj = 1:(dsf*tot.dim)*3
+          if (plot.errors.center == "estimate" | !plot.errors) {
+            y.max = max(na.omit(as.double(data.eval)) +
+              if (plot.errors) na.omit(as.double(data.err[,jj-1]))
+              else 0)
+            y.min = min(na.omit(as.double(data.eval)) -
+              if (plot.errors) na.omit(as.double(data.err[,jj-2]))
+              else 0)
+          } else if (plot.errors.center == "bias-corrected") {
+            y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+            y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+          }
         }
 
         if(!is.null(ylim)){
@@ -5900,11 +6244,23 @@ npplot.condbandwidth <-
 
             ## error plotting evaluation
             if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-              if (!xi.factor && !plotOnEstimate)
-                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+              if (plot.errors.type == "all") {
+                idx <- (plot.index-1)*dsf+j
+                draw.all.error.types(
+                  ex = as.numeric(na.omit(allei[,plot.index])),
+                  center = if (plotOnEstimate)
+                    na.omit(data.eval[,idx])
+                  else
+                    na.omit(data.err[,3*idx]),
+                  all.err = data.err.all[[idx]],
+                  xi.factor = xi.factor)
+              } else {
+                if (!xi.factor && !plotOnEstimate)
+                  lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+                eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
+                             eval(eehyE), eval(erestE), ")")))
+              }
               
             }
           }
@@ -6029,6 +6385,10 @@ npplot.sibandwidth <-
         is.null(plot.errors.boot.blocklen))
       plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
     
+    if (plot.errors.method == "none" && plot.errors.type == "all") {
+      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+      plot.errors.method <- "bootstrap"
+    }
 
     plot.errors = (plot.errors.method != "none")
 
@@ -6045,13 +6405,14 @@ npplot.sibandwidth <-
     
     temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
     temp.mean = replicate(maxneval, NA)
+    temp.all.err <- NULL
     
 
     temp.mean[] = if(gradients) tobj$grad[,1] else tobj$mean
 
     if (plot.errors){
-      if (plot.errors.method == "bootstrap")
-        temp.err[,] = compute.bootstrap.errors(
+      if (plot.errors.method == "bootstrap") {
+        temp.boot.raw <- compute.bootstrap.errors(
                   xdat = xdat, ydat = ydat,
                   gradients = gradients,
                   plot.errors.boot.method = plot.errors.boot.method,
@@ -6061,6 +6422,9 @@ npplot.sibandwidth <-
                   plot.errors.type = plot.errors.type,
                   plot.errors.alpha = plot.errors.alpha,
                   bws = bws)
+        temp.err[,] <- temp.boot.raw[["boot.err"]]
+        temp.all.err <- temp.boot.raw[["boot.all.err"]]
+      }
     }
 
     i.sort = sort(tobj$index, index.return=TRUE)$ix
@@ -6070,22 +6434,29 @@ npplot.sibandwidth <-
         ymin = ylim[1]
         ymax = ylim[2]
       } else {
-        ymin <- eval(parse(text=paste("min(",
-                             ifelse(plot.errors,"na.omit(",""),
-                             "c(temp.mean",
-                             ifelse(plot.errors,"- temp.err[,1]",""),
-                             ", temp.err[,3]",
-                             ifelse(plot.errors,"- temp.err[,1]",""),
-                             "))",
-                             ifelse(plot.errors,")",""))))
-        ymax <- eval(parse(text=paste("max(",
-                             ifelse(plot.errors,"na.omit(",""),
-                             "c(temp.mean",
-                             ifelse(plot.errors,"+ temp.err[,2]",""),
-                             ", temp.err[,3]",
-                             ifelse(plot.errors,"+ temp.err[,2]",""),
-                             "))",
-                             ifelse(plot.errors,")",""))))
+        if (plot.errors && plot.errors.type == "all") {
+          yr <- compute.all.error.range(if (plot.errors.center == "estimate") temp.mean else temp.err[,3],
+                                        temp.all.err)
+          ymin <- yr[1]
+          ymax <- yr[2]
+        } else {
+          ymin <- eval(parse(text=paste("min(",
+                               ifelse(plot.errors,"na.omit(",""),
+                               "c(temp.mean",
+                               ifelse(plot.errors,"- temp.err[,1]",""),
+                               ", temp.err[,3]",
+                               ifelse(plot.errors,"- temp.err[,1]",""),
+                               "))",
+                               ifelse(plot.errors,")",""))))
+          ymax <- eval(parse(text=paste("max(",
+                               ifelse(plot.errors,"na.omit(",""),
+                               "c(temp.mean",
+                               ifelse(plot.errors,"+ temp.err[,2]",""),
+                               ", temp.err[,3]",
+                               ifelse(plot.errors,"+ temp.err[,2]",""),
+                               "))",
+                               ifelse(plot.errors,")",""))))
+        }
       }
 
 
@@ -6106,7 +6477,16 @@ npplot.sibandwidth <-
                main = main,
                sub = sub,
                lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
-          if (plot.errors.center == "estimate") {
+          if (plot.errors.type == "all") {
+            draw.all.error.types(
+              ex = na.omit(tobj$index[i.sort]),
+              center = na.omit(if (plot.errors.center == "estimate") temp.mean[i.sort] else temp.err[i.sort,3]),
+              all.err = temp.all.err,
+              plot.errors.style = plot.errors.style,
+              plot.errors.bar = plot.errors.bar,
+              plot.errors.bar.num = plot.errors.bar.num,
+              lty = 2)
+          } else if (plot.errors.center == "estimate") {
             draw.errors(ex = na.omit(tobj$index[i.sort]),
                         ely = na.omit(temp.mean[i.sort] - temp.err[i.sort,1]),
                         ehy = na.omit(temp.mean[i.sort] + temp.err[i.sort,2]),
@@ -6153,7 +6533,12 @@ npplot.sibandwidth <-
         bmax = max(bws$beta)
         bmin = min(bws$beta)
 
-        if (plot.errors){
+        if (plot.errors && plot.errors.type == "all"){
+          yr <- compute.all.error.range(if (plot.errors.center == "estimate") temp.mean else temp.err[,3],
+                                        temp.all.err)
+          ymax = yr[2]
+          ymin = yr[1]
+        } else if (plot.errors){
           ymax = max(temp.mean + temp.err[,2])
           ymin = min(temp.mean - temp.err[,1])
         } else {
@@ -6204,7 +6589,20 @@ npplot.sibandwidth <-
                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
             
             if (plot.errors){
-              if (plot.errors.center == "estimate") {
+              if (plot.errors.type == "all") {
+                scaled.all.err <- lapply(temp.all.err, function(err) {
+                  if (is.null(err)) return(NULL)
+                  abs(bws$beta[i]) * err
+                })
+                draw.all.error.types(
+                  ex = na.omit(tobj$index[i.sort]),
+                  center = na.omit(bws$beta[i] * if (plot.errors.center == "estimate") temp.mean[i.sort] else temp.err[i.sort,3]),
+                  all.err = scaled.all.err,
+                  plot.errors.style = plot.errors.style,
+                  plot.errors.bar = plot.errors.bar,
+                  plot.errors.bar.num = plot.errors.bar.num,
+                  lty = 2)
+              } else if (plot.errors.center == "estimate") {
                 draw.errors(ex = na.omit(tobj$index[i.sort]),
                             ely = na.omit(bws$beta[i]*(temp.mean[i.sort] - temp.err[i.sort,1])),
                             ehy = na.omit(bws$beta[i]*(temp.mean[i.sort] + temp.err[i.sort,2])),
