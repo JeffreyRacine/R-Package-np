@@ -1,4 +1,4 @@
-Changes from Version 0.60-21 to 0.60-22 [16-Feb-2026]
+Changes from Version 0.60-20 to 0.60-21 [16-Feb-2026]
 
 * Ported bounded continuous-kernel support from np master across npRmpi
   interfaces and C pathways with unified bound controls:
@@ -23,7 +23,25 @@ Changes from Version 0.60-21 to 0.60-22 [16-Feb-2026]
   one-time per-session warning to preserve backward compatibility while
   removing a stale legacy selector path.
 
-Changes from Version 0.60-20 to 0.60-21 [12-Feb-2026]
+* Synchronized `npplot()` bootstrap error-band enhancements/fixes from
+  np master:
+  - replaced fixed quantiles with scalar `plot.errors.alpha` and added
+    bootstrap quantile band types `pointwise`, `bonferroni`,
+    `simultaneous`, and `all` (alongside `standard`)
+  - vendored/attributed rank-based simultaneous set computation (from
+    `MCPAN::SCSrank`) for `plot.errors.type="simultaneous"`
+  - added color-coded overlay + legend for `plot.errors.type="all"`
+    (Pointwise/Simultaneous/Bonferroni)
+  - fixed non-`all` bootstrap overlays not drawing in several paths due to
+    default color handling
+  - fixed mixed/factor plotting branches (including `npreg`) so all
+    bootstrap error types (`standard`, `pointwise`, `bonferroni`,
+    `simultaneous`, `all`) render consistently
+  - fixed single-index (`npindex`) plotting edge cases in gradient mode:
+    corrected sign-aware lower/upper bounds for negative index weights,
+    fixed sorted alignment for `all` bands, fixed `plot.behavior="data"`
+    return-shape errors, and fixed `ylim` handling for user limits and
+    panel-specific error ranges.
 
 * Ported recent core-performance updates from np master (kernel/jksum
   optimizations) and synchronized behavior across serial/MPI variants.
