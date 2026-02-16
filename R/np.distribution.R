@@ -102,6 +102,9 @@ npudist.dbandwidth <-
     if (!no.e)
       edat <- adjustLevels(edat, bws$xdati, allowNewCells = TRUE)
 
+    if (!no.e)
+      npKernelBoundsCheckEval(edat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
     ## grab the evaluation data before it is converted to numeric
     if(no.e)
       teval <- tdat
@@ -158,6 +161,7 @@ npudist.dbandwidth <-
       densOrDist = NP_DO_DIST,
       old.dist = FALSE,
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
     
     myout=
@@ -170,6 +174,8 @@ npudist.dbandwidth <-
          dist = double(enrow),
          derr = double(enrow),
          log_likelihood = double(1),
+         cker.bounds.c$lb,
+         cker.bounds.c$ub,
          PACKAGE="np" )[c("dist","derr", "log_likelihood")]
 
     ev <- npdistribution(bws=bws, eval=teval, dist = myout$dist,

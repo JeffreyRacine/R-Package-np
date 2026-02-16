@@ -104,6 +104,9 @@ npudens.bandwidth <-
   if (!no.e)
     edat <- adjustLevels(edat, bws$xdati, allowNewCells = TRUE)
 
+  if (!no.e)
+    npKernelBoundsCheckEval(edat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
   ## grab the evaluation data before it is converted to numeric
   if(no.e)
     teval <- tdat
@@ -157,9 +160,10 @@ npudens.bandwidth <-
       liracine = OKER_NLR),
     no.e = no.e,
     mcv.numRow = attr(bws$xmcv, "num.row"),
-    densOrDist = NP_DO_DENS,
-    old.dens = FALSE,
-    int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+      densOrDist = NP_DO_DENS,
+      old.dens = FALSE,
+      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+  cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
   
   myout=
     .C("np_density", as.double(tuno), as.double(tord), as.double(tcon),
@@ -171,6 +175,8 @@ npudens.bandwidth <-
        dens = double(enrow),
        derr = double(enrow),
        log_likelihood = double(1),
+       cker.bounds.c$lb,
+       cker.bounds.c$ub,
        PACKAGE="np" )[c("dens","derr", "log_likelihood")]
 
   ## For purely categorical density with zero bandwidths, the variance of

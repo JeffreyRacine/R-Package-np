@@ -6,10 +6,16 @@ condbandwidth <-
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
            cxkertype = c("gaussian","truncated gaussian","epanechnikov","uniform"), 
            cxkerorder = c(2,4,6,8),
+           cxkerbound = c("none","range","fixed"),
+           cxkerlb = NULL,
+           cxkerub = NULL,
            uxkertype = c("aitchisonaitken","liracine"),
            oxkertype = c("liracine","wangvanryzin"),
            cykertype = c("gaussian","truncated gaussian","epanechnikov","uniform"), 
            cykerorder = c(2,4,6,8),
+           cykerbound = c("none","range","fixed"),
+           cykerlb = NULL,
+           cykerub = NULL,
            uykertype = c("aitchisonaitken","liracine"),
            oykertype = c("liracine","wangvanryzin"),
            fval = NA,
@@ -43,6 +49,8 @@ condbandwidth <-
 
   cxkertype = match.arg(cxkertype)
   cykertype = match.arg(cykertype)
+  cxkerbound = match.arg(cxkerbound)
+  cykerbound = match.arg(cykerbound)
 
   if(missing(cxkerorder))
     cxkerorder = 2
@@ -90,6 +98,22 @@ condbandwidth <-
   
   oxkertype = match.arg(oxkertype)
   oykertype = match.arg(oykertype)
+  cxbounds <- npKernelBoundsResolve(
+    dati = xdati,
+    varnames = xnames,
+    kerbound = cxkerbound,
+    kerlb = cxkerlb,
+    kerub = cxkerub,
+    argprefix = "cxker")
+  cybounds <- npKernelBoundsResolve(
+    dati = ydati,
+    varnames = ynames,
+    kerbound = cykerbound,
+    kerlb = cykerlb,
+    kerub = cykerub,
+    argprefix = "cyker")
+  if (bwtype != "fixed" && (cxbounds$bound != "none" || cybounds$bound != "none"))
+    stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
   pxorder = switch( cxkerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   pyorder = switch( cykerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
@@ -143,6 +167,12 @@ condbandwidth <-
     cykertype = cykertype,
     cxkerorder = cxkerorder,
     cykerorder = cykerorder,
+    cxkerbound = cxbounds$bound,
+    cxkerlb = cxbounds$lb,
+    cxkerub = cxbounds$ub,
+    cykerbound = cybounds$bound,
+    cykerlb = cybounds$lb,
+    cykerub = cybounds$ub,
     pcxkertype = cktToPrint(cxkertype, order = pxorder),
     pcykertype = cktToPrint(cykertype, order = pyorder),
     uxkertype = uxkertype,
@@ -194,6 +224,9 @@ condbandwidth <-
   mybw$klist = list(
     x =
     list(ckertype = cxkertype,
+         ckerbound = cxbounds$bound,
+         ckerlb = cxbounds$lb,
+         ckerub = cxbounds$ub,
          pckertype = mybw$pcxkertype,
          ukertype = uxkertype,
          pukertype = mybw$puxkertype,
@@ -201,6 +234,9 @@ condbandwidth <-
          pokertype = mybw$poxkertype),
     y =
     list(ckertype = cykertype,
+         ckerbound = cybounds$bound,
+         ckerlb = cybounds$lb,
+         ckerub = cybounds$ub,
          pckertype = mybw$pcykertype,
          ukertype = uykertype,
          pukertype = mybw$puykertype,

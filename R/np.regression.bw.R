@@ -269,6 +269,9 @@ npregbw.rbandwidth <-
                       bwtype = tbw$type,
                       ckertype = tbw$ckertype,
                       ckerorder = tbw$ckerorder,
+                      ckerbound = tbw$ckerbound,
+                      ckerlb = tbw$ckerlb,
+                      ckerub = tbw$ckerub,
                       ukertype = tbw$ukertype,
                       okertype = tbw$okertype,
                       fval = tbw$fval,
@@ -310,7 +313,7 @@ npregbw.default <-
            penalty.multiplier = 10,
            ## dummy arguments for later passing into rbandwidth()
            regtype, bwmethod, bwscaling, bwtype,
-           ckertype, ckerorder, ukertype, okertype,
+           ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
 
     xdat <- toFrame(xdat)
@@ -323,7 +326,7 @@ npregbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("regtype", "bwmethod", "bwscaling", "bwtype",
-               "ckertype", "ckerorder", "ukertype", "okertype")
+               "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

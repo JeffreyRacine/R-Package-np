@@ -548,6 +548,9 @@ npscoefbw.scbandwidth <-
                        bwtype = bws$type,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder,
+                       ckerbound = bws$ckerbound,
+                       ckerlb = bws$ckerlb,
+                       ckerub = bws$ckerub,
                        ukertype = bws$ukertype,
                        okertype = bws$okertype,
                        fval = bws$fval,
@@ -587,7 +590,7 @@ npscoefbw.default <-
            bandwidth.compute = TRUE,
            ## dummy arguments for scbandwidth()
            bwmethod, bwscaling, bwtype,
-           ckertype, ckerorder,
+           ckertype, ckerorder, ckerbound, ckerlb, ckerub,
            ukertype, okertype,
            optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit,
@@ -608,7 +611,7 @@ npscoefbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
-               "ukertype", "okertype")
+               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

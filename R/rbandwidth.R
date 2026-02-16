@@ -6,6 +6,9 @@ rbandwidth <-
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
            ckertype = c("gaussian","truncated gaussian","epanechnikov","uniform"),
            ckerorder = c(2,4,6,8),
+           ckerbound = c("none","range","fixed"),
+           ckerlb = NULL,
+           ckerub = NULL,
            ukertype = c("aitchisonaitken", "liracine"),
            okertype = c("liracine","wangvanryzin"),
            fval = NA,
@@ -34,6 +37,7 @@ rbandwidth <-
   bwmethod = match.arg(bwmethod)
   bwtype = match.arg(bwtype)
   ckertype = match.arg(ckertype)
+  ckerbound = match.arg(ckerbound)
 
   if(missing(ckerorder))
     ckerorder = 2
@@ -50,6 +54,15 @@ rbandwidth <-
 
   ukertype = match.arg(ukertype)
   okertype = match.arg(okertype)
+  cbounds <- npKernelBoundsResolve(
+    dati = xdati,
+    varnames = xnames,
+    kerbound = ckerbound,
+    kerlb = ckerlb,
+    kerub = ckerub,
+    argprefix = "cker")
+  if (bwtype != "fixed" && cbounds$bound != "none")
+    stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   ## calculate some info to be pretty-printed
@@ -92,6 +105,9 @@ rbandwidth <-
     ptype = bwtToPrint(bwtype),
     ckertype = ckertype,    
     ckerorder = ckerorder,
+    ckerbound = cbounds$bound,
+    ckerlb = cbounds$lb,
+    ckerub = cbounds$ub,
     pckertype = cktToPrint(ckertype, order = porder),
     ukertype = ukertype,
     pukertype = uktToPrint(ukertype),

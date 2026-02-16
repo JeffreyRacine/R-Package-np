@@ -250,6 +250,9 @@ npksum.default <-
     if (!miss.ex)
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
 
+    if (!miss.ex)
+      npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
     ## grab the evaluation data before it is converted to numeric
     if(miss.ex)
       teval <- txdat

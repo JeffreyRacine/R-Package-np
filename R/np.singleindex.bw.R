@@ -254,7 +254,10 @@ npindexbw.sibandwidth <-
                             bandwidth.divide=TRUE,
                             bws=c(h),
                             ckertype = bws$ckertype,
-                            ckerorder = bws$ckerorder)$ksum
+                            ckerorder = bws$ckerorder,
+                            ckerbound = bws$ckerbound,
+                            ckerlb = bws$ckerlb,
+                            ckerub = bws$ckerub)$ksum
 
               fit.loo <- tww[1,2,]/NZD(tww[2,2,])
 
@@ -316,7 +319,10 @@ npindexbw.sibandwidth <-
                             bandwidth.divide=TRUE,
                             bws=c(h),
                             ckertype = bws$ckertype,
-                            ckerorder = bws$ckerorder)$ksum
+                            ckerorder = bws$ckerorder,
+                            ckerbound = bws$ckerbound,
+                            ckerlb = bws$ckerlb,
+                            ckerub = bws$ckerub)$ksum
 
               ks.loo <- tww[1,2,]/NZD(tww[2,2,])
 
@@ -475,6 +481,9 @@ npindexbw.sibandwidth <-
                        method = bws$method,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder,
+                       ckerbound = bws$ckerbound,
+                       ckerlb = bws$ckerlb,
+                       ckerub = bws$ckerub,
                        bwtype = bws$type,
                        fval = bws$fval,
                        ifval = bws$ifval,

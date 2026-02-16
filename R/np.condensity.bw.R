@@ -331,10 +331,16 @@ npcdensbw.conbandwidth <-
                         bwtype = tbw$type,
                         cxkertype = tbw$cxkertype,
                         cxkerorder = tbw$cxkerorder,
+                        cxkerbound = tbw$cxkerbound,
+                        cxkerlb = tbw$cxkerlb,
+                        cxkerub = tbw$cxkerub,
                         uxkertype = tbw$uxkertype,
                         oxkertype = tbw$oxkertype,
                         cykertype = tbw$cykertype,
                         cykerorder = tbw$cykerorder,
+                        cykerbound = tbw$cykerbound,
+                        cykerlb = tbw$cykerlb,
+                        cykerub = tbw$cykerub,
                         uykertype = tbw$uykertype,
                         oykertype = tbw$oykertype,
                         fval = tbw$fval,
@@ -404,7 +410,9 @@ npcdensbw.default <-
            ## dummy arguments for conbandwidth() function call
            bwmethod, bwscaling, bwtype,
            cxkertype, cxkerorder,
+           cxkerbound, cxkerlb, cxkerub,
            cykertype, cykerorder,
+           cykerbound, cykerlb, cykerub,
            uxkertype, uykertype,
            oxkertype, oykertype,
            ...){
@@ -420,8 +428,9 @@ npcdensbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "cxkertype", "cxkerorder",
-               "cykertype", "cykerorder", "uxkertype", "uykertype", "oxkertype",
-               "oykertype")
+               "cxkerbound", "cxkerlb", "cxkerub",
+               "cykertype", "cykerorder", "cykerbound", "cykerlb", "cykerub",
+               "uxkertype", "uykertype", "oxkertype", "oykertype")
 
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)

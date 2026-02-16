@@ -12,6 +12,9 @@ kbandwidth.default <- function(bw, ...){
                      bwtype = bw$type,
                      ckertype = bw$ckertype,
                      ckerorder = bw$ckerorder,
+                     ckerbound = if (!is.null(bw$ckerbound)) bw$ckerbound else "none",
+                     ckerlb = if (!is.null(bw$ckerlb)) bw$ckerlb else NULL,
+                     ckerub = if (!is.null(bw$ckerub)) bw$ckerub else NULL,
                      ukertype = bw$ukertype,
                      okertype = bw$okertype,
                      nobs = bw$nobs,
@@ -28,6 +31,9 @@ kbandwidth.numeric <-
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
            ckertype = c("gaussian","truncated gaussian","epanechnikov","uniform"),
            ckerorder = c(2,4,6,8),
+           ckerbound = c("none","range","fixed"),
+           ckerlb = NULL,
+           ckerub = NULL,
            ukertype = c("aitchisonaitken", "liracine"),
            okertype = c("liracine","wangvanryzin", "nliracine"),
            nobs = NA,
@@ -40,6 +46,7 @@ kbandwidth.numeric <-
     ndim = length(bw)
     bwtype = match.arg(bwtype)
     ckertype = match.arg(ckertype)
+    ckerbound = match.arg(ckerbound)
 
     if(missing(ckerorder))
       ckerorder = 2
@@ -56,6 +63,15 @@ kbandwidth.numeric <-
     
     ukertype = match.arg(ukertype)
     okertype = match.arg(okertype)
+    cbounds <- npKernelBoundsResolve(
+      dati = xdati,
+      varnames = xnames,
+      kerbound = ckerbound,
+      kerlb = ckerlb,
+      kerub = ckerub,
+      argprefix = "cker")
+    if (bwtype != "fixed" && cbounds$bound != "none")
+      stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
     porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
     
@@ -67,6 +83,9 @@ kbandwidth.numeric <-
       ptype = bwtToPrint(bwtype),
       ckertype = ckertype,    
       ckerorder = ckerorder,
+      ckerbound = cbounds$bound,
+      ckerlb = cbounds$lb,
+      ckerub = cbounds$ub,
       pckertype = cktToPrint(ckertype, order = porder),
       ukertype = ukertype,
       pukertype = uktToPrint(ukertype),

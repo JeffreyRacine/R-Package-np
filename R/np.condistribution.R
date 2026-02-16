@@ -147,6 +147,8 @@ npcdist.condbandwidth <-
     if (!no.exy){
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
       eydat <- adjustLevels(eydat, bws$ydati, allowNewCells = TRUE)
+      npKernelBoundsCheckEval(exdat, bws$ixcon, bws$cxkerlb, bws$cxkerub, argprefix = "cxker")
+      npKernelBoundsCheckEval(eydat, bws$iycon, bws$cykerlb, bws$cykerub, argprefix = "cyker")
     }
 
     ## grab the evaluation data before it is converted to numeric
@@ -343,4 +345,3 @@ npcdist.default <- function(bws, txdat, tydat, ...){
   
   eval(parse(text=paste("npcdist(bws = tbw", tx.str, ty.str, ",...)")))
 }
-

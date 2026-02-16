@@ -224,6 +224,9 @@ npreg.rbandwidth <-
     if (!no.ex)
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
 
+    if (!no.ex)
+      npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+
     ## grab the evaluation data before it is converted to numeric
     if(no.ex)
       teval <- txdat
@@ -398,4 +401,3 @@ npreg.default <- function(bws, txdat, tydat, ...){
   environment(ev$call) <- parent.frame()
   return(ev)
 }
-

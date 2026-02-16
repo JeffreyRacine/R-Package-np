@@ -78,6 +78,10 @@ int num_reg_continuous_extern=0;
 int num_reg_unordered_extern=0;
 int num_reg_ordered_extern=0;
 
+int int_cker_bound_extern=0;
+double *vector_ckerlb_extern=NULL;
+double *vector_ckerub_extern=NULL;
+
 
 int *num_categories_extern;
 double **matrix_categorical_vals_extern;
@@ -156,6 +160,21 @@ static int bwm_penalty_mode = 0;
 static double bwm_penalty_value = DBL_MAX;
 static int *bwm_kernel_unordered_vec = NULL;
 static int bwm_kernel_unordered_len = 0;
+
+static int np_has_finite_cker_bounds(const double *lb, const double *ub, const int n)
+{
+  int i;
+  const double big = 0.5*DBL_MAX;
+  if(lb == NULL || ub == NULL || n <= 0)
+    return 0;
+  for(i = 0; i < n; i++) {
+    const int lb_fin = isfinite(lb[i]) && (fabs(lb[i]) < big);
+    const int ub_fin = isfinite(ub[i]) && (fabs(ub[i]) < big);
+    if(lb_fin || ub_fin)
+      return 1;
+  }
+  return 0;
+}
 
 static void bwm_reset_counters(void)
 {
@@ -439,7 +458,8 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
                    double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
                    double * objective_function_values, double * objective_function_evals,
                    double * objective_function_invalid, double * timing,
-                   int * penalty_mode, double * penalty_mult){
+                   int * penalty_mode, double * penalty_mult,
+                   double * ckerlb, double * ckerub){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -472,6 +492,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   num_reg_unordered_extern = myopti[BW_NUNOI];
   num_reg_ordered_extern = myopti[BW_NORDI];
   num_reg_continuous_extern = myopti[BW_NCONI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -1001,6 +1025,10 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   return ;
   
 }
@@ -1014,7 +1042,8 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
                         int * myopti, double * myoptd, double * myans, double * fval,
                         double * objective_function_values, double * objective_function_evals,
                         double * objective_function_invalid, double * timing,
-                        int * penalty_mode, double * penalty_mult){
+                        int * penalty_mode, double * penalty_mult,
+                        double * ckerlb, double * ckerub){
   /* Likelihood bandwidth selection for density estimation */
 
   double **matrix_y;
@@ -1048,6 +1077,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
   num_reg_unordered_extern = myopti[DBW_NUNOI];
   num_reg_ordered_extern = myopti[DBW_NORDI];
   num_reg_continuous_extern = myopti[DBW_NCONI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -1630,6 +1663,10 @@ void np_distribution_bw(double * myuno, double * myord, double * mycon,
 
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
+
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
 
   return ;
   
@@ -3786,7 +3823,8 @@ void np_density(double * tuno, double * tord, double * tcon,
                 double * dbw, 
                 double * mcv, double * padnum, 
                 double * nconfac, double * ncatfac, double * mysd,
-                int * myopti, double * mydens, double * myderr, double * ll){
+                int * myopti, double * mydens, double * myderr, double * ll,
+                double * ckerlb, double * ckerub){
 
 
   double small = 1.0e-16;
@@ -3805,6 +3843,10 @@ void np_density(double * tuno, double * tord, double * tcon,
   num_reg_continuous_extern = myopti[DEN_NCONI];
   num_reg_unordered_extern = myopti[DEN_NUNOI];
   num_reg_ordered_extern = myopti[DEN_NORDI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   num_var = num_reg_ordered_extern + num_reg_continuous_extern + num_reg_unordered_extern;
 
@@ -4094,6 +4136,10 @@ void np_density(double * tuno, double * tord, double * tcon,
     free_kdtree(&kdt_extern_X);
     int_TREE_X = NP_TREE_FALSE;
   }
+
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
 
   return;
 }

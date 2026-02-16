@@ -175,6 +175,7 @@ npudensbw.bandwidth <-
         lbc.init = lbc.init, hbc.init = hbc.init, cfac.init = cfac.init, 
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
+      cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
       if (bws$method != "normal-reference"){
         total.time <-
@@ -188,6 +189,8 @@ npudensbw.bandwidth <-
                          timing = double(1),
                          penalty.mode = as.integer(penalty_mode),
                          penalty.multiplier = as.double(penalty.multiplier),
+                         cker.bounds.c$lb,
+                         cker.bounds.c$ub,
                          PACKAGE="np" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
       } else {
         nbw = double(ncol)
@@ -250,6 +253,9 @@ npudensbw.bandwidth <-
                      bwtype = tbw$type,
                      ckertype = tbw$ckertype,
                      ckerorder = tbw$ckerorder,
+                     ckerbound = tbw$ckerbound,
+                     ckerlb = tbw$ckerlb,
+                     ckerub = tbw$ckerub,
                      ukertype = tbw$ukertype,
                      okertype = tbw$okertype,
                      fval = tbw$fval,
@@ -289,7 +295,7 @@ npudensbw.default <-
            penalty.multiplier,
            ## dummy arguments for later passing into bandwidth()
            bwmethod, bwscaling, bwtype,
-           ckertype, ckerorder, ukertype, okertype,
+           ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
 
     t.names <- NULL
@@ -306,7 +312,7 @@ npudensbw.default <-
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
-               "ukertype", "okertype")
+               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
 
     m <- match(margs, mc.names, nomatch = 0)
