@@ -4295,7 +4295,8 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                       double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
                       double * objective_function_values, double * objective_function_evals,
                       double * objective_function_invalid, double * timing,
-                      int * penalty_mode, double * penalty_mult){
+                      int * penalty_mode, double * penalty_mult,
+                      double * ckerlb, double * ckerub){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -4338,6 +4339,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   KERNEL_reg_extern = myopti[RBW_CKRNEVI];
   KERNEL_reg_unordered_extern = myopti[RBW_UKRNEVI];
   KERNEL_reg_ordered_extern = myopti[RBW_OKRNEVI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   int_use_starting_values= myopti[RBW_USTARTI];
   int_LARGE_SF=myopti[RBW_LSFI];
@@ -4852,6 +4857,10 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   //fprintf(stderr,"\nNP TOASTY\n");
   return ;
   
@@ -4865,7 +4874,8 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * nconfac, double * ncatfac, double * mysd,
                    int * myopti, 
                    double * cm, double * cmerr, double * g, double *gerr, 
-                   double * xtra){
+                   double * xtra,
+                   double * ckerlb, double * ckerub){
 
   double * vector_scale_factor, * ecm = NULL, * ecmerr = NULL, ** eg = NULL, **egerr = NULL;
   double * lambda, ** matrix_bandwidth;
@@ -4897,6 +4907,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   KERNEL_reg_extern = myopti[REG_CKRNEVI];
   KERNEL_reg_unordered_extern = myopti[REG_UKRNEVI];
   KERNEL_reg_ordered_extern = myopti[REG_OKRNEVI];
+
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   int_LARGE_SF = myopti[REG_LSFI];
   int_MINIMIZE_IO = myopti[REG_MINIOI];
@@ -5293,6 +5307,10 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
 
   safe_free(lambda);
 
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
+
   return;
 }
 
@@ -5304,7 +5322,8 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                   int * operator,
                   int * myopti, double * kpow, 
                   double * weighted_sum, double * weighted_p_sum,
-                  double * kernel_weights){
+                  double * kernel_weights,
+                  double * ckerlb, double * ckerub){
 
   int * ipt = NULL, * ipe = NULL;  // point permutation, see tree.c
       
@@ -5345,6 +5364,9 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   KERNEL_reg_extern = myopti[KWS_CKRNEVI];
   KERNEL_reg_unordered_extern = myopti[KWS_UKRNEVI];
   KERNEL_reg_ordered_extern = myopti[KWS_OKRNEVI];
+  vector_ckerlb_extern = ckerlb;
+  vector_ckerub_extern = ckerub;
+  int_cker_bound_extern = np_has_finite_cker_bounds(ckerlb, ckerub, num_reg_continuous_extern);
 
   int_LARGE_SF = myopti[KWS_LSFI];
   int_MINIMIZE_IO = myopti[KWS_MINIOI];
@@ -5837,6 +5859,10 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
     free(matrix_ordered_indices[0]);
     free(matrix_ordered_indices);
   }
+
+  int_cker_bound_extern = 0;
+  vector_ckerlb_extern = NULL;
+  vector_ckerub_extern = NULL;
 
   return;
 }

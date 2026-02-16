@@ -203,6 +203,8 @@ npregbw.rbandwidth <-
         lbd.init = lbd.init, hbd.init = hbd.init, dfac.init = dfac.init, 
         nconfac = nconfac, ncatfac = ncatfac)
 
+        cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+
         total.time <-
           system.time(myout <- 
         .C("np_regression_bw",
@@ -215,6 +217,8 @@ npregbw.rbandwidth <-
            timing = double(1),
            penalty.mode = as.integer(penalty_mode),
            penalty.multiplier = as.double(penalty.multiplier),
+           ckerlb = as.double(cker.bounds.c$lb),
+           ckerub = as.double(cker.bounds.c$ub),
            PACKAGE="np" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
       
 

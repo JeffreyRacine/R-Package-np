@@ -14,10 +14,10 @@ extern void np_density_conditional(void *, void *, void *, void *, void *, void 
 extern void np_density_conditional_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_distribution_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_distribution_conditional_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
-extern void np_kernelsum(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void np_kernelsum(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_quantile_conditional(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
-extern void np_regression(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
-extern void np_regression_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void np_regression(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void np_regression_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_release_static_buffers(void *);
 extern void np_set_seed(void *);
 extern void np_set_tgauss2(void *);
@@ -31,10 +31,10 @@ static const R_CMethodDef CEntries[] = {
     {"np_density_conditional_bw",      (DL_FUNC) &np_density_conditional_bw,      21},
     {"np_distribution_bw",             (DL_FUNC) &np_distribution_bw,             19},
     {"np_distribution_conditional_bw", (DL_FUNC) &np_distribution_conditional_bw, 24},
-    {"np_kernelsum",                   (DL_FUNC) &np_kernelsum,                   17},
+    {"np_kernelsum",                   (DL_FUNC) &np_kernelsum,                   19},
     {"np_quantile_conditional",        (DL_FUNC) &np_quantile_conditional,        19},
-    {"np_regression",                  (DL_FUNC) &np_regression,                  20},
-    {"np_regression_bw",               (DL_FUNC) &np_regression_bw,               15},
+    {"np_regression",                  (DL_FUNC) &np_regression,                  22},
+    {"np_regression_bw",               (DL_FUNC) &np_regression_bw,               17},
     {"np_release_static_buffers",      (DL_FUNC) &np_release_static_buffers,       1},
     {"np_set_seed",                    (DL_FUNC) &np_set_seed,                     1},
     {"np_set_tgauss2",                 (DL_FUNC) &np_set_tgauss2,                  1},

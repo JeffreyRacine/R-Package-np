@@ -286,6 +286,8 @@ npreg.rbandwidth <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
       old.reg = FALSE)
+
+    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     
    asDouble <- function(data){
 	   if (is.null(data)){
@@ -311,6 +313,8 @@ npreg.rbandwidth <-
          g = double(ifelse(gradients,enrow*ncol,0)),
          gerr = double(ifelse(gradients,enrow*ncol,0)),
          xtra = double(6),
+         ckerlb = as.double(cker.bounds.c$lb),
+         ckerub = as.double(cker.bounds.c$ub),
          PACKAGE="np" )[c("mean","merr", "g", "gerr", "xtra")]
 
     if (gradients){

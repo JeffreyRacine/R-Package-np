@@ -285,7 +285,7 @@ npksum.default <-
 
     return.names <- c("ksum","kernel.weights","p.ksum")
       
-    myopti = list(
+	    myopti = list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
       num_uno = bws$nuno,
@@ -318,8 +318,10 @@ npksum.default <-
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
       return.kernel.weights = return.kernel.weights,
       permutation.operator = poperator.num,
-      compute.score = compute.score,
-      compute.ocg = compute.ocg)
+	      compute.score = compute.score,
+	      compute.ocg = compute.ocg)
+
+	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     
    asDouble <- function(data){
 	   if (is.null(data)){
@@ -337,13 +339,15 @@ npksum.default <-
          asDouble(tydat), asDouble(weights),
          asDouble(euno),  asDouble(eord),  asDouble(econ), 
          as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
-         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-         as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
-         as.integer(myopti), as.double(kernel.pow),
-         ksum = double(length.out),
-         p.ksum = double(p.length.out),
-         kernel.weights = double(nkw),
-         PACKAGE="np" )[return.names]
+	         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+	         as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
+	         as.integer(myopti), as.double(kernel.pow),
+	         ksum = double(length.out),
+	         p.ksum = double(p.length.out),
+	         kernel.weights = double(nkw),
+	         ckerlb = as.double(cker.bounds.c$lb),
+	         ckerub = as.double(cker.bounds.c$ub),
+	         PACKAGE="np" )[return.names]
 
     if (dim.out[1] > 1){
       dim(myout[["ksum"]]) <- dim.out
