@@ -668,11 +668,12 @@ uMaxL <- function(c, kertype = c("aitchisonaitken","liracine")){
          liracine = 1.0)
 }
 
-oMaxL <- function(c, kertype = c("wangvanryzin", "liracine", "nliracine")){
+oMaxL <- function(c, kertype = c("wangvanryzin", "liracine", "nliracine", "racine-li-yan")){
   switch(kertype,
          wangvanryzin = 1.0,
          liracine = 1.0,
-         nliracine = 1.0)
+         nliracine = 1.0,
+         "racine-li-yan" = 1.0)
 }
 
 ## tested with: rbandwidth
@@ -1083,13 +1084,15 @@ oktToPrint <- function(s, normalized = FALSE) {
       switch(s,
              wangvanryzin = "Wang and Van Ryzin", 
              liracine = "Li and Racine (normalized)",
-             nliracine = "Li and Racine (normalized)")
+             nliracine = "Li and Racine (normalized)",
+             "racine-li-yan" = "Racine, Li, and Yan")
   } else {
     pok <- 
       switch(s,
              wangvanryzin = "Wang and Van Ryzin", 
              liracine = "Li and Racine",
-             nliracine = "Li and Racine (normalized)")
+             nliracine = "Li and Racine (normalized)",
+             "racine-li-yan" = "Racine, Li, and Yan")
   }
   return(pok)
 }
@@ -1316,6 +1319,7 @@ UKER_LR = 1
 OKER_WANG = 0
 OKER_LR = 1
 OKER_NLR = 2
+OKER_RLY = 3
 
 ##density 
 BWM_CVML = 0

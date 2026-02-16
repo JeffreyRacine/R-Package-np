@@ -10,7 +10,7 @@ plbandwidth <-
            ckerlb = NULL,
            ckerub = NULL,
            ukertype = c("aitchisonaitken", "liracine"),
-           okertype = c("liracine","wangvanryzin"),
+           okertype = c("liracine","wangvanryzin","racine-li-yan"),
            xdati, ydati, zdati,
            xnames, ynames, znames,
            nobs = NA,

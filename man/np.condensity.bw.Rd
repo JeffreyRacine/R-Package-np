@@ -89,8 +89,14 @@ npcdensbw(\dots)
           bwtype,
           cxkertype,
           cxkerorder,
+          cxkerbound,
+          cxkerlb,
+          cxkerub,
           cykertype,
           cykerorder,
+          cykerbound,
+          cykerlb,
+          cykerub,
           uxkertype,
           uykertype,
           oxkertype,
@@ -225,6 +231,24 @@ npcdensbw(\dots)
   \code{uniform} continuous kernel type will be ignored. Defaults to
   \code{2}.
   }
+  \item{cxkerbound}{
+    character string controlling continuous-kernel support handling for
+    \code{xdat}. Can be set as \code{none} (default kernel on full support),
+    \code{range} (use sample min/max), or \code{fixed} (use
+    \code{cxkerlb}/\code{cxkerub}).
+  }
+  \item{cxkerlb}{
+    numeric scalar/vector of lower bounds for continuous \code{xdat}
+    variables used when \code{cxkerbound="fixed"}. Must satisfy
+    lower-bound validity for each variable (e.g.,
+    \code{<= min(variable)}). Use \code{-Inf} for unbounded below.
+  }
+  \item{cxkerub}{
+    numeric scalar/vector of upper bounds for continuous \code{xdat}
+    variables used when \code{cxkerbound="fixed"}. Must satisfy
+    upper-bound validity for each variable (e.g.,
+    \code{>= max(variable)}). Use \code{Inf} for unbounded above.
+  }
   \item{cykertype}{
     character string used to specify the continuous kernel type for
     \code{ydat}.
@@ -238,6 +262,24 @@ npcdensbw(\dots)
   \code{uniform} continuous kernel type will be ignored. Defaults to
   \code{2}.
   }
+  \item{cykerbound}{
+    character string controlling continuous-kernel support handling for
+    \code{ydat}. Can be set as \code{none} (default kernel on full support),
+    \code{range} (use sample min/max), or \code{fixed} (use
+    \code{cykerlb}/\code{cykerub}).
+  }
+  \item{cykerlb}{
+    numeric scalar/vector of lower bounds for continuous \code{ydat}
+    variables used when \code{cykerbound="fixed"}. Must satisfy
+    lower-bound validity for each variable (e.g.,
+    \code{<= min(variable)}). Use \code{-Inf} for unbounded below.
+  }
+  \item{cykerub}{
+    numeric scalar/vector of upper bounds for continuous \code{ydat}
+    variables used when \code{cykerbound="fixed"}. Must satisfy
+    upper-bound validity for each variable (e.g.,
+    \code{>= max(variable)}). Use \code{Inf} for unbounded above.
+  }
   \item{uxkertype}{
     character string used to specify the unordered categorical
     kernel type. Can be set as \code{aitchisonaitken} or
@@ -249,12 +291,11 @@ npcdensbw(\dots)
   }
   \item{oxkertype}{
     character string used to specify the ordered categorical
-    kernel type. Can be set as \code{wangvanryzin} or
-    \code{liracine}. Defaults to \code{liracine}.
+    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racine-li-yan}. Defaults to \code{liracine}.
   }
   \item{oykertype}{
     character string used to specify the ordered categorical
-    kernel type. Can be set as \code{wangvanryzin} or \code{liracine}.
+    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racine-li-yan}.
   }
 
   \item{nmulti}{

@@ -65,3 +65,16 @@
   - port shared core changes
   - merge repo-specific R-layer docs/options carefully
   - run smoke benchmark/parity check in MPI path.
+
+9. Conditional density/distribution `regtype` extension (`lc` -> `ll`)
+- Add `regtype = c("lc","ll")` to:
+  - `conbandwidth`/`npcdens*`
+  - `condbandwidth`/`npcdist*`
+- Keep default `regtype = "lc"` (current behavior unchanged).
+- Thread `regtype` through R option lists and C indices (`headers.h`/`np.c`).
+- Implement `ll` branch in conditional estimator core (`src/jksum.c`, `np_kernel_estimate_con_dens_dist_categorical`) rather than only wiring in R.
+- Initial guardrails (phase 1):
+  - hard-stop `gradients=TRUE` with `regtype="ll"` until ll-gradient formulas are implemented,
+  - hard-stop ll bandwidth-selection paths (`cv.ml`/`cv.ls`) until ll CV objectives are validated/implemented.
+- Evaluate shape constraints for conditional CDF under ll (`npcdist`):
+  - potential finite-sample non-monotonicity and out-of-[0,1] behavior; decide policy (raw vs optional projection).

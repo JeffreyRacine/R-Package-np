@@ -93,6 +93,9 @@ npudistbw(\dots)
           bwtype,
           ckertype,
           ckerorder,
+          ckerbound,
+          ckerlb,
+          ckerub,
           okertype,
           \dots) 
 
@@ -228,9 +231,30 @@ npudistbw(\dots)
   \code{2}.
   }
 
+  \item{ckerbound}{
+    character string controlling continuous-kernel support handling.
+    Can be set as \code{none} (default kernel on full support),
+    \code{range} (use sample min/max), or \code{fixed} (use
+    \code{ckerlb}/\code{ckerub}).
+  }
+
+  \item{ckerlb}{
+    numeric scalar/vector of lower bounds for continuous variables used
+    when \code{ckerbound="fixed"}. Must satisfy lower-bound validity for
+    each continuous variable (e.g., \code{<= min(variable)}). Use
+    \code{-Inf} for unbounded below.
+  }
+
+  \item{ckerub}{
+    numeric scalar/vector of upper bounds for continuous variables used
+    when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
+    each continuous variable (e.g., \code{>= max(variable)}). Use
+    \code{Inf} for unbounded above.
+  }
+
   \item{okertype}{
     character string used to specify the ordered categorical kernel type.
-    Can be set as \code{wangvanryzin}.
+    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racine-li-yan}.
   }
 
   \item{nmulti}{

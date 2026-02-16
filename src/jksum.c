@@ -691,6 +691,103 @@ double np_score_onli_racine(const double x, const double y, const double lambda,
   return ((cxy != 0) || (lambda != 0.0)) ? ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0 *lambda) : -2.0;
 }
 
+static inline void np_orly_term_deriv(const int d, const double lambda, double *term, double *dterm){
+  if(d <= 0){
+    *term = 1.0;
+    *dterm = 0.0;
+    return;
+  }
+
+  if(lambda == 0.0){
+    *term = 0.0;
+    *dterm = (d == 1) ? 1.0 : 0.0;
+    return;
+  }
+
+  *term = R_pow_di(lambda, d);
+  *dterm = d * R_pow_di(lambda, d - 1);
+}
+
+static inline double np_orly_denom_support(const double x,
+                                           const double lambda,
+                                           const double * const cats,
+                                           const int ncat,
+                                           const double cl,
+                                           const double ch){
+  double denom = 0.0;
+  int z;
+
+  if(cats != NULL && ncat > 0){
+    int i;
+    for(i = 0; i < ncat; i++)
+      denom += R_pow_di(lambda, (int)fabs(x - cats[i]));
+    return denom;
+  }
+
+  for(z = (int)cl; z <= (int)ch; z++)
+    denom += R_pow_di(lambda, (int)fabs(x - (double)z));
+
+  return denom;
+}
+
+static inline double np_orly_kernel_support(const double x,
+                                            const double y,
+                                            const double lambda,
+                                            const double * const cats,
+                                            const int ncat,
+                                            const double cl,
+                                            const double ch){
+  const double num = R_pow_di(lambda, (int)fabs(x - y));
+  const double den = np_orly_denom_support(x, lambda, cats, ncat, cl, ch);
+  return (den > 0.0) ? (num / den) : 0.0;
+}
+
+static inline double np_orly_score_support(const double x,
+                                           const double y,
+                                           const double lambda,
+                                           const double * const cats,
+                                           const int ncat,
+                                           const double cl,
+                                           const double ch){
+  const int dxy = (int)fabs(x - y);
+  double num, dnum, den = 0.0, dden = 0.0;
+  int z;
+
+  np_orly_term_deriv(dxy, lambda, &num, &dnum);
+
+  if(cats != NULL && ncat > 0){
+    int i;
+    for(i = 0; i < ncat; i++){
+      const int d = (int)fabs(x - cats[i]);
+      double t, dt;
+      np_orly_term_deriv(d, lambda, &t, &dt);
+      den += t;
+      dden += dt;
+    }
+  } else {
+    for(z = (int)cl; z <= (int)ch; z++){
+      const int d = (int)fabs(x - (double)z);
+      double t, dt;
+      np_orly_term_deriv(d, lambda, &t, &dt);
+      den += t;
+      dden += dt;
+    }
+  }
+
+  if(!(den > 0.0))
+    return 0.0;
+
+  return (dnum * den - num * dden)/(den * den);
+}
+
+double np_oracine_li_yan(const double x, const double y, const double lambda, const double cl, const double ch){
+  return np_orly_kernel_support(x, y, lambda, NULL, 0, cl, ch);
+}
+
+double np_score_oracine_li_yan(const double x, const double y, const double lambda, const double cl, const double ch){
+  return np_orly_score_support(x, y, lambda, NULL, 0, cl, ch);
+}
+
 static inline double np_ordered_eval_cached012(const int kernel,
                                                const double x,
                                                const double y,
@@ -709,6 +806,24 @@ static inline double np_ordered_eval_cached012(const int kernel,
     default:
       return 0.0;
   }
+}
+
+static inline double np_ordered_eval_kernel(const int kernel,
+                                            const double x,
+                                            const double y,
+                                            const double lambda,
+                                            const int max_cxy,
+                                            const double * const lpow,
+                                            const double * const cats,
+                                            const int ncat,
+                                            const double cl,
+                                            const double ch){
+  if(kernel >= 0 && kernel <= 2)
+    return np_ordered_eval_cached012(kernel, x, y, lambda, max_cxy, lpow);
+  if(kernel == 3)
+    return np_orly_kernel_support(x, y, lambda, cats, ncat, cl, ch);
+
+  return 0.0;
 }
 
 static inline uint64_t np_mix_u64(uint64_t x){
@@ -1053,9 +1168,10 @@ static inline void np_gate_override_set(const int num_reg_continuous,
 static inline int np_disc_ordered_has_upper(const int kernel){
   /* Exclude WvR family; support Li-Racine and transformed variants. */
   switch(kernel){
-    case 1: case 2: case 5:
-    case 7: case 8:
-    case 10: case 11:
+    case 1: case 2: case 3:
+    case 6: case 7:
+    case 9: case 10: case 11:
+    case 13: case 14: case 15:
       return 1;
     default:
       return 0;
@@ -1212,6 +1328,24 @@ double np_econvol_onli_racine(const double x, const double y, const double lambd
   const double l2 = lambda*lambda;
   return lnorm*lnorm*R_pow_di(lambda, cxy)*((1.0 + l2)/(1.0 - l2) + cxy);
 
+}
+
+double np_econvol_oracine_li_yan(const double x, const double y, const double lambda, const double cl, const double ch){
+  double out = 0.0;
+  int z;
+  const double denx = np_orly_denom_support(x, lambda, NULL, 0, cl, ch);
+  const double deny = np_orly_denom_support(y, lambda, NULL, 0, cl, ch);
+  const double den = denx*deny;
+
+  if(!(den > 0.0))
+    return 0.0;
+
+  for(z = (int)cl; z <= (int)ch; z++){
+    const double zz = (double)z;
+    out += R_pow_di(lambda, (int)fabs(x-zz)) * R_pow_di(lambda, (int)fabs(y-zz));
+  }
+
+  return out/den;
 }
 
 double np_econvol_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -1420,6 +1554,21 @@ double np_cdf_onli_racine(const double y, const double x, const double lambda, c
   const int cxy = (int)fabs(x-y);
   const double gee = R_pow_di(lambda, cxy)/(1.0+lambda);
   return (x < y) ? gee : 1.0 - lambda*gee;
+}
+
+double np_cdf_oracine_li_yan(const double y, const double x, const double lambda, const double cl, const double ch){
+  double out = 0.0;
+  int z;
+  const int xh = (x > ch) ? (int)ch : (int)x;
+  const double den = np_orly_denom_support(y, lambda, NULL, 0, cl, ch);
+
+  if(x < cl || !(den > 0.0))
+    return 0.0;
+
+  for(z = (int)cl; z <= xh; z++)
+    out += R_pow_di(lambda, (int)fabs(y - (double)z));
+
+  return out/den;
 }
 
 // this is a null kernel, it is a placeholder kernel for testing
@@ -3360,10 +3509,10 @@ void np_p_okernelv(const int KERNEL,
   double * const pxw = (bin_do_xw ? p_result : &unit_weight);
 
   double (* const k[])(double, double, double, double, double) = { 
-    np_owang_van_ryzin, np_oli_racine, np_onli_racine, 
-    np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-    np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-    np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+    np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+    np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+    np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+    np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
   };
 
   double *kbuf = scratch_kbuf;
@@ -3382,8 +3531,8 @@ void np_p_okernelv(const int KERNEL,
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
   const int max_cxy = (int)fabs(ch-cl);
-  const int fast_kernel = (KERNEL >= 0 && KERNEL <= 2 && cats != NULL);
-  const int fast_p_kernel = (P_KERNEL >= 0 && P_KERNEL <= 2 && cats != NULL);
+  const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
+  const int fast_p_kernel = (P_KERNEL >= 0 && P_KERNEL <= 3 && cats != NULL);
   double *lpow = NULL;
 
   if((fast_kernel || fast_p_kernel) && max_cxy >= 0){
@@ -3402,7 +3551,7 @@ void np_p_okernelv(const int KERNEL,
         const double c3 = do_ocg ? cat : (swap_xxt ? xt[i] : x);
 
         const double kn = fast_kernel
-          ? np_ordered_eval_cached012(KERNEL, c1, c2, lambda, max_cxy, lpow)
+          ? np_ordered_eval_kernel(KERNEL, c1, c2, lambda, max_cxy, lpow, cats, ncat, cl, ch)
           : k[KERNEL](c1, c2, lambda, cl, ch);
 
         result[i] = xw[j]*kn;
@@ -3410,7 +3559,7 @@ void np_p_okernelv(const int KERNEL,
 
         p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
           (fast_p_kernel
-            ? np_ordered_eval_cached012(P_KERNEL, c1, c3, lambda, max_cxy, lpow)
+            ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
             : k[P_KERNEL](c1, c3, lambda, cl, ch));
       }
 
@@ -3430,7 +3579,7 @@ void np_p_okernelv(const int KERNEL,
           const double c2 = swap_xxt ? xt[i] : x;
 
           const double kn = fast_kernel
-            ? np_ordered_eval_cached012(KERNEL, c1, c2, lambda, max_cxy, lpow)
+            ? np_ordered_eval_kernel(KERNEL, c1, c2, lambda, max_cxy, lpow, cats, ncat, cl, ch)
             : k[KERNEL](c1, c2, lambda, cl, ch);
 
           result[i] = xw[j]*kn;
@@ -3448,7 +3597,7 @@ void np_p_okernelv(const int KERNEL,
 
           p_result[P_IDX*num_xt + i] = pxw[bin_do_xw*P_IDX*num_xt + j]*
             (fast_p_kernel
-              ? np_ordered_eval_cached012(P_KERNEL, c1, c3, lambda, max_cxy, lpow)
+              ? np_ordered_eval_kernel(P_KERNEL, c1, c3, lambda, max_cxy, lpow, cats, ncat, cl, ch)
               : k[P_KERNEL](c1, c3, lambda, cl, ch));
         }
       }
@@ -3495,7 +3644,7 @@ void np_okernelv(const int KERNEL,
   const double cl = (cats != NULL)? cats[0] : 0.0;
   const double ch = (cats != NULL)? cats[ncat - 1] : 0.0;
   const int max_cxy = (int)fabs(ch-cl);
-  const int fast_kernel = (KERNEL >= 0 && KERNEL <= 2 && cats != NULL);
+  const int fast_kernel = (KERNEL >= 0 && KERNEL <= 3 && cats != NULL);
 
   if(fast_kernel && max_cxy >= 0){
     double *lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
@@ -3508,11 +3657,11 @@ void np_okernelv(const int KERNEL,
       if(xl == NULL){
         if(!bin_do_xw){
           for(i = 0; i < num_xt; i++)
-            result[i] = np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+            result[i] = np_ordered_eval_kernel(KERNEL, xt[i], x, lambda, max_cxy, lpow, cats, ncat, cl, ch);
         } else {
           for(i = 0; i < num_xt; i++){
             if(xw[i] == 0.0) continue;
-            result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+            result[i] = xw[i]*np_ordered_eval_kernel(KERNEL, xt[i], x, lambda, max_cxy, lpow, cats, ncat, cl, ch);
           }
         }
       } else {
@@ -3521,11 +3670,11 @@ void np_okernelv(const int KERNEL,
           const int nlev = xl->nlev[m];
           if(!bin_do_xw){
             for(i = istart; i < istart+nlev; i++)
-              result[i] = np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+              result[i] = np_ordered_eval_kernel(KERNEL, xt[i], x, lambda, max_cxy, lpow, cats, ncat, cl, ch);
           } else {
             for(i = istart; i < istart+nlev; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, xt[i], x, lambda, max_cxy, lpow);
+              result[i] = xw[i]*np_ordered_eval_kernel(KERNEL, xt[i], x, lambda, max_cxy, lpow, cats, ncat, cl, ch);
             }
           }
         }
@@ -3534,11 +3683,11 @@ void np_okernelv(const int KERNEL,
       if(xl == NULL){
         if(!bin_do_xw){
           for(i = 0; i < num_xt; i++)
-            result[i] = np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+            result[i] = np_ordered_eval_kernel(KERNEL, x, xt[i], lambda, max_cxy, lpow, cats, ncat, cl, ch);
         } else {
           for(i = 0; i < num_xt; i++){
             if(xw[i] == 0.0) continue;
-            result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+            result[i] = xw[i]*np_ordered_eval_kernel(KERNEL, x, xt[i], lambda, max_cxy, lpow, cats, ncat, cl, ch);
           }
         }
       } else {
@@ -3547,11 +3696,11 @@ void np_okernelv(const int KERNEL,
           const int nlev = xl->nlev[m];
           if(!bin_do_xw){
             for(i = istart; i < istart+nlev; i++)
-              result[i] = np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+              result[i] = np_ordered_eval_kernel(KERNEL, x, xt[i], lambda, max_cxy, lpow, cats, ncat, cl, ch);
           } else {
             for(i = istart; i < istart+nlev; i++){
               if(xw[i] == 0.0) continue;
-              result[i] = xw[i]*np_ordered_eval_cached012(KERNEL, x, xt[i], lambda, max_cxy, lpow);
+              result[i] = xw[i]*np_ordered_eval_kernel(KERNEL, x, xt[i], lambda, max_cxy, lpow, cats, ncat, cl, ch);
             }
           }
         }
@@ -3624,21 +3773,25 @@ void np_okernelv(const int KERNEL,
     case 0: NP_OKERNELV_APPLY(np_owang_van_ryzin); break;
     case 1: NP_OKERNELV_APPLY(np_oli_racine); break;
     case 2: NP_OKERNELV_APPLY(np_onli_racine); break;
-    case 3: NP_OKERNELV_APPLY(np_econvol_owang_van_ryzin); break;
-    case 4: NP_OKERNELV_APPLY(np_onull); break;
-    case 5: NP_OKERNELV_APPLY(np_econvol_onli_racine); break;
-    case 6: NP_OKERNELV_APPLY(np_onull); break;
-    case 7: NP_OKERNELV_APPLY(np_onull); break;
-    case 8: NP_OKERNELV_APPLY(np_onull); break;
-    case 9: NP_OKERNELV_APPLY(np_cdf_owang_van_ryzin); break;
-    case 10: NP_OKERNELV_APPLY(np_cdf_oli_racine); break;
-    case 11: NP_OKERNELV_APPLY(np_cdf_onli_racine); break;
+    case 3: NP_OKERNELV_APPLY(np_oracine_li_yan); break;
+    case 4: NP_OKERNELV_APPLY(np_econvol_owang_van_ryzin); break;
+    case 5: NP_OKERNELV_APPLY(np_onull); break;
+    case 6: NP_OKERNELV_APPLY(np_econvol_onli_racine); break;
+    case 7: NP_OKERNELV_APPLY(np_econvol_oracine_li_yan); break;
+    case 8: NP_OKERNELV_APPLY(np_score_owang_van_ryzin); break;
+    case 9: NP_OKERNELV_APPLY(np_score_oli_racine); break;
+    case 10: NP_OKERNELV_APPLY(np_score_onli_racine); break;
+    case 11: NP_OKERNELV_APPLY(np_score_oracine_li_yan); break;
+    case 12: NP_OKERNELV_APPLY(np_cdf_owang_van_ryzin); break;
+    case 13: NP_OKERNELV_APPLY(np_cdf_oli_racine); break;
+    case 14: NP_OKERNELV_APPLY(np_cdf_onli_racine); break;
+    case 15: NP_OKERNELV_APPLY(np_cdf_oracine_li_yan); break;
     default: {
       double (* const k[])(double, double, double, double, double) = {
-        np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-        np_onull, np_onull, np_onull,
-        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+        np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
       };
       const int kernel = (KERNEL >= 0 && KERNEL < (int)(sizeof(k)/sizeof(k[0]))) ? KERNEL : 0;
 
@@ -4550,10 +4703,10 @@ double * const kw){
 
     if(disc_ord_const_ok != NULL && disc_ord_const != NULL){
       double (* const okf[])(double, double, double, double, double) = {
-        np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+        np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
       };
       const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
 
@@ -5139,10 +5292,10 @@ double * const kw){
         np_score_uaa, np_score_unli_racine
       };
       double (* const okf[])(double, double, double, double, double) = {
-        np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+        np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
       };
       const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
       const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
@@ -5901,10 +6054,10 @@ double *trace_out){
       np_score_uaa, np_score_unli_racine
     };
     double (* const okf[])(double, double, double, double, double) = {
-      np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-      np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-      np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-      np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+      np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
     };
     const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
     const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
@@ -6245,10 +6398,10 @@ int *num_categories){
       ok_all = (ov_disc_ord_ok != NULL) && (ov_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_reg_ordered; i++){
@@ -7831,10 +7984,10 @@ double *cv){
       ok_all = (x_disc_ord_ok != NULL) && (x_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_reg_ordered; i++){
@@ -7937,10 +8090,10 @@ double *cv){
       ok_all = (y_disc_ord_ok != NULL) && (y_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_var_ordered; i++){
@@ -8990,10 +9143,10 @@ double *cv){
       ok_all = (x_disc_ord_ok != NULL) && (x_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_reg_ordered; i++){
@@ -9091,10 +9244,10 @@ double *cv){
       ok_all = (y_disc_ord_ok != NULL) && (y_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_var_ordered; i++){
@@ -9192,10 +9345,10 @@ double *cv){
       ok_all = (xy_disc_ord_ok != NULL) && (xy_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_all_ovar; i++){
@@ -10893,10 +11046,10 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
       ok_all = (ov_disc_ord_ok != NULL) && (ov_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_reg_ordered; i++){
@@ -11231,10 +11384,10 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
       ok_all = (ov_disc_ord_ok != NULL) && (ov_disc_ord_const != NULL);
       if(ok_all){
         double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine,
-          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine,
-          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine,
-          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
         };
         const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
         for(i = 0; i < num_reg_ordered; i++){
