@@ -1,3 +1,28 @@
+Changes from Version 0.60-21 to 0.60-22 [16-Feb-2026]
+
+* Ported bounded continuous-kernel support from np master across npRmpi
+  interfaces and C pathways with unified bound controls:
+  - bound modes `none`, `range`, and `fixed`
+  - per-variable lower/upper bounds (`*kerlb`, `*kerub`)
+  - fixed-bandwidth enforcement for finite-bound operation.
+
+* Added the ordered kernel option `"racine-li-yan"` to ordered-kernel
+  interfaces (`okertype`, `oxkertype`, `oykertype`) and synchronized
+  conditional-density/distribution mappings.
+
+* Synchronized bounded-kernel normalization/convolution support in shared
+  kernel-sum code used by conditional-density/distribution LS-CV pathways.
+
+* Fixed internal package registration targets for native setup calls in
+  npRmpi R wrappers:
+  - `.C("np_set_seed", ..., PACKAGE="npRmpi")`
+  - `.C("np_set_tgauss2", ..., PACKAGE="npRmpi")`
+  resolving R CMD check foreign-call NOTEs about cross-package targets.
+
+* Deprecated `bwmethod="cv.ls.np"`: calls are now aliased to `cv.ls` with a
+  one-time per-session warning to preserve backward compatibility while
+  removing a stale legacy selector path.
+
 Changes from Version 0.60-20 to 0.60-21 [12-Feb-2026]
 
 * Ported recent core-performance updates from np master (kernel/jksum
