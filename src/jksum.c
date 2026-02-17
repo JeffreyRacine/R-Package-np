@@ -871,6 +871,204 @@ static inline int np_same_discrete_profile_idx(const int ia,
   return 1;
 }
 
+static int np_build_discrete_profile_index(const int num_xt,
+                                           const int num_reg_unordered,
+                                           const int num_reg_ordered,
+                                           double * const * const xtu,
+                                           double * const * const xto,
+                                           int **out_disc_prof_id,
+                                           int **out_disc_prof_rep,
+                                           int *out_disc_nprof){
+  int i, pos, pid;
+  int tsz = 1;
+  int nprof = 0;
+  int *disc_prof_id = NULL, *disc_prof_rep = NULL, *htable = NULL;
+  uint64_t *disc_prof_hash = NULL;
+
+  if(out_disc_prof_id == NULL || out_disc_prof_rep == NULL || out_disc_nprof == NULL)
+    return 0;
+
+  *out_disc_prof_id = NULL;
+  *out_disc_prof_rep = NULL;
+  *out_disc_nprof = 0;
+
+  if(num_xt <= 0 || (num_reg_unordered + num_reg_ordered) <= 1)
+    return 0;
+
+  disc_prof_id = (int *)malloc((size_t)num_xt*sizeof(int));
+  disc_prof_rep = (int *)malloc((size_t)num_xt*sizeof(int));
+  disc_prof_hash = (uint64_t *)malloc((size_t)num_xt*sizeof(uint64_t));
+
+  if(disc_prof_id == NULL || disc_prof_rep == NULL || disc_prof_hash == NULL)
+    goto fail;
+
+  while(tsz < (2*num_xt)) tsz <<= 1;
+  htable = (int *)malloc((size_t)tsz*sizeof(int));
+  if(htable == NULL)
+    goto fail;
+
+  for(i = 0; i < tsz; i++)
+    htable[i] = -1;
+
+  for(i = 0; i < num_xt; i++){
+    const uint64_t h = np_hash_discrete_profile_idx(i, num_reg_unordered, num_reg_ordered, xtu, xto);
+    pos = (int)(h & (uint64_t)(tsz - 1));
+    pid = -1;
+
+    while(1){
+      const int hs = htable[pos];
+      if(hs < 0){
+        pid = nprof++;
+        htable[pos] = pid;
+        disc_prof_rep[pid] = i;
+        disc_prof_hash[pid] = h;
+        break;
+      }
+      if(disc_prof_hash[hs] == h &&
+         np_same_discrete_profile_idx(i, disc_prof_rep[hs], num_reg_unordered, num_reg_ordered, xtu, xto)){
+        pid = hs;
+        break;
+      }
+      pos = (pos + 1) & (tsz - 1);
+    }
+
+    disc_prof_id[i] = pid;
+  }
+
+  free(htable);
+  free(disc_prof_hash);
+
+  *out_disc_prof_id = disc_prof_id;
+  *out_disc_prof_rep = disc_prof_rep;
+  *out_disc_nprof = nprof;
+  return 1;
+
+ fail:
+  if(htable != NULL) free(htable);
+  if(disc_prof_hash != NULL) free(disc_prof_hash);
+  if(disc_prof_id != NULL) free(disc_prof_id);
+  if(disc_prof_rep != NULL) free(disc_prof_rep);
+  return 0;
+}
+
+typedef struct {
+  int valid;
+  int num_xt;
+  int num_reg_unordered;
+  int num_reg_ordered;
+  int nprof;
+  const double **xtu_rows;
+  const double **xto_rows;
+  int *disc_prof_id;
+  int *disc_prof_rep;
+} NP_DiscProfileCache;
+
+static NP_DiscProfileCache np_disc_profile_cache = {0};
+
+static inline void np_disc_profile_cache_clear(void){
+  if(np_disc_profile_cache.xtu_rows != NULL) free((void *)np_disc_profile_cache.xtu_rows);
+  if(np_disc_profile_cache.xto_rows != NULL) free((void *)np_disc_profile_cache.xto_rows);
+  if(np_disc_profile_cache.disc_prof_id != NULL) free(np_disc_profile_cache.disc_prof_id);
+  if(np_disc_profile_cache.disc_prof_rep != NULL) free(np_disc_profile_cache.disc_prof_rep);
+  memset(&np_disc_profile_cache, 0, sizeof(np_disc_profile_cache));
+}
+
+static int np_disc_profile_cache_match(const int num_xt,
+                                       const int num_reg_unordered,
+                                       const int num_reg_ordered,
+                                       double * const * const xtu,
+                                       double * const * const xto){
+  int i;
+  if(!np_disc_profile_cache.valid) return 0;
+  if(np_disc_profile_cache.num_xt != num_xt) return 0;
+  if(np_disc_profile_cache.num_reg_unordered != num_reg_unordered) return 0;
+  if(np_disc_profile_cache.num_reg_ordered != num_reg_ordered) return 0;
+  if(num_reg_unordered > 0){
+    if(np_disc_profile_cache.xtu_rows == NULL || xtu == NULL) return 0;
+    for(i = 0; i < num_reg_unordered; i++)
+      if(np_disc_profile_cache.xtu_rows[i] != xtu[i]) return 0;
+  }
+  if(num_reg_ordered > 0){
+    if(np_disc_profile_cache.xto_rows == NULL || xto == NULL) return 0;
+    for(i = 0; i < num_reg_ordered; i++)
+      if(np_disc_profile_cache.xto_rows[i] != xto[i]) return 0;
+  }
+  return 1;
+}
+
+static int np_disc_profile_cache_get_or_build(const int num_xt,
+                                              const int num_reg_unordered,
+                                              const int num_reg_ordered,
+                                              double * const * const xtu,
+                                              double * const * const xto,
+                                              int **out_disc_prof_id,
+                                              int **out_disc_prof_rep,
+                                              int *out_disc_nprof){
+  int i;
+  int *disc_prof_id = NULL, *disc_prof_rep = NULL;
+  const double **xtu_rows = NULL, **xto_rows = NULL;
+  int nprof = 0;
+
+  if(out_disc_prof_id == NULL || out_disc_prof_rep == NULL || out_disc_nprof == NULL)
+    return 0;
+
+  *out_disc_prof_id = NULL;
+  *out_disc_prof_rep = NULL;
+  *out_disc_nprof = 0;
+
+  if(np_disc_profile_cache_match(num_xt, num_reg_unordered, num_reg_ordered, xtu, xto)){
+    *out_disc_prof_id = np_disc_profile_cache.disc_prof_id;
+    *out_disc_prof_rep = np_disc_profile_cache.disc_prof_rep;
+    *out_disc_nprof = np_disc_profile_cache.nprof;
+    return 1;
+  }
+
+  if(!np_build_discrete_profile_index(num_xt,
+                                      num_reg_unordered,
+                                      num_reg_ordered,
+                                      xtu,
+                                      xto,
+                                      &disc_prof_id,
+                                      &disc_prof_rep,
+                                      &nprof))
+    return 0;
+
+  if(num_reg_unordered > 0){
+    xtu_rows = (const double **)malloc((size_t)num_reg_unordered*sizeof(double *));
+    if(xtu_rows == NULL) goto fail;
+    for(i = 0; i < num_reg_unordered; i++) xtu_rows[i] = xtu[i];
+  }
+
+  if(num_reg_ordered > 0){
+    xto_rows = (const double **)malloc((size_t)num_reg_ordered*sizeof(double *));
+    if(xto_rows == NULL) goto fail;
+    for(i = 0; i < num_reg_ordered; i++) xto_rows[i] = xto[i];
+  }
+
+  np_disc_profile_cache_clear();
+  np_disc_profile_cache.valid = 1;
+  np_disc_profile_cache.num_xt = num_xt;
+  np_disc_profile_cache.num_reg_unordered = num_reg_unordered;
+  np_disc_profile_cache.num_reg_ordered = num_reg_ordered;
+  np_disc_profile_cache.nprof = nprof;
+  np_disc_profile_cache.xtu_rows = xtu_rows;
+  np_disc_profile_cache.xto_rows = xto_rows;
+  np_disc_profile_cache.disc_prof_id = disc_prof_id;
+  np_disc_profile_cache.disc_prof_rep = disc_prof_rep;
+
+  *out_disc_prof_id = np_disc_profile_cache.disc_prof_id;
+  *out_disc_prof_rep = np_disc_profile_cache.disc_prof_rep;
+  *out_disc_nprof = np_disc_profile_cache.nprof;
+  return 1;
+
+ fail:
+  if(xtu_rows != NULL) free((void *)xtu_rows);
+  if(xto_rows != NULL) free((void *)xto_rows);
+  if(disc_prof_id != NULL) free(disc_prof_id);
+  if(disc_prof_rep != NULL) free(disc_prof_rep);
+  return 0;
+}
+
 /*
   Large-bandwidth shortcut for ordinary continuous kernels:
   if max_i |(x - x_i)/h| <= u_tol, replace K((x-x_i)/h) by K(0) to avoid
@@ -1110,6 +1308,10 @@ typedef struct {
   const double *disc_uno_const;
   const int *disc_ord_ok;
   const double *disc_ord_const;
+  int disc_prof_num_xt;
+  int disc_nprof;
+  const int *disc_prof_id;
+  const int *disc_prof_rep;
 } NP_GateOverrideCtx;
 
 static NP_GateOverrideCtx np_gate_override_ctx = {0};
@@ -1163,6 +1365,16 @@ static inline void np_gate_override_set(const int num_reg_continuous,
   np_gate_override_ctx.disc_uno_const = disc_uno_const;
   np_gate_override_ctx.disc_ord_ok = disc_ord_ok;
   np_gate_override_ctx.disc_ord_const = disc_ord_const;
+}
+
+static inline void np_gate_override_set_disc_profile(const int num_xt,
+                                                     const int * const disc_prof_id,
+                                                     const int * const disc_prof_rep,
+                                                     const int disc_nprof){
+  np_gate_override_ctx.disc_prof_num_xt = num_xt;
+  np_gate_override_ctx.disc_prof_id = disc_prof_id;
+  np_gate_override_ctx.disc_prof_rep = disc_prof_rep;
+  np_gate_override_ctx.disc_nprof = disc_nprof;
 }
 
 static inline int np_disc_ordered_has_upper(const int kernel){
@@ -4389,6 +4601,8 @@ double * const kw){
   double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
   double *perm_kbuf = NULL;
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
+  int disc_profile_from_override = 0;
+  int disc_profile_from_global_cache = 0;
   int *disc_prof_id = NULL, *disc_prof_rep = NULL, *disc_prof_mark = NULL;
   int *disc_prof_list = NULL, *disc_active_idx = NULL;
   uint64_t *disc_prof_hash = NULL;
@@ -4891,71 +5105,54 @@ double * const kw){
   if((!doscoreocg) && (p_nvar == 0) &&
      ((num_reg_unordered + num_reg_ordered) > 1) &&
      (num_xt >= 128)){
-
-    disc_prof_id = (int *)malloc((size_t)num_xt*sizeof(int));
-    disc_prof_rep = (int *)malloc((size_t)num_xt*sizeof(int));
-    disc_prof_hash = (uint64_t *)malloc((size_t)num_xt*sizeof(uint64_t));
-
-    if(disc_prof_id != NULL && disc_prof_rep != NULL && disc_prof_hash != NULL){
-      int tsz = 1;
-      while(tsz < (2*num_xt)) tsz <<= 1;
-      int *htable = (int *)malloc((size_t)tsz*sizeof(int));
-
-      if(htable != NULL){
-        for(i = 0; i < tsz; i++) htable[i] = -1;
-
+    if(np_gate_override_ctx.disc_prof_id != NULL &&
+       np_gate_override_ctx.disc_prof_rep != NULL &&
+       np_gate_override_ctx.disc_nprof > 0 &&
+       np_gate_override_ctx.disc_prof_num_xt == num_xt){
+      disc_prof_id = (int *)np_gate_override_ctx.disc_prof_id;
+      disc_prof_rep = (int *)np_gate_override_ctx.disc_prof_rep;
+      disc_nprof = np_gate_override_ctx.disc_nprof;
+      disc_profile_from_override = 1;
+      disc_profile_from_global_cache = 0;
+    } else {
+      disc_profile_from_override = 0;
+      if(np_disc_profile_cache_get_or_build(num_xt,
+                                            num_reg_unordered,
+                                            num_reg_ordered,
+                                            xtu,
+                                            xto,
+                                            &disc_prof_id,
+                                            &disc_prof_rep,
+                                            &disc_nprof)){
+        disc_profile_from_global_cache = 1;
+      } else {
+        disc_prof_id = NULL;
+        disc_prof_rep = NULL;
         disc_nprof = 0;
-        for(i = 0; i < num_xt; i++){
-          const uint64_t h = np_hash_discrete_profile_idx(i, num_reg_unordered, num_reg_ordered, xtu, xto);
-          int pos = (int)(h & (uint64_t)(tsz - 1));
-          int pid = -1;
+        disc_profile_from_global_cache = 0;
+      }
+    }
 
-          while(1){
-            const int hs = htable[pos];
-            if(hs < 0){
-              pid = disc_nprof++;
-              htable[pos] = pid;
-              disc_prof_rep[pid] = i;
-              disc_prof_hash[pid] = h;
-              break;
-            }
+    if((disc_nprof > 0) && (4*disc_nprof <= 3*num_xt)){
+      disc_prof_mark = (int *)calloc((size_t)disc_nprof, sizeof(int));
+      disc_prof_list = (int *)malloc((size_t)disc_nprof*sizeof(int));
+      disc_active_idx = (int *)malloc((size_t)num_xt*sizeof(int));
+      disc_prof_val = (double *)malloc((size_t)disc_nprof*sizeof(double));
 
-            if(disc_prof_hash[hs] == h &&
-               np_same_discrete_profile_idx(i, disc_prof_rep[hs], num_reg_unordered, num_reg_ordered, xtu, xto)){
-              pid = hs;
-              break;
-            }
+      if(num_reg_ordered > 0){
+        disc_ord_cl = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+        disc_ord_ch = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+      }
 
-            pos = (pos + 1) & (tsz - 1);
-          }
-
-          disc_prof_id[i] = pid;
+      if(disc_prof_mark != NULL && disc_prof_list != NULL &&
+         disc_active_idx != NULL && disc_prof_val != NULL &&
+         ((num_reg_ordered == 0) || (disc_ord_cl != NULL && disc_ord_ch != NULL))){
+        for(i = 0; i < num_reg_ordered; i++){
+          const int oi = i + num_reg_unordered;
+          disc_ord_cl[i] = (matrix_categorical_vals != NULL) ? matrix_categorical_vals[oi][0] : 0.0;
+          disc_ord_ch[i] = (matrix_categorical_vals != NULL) ? matrix_categorical_vals[oi][num_categories[oi] - 1] : 0.0;
         }
-
-        free(htable);
-
-        if((disc_nprof > 0) && (4*disc_nprof <= 3*num_xt)){
-          disc_prof_mark = (int *)calloc((size_t)disc_nprof, sizeof(int));
-          disc_prof_list = (int *)malloc((size_t)disc_nprof*sizeof(int));
-          disc_active_idx = (int *)malloc((size_t)num_xt*sizeof(int));
-          disc_prof_val = (double *)malloc((size_t)disc_nprof*sizeof(double));
-
-          if(num_reg_ordered > 0){
-            disc_ord_cl = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
-            disc_ord_ch = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
-          }
-
-          if(disc_prof_mark != NULL && disc_prof_list != NULL &&
-             disc_active_idx != NULL && disc_prof_val != NULL &&
-             ((num_reg_ordered == 0) || (disc_ord_cl != NULL && disc_ord_ch != NULL))){
-            for(i = 0; i < num_reg_ordered; i++){
-              const int oi = i + num_reg_unordered;
-              disc_ord_cl[i] = (matrix_categorical_vals != NULL) ? matrix_categorical_vals[oi][0] : 0.0;
-              disc_ord_ch[i] = (matrix_categorical_vals != NULL) ? matrix_categorical_vals[oi][num_categories[oi] - 1] : 0.0;
-            }
-            use_disc_profile_cache = 1;
-          }
-        }
+        use_disc_profile_cache = 1;
       }
     }
 
@@ -4966,9 +5163,8 @@ double * const kw){
       if(disc_prof_val != NULL){ free(disc_prof_val); disc_prof_val = NULL; }
       if(disc_ord_cl != NULL){ free(disc_ord_cl); disc_ord_cl = NULL; }
       if(disc_ord_ch != NULL){ free(disc_ord_ch); disc_ord_ch = NULL; }
-      if(disc_prof_id != NULL){ free(disc_prof_id); disc_prof_id = NULL; }
-      if(disc_prof_rep != NULL){ free(disc_prof_rep); disc_prof_rep = NULL; }
-      if(disc_prof_hash != NULL){ free(disc_prof_hash); disc_prof_hash = NULL; }
+      if((disc_prof_id != NULL) && (!disc_profile_from_override) && (!disc_profile_from_global_cache)){ free(disc_prof_id); disc_prof_id = NULL; }
+      if((disc_prof_rep != NULL) && (!disc_profile_from_override) && (!disc_profile_from_global_cache)){ free(disc_prof_rep); disc_prof_rep = NULL; }
       disc_nprof = 0;
     }
   }
@@ -5587,8 +5783,8 @@ double * const kw){
     free(p_dband);
   }
 
-  if(disc_prof_id != NULL) free(disc_prof_id);
-  if(disc_prof_rep != NULL) free(disc_prof_rep);
+  if((disc_prof_id != NULL) && (!disc_profile_from_override) && (!disc_profile_from_global_cache)) free(disc_prof_id);
+  if((disc_prof_rep != NULL) && (!disc_profile_from_override) && (!disc_profile_from_global_cache)) free(disc_prof_rep);
   if(disc_prof_hash != NULL) free(disc_prof_hash);
   if(disc_prof_mark != NULL) free(disc_prof_mark);
   if(disc_prof_list != NULL) free(disc_prof_list);
@@ -6307,7 +6503,9 @@ int *num_categories){
   int * operator = NULL;
   int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
   int gate_override_active = 0;
+  int gate_disc_profile_active = 0;
   int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
+  int *ov_disc_prof_id = NULL, *ov_disc_prof_rep = NULL, ov_disc_nprof = 0;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
 
@@ -6504,6 +6702,21 @@ int *num_categories){
         (fabs(matrix_bandwidth[i][0]) >= ov_cont_hmin[i]);
     }
     all_cont_largeh_fixed = ok_all;
+  }
+
+  if(np_build_discrete_profile_index(num_obs,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     matrix_X_unordered,
+                                     matrix_X_ordered,
+                                     &ov_disc_prof_id,
+                                     &ov_disc_prof_rep,
+                                     &ov_disc_nprof)){
+    np_gate_override_set_disc_profile(num_obs,
+                                      ov_disc_prof_id,
+                                      ov_disc_prof_rep,
+                                      ov_disc_nprof);
+    gate_disc_profile_active = 1;
   }
 
 
@@ -7330,6 +7543,8 @@ int *num_categories){
   free_tmat(matrix_bandwidth);
   if(gate_override_active)
     np_gate_override_clear();
+  if(gate_disc_profile_active)
+    np_gate_override_clear();
   if(ov_cont_ok != NULL) free(ov_cont_ok);
   if(ov_cont_hmin != NULL) free(ov_cont_hmin);
   if(ov_cont_k0 != NULL) free(ov_cont_k0);
@@ -7337,6 +7552,8 @@ int *num_categories){
   if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
   if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
   if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
+  if(ov_disc_prof_id != NULL) free(ov_disc_prof_id);
+  if(ov_disc_prof_rep != NULL) free(ov_disc_prof_rep);
 
 	/* Negative penalties are treated as infinite: Hurvich et al pg 277 */
 
