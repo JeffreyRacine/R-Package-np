@@ -1064,12 +1064,15 @@ bwtToPrint <- function(s){
          adaptive_nn = "Adaptive Nearest Neighbour" )
 }
 
-cktToPrint <- function(s, order = ""){
-  switch(s,
-         gaussian = paste(order,"Gaussian"),
-         epanechnikov =  paste(order,"Epanechnikov"),
-         uniform = "Uniform",
-         "truncated gaussian" = "Truncated Gaussian")
+cktToPrint <- function(s, order = "", kerbound = "none"){
+  pck <- switch(s,
+                gaussian = paste(order,"Gaussian"),
+                epanechnikov =  paste(order,"Epanechnikov"),
+                uniform = "Uniform",
+                "truncated gaussian" = "Truncated Gaussian")
+  if (!is.null(kerbound) && !identical(kerbound, "none"))
+    pck <- paste0(pck, " (bounded/", kerbound, ")")
+  pck
 }
 
 uktToPrint <- function(s){

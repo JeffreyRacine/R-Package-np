@@ -103,7 +103,7 @@ bandwidth <-
       ckerbound = cbounds$bound,
       ckerlb = cbounds$lb,
       ckerub = cbounds$ub,
-      pckertype = cktToPrint(ckertype, order = porder),
+      pckertype = cktToPrint(ckertype, order = porder, kerbound = cbounds$bound),
       ukertype = ukertype,
       pukertype = uktToPrint(ukertype),
       okertype = okertype,
