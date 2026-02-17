@@ -244,7 +244,7 @@ npudensbw(\dots)
 
   \item{okertype}{
     character string used to specify the ordered categorical kernel type.
-    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racine-li-yan}.
+    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}.
   }
 
   \item{nmulti}{

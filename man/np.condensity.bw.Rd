@@ -291,11 +291,11 @@ npcdensbw(\dots)
   }
   \item{oxkertype}{
     character string used to specify the ordered categorical
-    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racine-li-yan}. Defaults to \code{liracine}.
+    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}. Defaults to \code{liracine}.
   }
   \item{oykertype}{
     character string used to specify the ordered categorical
-    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racine-li-yan}.
+    kernel type. Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}.
   }
 
   \item{nmulti}{

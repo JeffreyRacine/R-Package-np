@@ -309,7 +309,7 @@ npksum.default <-
         wangvanryzin = OKER_WANG,
         liracine = OKER_LR,
         nliracine = OKER_NLR,
-        "racine-li-yan" = OKER_RLY),
+        "racineliyan" = OKER_RLY),
       miss.ex = miss.ex,
       leave.one.out = leave.one.out, 
       bandwidth.divide = bandwidth.divide,

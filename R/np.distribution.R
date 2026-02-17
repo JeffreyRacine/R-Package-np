@@ -156,7 +156,7 @@ npudist.dbandwidth <-
       okerneval = switch(bws$okertype,
         wangvanryzin = OKER_WANG,
         liracine = OKER_NLR,
-        "racine-li-yan" = OKER_RLY),
+        "racineliyan" = OKER_RLY),
       no.e = no.e,
       mcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DIST,

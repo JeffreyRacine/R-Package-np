@@ -9,7 +9,7 @@ dbandwidth <-
            ckerlb = NULL,
            ckerub = NULL,
            ukertype = c("aitchisonaitken","liracine"),
-           okertype = c("liracine","wangvanryzin","racine-li-yan"),
+           okertype = c("liracine","wangvanryzin","racineliyan"),
            fval = NA,
            ifval = NA,
            num.feval = NA,
