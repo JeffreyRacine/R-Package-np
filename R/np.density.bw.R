@@ -159,7 +159,7 @@ npudensbw.bandwidth <-
         okerneval = switch(bws$okertype,
           wangvanryzin = OKER_WANG,
           liracine = OKER_NLR,
-        "racine-li-yan" = OKER_RLY),
+        "racineliyan" = OKER_RLY),
         nuno = dim(duno)[2],
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],

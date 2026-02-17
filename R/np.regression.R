@@ -277,7 +277,7 @@ npreg.rbandwidth <-
       okerneval = switch(bws$okertype,
         wangvanryzin = OKER_WANG,
         liracine = OKER_LR,
-        "racine-li-yan" = OKER_RLY),
+        "racineliyan" = OKER_RLY),
       ey_is_ty = no.ey,
       do_grad = gradients,
       regtype = switch(bws$regtype,

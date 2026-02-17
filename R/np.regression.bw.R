@@ -185,7 +185,7 @@ npregbw.rbandwidth <-
         okerneval = switch(bws$okertype,
           wangvanryzin = OKER_WANG,
           liracine = OKER_LR,
-        "racine-li-yan" = OKER_RLY),
+        "racineliyan" = OKER_RLY),
         nuno = bws$nuno,
         nord = bws$nord,
         ncon = bws$ncon,
