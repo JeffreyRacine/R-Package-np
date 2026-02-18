@@ -369,6 +369,7 @@ double *vector_Y_null;
 
 int int_ll_extern=0;
 int *vector_glp_degree_extern=NULL;
+int int_glp_bernstein_extern=0;
 
 int KERNEL_reg_extern=0;
 int KERNEL_reg_unordered_extern=0;
@@ -4318,6 +4319,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                       double * objective_function_fallback,
                       int * penalty_mode, double * penalty_mult,
                       int * glp_degree,
+                      int * glp_bernstein,
                       double * ckerlb, double * ckerub){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
@@ -4379,6 +4381,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   int_ll_extern = myopti[RBW_LL];
   vector_glp_degree_extern = glp_degree;
+  int_glp_bernstein_extern = *glp_bernstein;
 
   int_TREE_X = myopti[RBW_DOTREEI];
   scale_cat = myopti[RBW_SCATI];
@@ -4891,6 +4894,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
 
   //fprintf(stderr,"\nNP TOASTY\n");
   return ;
@@ -4905,6 +4909,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * nconfac, double * ncatfac, double * mysd,
                    int * myopti, 
                    int * glp_degree,
+                   int * glp_bernstein,
                    double * cm, double * cmerr, double * g, double *gerr, 
                    double * xtra,
                    double * ckerlb, double * ckerub){
@@ -4951,6 +4956,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   do_grad = myopti[REG_GRAD];
   int_ll_extern = myopti[REG_LL];
   vector_glp_degree_extern = glp_degree;
+  int_glp_bernstein_extern = *glp_bernstein;
 
   max_lev = myopti[REG_MLEVI];
   pad_num = *padnum;
@@ -5344,6 +5350,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
 
   return;
 }

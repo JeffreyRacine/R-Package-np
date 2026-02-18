@@ -56,6 +56,7 @@ npregbw(\dots)
         penalty.multiplier = 10,
         regtype,
         glp.degree,
+        glp.bernstein,
         bwmethod,
         bwscaling,
         bwtype,
@@ -176,6 +177,15 @@ npregbw(\dots)
     degree one for each continuous predictor. Entries must be
     non-negative integers in \code{[0,12]}. Bandwidth optimization
     treats this vector as fixed input and optimizes only bandwidths.
+  }
+
+  \item{glp.bernstein}{
+    logical flag relevant only when \code{regtype="glp"}. If
+    \code{FALSE} (default), the GLP basis uses raw local-polynomial
+    powers (stable for extrapolation). If \code{TRUE}, a Bernstein
+    (B-spline) basis is used for continuous predictors. For
+    \code{glp.bernstein=TRUE}, prediction/evaluation points must lie
+    within the training support of each continuous predictor.
   }
   
   \item{bwmethod}{

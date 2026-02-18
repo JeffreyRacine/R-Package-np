@@ -129,6 +129,19 @@ npValidateGlpDegree <- function(regtype, glp.degree, ncon, argname = "glp.degree
   as.integer(glp.degree)
 }
 
+npValidateGlpBernstein <- function(regtype, glp.bernstein, argname = "glp.bernstein") {
+  if (!identical(regtype, "glp"))
+    return(FALSE)
+
+  if (is.null(glp.bernstein))
+    glp.bernstein <- FALSE
+
+  if (!is.logical(glp.bernstein) || length(glp.bernstein) != 1L || is.na(glp.bernstein))
+    stop(sprintf("%s must be TRUE or FALSE", argname))
+
+  isTRUE(glp.bernstein)
+}
+
 npValidateGlpGradientOrder <- function(regtype,
                                        gradient.order,
                                        ncon,

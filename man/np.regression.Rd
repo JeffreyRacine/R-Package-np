@@ -184,7 +184,10 @@ FALSE, \dots)
 
   When bandwidths are obtained with \code{regtype="glp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via
-  \code{glp.degree}. The homogeneous degree-0 and degree-1 cases remain
+  \code{glp.degree}. The optional flag \code{glp.bernstein} controls
+  basis construction: \code{FALSE} (default) uses raw local-polynomial
+  powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
+  homogeneous degree-0 and degree-1 cases remain
   equivalent to \code{lc} and \code{ll}, respectively. Current GLP
   derivative output is first-order for continuous predictors; higher
   order and cross-partial extraction are reserved for future extension.
@@ -192,7 +195,10 @@ FALSE, \dots)
   predictors are returned as \code{NA}.
   The degree vector is fixed user input (one entry per continuous
   predictor, non-negative integers in \code{[0,12]}), while
-  optimization remains over bandwidths only.
+  optimization remains over bandwidths only. For
+  \code{glp.bernstein=TRUE}, evaluation points for continuous predictors
+  must lie within training support; use \code{glp.bernstein=FALSE} for
+  extrapolation.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths can lead to numerical problems for the local linear

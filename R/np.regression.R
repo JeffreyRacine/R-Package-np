@@ -151,6 +151,8 @@ npreg.rbandwidth <-
     bws$glp.degree <- npValidateGlpDegree(regtype = bws$regtype,
                                           glp.degree = bws$glp.degree,
                                           ncon = bws$ncon)
+    bws$glp.bernstein <- npValidateGlpBernstein(regtype = bws$regtype,
+                                                glp.bernstein = bws$glp.bernstein)
     glp.gradient.order <- npValidateGlpGradientOrder(regtype = bws$regtype,
                                                      gradient.order = gradient.order,
                                                      ncon = bws$ncon)
@@ -201,6 +203,19 @@ npreg.rbandwidth <-
 
       if (all(goodrows==0))
         stop("Evaluation data has no rows without NAs")
+    }
+
+    if (identical(bws$regtype, "glp") &&
+        isTRUE(bws$glp.bernstein) &&
+        !no.ex &&
+        any(bws$icon)) {
+      for (ii in which(bws$icon)) {
+        tr <- range(as.numeric(txdat[[ii]]))
+        ex <- as.numeric(exdat[[ii]])
+        if (any(ex < tr[1] | ex > tr[2])) {
+          stop("glp.bernstein=TRUE requires evaluation continuous predictors to lie within training support; use glp.bernstein=FALSE for extrapolation")
+        }
+      }
     }
 
     ## evaluate residuals before data conversion ...
@@ -328,6 +343,7 @@ npreg.rbandwidth <-
          asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
          as.integer(myopti),
          glp.degree = glp.degree.c,
+         glp.bernstein = as.integer(isTRUE(bws$glp.bernstein)),
          mean = double(enrow),
          merr = double(enrow),
          g = double(ifelse(gradients,enrow*ncol,0)),
