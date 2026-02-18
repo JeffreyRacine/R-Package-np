@@ -6618,6 +6618,7 @@ int gate_override_active = 0;
   int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
+  int ov_cont_from_cache = 0;
 
   const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
   np_gate_ctx_clear(&gate_ctx_local);
@@ -6686,28 +6687,41 @@ int gate_override_active = 0;
     int ok_all = 1;
 
     if(num_reg_continuous > 0){
-      ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
-      ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-      ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-      ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
-      if(ok_all){
-        const double rel_tol = np_cont_largeh_rel_tol();
-        for(i = 0; i < num_reg_continuous; i++){
-          const int kern = kernel_c[i];
-          double xmin = DBL_MAX, xmax = -DBL_MAX;
-          ov_cont_ok[i] = 0; ov_cont_hmin[i] = DBL_MAX; ov_cont_k0[i] = 0.0;
-          if(!np_cont_largeh_kernel_supported(kern)) continue;
-          for(int jj = 0; jj < num_obs; jj++){
-            const double v = matrix_X_continuous[i][jj];
-            if(!isfinite(v)) continue;
-            xmin = MIN(xmin, v); xmax = MAX(xmax, v);
-          }
-          if(xmax >= xmin){
-            const double utol = np_cont_largeh_utol(kern, rel_tol);
-            if(utol > 0.0 && isfinite(utol)){
-              ov_cont_ok[i] = 1;
-              ov_cont_hmin[i] = (xmax - xmin)/utol;
-              ov_cont_k0[i] = np_cont_largeh_k0(kern);
+      const double rel_tol = np_cont_largeh_rel_tol();
+      if(np_cont_largeh_cache_get_or_build(num_obs,
+                                           num_obs,
+                                           num_reg_continuous,
+                                           kernel_c,
+                                           matrix_X_continuous,
+                                           matrix_X_continuous,
+                                           rel_tol,
+                                           &ov_cont_ok,
+                                           &ov_cont_hmin,
+                                           &ov_cont_k0)){
+        ov_cont_from_cache = 1;
+      } else {
+        ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+        ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+        ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+        ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
+        if(ok_all){
+          for(i = 0; i < num_reg_continuous; i++){
+            const int kern = kernel_c[i];
+            double xmin = DBL_MAX, xmax = -DBL_MAX;
+            ov_cont_ok[i] = 0; ov_cont_hmin[i] = DBL_MAX; ov_cont_k0[i] = 0.0;
+            if(!np_cont_largeh_kernel_supported(kern)) continue;
+            for(int jj = 0; jj < num_obs; jj++){
+              const double v = matrix_X_continuous[i][jj];
+              if(!isfinite(v)) continue;
+              xmin = MIN(xmin, v); xmax = MAX(xmax, v);
+            }
+            if(xmax >= xmin){
+              const double utol = np_cont_largeh_utol(kern, rel_tol);
+              if(utol > 0.0 && isfinite(utol)){
+                ov_cont_ok[i] = 1;
+                ov_cont_hmin[i] = (xmax - xmin)/utol;
+                ov_cont_k0[i] = np_cont_largeh_k0(kern);
+              }
             }
           }
         }
@@ -7490,9 +7504,9 @@ int gate_override_active = 0;
   free(lambda);
   free_tmat(matrix_bandwidth);
   if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
-  if(ov_cont_ok != NULL) free(ov_cont_ok);
-  if(ov_cont_hmin != NULL) free(ov_cont_hmin);
-  if(ov_cont_k0 != NULL) free(ov_cont_k0);
+  if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
+  if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
+  if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
   if(ov_disc_uno_ok != NULL) free(ov_disc_uno_ok);
   if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
   if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
@@ -11151,6 +11165,7 @@ double *cv){
   int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
+  int ov_cont_from_cache = 0;
   double **matrix_bandwidth = NULL;
   double *lambda = NULL;
 
@@ -11218,28 +11233,41 @@ double *cv){
     int ok_all = 1;
 
     if(num_reg_continuous > 0){
-      ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
-      ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-      ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-      ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
-      if(ok_all){
-        const double rel_tol = np_cont_largeh_rel_tol();
-        for(i = 0; i < num_reg_continuous; i++){
-          const int kern = kernel_c[i];
-          double xmin = DBL_MAX, xmax = -DBL_MAX;
-          ov_cont_ok[i] = 0; ov_cont_hmin[i] = DBL_MAX; ov_cont_k0[i] = 0.0;
-          if(!np_cont_largeh_kernel_supported(kern)) continue;
-          for(int j = 0; j < num_obs; j++){
-            const double v = matrix_X_continuous[i][j];
-            if(!isfinite(v)) continue;
-            xmin = MIN(xmin, v); xmax = MAX(xmax, v);
-          }
-          if(xmax >= xmin){
-            const double utol = np_cont_largeh_utol(kern, rel_tol);
-            if(utol > 0.0 && isfinite(utol)){
-              ov_cont_ok[i] = 1;
-              ov_cont_hmin[i] = (xmax - xmin)/utol;
-              ov_cont_k0[i] = np_cont_largeh_k0(kern);
+      const double rel_tol = np_cont_largeh_rel_tol();
+      if(np_cont_largeh_cache_get_or_build(num_obs,
+                                           num_obs,
+                                           num_reg_continuous,
+                                           kernel_c,
+                                           matrix_X_continuous,
+                                           matrix_X_continuous,
+                                           rel_tol,
+                                           &ov_cont_ok,
+                                           &ov_cont_hmin,
+                                           &ov_cont_k0)){
+        ov_cont_from_cache = 1;
+      } else {
+        ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+        ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+        ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+        ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
+        if(ok_all){
+          for(i = 0; i < num_reg_continuous; i++){
+            const int kern = kernel_c[i];
+            double xmin = DBL_MAX, xmax = -DBL_MAX;
+            ov_cont_ok[i] = 0; ov_cont_hmin[i] = DBL_MAX; ov_cont_k0[i] = 0.0;
+            if(!np_cont_largeh_kernel_supported(kern)) continue;
+            for(int j = 0; j < num_obs; j++){
+              const double v = matrix_X_continuous[i][j];
+              if(!isfinite(v)) continue;
+              xmin = MIN(xmin, v); xmax = MAX(xmax, v);
+            }
+            if(xmax >= xmin){
+              const double utol = np_cont_largeh_utol(kern, rel_tol);
+              if(utol > 0.0 && isfinite(utol)){
+                ov_cont_ok[i] = 1;
+                ov_cont_hmin[i] = (xmax - xmin)/utol;
+                ov_cont_k0[i] = np_cont_largeh_k0(kern);
+              }
             }
           }
         }
@@ -11393,9 +11421,9 @@ double *cv){
   free(lambda);
   free_mat(matrix_bandwidth, num_reg_continuous);
   if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
-  if(ov_cont_ok != NULL) free(ov_cont_ok);
-  if(ov_cont_hmin != NULL) free(ov_cont_hmin);
-  if(ov_cont_k0 != NULL) free(ov_cont_k0);
+  if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
+  if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
+  if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
   if(ov_disc_uno_ok != NULL) free(ov_disc_uno_ok);
   if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
   if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
