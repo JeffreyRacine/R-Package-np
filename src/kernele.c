@@ -35,6 +35,10 @@ extern int int_MINIMIZE_IO;
 extern int int_TAYLOR;
 extern int int_WEIGHTS;
 
+#ifdef RCSID
+static char rcsid[] = "$Id: kernele.c,v 1.12 2006/11/02 19:50:13 tristen Exp $";
+#endif
+
 /* Some externals for numerical routines */
 
 extern int num_obs_train_extern;
@@ -2987,7 +2991,7 @@ double *SIGN)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -3018,13 +3022,13 @@ double *SIGN)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j] = DELTA[0][0];
 
@@ -3197,7 +3201,7 @@ double *SIGN)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -3228,13 +3232,13 @@ double *SIGN)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j] = DELTA[0][0];
 
@@ -3409,7 +3413,7 @@ double *SIGN)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -3440,13 +3444,13 @@ double *SIGN)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j] = DELTA[0][0];
 
@@ -3953,7 +3957,7 @@ double *SIGN)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -3984,13 +3988,13 @@ double *SIGN)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -4163,7 +4167,7 @@ double *SIGN)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -4194,13 +4198,13 @@ double *SIGN)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -4375,7 +4379,7 @@ double *SIGN)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -4406,13 +4410,13 @@ double *SIGN)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -4960,7 +4964,7 @@ double *mean)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -4991,13 +4995,13 @@ double *mean)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 				*pointer_m++ = DELTA[0][0];
 
 			}
@@ -5132,7 +5136,7 @@ double *mean)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -5163,13 +5167,13 @@ double *mean)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 				*pointer_m++ = DELTA[0][0];
 
 			}
@@ -5304,7 +5308,7 @@ double *mean)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -5335,13 +5339,13 @@ double *mean)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 				*pointer_m++ = DELTA[0][0];
 
 			}
@@ -5723,7 +5727,7 @@ double *mean)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -5755,13 +5759,13 @@ double *mean)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j-my_rank*stride] =  DELTA[0][0];
 
@@ -5896,7 +5900,7 @@ double *mean)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -5927,13 +5931,13 @@ double *mean)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j-my_rank*stride] =  DELTA[0][0];
 
@@ -6068,7 +6072,7 @@ double *mean)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -6099,13 +6103,13 @@ double *mean)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 				mean[j-my_rank*stride] =  DELTA[0][0];
 
@@ -6743,7 +6747,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -6774,13 +6778,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
               XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 						*pointer_m++ = DELTA[0][0];
 
 						for(k = 0; k < num_reg_cat_cont; k++)
@@ -6919,7 +6923,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -6949,13 +6953,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
               XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 						*pointer_m++ = DELTA[0][0];
 
 						for(k = 0; k < num_reg_cat_cont; k++)
@@ -7095,7 +7099,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -7126,13 +7130,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
               XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						*pointer_m++ = DELTA[0][0];
 
@@ -7496,7 +7500,7 @@ double **gradient)
 					if(fabs(mat_det(XTKX)) > 0.0 )
 					{
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 					}
 					else
@@ -7527,13 +7531,13 @@ double **gradient)
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 						/* Add epsilon times local constant estimator to first element of XTKY */
             XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
-					DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 					mean[j] = DELTA[0][0];
 
@@ -7860,7 +7864,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -7892,13 +7896,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						mean[j] = DELTA[0][0];
 
@@ -8031,7 +8035,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -8062,13 +8066,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						mean[j] = DELTA[0][0];
 
@@ -8201,7 +8205,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -8232,13 +8236,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						mean[j] = DELTA[0][0];
 
@@ -8405,7 +8409,7 @@ double **gradient)
 					if(fabs(mat_det(XTKX)) > 0.0 )
 					{
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 					}
 					else
@@ -8436,13 +8440,13 @@ double **gradient)
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 						/* Add epsilon times local constant estimator to first element of XTKY */
 						XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
-					DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 					mean[j] = DELTA[0][0];
 
@@ -8952,7 +8956,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -8983,13 +8987,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 						mean[j-my_rank*stride] = DELTA[0][0];
 
 						for(k = 0; k < num_reg_cat_cont; k++)
@@ -9126,7 +9130,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -9157,13 +9161,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 						mean[j-my_rank*stride] = DELTA[0][0];
 
 						for(k = 0; k < num_reg_cat_cont; k++)
@@ -9301,7 +9305,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -9332,13 +9336,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -9681,7 +9685,7 @@ double **gradient)
 					if(fabs(mat_det(XTKX)) > 0.0 )
 					{
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 					}
 					else
@@ -9712,13 +9716,13 @@ double **gradient)
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 						/* Add epsilon times local constant estimator to first element of XTKY */
 						XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
-					DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 					mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -10039,7 +10043,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -10070,13 +10074,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -10209,7 +10213,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -10240,13 +10244,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -10379,7 +10383,7 @@ double **gradient)
 						if(fabs(mat_det(XTKX)) > 0.0 )
 						{
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 						}
 						else
@@ -10410,13 +10414,13 @@ double **gradient)
 								}
 							} while (fabs(mat_det(XTKX)) == 0.0);
 
-							XTKXINV = mat_inv( XTKX, XTKXINV );
+
 							/* Add epsilon times local constant estimator to first element of XTKY */
 							XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 						}
 
-						DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 						mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -10581,7 +10585,7 @@ double **gradient)
 					if(fabs(mat_det(XTKX)) > 0.0 )
 					{
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 					}
 					else
@@ -10612,13 +10616,13 @@ double **gradient)
 							}
 						} while (fabs(mat_det(XTKX)) == 0.0);
 
-						XTKXINV = mat_inv( XTKX, XTKXINV );
+
 						/* Add epsilon times local constant estimator to first element of XTKY */
 						XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 					}
 
-					DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
+					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
 					mean[j-my_rank*stride] = DELTA[0][0];
 
@@ -18584,7 +18588,7 @@ int *num_categories)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -18615,14 +18619,14 @@ int *num_categories)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
-				trace_H += XTKXINV[0][0]*prod_kernel_i_eq_j;
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
+				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H += inv00*prod_kernel_i_eq_j; }
 				*pointer_m++ = DELTA[0][0];
 
 			}
@@ -18758,7 +18762,7 @@ int *num_categories)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -18789,14 +18793,14 @@ int *num_categories)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
-				trace_H += XTKXINV[0][0]*prod_kernel_i_eq_j;
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
+				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H += inv00*prod_kernel_i_eq_j; }
 				*pointer_m++ = DELTA[0][0];
 
 			}
@@ -18932,7 +18936,7 @@ int *num_categories)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -18963,14 +18967,14 @@ int *num_categories)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
-				trace_H += XTKXINV[0][0]*prod_kernel_i_eq_j;
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
+				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H += inv00*prod_kernel_i_eq_j; }
 				*pointer_m++ = DELTA[0][0];
 
 			}
@@ -19362,7 +19366,7 @@ int *num_categories)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -19393,14 +19397,14 @@ int *num_categories)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
-				trace_H_MPI += XTKXINV[0][0]*prod_kernel_i_eq_j;
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
+				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H_MPI += inv00*prod_kernel_i_eq_j; }
 				mean[j-my_rank*stride] =  DELTA[0][0];
 
 			}
@@ -19534,7 +19538,7 @@ int *num_categories)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -19565,14 +19569,14 @@ int *num_categories)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
-				trace_H_MPI += XTKXINV[0][0]*prod_kernel_i_eq_j;
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
+				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H_MPI += inv00*prod_kernel_i_eq_j; }
 				mean[j-my_rank*stride] =  DELTA[0][0];
 
 			}
@@ -19706,7 +19710,7 @@ int *num_categories)
 				if(fabs(mat_det(XTKX)) > 0.0 )
 				{
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 
 				}
 				else
@@ -19737,14 +19741,14 @@ int *num_categories)
 						}
 					} while (fabs(mat_det(XTKX)) == 0.0);
 
-					XTKXINV = mat_inv( XTKX, XTKXINV );
+
 					/* Add epsilon times local constant estimator to first element of XTKY */
 					XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(XTKX[0][0]);
 
 				}
 
-				DELTA =  mat_mul( XTKXINV, XTKY, DELTA);
-				trace_H_MPI += XTKXINV[0][0]*prod_kernel_i_eq_j;
+				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
+				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H_MPI += inv00*prod_kernel_i_eq_j; }
 				mean[j-my_rank*stride] =  DELTA[0][0];
 
 			}
