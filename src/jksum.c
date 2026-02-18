@@ -6812,6 +6812,155 @@ int gate_override_active = 0;
     }
   }
 
+  /*
+    All-large gate shortcut:
+    when every active kernel component is effectively constant, the estimator
+    collapses to a global least-squares fit.
+
+    - LC: intercept-only global mean model
+    - LL: global linear model on continuous regressors (matches current LL path)
+
+    Then:
+    - CVLS: exact LOOCV via e_i/(1-h_ii)
+    - CVAIC: SSE term from in-sample residuals, trace(H)=sum(h_ii)
+  */
+  {
+    int all_large_gate = (BANDWIDTH_reg == BW_FIXED);
+    if(all_large_gate){
+      for(i = 0; i < num_reg_continuous; i++){
+        const double h = matrix_bandwidth[i][0];
+        if((ov_cont_ok == NULL) || (!ov_cont_ok[i]) || (!isfinite(h)) ||
+           (fabs(h) < ov_cont_hmin[i])){
+          all_large_gate = 0;
+          break;
+        }
+      }
+    }
+    if(all_large_gate){
+      for(i = 0; i < num_reg_unordered; i++){
+        if((ov_disc_uno_ok == NULL) || (!ov_disc_uno_ok[i])){
+          all_large_gate = 0;
+          break;
+        }
+      }
+    }
+    if(all_large_gate){
+      for(i = 0; i < num_reg_ordered; i++){
+        if((ov_disc_ord_ok == NULL) || (!ov_disc_ord_ok[i])){
+          all_large_gate = 0;
+          break;
+        }
+      }
+    }
+
+    if(all_large_gate){
+      const int k = (int_ll == LL_LC) ? 1 : (num_reg_continuous + 1);
+      MATRIX XtX = mat_creat(k, k, UNDEFINED);
+      MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
+      MATRIX XtY = mat_creat(k, 1, UNDEFINED);
+      MATRIX BETA = mat_creat(k, 1, UNDEFINED);
+      int fast_ok = (XtX != NULL) && (XtXINV != NULL) && (XtY != NULL) && (BETA != NULL);
+
+      if(fast_ok){
+        const double ridge_eps = 1.0/(double)MAX(1, num_obs);
+        int ridge_it = 0;
+
+        for(i = 0; i < k; i++){
+          XtY[i][0] = 0.0;
+          BETA[i][0] = 0.0;
+          for(j = 0; j < k; j++)
+            XtX[i][j] = 0.0;
+        }
+
+        for(i = 0; i < num_obs; i++){
+          XtX[0][0] += 1.0;
+          XtY[0][0] += vector_Y[i];
+          if(k > 1){
+            for(j = 0; j < num_reg_continuous; j++){
+              const double xj = matrix_X_continuous[j][i];
+              const int cj = j + 1;
+              XtX[0][cj] += xj;
+              XtX[cj][0] += xj;
+              XtY[cj][0] += xj*vector_Y[i];
+            }
+            for(int a = 0; a < num_reg_continuous; a++){
+              const double xa = matrix_X_continuous[a][i];
+              const int ca = a + 1;
+              for(int b = a; b < num_reg_continuous; b++){
+                const double xb = matrix_X_continuous[b][i];
+                const int cb = b + 1;
+                XtX[ca][cb] += xa*xb;
+                if(cb != ca) XtX[cb][ca] += xa*xb;
+              }
+            }
+          }
+        }
+
+        while(mat_inv(XtX, XtXINV) == NULL){
+          for(i = 0; i < k; i++)
+            XtX[i][i] += ridge_eps;
+          ridge_it++;
+          if(ridge_it > 64){
+            fast_ok = 0;
+            break;
+          }
+        }
+
+        if(fast_ok){
+          for(i = 0; i < k; i++){
+            double s = 0.0;
+            for(j = 0; j < k; j++)
+              s += XtXINV[i][j]*XtY[j][0];
+            BETA[i][0] = s;
+          }
+
+          cv = 0.0;
+          traceH = 0.0;
+          for(i = 0; i < num_obs; i++){
+            double yhat = BETA[0][0];
+            double hii = XtXINV[0][0];
+            if(k > 1){
+              for(j = 0; j < num_reg_continuous; j++){
+                const double xj = matrix_X_continuous[j][i];
+                yhat += BETA[j+1][0]*xj;
+              }
+              for(j = 0; j < num_reg_continuous; j++){
+                const double xj = matrix_X_continuous[j][i];
+                hii += 2.0*xj*XtXINV[0][j+1];
+              }
+              for(int a = 0; a < num_reg_continuous; a++){
+                const double xa = matrix_X_continuous[a][i];
+                for(int b = 0; b < num_reg_continuous; b++){
+                  const double xb = matrix_X_continuous[b][i];
+                  hii += xa*XtXINV[a+1][b+1]*xb;
+                }
+              }
+            }
+
+            const double err = vector_Y[i] - yhat;
+            if(bwm == RBWM_CVLS){
+              const double den = NZD(1.0 - hii);
+              const double err_loo = err/den;
+              cv += err_loo*err_loo;
+            } else {
+              cv += err*err;
+              traceH += hii;
+            }
+          }
+        }
+      }
+
+      if(XtX != NULL) mat_free(XtX);
+      if(XtXINV != NULL) mat_free(XtXINV);
+      if(XtY != NULL) mat_free(XtY);
+      if(BETA != NULL) mat_free(BETA);
+
+      if(fast_ok){
+        goto finish_cv_path;
+      }
+    }
+  }
+
   if(bwm == RBWM_CVAIC){
     // compute normalisation constant
 
@@ -7497,6 +7646,7 @@ int gate_override_active = 0;
     free_tmat(matrix_bandwidth_eval);
   }
 
+finish_cv_path:
   free(operator);
   free(kernel_c);
   free(kernel_u);
