@@ -2,6 +2,7 @@ rbandwidth <-
   function(bw = stop("rbandwidth:argument 'bw' missing"),
            regtype = c("lc","ll","glp"),
            glp.degree = NULL,
+           glp.bernstein = FALSE,
            bwmethod = c("cv.ls","cv.aic"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
@@ -71,6 +72,8 @@ rbandwidth <-
   glp.degree <- npValidateGlpDegree(regtype = regtype,
                                     glp.degree = glp.degree,
                                     ncon = ncon)
+  glp.bernstein <- npValidateGlpBernstein(regtype = regtype,
+                                          glp.bernstein = glp.bernstein)
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   ## calculate some info to be pretty-printed
@@ -101,6 +104,7 @@ rbandwidth <-
       ll = "Local-Linear",
       glp = "Generalized-Local-Polynomial"),
     glp.degree = glp.degree,
+    glp.bernstein = glp.bernstein,
     method = bwmethod,
     pmethod = bwmToPrint(bwmethod),
     fval = fval,
@@ -185,7 +189,8 @@ print.rbandwidth <- function(x, digits=NULL, ...){
 
   cat(genBwSelStr(x))
   if (identical(x$regtype, "glp") && x$ncon > 0)
-    cat("\nGLP polynomial degree(s):", paste(x$glp.degree, collapse = " "))
+    cat("\nGLP polynomial degree(s):", paste(x$glp.degree, collapse = " "),
+        "\nGLP Bernstein basis:", ifelse(isTRUE(x$glp.bernstein), "TRUE", "FALSE"))
   cat(genBwKerStrs(x))
 
   cat("\n\n")
@@ -207,7 +212,8 @@ summary.rbandwidth <- function(object, ...){
   cat('\n')
   cat(genBwScaleStrs(object))
   if (identical(object$regtype, "glp") && object$ncon > 0)
-    cat("\nGLP polynomial degree(s):", paste(object$glp.degree, collapse = " "), "\n")
+    cat("\nGLP polynomial degree(s):", paste(object$glp.degree, collapse = " "),
+        "\nGLP Bernstein basis:", ifelse(isTRUE(object$glp.bernstein), "TRUE", "FALSE"), "\n")
   cat(genBwKerStrs(object))
 
   cat(genTimingStr(object))

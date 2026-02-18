@@ -184,7 +184,10 @@ FALSE, \dots)
 
   When bandwidths are obtained with \code{regtype="glp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via
-  \code{glp.degree}. The homogeneous degree-0 and degree-1 cases remain
+  \code{glp.degree}. The optional flag \code{glp.bernstein} controls
+  basis construction: \code{FALSE} (default) uses raw local-polynomial
+  powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
+  homogeneous degree-0 and degree-1 cases remain
   equivalent to \code{lc} and \code{ll}, respectively. Current GLP
   derivative output is first-order for continuous predictors; higher
   order and cross-partial extraction are reserved for future extension.
@@ -192,7 +195,10 @@ FALSE, \dots)
   predictors are returned as \code{NA}.
   The degree vector is fixed user input (one entry per continuous
   predictor, non-negative integers in \code{[0,12]}), while
-  optimization remains over bandwidths only.
+  optimization remains over bandwidths only. For
+  \code{glp.bernstein=TRUE}, evaluation points for continuous predictors
+  must lie within training support; use \code{glp.bernstein=FALSE} for
+  extrapolation.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths can lead to numerical problems for the local linear
@@ -289,345 +295,67 @@ FALSE, \dots)
 }
 \examples{
 \dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
-# bivariate nonparametric regression estimate for Giovanni Baiocchi's
-# Italian income panel (see Italy for details)
+## Not run in checks: excluded to keep MPI examples stable and check times short.
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-data("Italy")
-attach(Italy)
+## Start npRmpi for interactive execution. If slaves are already running and
+## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
+## reuse the existing pool instead of respawning. To change the number of
+## slaves, call `npRmpi.stop(force=TRUE)` then restart.
+npRmpi.start(nslaves=1)
 
-# First, compute the least-squares cross-validated bandwidths for the
-# local constant estimator (default).
+set.seed(42)
 
-bw <- npregbw(formula=gdp~ordered(year))
+n <- 250
 
-# Now take these bandwidths and fit the model and gradients
+x <- runif(n)
+z1 <- rbinom(n,1,.5)
+z2 <- rbinom(n,1,.5)
+y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
+z1 <- factor(z1)
+z2 <- factor(z2)
+mydat <- data.frame(y,x,z1,z2)
+rm(x,y,z1,z2)
 
-model <- npreg(bws = bw, gradients = TRUE)
+mpi.bcast.Robj2slave(mydat)
+
+mpi.bcast.cmd(bw <- npregbw(y~x+z1+z2,
+                            regtype="lc",
+                            bwmethod="cv.ls",
+                            data=mydat),
+              caller.execute=TRUE)
+
+summary(bw)
+
+mpi.bcast.cmd(model <- npreg(bws=bw,
+                             data=mydat),
+              caller.execute=TRUE)
 
 summary(model)
 
-# Use plot() to visualize the regression function, add bootstrap
-# error bars, and overlay the data on the same plot.
-
-# Note - this may take a minute or two depending on the speed of your
-# computer due to bootstrapping being conducted (<ctrl>-C will
-# interrupt). Note - nothing will appear in the graphics window until
-# all computations are completed (if you use
-# plot.errors.method="asymptotic" the figure will instantly appear).
-
-plot(bw, plot.errors.method="bootstrap")
-points(ordered(year), gdp, cex=.2, col="red")
-
-detach(Italy)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
-# bivariate nonparametric regression estimate for Giovanni Baiocchi's
-# Italian income panel (see Italy for details)
-
-data("Italy")
-attach(Italy)
-
-# First, compute the least-squares cross-validated bandwidths for the
-# local constant estimator (default).
-
-bw <- npregbw(xdat=ordered(year), ydat=gdp)
-
-# Now take these bandwidths and fit the model and gradients
-
-model <- npreg(bws = bw, gradients = TRUE)
-
-summary(model)
-
-# Use plot() to visualize the regression function, add bootstrap
-# error bars, and overlay the data on the same plot.
-
-# Note - this may take a minute or two depending on the speed of your
-# computer due to bootstrapping being conducted (<ctrl>-C will
-# interrupt). Note - nothing will appear in the graphics window until
-# all computations are completed (if you use
-# plot.errors.method="asymptotic" the figure will instantly appear).
-
-plot(bw, plot.errors.method="bootstrap")
-points(ordered(year), gdp, cex=.2, col="red")
-
-detach(Italy)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# EXAMPLE 2 (INTERFACE=FORMULA): For this example, we compute a local
-# linear fit using the AIC_c bandwidth selection criterion. We then plot
-# the estimator and its gradient using asymptotic standard errors.
-
-data("cps71")
-attach(cps71)
-
-bw <- npregbw(logwage~age, regtype="ll", bwmethod="cv.aic")
-
-# Next, plot the regression function...
-
-plot(bw, plot.errors.method="asymptotic")
-points(age, logwage, cex=.2, col="red")
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Next, plot the derivative...
-
-plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
-
-detach(cps71)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we compute a local
-# linear fit using the AIC_c bandwidth selection criterion. We then plot
-# the estimator and its gradient using asymptotic standard errors.
-
-data("cps71")
-attach(cps71)
-
-bw <- npregbw(xdat=age, ydat=logwage, regtype="ll", bwmethod="cv.aic")
-
-# Next, plot the regression function...
-
-plot(bw, plot.errors.method="asymptotic")
-points(age, logwage, cex=.2, col="red")
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Next, plot the derivative...
-
-plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
-
-detach(cps71)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# EXAMPLE 3 (INTERFACE=FORMULA): For this example, we replicate the
-# nonparametric regression in Maasoumi, Racine, and Stengos
-# (2007) (see oecdpanel for details). Note that X is multivariate
-# containing a mix of unordered, ordered, and continuous data types. Note
-# - this may take a few minutes depending on the speed of your computer.
-
-data("oecdpanel")
-attach(oecdpanel)
-
-bw <- npregbw(formula=growth~
-              factor(oecd)+
-              factor(year)+
-              initgdp+
-              popgro+
-              inv+
-              humancap)
-
-plot(bw, plot.errors.method="asymptotic")
-
-detach(oecdpanel)
-
-# EXAMPLE 3 (INTERFACE=DATA FRAME): For this example, we replicate the
-# nonparametric regression in Maasoumi, Racine, and Stengos
-# (2007) (see oecdpanel for details). Note that X is multivariate
-# containing a mix of unordered, ordered, and continuous data types. Note
-# - this may take a few minutes depending on the speed of your computer.
-
-data("oecdpanel")
-attach(oecdpanel)
-
-y <- growth
-X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
-
-bw <- npregbw(xdat=X, ydat=y)
-
-plot(bw, plot.errors.method="asymptotic")
-
-detach(oecdpanel)
-
-
-# EXAMPLE 4 (INTERFACE=FORMULA): Experimental data - the effect of
-# vitamin C on tooth growth in guinea pigs
-#
-# Description:
-#
-#     The response is the length of odontoblasts (teeth) in each of 10
-#     guinea pigs at each of three dose levels of Vitamin C (0.5, 1, and
-#     2 mg) with each of two delivery methods (orange juice or ascorbic
-#     acid).
-#
-# Usage:
-#
-#     ToothGrowth
-#
-# Format:
-#
-#     A data frame with 60 observations on 3 variables.
-#
-#       [,1]  len   numeric  Tooth length
-#       [,2]  supp  factor   Supplement type (VC or OJ).
-#       [,3]  dose  numeric  Dose in milligrams.
-
-library("datasets")
-attach(ToothGrowth)
-
-# Note - in this example, there are six cells. 
-
-bw <- npregbw(formula=len~factor(supp)+ordered(dose))
-
-# Now plot the partial regression surfaces with bootstrapped
-# nonparametric confidence bounds
-
-plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
-
-detach(ToothGrowth)
-
-# EXAMPLE 4 (INTERFACE=DATA FRAME): Experimental data - the effect of
-# vitamin C on tooth growth in guinea pigs
-#
-# Description:
-#
-#     The response is the length of odontoblasts (teeth) in each of 10
-#     guinea pigs at each of three dose levels of Vitamin C (0.5, 1, and
-#     2 mg) with each of two delivery methods (orange juice or ascorbic
-#     acid).
-#
-# Usage:
-#
-#     ToothGrowth
-#
-# Format:
-#
-#     A data frame with 60 observations on 3 variables.
-#
-#       [,1]  len   numeric  Tooth length
-#       [,2]  supp  factor   Supplement type (VC or OJ).
-#       [,3]  dose  numeric  Dose in milligrams.
-
-library("datasets")
-attach(ToothGrowth)
-
-# Note - in this example, there are six cells. 
-
-y <- len
-X <- data.frame(supp=factor(supp), dose=ordered(dose))
-
-bw <- npregbw(X, y)
-
-# Now plot the partial regression surfaces with bootstrapped
-# nonparametric confidence bounds
-
-plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
-
-detach(ToothGrowth)
-
-# EXAMPLE 5 (INTERFACE=FORMULA): a pretty 2-d smoothing example adapted
-# from the R mgcv library which was written by Simon N. Wood.
-
-set.seed(12345)
-
-# This function generates a smooth nonlinear DGP
-
-dgp.func <- function(x, z, sx=0.3, sz=0.4)
-  { (pi**sx*sz)*(1.2*exp(-(x-0.2)^2/sx^2-(z-0.3)^2/sz^2)+
-                 0.8*exp(-(x-0.7)^2/sx^2-(z-0.8)^2/sz^2))
-  }
-
-# Generate 500 observations, compute the true DGP (i.e., no noise), 
-# then a noisy sample
-
-n <- 500
-
-x <- runif(n)
-z <- runif(n)
-
-xs <- seq(0, 1, length=30)
-zs <- seq(0, 1, length=30)
-
-X.eval <- data.frame(x=rep(xs, 30), z=rep(zs, rep(30, 30)))
-
-dgp <- matrix(dgp.func(X.eval$x, X.eval$z), 30, 30)
-
-y <- dgp.func(x, z)+rnorm(n)*0.1
-
-# Prepare the screen for output... first, plot the true DGP
-
-split.screen(c(2, 1))
-
-screen(1)
-
-persp(xs, zs, dgp, xlab="x1", ylab="x2", zlab="y", main="True DGP")
-
-# Next, compute a local linear fit and plot that
-
-bw <- npregbw(formula=y~x+z, regtype="ll", bwmethod="cv.aic")
-fit <- fitted(npreg(bws=bw, newdata=X.eval))
-fit.mat <- matrix(fit, 30, 30)
-
-screen(2)
-
-persp(xs, zs, fit.mat, xlab="x1", ylab="x2", zlab="y",
-      main="Local linear estimate")
-
-# EXAMPLE 5 (INTERFACE=DATA FRAME): a pretty 2-d smoothing example
-# adapted from the R mgcv library which was written by Simon N. Wood.
-
-set.seed(12345)
-
-# This function generates a smooth nonlinear DGP
-
-dgp.func <- function(x, z, sx=0.3, sz=0.4)
-  { (pi**sx*sz)*(1.2*exp(-(x-0.2)^2/sx^2-(z-0.3)^2/sz^2)+
-                 0.8*exp(-(x-0.7)^2/sx^2-(z-0.8)^2/sz^2))
-  }
-
-# Generate 500 observations, compute the true DGP (i.e., no noise), 
-# then a noisy sample
-
-n <- 500
-
-x <- runif(n)
-z <- runif(n)
-
-xs <- seq(0, 1, length=30)
-zs <- seq(0, 1, length=30)
-
-X <- data.frame(x, z)
-X.eval <- data.frame(x=rep(xs, 30), z=rep(zs, rep(30, 30)))
-
-dgp <- matrix(dgp.func(X.eval$x, X.eval$z), 30, 30)
-
-y <- dgp.func(x, z)+rnorm(n)*0.1
-
-# Prepare the screen for output... first, plot the true DGP
-
-split.screen(c(2, 1))
-
-screen(1)
-
-persp(xs, zs, dgp, xlab="x1", ylab="x2", zlab="y", main="True DGP")
-
-# Next, compute a local linear fit and plot that
-
-bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic")
-fit <- fitted(npreg(exdat=X.eval, bws=bw))
-fit.mat <- matrix(fit, 30, 30)
-
-screen(2)
-
-persp(xs, zs, fit.mat, xlab="x1", ylab="x2", zlab="y",
-      main="Local linear estimate")
-} % enddontrun
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
+
+## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
+## tearing down slaves in the same R session can lead to hangs/crashes.
+## npRmpi may therefore keep slave daemons alive by default and
+## `npRmpi.stop()` performs a "soft close". Use `force=TRUE` to
+## actually shut down the slaves.
+
+npRmpi.stop()               ## soft close (may keep slaves alive)
+## npRmpi.stop(force=TRUE)  ## hard close
+
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
+
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 \keyword{nonparametric}

@@ -129,6 +129,19 @@ npValidateGlpDegree <- function(regtype, glp.degree, ncon, argname = "glp.degree
   as.integer(glp.degree)
 }
 
+npValidateGlpBernstein <- function(regtype, glp.bernstein, argname = "glp.bernstein") {
+  if (!identical(regtype, "glp"))
+    return(FALSE)
+
+  if (is.null(glp.bernstein))
+    glp.bernstein <- FALSE
+
+  if (!is.logical(glp.bernstein) || length(glp.bernstein) != 1L || is.na(glp.bernstein))
+    stop(sprintf("%s must be TRUE or FALSE", argname))
+
+  isTRUE(glp.bernstein)
+}
+
 npValidateGlpGradientOrder <- function(regtype,
                                        gradient.order,
                                        ncon,
@@ -204,7 +217,7 @@ matrix.sd <- function(x, na.rm=FALSE) {
 }
 
 npseed <- function(seed){
-  .C("np_set_seed",as.integer(abs(seed)), PACKAGE="npRmpi")
+  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "npRmpi")
   invisible()
 }
 
@@ -237,7 +250,7 @@ nptgauss <- function(b){
 
   int.kernels[CKER_TGAUSS + 1] <- k
   
-  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE="npRmpi"))
+  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "npRmpi"))
 
 }
 

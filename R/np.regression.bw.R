@@ -154,6 +154,8 @@ npregbw.rbandwidth <-
     tbw$glp.degree <- npValidateGlpDegree(regtype = tbw$regtype,
                                           glp.degree = tbw$glp.degree,
                                           ncon = tbw$ncon)
+    tbw$glp.bernstein <- npValidateGlpBernstein(regtype = tbw$regtype,
+                                                glp.bernstein = tbw$glp.bernstein)
 
     mysd <- EssDee(rcon)
     nconfac <- nrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
@@ -236,6 +238,7 @@ npregbw.rbandwidth <-
            penalty.mode = as.integer(penalty_mode),
            penalty.multiplier = as.double(penalty.multiplier),
            glp.degree = glp.degree.c,
+           glp.bernstein = as.integer(isTRUE(tbw$glp.bernstein)),
            ckerlb = as.double(cker.bounds.c$lb),
            ckerub = as.double(cker.bounds.c$ub),
            PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing","fast.history","fallback.history")])[1]
@@ -290,6 +293,7 @@ npregbw.rbandwidth <-
     tbw <- rbandwidth(bw = tbw$bw,
                       regtype = tbw$regtype,
                       glp.degree = tbw$glp.degree,
+                      glp.bernstein = tbw$glp.bernstein,
                       bwmethod = tbw$method,
                       bwscaling = tbw$scaling,
                       bwtype = tbw$type,
@@ -340,7 +344,7 @@ npregbw.default <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ## dummy arguments for later passing into rbandwidth()
-           regtype, glp.degree, bwmethod, bwscaling, bwtype,
+           regtype, glp.degree, glp.bernstein, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
 
@@ -353,7 +357,7 @@ npregbw.default <-
     ## bandwidth() call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("regtype", "glp.degree", "bwmethod", "bwscaling", "bwtype",
+    margs <- c("regtype", "glp.degree", "glp.bernstein", "bwmethod", "bwscaling", "bwtype",
                "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)

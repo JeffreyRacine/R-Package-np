@@ -56,6 +56,7 @@ npregbw(\dots)
         penalty.multiplier = 10,
         regtype,
         glp.degree,
+        glp.bernstein,
         bwmethod,
         bwscaling,
         bwtype,
@@ -176,6 +177,15 @@ npregbw(\dots)
     degree one for each continuous predictor. Entries must be
     non-negative integers in \code{[0,12]}. Bandwidth optimization
     treats this vector as fixed input and optimizes only bandwidths.
+  }
+
+  \item{glp.bernstein}{
+    logical flag relevant only when \code{regtype="glp"}. If
+    \code{FALSE} (default), the GLP basis uses raw local-polynomial
+    powers (stable for extrapolation). If \code{TRUE}, a Bernstein
+    (B-spline) basis is used for continuous predictors. For
+    \code{glp.bernstein=TRUE}, prediction/evaluation points must lie
+    within the training support of each continuous predictor.
   }
   
   \item{bwmethod}{
@@ -532,93 +542,65 @@ npregbw(\dots)
 }
 \examples{
 \dontrun{
-# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
-# Bivariate nonparametric regression estimate for Giovanni Baiocchi's
-# Italian income panel (see Italy for details)
+## Not run in checks: excluded to keep MPI examples stable and check times short.
+## The following example is adapted for interactive parallel execution
+## in R. Here we spawn 1 slave so that there will be two compute nodes
+## (master and slave).  Kindly see the batch examples in the demos
+## directory (npRmpi/demos) and study them carefully. Also kindly see
+## the more extensive examples in the np package itself. See the npRmpi
+## vignette for further details on running parallel np programs via
+## vignette("npRmpi",package="npRmpi").
 
-data("Italy")
-attach(Italy)
+## Start npRmpi for interactive execution. If slaves are already running and
+## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
+## reuse the existing pool instead of respawning. To change the number of
+## slaves, call `npRmpi.stop(force=TRUE)` then restart.
+npRmpi.start(nslaves=1)
 
-# Compute the least-squares cross-validated bandwidths for the local
-# constant estimator (default)
+set.seed(42)
 
-bw <- npregbw(formula=gdp~ordered(year))
+n <- 250
 
-summary(bw)
+x <- runif(n)
+z1 <- rbinom(n,1,.5)
+z2 <- rbinom(n,1,.5)
+y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
+z1 <- factor(z1)
+z2 <- factor(z2)
+mydat <- data.frame(y,x,z1,z2)
+rm(x,y,z1,z2)
 
-# Sleep for 5 seconds so that we can examine the output...
+mpi.bcast.Robj2slave(mydat)
 
-Sys.sleep(5)
-
-# Supply your own bandwidth...
-
-bw <- npregbw(formula=gdp~ordered(year), bws=c(0.75),
-              bandwidth.compute=FALSE)
-
-summary(bw)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Treat year as continuous and supply your own scaling factor c in
-# c sigma n^{-1/(2p+q)}
-
-bw <- npregbw(formula=gdp~year, bws=c(1.06),
-              bandwidth.compute=FALSE, 
-              bwscaling=TRUE)
-
-summary(bw)
-
-# Note - see also the example for npudensbw() for more extensive
-# multiple illustrations of how to change the kernel function, kernel
-# order, bandwidth type and so forth.
-
-detach(Italy)
-
-# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
-# Bivariate nonparametric regression estimate for Giovanni Baiocchi's
-# Italian income panel (see Italy for details)
-
-data("Italy")
-attach(Italy)
-
-# Compute the least-squares cross-validated bandwidths for the local
-# constant estimator (default)
-
-bw <- npregbw(xdat=ordered(year), ydat=gdp)
+mpi.bcast.cmd(bw <- npregbw(y~x+z1+z2,
+                            regtype="lc",
+                            bwmethod="cv.ls",
+                            data=mydat),
+              caller.execute=TRUE)
 
 summary(bw)
 
-# Sleep for 5 seconds so that we can examine the output...
+## For the interactive run only we close the slaves perhaps to proceed
+## with other examples and so forth. This is redundant in batch mode.
 
-Sys.sleep(5)
+## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
+## tearing down slaves in the same R session can lead to hangs/crashes.
+## npRmpi may therefore keep slave daemons alive by default and
+## `npRmpi.stop()` performs a "soft close". Use `force=TRUE` to
+## actually shut down the slaves.
+##
+## You can disable reuse via `options(npRmpi.reuse.slaves=FALSE)` or by
+## setting the environment variable `NP_RMPI_NO_REUSE_SLAVES=1` before
+## loading the package.
 
-# Supply your own bandwidth...
+npRmpi.stop()               ## soft close (may keep slaves alive)
+## npRmpi.stop(force=TRUE)  ## hard close
 
-bw <- npregbw(xdat=ordered(year), ydat=gdp, bws=c(0.75),
-              bandwidth.compute=FALSE)
+## Note that in order to exit npRmpi properly avoid quit(), and instead
+## use mpi.quit() as follows.
 
-summary(bw)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
-
-# Treat year as continuous and supply your own scaling factor c in
-# c sigma n^{-1/(2p+q)}
-
-bw <- npregbw(xdat=year, ydat=gdp, bws=c(1.06),
-              bandwidth.compute=FALSE, 
-              bwscaling=TRUE)
-
-summary(bw)
-
-# Note - see also the example for npudensbw() for more extensive
-# multiple illustrations of how to change the kernel function, kernel
-# order, bandwidth type and so forth.
-
-detach(Italy)
-} % enddontrun
+## mpi.bcast.cmd(mpi.quit(),
+##               caller.execute=TRUE)
+} % enddontrun     
 }
 \keyword{nonparametric}
