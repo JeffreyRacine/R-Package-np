@@ -787,6 +787,14 @@ genBwSelStr <- function(x){
     }
   }
 
+  nfe.str <- ""
+  if(!(is.null(x$num.feval) || identical(x$num.feval, NA))){
+    nfe.str <- paste("\nNumber of Function Evaluations: ", format(x$num.feval), sep="")
+    if(!(is.null(x$num.feval.fast) || identical(x$num.feval.fast, NA))){
+      nfe.str <- paste(nfe.str, " (fast = ", format(x$num.feval.fast), ")", sep="")
+    }
+  }
+
   paste(ifelse(is.null(x$pregtype),"",paste("\nRegression Type:", x$pregtype)),
         ifelse(is.null(x$pmethod),"",paste("\nBandwidth Selection Method:",
                                            x$pmethod)),
@@ -795,8 +803,7 @@ genBwSelStr <- function(x){
         ifelse(is.null(x$ptype), "",
                paste("\nBandwidth Type: ",x$ptype, sep="")),
         fval.str,
-        ifelse(is.null(x$num.feval) || identical(x$num.feval, NA), "",
-               paste("\nNumber of Function Evaluations: ", format(x$num.feval), sep="")),
+        nfe.str,
         sep="")
 }
 
