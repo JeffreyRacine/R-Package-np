@@ -252,6 +252,7 @@ compute.bootstrap.errors.rbandwidth =
   function(xdat, ydat,
            exdat,
            gradients,
+           gradient.order,
            slice.index,
            plot.errors.boot.method,
            plot.errors.boot.blocklen,
@@ -272,9 +273,11 @@ compute.bootstrap.errors.rbandwidth =
     strty = ifelse(is.inid, "tydat = ydat[indices],",
       "tydat = tsb[,ncol(tsb)],")
     
-    boofun = eval(parse(text=paste(strf, "npreg(", strtx, strty,
+    boofun = eval(parse(text=paste(strf, "suppressWarnings(npreg(", strtx, strty,
                           "exdat = exdat, bws = bws,",
-                          "gradients = gradients)$",
+                          "gradients = gradients,",
+                          "gradient.order = gradient.order,",
+                          "warn.glp.gradient = FALSE))$",
                           ifelse(gradients, "grad[,slice.index]", "mean"), "}", sep="")))
 
     if (is.inid){
@@ -1122,6 +1125,7 @@ npplot.rbandwidth <-
            common.scale = TRUE,
            perspective = TRUE,
            gradients = FALSE,
+           gradient.order = 1L,
            main = NULL,
            type = NULL,
            border = NULL,
@@ -1248,6 +1252,18 @@ npplot.rbandwidth <-
       plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]    
 
     plot.errors = (plot.errors.method != "none")
+    plot.gradient.order.label <- rep.int(1L, bws$ndim)
+    if (gradients && identical(bws$regtype, "glp")) {
+      go <- npValidateGlpGradientOrder(regtype = bws$regtype,
+                                       gradient.order = gradient.order,
+                                       ncon = bws$ncon)
+      if (length(go))
+        plot.gradient.order.label[which(bws$icon)] <- go
+      if (any(go > bws$glp.degree))
+        warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
+      if (any(go > 1L))
+        warning("higher-order glp derivatives are not yet available at C level; plotting NA for requested orders > 1")
+    }
 
     if ((bws$ncon + bws$nord == 2) & (bws$nuno == 0) & perspective & !gradients &
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
@@ -1283,7 +1299,9 @@ npplot.rbandwidth <-
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
       tobj = npreg(txdat = xdat, tydat = ydat,
-        exdat = x.eval, bws = bws)
+        exdat = x.eval, bws = bws,
+        gradient.order = gradient.order,
+        warn.glp.gradient = FALSE)
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
@@ -1295,6 +1313,7 @@ npplot.rbandwidth <-
         terr <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           gradients = FALSE,
+          gradient.order = gradient.order,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -1472,7 +1491,7 @@ npplot.rbandwidth <-
 
       pxlabE = "xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[i], paste('X', i, sep = ''))),"
       pylabE = "ylab = ifelse(!is.null(ylab),ylab,paste(ifelse(gradients,
-          paste('Gradient Component ', i, ' of', sep=''), ''),
+          paste('Derivative order ', plot.gradient.order.label[i], ' component ', i, ' of', sep=''), ''),
           gen.label(bws$ynames, 'Conditional Mean'))),"
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,par()$lty), col = ifelse(!is.null(col),col,par()$col), lwd = ifelse(!is.null(lwd),lwd,par()$lwd), cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis), cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab), cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main), cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),"))
@@ -1524,9 +1543,19 @@ npplot.rbandwidth <-
           ei[(xi.neval+1):maxneval] = NA
         }
         
-        tr = npreg(txdat = xdat, tydat = ydat,
-          exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws,
-          gradients = gradients)
+        tr <- if (gradients && identical(bws$regtype, "glp")) {
+          suppressWarnings(npreg(txdat = xdat, tydat = ydat,
+            exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            warn.glp.gradient = FALSE))
+        } else {
+          npreg(txdat = xdat, tydat = ydat,
+            exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            warn.glp.gradient = FALSE)
+        }
 
         temp.mean[1:xi.neval] = if(gradients) tr$grad[,i] else tr$mean
 
@@ -1538,6 +1567,7 @@ npplot.rbandwidth <-
                       xdat = xdat, ydat = ydat,
                       exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
                       gradients = gradients,
+                      gradient.order = gradient.order,
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,

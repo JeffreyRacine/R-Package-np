@@ -176,6 +176,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        common.scale = TRUE,
        perspective = TRUE,
        gradients = FALSE,
+       gradient.order = 1L,
        main = NULL,
        type = NULL,
        border = NULL,
@@ -397,6 +398,16 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   \item{gradients}{
     a logical value specifying whether gradients should be plotted
     (if possible). Defaults to \code{FALSE}.
+  }
+
+  \item{gradient.order}{
+    for \code{npplot.rbandwidth} with \code{regtype="glp"} and
+    \code{gradients=TRUE}, a positive integer (or integer vector with
+    one entry per continuous predictor) indicating the requested
+    derivative order. Orders greater than one are currently returned as
+    \code{NA} (reserved for future C-level higher-order derivatives),
+    and orders exceeding a predictor's polynomial degree are also
+    \code{NA}. Defaults to \code{1L}.
   }
 
   \item{main}{

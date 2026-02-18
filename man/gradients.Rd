@@ -13,7 +13,7 @@ gradients(x, \dots)
 
 \method{gradients}{condistribution}(x, errors = FALSE, \dots)
 
-\method{gradients}{npregression}(x, errors = FALSE, \dots)
+\method{gradients}{npregression}(x, errors = FALSE, gradient.order = NULL, \dots)
 
 \method{gradients}{qregression}(x, errors = FALSE, \dots)
 
@@ -26,6 +26,13 @@ gradients(x, \dots)
   \item{\dots}{other arguments.}
   \item{errors}{ a logical value specifying whether or not standard
     errors of gradients are desired. Defaults to \code{FALSE}.}
+  \item{gradient.order}{
+    for \code{npregression} objects fitted with \code{regtype="glp"},
+    optional derivative order request (scalar or one entry per
+    continuous predictor). Orders exceeding the fitted polynomial degree
+    (or greater than one, pending future C-level support) are returned
+    as \code{NA}.
+  }
 }
 \value{
   Gradients extracted from the model object \code{x}.

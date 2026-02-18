@@ -103,11 +103,14 @@ npreg.rbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
-           exdat, eydat, gradients = FALSE, residuals = FALSE, 
+           exdat, eydat, gradients = FALSE, gradient.order = 1L,
+           residuals = FALSE,
            ...){
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)
+    dots <- list(...)
+    warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
     txdat = toFrame(txdat)
 
@@ -148,6 +151,9 @@ npreg.rbandwidth <-
     bws$glp.degree <- npValidateGlpDegree(regtype = bws$regtype,
                                           glp.degree = bws$glp.degree,
                                           ncon = bws$ncon)
+    glp.gradient.order <- npValidateGlpGradientOrder(regtype = bws$regtype,
+                                                     gradient.order = gradient.order,
+                                                     ncon = bws$ncon)
 
     reg.c <- npRegtypeToC(regtype = bws$regtype,
                           glp.degree = bws$glp.degree,
@@ -158,13 +164,6 @@ npreg.rbandwidth <-
     } else {
       integer(1)
     }
-
-    if (identical(bws$regtype, "glp") && gradients &&
-        ((bws$ncon == 0L) || all(bws$glp.degree == 0L)))
-      stop("need polynomial degree > 0 for at least one continuous predictor to compute glp derivatives")
-
-    if (identical(bws$regtype, "glp") && gradients && (bws$nuno + bws$nord > 0L))
-      stop("glp derivatives for unordered/ordered predictors are not yet supported")
 
     ccon = unlist(lapply(txdat[,bws$icon, drop = FALSE],class))
     if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
@@ -346,6 +345,27 @@ npreg.rbandwidth <-
 
       myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
       myout$gerr = as.matrix(myout$gerr[,rorder])
+
+      if (identical(bws$regtype, "glp")) {
+        raw.g <- myout$g
+        raw.gerr <- myout$gerr
+        myout$g[,] <- NA_real_
+        myout$gerr[,] <- NA_real_
+        cont.idx <- which(bws$icon)
+
+        if (length(cont.idx)) {
+          keep.cont <- (glp.gradient.order == 1L) & (bws$glp.degree >= 1L)
+          if (any(keep.cont)) {
+            keep.idx <- cont.idx[keep.cont]
+            myout$g[, keep.idx] <- raw.g[, keep.idx, drop = FALSE]
+            myout$gerr[, keep.idx] <- raw.gerr[, keep.idx, drop = FALSE]
+          }
+          if (warn.glp.gradient && any(glp.gradient.order > bws$glp.degree))
+            warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
+          if (warn.glp.gradient && any(glp.gradient.order > 1L))
+            warning("higher-order glp derivatives are not yet available at C level; returning NA for requested orders > 1")
+        }
+      }
     }
 
 
@@ -358,6 +378,8 @@ npreg.rbandwidth <-
                          "ntrain = tnrow,",
                          "trainiseval = no.ex,",
                          "gradients = gradients,",
+                         ifelse(identical(bws$regtype, "glp"),
+                                "gradient.order = glp.gradient.order,", ""),
                          "residuals = residuals,",
                          "xtra = myout$xtra, rows.omit = rows.omit)")))
 
