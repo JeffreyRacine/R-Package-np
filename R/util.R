@@ -129,6 +129,43 @@ npValidateGlpDegree <- function(regtype, glp.degree, ncon, argname = "glp.degree
   as.integer(glp.degree)
 }
 
+npValidateGlpGradientOrder <- function(regtype,
+                                       gradient.order,
+                                       ncon,
+                                       argname = "gradient.order") {
+  glp.degree.max <- 12L
+
+  if (!identical(regtype, "glp"))
+    return(NULL)
+
+  if (is.null(gradient.order))
+    gradient.order <- rep.int(1L, ncon)
+
+  if (!length(gradient.order) && ncon == 0L)
+    return(integer(0))
+
+  if (length(gradient.order) == 1L && ncon > 1L)
+    gradient.order <- rep.int(gradient.order, ncon)
+
+  if (length(gradient.order) != ncon)
+    stop(sprintf("%s must have one entry per continuous predictor (%d expected, got %d)",
+                 argname, ncon, length(gradient.order)))
+
+  if (any(!is.finite(gradient.order)))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (any(gradient.order <= 0))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (any(gradient.order != floor(gradient.order)))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (any(gradient.order > glp.degree.max))
+    stop(sprintf("%s must contain integers in [1,%d]", argname, glp.degree.max))
+
+  as.integer(gradient.order)
+}
+
 npRegtypeToC <- function(regtype, glp.degree, ncon, context = "npreg") {
   if (identical(regtype, "lc"))
     return(list(code = REGTYPE_LC, glp.degree = NULL))

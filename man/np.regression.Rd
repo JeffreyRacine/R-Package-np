@@ -34,6 +34,7 @@ FALSE, \dots)
       exdat,
       eydat,
       gradients = FALSE,
+      gradient.order = 1L,
       residuals = FALSE,
       \dots)
 }
@@ -100,11 +101,20 @@ FALSE, \dots)
   \item{gradients}{
     a logical value indicating that you want gradients computed and
     returned in the resulting \code{npregression} object. Defaults to
-    \code{FALSE}. For \code{regtype="glp"} with all continuous
-    polynomial degrees equal to zero, derivatives are not defined and
-    an error is issued if \code{gradients=TRUE}. In the current GLP
-    implementation, derivatives for unordered/ordered predictors are
-    not yet supported.
+    \code{FALSE}. For \code{regtype="glp"}, derivative components that
+    are not defined (requested order exceeds the variable-specific
+    polynomial degree) are returned as \code{NA}. Higher-order GLP
+    derivatives (order \eqn{>1}) are reserved for future C-level
+    extraction and currently return \code{NA}.
+  }
+
+  \item{gradient.order}{
+    for \code{regtype="glp"} with \code{gradients=TRUE}, a positive
+    integer (or integer vector with one entry per continuous predictor)
+    specifying derivative order(s). Defaults to \code{1L}. Orders
+    exceeding \code{glp.degree} for a variable are returned as
+    \code{NA}; orders greater than one are currently reserved for
+    future extension and return \code{NA}.
   }
 
   \item{residuals}{
@@ -178,6 +188,8 @@ FALSE, \dots)
   equivalent to \code{lc} and \code{ll}, respectively. Current GLP
   derivative output is first-order for continuous predictors; higher
   order and cross-partial extraction are reserved for future extension.
+  In mixed-data GLP settings, derivative entries for unordered/ordered
+  predictors are returned as \code{NA}.
   The degree vector is fixed user input (one entry per continuous
   predictor, non-negative integers in \code{[0,12]}), while
   optimization remains over bandwidths only.

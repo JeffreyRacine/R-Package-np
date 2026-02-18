@@ -2,6 +2,7 @@ npregression <-
     function(bws, eval, mean, merr = NA, grad = NA, gerr = NA,
              resid = NA,
              ntrain, trainiseval = FALSE, gradients = FALSE, residuals = FALSE,
+             gradient.order = NULL,
              xtra = rep(NA, 6),
              rows.omit = NA){
 
@@ -36,6 +37,7 @@ npregression <-
             ntrain = ntrain,
             trainiseval = trainiseval,
             gradients = gradients,
+            gradient.order = gradient.order,
             residuals = residuals,
             R2 = xtra[1],
             MSE = xtra[2],
@@ -75,11 +77,33 @@ residuals.npregression <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npreg(bws = object$bws, residuals =TRUE)$resid) } 
 }
 se.npregression <- function(x) { x$merr }
-gradients.npregression <- function(x, errors = FALSE, ...) {
-  if(!errors)
-    return(x$grad)
-  else
-    return(x$gerr)
+gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...) {
+  gout <- if (!errors) x$grad else x$gerr
+
+  if (!identical(x$bws$regtype, "glp") || is.null(gradient.order))
+    return(gout)
+
+  if (!is.matrix(gout))
+    return(gout)
+
+  gorder <- npValidateGlpGradientOrder(regtype = x$bws$regtype,
+                                       gradient.order = gradient.order,
+                                       ncon = x$bws$ncon)
+  gout.masked <- gout
+  gout.masked[,] <- NA_real_
+  cont.idx <- which(x$bws$icon)
+  if (length(cont.idx)) {
+    keep.cont <- (gorder == 1L) & (x$bws$glp.degree >= 1L)
+    if (any(keep.cont)) {
+      keep.idx <- cont.idx[keep.cont]
+      gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]
+    }
+    if (any(gorder > x$bws$glp.degree))
+      warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
+    if (any(gorder > 1L))
+      warning("higher-order glp derivatives are not yet available at C level; returning NA for requested orders > 1")
+  }
+  gout.masked
 }
 predict.npregression <- function(object, se.fit = FALSE, ...) {
   tr <- eval(npreg(bws = object$bws, ...), envir = parent.frame())
