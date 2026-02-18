@@ -1,6 +1,7 @@
 rbandwidth <-
   function(bw = stop("rbandwidth:argument 'bw' missing"),
-           regtype = c("lc","ll"),
+           regtype = c("lc","ll","glp"),
+           glp.degree = NULL,
            bwmethod = c("cv.ls","cv.aic"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
@@ -66,6 +67,11 @@ rbandwidth <-
   if (bwtype != "fixed" && cbounds$bound != "none")
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
+  ncon <- sum(xdati$icon)
+  glp.degree <- npValidateGlpDegree(regtype = regtype,
+                                    glp.degree = glp.degree,
+                                    ncon = ncon)
+
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   ## calculate some info to be pretty-printed
 
@@ -92,7 +98,9 @@ rbandwidth <-
     regtype = regtype,
     pregtype = switch(regtype,
       lc = "Local-Constant",
-      ll = "Local-Linear"),
+      ll = "Local-Linear",
+      glp = "Generalized-Local-Polynomial"),
+    glp.degree = glp.degree,
     method = bwmethod,
     pmethod = bwmToPrint(bwmethod),
     fval = fval,
@@ -119,7 +127,7 @@ rbandwidth <-
     pokertype = oktToPrint(okertype),
     nobs = nobs,
     ndim = ndim,
-    ncon = sum(xdati$icon),
+    ncon = ncon,
     nuno = sum(xdati$iuno),
     nord = sum(xdati$iord),
     icon = xdati$icon,
@@ -176,6 +184,8 @@ print.rbandwidth <- function(x, digits=NULL, ...){
   print(matrix(x$bw,ncol=x$ndim,dimnames=list(paste(x$pscaling,":",sep=""),x$xnames)))
 
   cat(genBwSelStr(x))
+  if (identical(x$regtype, "glp") && x$ncon > 0)
+    cat("\nGLP polynomial degree(s):", paste(x$glp.degree, collapse = " "))
   cat(genBwKerStrs(x))
 
   cat("\n\n")
@@ -196,6 +206,8 @@ summary.rbandwidth <- function(object, ...){
 
   cat('\n')
   cat(genBwScaleStrs(object))
+  if (identical(object$regtype, "glp") && object$ncon > 0)
+    cat("\nGLP polynomial degree(s):", paste(object$glp.degree, collapse = " "), "\n")
   cat(genBwKerStrs(object))
 
   cat(genTimingStr(object))

@@ -275,6 +275,7 @@ double max_unordered_bw(int num_categories,
 
 #define LL_LC  0
 #define LL_LL  1
+#define LL_GLP 2
 
 #define OCG_UNO 0
 #define OCG_ORD 1

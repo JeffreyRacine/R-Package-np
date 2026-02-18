@@ -55,6 +55,7 @@ npregbw(\dots)
         invalid.penalty = c("baseline","dbmax"),
         penalty.multiplier = 10,
         regtype,
+        glp.degree,
         bwmethod,
         bwscaling,
         bwtype,
@@ -126,7 +127,7 @@ npregbw(\dots)
   
   \item{call}{
     the original function call. This is passed internally by
-    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
+    \code{\link{np}} when a bandwidth search has been implied by a call to
     another function. It is not recommended that the user set this.
   }
 
@@ -163,7 +164,18 @@ npregbw(\dots)
     a character string specifying which type of kernel regression
     estimator to use. \code{lc} specifies a local-constant estimator
     (Nadaraya-Watson) and \code{ll} specifies a local-linear
-    estimator. Defaults to \code{lc}.
+    estimator. \code{glp} specifies a generalized local polynomial
+    estimator with polynomial degree(s) given by \code{glp.degree} for
+    continuous predictors. Defaults to \code{lc}.
+  }
+
+  \item{glp.degree}{
+    a user-supplied vector of fixed polynomial degrees for the
+    continuous predictors (exactly one degree per continuous predictor),
+    relevant only when \code{regtype="glp"}. If omitted, the default is
+    degree one for each continuous predictor. Entries must be
+    non-negative integers in \code{[0,12]}. Bandwidth optimization
+    treats this vector as fixed input and optimizes only bandwidths.
   }
   
   \item{bwmethod}{
@@ -324,7 +336,9 @@ npregbw(\dots)
   \item{transform.bounds}{ a logical value that when set to \code{TRUE}
     applies an internal transformation that maps the unconstrained
     search to the feasible bandwidth domain. Defaults to
-    \code{FALSE}.}
+    \code{FALSE}. For true generalized local polynomial optimization
+    (i.e. \code{regtype="glp"} with mixed/higher continuous degrees),
+    transformed bounds are enabled internally for stability.}
 
   \item{invalid.penalty}{ a character string specifying the penalty
     used when the optimizer encounters invalid bandwidths.
@@ -374,7 +388,7 @@ npregbw(\dots)
   (to be specified in the data frame \code{xdat} using
   \code{\link{ordered}}). Data can be entered in an arbitrary order and
   data types will be detected automatically by the routine (see
-  \code{\link{npRmpi}} for details).
+  \code{\link{np}} for details).
 
   Data for which bandwidths are to be estimated may be specified
   symbolically. A typical description has the form \code{dependent data
@@ -518,65 +532,93 @@ npregbw(\dots)
 }
 \examples{
 \dontrun{
-## Not run in checks: excluded to keep MPI examples stable and check times short.
-## The following example is adapted for interactive parallel execution
-## in R. Here we spawn 1 slave so that there will be two compute nodes
-## (master and slave).  Kindly see the batch examples in the demos
-## directory (npRmpi/demos) and study them carefully. Also kindly see
-## the more extensive examples in the np package itself. See the npRmpi
-## vignette for further details on running parallel np programs via
-## vignette("npRmpi",package="npRmpi").
+# EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute a
+# Bivariate nonparametric regression estimate for Giovanni Baiocchi's
+# Italian income panel (see Italy for details)
 
-## Start npRmpi for interactive execution. If slaves are already running and
-## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
-## reuse the existing pool instead of respawning. To change the number of
-## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-npRmpi.start(nslaves=1)
+data("Italy")
+attach(Italy)
 
-set.seed(42)
+# Compute the least-squares cross-validated bandwidths for the local
+# constant estimator (default)
 
-n <- 250
-
-x <- runif(n)
-z1 <- rbinom(n,1,.5)
-z2 <- rbinom(n,1,.5)
-y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
-z1 <- factor(z1)
-z2 <- factor(z2)
-mydat <- data.frame(y,x,z1,z2)
-rm(x,y,z1,z2)
-
-mpi.bcast.Robj2slave(mydat)
-
-mpi.bcast.cmd(bw <- npregbw(y~x+z1+z2,
-                            regtype="lc",
-                            bwmethod="cv.ls",
-                            data=mydat),
-              caller.execute=TRUE)
+bw <- npregbw(formula=gdp~ordered(year))
 
 summary(bw)
 
-## For the interactive run only we close the slaves perhaps to proceed
-## with other examples and so forth. This is redundant in batch mode.
+# Sleep for 5 seconds so that we can examine the output...
 
-## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
-## tearing down slaves in the same R session can lead to hangs/crashes.
-## npRmpi may therefore keep slave daemons alive by default and
-## `npRmpi.stop()` performs a "soft close". Use `force=TRUE` to
-## actually shut down the slaves.
-##
-## You can disable reuse via `options(npRmpi.reuse.slaves=FALSE)` or by
-## setting the environment variable `NP_RMPI_NO_REUSE_SLAVES=1` before
-## loading the package.
+Sys.sleep(5)
 
-npRmpi.stop()               ## soft close (may keep slaves alive)
-## npRmpi.stop(force=TRUE)  ## hard close
+# Supply your own bandwidth...
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
+bw <- npregbw(formula=gdp~ordered(year), bws=c(0.75),
+              bandwidth.compute=FALSE)
 
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddontrun     
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Treat year as continuous and supply your own scaling factor c in
+# c sigma n^{-1/(2p+q)}
+
+bw <- npregbw(formula=gdp~year, bws=c(1.06),
+              bandwidth.compute=FALSE, 
+              bwscaling=TRUE)
+
+summary(bw)
+
+# Note - see also the example for npudensbw() for more extensive
+# multiple illustrations of how to change the kernel function, kernel
+# order, bandwidth type and so forth.
+
+detach(Italy)
+
+# EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
+# Bivariate nonparametric regression estimate for Giovanni Baiocchi's
+# Italian income panel (see Italy for details)
+
+data("Italy")
+attach(Italy)
+
+# Compute the least-squares cross-validated bandwidths for the local
+# constant estimator (default)
+
+bw <- npregbw(xdat=ordered(year), ydat=gdp)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Supply your own bandwidth...
+
+bw <- npregbw(xdat=ordered(year), ydat=gdp, bws=c(0.75),
+              bandwidth.compute=FALSE)
+
+summary(bw)
+
+# Sleep for 5 seconds so that we can examine the output...
+
+Sys.sleep(5)
+
+# Treat year as continuous and supply your own scaling factor c in
+# c sigma n^{-1/(2p+q)}
+
+bw <- npregbw(xdat=year, ydat=gdp, bws=c(1.06),
+              bandwidth.compute=FALSE, 
+              bwscaling=TRUE)
+
+summary(bw)
+
+# Note - see also the example for npudensbw() for more extensive
+# multiple illustrations of how to change the kernel function, kernel
+# order, bandwidth type and so forth.
+
+detach(Italy)
+} % enddontrun
 }
 \keyword{nonparametric}
