@@ -120,6 +120,7 @@ extern double **matrix_X_unordered_quantile_extern;
 extern double **matrix_X_ordered_quantile_extern;
 
 extern int int_ll_extern;
+extern int *vector_glp_degree_extern;
 
 extern int KERNEL_reg_extern;
 extern int KERNEL_reg_unordered_extern;
@@ -6597,6 +6598,168 @@ double *cv){
   return(0);
 }
 
+static int np_glp_max_degree(const int ncon, const int *deg){
+  int j, dmax = 0;
+  if((ncon <= 0) || (deg == NULL)) return 0;
+  for(j = 0; j < ncon; j++)
+    if(deg[j] > dmax) dmax = deg[j];
+  return dmax;
+}
+
+static int np_glp_store_term(const int ncon,
+                             int **terms_ptr,
+                             int *nterms,
+                             int *cap,
+                             const int *cur){
+  int j, k;
+  if(*nterms >= *cap){
+    int newcap = (*cap <= 0) ? 32 : 2*(*cap);
+    int *tmp = (int *)realloc(*terms_ptr, (size_t)newcap*(size_t)ncon*sizeof(int));
+    if(tmp == NULL) return 0;
+    *terms_ptr = tmp;
+    *cap = newcap;
+  }
+  k = (*nterms)*ncon;
+  for(j = 0; j < ncon; j++)
+    (*terms_ptr)[k + j] = cur[j];
+  (*nterms)++;
+  return 1;
+}
+
+static int np_glp_enum_terms_rec(const int idx,
+                                 const int ncon,
+                                 const int dmax,
+                                 const int *deg,
+                                 int *cur,
+                                 int **terms_ptr,
+                                 int *nterms,
+                                 int *cap){
+  int k;
+  if(idx == ncon){
+    int s = 0;
+    for(k = 0; k < ncon; k++)
+      s += cur[k];
+    if((s <= 0) || (s > dmax)) return 1;
+
+    for(k = 0; k < ncon; k++){
+      const int dk = deg[k];
+      if((dk > 0) && (dk < dmax) && (s > dk) && (cur[k] == dk))
+        return 1;
+    }
+
+    if(!np_glp_store_term(ncon, terms_ptr, nterms, cap, cur))
+      return 0;
+    return 1;
+  }
+
+  for(k = 0; k <= deg[idx]; k++){
+    cur[idx] = k;
+    if(np_glp_enum_terms_rec(idx + 1, ncon, dmax, deg, cur, terms_ptr, nterms, cap) == 0)
+      return 0;
+  }
+  return 1;
+}
+
+static int np_glp_build_terms(const int ncon,
+                              const int *deg,
+                              int **terms_out,
+                              int *nterms_out){
+  int dmax, j;
+  double tcount_bound = 1.0;
+  int *terms = NULL;
+  int *cur = NULL;
+  int *zero = NULL;
+  int nterms = 0, cap = 0;
+
+  *terms_out = NULL;
+  *nterms_out = 0;
+
+  if(ncon <= 0){
+    *nterms_out = 1;
+    return 1;
+  }
+
+  for(j = 0; j < ncon; j++){
+    if((deg[j] < 0) || (deg[j] > 12))
+      return 0;
+    tcount_bound *= (double)(deg[j] + 1);
+    if(tcount_bound > 100000.0)
+      return 0;
+  }
+
+  dmax = np_glp_max_degree(ncon, deg);
+  if(dmax > 12)
+    return 0;
+
+  zero = (int *)calloc((size_t)ncon, sizeof(int));
+  if(zero == NULL)
+    return 0;
+  if(!np_glp_store_term(ncon, &terms, &nterms, &cap, zero)){
+    free(zero);
+    return 0;
+  }
+  free(zero);
+
+  cur = (int *)calloc((size_t)ncon, sizeof(int));
+  if(cur == NULL){
+    free(terms);
+    return 0;
+  }
+
+  if(dmax > 0){
+    if(np_glp_enum_terms_rec(0, ncon, dmax, deg, cur, &terms, &nterms, &cap) == 0){
+      free(cur);
+      free(terms);
+      return 0;
+    }
+  }
+
+  free(cur);
+  *terms_out = terms;
+  *nterms_out = nterms;
+  return 1;
+}
+
+static int np_glp_find_linear_term(const int ncon, const int *terms, const int nterms, const int which){
+  int t, j;
+  for(t = 0; t < nterms; t++){
+    const int *et = terms + t*ncon;
+    int ok = (et[which] == 1);
+    if(!ok) continue;
+    for(j = 0; j < ncon; j++){
+      if(j == which) continue;
+      if(et[j] != 0){ ok = 0; break; }
+    }
+    if(ok) return t;
+  }
+  return -1;
+}
+
+static void np_glp_fill_basis(const int ncon,
+                              const int *terms,
+                              const int nterms,
+                              double **matrix_X_continuous_train,
+                              double **matrix_X_continuous_eval,
+                              const int eval_index,
+                              const int num_obs_train,
+                              double **basis){
+  int t, i, j;
+  for(t = 0; t < nterms; t++){
+    const int *et = terms + t*ncon;
+    for(i = 0; i < num_obs_train; i++){
+      double b = 1.0;
+      for(j = 0; j < ncon; j++){
+        const int p = et[j];
+        if(p > 0){
+          const double dx = matrix_X_continuous_train[j][i] - matrix_X_continuous_eval[j][eval_index];
+          b *= ipow(dx, p);
+        }
+      }
+      basis[t][i] = b;
+    }
+  }
+}
+
 // Regression CV objective for local-constant/local-linear models.
 // The LL branch solves weighted normal equations with ridge fallback if singular.
 
@@ -6699,6 +6862,261 @@ int gate_override_active = 0;
     free_tmat(matrix_bandwidth);
     
     return(DBL_MAX);
+  }
+
+  if(int_ll == LL_GLP){
+    int *glp_terms = NULL;
+    int glp_nterms = 0;
+    MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+    double **basis = NULL;
+    double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
+    double **Ycols = NULL, **Wcols = NULL;
+    double *y2 = NULL, *out = NULL;
+    const double epsilon = 1.0/(double)MAX(1, num_obs);
+    int glp_ok = 1;
+
+    if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)){
+      cv = DBL_MAX;
+      goto finish_cv_path;
+    }
+
+    if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, &glp_terms, &glp_nterms)){
+      cv = DBL_MAX;
+      goto finish_cv_path;
+    }
+
+    if(glp_nterms <= 0){
+      free(glp_terms);
+      cv = DBL_MAX;
+      goto finish_cv_path;
+    }
+
+    KWM = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
+    XTKY = mat_creat(glp_nterms, 1, UNDEFINED);
+    DELTA = mat_creat(glp_nterms, 1, UNDEFINED);
+    basis = alloc_matd(num_obs, glp_nterms);
+    TCON = alloc_matd(1, num_reg_continuous);
+    TUNO = alloc_matd(1, num_reg_unordered);
+    TORD = alloc_matd(1, num_reg_ordered);
+    Ycols = (double **)malloc((size_t)(glp_nterms + 2)*sizeof(double *));
+    Wcols = (double **)malloc((size_t)glp_nterms*sizeof(double *));
+    y2 = (double *)malloc((size_t)num_obs*sizeof(double));
+    out = (double *)malloc((size_t)(glp_nterms + 2)*(size_t)glp_nterms*sizeof(double));
+
+    glp_ok = (KWM != NULL) && (XTKY != NULL) && (DELTA != NULL) &&
+      (basis != NULL) &&
+      ((num_reg_continuous == 0) || (TCON != NULL)) &&
+      ((num_reg_unordered == 0) || (TUNO != NULL)) &&
+      ((num_reg_ordered == 0) || (TORD != NULL)) &&
+      (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL);
+
+    if(!glp_ok){
+      if(KWM != NULL) mat_free(KWM);
+      if(XTKY != NULL) mat_free(XTKY);
+      if(DELTA != NULL) mat_free(DELTA);
+      if(basis != NULL) free_mat(basis, glp_nterms);
+      if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
+      if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
+      if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
+      free(Ycols); free(Wcols); free(y2); free(out); free(glp_terms);
+      cv = DBL_MAX;
+      goto finish_cv_path;
+    }
+
+    for(i = 0; i < num_obs; i++)
+      y2[i] = vector_Y[i]*vector_Y[i];
+
+    if(bwm == RBWM_CVAIC){
+      tsf = int_LARGE_SF;
+      int_LARGE_SF = 1;
+      kernel_weighted_sum_np_ctx(kernel_c,
+                                 kernel_u,
+                                 kernel_o,
+                                 BANDWIDTH_reg,
+                                 1,
+                                 1,
+                                 num_reg_unordered,
+                                 num_reg_ordered,
+                                 num_reg_continuous,
+                                 0,
+                                 0,
+                                 1,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 operator,
+                                 OP_NOOP,
+                                 0,
+                                 0,
+                                 NULL,
+                                 1,
+                                 0,
+                                 0,
+                                 NP_TREE_FALSE,
+                                 0,
+                                 NULL, NULL, NULL, NULL,
+                                 matrix_X_unordered,
+                                 matrix_X_ordered,
+                                 matrix_X_continuous,
+                                 matrix_X_unordered,
+                                 matrix_X_ordered,
+                                 matrix_X_continuous,
+                                 NULL,
+                                 NULL,
+                                 NULL,
+                                 vector_scale_factor,
+                                 1,
+                                 matrix_bandwidth,
+                                 matrix_bandwidth,
+                                 lambda,
+                                 num_categories,
+                                 NULL,
+                                 NULL,
+                                 &aicc,
+                                 NULL,
+                                 NULL,
+                                 &gate_ctx_local);
+      int_LARGE_SF = tsf;
+    }
+
+    for(j = 0; j < num_obs; j++){
+      double nepsilon = 0.0;
+      double pnh = 1.0;
+
+      np_glp_fill_basis(num_reg_continuous, glp_terms, glp_nterms,
+                        matrix_X_continuous, matrix_X_continuous,
+                        j, num_obs, basis);
+
+      for(l = 0; l < num_reg_continuous; l++){
+        TCON[l][0] = matrix_X_continuous[l][j];
+        if(BANDWIDTH_reg == BW_GEN_NN)
+          ; /* matrix_bandwidth already indexed by eval in kernel call */
+      }
+      for(l = 0; l < num_reg_unordered; l++)
+        TUNO[l][0] = matrix_X_unordered[l][j];
+      for(l = 0; l < num_reg_ordered; l++)
+        TORD[l][0] = matrix_X_ordered[l][j];
+
+      Ycols[0] = y2;
+      Ycols[1] = vector_Y;
+      for(l = 0; l < glp_nterms; l++){
+        Ycols[l + 2] = basis[l];
+        Wcols[l] = basis[l];
+      }
+
+      kernel_weighted_sum_np_ctx(kernel_c,
+                                 kernel_u,
+                                 kernel_o,
+                                 BANDWIDTH_reg,
+                                 num_obs,
+                                 1,
+                                 num_reg_unordered,
+                                 num_reg_ordered,
+                                 num_reg_continuous,
+                                 0,
+                                 0,
+                                 1,
+                                 1,
+                                 0,
+                                 0,
+                                 0,
+                                 (bwm == RBWM_CVLS) ? 1 : 0,
+                                 (bwm == RBWM_CVLS) ? j : 0,
+                                 operator,
+                                 OP_NOOP,
+                                 0,
+                                 0,
+                                 NULL,
+                                 1,
+                                 glp_nterms + 2,
+                                 glp_nterms,
+                                 (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+                                 0,
+                                 (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+                                 NULL, NULL, NULL,
+                                 matrix_X_unordered,
+                                 matrix_X_ordered,
+                                 matrix_X_continuous,
+                                 TUNO,
+                                 TORD,
+                                 TCON,
+                                 Ycols,
+                                 Wcols,
+                                 NULL,
+                                 vector_scale_factor,
+                                 1,
+                                 matrix_bandwidth,
+                                 matrix_bandwidth,
+                                 lambda,
+                                 num_categories,
+                                 NULL,
+                                 NULL,
+                                 out,
+                                 NULL,
+                                 NULL,
+                                 &gate_ctx_local);
+
+      for(i = 0; i < glp_nterms; i++){
+        XTKY[i][0] = out[glp_nterms + i];
+        for(l = 0; l < glp_nterms; l++)
+          KWM[i][l] = out[(i + 2)*glp_nterms + l];
+      }
+
+      if((BANDWIDTH_reg == BW_ADAP_NN) && (bwm == RBWM_CVAIC)){
+        for(l = 0; l < num_reg_continuous; l++)
+          pnh /= matrix_bandwidth[l][j];
+      }
+
+      if(bwm == RBWM_CVAIC){
+        KWM[0][0] += pnh*aicc;
+        XTKY[0][0] += pnh*aicc*vector_Y[j];
+      }
+
+      while(mat_solve(KWM, XTKY, DELTA) == NULL){
+        for(i = 0; i < glp_nterms; i++)
+          KWM[i][i] += epsilon;
+        nepsilon += epsilon;
+      }
+
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      if(nepsilon > 0.0){
+        if(mat_solve(KWM, XTKY, DELTA) == NULL){
+          glp_ok = 0;
+          break;
+        }
+      }
+
+      {
+        const double dy = vector_Y[j] - DELTA[0][0];
+        cv += dy*dy;
+      }
+
+      if(bwm == RBWM_CVAIC){
+        int ok00 = 0;
+        const double inv00 = mat_inv00(KWM, &ok00);
+        if(!ok00){ glp_ok = 0; break; }
+        traceH += inv00*pnh*aicc;
+      }
+    }
+
+    mat_free(KWM);
+    mat_free(XTKY);
+    mat_free(DELTA);
+    free_mat(basis, glp_nterms);
+    if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
+    if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
+    if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
+    free(Ycols); free(Wcols); free(y2); free(out); free(glp_terms);
+
+    if(!glp_ok){
+      cv = DBL_MAX;
+      goto finish_cv_path;
+    }
+
+    goto finish_cv_path;
   }
 
   if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
@@ -10861,6 +11279,176 @@ double *SIGN){
     free(lc_Y[1]);
     free(lc_Y[2]);
 #undef NCOL_Y
+  } else if(int_ll == LL_GLP) { // Generalized Local Polynomial
+    int *glp_terms = NULL, *lin_idx = NULL;
+    int glp_nterms = 0;
+    MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+    double **basis = NULL;
+    double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
+    double **Ycols = NULL, **Wcols = NULL;
+    double *y2 = NULL, *out = NULL;
+    const double epsilon = 1.0/(double)MAX(1, num_obs_train);
+
+    if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
+      error("glp degree vector unavailable");
+
+    if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, &glp_terms, &glp_nterms))
+      error("failed to build glp basis terms");
+    if(glp_nterms <= 0)
+      error("invalid glp basis dimension");
+
+    lin_idx = (int *)malloc((size_t)MAX(1, num_reg_continuous)*sizeof(int));
+    for(l = 0; l < num_reg_continuous; l++)
+      lin_idx[l] = np_glp_find_linear_term(num_reg_continuous, glp_terms, glp_nterms, l);
+
+    KWM = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
+    XTKY = mat_creat(glp_nterms, 1, UNDEFINED);
+    DELTA = mat_creat(glp_nterms, 1, UNDEFINED);
+    basis = alloc_matd(num_obs_train, glp_nterms);
+    TCON = alloc_matd(1, num_reg_continuous);
+    TUNO = alloc_matd(1, num_reg_unordered);
+    TORD = alloc_matd(1, num_reg_ordered);
+    Ycols = (double **)malloc((size_t)(glp_nterms + 2)*sizeof(double *));
+    Wcols = (double **)malloc((size_t)glp_nterms*sizeof(double *));
+    y2 = (double *)malloc((size_t)num_obs_train*sizeof(double));
+    out = (double *)malloc((size_t)(glp_nterms + 2)*(size_t)glp_nterms*sizeof(double));
+
+    if(!((KWM != NULL) && (XTKY != NULL) && (DELTA != NULL) &&
+      (basis != NULL) &&
+      ((num_reg_continuous == 0) || (TCON != NULL)) &&
+      ((num_reg_unordered == 0) || (TUNO != NULL)) &&
+      ((num_reg_ordered == 0) || (TORD != NULL)) &&
+      (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) && (lin_idx != NULL)))
+      error("memory allocation failed in glp path");
+
+    for(i = 0; i < num_obs_train; i++)
+      y2[i] = vector_Y[i]*vector_Y[i];
+
+    for(j = 0; j < num_obs_eval; j++){
+      double nepsilon = 0.0;
+      double sk, ey, ey2;
+
+      np_glp_fill_basis(num_reg_continuous, glp_terms, glp_nterms,
+                        matrix_X_continuous_train, matrix_X_continuous_eval,
+                        j, num_obs_train, basis);
+
+      for(l = 0; l < num_reg_continuous; l++)
+        TCON[l][0] = matrix_X_continuous_eval[l][j];
+      for(l = 0; l < num_reg_unordered; l++)
+        TUNO[l][0] = matrix_X_unordered_eval[l][j];
+      for(l = 0; l < num_reg_ordered; l++)
+        TORD[l][0] = matrix_X_ordered_eval[l][j];
+
+      Ycols[0] = y2;
+      Ycols[1] = vector_Y;
+      for(l = 0; l < glp_nterms; l++){
+        Ycols[l + 2] = basis[l];
+        Wcols[l] = basis[l];
+      }
+
+      kernel_weighted_sum_np(kernel_c,
+                             kernel_u,
+                             kernel_o,
+                             BANDWIDTH_reg,
+                             num_obs_train,
+                             1,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             num_reg_continuous,
+                             0,
+                             0,
+                             1,
+                             1,
+                             0,
+                             0,
+                             0,
+                             0,
+                             0,
+                             operator,
+                             OP_NOOP,
+                             0,
+                             0,
+                             NULL,
+                             1,
+                             glp_nterms + 2,
+                             glp_nterms,
+                             (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+                             0,
+                             (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+                             NULL, NULL, NULL,
+                             matrix_X_unordered_train,
+                             matrix_X_ordered_train,
+                             matrix_X_continuous_train,
+                             TUNO,
+                             TORD,
+                             TCON,
+                             Ycols,
+                             Wcols,
+                             NULL,
+                             vector_scale_factor,
+                             1,
+                             matrix_bandwidth,
+                             matrix_bandwidth,
+                             lambda,
+                             num_categories,
+                             matrix_categorical_vals,
+                             NULL,
+                             out,
+                             NULL,
+                             NULL);
+
+      for(i = 0; i < glp_nterms; i++){
+        XTKY[i][0] = out[glp_nterms + i];
+        for(l = 0; l < glp_nterms; l++)
+          KWM[i][l] = out[(i + 2)*glp_nterms + l];
+      }
+
+      while(mat_solve(KWM, XTKY, DELTA) == NULL){
+        for(i = 0; i < glp_nterms; i++)
+          KWM[i][i] += epsilon;
+        nepsilon += epsilon;
+      }
+
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      if(nepsilon > 0.0){
+        if(mat_solve(KWM, XTKY, DELTA) == NULL)
+          error("mat_solve failed in glp path");
+      }
+
+      mean[j] = DELTA[0][0];
+      sk = copysign(DBL_MIN, out[2*glp_nterms]) + out[2*glp_nterms];
+      ey = out[glp_nterms]/sk;
+      ey2 = out[0]/sk;
+      mean_stderr[j] = (ey2 - ey*ey);
+      mean_stderr[j] = (mean_stderr[j] <= 0.0) ? 0.0 : sqrt(mean_stderr[j] * K_INT_KERNEL_P / (sk*hprod));
+
+      if(do_grad){
+        for(l = 0; l < num_reg_continuous; l++){
+          gradient[l][j] = (lin_idx[l] >= 0) ? DELTA[lin_idx[l]][0] : 0.0;
+          if(do_gerr)
+            gradient_stderr[l][j] = 0.0;
+        }
+        for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++){
+          gradient[l][j] = 0.0;
+          if(do_gerr) gradient_stderr[l][j] = 0.0;
+        }
+      }
+    }
+
+    mat_free(KWM);
+    mat_free(XTKY);
+    mat_free(DELTA);
+    free_mat(basis, glp_nterms);
+    if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
+    if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
+    if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
+    free(Ycols);
+    free(Wcols);
+    free(y2);
+    free(out);
+    free(glp_terms);
+    free(lin_idx);
+
   } else { // Local Linear 
 
     // because we manipulate the training data scale factors can be wrong

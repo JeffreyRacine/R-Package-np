@@ -55,6 +55,7 @@ npregbw(\dots)
         invalid.penalty = c("baseline","dbmax"),
         penalty.multiplier = 10,
         regtype,
+        glp.degree,
         bwmethod,
         bwscaling,
         bwtype,
@@ -163,7 +164,18 @@ npregbw(\dots)
     a character string specifying which type of kernel regression
     estimator to use. \code{lc} specifies a local-constant estimator
     (Nadaraya-Watson) and \code{ll} specifies a local-linear
-    estimator. Defaults to \code{lc}.
+    estimator. \code{glp} specifies a generalized local polynomial
+    estimator with polynomial degree(s) given by \code{glp.degree} for
+    continuous predictors. Defaults to \code{lc}.
+  }
+
+  \item{glp.degree}{
+    a user-supplied vector of fixed polynomial degrees for the
+    continuous predictors (exactly one degree per continuous predictor),
+    relevant only when \code{regtype="glp"}. If omitted, the default is
+    degree one for each continuous predictor. Entries must be
+    non-negative integers in \code{[0,12]}. Bandwidth optimization
+    treats this vector as fixed input and optimizes only bandwidths.
   }
   
   \item{bwmethod}{
@@ -324,7 +336,9 @@ npregbw(\dots)
   \item{transform.bounds}{ a logical value that when set to \code{TRUE}
     applies an internal transformation that maps the unconstrained
     search to the feasible bandwidth domain. Defaults to
-    \code{FALSE}.}
+    \code{FALSE}. For true generalized local polynomial optimization
+    (i.e. \code{regtype="glp"} with mixed/higher continuous degrees),
+    transformed bounds are enabled internally for stability.}
 
   \item{invalid.penalty}{ a character string specifying the penalty
     used when the optimizer encounters invalid bandwidths.

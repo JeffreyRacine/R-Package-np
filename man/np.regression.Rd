@@ -100,7 +100,11 @@ FALSE, \dots)
   \item{gradients}{
     a logical value indicating that you want gradients computed and
     returned in the resulting \code{npregression} object. Defaults to
-    \code{FALSE}.
+    \code{FALSE}. For \code{regtype="glp"} with all continuous
+    polynomial degrees equal to zero, derivatives are not defined and
+    an error is issued if \code{gradients=TRUE}. In the current GLP
+    implementation, derivatives for unordered/ordered predictors are
+    not yet supported.
   }
 
   \item{residuals}{
@@ -167,6 +171,16 @@ FALSE, \dots)
   kernel. Unordered discrete data types use a variation on Aitchison and
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
+
+  When bandwidths are obtained with \code{regtype="glp"}, C-level
+  \code{npreg} supports heterogeneous continuous polynomial degrees via
+  \code{glp.degree}. The homogeneous degree-0 and degree-1 cases remain
+  equivalent to \code{lc} and \code{ll}, respectively. Current GLP
+  derivative output is first-order for continuous predictors; higher
+  order and cross-partial extraction are reserved for future extension.
+  The degree vector is fixed user input (one entry per continuous
+  predictor, non-negative integers in \code{[0,12]}), while
+  optimization remains over bandwidths only.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths can lead to numerical problems for the local linear

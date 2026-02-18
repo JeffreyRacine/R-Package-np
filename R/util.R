@@ -97,6 +97,56 @@ NZD_pos <- function(a) {
   a
 }
 
+npValidateGlpDegree <- function(regtype, glp.degree, ncon, argname = "glp.degree") {
+  glp.degree.max <- 12L
+
+  if (!identical(regtype, "glp"))
+    return(NULL)
+
+  if (is.null(glp.degree))
+    glp.degree <- rep.int(1L, ncon)
+
+  if (!length(glp.degree) && ncon == 0L)
+    return(integer(0))
+
+  if (length(glp.degree) != ncon)
+    stop(sprintf("%s must have one entry per continuous predictor (%d expected, got %d)",
+                 argname, ncon, length(glp.degree)))
+
+  if (any(!is.finite(glp.degree)))
+    stop(sprintf("%s must contain finite non-negative integers", argname))
+
+  if (any(glp.degree < 0))
+    stop(sprintf("%s must contain finite non-negative integers", argname))
+
+  if (any(glp.degree != floor(glp.degree)))
+    stop(sprintf("%s must contain finite non-negative integers", argname))
+
+  if (any(glp.degree > glp.degree.max))
+    stop(sprintf("%s must contain finite non-negative integers in [0,%d]",
+                 argname, glp.degree.max))
+
+  as.integer(glp.degree)
+}
+
+npRegtypeToC <- function(regtype, glp.degree, ncon, context = "npreg") {
+  if (identical(regtype, "lc"))
+    return(list(code = REGTYPE_LC, glp.degree = NULL))
+
+  if (identical(regtype, "ll"))
+    return(list(code = REGTYPE_LL, glp.degree = NULL))
+
+  glp.degree <- npValidateGlpDegree(regtype, glp.degree, ncon)
+
+  if ((ncon == 0L) || all(glp.degree == 0L))
+    return(list(code = REGTYPE_LC, glp.degree = glp.degree))
+
+  if (all(glp.degree == 1L))
+    return(list(code = REGTYPE_LL, glp.degree = glp.degree))
+
+  list(code = REGTYPE_GLP, glp.degree = glp.degree)
+}
+
 ## Function to test for monotone increasing vector
 
 is.monotone.increasing <- function(x) {
@@ -1352,6 +1402,7 @@ BWM_CVAIC = 0
 
 REGTYPE_LC = 0
 REGTYPE_LL = 1
+REGTYPE_GLP = 2
 
 ##conditional density/distribution
 CBWM_CVML = 0

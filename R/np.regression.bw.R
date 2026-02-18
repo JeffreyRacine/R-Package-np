@@ -151,6 +151,9 @@ npregbw.rbandwidth <-
     rord = xdat[, bws$iord, drop = FALSE]
 
     tbw <- bws
+    tbw$glp.degree <- npValidateGlpDegree(regtype = tbw$regtype,
+                                          glp.degree = tbw$glp.degree,
+                                          ncon = tbw$ncon)
 
     mysd <- EssDee(rcon)
     nconfac <- nrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
@@ -158,6 +161,20 @@ npregbw.rbandwidth <-
 
     invalid.penalty <- match.arg(invalid.penalty)
     penalty_mode <- ifelse(invalid.penalty == "baseline", 1L, 0L)
+
+    reg.c <- npRegtypeToC(regtype = bws$regtype,
+                          glp.degree = bws$glp.degree,
+                          ncon = bws$ncon,
+                          context = "npregbw")
+    if (identical(bws$regtype, "glp") &&
+        identical(reg.c$code, REGTYPE_GLP) &&
+        !isTRUE(transform.bounds))
+      transform.bounds <- TRUE
+    glp.degree.c <- if (bws$ncon > 0) {
+      as.integer(if (is.null(reg.c$glp.degree)) rep.int(0L, bws$ncon) else reg.c$glp.degree)
+    } else {
+      integer(1)
+    }
 
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(xdat)[1], 
@@ -189,9 +206,7 @@ npregbw.rbandwidth <-
         nuno = bws$nuno,
         nord = bws$nord,
         ncon = bws$ncon,
-        regtype = switch(bws$regtype,
-          lc = REGTYPE_LC,
-          ll = REGTYPE_LL),
+        regtype = reg.c$code,
         int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
@@ -220,6 +235,7 @@ npregbw.rbandwidth <-
            fallback.history = double(1),
            penalty.mode = as.integer(penalty_mode),
            penalty.multiplier = as.double(penalty.multiplier),
+           glp.degree = glp.degree.c,
            ckerlb = as.double(cker.bounds.c$lb),
            ckerub = as.double(cker.bounds.c$ub),
            PACKAGE="np" )[c("bw","fval","fval.history","eval.history","invalid.history","timing","fast.history","fallback.history")])[1]
@@ -273,6 +289,7 @@ npregbw.rbandwidth <-
 
     tbw <- rbandwidth(bw = tbw$bw,
                       regtype = tbw$regtype,
+                      glp.degree = tbw$glp.degree,
                       bwmethod = tbw$method,
                       bwscaling = tbw$scaling,
                       bwtype = tbw$type,
@@ -323,7 +340,7 @@ npregbw.default <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ## dummy arguments for later passing into rbandwidth()
-           regtype, bwmethod, bwscaling, bwtype,
+           regtype, glp.degree, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
 
@@ -336,7 +353,7 @@ npregbw.default <-
     ## bandwidth() call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("regtype", "bwmethod", "bwscaling", "bwtype",
+    margs <- c("regtype", "glp.degree", "bwmethod", "bwscaling", "bwtype",
                "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)

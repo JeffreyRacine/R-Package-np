@@ -145,6 +145,27 @@ npreg.rbandwidth <-
     if (length(bws$bw) != length(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
+    bws$glp.degree <- npValidateGlpDegree(regtype = bws$regtype,
+                                          glp.degree = bws$glp.degree,
+                                          ncon = bws$ncon)
+
+    reg.c <- npRegtypeToC(regtype = bws$regtype,
+                          glp.degree = bws$glp.degree,
+                          ncon = bws$ncon,
+                          context = "npreg")
+    glp.degree.c <- if (bws$ncon > 0) {
+      as.integer(if (is.null(reg.c$glp.degree)) rep.int(0L, bws$ncon) else reg.c$glp.degree)
+    } else {
+      integer(1)
+    }
+
+    if (identical(bws$regtype, "glp") && gradients &&
+        ((bws$ncon == 0L) || all(bws$glp.degree == 0L)))
+      stop("need polynomial degree > 0 for at least one continuous predictor to compute glp derivatives")
+
+    if (identical(bws$regtype, "glp") && gradients && (bws$nuno + bws$nord > 0L))
+      stop("glp derivatives for unordered/ordered predictors are not yet supported")
+
     ccon = unlist(lapply(txdat[,bws$icon, drop = FALSE],class))
     if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
         (any(bws$iord) && !all(sapply(txdat[,bws$iord, drop = FALSE],inherits, "ordered"))) ||
@@ -280,9 +301,7 @@ npreg.rbandwidth <-
         "racineliyan" = OKER_RLY),
       ey_is_ty = no.ey,
       do_grad = gradients,
-      regtype = switch(bws$regtype,
-        lc = REGTYPE_LC,
-        ll = REGTYPE_LL),
+      regtype = reg.c$code,
       no.ex = no.ex,
       mcv.numRow = attr(bws$xmcv, "num.row"),
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
@@ -309,6 +328,7 @@ npreg.rbandwidth <-
          asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
          asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
          as.integer(myopti),
+         glp.degree = glp.degree.c,
          mean = double(enrow),
          merr = double(enrow),
          g = double(ifelse(gradients,enrow*ncol,0)),
