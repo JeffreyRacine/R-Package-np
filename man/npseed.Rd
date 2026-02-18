@@ -18,7 +18,7 @@ npseed(seed)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
 
   \code{npseed} provides an interface for setting the random seed (and
   resetting the random number generator) used
@@ -37,7 +37,7 @@ npseed(seed)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{set.seed}}
 }
 

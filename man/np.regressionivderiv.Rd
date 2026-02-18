@@ -128,7 +128,7 @@ npregivderiv(y,
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
 
 
   Note that Landweber-Fridman iteration presumes that
@@ -233,7 +233,7 @@ npregivderiv(y,
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
 \code{\link{npregiv},\link{npreg}}
 }
 \examples{

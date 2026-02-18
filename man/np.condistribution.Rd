@@ -107,7 +107,7 @@ npcdist(bws, \dots)
 
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
 
   \code{npcdist} implements a variety of methods for estimating
   multivariate conditional cumulative distributions (\eqn{p+q}-variate)
@@ -216,7 +216,7 @@ npcdist(bws, \dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{npudens}}
 }
 \examples{

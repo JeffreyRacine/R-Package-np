@@ -69,3 +69,23 @@ Speedups are reported as `baseline / current` (so `>1` is faster) with percent c
 - `npcdens` shows consistent but smaller gains across sample sizes.
 - `npudens` is modestly better on mean at all sample sizes; median is near-neutral at `n=500` and slightly improved at larger `n`.
 - Across all 18 tree/function/sample cells: 16 mean wins and 15 median wins.
+
+## 2026-02-18: All-Large Regression CV Fast Path Telemetry (Port Sync)
+
+### Summary
+- Ported/refined the shared `src/jksum.c` all-large regression CV path from `np-master`.
+- Added cumulative bandwidth summary counters to mirror serial package behavior:
+  - `num.feval`
+  - `num.feval.fast`
+  - `num.feval.fallback`
+- Summary now prints: `Number of Function Evaluations: N (fast = X, fallback = Y)`.
+
+### Notes
+- Fast-path usage is conditional and may be sparse in nonlinear/small-bandwidth regimes.
+- Fallback count tracks all-large attempts that reverted to generic evaluation.
+- `npRmpi` behavior should be interpreted with MPI lifecycle/broadcast requirements intact.
+
+### Release/Validation
+- Current development baseline: `0.70-0`.
+- Built and uploaded tarball to win-builder (`R-release` and `R-devel`) from:
+  - `/Users/jracine/Development/npRmpi_0.70-0.tar.gz`

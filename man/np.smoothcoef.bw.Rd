@@ -324,7 +324,7 @@ npscoefbw(\dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
 
   \code{npscoefbw} implements a variety of methods for semiparametric
  regression on multivariate (\eqn{p+q}-variate) explanatory data defined
@@ -465,7 +465,7 @@ npscoefbw(\dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
 \dontrun{

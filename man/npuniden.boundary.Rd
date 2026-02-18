@@ -75,7 +75,7 @@ and distribution function estimates over the range \eqn{[a,b]}
 }
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
@@ -210,7 +210,7 @@ and distribution function estimates over the range \eqn{[a,b]}
 Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
 The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.reflect}}.
 }
 \examples{
