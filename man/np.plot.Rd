@@ -55,7 +55,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.blocklen = NULL,
        plot.errors.boot.num = 399,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+       plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
        plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
@@ -105,7 +105,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.blocklen = NULL,
        plot.errors.boot.num = 399,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+       plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
        plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
@@ -155,7 +155,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.blocklen = NULL,
        plot.errors.boot.num = 399,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+       plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
        plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
@@ -202,7 +202,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.method = c("inid", "fixed", "geom"),
        plot.errors.boot.blocklen = NULL,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+       plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
        plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
@@ -252,7 +252,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.method = c("inid", "fixed", "geom"),
        plot.errors.boot.blocklen = NULL,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+       plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
        plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
@@ -289,7 +289,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
        plot.errors.boot.method = c("inid", "fixed", "geom"),
        plot.errors.boot.blocklen = NULL,
        plot.errors.center = c("estimate","bias-corrected"),
-       plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+       plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
        plot.errors.alpha = 0.05,
        plot.errors.style = c("band","bar"),
        plot.errors.bar = c("|","I"),
@@ -541,14 +541,23 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
   \item{plot.errors.type}{
     a character string used to specify the type of error to
-    calculate. Can be set as \code{standard}, \code{pointwise},
+    calculate. Can be set as \code{pmzsd}, \code{pointwise},
     \code{bonferroni}, \code{simultaneous}, or \code{all}. Defaults
-    to \code{standard}.
+    to \code{pmzsd}. For \code{pmzsd}, errors are
+    \eqn{\pm z_{1-\alpha/2}} times the pointwise standard deviation
+    estimate, where \eqn{z_{1-\alpha/2}} is obtained via
+    \code{qnorm(plot.errors.alpha/2, lower.tail=FALSE)}.
   }
 
   \item{plot.errors.alpha}{
-    a scalar numeric value in \eqn{(0,1)} specifying \eqn{\alpha} for
-    bootstrap quantile bands. For \code{pointwise}, quantiles are
+    a scalar numeric value in \eqn{(0,0.5)} specifying \eqn{\alpha}. For
+    \code{pmzsd}, \eqn{\alpha} determines the normal quantile
+    \eqn{z_{1-\alpha/2}} used in
+    \code{qnorm(plot.errors.alpha/2, lower.tail=FALSE)} for pointwise
+    \eqn{\pm z_{1-\alpha/2}} standard-deviation bands. For bootstrap
+    quantile bands (\code{pointwise}, \code{bonferroni},
+    \code{simultaneous}, and \code{all}), \eqn{\alpha} is used as
+    follows: for \code{pointwise}, quantiles are
     \eqn{(\alpha/2, 1-\alpha/2)}. For \code{bonferroni}, quantiles are
     \eqn{(\alpha/(2m), 1-\alpha/(2m))} where \eqn{m} is the number of
     evaluation points. For \code{simultaneous}, a rank-based rectangular
