@@ -7621,18 +7621,25 @@ int gate_override_active = 0;
         XTKY[0][0] += pnh*aicc*vector_Y[j];
       }
 
-      while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
+      while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
         for(int ii = 0; ii < (nrc1); ii++)
           KWM[ii][ii] += epsilon;
         nepsilon += epsilon;
       }
-      
-      if(bwm == RBWM_CVAIC)
-        traceH += XTKXINV[0][0]*pnh*aicc;
-   
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
-      DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+      if(bwm == RBWM_CVAIC){
+        int ok00 = 0;
+        const double inv00 = mat_inv00(KWM, &ok00);
+        if(!ok00)
+          error("mat_inv00 failed after ridge adjustment");
+        traceH += inv00*pnh*aicc;
+      }
+
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      if(nepsilon > 0.0){
+        if(mat_solve(KWM, XTKY, DELTA) == NULL)
+          error("mat_solve failed after ridge adjustment");
+      }
       const double dy = vector_Y[j]-DELTA[0][0];
       cv += dy*dy; 
     }
@@ -11130,15 +11137,17 @@ double *SIGN){
         }
       }
 
-      while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
+      while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
         for(int ii = 0; ii < (nrc1); ii++)
           KWM[ii][ii] += epsilon;
         nepsilon += epsilon;
       }
-      
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
 
-      DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      if(nepsilon > 0.0){
+        if(mat_solve(KWM, XTKY, DELTA) == NULL)
+          error("mat_solve failed after ridge adjustment");
+      }
       mean[j] = DELTA[0][0];
 
       const double sk = copysign(DBL_MIN, (kwm+j*nrcc33)[2*nrc3+2]) + (kwm+j*nrcc33)[2*nrc3+2];
@@ -11166,15 +11175,17 @@ double *SIGN){
           }
 
           nepsilon = 0.0;
-          while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
+          while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
             for(int ii = 0; ii < (nrc1); ii++)
               KWM[ii][ii] += epsilon;
             nepsilon += epsilon;
           }
 
           XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
-
-          DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+          if(nepsilon > 0.0){
+            if(mat_solve(KWM, XTKY, DELTA) == NULL)
+              error("mat_solve failed after ridge adjustment");
+          }
 
           gradient[l][j] = mean[j] - DELTA[0][0];
           
@@ -11204,15 +11215,17 @@ double *SIGN){
           }
 
           nepsilon = 0.0;
-          while(mat_inv(KWM, XTKXINV) == NULL){ // singular = ridge about
+          while(mat_solve(KWM, XTKY, DELTA) == NULL){ // singular = ridge about
             for(int ii = 0; ii < (nrc1); ii++)
               KWM[ii][ii] += epsilon;
             nepsilon += epsilon;
           }
 
           XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
-
-          DELTA = mat_mul(XTKXINV, XTKY, DELTA);
+          if(nepsilon > 0.0){
+            if(mat_solve(KWM, XTKY, DELTA) == NULL)
+              error("mat_solve failed after ridge adjustment");
+          }
 
           gradient[l][j] = (mean[j] - DELTA[0][0])*((matrix_ordered_indices[l - num_reg_continuous - num_reg_unordered][j] != 0) ? 1.0 : -1.0);
           

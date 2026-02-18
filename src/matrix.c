@@ -4,6 +4,8 @@
 #include "matrix.h"
 
 #include <R.h>
+#include <R_ext/BLAS.h>
+#include <R_ext/Lapack.h>
 
 #ifdef RCSID
 static char rcsid[] = "$Id: matrix.c,v 1.4 2006/11/02 19:50:13 tristen Exp $";
@@ -402,8 +404,13 @@ MATRIX mat_fdumpf( MATRIX A, char *s, FILE *fp )
  */
 MATRIX mat_inv( MATRIX a , MATRIX C)
 {
-	MATRIX  A, B, P;
-	int i, n;
+	int i, j, n;
+	int info = 0;
+	int lwork = -1;
+	double work_query = 0.0;
+	double *A = NULL;
+	int *ipiv = NULL;
+	double *work = NULL;
 
 #ifdef CONFORM_CHECK
 
@@ -419,50 +426,60 @@ MATRIX mat_inv( MATRIX a , MATRIX C)
 #endif
 
 	n = MatCol(a);
-	A = mat_creat(MatRow(a), MatCol(a), UNDEFINED);
-	A = mat_copy(a, A);
-	B = mat_creat( n, 1, UNDEFINED );
-	P = mat_creat( n, 1, UNDEFINED );
 
+	A = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
+	ipiv = (int *)malloc((size_t)n * sizeof(int));
+	if ((A == NULL) || (ipiv == NULL))
+		error("mat_inv: malloc error\n");
 
+	/* Copy to LAPACK column-major dense storage. */
+	for (j = 0; j < n; j++)
+		for (i = 0; i < n; i++)
+			A[i + j*n] = a[i][j];
 
-/*
- * - LU-decomposition -
- * also check for singular matrix
- */
-
-	if (mat_lu(A, P) == -1)
+	F77_CALL(dgetrf)(&n, &n, A, &n, ipiv, &info);
+	if (info != 0)
 	{
-
-		mat_free(A);
-		mat_free(B);
-		mat_free(P);
-
-		return (NULL);
-
+		free(A);
+		free(ipiv);
+		return NULL;
 	}
-	else
+
+	F77_CALL(dgetri)(&n, A, &n, ipiv, &work_query, &lwork, &info);
+	if (info != 0)
 	{
-
-/* Bug??? was still mat_backsubs1 even when singular??? */
-
-		for (i=0; i<n; i++)
-		{
-			mat_fill(B, ZERO_MATRIX);
-			B[i][0] = 1.0;
-			mat_backsubs1( A, B, C, P, i );
-		}
-
-		mat_free(A);
-		mat_free(B);
-		mat_free(P);
-
-    if(!isFiniteMatrix(C))
-      return NULL;
-
-		return (C);
-
+		free(A);
+		free(ipiv);
+		return NULL;
 	}
+
+	lwork = (int)work_query;
+	if (lwork < n)
+		lwork = n;
+	work = (double *)malloc((size_t)lwork * sizeof(double));
+	if (work == NULL)
+		error("mat_inv: malloc error\n");
+
+	F77_CALL(dgetri)(&n, A, &n, ipiv, work, &lwork, &info);
+	free(work);
+	free(ipiv);
+	if (info != 0)
+	{
+		free(A);
+		return NULL;
+	}
+
+	/* Copy back from LAPACK column-major dense storage. */
+	for (j = 0; j < n; j++)
+		for (i = 0; i < n; i++)
+			C[i][j] = A[i + j*n];
+
+	free(A);
+
+	if(!isFiniteMatrix(C))
+		return NULL;
+
+	return (C);
 
 }
 
@@ -524,7 +541,92 @@ MATRIX mat_mul( MATRIX A, MATRIX B , MATRIX C)
 			}
 		}
 	}
+
 	return (C);
+}
+
+/*
+ *-----------------------------------------------------------------------------
+ * funct:  mat_solve
+ * desct:  solve A * X = B directly (prefer SPD via Cholesky, fallback LU)
+ * given:  A square, B with matching rows
+ * retrn:  X on success, NULL on singular/failed solve
+ *-----------------------------------------------------------------------------
+ */
+MATRIX mat_solve( MATRIX A, MATRIX B, MATRIX X)
+{
+	int i, j;
+	const int n = MatRow(A);
+	const int nrhs = MatCol(B);
+	MATRIX A_LU = NULL, P = NULL, Btmp = NULL;
+
+#ifdef CONFORM_CHECK
+	if (MatCol(A) != n)
+		error("\nUnconformable matrices in routine mat_solve(): A must be square\n");
+	if (MatRow(B) != n)
+		error("\nUnconformable matrices in routine mat_solve(): Row(A)!=Row(B)\n");
+	if (MatRow(X) != n || MatCol(X) != nrhs)
+		error("\nUnconformable matrices in routine mat_solve(): X dims mismatch\n");
+#endif
+
+	A_LU = mat_creat(n, n, UNDEFINED);
+	P = mat_creat(n, 1, UNDEFINED);
+	Btmp = mat_creat(n, 1, UNDEFINED);
+
+	mat_copy(A, A_LU);
+
+	if (mat_lu(A_LU, P) == -1) {
+		mat_free(A_LU);
+		mat_free(P);
+		mat_free(Btmp);
+		return NULL;
+	}
+
+	for (j = 0; j < nrhs; j++) {
+		for (i = 0; i < n; i++)
+			Btmp[i][0] = B[i][j];
+		mat_backsubs1(A_LU, Btmp, X, P, j);
+	}
+
+	mat_free(A_LU);
+	mat_free(P);
+	mat_free(Btmp);
+
+	if(!isFiniteMatrix(X))
+		return NULL;
+
+	return X;
+}
+
+double mat_inv00( MATRIX A, int *ok )
+{
+	const int n = MatRow(A);
+	MATRIX B = NULL, X = NULL;
+	double v = 0.0;
+
+#ifdef CONFORM_CHECK
+	if (MatCol(A) != n)
+		error("\nUnconformable matrices in routine mat_inv00(): A must be square\n");
+#endif
+
+	B = mat_creat(n, 1, ZERO_MATRIX);
+	X = mat_creat(n, 1, ZERO_MATRIX);
+	B[0][0] = 1.0;
+
+	if (mat_solve(A, B, X) == NULL) {
+		*ok = 0;
+		mat_free(B);
+		mat_free(X);
+		return 0.0;
+	}
+
+	v = X[0][0];
+	*ok = isfinite(v) ? 1 : 0;
+
+	mat_free(B);
+	mat_free(X);
+
+	return v;
 }
 
 
