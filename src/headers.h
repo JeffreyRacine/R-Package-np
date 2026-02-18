@@ -36,7 +36,13 @@ int difftime(time_t t1, time_t t0)
 #define MAX(a,b) ((a) > (b) ? (a) : (b))
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 /* No zero divide allowing for negative or positive values */
-#define NZD(a) ((a) < 0 ? (MIN(-DBL_EPSILON,a)) : (MAX(DBL_EPSILON,a)))
+static inline double NZD(const double a){
+  return (a < 0.0) ? MIN(-DBL_EPSILON, a) : MAX(DBL_EPSILON, a);
+}
+/* Positive-only no-zero guard for known-positive quantities */
+static inline double NZD_POS(const double a){
+  return (a > DBL_EPSILON) ? a : DBL_EPSILON;
+}
 
 double **alloc_matd(int nrows, int ncols);
 double **alloc_tmatd(int nrows, int ncols);
