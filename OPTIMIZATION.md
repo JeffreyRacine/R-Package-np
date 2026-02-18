@@ -190,3 +190,23 @@ Selected rows from `/tmp/np_largeh_timing_bw_join.csv`:
 ### Interpretation
 - The shortcut behaves as intended: gains are strongest in regimes where CV chooses large continuous bandwidths relative to predictor range.
 - Cases with small/moderate `h/range` show little or no speedup, which is expected for this targeted optimization.
+
+## 2026-02-18 (All-Large Regression CV Fast Path + Telemetry)
+
+### Summary
+- Refined `src/jksum.c` all-large (`large-h`/`large-lambda`) handling for regression CV (`ll`/`lc`, `cv.ls`/`cv.aic`) with a lean global-fit shortcut.
+- Added cumulative counters in bandwidth objects/summary output:
+  - `num.feval` (total),
+  - `num.feval.fast` (all-large fast path),
+  - `num.feval.fallback` (all-large attempt reverted to generic path).
+- Summary format now reports: `Number of Function Evaluations: N (fast = X, fallback = Y)`.
+
+### Practical Notes
+- Fast path activation remains conditional on gate checks and candidate bandwidth state.
+- `num.feval.fast + num.feval.fallback` can be less than `num.feval` because many evaluations are not all-large candidates.
+- New docs hub `man/np.kernels.Rd` was added and linked from method pages with `np.options` and `np.plot`.
+
+### Release/Validation
+- Current development baseline: `0.70-0`.
+- Built and uploaded tarball to win-builder (`R-release` and `R-devel`) from:
+  - `/Users/jracine/Development/np_0.70-0.tar.gz`

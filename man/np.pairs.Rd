@@ -32,7 +32,7 @@ np.pairs.plot(pair_list)
   \code{np.pairs.plot} returns \code{NULL} (invisibly).
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
 
 On the diagonal, \code{npudens} is used to compute kernel density
 estimates. Off-diagonal panels use \code{npreg} with residuals to draw
@@ -55,5 +55,5 @@ np.pairs.plot(pair_list)
 }
 }
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}\code{\link{npudens}}, \code{\link{npreg}}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}\code{\link{npudens}}, \code{\link{npreg}}}
 \keyword{hplot}

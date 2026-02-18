@@ -417,7 +417,7 @@ npcdistbw(\dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
 
   \code{npcdistbw} implements a variety of methods for choosing
   bandwidths for multivariate distributions (\eqn{p+q}-variate) defined
@@ -587,7 +587,7 @@ npcdistbw(\dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}}, \code{\link{hist}},
   \code{\link{npudens}}, \code{\link{npudist}}
 }

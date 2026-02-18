@@ -11,7 +11,7 @@ with Mixed Data Types }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
-  \code{\link{np.plot}} for plotting options.
+  \code{\link{npplot}} for plotting options.
 }
 \usage{
 npqcmstest(formula,
@@ -189,7 +189,7 @@ npqcmstest(formula,
 
 \seealso{
   \code{\link{np.kernels}}, \code{\link{np.options}},
-  \code{\link{np.plot}}, \code{\link{npregbw}}.
+  \code{\link{npplot}}, \code{\link{npregbw}}.
 }
 
 \examples{

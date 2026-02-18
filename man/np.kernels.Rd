@@ -8,7 +8,7 @@
 }
 \details{
   Documentation guide: see \code{\link{np.options}} for global options
-  and \code{\link{np.plot}} for plotting options.
+  and \code{\link{npplot}} for plotting options.
 
   Kernel option names used in \pkg{np}:
 
@@ -118,7 +118,7 @@
   \emph{Journal of the American Statistical Association}, \bold{99}, 1015--1026.
 }
 \seealso{
-  \code{\link{np.options}}, \code{\link{np.plot}}
+  \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{npregbw}},
   \code{\link{npudensbw}},
   \code{\link{npudistbw}},
