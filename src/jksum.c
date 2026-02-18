@@ -1462,6 +1462,12 @@ static inline int np_disc_near_const_kernel(const double k_same, const double k_
   return fabs(k_same - k_diff) <= np_disc_rel_tol()*scale;
 }
 
+/*
+  Gate override behavior for kernel_weighted_sum_np_ctx:
+  - `NP_GATE_CTX_INACTIVE`: no override; build gate/caches locally.
+  - `NP_GATE_CTX_OVERRIDE`: caller supplies precomputed gate state.
+  - `NP_GATE_CTX_DISABLE`: bypass gate shortcuts and run generic path.
+*/
 typedef struct {
   int active;
   int num_reg_continuous;
@@ -1512,6 +1518,74 @@ static inline int np_gate_int_array_equal(const int * const a,
   for(i = 0; i < n; i++)
     if(a[i] != b[i])
       return 0;
+  return 1;
+}
+
+static inline int np_gate_ptr_pair_valid(const void * const a,
+                                         const void * const b){
+  return ((a == NULL) == (b == NULL));
+}
+
+static inline int np_gate_ptr_triplet_valid(const void * const a,
+                                            const void * const b,
+                                            const void * const c){
+  return ((a == NULL) && (b == NULL) && (c == NULL)) ||
+         ((a != NULL) && (b != NULL) && (c != NULL));
+}
+
+static inline int np_gate_ctx_is_sane(const NP_GateOverrideCtx * const ctx){
+  if(ctx == NULL)
+    return 1;
+
+  if((ctx->active == NP_GATE_CTX_INACTIVE) || (ctx->active == NP_GATE_CTX_DISABLE))
+    return 1;
+
+  if(ctx->active != NP_GATE_CTX_OVERRIDE)
+    return 0;
+
+  if((ctx->num_reg_continuous < 0) ||
+     (ctx->num_reg_unordered < 0) ||
+     (ctx->num_reg_ordered < 0) ||
+     (ctx->disc_nprof < 0))
+    return 0;
+
+  if(!np_gate_ptr_triplet_valid(ctx->cont_ok, ctx->cont_hmin, ctx->cont_k0))
+    return 0;
+  if(!np_gate_ptr_pair_valid(ctx->disc_uno_ok, ctx->disc_uno_const))
+    return 0;
+  if(!np_gate_ptr_pair_valid(ctx->disc_ord_ok, ctx->disc_ord_const))
+    return 0;
+  if(!np_gate_ptr_pair_valid(ctx->disc_prof_id, ctx->disc_prof_rep))
+    return 0;
+
+  return 1;
+}
+
+static inline int np_gate_ctx_signature_matches(const NP_GateOverrideCtx * const ctx,
+                                                const int num_reg_continuous,
+                                                const int num_reg_unordered,
+                                                const int num_reg_ordered,
+                                                const int * const kernel_c,
+                                                const int * const kernel_u,
+                                                const int * const kernel_o,
+                                                const int * const operator){
+  const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
+
+  if((ctx == NULL) ||
+     (ctx->num_reg_continuous != num_reg_continuous) ||
+     (ctx->num_reg_unordered != num_reg_unordered) ||
+     (ctx->num_reg_ordered != num_reg_ordered))
+    return 0;
+
+  if(!np_gate_int_array_equal(ctx->operator, operator, total_regs))
+    return 0;
+  if(!np_gate_int_array_equal(ctx->kernel_c, kernel_c, num_reg_continuous))
+    return 0;
+  if(!np_gate_int_array_equal(ctx->kernel_u, kernel_u, num_reg_unordered))
+    return 0;
+  if(!np_gate_int_array_equal(ctx->kernel_o, kernel_o, num_reg_ordered))
+    return 0;
+
   return 1;
 }
 
@@ -4635,10 +4709,14 @@ double * const weighted_sum,
 double * const weighted_permutation_sum,
 double * const kw,
 const NP_GateOverrideCtx * const gate_override_ctx){
-  const NP_GateOverrideCtx * const gate_ctx =
+  const NP_GateOverrideCtx * const gate_ctx_raw =
     (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
+  const NP_GateOverrideCtx gate_ctx_empty = {0};
+  const NP_GateOverrideCtx * const gate_ctx =
+    np_gate_ctx_is_sane(gate_ctx_raw) ? gate_ctx_raw : &gate_ctx_empty;
   const int disable_gate_features =
     (gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE);
+  assert(np_gate_ctx_is_sane(gate_ctx));
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -4650,7 +4728,6 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   int i, ii, j, kk, k, l, mstep, js, je, num_obs_eval_alloc, sum_element_length, ip;
   int do_psum, swap_xxt;
 
-  // USED TO default to -1
   int * permutation_kernel = NULL;
   int doscoreocg = do_score || do_ocg;
   int do_perm = permutation_operator != OP_NOOP; 
@@ -4929,10 +5006,10 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     }
   }
 
-  if(!bandwidth_provided && (is_adaptive && any_convolution)){ // need additional bandwidths 
+  if(!bandwidth_provided && (is_adaptive && any_convolution)){ // need additional bandwidths
     matrix_alt_bandwidth = alloc_tmatd(num_obs_eval, num_reg_continuous);  
 
-    // this is a bug
+    // Adaptive convolution requires an auxiliary BW_GEN_NN bandwidth matrix.
     if(kernel_bandwidth_mean((num_reg_continuous != 0) ? KERNEL_reg[0]: 0,
                              BW_GEN_NN, // this is not an error!
                              num_obs_train,
@@ -4964,8 +5041,15 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   }
 
   if((!disable_gate_features) && (num_reg_continuous > 0)){
-    const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
     if((gate_ctx->active == NP_GATE_CTX_OVERRIDE) &&
+       np_gate_ctx_signature_matches(gate_ctx,
+                                     num_reg_continuous,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     KERNEL_reg_np,
+                                     KERNEL_unordered_reg_np,
+                                     KERNEL_ordered_reg_np,
+                                     operator) &&
        gate_ctx->cont_ok != NULL &&
        gate_ctx->cont_hmin != NULL &&
        gate_ctx->cont_k0 != NULL){
@@ -4974,11 +5058,14 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       cont_largeh_k0 = (double *)gate_ctx->cont_k0;
       cont_largeh_from_override = 1;
     } else if(gate_ctx->active &&
-       gate_ctx->num_reg_continuous == num_reg_continuous &&
-       gate_ctx->num_reg_unordered == num_reg_unordered &&
-       gate_ctx->num_reg_ordered == num_reg_ordered &&
-       np_gate_int_array_equal(gate_ctx->kernel_c, KERNEL_reg_np, num_reg_continuous) &&
-       np_gate_int_array_equal(gate_ctx->operator, operator, total_regs) &&
+       np_gate_ctx_signature_matches(gate_ctx,
+                                     num_reg_continuous,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     KERNEL_reg_np,
+                                     KERNEL_unordered_reg_np,
+                                     KERNEL_ordered_reg_np,
+                                     operator) &&
        gate_ctx->cont_ok != NULL &&
        gate_ctx->cont_hmin != NULL &&
        gate_ctx->cont_k0 != NULL){
@@ -5049,19 +5136,29 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   }
 
   if((!disable_gate_features) && (num_reg_unordered > 0)){
-    const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
     if((gate_ctx->active == NP_GATE_CTX_OVERRIDE) &&
+       np_gate_ctx_signature_matches(gate_ctx,
+                                     num_reg_continuous,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     KERNEL_reg_np,
+                                     KERNEL_unordered_reg_np,
+                                     KERNEL_ordered_reg_np,
+                                     operator) &&
        gate_ctx->disc_uno_ok != NULL &&
        gate_ctx->disc_uno_const != NULL){
       disc_uno_const_ok = (int *)gate_ctx->disc_uno_ok;
       disc_uno_const = (double *)gate_ctx->disc_uno_const;
       disc_uno_from_override = 1;
     } else if(gate_ctx->active &&
-       gate_ctx->num_reg_continuous == num_reg_continuous &&
-       gate_ctx->num_reg_unordered == num_reg_unordered &&
-       gate_ctx->num_reg_ordered == num_reg_ordered &&
-       np_gate_int_array_equal(gate_ctx->kernel_u, KERNEL_unordered_reg_np, num_reg_unordered) &&
-       np_gate_int_array_equal(gate_ctx->operator, operator, total_regs) &&
+       np_gate_ctx_signature_matches(gate_ctx,
+                                     num_reg_continuous,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     KERNEL_reg_np,
+                                     KERNEL_unordered_reg_np,
+                                     KERNEL_ordered_reg_np,
+                                     operator) &&
        gate_ctx->disc_uno_ok != NULL &&
        gate_ctx->disc_uno_const != NULL){
       disc_uno_const_ok = (int *)gate_ctx->disc_uno_ok;
@@ -5106,19 +5203,29 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   }
 
   if((!disable_gate_features) && (num_reg_ordered > 0)){
-    const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
     if((gate_ctx->active == NP_GATE_CTX_OVERRIDE) &&
+       np_gate_ctx_signature_matches(gate_ctx,
+                                     num_reg_continuous,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     KERNEL_reg_np,
+                                     KERNEL_unordered_reg_np,
+                                     KERNEL_ordered_reg_np,
+                                     operator) &&
        gate_ctx->disc_ord_ok != NULL &&
        gate_ctx->disc_ord_const != NULL){
       disc_ord_const_ok = (int *)gate_ctx->disc_ord_ok;
       disc_ord_const = (double *)gate_ctx->disc_ord_const;
       disc_ord_from_override = 1;
     } else if(gate_ctx->active &&
-       gate_ctx->num_reg_continuous == num_reg_continuous &&
-       gate_ctx->num_reg_unordered == num_reg_unordered &&
-       gate_ctx->num_reg_ordered == num_reg_ordered &&
-       np_gate_int_array_equal(gate_ctx->kernel_o, KERNEL_ordered_reg_np, num_reg_ordered) &&
-       np_gate_int_array_equal(gate_ctx->operator, operator, total_regs) &&
+       np_gate_ctx_signature_matches(gate_ctx,
+                                     num_reg_continuous,
+                                     num_reg_unordered,
+                                     num_reg_ordered,
+                                     KERNEL_reg_np,
+                                     KERNEL_unordered_reg_np,
+                                     KERNEL_ordered_reg_np,
+                                     operator) &&
        gate_ctx->disc_ord_ok != NULL &&
        gate_ctx->disc_ord_const != NULL){
       disc_ord_const_ok = (int *)gate_ctx->disc_ord_ok;
@@ -5349,6 +5456,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       if((disc_prof_rep != NULL) && (!disc_profile_from_override) && (!disc_profile_from_global_cache)){ free(disc_prof_rep); disc_prof_rep = NULL; }
       disc_nprof = 0;
     }
+    if(use_disc_profile_cache)
+      assert((disc_prof_id != NULL) && (disc_prof_rep != NULL));
   }
 
   const int leave_or_drop = leave_one_out || (drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN));
@@ -6478,13 +6587,8 @@ double *cv){
   return(0);
 }
 
-// consider the leave one out local linear estimator used in cross-validation:
-// g_{-i} = (sum_{j!=i}(k_{ji}*q_{ji}*t(q_{ji})))^(-1)*(sum_{j!=i}(k_{ji}*q_{ji}*y_{j})
-// the expression k_{ji}*q_{ji}*t(q_{ji}) is nearly symmetric with respect to interchange of i and j:
-// k_{ji}*q_{ji}*t(q_{ji}) = k_{ij}*(q_{ij}*t(q_{ij}) - 2*(q_{ij}*t(l) + l*t(q_{ij})) + 4*l*t(l))
-// where t(q_{ij}) = (1 (x_{i}-x_{j})) and t(l) = (1 0) 
-// we take advantage of both the quasi-parity, and 
-// of the algebraic transpose symmetry of the aforementioned expression to gain a factor of ~ 4 speed-up
+// Regression CV objective for local-constant/local-linear models.
+// The LL branch solves weighted normal equations with ridge fallback if singular.
 
 double np_kernel_estimate_regression_categorical_ls_aic(
 int int_ll,
