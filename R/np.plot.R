@@ -312,8 +312,8 @@ compute.bootstrap.errors.rbandwidth =
       rm(boot.frame)
     }
     
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -423,8 +423,8 @@ compute.bootstrap.errors.scbandwidth =
       rm(boot.frame)
     }
     
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -526,8 +526,8 @@ compute.bootstrap.errors.plbandwidth =
       rm(boot.frame)
     }
 
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -621,8 +621,8 @@ compute.bootstrap.errors.bandwidth =
       rm(boot.frame)
     }
 
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -711,8 +711,8 @@ compute.bootstrap.errors.dbandwidth =
       rm(boot.frame)
     }
 
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -833,8 +833,8 @@ compute.bootstrap.errors.conbandwidth =
       rm(boot.frame)
     }
 
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -955,8 +955,8 @@ compute.bootstrap.errors.condbandwidth =
       rm(boot.frame)
     }
 
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -1025,8 +1025,8 @@ compute.bootstrap.errors.sibandwidth =
         sim = plot.errors.boot.method)
     }
     
-    if (plot.errors.type == "standard") {
-      boot.err[,1:2] = 2.0*sqrt(diag(cov(boot.out$t)))
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
     }
     else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       if (plot.errors.type == "all") {
@@ -1148,7 +1148,7 @@ npplot.rbandwidth <-
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -1219,8 +1219,8 @@ npplot.rbandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -1233,8 +1233,8 @@ npplot.rbandwidth <-
 
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
-        plot.errors.type = "standard"
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+        plot.errors.type = "pmzsd"
       }
 
       if (plot.errors.center == "bias-corrected") {
@@ -1315,10 +1315,10 @@ npplot.rbandwidth <-
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tobj$mean - 2.0*tobj$merr,
+        lerr = matrix(data = tobj$mean - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tobj$mean + 2.0*tobj$merr,
+        herr = matrix(data = tobj$mean + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -1532,7 +1532,7 @@ npplot.rbandwidth <-
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
-            temp.err[1:xi.neval,1:2] = replicate(2,2.0*(if(gradients) tr$gerr[,i] else tr$merr))
+            temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*(if(gradients) tr$gerr[,i] else tr$merr))
           else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat, ydat = ydat,
@@ -1754,7 +1754,7 @@ npplot.scbandwidth <-
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -1850,8 +1850,8 @@ npplot.scbandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -1864,8 +1864,8 @@ npplot.scbandwidth <-
 
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
-        plot.errors.type = "standard"
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+        plot.errors.type = "pmzsd"
       }
 
       if (plot.errors.center == "bias-corrected") {
@@ -1965,10 +1965,10 @@ npplot.scbandwidth <-
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tobj$mean - 2.0*tobj$merr,
+        lerr = matrix(data = tobj$mean - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tobj$mean + 2.0*tobj$merr,
+        herr = matrix(data = tobj$mean + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -2220,7 +2220,7 @@ npplot.scbandwidth <-
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
-            temp.err[1:xi.neval,1:2] = 2.0*tobj$merr
+            temp.err[1:xi.neval,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
           else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- eval(parse(text = paste("compute.bootstrap.errors(",
                                       "xdat = xdat, ydat = ydat,",
@@ -2344,7 +2344,7 @@ npplot.scbandwidth <-
 
           if (plot.errors){
             if (plot.errors.method == "asymptotic")
-              temp.err[1:xi.neval,1:2] = 2.0*tobj$merr
+              temp.err[1:xi.neval,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
           else if (plot.errors.method == "bootstrap"){
               temp.boot.raw <- compute.bootstrap.errors(
                                                     xdat = xdat,
@@ -2576,7 +2576,7 @@ npplot.plbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -2672,8 +2672,8 @@ npplot.plbandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -3346,7 +3346,7 @@ npplot.bandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -3400,8 +3400,8 @@ npplot.bandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -3414,8 +3414,8 @@ npplot.bandwidth <-
 
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
-        plot.errors.type = "standard"
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+        plot.errors.type = "pmzsd"
       }
 
       if (plot.errors.center == "bias-corrected") {
@@ -3512,10 +3512,10 @@ npplot.bandwidth <-
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = eval(tcomp) - 2.0*tobj$derr,
+        lerr = matrix(data = eval(tcomp) - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = eval(tcomp) + 2.0*tobj$derr,
+        herr = matrix(data = eval(tcomp) + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -3800,7 +3800,7 @@ npplot.bandwidth <-
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
-            temp.err[1:xi.neval,1:2] = replicate(2,2.0*tobj$derr)
+            temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr)
           else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat,
@@ -3991,7 +3991,7 @@ npplot.dbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -4045,8 +4045,8 @@ npplot.dbandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -4059,8 +4059,8 @@ npplot.dbandwidth <-
 
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
-        plot.errors.type = "standard"
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+        plot.errors.type = "pmzsd"
       }
 
       if (plot.errors.center == "bias-corrected") {
@@ -4154,10 +4154,10 @@ npplot.dbandwidth <-
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tobj$dist - 2.0*tobj$derr,
+        lerr = matrix(data = tobj$dist - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tobj$dist + 2.0*tobj$derr,
+        herr = matrix(data = tobj$dist + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -4430,7 +4430,7 @@ npplot.dbandwidth <-
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
-            temp.err[1:xi.neval,1:2] = replicate(2,2.0*tobj$derr)
+            temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr)
           else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat,
@@ -4626,7 +4626,7 @@ npplot.conbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -4705,8 +4705,8 @@ npplot.conbandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -4719,8 +4719,8 @@ npplot.conbandwidth <-
 
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
-        plot.errors.type = "standard"
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+        plot.errors.type = "pmzsd"
       }
 
       if (plot.errors.center == "bias-corrected") {
@@ -4851,10 +4851,10 @@ npplot.conbandwidth <-
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = eval(tcomp) - 2.0*eval(tcerr),
+        lerr = matrix(data = eval(tcomp) - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = eval(tcomp) + 2.0*eval(tcerr),
+        herr = matrix(data = eval(tcomp) + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -5128,7 +5128,7 @@ npplot.conbandwidth <-
           
           if (plot.errors){
             if (plot.errors.method == "asymptotic")
-              temp.err[1:xi.neval,1:2] = replicate(2,2.0*eval(terrexpr))
+              temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(terrexpr))
             else if (plot.errors.method == "bootstrap"){
               temp.boot <- compute.bootstrap.errors(
                         xdat = xdat,
@@ -5263,7 +5263,7 @@ npplot.conbandwidth <-
             
             if (plot.errors){
               if (plot.errors.method == "asymptotic")
-                temp.err[1:xi.neval,1:2] = replicate(2,2.0*eval(terrexpr))
+                temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(terrexpr))
               else if (plot.errors.method == "bootstrap"){
                 temp.boot <- compute.bootstrap.errors(
                           xdat = xdat,
@@ -5473,7 +5473,7 @@ npplot.condbandwidth <-
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -5551,8 +5551,8 @@ npplot.condbandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
@@ -5565,8 +5565,8 @@ npplot.condbandwidth <-
 
     if (plot.errors.method == "asymptotic") {
       if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating standard errors")
-        plot.errors.type = "standard"
+        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+        plot.errors.type = "pmzsd"
       }
 
       if (plot.errors.center == "bias-corrected") {
@@ -5697,10 +5697,10 @@ npplot.condbandwidth <-
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = eval(tcomp) - 2.0*eval(tcerr),
+        lerr = matrix(data = eval(tcomp) - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = eval(tcomp) + 2.0*eval(tcerr),
+        herr = matrix(data = eval(tcomp) + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -5970,7 +5970,7 @@ npplot.condbandwidth <-
           
           if (plot.errors){
             if (plot.errors.method == "asymptotic")
-              temp.err[1:xi.neval,1:2] = replicate(2,2.0*eval(terrexpr))
+              temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(terrexpr))
             else if (plot.errors.method == "bootstrap"){
               temp.boot <- compute.bootstrap.errors(
                         xdat = xdat,
@@ -6106,7 +6106,7 @@ npplot.condbandwidth <-
             
             if (plot.errors){
               if (plot.errors.method == "asymptotic")
-                temp.err[1:xi.neval,1:2] = replicate(2,2.0*eval(terrexpr))
+                temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(terrexpr))
               else if (plot.errors.method == "bootstrap"){
                 temp.boot <- compute.bootstrap.errors(
                           xdat = xdat,
@@ -6304,7 +6304,7 @@ npplot.sibandwidth <-
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
-           plot.errors.type = c("standard","pointwise","bonferroni","simultaneous","all"),
+           plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
            plot.errors.style = c("band","bar"),
            plot.errors.bar = c("|","I"),
@@ -6368,8 +6368,8 @@ npplot.sibandwidth <-
     plot.errors.type = match.arg(plot.errors.type)
 
     if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 1)
-      stop("'plot.errors.alpha' must be a scalar in (0,1)")
+        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
     plot.errors.style = match.arg(plot.errors.style)
     plot.errors.bar = match.arg(plot.errors.bar)
 
