@@ -136,6 +136,7 @@ static double (*bwmfunc_raw)(double *) = NULL;
 static double bwm_eval_count = 0.0;
 static double bwm_invalid_count = 0.0;
 static double bwm_fast_eval_count = 0.0;
+static double bwm_fallback_eval_count = 0.0;
 static int bwm_use_transform = 0;
 static int bwm_num_reg_continuous = 0;
 static int bwm_num_reg_unordered = 0;
@@ -191,7 +192,9 @@ static void bwm_reset_counters(void)
   bwm_eval_count = 0.0;
   bwm_invalid_count = 0.0;
   bwm_fast_eval_count = 0.0;
+  bwm_fallback_eval_count = 0.0;
   np_fastcv_alllarge_hits_reset();
+  np_fastcv_alllarge_fallbacks_reset();
 }
 
 static double bwm_sigmoid(double x)
@@ -313,6 +316,7 @@ static double bwmfunc_wrapper(double *p)
   double val;
   double *use_p = p;
   const double fast_before = np_fastcv_alllarge_hits_get();
+  const double fallback_before = np_fastcv_alllarge_fallbacks_get();
 
   bwm_eval_count += 1.0;
   if (bwm_use_transform) {
@@ -327,6 +331,11 @@ static double bwmfunc_wrapper(double *p)
     const double fast_after = np_fastcv_alllarge_hits_get();
     if (fast_after > fast_before)
       bwm_fast_eval_count += (fast_after - fast_before);
+  }
+  {
+    const double fallback_after = np_fastcv_alllarge_fallbacks_get();
+    if (fallback_after > fallback_before)
+      bwm_fallback_eval_count += (fallback_after - fallback_before);
   }
 
   if (!R_FINITE(val) || val == DBL_MAX) {
@@ -4305,6 +4314,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                       double * objective_function_values, double * objective_function_evals,
                       double * objective_function_invalid, double * timing,
                       double * objective_function_fast,
+                      double * objective_function_fallback,
                       int * penalty_mode, double * penalty_mult,
                       double * ckerlb, double * ckerub){
   //KDT * kdt = NULL; // tree structure
@@ -4329,7 +4339,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   int dfc_dir;
 
   int i,j;
-  double fast_eval_total = 0.0;
+  double fast_eval_total = 0.0, fallback_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int itmax, iter;
@@ -4687,6 +4697,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   objective_function_evals[0]=bwm_eval_count;
   objective_function_invalid[0]=bwm_invalid_count;
   fast_eval_total += bwm_fast_eval_count;
+  fallback_eval_total += bwm_fallback_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -4814,6 +4825,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       fast_eval_total += bwm_fast_eval_count;
+      fallback_eval_total += bwm_fallback_eval_count;
 
     }
 
@@ -4843,6 +4855,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   fval[0] = fret;
   fval[1] = iImproved;
   objective_function_fast[0] = fast_eval_total;
+  objective_function_fallback[0] = fallback_eval_total;
   /* end return data */
 
   /* Free data objects */

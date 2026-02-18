@@ -45,6 +45,8 @@ static inline double NZD_POS(const double a){
 }
 void np_fastcv_alllarge_hits_reset(void);
 double np_fastcv_alllarge_hits_get(void);
+void np_fastcv_alllarge_fallbacks_reset(void);
+double np_fastcv_alllarge_fallbacks_get(void);
 
 double **alloc_matd(int nrows, int ncols);
 double **alloc_tmatd(int nrows, int ncols);
