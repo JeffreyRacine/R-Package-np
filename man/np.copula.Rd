@@ -77,6 +77,8 @@ npcopula(bws,
 }
 
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
 
   \code{npcopula} computes the nonparametric copula or copula density
   using inversion (Nelsen (2006), page 51). For the inversion approach,
@@ -127,6 +129,7 @@ npcopula(bws,
 }
 
 \seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
   \link{npudensbw},\link{npudens},\link{npudist}
 }
 

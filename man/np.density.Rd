@@ -79,6 +79,8 @@ npudens(bws, \dots)
 }
 
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
@@ -190,7 +192,8 @@ npudens(bws, \dots)
   type.
 }
 
-\seealso{ \code{\link{npudensbw}} , \code{\link{density}} }
+\seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}} \code{\link{npudensbw}} , \code{\link{density}} }
 
 \examples{
 \dontrun{

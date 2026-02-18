@@ -7,6 +7,11 @@
   specification of parametric regression models (linear or nonlinear) as
   described in Hsiao, Li, and Racine (2007).
 }
+\details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and
+  \code{\link{np.plot}} for plotting options.
+}
 \usage{
 npcmstest(formula,
           data = NULL,
@@ -173,6 +178,11 @@ npcmstest(formula,
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+}
+
+\seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}},
+  \code{\link{np.plot}}, \code{\link{npregbw}}.
 }
 
 \examples{

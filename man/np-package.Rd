@@ -128,7 +128,9 @@
 
 }
 
-\details{ The kernel methods in \code{np} employ the so-called
+\details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+ The kernel methods in \code{np} employ the so-called
 	\sQuote{generalized product kernels} found in Hall, Racine,
 	and Li (2004), Li, Lin, and Racine (2013), Li, Ouyang, and
 	Racine (2013), Li and Racine (2003), Li and Racine (2004), Li
@@ -273,6 +275,7 @@
 }
 
 \seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
   \code{\link{np.options}}
 }
 

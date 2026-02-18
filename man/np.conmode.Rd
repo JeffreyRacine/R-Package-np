@@ -14,6 +14,11 @@
   Automatically computes various in sample and out of sample measures of
   accuracy.
 }
+\details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and
+  \code{\link{np.plot}} for plotting options.
+}
 
 \usage{
 npconmode(bws, \dots)
@@ -158,6 +163,11 @@ npconmode(bws, \dots)
   type.
 }
 
+\seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}},
+  \code{\link{np.plot}}, \code{\link{npcdensbw}}.
+}
+
 \examples{
 \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we use the
@@ -292,4 +302,3 @@ detach(birthwt)
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
-

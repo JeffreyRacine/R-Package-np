@@ -138,6 +138,8 @@ npindex(bws, \dots)
 }
 
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
 
   A matrix of gradients along with average derivatives are computed and
   returned if \code{gradients=TRUE} is used.
