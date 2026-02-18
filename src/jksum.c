@@ -1935,14 +1935,6 @@ static inline void np_activate_bounds_xy(void){
   vector_ckerub_extern = vector_cxykerub_extern;
 }
 
-/*
-  Fast positive-only no-zero guard for known-positive denominators.
-  This avoids signed branching in NZD(a) when sign is known a priori.
-*/
-static inline double np_nzd_pos(const double a){
-  return (a > DBL_EPSILON) ? a : DBL_EPSILON;
-}
-
 static inline double np_cker_invnorm(const int kernel,
                                      const double x,
                                      const double h,
@@ -1984,7 +1976,7 @@ static inline double np_cker_invnorm(const int kernel,
     den = fmax(kbase[k0](zmid)*du, kbase[k0](0.0)*du);
   }
 
-  den = np_nzd_pos(den);
+  den = NZD_POS(den);
 
   return 1.0/den;
 }
@@ -3748,8 +3740,8 @@ void np_convol_ckernelv(const int KERNEL,
         const double zc_u = isfinite(ub) ? ((ub - mu)/sig) : R_PosInf;
         const double zc_l = isfinite(lb) ? ((lb - mu)/sig) : R_NegInf;
         const double cint = np_cdf_gauss2(zc_u) - np_cdf_gauss2(zc_l);
-        const double den = np_nzd_pos(denx)*np_nzd_pos(deny);
-        kval *= np_nzd_pos(cint)/den;
+        const double den = NZD_POS(denx)*NZD_POS(deny);
+        kval *= NZD_POS(cint)/den;
       }
     }
 
@@ -6355,8 +6347,8 @@ double *cv){
     error("!(blk_xj != NULL)");
 
   blk_yij = (double *)malloc(sizeof(double)*blklen*blklen);
-  if(!(blk_xj != NULL)) 
-    error("!(blk_xj != NULL)");
+  if(!(blk_yij != NULL)) 
+    error("!(blk_yij != NULL)");
 
   sum_ker = (double *)malloc(num_obs*sizeof(double));
   if(!(sum_ker != NULL))
@@ -6622,13 +6614,6 @@ int *num_categories){
 int * operator = NULL;
 int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 NP_GateOverrideCtx gate_ctx_local;
-int gate_override_active = 0;
-int gate_disc_profile_active = 0;
-  int ov_disc_prof_from_global_cache = 0;
-  int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
-  int *ov_disc_prof_id = NULL, *ov_disc_prof_rep = NULL;
-  double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
-  double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
 
   const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
   np_gate_ctx_clear(&gate_ctx_local);
@@ -7385,19 +7370,6 @@ int gate_disc_profile_active = 0;
   free(kernel_o);
   free(lambda);
   free_tmat(matrix_bandwidth);
-  if(gate_override_active)
-    np_gate_ctx_clear(&gate_ctx_local);
-  if(gate_disc_profile_active)
-    np_gate_ctx_clear(&gate_ctx_local);
-  if(ov_cont_ok != NULL) free(ov_cont_ok);
-  if(ov_cont_hmin != NULL) free(ov_cont_hmin);
-  if(ov_cont_k0 != NULL) free(ov_cont_k0);
-  if(ov_disc_uno_ok != NULL) free(ov_disc_uno_ok);
-  if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
-  if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
-  if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
-  if((ov_disc_prof_id != NULL) && (!ov_disc_prof_from_global_cache)) free(ov_disc_prof_id);
-  if((ov_disc_prof_rep != NULL) && (!ov_disc_prof_from_global_cache)) free(ov_disc_prof_rep);
 
 	/* Negative penalties are treated as infinite: Hurvich et al pg 277 */
 
