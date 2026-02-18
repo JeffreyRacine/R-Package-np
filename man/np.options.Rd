@@ -48,11 +48,6 @@
 
   Option values can be set globally via \code{\link{options}} and restored
   with \code{\link{on.exit}} in scripts/functions for reproducibility.
-
-  Continuous kernel bounds are not controlled via global options.
-  Use per-call arguments such as \code{ckerbound}/\code{ckerlb}/\code{ckerub}
-  (and conditional counterparts \code{cxker*}, \code{cyker*}) in bandwidth
-  and estimation interfaces.
 }
 \author{
   Jeffrey S. Racine \email{racinej@mcmaster.ca}
@@ -63,14 +58,17 @@
 }
 \examples{
 \dontrun{
-old <- options(
+npRmpi.start(nslaves=1)
+
+mpi.bcast.cmd(old <- options(
   np.tree = TRUE,
   np.messages = FALSE,
   np.largeh.rel.tol = 1e-3,
   np.disc.upper.rel.tol = 1e-2,
   np.groupcv.fast = TRUE
-)
-on.exit(options(old), add = TRUE)
+), caller.execute=TRUE)
+on.exit(mpi.bcast.cmd(options(old), caller.execute=TRUE), add = TRUE)
+on.exit(npRmpi.stop(force=TRUE), add = TRUE)
 
 ## ... run bandwidth selection / estimation ...
 }
