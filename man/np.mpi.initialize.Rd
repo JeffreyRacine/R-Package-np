@@ -4,6 +4,11 @@
 \description{
   \code{np.mpi.initialize} is used to initialize master and slave nodes.
 }
+\details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and
+  \code{\link{np.plot}} for plotting options.
+}
 \usage{
 np.mpi.initialize()
 }
@@ -17,3 +22,7 @@ np.mpi.initialize()
  Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
+\seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}},
+  \code{\link{np.plot}}, \code{\link{npRmpi.session}}.
+}

@@ -24,6 +24,8 @@ npRmpi.session.info(comm = 1)
   \item{dellog}{Logical; when \code{TRUE}, remove slave log files (if applicable).}
 }
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
 \code{npRmpi.start()} ensures that a slave pool exists (spawning if needed)
 and runs \code{np.mpi.initialize()} on all ranks via \code{mpi.bcast.cmd()}.
 

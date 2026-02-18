@@ -32,6 +32,8 @@ np.pairs.plot(pair_list)
   \code{np.pairs.plot} returns \code{NULL} (invisibly).
 }
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
 On the diagonal, \code{npudens} is used to compute kernel density
 estimates. Off-diagonal panels use \code{npreg} with residuals to draw
 scatterplots and smoothers.
@@ -90,5 +92,6 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 ##               caller.execute=TRUE)
 } % enddontrun
 }
-\seealso{\code{\link{npudens}}, \code{\link{npreg}}}
+\seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}\code{\link{npudens}}, \code{\link{npreg}}}
 \keyword{hplot}

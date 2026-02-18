@@ -130,6 +130,8 @@ FALSE, \dots)
 }
 
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
  \code{npplreg} uses a combination of OLS and nonparametric
  regression to estimate the parameter \eqn{\beta}{B} in the model
  \eqn{Y = X\beta + \Theta (Z) + \epsilon}{Y = XB + theta(Z) + epsilon}.
@@ -245,6 +247,7 @@ FALSE, \dots)
 }
 
 \seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
 \dontrun{

@@ -338,6 +338,8 @@ npregbw(\dots)
 
 }
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
   \code{npregbw} implements a variety of methods for choosing
   bandwidths for multivariate (\eqn{p}-variate) regression data defined
   over a set of possibly continuous and/or discrete (unordered, ordered)
@@ -511,6 +513,7 @@ npregbw(\dots)
 }
 
 \seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
   \code{\link{npreg}}
 }
 \examples{

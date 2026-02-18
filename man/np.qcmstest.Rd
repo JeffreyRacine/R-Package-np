@@ -8,6 +8,11 @@ with Mixed Data Types }
   nonlinear) as described in Racine (2006) which extends the work of
   Zheng (1998).
 }
+\details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and
+  \code{\link{np.plot}} for plotting options.
+}
 \usage{
 npqcmstest(formula,
            data = NULL,
@@ -180,6 +185,11 @@ npqcmstest(formula,
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+}
+
+\seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}},
+  \code{\link{np.plot}}, \code{\link{npregbw}}.
 }
 
 \examples{

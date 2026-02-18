@@ -21,6 +21,8 @@ No return value, called for side effects (sets kernel constants in the
 }
 
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
   \code{nptgauss} allows one to set the truncation radius of the truncated Gaussian kernel used by \pkg{npRmpi}, which defaults to 3. It automatically computes the constants describing the truncated gaussian kernel for the user.
   
 We define the truncated gaussion kernel on the interval \eqn{[-b,b]} as:

@@ -14,6 +14,11 @@
   Automatically computes various in sample and out of sample measures of
   accuracy.
 }
+\details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels,
+  \code{\link{np.options}} for global options, and
+  \code{\link{np.plot}} for plotting options.
+}
 
 \usage{
 npconmode(bws, \dots)
@@ -156,6 +161,11 @@ npconmode(bws, \dots)
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+}
+
+\seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}},
+  \code{\link{np.plot}}, \code{\link{npcdensbw}}.
 }
 
 \examples{

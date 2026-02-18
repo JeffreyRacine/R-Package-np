@@ -166,6 +166,8 @@ npksum(\dots)
 
 }
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
   \code{npksum}
   exists so that you can create your own kernel objects with
   or without a variable to be weighted (default \eqn{Y=1}). With the options

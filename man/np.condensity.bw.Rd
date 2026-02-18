@@ -392,6 +392,8 @@ npcdensbw(\dots)
 }
 
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
 
   \code{npcdensbw} implements a variety of methods for choosing
   bandwidths for multivariate distributions (\eqn{p+q}-variate) defined
@@ -548,6 +550,7 @@ npcdensbw(\dots)
 }
 
 \seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}}, \code{\link{hist}},
   \code{\link{npudens}}, \code{\link{npudist}}
 }

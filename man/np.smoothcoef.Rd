@@ -261,6 +261,7 @@ FALSE, \dots)
 }
 
 \seealso{
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{np.plot}}
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}}, \code{\link{hist}},
   \code{\link{npudens}}, \code{\link{npudist}},
   \code{\link{npudensbw}}, \code{\link{npscoefbw}} }

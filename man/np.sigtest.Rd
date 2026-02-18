@@ -133,6 +133,8 @@ npsigtest(bws, \dots)
 
 }
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{np.plot}} for plotting options.
+
 
   \code{npsigtest} implements a variety of methods for computing the
   null distribution of the test statistic and allows the user to

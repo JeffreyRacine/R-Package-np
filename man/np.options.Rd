@@ -6,6 +6,9 @@
   for the \pkg{npRmpi} package.
 }
 \details{
+  Documentation guide: see \code{\link{np.kernels}} for kernels and
+  \code{\link{np.plot}} for plotting options.
+
   The following options are recognized by \pkg{npRmpi}.
 
   \itemize{
@@ -55,6 +58,7 @@
   Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
+  \code{\link{np.kernels}}, \code{\link{np.plot}}
   \code{\link{npRmpi}}, \code{\link{npplot}}, \code{\link{options}}
 }
 \examples{
