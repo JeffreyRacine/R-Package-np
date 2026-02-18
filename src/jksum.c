@@ -7,6 +7,7 @@
 #include <float.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 #include <R.h>
 #include <R_ext/Utils.h>
@@ -965,12 +966,38 @@ typedef struct {
 
 static NP_DiscProfileCache np_disc_profile_cache = {0};
 
+typedef struct {
+  int valid;
+  int num_obs_train;
+  int num_obs_eval;
+  int num_reg_continuous;
+  double rel_tol;
+  const double **x_train_rows;
+  const double **x_eval_rows;
+  int *kernel_c;
+  int *cont_ok;
+  double *cont_hmin;
+  double *cont_k0;
+} NP_ContLargeHCache;
+
+static NP_ContLargeHCache np_cont_largeh_cache = {0};
+
 static inline void np_disc_profile_cache_clear(void){
   if(np_disc_profile_cache.xtu_rows != NULL) free((void *)np_disc_profile_cache.xtu_rows);
   if(np_disc_profile_cache.xto_rows != NULL) free((void *)np_disc_profile_cache.xto_rows);
   if(np_disc_profile_cache.disc_prof_id != NULL) free(np_disc_profile_cache.disc_prof_id);
   if(np_disc_profile_cache.disc_prof_rep != NULL) free(np_disc_profile_cache.disc_prof_rep);
   memset(&np_disc_profile_cache, 0, sizeof(np_disc_profile_cache));
+}
+
+static inline void np_cont_largeh_cache_clear(void){
+  if(np_cont_largeh_cache.x_train_rows != NULL) free((void *)np_cont_largeh_cache.x_train_rows);
+  if(np_cont_largeh_cache.x_eval_rows != NULL) free((void *)np_cont_largeh_cache.x_eval_rows);
+  if(np_cont_largeh_cache.kernel_c != NULL) free(np_cont_largeh_cache.kernel_c);
+  if(np_cont_largeh_cache.cont_ok != NULL) free(np_cont_largeh_cache.cont_ok);
+  if(np_cont_largeh_cache.cont_hmin != NULL) free(np_cont_largeh_cache.cont_hmin);
+  if(np_cont_largeh_cache.cont_k0 != NULL) free(np_cont_largeh_cache.cont_k0);
+  memset(&np_cont_largeh_cache, 0, sizeof(np_cont_largeh_cache));
 }
 
 static int np_disc_profile_cache_match(const int num_xt,
@@ -1098,41 +1125,10 @@ static inline double np_get_option_double(const char * const name, const double 
   return fallback;
 }
 
-static inline int np_get_option_bool(const char * const name, const int fallback){
-  const SEXP sym = Rf_install(name);
-  const SEXP val = Rf_GetOption1(sym);
-
-  if(val == R_NilValue)
-    return fallback;
-
-  if(TYPEOF(val) == LGLSXP && XLENGTH(val) > 0){
-    const int v = LOGICAL(val)[0];
-    if(v == NA_LOGICAL)
-      return fallback;
-    return (v != 0);
-  }
-
-  if(TYPEOF(val) == INTSXP && XLENGTH(val) > 0)
-    return (INTEGER(val)[0] != 0);
-
-  if(TYPEOF(val) == REALSXP && XLENGTH(val) > 0)
-    return (REAL(val)[0] != 0.0);
-
-  return fallback;
-}
-
-static inline int np_groupcv_fast_enabled(void){
-  const int opt = np_get_option_bool("np.groupcv.fast", 0);
-  if(opt)
-    return 1;
-  {
-    const char *ev = getenv("NP_GROUPCV_FAST");
-    if(ev != NULL && ev[0] != '\0')
-      return (atoi(ev) != 0);
-  }
-  return 0;
-}
-
+/*
+  Lean LL/CVLS hot path for fixed bandwidth with one continuous regressor.
+  Returns 1 on success and writes *cv_out, else 0 to signal fallback.
+*/
 static int np_runtime_tol_cache_ready = 0;
 static double np_largeh_rel_tol_cache = 1e-3;
 static double np_disc_rel_tol_cache = 1e-2;
@@ -1176,6 +1172,180 @@ static inline double np_cont_largeh_rel_tol(void){
   if(!np_runtime_tol_cache_ready)
     np_refresh_runtime_tolerances();
   return np_largeh_rel_tol_cache;
+}
+
+static int np_cont_largeh_build_params(const int num_obs_train,
+                                       const int num_obs_eval,
+                                       const int num_reg_continuous,
+                                       const int * const kernel_c,
+                                       double * const * const x_train,
+                                       double * const * const x_eval,
+                                       const double rel_tol,
+                                       int **out_ok,
+                                       double **out_hmin,
+                                       double **out_k0){
+  int i, ii;
+  int *cont_ok = NULL;
+  double *cont_hmin = NULL, *cont_k0 = NULL;
+
+  if((out_ok == NULL) || (out_hmin == NULL) || (out_k0 == NULL))
+    return 0;
+
+  *out_ok = NULL;
+  *out_hmin = NULL;
+  *out_k0 = NULL;
+
+  if(num_reg_continuous <= 0 || kernel_c == NULL || x_train == NULL || x_eval == NULL)
+    return 0;
+
+  cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+  cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+  cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+
+  if((cont_ok == NULL) || (cont_hmin == NULL) || (cont_k0 == NULL))
+    goto fail;
+
+  for(i = 0; i < num_reg_continuous; i++){
+    const int kern = kernel_c[i];
+    double xmin = DBL_MAX, xmax = -DBL_MAX;
+
+    cont_ok[i] = 0;
+    cont_hmin[i] = DBL_MAX;
+    cont_k0[i] = 0.0;
+
+    if(!np_cont_largeh_kernel_supported(kern))
+      continue;
+
+    for(ii = 0; ii < num_obs_train; ii++){
+      const double v = x_train[i][ii];
+      if(!isfinite(v)) continue;
+      xmin = MIN(xmin, v);
+      xmax = MAX(xmax, v);
+    }
+
+    for(ii = 0; ii < num_obs_eval; ii++){
+      const double v = x_eval[i][ii];
+      if(!isfinite(v)) continue;
+      xmin = MIN(xmin, v);
+      xmax = MAX(xmax, v);
+    }
+
+    if(xmax >= xmin){
+      const double utol = np_cont_largeh_utol(kern, rel_tol);
+      if(utol > 0.0 && isfinite(utol)){
+        cont_ok[i] = 1;
+        cont_hmin[i] = (xmax - xmin)/utol;
+        cont_k0[i] = np_cont_largeh_k0(kern);
+      }
+    }
+  }
+
+  *out_ok = cont_ok;
+  *out_hmin = cont_hmin;
+  *out_k0 = cont_k0;
+  return 1;
+
+ fail:
+  if(cont_ok != NULL) free(cont_ok);
+  if(cont_hmin != NULL) free(cont_hmin);
+  if(cont_k0 != NULL) free(cont_k0);
+  return 0;
+}
+
+static int np_cont_largeh_cache_match(const int num_obs_train,
+                                      const int num_obs_eval,
+                                      const int num_reg_continuous,
+                                      const int * const kernel_c,
+                                      double * const * const x_train,
+                                      double * const * const x_eval,
+                                      const double rel_tol){
+  int i;
+  if(!np_cont_largeh_cache.valid) return 0;
+  if(np_cont_largeh_cache.num_obs_train != num_obs_train) return 0;
+  if(np_cont_largeh_cache.num_obs_eval != num_obs_eval) return 0;
+  if(np_cont_largeh_cache.num_reg_continuous != num_reg_continuous) return 0;
+  if(np_cont_largeh_cache.rel_tol != rel_tol) return 0;
+  if(num_reg_continuous <= 0) return 0;
+  if(np_cont_largeh_cache.kernel_c == NULL || np_cont_largeh_cache.x_train_rows == NULL || np_cont_largeh_cache.x_eval_rows == NULL)
+    return 0;
+  for(i = 0; i < num_reg_continuous; i++){
+    if(np_cont_largeh_cache.kernel_c[i] != kernel_c[i]) return 0;
+    if(np_cont_largeh_cache.x_train_rows[i] != x_train[i]) return 0;
+    if(np_cont_largeh_cache.x_eval_rows[i] != x_eval[i]) return 0;
+  }
+  return 1;
+}
+
+static int np_cont_largeh_cache_get_or_build(const int num_obs_train,
+                                             const int num_obs_eval,
+                                             const int num_reg_continuous,
+                                             const int * const kernel_c,
+                                             double * const * const x_train,
+                                             double * const * const x_eval,
+                                             const double rel_tol,
+                                             int **out_ok,
+                                             double **out_hmin,
+                                             double **out_k0){
+  int i;
+  int *cont_ok = NULL, *kernel_copy = NULL;
+  double *cont_hmin = NULL, *cont_k0 = NULL;
+  const double **x_train_rows = NULL, **x_eval_rows = NULL;
+
+  if((out_ok == NULL) || (out_hmin == NULL) || (out_k0 == NULL))
+    return 0;
+
+  *out_ok = NULL;
+  *out_hmin = NULL;
+  *out_k0 = NULL;
+
+  if(np_cont_largeh_cache_match(num_obs_train, num_obs_eval, num_reg_continuous, kernel_c, x_train, x_eval, rel_tol)){
+    *out_ok = np_cont_largeh_cache.cont_ok;
+    *out_hmin = np_cont_largeh_cache.cont_hmin;
+    *out_k0 = np_cont_largeh_cache.cont_k0;
+    return 1;
+  }
+
+  if(!np_cont_largeh_build_params(num_obs_train, num_obs_eval, num_reg_continuous, kernel_c, x_train, x_eval, rel_tol, &cont_ok, &cont_hmin, &cont_k0))
+    return 0;
+
+  x_train_rows = (const double **)malloc((size_t)num_reg_continuous*sizeof(double *));
+  x_eval_rows = (const double **)malloc((size_t)num_reg_continuous*sizeof(double *));
+  kernel_copy = (int *)malloc((size_t)num_reg_continuous*sizeof(int));
+  if((x_train_rows == NULL) || (x_eval_rows == NULL) || (kernel_copy == NULL))
+    goto fail;
+
+  for(i = 0; i < num_reg_continuous; i++){
+    x_train_rows[i] = x_train[i];
+    x_eval_rows[i] = x_eval[i];
+    kernel_copy[i] = kernel_c[i];
+  }
+
+  np_cont_largeh_cache_clear();
+  np_cont_largeh_cache.valid = 1;
+  np_cont_largeh_cache.num_obs_train = num_obs_train;
+  np_cont_largeh_cache.num_obs_eval = num_obs_eval;
+  np_cont_largeh_cache.num_reg_continuous = num_reg_continuous;
+  np_cont_largeh_cache.rel_tol = rel_tol;
+  np_cont_largeh_cache.x_train_rows = x_train_rows;
+  np_cont_largeh_cache.x_eval_rows = x_eval_rows;
+  np_cont_largeh_cache.kernel_c = kernel_copy;
+  np_cont_largeh_cache.cont_ok = cont_ok;
+  np_cont_largeh_cache.cont_hmin = cont_hmin;
+  np_cont_largeh_cache.cont_k0 = cont_k0;
+
+  *out_ok = np_cont_largeh_cache.cont_ok;
+  *out_hmin = np_cont_largeh_cache.cont_hmin;
+  *out_k0 = np_cont_largeh_cache.cont_k0;
+  return 1;
+
+ fail:
+  if(x_train_rows != NULL) free((void *)x_train_rows);
+  if(x_eval_rows != NULL) free((void *)x_eval_rows);
+  if(kernel_copy != NULL) free(kernel_copy);
+  if(cont_ok != NULL) free(cont_ok);
+  if(cont_hmin != NULL) free(cont_hmin);
+  if(cont_k0 != NULL) free(cont_k0);
+  return 0;
 }
 
 static inline int np_cont_largeh_is_active(const int kernel,
@@ -1314,7 +1484,16 @@ typedef struct {
   const int *disc_prof_rep;
 } NP_GateOverrideCtx;
 
+#define NP_GATE_CTX_INACTIVE 0
+#define NP_GATE_CTX_OVERRIDE 1
+#define NP_GATE_CTX_DISABLE 2
+
 static NP_GateOverrideCtx np_gate_override_ctx = {0};
+
+static inline void np_gate_ctx_clear(NP_GateOverrideCtx * const ctx){
+  if(ctx != NULL)
+    memset(ctx, 0, sizeof(*ctx));
+}
 
 static inline void np_gate_override_clear(void){
   memset(&np_gate_override_ctx, 0, sizeof(np_gate_override_ctx));
@@ -1336,45 +1515,37 @@ static inline int np_gate_int_array_equal(const int * const a,
   return 1;
 }
 
-static inline void np_gate_override_set(const int num_reg_continuous,
-                                        const int num_reg_unordered,
-                                        const int num_reg_ordered,
-                                        const int * const kernel_c,
-                                        const int * const kernel_u,
-                                        const int * const kernel_o,
-                                        const int * const operator,
-                                        const int * const cont_ok,
-                                        const double * const cont_hmin,
-                                        const double * const cont_k0,
-                                        const int * const disc_uno_ok,
-                                        const double * const disc_uno_const,
-                                        const int * const disc_ord_ok,
-                                        const double * const disc_ord_const){
-  np_gate_override_ctx.active = 1;
-  np_gate_override_ctx.num_reg_continuous = num_reg_continuous;
-  np_gate_override_ctx.num_reg_unordered = num_reg_unordered;
-  np_gate_override_ctx.num_reg_ordered = num_reg_ordered;
-  np_gate_override_ctx.kernel_c = kernel_c;
-  np_gate_override_ctx.kernel_u = kernel_u;
-  np_gate_override_ctx.kernel_o = kernel_o;
-  np_gate_override_ctx.operator = operator;
-  np_gate_override_ctx.cont_ok = cont_ok;
-  np_gate_override_ctx.cont_hmin = cont_hmin;
-  np_gate_override_ctx.cont_k0 = cont_k0;
-  np_gate_override_ctx.disc_uno_ok = disc_uno_ok;
-  np_gate_override_ctx.disc_uno_const = disc_uno_const;
-  np_gate_override_ctx.disc_ord_ok = disc_ord_ok;
-  np_gate_override_ctx.disc_ord_const = disc_ord_const;
-}
-
-static inline void np_gate_override_set_disc_profile(const int num_xt,
-                                                     const int * const disc_prof_id,
-                                                     const int * const disc_prof_rep,
-                                                     const int disc_nprof){
-  np_gate_override_ctx.disc_prof_num_xt = num_xt;
-  np_gate_override_ctx.disc_prof_id = disc_prof_id;
-  np_gate_override_ctx.disc_prof_rep = disc_prof_rep;
-  np_gate_override_ctx.disc_nprof = disc_nprof;
+static inline void np_gate_ctx_set(NP_GateOverrideCtx * const ctx,
+                                   const int num_reg_continuous,
+                                   const int num_reg_unordered,
+                                   const int num_reg_ordered,
+                                   const int * const kernel_c,
+                                   const int * const kernel_u,
+                                   const int * const kernel_o,
+                                   const int * const operator,
+                                   const int * const cont_ok,
+                                   const double * const cont_hmin,
+                                   const double * const cont_k0,
+                                   const int * const disc_uno_ok,
+                                   const double * const disc_uno_const,
+                                   const int * const disc_ord_ok,
+                                   const double * const disc_ord_const){
+  if(ctx == NULL) return;
+  ctx->active = NP_GATE_CTX_OVERRIDE;
+  ctx->num_reg_continuous = num_reg_continuous;
+  ctx->num_reg_unordered = num_reg_unordered;
+  ctx->num_reg_ordered = num_reg_ordered;
+  ctx->kernel_c = kernel_c;
+  ctx->kernel_u = kernel_u;
+  ctx->kernel_o = kernel_o;
+  ctx->operator = operator;
+  ctx->cont_ok = cont_ok;
+  ctx->cont_hmin = cont_hmin;
+  ctx->cont_k0 = cont_k0;
+  ctx->disc_uno_ok = disc_uno_ok;
+  ctx->disc_uno_const = disc_uno_const;
+  ctx->disc_ord_ok = disc_ord_ok;
+  ctx->disc_ord_const = disc_ord_const;
 }
 
 static inline int np_disc_ordered_has_upper(const int kernel){
@@ -4410,7 +4581,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 
 // this will be fixed by using the mpi*v functions
 
-int kernel_weighted_sum_np(
+int kernel_weighted_sum_np_ctx(
 int * KERNEL_reg,
 int * KERNEL_unordered_reg,
 int * KERNEL_ordered_reg,
@@ -4462,7 +4633,12 @@ double **matrix_categorical_vals,
 int ** matrix_ordered_indices,
 double * const weighted_sum,
 double * const weighted_permutation_sum,
-double * const kw){
+double * const kw,
+const NP_GateOverrideCtx * const gate_override_ctx){
+  const NP_GateOverrideCtx * const gate_ctx =
+    (gate_override_ctx != NULL) ? gate_override_ctx : &np_gate_override_ctx;
+  const int disable_gate_features =
+    (gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE);
   
   /* This function takes a vector Y and returns a kernel weighted
      leave-one-out sum. By default Y should be a vector of ones
@@ -4615,8 +4791,15 @@ double * const kw){
   int *cont_largeh_active = NULL, *cont_largeh_active_fixed = NULL;
   int *tree_active_dims = NULL;
   int cont_largeh_all_fixed = 0, cont_largeh_fixed_ready = 0;
+  int cont_largeh_any_fixed = 0;
   int cont_largeh_from_override = 0;
+  int cont_largeh_from_global_cache = 0;
   int disc_uno_from_override = 0, disc_ord_from_override = 0;
+  const int lean_reg_cont_loop =
+    (!doscoreocg) &&
+    (p_nvar == 0) &&
+    (!int_cker_bound_extern) &&
+    (!any_convolution);
 
   double * const * const xtc = is_adaptive?
     matrix_X_continuous_eval:matrix_X_continuous_train;
@@ -4780,85 +4963,70 @@ double * const kw){
 
   }
 
-  if(num_reg_continuous > 0){
+  if((!disable_gate_features) && (num_reg_continuous > 0)){
     const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
-    if(np_gate_override_ctx.active &&
-       np_gate_override_ctx.num_reg_continuous == num_reg_continuous &&
-       np_gate_override_ctx.num_reg_unordered == num_reg_unordered &&
-       np_gate_override_ctx.num_reg_ordered == num_reg_ordered &&
-       np_gate_int_array_equal(np_gate_override_ctx.kernel_c, KERNEL_reg_np, num_reg_continuous) &&
-       np_gate_int_array_equal(np_gate_override_ctx.operator, operator, total_regs) &&
-       np_gate_override_ctx.cont_ok != NULL &&
-       np_gate_override_ctx.cont_hmin != NULL &&
-       np_gate_override_ctx.cont_k0 != NULL){
-      cont_largeh_ok = (int *)np_gate_override_ctx.cont_ok;
-      cont_largeh_hmin = (double *)np_gate_override_ctx.cont_hmin;
-      cont_largeh_k0 = (double *)np_gate_override_ctx.cont_k0;
+    if((gate_ctx->active == NP_GATE_CTX_OVERRIDE) &&
+       gate_ctx->cont_ok != NULL &&
+       gate_ctx->cont_hmin != NULL &&
+       gate_ctx->cont_k0 != NULL){
+      cont_largeh_ok = (int *)gate_ctx->cont_ok;
+      cont_largeh_hmin = (double *)gate_ctx->cont_hmin;
+      cont_largeh_k0 = (double *)gate_ctx->cont_k0;
+      cont_largeh_from_override = 1;
+    } else if(gate_ctx->active &&
+       gate_ctx->num_reg_continuous == num_reg_continuous &&
+       gate_ctx->num_reg_unordered == num_reg_unordered &&
+       gate_ctx->num_reg_ordered == num_reg_ordered &&
+       np_gate_int_array_equal(gate_ctx->kernel_c, KERNEL_reg_np, num_reg_continuous) &&
+       np_gate_int_array_equal(gate_ctx->operator, operator, total_regs) &&
+       gate_ctx->cont_ok != NULL &&
+       gate_ctx->cont_hmin != NULL &&
+       gate_ctx->cont_k0 != NULL){
+      cont_largeh_ok = (int *)gate_ctx->cont_ok;
+      cont_largeh_hmin = (double *)gate_ctx->cont_hmin;
+      cont_largeh_k0 = (double *)gate_ctx->cont_k0;
       cont_largeh_from_override = 1;
     }
 
     if(!cont_largeh_from_override){
-    const char *rt_env = getenv("NP_LARGEH_REL_TOL");
-    if(rt_env != NULL && rt_env[0] != '\0'){
-      const double v = atof(rt_env);
-      if(isfinite(v) && v > 0.0 && v < 0.1){
-        cont_largeh_rel_tol = v;
-      }
-    }
-
-    cont_largeh_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
-    cont_largeh_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-    cont_largeh_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-
-    if(cont_largeh_ok != NULL && cont_largeh_hmin != NULL && cont_largeh_k0 != NULL){
-      for(i = 0; i < num_reg_continuous; i++){
-        const int kern = KERNEL_reg_np[i];
-        const int ok = np_cont_largeh_kernel_supported(kern);
-        double xmin = DBL_MAX, xmax = -DBL_MAX;
-
-        cont_largeh_ok[i] = 0;
-        cont_largeh_hmin[i] = DBL_MAX;
-        cont_largeh_k0[i] = 0.0;
-
-        if(!ok) continue;
-
-        for(ii = 0; ii < num_obs_train; ii++){
-          const double v = matrix_X_continuous_train[i][ii];
-          if(!isfinite(v)) continue;
-          xmin = MIN(xmin, v);
-          xmax = MAX(xmax, v);
-        }
-
-        for(ii = 0; ii < num_obs_eval; ii++){
-          const double v = matrix_X_continuous_eval[i][ii];
-          if(!isfinite(v)) continue;
-          xmin = MIN(xmin, v);
-          xmax = MAX(xmax, v);
-        }
-
-        if(xmax >= xmin){
-          const double utol = np_cont_largeh_utol(kern, cont_largeh_rel_tol);
-          if(utol > 0.0 && isfinite(utol)){
-            cont_largeh_ok[i] = 1;
-            cont_largeh_hmin[i] = (xmax - xmin)/utol;
-            cont_largeh_k0[i] = np_cont_largeh_k0(kern);
-          }
+      cont_largeh_rel_tol = np_cont_largeh_rel_tol();
+      if(np_cont_largeh_cache_get_or_build(num_obs_train,
+                                           num_obs_eval,
+                                           num_reg_continuous,
+                                           KERNEL_reg_np,
+                                           matrix_X_continuous_train,
+                                           matrix_X_continuous_eval,
+                                           cont_largeh_rel_tol,
+                                           &cont_largeh_ok,
+                                           &cont_largeh_hmin,
+                                           &cont_largeh_k0)){
+        cont_largeh_from_global_cache = 1;
+      } else {
+        if(!np_cont_largeh_build_params(num_obs_train,
+                                        num_obs_eval,
+                                        num_reg_continuous,
+                                        KERNEL_reg_np,
+                                        matrix_X_continuous_train,
+                                        matrix_X_continuous_eval,
+                                        cont_largeh_rel_tol,
+                                        &cont_largeh_ok,
+                                        &cont_largeh_hmin,
+                                        &cont_largeh_k0)){
+          cont_largeh_ok = NULL;
+          cont_largeh_hmin = NULL;
+          cont_largeh_k0 = NULL;
         }
       }
-    } else {
-      if(cont_largeh_ok != NULL){ free(cont_largeh_ok); cont_largeh_ok = NULL; }
-      if(cont_largeh_hmin != NULL){ free(cont_largeh_hmin); cont_largeh_hmin = NULL; }
-      if(cont_largeh_k0 != NULL){ free(cont_largeh_k0); cont_largeh_k0 = NULL; }
-    }
     }
   }
 
-  if(num_reg_continuous > 0){
+  if((!disable_gate_features) && (num_reg_continuous > 0)){
     cont_largeh_active = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
     if(BANDWIDTH_reg == BW_FIXED){
       cont_largeh_active_fixed = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
       if(cont_largeh_active != NULL && cont_largeh_active_fixed != NULL){
         cont_largeh_all_fixed = 1;
+        cont_largeh_any_fixed = 0;
         for(i = 0; i < num_reg_continuous; i++){
           const int is_largeh = (cont_largeh_ok != NULL) &&
             cont_largeh_ok[i] &&
@@ -4869,6 +5037,7 @@ double * const kw){
           cont_largeh_active_fixed[i] = is_largeh;
           cont_largeh_active[i] = is_largeh;
           cont_largeh_all_fixed &= is_largeh;
+          cont_largeh_any_fixed |= is_largeh;
         }
         cont_largeh_fixed_ready = 1;
       }
@@ -4879,18 +5048,24 @@ double * const kw){
     tree_active_dims = (int *)malloc((size_t)num_reg_continuous*sizeof(int));
   }
 
-  if(num_reg_unordered > 0){
+  if((!disable_gate_features) && (num_reg_unordered > 0)){
     const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
-    if(np_gate_override_ctx.active &&
-       np_gate_override_ctx.num_reg_continuous == num_reg_continuous &&
-       np_gate_override_ctx.num_reg_unordered == num_reg_unordered &&
-       np_gate_override_ctx.num_reg_ordered == num_reg_ordered &&
-       np_gate_int_array_equal(np_gate_override_ctx.kernel_u, KERNEL_unordered_reg_np, num_reg_unordered) &&
-       np_gate_int_array_equal(np_gate_override_ctx.operator, operator, total_regs) &&
-       np_gate_override_ctx.disc_uno_ok != NULL &&
-       np_gate_override_ctx.disc_uno_const != NULL){
-      disc_uno_const_ok = (int *)np_gate_override_ctx.disc_uno_ok;
-      disc_uno_const = (double *)np_gate_override_ctx.disc_uno_const;
+    if((gate_ctx->active == NP_GATE_CTX_OVERRIDE) &&
+       gate_ctx->disc_uno_ok != NULL &&
+       gate_ctx->disc_uno_const != NULL){
+      disc_uno_const_ok = (int *)gate_ctx->disc_uno_ok;
+      disc_uno_const = (double *)gate_ctx->disc_uno_const;
+      disc_uno_from_override = 1;
+    } else if(gate_ctx->active &&
+       gate_ctx->num_reg_continuous == num_reg_continuous &&
+       gate_ctx->num_reg_unordered == num_reg_unordered &&
+       gate_ctx->num_reg_ordered == num_reg_ordered &&
+       np_gate_int_array_equal(gate_ctx->kernel_u, KERNEL_unordered_reg_np, num_reg_unordered) &&
+       np_gate_int_array_equal(gate_ctx->operator, operator, total_regs) &&
+       gate_ctx->disc_uno_ok != NULL &&
+       gate_ctx->disc_uno_const != NULL){
+      disc_uno_const_ok = (int *)gate_ctx->disc_uno_ok;
+      disc_uno_const = (double *)gate_ctx->disc_uno_const;
       disc_uno_from_override = 1;
     }
 
@@ -4930,18 +5105,24 @@ double * const kw){
     }
   }
 
-  if(num_reg_ordered > 0){
+  if((!disable_gate_features) && (num_reg_ordered > 0)){
     const int total_regs = num_reg_continuous + num_reg_unordered + num_reg_ordered;
-    if(np_gate_override_ctx.active &&
-       np_gate_override_ctx.num_reg_continuous == num_reg_continuous &&
-       np_gate_override_ctx.num_reg_unordered == num_reg_unordered &&
-       np_gate_override_ctx.num_reg_ordered == num_reg_ordered &&
-       np_gate_int_array_equal(np_gate_override_ctx.kernel_o, KERNEL_ordered_reg_np, num_reg_ordered) &&
-       np_gate_int_array_equal(np_gate_override_ctx.operator, operator, total_regs) &&
-       np_gate_override_ctx.disc_ord_ok != NULL &&
-       np_gate_override_ctx.disc_ord_const != NULL){
-      disc_ord_const_ok = (int *)np_gate_override_ctx.disc_ord_ok;
-      disc_ord_const = (double *)np_gate_override_ctx.disc_ord_const;
+    if((gate_ctx->active == NP_GATE_CTX_OVERRIDE) &&
+       gate_ctx->disc_ord_ok != NULL &&
+       gate_ctx->disc_ord_const != NULL){
+      disc_ord_const_ok = (int *)gate_ctx->disc_ord_ok;
+      disc_ord_const = (double *)gate_ctx->disc_ord_const;
+      disc_ord_from_override = 1;
+    } else if(gate_ctx->active &&
+       gate_ctx->num_reg_continuous == num_reg_continuous &&
+       gate_ctx->num_reg_unordered == num_reg_unordered &&
+       gate_ctx->num_reg_ordered == num_reg_ordered &&
+       np_gate_int_array_equal(gate_ctx->kernel_o, KERNEL_ordered_reg_np, num_reg_ordered) &&
+       np_gate_int_array_equal(gate_ctx->operator, operator, total_regs) &&
+       gate_ctx->disc_ord_ok != NULL &&
+       gate_ctx->disc_ord_const != NULL){
+      disc_ord_const_ok = (int *)gate_ctx->disc_ord_ok;
+      disc_ord_const = (double *)gate_ctx->disc_ord_const;
       disc_ord_from_override = 1;
     }
 
@@ -5102,16 +5283,17 @@ double * const kw){
 #endif
   }
 
-  if((!doscoreocg) && (p_nvar == 0) &&
+  if((!disable_gate_features) && (!doscoreocg) && (p_nvar == 0) &&
      ((num_reg_unordered + num_reg_ordered) > 1) &&
+     ((num_reg_ordered > 0) || ((num_reg_unordered + num_reg_ordered) > 2)) &&
      (num_xt >= 128)){
-    if(np_gate_override_ctx.disc_prof_id != NULL &&
-       np_gate_override_ctx.disc_prof_rep != NULL &&
-       np_gate_override_ctx.disc_nprof > 0 &&
-       np_gate_override_ctx.disc_prof_num_xt == num_xt){
-      disc_prof_id = (int *)np_gate_override_ctx.disc_prof_id;
-      disc_prof_rep = (int *)np_gate_override_ctx.disc_prof_rep;
-      disc_nprof = np_gate_override_ctx.disc_nprof;
+    if(gate_ctx->disc_prof_id != NULL &&
+       gate_ctx->disc_prof_rep != NULL &&
+       gate_ctx->disc_nprof > 0 &&
+       gate_ctx->disc_prof_num_xt == num_xt){
+      disc_prof_id = (int *)gate_ctx->disc_prof_id;
+      disc_prof_rep = (int *)gate_ctx->disc_prof_rep;
+      disc_nprof = gate_ctx->disc_nprof;
       disc_profile_from_override = 1;
       disc_profile_from_global_cache = 0;
     } else {
@@ -5184,6 +5366,7 @@ double * const kw){
     int deferred_const_active = 0;
     double deferred_const = 1.0;
     int all_cont_largeh = (num_reg_continuous > 0);
+    int any_cont_largeh = 0;
     int tree_active_n = num_reg_continuous;
     const int tree_use_active_dims =
       np_ks_tree_use &&
@@ -5194,6 +5377,7 @@ double * const kw){
 
     if(cont_largeh_fixed_ready){
       all_cont_largeh = cont_largeh_all_fixed;
+      any_cont_largeh = cont_largeh_any_fixed;
     } else if(cont_largeh_active != NULL){
       for(i = 0; i < num_reg_continuous; i++){
         const int is_largeh = (cont_largeh_ok != NULL) &&
@@ -5204,9 +5388,11 @@ double * const kw){
 
         cont_largeh_active[i] = is_largeh;
         all_cont_largeh &= is_largeh;
+        any_cont_largeh |= is_largeh;
       }
     } else {
       all_cont_largeh = 0;
+      any_cont_largeh = 0;
     }
 
     if(tree_use_active_dims){
@@ -5379,83 +5565,100 @@ double * const kw){
 
     /* for the first iteration, no weights */
     /* for the rest, the accumulated products are the weights */
-    for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
-      const int kbase_i = KERNEL_reg_np[i] % 10;
-      const int p_kbase_i = (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]) % 10;
-      const int use_bounds_i = int_cker_bound_extern &&
-        vector_ckerlb_extern != NULL &&
-        vector_ckerub_extern != NULL &&
-        (kbase_i >= 0 && kbase_i <= 9) &&
-        ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
-         (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
-      const int use_p_bounds_i = int_cker_bound_extern &&
-        vector_ckerlb_extern != NULL &&
-        vector_ckerub_extern != NULL &&
-        (p_kbase_i >= 0 && p_kbase_i <= 9) &&
-        ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
-         (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
-      const double invnorm = use_bounds_i ?
-        np_cker_invnorm(KERNEL_reg_np[i], xc[i][j], m[i][jbw],
-                        vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
-      const double p_invnorm = use_p_bounds_i ?
-        np_cker_invnorm((do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]),
-                        xc[i][j], m[i][jbw],
-                        vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
+    if(lean_reg_cont_loop){
+      for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
+        const int use_largeh = any_cont_largeh && (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
 
-      if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
-        if(p_nvar == 0){
-          const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
-
-          if(use_largeh){
-            deferred_const *= cont_largeh_k0[i]*invnorm;
-            deferred_const_active = 1;
-          } else {
-            np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1, invnorm);
-            tprod_has_vals = 1;
-          }
+        if(use_largeh){
+          deferred_const *= cont_largeh_k0[i];
+          deferred_const_active = 1;
         } else {
-          const int use_largeh = (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
-
-          np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf, use_largeh, (use_largeh ? cont_largeh_k0[i] : 0.0), invnorm, p_invnorm);
+          np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1, 1.0);
+          tprod_has_vals = 1;
         }
-      }
-      else if(p_nvar == 0){
-        const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
-        np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, tprod_has_vals, xc[i][j],
-                           matrix_alt_bandwidth[i], m[i][jbw],
-                           use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
-                           use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
-                           use_bound_convol_i,
-                           tprod, bpow[i]);
-        tprod_has_vals = 1;
-      } else
-      {
-        const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
-        np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j],
-                           matrix_alt_bandwidth[i], m[i][jbw],
-                           use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
-                           use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
-                           use_bound_convol_i,
-                           tprod, bpow[i]);
-      }
-      dband *= ipow(m[i][jbw], bpow[i]);
 
-      if(do_perm){
-        for(ii = 0, kk = 0; ii < num_reg_continuous; ii++){
-          if(bpso[ii]){
-            if (i != ii){
-              p_dband[kk] *= ipow(m[i][jbw], bpow[i]);              
+        dband *= ipow(m[i][jbw], bpow[i]);
+        k += bpso[l];
+      }
+    } else {
+      for(i = 0, l = 0, ip = 0, k = 0; i < num_reg_continuous; i++, l++, ip += do_perm){
+        const int kbase_i = KERNEL_reg_np[i] % 10;
+        const int p_kbase_i = (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]) % 10;
+        const int use_bounds_i = int_cker_bound_extern &&
+          vector_ckerlb_extern != NULL &&
+          vector_ckerub_extern != NULL &&
+          (kbase_i >= 0 && kbase_i <= 9) &&
+          ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
+           (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
+        const int use_p_bounds_i = int_cker_bound_extern &&
+          vector_ckerlb_extern != NULL &&
+          vector_ckerub_extern != NULL &&
+          (p_kbase_i >= 0 && p_kbase_i <= 9) &&
+          ((isfinite(vector_ckerlb_extern[i]) && (fabs(vector_ckerlb_extern[i]) < 0.5*DBL_MAX)) ||
+           (isfinite(vector_ckerub_extern[i]) && (fabs(vector_ckerub_extern[i]) < 0.5*DBL_MAX)));
+        const double invnorm = use_bounds_i ?
+          np_cker_invnorm(KERNEL_reg_np[i], xc[i][j], m[i][jbw],
+                          vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
+        const double p_invnorm = use_p_bounds_i ?
+          np_cker_invnorm((do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]),
+                          xc[i][j], m[i][jbw],
+                          vector_ckerlb_extern[i], vector_ckerub_extern[i]) : 1.0;
+
+        if((BANDWIDTH_reg != BW_ADAP_NN) || (operator[l] != OP_CONVOLUTION)){
+          if(p_nvar == 0){
+            const int use_largeh = any_cont_largeh && (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
+
+            if(use_largeh){
+              deferred_const *= cont_largeh_k0[i]*invnorm;
+              deferred_const_active = 1;
             } else {
-              p_dband[kk] *= ipow(m[i][jbw], p_ipow);
-              if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
-                p_dband[kk] *= vector_scale_factor[ii]/(m[i][jbw]);
-              }
+              np_ckernelv(KERNEL_reg_np[i], xtc[i], num_xt, tprod_has_vals, xc[i][j], m[i][jbw], tprod, pxl, swap_xxt, 1, invnorm);
+              tprod_has_vals = 1;
             }
-            kk++;
+          } else {
+            const int use_largeh = any_cont_largeh && (cont_largeh_active != NULL) ? cont_largeh_active[i] : 0;
+
+            np_p_ckernelv(KERNEL_reg_np[i], (do_perm ? permutation_kernel[i] : KERNEL_reg_np[i]), k, p_nvar, xtc[i], num_xt, l, xc[i][j], m[i][jbw], tprod, tprod_mp, pxl, (p_pxl==NULL?NULL : p_pxl+k), swap_xxt, bpso[l], do_score, perm_kbuf, use_largeh, (use_largeh ? cont_largeh_k0[i] : 0.0), invnorm, p_invnorm);
           }
         }
+        else if(p_nvar == 0){
+          const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
+          np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, tprod_has_vals, xc[i][j],
+                             matrix_alt_bandwidth[i], m[i][jbw],
+                             use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
+                             use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
+                             use_bound_convol_i,
+                             tprod, bpow[i]);
+          tprod_has_vals = 1;
+        } else
+        {
+          const int use_bound_convol_i = use_bounds_i && (operator[l] == OP_CONVOLUTION);
+          np_convol_ckernelv(KERNEL_reg[i], xtc[i], num_xt, l, xc[i][j],
+                             matrix_alt_bandwidth[i], m[i][jbw],
+                             use_bounds_i ? vector_ckerlb_extern[i] : R_NegInf,
+                             use_bounds_i ? vector_ckerub_extern[i] : R_PosInf,
+                             use_bound_convol_i,
+                             tprod, bpow[i]);
+        }
+        dband *= ipow(m[i][jbw], bpow[i]);
+
+        if(do_perm){
+          for(ii = 0, kk = 0; ii < num_reg_continuous; ii++){
+            if(bpso[ii]){
+              if (i != ii){
+                p_dband[kk] *= ipow(m[i][jbw], bpow[i]);              
+              } else {
+                p_dband[kk] *= ipow(m[i][jbw], p_ipow);
+                if(((BANDWIDTH_reg == BW_FIXED) && (int_LARGE_SF == 0) && do_score)){
+                  p_dband[kk] *= vector_scale_factor[ii]/(m[i][jbw]);
+                }
+              }
+              kk++;
+            }
+          }
+        }
+        k += bpso[l];
       }
-      k += bpso[l];
     }
 
 
@@ -5610,7 +5813,8 @@ double * const kw){
             np_ckernelv_mul_const(disc_uno_const[i], num_xt, l, tprod, pxl);
           } else {
             np_ukernelv(KERNEL_unordered_reg_np[i], xtu[i], num_xt, tprod_has_vals, xu[i][j], 
-                        lambda[i], num_categories[i], tprod, pxl, (disc_uno_const_ok != NULL));
+                        lambda[i], num_categories[i], tprod, pxl,
+                        (disable_gate_features ? 1 : (disc_uno_const_ok != NULL)));
             tprod_has_vals = 1;
           }
         }
@@ -5655,7 +5859,6 @@ double * const kw){
         k += bpso[l];
       }
     }
-
     if((p_nvar == 0) && deferred_const_active){
       np_ckernelv_mul_const(deferred_const, num_xt, tprod_has_vals, tprod, pxl);
       tprod_has_vals = 1;
@@ -5796,17 +5999,126 @@ double * const kw){
   if((disc_uno_const != NULL) && (!disc_uno_from_override)) free(disc_uno_const);
   if((disc_ord_const_ok != NULL) && (!disc_ord_from_override)) free(disc_ord_const_ok);
   if((disc_ord_const != NULL) && (!disc_ord_from_override)) free(disc_ord_const);
-  if((cont_largeh_ok != NULL) && (!cont_largeh_from_override)) free(cont_largeh_ok);
-  if((cont_largeh_hmin != NULL) && (!cont_largeh_from_override)) free(cont_largeh_hmin);
-  if((cont_largeh_k0 != NULL) && (!cont_largeh_from_override)) free(cont_largeh_k0);
+  if((cont_largeh_ok != NULL) && (!cont_largeh_from_override) && (!cont_largeh_from_global_cache)) free(cont_largeh_ok);
+  if((cont_largeh_hmin != NULL) && (!cont_largeh_from_override) && (!cont_largeh_from_global_cache)) free(cont_largeh_hmin);
+  if((cont_largeh_k0 != NULL) && (!cont_largeh_from_override) && (!cont_largeh_from_global_cache)) free(cont_largeh_k0);
   if(cont_largeh_active != NULL) free(cont_largeh_active);
   if(cont_largeh_active_fixed != NULL) free(cont_largeh_active_fixed);
   if(tree_active_dims != NULL) free(tree_active_dims);
 
   if(no_bpso)
     free(bpso);
-  
+
+
   return(0);
+}
+
+int kernel_weighted_sum_np(
+int * KERNEL_reg,
+int * KERNEL_unordered_reg,
+int * KERNEL_ordered_reg,
+const int BANDWIDTH_reg,
+const int num_obs_train,
+const int num_obs_eval,
+const int num_reg_unordered,
+const int num_reg_ordered,
+const int num_reg_continuous,
+const int leave_one_out,
+const int leave_one_out_offset,
+const int kernel_pow,
+const int bandwidth_divide,
+const int bandwidth_divide_weights,
+const int symmetric,
+const int gather_scatter,
+const int drop_one_train,
+const int drop_which_train,
+const int * const operator,
+const int permutation_operator,
+int do_score,
+int do_ocg,
+int * bpso,
+const int suppress_parallel,
+const int ncol_Y,
+const int ncol_W,
+const int int_TREE,
+const int do_partial_tree,
+KDT * const kdt,
+NL * const inl,
+int * const nld,
+int * const idx,
+double **matrix_X_unordered_train,
+double **matrix_X_ordered_train,
+double **matrix_X_continuous_train,
+double **matrix_X_unordered_eval,
+double **matrix_X_ordered_eval,
+double **matrix_X_continuous_eval,
+double **matrix_Y,
+double **matrix_W,
+double * sgn,
+double *vector_scale_factor,
+int bandwidth_provided,
+double ** matrix_bw_train,
+double ** matrix_bw_eval,
+double * lambda_pre,
+int *num_categories,
+double **matrix_categorical_vals,
+int ** matrix_ordered_indices,
+double * const weighted_sum,
+double * const weighted_permutation_sum,
+double * const kw){
+  return kernel_weighted_sum_np_ctx(KERNEL_reg,
+                                    KERNEL_unordered_reg,
+                                    KERNEL_ordered_reg,
+                                    BANDWIDTH_reg,
+                                    num_obs_train,
+                                    num_obs_eval,
+                                    num_reg_unordered,
+                                    num_reg_ordered,
+                                    num_reg_continuous,
+                                    leave_one_out,
+                                    leave_one_out_offset,
+                                    kernel_pow,
+                                    bandwidth_divide,
+                                    bandwidth_divide_weights,
+                                    symmetric,
+                                    gather_scatter,
+                                    drop_one_train,
+                                    drop_which_train,
+                                    operator,
+                                    permutation_operator,
+                                    do_score,
+                                    do_ocg,
+                                    bpso,
+                                    suppress_parallel,
+                                    ncol_Y,
+                                    ncol_W,
+                                    int_TREE,
+                                    do_partial_tree,
+                                    kdt,
+                                    inl,
+                                    nld,
+                                    idx,
+                                    matrix_X_unordered_train,
+                                    matrix_X_ordered_train,
+                                    matrix_X_continuous_train,
+                                    matrix_X_unordered_eval,
+                                    matrix_X_ordered_eval,
+                                    matrix_X_continuous_eval,
+                                    matrix_Y,
+                                    matrix_W,
+                                    sgn,
+                                    vector_scale_factor,
+                                    bandwidth_provided,
+                                    matrix_bw_train,
+                                    matrix_bw_eval,
+                                    lambda_pre,
+                                    num_categories,
+                                    matrix_categorical_vals,
+                                    matrix_ordered_indices,
+                                    weighted_sum,
+                                    weighted_permutation_sum,
+                                    kw,
+                                    NULL);
 }
 
 int np_kernel_estimate_con_density_categorical_convolution_cv(
@@ -6174,301 +6486,6 @@ double *cv){
 // we take advantage of both the quasi-parity, and 
 // of the algebraic transpose symmetry of the aforementioned expression to gain a factor of ~ 4 speed-up
 
-static int np_regression_group_fast_path(
-int int_ll,
-int bwm,
-int num_obs,
-int num_reg_unordered,
-int num_reg_ordered,
-int num_reg_continuous,
-int *kernel_u,
-int *kernel_o,
-double **matrix_X_unordered,
-double **matrix_X_ordered,
-double **matrix_X_continuous,
-double *vector_Y,
-double *lambda,
-int *num_categories,
-double cont_const,
-double aicc,
-double *cv_out,
-double *trace_out){
-
-  int i, j, g, h, l, m;
-  int ok = 0;
-  int G = 0;
-  int *gid = NULL, *grep = NULL, *gcount = NULL;
-  double *gysum = NULL, *gxsum = NULL, *gxxsum = NULL, *gxysum = NULL;
-  double *K = NULL, *Kg_n = NULL, *Kg_y = NULL, *Kg_x = NULL, *Kg_xx = NULL, *Kg_xy = NULL;
-  MATRIX KWM = NULL, XTKXINV = NULL, XTKY = NULL, DELTA = NULL;
-  const double epsilon = (num_obs > 0) ? (1.0/(double)num_obs) : 1.0;
-  double cv = 0.0, traceH = 0.0;
-
-  if((num_obs <= 0) || (cv_out == NULL) || (trace_out == NULL))
-    return 0;
-
-  gid = (int *)malloc((size_t)num_obs*sizeof(int));
-  grep = (int *)malloc((size_t)num_obs*sizeof(int));
-  if((gid == NULL) || (grep == NULL)) goto cleanup;
-
-  for(i = 0; i < num_obs; i++){
-    int found = 0;
-    for(g = 0; g < G; g++){
-      const int r = grep[g];
-      int same = 1;
-      for(j = 0; j < num_reg_unordered; j++){
-        if(matrix_X_unordered[j][i] != matrix_X_unordered[j][r]){
-          same = 0;
-          break;
-        }
-      }
-      for(j = 0; same && (j < num_reg_ordered); j++){
-        if(matrix_X_ordered[j][i] != matrix_X_ordered[j][r]){
-          same = 0;
-          break;
-        }
-      }
-      if(same){
-        found = 1;
-        break;
-      }
-    }
-
-    if(!found){
-      grep[G] = i;
-      g = G;
-      G++;
-    }
-    gid[i] = g;
-  }
-
-  if(((double)G/(double)num_obs) > 0.75)
-    goto cleanup;
-
-  gcount = (int *)calloc((size_t)G, sizeof(int));
-  gysum = (double *)calloc((size_t)G, sizeof(double));
-  if((gcount == NULL) || (gysum == NULL)) goto cleanup;
-
-  if(num_reg_continuous > 0){
-    gxsum = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
-    gxxsum = (double *)calloc((size_t)G*(size_t)num_reg_continuous*(size_t)num_reg_continuous, sizeof(double));
-    gxysum = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
-    if((gxsum == NULL) || (gxxsum == NULL) || (gxysum == NULL)) goto cleanup;
-  }
-
-  for(i = 0; i < num_obs; i++){
-    const int gi = gid[i];
-    const double yi = vector_Y[i];
-
-    gcount[gi]++;
-    gysum[gi] += yi;
-
-    for(l = 0; l < num_reg_continuous; l++){
-      const double xl = matrix_X_continuous[l][i];
-      gxsum[gi*num_reg_continuous + l] += xl;
-      gxysum[gi*num_reg_continuous + l] += xl*yi;
-    }
-
-    for(l = 0; l < num_reg_continuous; l++){
-      const double xl = matrix_X_continuous[l][i];
-      for(m = 0; m < num_reg_continuous; m++){
-        const double xm = matrix_X_continuous[m][i];
-        gxxsum[(gi*num_reg_continuous + l)*num_reg_continuous + m] += xl*xm;
-      }
-    }
-  }
-
-  K = (double *)malloc((size_t)G*(size_t)G*sizeof(double));
-  Kg_n = (double *)calloc((size_t)G, sizeof(double));
-  Kg_y = (double *)calloc((size_t)G, sizeof(double));
-  if((K == NULL) || (Kg_n == NULL) || (Kg_y == NULL)) goto cleanup;
-
-  if(num_reg_continuous > 0){
-    Kg_x = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
-    Kg_xx = (double *)calloc((size_t)G*(size_t)num_reg_continuous*(size_t)num_reg_continuous, sizeof(double));
-    Kg_xy = (double *)calloc((size_t)G*(size_t)num_reg_continuous, sizeof(double));
-    if((Kg_x == NULL) || (Kg_xx == NULL) || (Kg_xy == NULL)) goto cleanup;
-  }
-
-  {
-    double (* const ukf[])(int, double, int) = {
-      np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
-      np_score_uaa, np_score_unli_racine
-    };
-    double (* const okf[])(double, double, double, double, double) = {
-      np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
-        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
-        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
-        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
-    };
-    const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
-    const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
-
-    for(g = 0; g < G; g++){
-      for(h = 0; h < G; h++){
-        const int rg = grep[g];
-        const int rh = grep[h];
-        double kv = cont_const;
-
-        for(j = 0; j < num_reg_unordered; j++){
-          const int ku = kernel_u[j];
-          const int ncat = (num_categories != NULL) ? num_categories[j] : 0;
-          if(ku < 0 || ku >= nuk) goto cleanup;
-          kv *= ukf[ku](matrix_X_unordered[j][rg] == matrix_X_unordered[j][rh],
-                        lambda[j], ncat);
-        }
-
-        for(j = 0; j < num_reg_ordered; j++){
-          const int oi = j + num_reg_unordered;
-          const int ko = kernel_o[j];
-          if((matrix_categorical_vals_extern == NULL) || (num_categories == NULL) || (num_categories[oi] <= 0))
-            goto cleanup;
-          if(ko < 0 || ko >= nok) goto cleanup;
-          {
-            const double cl = matrix_categorical_vals_extern[oi][0];
-            const double ch = matrix_categorical_vals_extern[oi][num_categories[oi]-1];
-            kv *= okf[ko](matrix_X_ordered[j][rg], matrix_X_ordered[j][rh], lambda[oi], cl, ch);
-          }
-        }
-
-        K[g*G + h] = kv;
-      }
-    }
-  }
-
-  for(g = 0; g < G; g++){
-    for(h = 0; h < G; h++){
-      const double kgh = K[g*G + h];
-      Kg_n[g] += kgh*(double)gcount[h];
-      Kg_y[g] += kgh*gysum[h];
-
-      for(l = 0; l < num_reg_continuous; l++){
-        Kg_x[g*num_reg_continuous + l] += kgh*gxsum[h*num_reg_continuous + l];
-        Kg_xy[g*num_reg_continuous + l] += kgh*gxysum[h*num_reg_continuous + l];
-      }
-
-      for(l = 0; l < num_reg_continuous; l++){
-        for(m = 0; m < num_reg_continuous; m++){
-          Kg_xx[(g*num_reg_continuous + l)*num_reg_continuous + m] +=
-            kgh*gxxsum[(h*num_reg_continuous + l)*num_reg_continuous + m];
-        }
-      }
-    }
-  }
-
-  if(int_ll == LL_LC){
-    for(i = 0; i < num_obs; i++){
-      const int gi = gid[i];
-      const double yi = vector_Y[i];
-      const double selfk = K[gi*G + gi];
-      const double den = (bwm == RBWM_CVLS) ? (Kg_n[gi] - selfk) : Kg_n[gi];
-      const double num = (bwm == RBWM_CVLS) ? (Kg_y[gi] - selfk*yi) : Kg_y[gi];
-      const double sk = copysign(DBL_MIN, den) + den;
-      const double dy = yi - num/sk;
-
-      cv += dy*dy;
-      if(bwm == RBWM_CVAIC)
-        traceH += aicc/sk;
-    }
-
-    ok = 1;
-    goto cleanup;
-  }
-
-  {
-    const int p = num_reg_continuous + 1;
-
-    KWM = mat_creat(p, p, UNDEFINED);
-    XTKXINV = mat_creat(p, p, UNDEFINED);
-    XTKY = mat_creat(p, 1, UNDEFINED);
-    DELTA = mat_creat(p, 1, UNDEFINED);
-    if((KWM == NULL) || (XTKXINV == NULL) || (XTKY == NULL) || (DELTA == NULL))
-      goto cleanup;
-
-    for(i = 0; i < num_obs; i++){
-      const int gi = gid[i];
-      const double yi = vector_Y[i];
-      const double selfk = K[gi*G + gi];
-      const double S0 = Kg_n[gi] - selfk;
-      const double Wy = Kg_y[gi] - selfk*yi;
-      double nepsilon = 0.0;
-
-      KWM[0][0] = S0;
-      XTKY[0][0] = Wy;
-
-      for(l = 0; l < num_reg_continuous; l++){
-        const double xi = matrix_X_continuous[l][i];
-        const double Wx = Kg_x[gi*num_reg_continuous + l] - selfk*xi;
-        const double Wxy = Kg_xy[gi*num_reg_continuous + l] - selfk*xi*yi;
-        const int ll1 = l + 1;
-
-        KWM[0][ll1] = Wx - xi*S0;
-        KWM[ll1][0] = KWM[0][ll1];
-        XTKY[ll1][0] = Wxy - xi*Wy;
-      }
-
-      for(l = 0; l < num_reg_continuous; l++){
-        const double xil = matrix_X_continuous[l][i];
-        const double Wxl = Kg_x[gi*num_reg_continuous + l] - selfk*xil;
-        const int ll1 = l + 1;
-        for(m = 0; m < num_reg_continuous; m++){
-          const double xim = matrix_X_continuous[m][i];
-          const double Wxm = Kg_x[gi*num_reg_continuous + m] - selfk*xim;
-          const double Wxx = Kg_xx[(gi*num_reg_continuous + l)*num_reg_continuous + m] - selfk*xil*xim;
-          KWM[ll1][m+1] = Wxx - xil*Wxm - Wxl*xim + xil*xim*S0;
-        }
-      }
-
-      if(bwm == RBWM_CVAIC){
-        KWM[0][0] += aicc;
-        XTKY[0][0] += aicc*yi;
-      }
-
-      while(mat_inv(KWM, XTKXINV) == NULL){
-        for(l = 0; l < p; l++)
-          KWM[l][l] += epsilon;
-        nepsilon += epsilon;
-      }
-
-      if(bwm == RBWM_CVAIC)
-        traceH += XTKXINV[0][0]*aicc;
-
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
-      DELTA = mat_mul(XTKXINV, XTKY, DELTA);
-      cv += (yi - DELTA[0][0])*(yi - DELTA[0][0]);
-    }
-  }
-
-  ok = 1;
-
- cleanup:
-  if(gid != NULL) free(gid);
-  if(grep != NULL) free(grep);
-  if(gcount != NULL) free(gcount);
-  if(gysum != NULL) free(gysum);
-  if(gxsum != NULL) free(gxsum);
-  if(gxxsum != NULL) free(gxxsum);
-  if(gxysum != NULL) free(gxysum);
-  if(K != NULL) free(K);
-  if(Kg_n != NULL) free(Kg_n);
-  if(Kg_y != NULL) free(Kg_y);
-  if(Kg_x != NULL) free(Kg_x);
-  if(Kg_xx != NULL) free(Kg_xx);
-  if(Kg_xy != NULL) free(Kg_xy);
-  if(KWM != NULL) mat_free(KWM);
-  if(XTKXINV != NULL) mat_free(XTKXINV);
-  if(XTKY != NULL) mat_free(XTKY);
-  if(DELTA != NULL) mat_free(DELTA);
-
-  if(ok){
-    *cv_out = cv;
-    *trace_out = traceH;
-    return 1;
-  }
-  return 0;
-}
-
-
 double np_kernel_estimate_regression_categorical_ls_aic(
 int int_ll,
 int bwm,
@@ -6498,18 +6515,20 @@ int *num_categories){
 
   double aicc = 0.0;
   double traceH = 0.0;
-  int all_cont_largeh_fixed = (num_reg_continuous == 0);
-
-  int * operator = NULL;
-  int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
-  int gate_override_active = 0;
-  int gate_disc_profile_active = 0;
+int * operator = NULL;
+int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
+NP_GateOverrideCtx gate_ctx_local;
+int gate_override_active = 0;
+int gate_disc_profile_active = 0;
+  int ov_disc_prof_from_global_cache = 0;
   int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
-  int *ov_disc_prof_id = NULL, *ov_disc_prof_rep = NULL, ov_disc_nprof = 0;
+  int *ov_disc_prof_id = NULL, *ov_disc_prof_rep = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
 
   const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
+  np_gate_ctx_clear(&gate_ctx_local);
+  gate_ctx_local.active = NP_GATE_CTX_DISABLE;
 
   operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
 
@@ -6571,155 +6590,6 @@ int *num_categories){
     return(DBL_MAX);
   }
 
-  if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
-    int ok_all = 1;
-
-    if(num_reg_continuous > 0){
-      ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
-      ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-      ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
-      ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
-      if(ok_all){
-        const double rel_tol = np_cont_largeh_rel_tol();
-        for(i = 0; i < num_reg_continuous; i++){
-          const int kern = kernel_c[i];
-          double xmin = DBL_MAX, xmax = -DBL_MAX;
-          ov_cont_ok[i] = 0;
-          ov_cont_hmin[i] = DBL_MAX;
-          ov_cont_k0[i] = 0.0;
-          if(!np_cont_largeh_kernel_supported(kern)) continue;
-          for(j = 0; j < num_obs; j++){
-            const double v = matrix_X_continuous[i][j];
-            if(!isfinite(v)) continue;
-            xmin = MIN(xmin, v);
-            xmax = MAX(xmax, v);
-          }
-          if(xmax >= xmin){
-            const double utol = np_cont_largeh_utol(kern, rel_tol);
-            if(utol > 0.0 && isfinite(utol)){
-              ov_cont_ok[i] = 1;
-              ov_cont_hmin[i] = (xmax - xmin)/utol;
-              ov_cont_k0[i] = np_cont_largeh_k0(kern);
-            }
-          }
-        }
-      }
-    }
-
-    if(ok_all && num_reg_unordered > 0){
-      ov_disc_uno_ok = (int *)calloc((size_t)num_reg_unordered, sizeof(int));
-      ov_disc_uno_const = (double *)malloc((size_t)num_reg_unordered*sizeof(double));
-      ok_all = (ov_disc_uno_ok != NULL) && (ov_disc_uno_const != NULL);
-      if(ok_all){
-        double (* const ukf[])(int, double, int) = {
-          np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
-          np_score_uaa, np_score_unli_racine
-        };
-        const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
-        for(i = 0; i < num_reg_unordered; i++){
-          const int ku = kernel_u[i];
-          const int ncat = (num_categories != NULL) ? num_categories[i] : 0;
-          const double lam = lambda[i];
-          ov_disc_uno_ok[i] = 0;
-          ov_disc_uno_const[i] = 0.0;
-          if(ku < 0 || ku >= nuk) continue;
-          if(!np_disc_near_upper(ku, lam, ncat)) continue;
-          {
-            const double ks = ukf[ku](1, lam, ncat);
-            const double kd = ukf[ku](0, lam, ncat);
-            if(np_disc_near_const_kernel(ks, kd)){
-              ov_disc_uno_ok[i] = 1;
-              ov_disc_uno_const[i] = 0.5*(ks + kd);
-            }
-          }
-        }
-      }
-    }
-
-    if(ok_all && num_reg_ordered > 0){
-      ov_disc_ord_ok = (int *)calloc((size_t)num_reg_ordered, sizeof(int));
-      ov_disc_ord_const = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
-      ok_all = (ov_disc_ord_ok != NULL) && (ov_disc_ord_const != NULL);
-      if(ok_all){
-        double (* const okf[])(double, double, double, double, double) = {
-          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
-        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
-        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
-        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
-        };
-        const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
-        for(i = 0; i < num_reg_ordered; i++){
-          const int oi = i + num_reg_unordered;
-          const int ko = kernel_o[i];
-          const int ncat = (num_categories != NULL) ? num_categories[oi] : 0;
-          const double lam = lambda[oi];
-          ov_disc_ord_ok[i] = 0;
-          ov_disc_ord_const[i] = 0.0;
-          if(ko < 0 || ko >= nok) continue;
-          if(ncat <= 0 || matrix_categorical_vals_extern == NULL) continue;
-          if(!np_disc_ordered_near_upper(ko, lam)) continue;
-          {
-            const double cl = matrix_categorical_vals_extern[oi][0];
-            const double ch = matrix_categorical_vals_extern[oi][ncat - 1];
-            const double k0 = okf[ko](cl, cl, lam, cl, ch);
-            const double k1 = okf[ko](cl, ch, lam, cl, ch);
-            if(np_disc_near_const_kernel(k0, k1)){
-              ov_disc_ord_ok[i] = 1;
-              ov_disc_ord_const[i] = 0.5*(k0 + k1);
-            }
-          }
-        }
-      }
-    }
-
-    if(ok_all){
-      np_gate_override_set(num_reg_continuous,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           kernel_c,
-                           kernel_u,
-                           kernel_o,
-                           operator,
-                           ov_cont_ok,
-                           ov_cont_hmin,
-                           ov_cont_k0,
-                           ov_disc_uno_ok,
-                           ov_disc_uno_const,
-                           ov_disc_ord_ok,
-                           ov_disc_ord_const);
-      gate_override_active = 1;
-    } else {
-      np_gate_override_clear();
-    }
-  }
-
-  if((BANDWIDTH_reg == BW_FIXED) && (num_reg_continuous > 0)){
-    int ok_all = 1;
-    for(i = 0; ok_all && (i < num_reg_continuous); i++){
-      ok_all = (ov_cont_ok != NULL) &&
-        ov_cont_ok[i] &&
-        isfinite(matrix_bandwidth[i][0]) &&
-        (fabs(matrix_bandwidth[i][0]) >= ov_cont_hmin[i]);
-    }
-    all_cont_largeh_fixed = ok_all;
-  }
-
-  if(np_build_discrete_profile_index(num_obs,
-                                     num_reg_unordered,
-                                     num_reg_ordered,
-                                     matrix_X_unordered,
-                                     matrix_X_ordered,
-                                     &ov_disc_prof_id,
-                                     &ov_disc_prof_rep,
-                                     &ov_disc_nprof)){
-    np_gate_override_set_disc_profile(num_obs,
-                                      ov_disc_prof_id,
-                                      ov_disc_prof_rep,
-                                      ov_disc_nprof);
-    gate_disc_profile_active = 1;
-  }
-
-
   if(bwm == RBWM_CVAIC){
     // compute normalisation constant
 
@@ -6729,7 +6599,7 @@ int *num_categories){
 
     int_LARGE_SF = 1;
 
-    kernel_weighted_sum_np(kernel_c,
+    kernel_weighted_sum_np_ctx(kernel_c,
                            kernel_u,
                            kernel_o,
                            BANDWIDTH_reg,
@@ -6780,147 +6650,13 @@ int *num_categories){
                            NULL,
                            &aicc,
                            NULL, // no permutations
-                           NULL); // do not return kernel weights
+                           NULL, // do not return kernel weights
+                           &gate_ctx_local);
     int_LARGE_SF = tsf;
 
     //fprintf(stderr,"\n%e\n",aicc);
   }
 
-  if((BANDWIDTH_reg == BW_FIXED) && all_cont_largeh_fixed && np_groupcv_fast_enabled()){
-    double cont_const = 1.0;
-
-    for(i = 0; i < num_reg_continuous; i++)
-      cont_const *= ov_cont_k0[i];
-
-    if((bwm == RBWM_CVLS) && (num_reg_unordered + num_reg_ordered == 0)){
-      if(int_ll == LL_LC){
-        if(num_obs <= 1){
-          cv = DBL_MAX;
-        } else {
-          double ysum = 0.0;
-          const double nmo = (double)(num_obs - 1);
-
-          for(i = 0; i < num_obs; i++)
-            ysum += vector_Y[i];
-
-          for(i = 0; i < num_obs; i++){
-            const double yhat = (ysum - vector_Y[i]) / nmo;
-            const double dy = vector_Y[i] - yhat;
-            cv += dy*dy;
-          }
-        }
-        goto compute_done;
-      } else {
-        const int p = num_reg_continuous + 1;
-
-        if(num_obs > p){
-          MATRIX XtX = mat_creat(p, p, UNDEFINED);
-          MATRIX XtXinv = mat_creat(p, p, UNDEFINED);
-          MATRIX Xty = mat_creat(p, 1, UNDEFINED);
-          MATRIX beta = mat_creat(p, 1, UNDEFINED);
-          int ll_fast_done = 0;
-
-          for(i = 0; i < p; i++){
-            Xty[i][0] = 0.0;
-            for(j = 0; j < p; j++)
-              XtX[i][j] = 0.0;
-          }
-
-          for(i = 0; i < num_obs; i++){
-            const double yi = vector_Y[i];
-
-            Xty[0][0] += yi;
-            XtX[0][0] += 1.0;
-
-            for(j = 0; j < num_reg_continuous; j++){
-              const double xj = matrix_X_continuous[j][i];
-              const int jj = j + 1;
-              Xty[jj][0] += xj * yi;
-              XtX[0][jj] += xj;
-              XtX[jj][0] += xj;
-            }
-
-            for(j = 0; j < num_reg_continuous; j++){
-              const double xj = matrix_X_continuous[j][i];
-              const int jj = j + 1;
-              for(l = 0; l < num_reg_continuous; l++){
-                const double xl = matrix_X_continuous[l][i];
-                XtX[jj][l+1] += xj * xl;
-              }
-            }
-          }
-
-          if(mat_inv(XtX, XtXinv) != NULL){
-            beta = mat_mul(XtXinv, Xty, beta);
-            ll_fast_done = 1;
-
-            for(i = 0; i < num_obs; i++){
-              double yhat = beta[0][0];
-              double hii = XtXinv[0][0];
-              double xinvx = 0.0;
-
-              for(j = 0; j < num_reg_continuous; j++){
-                const double xj = matrix_X_continuous[j][i];
-                yhat += beta[j+1][0]*xj;
-                hii += 2.0*xj*XtXinv[0][j+1];
-              }
-
-              for(j = 0; j < num_reg_continuous; j++){
-                const double xj = matrix_X_continuous[j][i];
-                for(l = 0; l < num_reg_continuous; l++){
-                  xinvx += xj*XtXinv[j+1][l+1]*matrix_X_continuous[l][i];
-                }
-              }
-              hii += xinvx;
-
-              {
-                const double den = 1.0 - hii;
-                if(fabs(den) <= DBL_EPSILON){
-                  ll_fast_done = 0;
-                  break;
-                }
-                {
-                  const double dy = (vector_Y[i] - yhat)/den;
-                  cv += dy*dy;
-                }
-              }
-            }
-          }
-
-          mat_free(XtX);
-          mat_free(XtXinv);
-          mat_free(Xty);
-          mat_free(beta);
-
-          if(ll_fast_done)
-            goto compute_done;
-
-          cv = 0.0;
-        }
-      }
-    }
-
-    if(np_regression_group_fast_path(int_ll,
-                                     bwm,
-                                     num_obs,
-                                     num_reg_unordered,
-                                     num_reg_ordered,
-                                     num_reg_continuous,
-                                     kernel_u,
-                                     kernel_o,
-                                     matrix_X_unordered,
-                                     matrix_X_ordered,
-                                     matrix_X_continuous,
-                                     vector_Y,
-                                     lambda,
-                                     num_categories,
-                                     cont_const,
-                                     aicc,
-                                     &cv,
-                                     &traceH)){
-      goto compute_done;
-    }
-  }
 
   // Conduct the estimation 
 
@@ -6937,7 +6673,7 @@ int *num_categories){
     for(int ii = 0; ii < num_obs; ii++)
       lc_Y[1][ii] = 1.0;
 
-    kernel_weighted_sum_np(kernel_c,
+    kernel_weighted_sum_np_ctx(kernel_c,
                            kernel_u,
                            kernel_o,
                            BANDWIDTH_reg,
@@ -6988,7 +6724,8 @@ int *num_categories){
                            NULL,
                            mean,
                            NULL, // no permutations
-                           NULL); // do not return kernel weights
+                           NULL, // do not return kernel weights
+                           &gate_ctx_local);
 
     // every even entry in mean is sum(y*kij)
     // every odd is sum(kij)
@@ -7133,7 +6870,7 @@ int *num_categories){
             for(l = 0; l < num_reg_ordered; l++)
               TORD[l][0] = matrix_X_ordered[l][j+my_rank];
 
-            kernel_weighted_sum_np(kernel_c,
+            kernel_weighted_sum_np_ctx(kernel_c,
                                    kernel_u,
                                    kernel_o,
                                    BANDWIDTH_reg,
@@ -7184,7 +6921,8 @@ int *num_categories){
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
-                                   NULL); // do not return kernel weights
+                                   NULL, // do not return kernel weights
+                                   &gate_ctx_local);
 
           }
           // synchro step
@@ -7227,7 +6965,7 @@ int *num_categories){
             for(l = 0; l < num_reg_ordered; l++)
               TORD[l][0] = matrix_X_ordered[l][j+my_rank];
 
-            kernel_weighted_sum_np(kernel_c,
+            kernel_weighted_sum_np_ctx(kernel_c,
                                    kernel_u,
                                    kernel_o,
                                    BANDWIDTH_reg,
@@ -7275,7 +7013,8 @@ int *num_categories){
                                    NULL,
                                    kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
-                                   NULL); // do not return kernel weights
+                                   NULL, // do not return kernel weights
+                                   &gate_ctx_local);
 
             // need to use reference weight to fix weight sum
             for(int jj = j+my_rank+1; jj < num_obs; jj++){
@@ -7323,7 +7062,7 @@ int *num_categories){
         for(l = 0; l < num_reg_ordered; l++)
           TORD[l][0] = matrix_X_ordered[l][j];
 
-        kernel_weighted_sum_np(kernel_c,
+        kernel_weighted_sum_np_ctx(kernel_c,
                                kernel_u,
                                kernel_o,
                                BANDWIDTH_reg,
@@ -7372,7 +7111,8 @@ int *num_categories){
                                NULL,
                                kwm+j*nrcc22,  // weighted sum
                                NULL, // no permutations
-                               NULL); // do not return kernel weights
+                               NULL, // do not return kernel weights
+                               &gate_ctx_local);
 
       } else {
         if(j < (num_obs-1)){
@@ -7408,7 +7148,7 @@ int *num_categories){
           for(l = 0; l < num_reg_ordered; l++)
             TORD[l][0] = matrix_X_ordered[l][j];
       
-          kernel_weighted_sum_np(kernel_c,
+          kernel_weighted_sum_np_ctx(kernel_c,
                                  kernel_u,
                                  kernel_o,
                                  BANDWIDTH_reg,
@@ -7456,7 +7196,8 @@ int *num_categories){
                                  NULL,
                                  kwm+j*nrcc22, // weighted sum
                                  NULL, // no permutations
-                                 NULL);  // no kernel weights
+                                 NULL,  // no kernel weights
+                                 &gate_ctx_local);
 
           // need to use reference weight to fix weight sum
           for(int jj = j+1; jj < num_obs; jj++){
@@ -7534,7 +7275,6 @@ int *num_categories){
     free_tmat(matrix_bandwidth_eval);
   }
 
- compute_done:
   free(operator);
   free(kernel_c);
   free(kernel_u);
@@ -7542,9 +7282,9 @@ int *num_categories){
   free(lambda);
   free_tmat(matrix_bandwidth);
   if(gate_override_active)
-    np_gate_override_clear();
+    np_gate_ctx_clear(&gate_ctx_local);
   if(gate_disc_profile_active)
-    np_gate_override_clear();
+    np_gate_ctx_clear(&gate_ctx_local);
   if(ov_cont_ok != NULL) free(ov_cont_ok);
   if(ov_cont_hmin != NULL) free(ov_cont_hmin);
   if(ov_cont_k0 != NULL) free(ov_cont_k0);
@@ -7552,8 +7292,8 @@ int *num_categories){
   if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
   if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
   if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
-  if(ov_disc_prof_id != NULL) free(ov_disc_prof_id);
-  if(ov_disc_prof_rep != NULL) free(ov_disc_prof_rep);
+  if((ov_disc_prof_id != NULL) && (!ov_disc_prof_from_global_cache)) free(ov_disc_prof_id);
+  if((ov_disc_prof_rep != NULL) && (!ov_disc_prof_from_global_cache)) free(ov_disc_prof_rep);
 
 	/* Negative penalties are treated as infinite: Hurvich et al pg 277 */
 
@@ -7596,7 +7336,8 @@ double * vsf,
 int * num_categories,
 double ** matrix_categorical_vals,
 double * cv){
-  np_gate_override_clear();
+  NP_GateOverrideCtx gate_ctx_local;
+  np_gate_ctx_clear(&gate_ctx_local);
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs_eval:
     ((BANDWIDTH_den==BW_ADAP_NN)?num_obs_train:1);
 
@@ -7765,20 +7506,21 @@ double * cv){
         }
       }
 
-      np_gate_override_set(num_reg_continuous,
-                           0,
-                           0,
-                           kernel_c,
-                           kernel_u,
-                           kernel_o,
-                           operator,
-                           ov_cont_ok,
-                           ov_cont_hmin,
-                           ov_cont_k0,
-                           NULL,
-                           NULL,
-                           NULL,
-                           NULL);
+      np_gate_ctx_set(&gate_ctx_local,
+                      num_reg_continuous,
+                      0,
+                      0,
+                      kernel_c,
+                      kernel_u,
+                      kernel_o,
+                      operator,
+                      ov_cont_ok,
+                      ov_cont_hmin,
+                      ov_cont_k0,
+                      NULL,
+                      NULL,
+                      NULL,
+                      NULL);
       gate_override_active = 1;
     }
   }
@@ -7805,7 +7547,7 @@ double * cv){
       matrix_wX_ordered_eval[l] = matrix_X_ordered_eval[l] + wxo;
 
 
-    kernel_weighted_sum_np(kernel_c,
+    kernel_weighted_sum_np_ctx(kernel_c,
                            kernel_u,
                            kernel_o,
                            BANDWIDTH_den,
@@ -7851,7 +7593,8 @@ double * cv){
                            NULL,
                            mean,
                            NULL, // no permutations
-                           kwx);
+                           kwx,
+                           &gate_ctx_local);
     
     for(i = is; i <= ie; i++){
       for(j = wxo; j < (wxo + dwx); j++){
@@ -7895,7 +7638,7 @@ double * cv){
   free(matrix_wX_unordered_eval);
   free(matrix_wX_ordered_eval);
   if(gate_override_active)
-    np_gate_override_clear();
+    np_gate_ctx_clear(&gate_ctx_local);
   if(ov_cont_ok != NULL) free(ov_cont_ok);
   if(ov_cont_hmin != NULL) free(ov_cont_hmin);
   if(ov_cont_k0 != NULL) free(ov_cont_k0);
@@ -7937,7 +7680,9 @@ double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
 double *cv){
-  np_gate_override_clear();
+  NP_GateOverrideCtx gate_x_ctx, gate_y_ctx;
+  np_gate_ctx_clear(&gate_x_ctx);
+  np_gate_ctx_clear(&gate_y_ctx);
 
   int indy;
   int64_t i,j,l,iwx,iwy;
@@ -8416,25 +8161,26 @@ double *cv){
 
 
       if(gate_x_active){
-        np_gate_override_set(num_reg_continuous,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             kernel_cx,
-                             kernel_ux,
-                             kernel_ox,
-                             x_operator,
-                             x_cont_ok,
-                             x_cont_hmin,
-                             x_cont_k0,
-                             x_disc_uno_ok,
-                             x_disc_uno_const,
-                             x_disc_ord_ok,
-                             x_disc_ord_const);
+        np_gate_ctx_set(&gate_x_ctx,
+                        num_reg_continuous,
+                        num_reg_unordered,
+                        num_reg_ordered,
+                        kernel_cx,
+                        kernel_ux,
+                        kernel_ox,
+                        x_operator,
+                        x_cont_ok,
+                        x_cont_hmin,
+                        x_cont_k0,
+                        x_disc_uno_ok,
+                        x_disc_uno_const,
+                        x_disc_ord_ok,
+                        x_disc_ord_const);
       } else {
-        np_gate_override_clear();
+        np_gate_ctx_clear(&gate_x_ctx);
       }
       np_activate_bounds_x();
-      kernel_weighted_sum_np(kernel_cx,
+      kernel_weighted_sum_np_ctx(kernel_cx,
                              kernel_ux,
                              kernel_ox,
                              BANDWIDTH_den,
@@ -8480,7 +8226,8 @@ double *cv){
                              NULL, // moo
                              mean,
                              NULL, // no permutations
-                             kwx);
+                             kwx,
+                             &gate_x_ctx);
 
       for(iwy = 0; iwy < nwy; iwy++){
 
@@ -8498,25 +8245,26 @@ double *cv){
 
         // compute y weights first
         if(gate_y_active){
-          np_gate_override_set(num_var_continuous,
-                               num_var_unordered,
-                               num_var_ordered,
-                               kernel_cy,
-                               kernel_uy,
-                               kernel_oy,
-                               y_operator,
-                               y_cont_ok,
-                               y_cont_hmin,
-                               y_cont_k0,
-                               y_disc_uno_ok,
-                               y_disc_uno_const,
-                               y_disc_ord_ok,
-                               y_disc_ord_const);
+          np_gate_ctx_set(&gate_y_ctx,
+                          num_var_continuous,
+                          num_var_unordered,
+                          num_var_ordered,
+                          kernel_cy,
+                          kernel_uy,
+                          kernel_oy,
+                          y_operator,
+                          y_cont_ok,
+                          y_cont_hmin,
+                          y_cont_k0,
+                          y_disc_uno_ok,
+                          y_disc_uno_const,
+                          y_disc_ord_ok,
+                          y_disc_ord_const);
         } else {
-          np_gate_override_clear();
+          np_gate_ctx_clear(&gate_y_ctx);
         }
         np_activate_bounds_y();
-        kernel_weighted_sum_np(kernel_cy,
+        kernel_weighted_sum_np_ctx(kernel_cy,
                                kernel_uy,
                                kernel_oy,
                                BANDWIDTH_den,
@@ -8562,7 +8310,8 @@ double *cv){
                                NULL,
                                NULL,
                                NULL, // no permutations
-                               kwy);
+                               kwy,
+                               &gate_y_ctx);
 
         const int64_t je_dwy = MIN(je,dwy);
 
@@ -8667,25 +8416,26 @@ double *cv){
 
 
       if(gate_x_active){
-        np_gate_override_set(num_reg_continuous,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             kernel_cx,
-                             kernel_ux,
-                             kernel_ox,
-                             x_operator,
-                             x_cont_ok,
-                             x_cont_hmin,
-                             x_cont_k0,
-                             x_disc_uno_ok,
-                             x_disc_uno_const,
-                             x_disc_ord_ok,
-                             x_disc_ord_const);
+        np_gate_ctx_set(&gate_x_ctx,
+                        num_reg_continuous,
+                        num_reg_unordered,
+                        num_reg_ordered,
+                        kernel_cx,
+                        kernel_ux,
+                        kernel_ox,
+                        x_operator,
+                        x_cont_ok,
+                        x_cont_hmin,
+                        x_cont_k0,
+                        x_disc_uno_ok,
+                        x_disc_uno_const,
+                        x_disc_ord_ok,
+                        x_disc_ord_const);
       } else {
-        np_gate_override_clear();
+        np_gate_ctx_clear(&gate_x_ctx);
       }
       np_activate_bounds_x();
-      kernel_weighted_sum_np(kernel_cx,
+      kernel_weighted_sum_np_ctx(kernel_cx,
                              kernel_ux,
                              kernel_ox,
                              BANDWIDTH_den,
@@ -8731,7 +8481,8 @@ double *cv){
                              NULL,
                              mean,
                              NULL, // no permutations
-                             kwx);
+                             kwx,
+                             &gate_x_ctx);
 
       for(iwy = 0; iwy < nwy; iwy++){
         const int64_t wyo = iwy*wy;
@@ -8748,25 +8499,26 @@ double *cv){
 
         // compute y weights first
         if(gate_y_active){
-          np_gate_override_set(num_var_continuous,
-                               num_var_unordered,
-                               num_var_ordered,
-                               kernel_cy,
-                               kernel_uy,
-                               kernel_oy,
-                               y_operator,
-                               y_cont_ok,
-                               y_cont_hmin,
-                               y_cont_k0,
-                               y_disc_uno_ok,
-                               y_disc_uno_const,
-                               y_disc_ord_ok,
-                               y_disc_ord_const);
+          np_gate_ctx_set(&gate_y_ctx,
+                          num_var_continuous,
+                          num_var_unordered,
+                          num_var_ordered,
+                          kernel_cy,
+                          kernel_uy,
+                          kernel_oy,
+                          y_operator,
+                          y_cont_ok,
+                          y_cont_hmin,
+                          y_cont_k0,
+                          y_disc_uno_ok,
+                          y_disc_uno_const,
+                          y_disc_ord_ok,
+                          y_disc_ord_const);
         } else {
-          np_gate_override_clear();
+          np_gate_ctx_clear(&gate_y_ctx);
         }
         np_activate_bounds_y();
-        kernel_weighted_sum_np(kernel_cy,
+        kernel_weighted_sum_np_ctx(kernel_cy,
                                kernel_uy,
                                kernel_oy,
                                BANDWIDTH_den,
@@ -8812,7 +8564,8 @@ double *cv){
                                NULL,
                                NULL,
                                NULL, // no permutations
-                               kwy);
+                               kwy,
+                               &gate_y_ctx);
 
         const int64_t je_dwy = MIN(je,dwy);
 
@@ -8976,7 +8729,10 @@ double *vector_scale_factor,
 int *num_categories,
 double **matrix_categorical_vals,
 double *cv){
-  np_gate_override_clear();
+  NP_GateOverrideCtx gate_x_ctx, gate_y_ctx, gate_xy_ctx;
+  np_gate_ctx_clear(&gate_x_ctx);
+  np_gate_ctx_clear(&gate_y_ctx);
+  np_gate_ctx_clear(&gate_xy_ctx);
 
   int64_t i,j,k,l;
 
@@ -9656,25 +9412,26 @@ double *cv){
 
   // joint density
   if(gate_xy_active){
-    np_gate_override_set(num_all_cvar,
-                         num_all_uvar,
-                         num_all_ovar,
-                         kernel_cxy,
-                         kernel_uxy,
-                         kernel_oxy,
-                         xy_operator,
-                         xy_cont_ok,
-                         xy_cont_hmin,
-                         xy_cont_k0,
-                         xy_disc_uno_ok,
-                         xy_disc_uno_const,
-                         xy_disc_ord_ok,
-                         xy_disc_ord_const);
+    np_gate_ctx_set(&gate_xy_ctx,
+                    num_all_cvar,
+                    num_all_uvar,
+                    num_all_ovar,
+                    kernel_cxy,
+                    kernel_uxy,
+                    kernel_oxy,
+                    xy_operator,
+                    xy_cont_ok,
+                    xy_cont_hmin,
+                    xy_cont_k0,
+                    xy_disc_uno_ok,
+                    xy_disc_uno_const,
+                    xy_disc_ord_ok,
+                    xy_disc_ord_const);
   } else {
-    np_gate_override_clear();
+    np_gate_ctx_clear(&gate_xy_ctx);
   }
   np_activate_bounds_xy();
-  kernel_weighted_sum_np(kernel_cxy,
+  kernel_weighted_sum_np_ctx(kernel_cxy,
                          kernel_uxy,
                          kernel_oxy,
                          BANDWIDTH_den,
@@ -9723,29 +9480,31 @@ double *cv){
                          NULL,
                          jmean,
                          NULL, // no permutations
-                         NULL);
+                         NULL,
+                         &gate_xy_ctx);
 
   // X density
   if(gate_x_active){
-    np_gate_override_set(num_reg_continuous,
-                         num_reg_unordered,
-                         num_reg_ordered,
-                         kernel_cx,
-                         kernel_ux,
-                         kernel_ox,
-                         x_operator,
-                         x_cont_ok,
-                         x_cont_hmin,
-                         x_cont_k0,
-                         x_disc_uno_ok,
-                         x_disc_uno_const,
-                         x_disc_ord_ok,
-                         x_disc_ord_const);
+    np_gate_ctx_set(&gate_x_ctx,
+                    num_reg_continuous,
+                    num_reg_unordered,
+                    num_reg_ordered,
+                    kernel_cx,
+                    kernel_ux,
+                    kernel_ox,
+                    x_operator,
+                    x_cont_ok,
+                    x_cont_hmin,
+                    x_cont_k0,
+                    x_disc_uno_ok,
+                    x_disc_uno_const,
+                    x_disc_ord_ok,
+                    x_disc_ord_const);
   } else {
-    np_gate_override_clear();
+    np_gate_ctx_clear(&gate_x_ctx);
   }
   np_activate_bounds_x();
-  kernel_weighted_sum_np(kernel_cx,
+  kernel_weighted_sum_np_ctx(kernel_cx,
                          kernel_ux,
                          kernel_ox,
                          BANDWIDTH_den,
@@ -9794,7 +9553,8 @@ double *cv){
                          NULL,
                          mean,
                          NULL, // no permutations
-                         NULL);
+                         NULL,
+                         &gate_x_ctx);
 
   if((!int_TREE_XY) && (!int_TREE_X)){
     for(i = is_i2n; i < ie_i2n; i++)
@@ -9883,25 +9643,26 @@ double *cv){
       // i is eval, j is train
 
       if(gate_x_active){
-        np_gate_override_set(num_reg_continuous,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             kernel_cx,
-                             kernel_ux,
-                             kernel_ox,
-                             x_operator,
-                             x_cont_ok,
-                             x_cont_hmin,
-                             x_cont_k0,
-                             x_disc_uno_ok,
-                             x_disc_uno_const,
-                             x_disc_ord_ok,
-                             x_disc_ord_const);
+        np_gate_ctx_set(&gate_x_ctx,
+                        num_reg_continuous,
+                        num_reg_unordered,
+                        num_reg_ordered,
+                        kernel_cx,
+                        kernel_ux,
+                        kernel_ox,
+                        x_operator,
+                        x_cont_ok,
+                        x_cont_hmin,
+                        x_cont_k0,
+                        x_disc_uno_ok,
+                        x_disc_uno_const,
+                        x_disc_ord_ok,
+                        x_disc_ord_const);
       } else {
-        np_gate_override_clear();
+        np_gate_ctx_clear(&gate_x_ctx);
       }
       np_activate_bounds_x();
-      kernel_weighted_sum_np(kernel_cx,
+      kernel_weighted_sum_np_ctx(kernel_cx,
                              kernel_ux,
                              kernel_ox,
                              BANDWIDTH_den,
@@ -9952,7 +9713,8 @@ double *cv){
                              NULL,
                              NULL, // no mean
                              NULL, // no permutations
-                             kx_ij);
+                             kx_ij,
+                             &gate_x_ctx);
 
       for(iwk = 0; iwk < nwk; iwk++){
         const int64_t wko = iwk*wk;
@@ -9995,25 +9757,26 @@ double *cv){
 
         if (iwk != iwj) {
           if(gate_x_active){
-            np_gate_override_set(num_reg_continuous,
-                                 num_reg_unordered,
-                                 num_reg_ordered,
-                                 kernel_cx,
-                                 kernel_ux,
-                                 kernel_ox,
-                                 x_operator,
-                                 x_cont_ok,
-                                 x_cont_hmin,
-                                 x_cont_k0,
-                                 x_disc_uno_ok,
-                                 x_disc_uno_const,
-                                 x_disc_ord_ok,
-                                 x_disc_ord_const);
+            np_gate_ctx_set(&gate_x_ctx,
+                            num_reg_continuous,
+                            num_reg_unordered,
+                            num_reg_ordered,
+                            kernel_cx,
+                            kernel_ux,
+                            kernel_ox,
+                            x_operator,
+                            x_cont_ok,
+                            x_cont_hmin,
+                            x_cont_k0,
+                            x_disc_uno_ok,
+                            x_disc_uno_const,
+                            x_disc_ord_ok,
+                            x_disc_ord_const);
           } else {
-            np_gate_override_clear();
+            np_gate_ctx_clear(&gate_x_ctx);
           }
           np_activate_bounds_x();
-          kernel_weighted_sum_np(kernel_cx,
+          kernel_weighted_sum_np_ctx(kernel_cx,
                                  kernel_ux,
                                  kernel_ox,
                                  BANDWIDTH_den,
@@ -10064,7 +9827,8 @@ double *cv){
                                  NULL,
                                  NULL, // no mean
                                  NULL, // no permutations
-                                 kx_ik);
+                                 kx_ik,
+                                 &gate_x_ctx);
 
         } else {
           kx_ik = kx_ij;
@@ -10072,25 +9836,26 @@ double *cv){
         // compute block ky_jk
 
         if(gate_y_active){
-          np_gate_override_set(num_var_continuous,
-                               num_var_unordered,
-                               num_var_ordered,
-                               kernel_cy,
-                               kernel_uy,
-                               kernel_oy,
-                               y_operator,
-                               y_cont_ok,
-                               y_cont_hmin,
-                               y_cont_k0,
-                               y_disc_uno_ok,
-                               y_disc_uno_const,
-                               y_disc_ord_ok,
-                               y_disc_ord_const);
+          np_gate_ctx_set(&gate_y_ctx,
+                          num_var_continuous,
+                          num_var_unordered,
+                          num_var_ordered,
+                          kernel_cy,
+                          kernel_uy,
+                          kernel_oy,
+                          y_operator,
+                          y_cont_ok,
+                          y_cont_hmin,
+                          y_cont_k0,
+                          y_disc_uno_ok,
+                          y_disc_uno_const,
+                          y_disc_ord_ok,
+                          y_disc_ord_const);
         } else {
-          np_gate_override_clear();
+          np_gate_ctx_clear(&gate_y_ctx);
         }
         np_activate_bounds_y();
-        kernel_weighted_sum_np(kernel_cy,
+        kernel_weighted_sum_np_ctx(kernel_cy,
                                kernel_uy,
                                kernel_oy,
                                BANDWIDTH_den,
@@ -10141,7 +9906,8 @@ double *cv){
                                NULL,
                                NULL, // no mean
                                NULL, // no permutations
-                               ky_jk);
+                               ky_jk,
+                               &gate_y_ctx);
 
         if(!int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN)){
           const int64_t ie_dwi = MIN(ie,dwi);
@@ -10349,7 +10115,9 @@ double *cv){
   clean_xl(&xl_xij);
   clean_xl(&xl_xik);
 
-  np_gate_override_clear();
+  np_gate_ctx_clear(&gate_x_ctx);
+  np_gate_ctx_clear(&gate_y_ctx);
+  np_gate_ctx_clear(&gate_xy_ctx);
 
   return(0);
 }
@@ -11162,11 +10930,12 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                             int num_reg_continuous,
                                                             double **matrix_X_unordered,
                                                             double **matrix_X_ordered,
-                                                            double **matrix_X_continuous,
-                                                            double *vector_scale_factor,
-                                                            int *num_categories,
-                                                            double *cv){
-  np_gate_override_clear();
+double **matrix_X_continuous,
+double *vector_scale_factor,
+int *num_categories,
+double *cv){
+  NP_GateOverrideCtx gate_ctx_local;
+  np_gate_ctx_clear(&gate_ctx_local);
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
@@ -11339,25 +11108,26 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
     }
 
     if(ok_all){
-      np_gate_override_set(num_reg_continuous,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           kernel_c,
-                           kernel_u,
-                           kernel_o,
-                           operator,
-                           ov_cont_ok,
-                           ov_cont_hmin,
-                           ov_cont_k0,
-                           ov_disc_uno_ok,
-                           ov_disc_uno_const,
-                           ov_disc_ord_ok,
-                           ov_disc_ord_const);
+      np_gate_ctx_set(&gate_ctx_local,
+                      num_reg_continuous,
+                      num_reg_unordered,
+                      num_reg_ordered,
+                      kernel_c,
+                      kernel_u,
+                      kernel_o,
+                      operator,
+                      ov_cont_ok,
+                      ov_cont_hmin,
+                      ov_cont_k0,
+                      ov_disc_uno_ok,
+                      ov_disc_uno_const,
+                      ov_disc_ord_ok,
+                      ov_disc_ord_const);
       gate_override_active = 1;
     }
   }
 
-  kernel_weighted_sum_np(kernel_c,
+  kernel_weighted_sum_np_ctx(kernel_c,
                          kernel_u,
                          kernel_o,
                          BANDWIDTH_den,
@@ -11403,7 +11173,8 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
                          NULL,
                          rho,  // weighted sum
                          NULL, // no permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         &gate_ctx_local);
   
   
 
@@ -11418,7 +11189,7 @@ int np_kernel_estimate_density_categorical_leave_one_out_cv(int KERNEL_den,
   free(rho);
   free(lambda);
   free_mat(matrix_bandwidth, num_reg_continuous);
-  if(gate_override_active) np_gate_override_clear();
+  if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
   if(ov_cont_ok != NULL) free(ov_cont_ok);
   if(ov_cont_hmin != NULL) free(ov_cont_hmin);
   if(ov_cont_k0 != NULL) free(ov_cont_k0);
@@ -11440,11 +11211,14 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                                                           double **matrix_X_unordered,
                                                           double **matrix_X_ordered,
                                                           double **matrix_X_continuous,
-                                                          double *vector_scale_factor,
-                                                          int *num_categories,
-                                                          double **matrix_categorical_vals,
-                                                          double *cv){
-  np_gate_override_clear();
+double *vector_scale_factor,
+int *num_categories,
+double **matrix_categorical_vals,
+double *cv){
+  NP_GateOverrideCtx gate_x_ctx, gate_y_ctx, gate_xy_ctx;
+  np_gate_ctx_clear(&gate_x_ctx);
+  np_gate_ctx_clear(&gate_y_ctx);
+  np_gate_ctx_clear(&gate_xy_ctx);
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int bwmdim = (BANDWIDTH_den==BW_GEN_NN)?num_obs:
@@ -11522,7 +11296,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
   }
 
 
-  kernel_weighted_sum_np(kernel_c,
+  kernel_weighted_sum_np_ctx(kernel_c,
                          kernel_u,
                          kernel_o,
                          BANDWIDTH_den,
@@ -11568,7 +11342,8 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          NULL, // no ocg
                          res,  // weighted sum
                          NULL, // no permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         &gate_x_ctx);
   
   
 
@@ -11677,27 +11452,28 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
     }
 
     if(ok_all){
-      np_gate_override_set(num_reg_continuous,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           kernel_c,
-                           kernel_u,
-                           kernel_o,
-                           operator,
-                           ov_cont_ok,
-                           ov_cont_hmin,
-                           ov_cont_k0,
-                           ov_disc_uno_ok,
-                           ov_disc_uno_const,
-                           ov_disc_ord_ok,
-                           ov_disc_ord_const);
+      np_gate_ctx_set(&gate_x_ctx,
+                      num_reg_continuous,
+                      num_reg_unordered,
+                      num_reg_ordered,
+                      kernel_c,
+                      kernel_u,
+                      kernel_o,
+                      operator,
+                      ov_cont_ok,
+                      ov_cont_hmin,
+                      ov_cont_k0,
+                      ov_disc_uno_ok,
+                      ov_disc_uno_const,
+                      ov_disc_ord_ok,
+                      ov_disc_ord_const);
       gate_override_active = 1;
     } else {
-      np_gate_override_clear();
+      np_gate_ctx_clear(&gate_x_ctx);
     }
   }
 
-  kernel_weighted_sum_np(kernel_c,
+  kernel_weighted_sum_np_ctx(kernel_c,
                          kernel_u,
                          kernel_o,
                          BANDWIDTH_den,
@@ -11743,7 +11519,8 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
                          NULL, // no ocg
                          res,  // weighted sum
                          NULL, // no permutations
-                         NULL); // do not return kernel weights
+                         NULL, // do not return kernel weights
+                         &gate_x_ctx);
 
 
   for(i = 0, cv2 = 0.0; i < num_obs; i++) cv2 += res[i];
@@ -11759,7 +11536,7 @@ int np_kernel_estimate_density_categorical_convolution_cv(int KERNEL_den,
   free(res);
   free(lambda);
   free_mat(matrix_bandwidth, num_reg_continuous);
-  if(gate_override_active) np_gate_override_clear();
+  if(gate_override_active) np_gate_ctx_clear(&gate_x_ctx);
   if(ov_cont_ok != NULL) free(ov_cont_ok);
   if(ov_cont_hmin != NULL) free(ov_cont_hmin);
   if(ov_cont_k0 != NULL) free(ov_cont_k0);
