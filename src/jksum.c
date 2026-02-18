@@ -982,6 +982,7 @@ typedef struct {
 
 static NP_ContLargeHCache np_cont_largeh_cache = {0};
 static uint64_t np_fastcv_alllarge_hits = 0;
+static uint64_t np_fastcv_alllarge_fallbacks = 0;
 
 void np_fastcv_alllarge_hits_reset(void){
   np_fastcv_alllarge_hits = 0;
@@ -989,6 +990,14 @@ void np_fastcv_alllarge_hits_reset(void){
 
 double np_fastcv_alllarge_hits_get(void){
   return (double)np_fastcv_alllarge_hits;
+}
+
+void np_fastcv_alllarge_fallbacks_reset(void){
+  np_fastcv_alllarge_fallbacks = 0;
+}
+
+double np_fastcv_alllarge_fallbacks_get(void){
+  return (double)np_fastcv_alllarge_fallbacks;
 }
 
 static inline void np_disc_profile_cache_clear(void){
@@ -6967,6 +6976,8 @@ int gate_override_active = 0;
       if(fast_ok){
         np_fastcv_alllarge_hits++;
         goto finish_cv_path;
+      } else {
+        np_fastcv_alllarge_fallbacks++;
       }
     }
   }
