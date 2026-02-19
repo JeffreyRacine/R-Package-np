@@ -10960,78 +10960,140 @@ double *cv){
   
   *cv = 0;
 
+  int fast_joint_y_only = 0;
+  int y_joint_operator[MAX(1,num_var_tot)];
   // joint density
-  if(gate_xy_active){
-    np_gate_ctx_set(&gate_xy_ctx,
-                    num_all_cvar,
-                    num_all_uvar,
-                    num_all_ovar,
-                    kernel_cxy,
-                    kernel_uxy,
-                    kernel_oxy,
-                    xy_operator,
-                    xy_cont_ok,
-                    xy_cont_hmin,
-                    xy_cont_k0,
-                    xy_disc_uno_ok,
-                    xy_disc_uno_const,
-                    xy_disc_ord_ok,
-                    xy_disc_ord_const);
+  if(gate_x_all_large_fixed && (BANDWIDTH_den == BW_FIXED)){
+    fast_joint_y_only = 1;
+    for(i = 0; i < (num_var_continuous+num_var_unordered+num_var_ordered); i++)
+      y_joint_operator[i] = OP_NORMAL;
+
+    np_gate_ctx_clear(&gate_y_ctx);
+    np_activate_bounds_y();
+    kernel_weighted_sum_np_ctx(kernel_cy,
+                           kernel_uy,
+                           kernel_oy,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           num_obs_train,
+                           num_var_unordered,
+                           num_var_ordered,
+                           num_var_continuous,
+                           1, // compute the leave-one-out marginals
+                           0,
+                           1, // kpow = 1
+                           1, // bw divide
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           y_joint_operator,
+                           OP_NOOP, // no permutations
+                           0, // no score
+                           0, // no ocg
+                           NULL,
+                           0, // don't explicity suppress parallel
+                           0,
+                           0,
+                           0, // do not use tree to keep index order direct
+                           0,
+                           NULL,
+                           NULL, NULL, NULL,
+                           matrix_Y_unordered_train,
+                           matrix_Y_ordered_train,
+                           matrix_Y_continuous_train,
+                           matrix_Y_unordered_train,
+                           matrix_Y_ordered_train,
+                           matrix_Y_continuous_train,
+                           NULL,
+                           NULL,
+                           NULL,
+                           vsfy,
+                           bandwidth_provided,
+                           matrix_bandwidth_y,
+                           matrix_bandwidth_y,
+                           lambday,
+                           num_categories_extern_Y,
+                           matrix_categorical_vals_extern_Y,
+                           NULL,
+                           jmean,
+                           NULL, // no permutations
+                           NULL,
+                           &gate_y_ctx);
   } else {
-    np_gate_ctx_clear(&gate_xy_ctx);
+    if(gate_xy_active){
+      np_gate_ctx_set(&gate_xy_ctx,
+                      num_all_cvar,
+                      num_all_uvar,
+                      num_all_ovar,
+                      kernel_cxy,
+                      kernel_uxy,
+                      kernel_oxy,
+                      xy_operator,
+                      xy_cont_ok,
+                      xy_cont_hmin,
+                      xy_cont_k0,
+                      xy_disc_uno_ok,
+                      xy_disc_uno_const,
+                      xy_disc_ord_ok,
+                      xy_disc_ord_const);
+    } else {
+      np_gate_ctx_clear(&gate_xy_ctx);
+    }
+    np_activate_bounds_xy();
+    kernel_weighted_sum_np_ctx(kernel_cxy,
+                           kernel_uxy,
+                           kernel_oxy,
+                           BANDWIDTH_den,
+                           num_obs_train,
+                           num_obs_train,
+                           num_all_uvar,
+                           num_all_ovar,
+                           num_all_cvar,
+                           1, // compute the leave-one-out marginals
+                           0,
+                           1, // kpow = 1
+                           1, // bw divide
+                           0, 
+                           0,
+                           0,
+                           0,
+                           0,
+                           xy_operator,
+                           OP_NOOP, // no permutations
+                           0, // no score
+                           0, // no ocg
+                           NULL,
+                           0, // don't explicity suppress parallel
+                           0,
+                           0,
+                           int_TREE_XY,
+                           0,
+                           kdt_extern_XY,
+                           NULL, NULL, NULL,
+                           matrix_XY_unordered_train,
+                           matrix_XY_ordered_train,
+                           matrix_XY_continuous_train,
+                           matrix_XY_unordered_train,
+                           matrix_XY_ordered_train,
+                           matrix_XY_continuous_train,
+                           NULL,
+                           NULL,
+                           NULL,
+                           vsfxy,
+                           bandwidth_provided,
+                           matrix_bandwidth_xy,
+                           matrix_bandwidth_xy,
+                           lambdaxy,
+                           num_categories_extern_XY,
+                           matrix_categorical_vals_extern_XY,
+                           NULL,
+                           jmean,
+                           NULL, // no permutations
+                           NULL,
+                           &gate_xy_ctx);
   }
-  np_activate_bounds_xy();
-  kernel_weighted_sum_np_ctx(kernel_cxy,
-                         kernel_uxy,
-                         kernel_oxy,
-                         BANDWIDTH_den,
-                         num_obs_train,
-                         num_obs_train,
-                         num_all_uvar,
-                         num_all_ovar,
-                         num_all_cvar,
-                         1, // compute the leave-one-out marginals
-                         0,
-                         1, // kpow = 1
-                         1, // bw divide
-                         0, 
-                         0,
-                         0,
-                         0,
-                         0,
-                         xy_operator,
-                         OP_NOOP, // no permutations
-                         0, // no score
-                         0, // no ocg
-                         NULL,
-                         0, // don't explicity suppress parallel
-                         0,
-                         0,
-                         int_TREE_XY,
-                         0,
-                         kdt_extern_XY,
-                         NULL, NULL, NULL,
-                         matrix_XY_unordered_train,
-                         matrix_XY_ordered_train,
-                         matrix_XY_continuous_train,
-                         matrix_XY_unordered_train,
-                         matrix_XY_ordered_train,
-                         matrix_XY_continuous_train,
-                         NULL,
-                         NULL,
-                         NULL,
-                         vsfxy,
-                         bandwidth_provided,
-                         matrix_bandwidth_xy,
-                         matrix_bandwidth_xy,
-                         lambdaxy,
-                         num_categories_extern_XY,
-                         matrix_categorical_vals_extern_XY,
-                         NULL,
-                         jmean,
-                         NULL, // no permutations
-                         NULL,
-                         &gate_xy_ctx);
 
   // X density
   if(gate_x_all_large_fixed){
@@ -11112,7 +11174,11 @@ double *cv){
                            &gate_x_ctx);
   }
 
-  if((!int_TREE_XY) && (!int_TREE_X)){
+  if(fast_joint_y_only){
+    const double inv_nmo = 1.0/(((double)(num_obs_train - 1)) + DBL_MIN);
+    for(i = is_i2n; i < ie_i2n; i++)
+      *cv -= 2.0*jmean[i]*inv_nmo;
+  } else if((!int_TREE_XY) && (!int_TREE_X)){
     for(i = is_i2n; i < ie_i2n; i++)
       *cv -= 2.0*jmean[i]/(mean[i] + DBL_MIN);
   } else {
@@ -11122,25 +11188,208 @@ double *cv){
 
   free(jmean);
 
-  double * kx_ij = (double *)malloc(num_obs_wi_alloc*num_obs_wj_alloc*sizeof(double));
-  pkx_ij = kx_ij;
-
-  if(kx_ij == NULL)
-    error("failed to allocate kx_ij, tried to allocate: %" PRIi64 "bytes\n", num_obs_wi_alloc*num_obs_wj_alloc*sizeof(double));
-
-  double * kx_ik = (double *)malloc(num_obs_wi_alloc*num_obs_wk_alloc*sizeof(double));
-  pkx_ik = kx_ik;
-
-  if(kx_ik == NULL)
-    error("failed to allocate kx_ik, tried to allocate: %" PRIi64 "bytes\n", num_obs_wi_alloc*num_obs_wk_alloc*sizeof(double));
-
-  double * ky_jk = (double *)malloc(num_obs_wj_alloc*num_obs_wk_alloc*sizeof(double));
+  double *ky_jk = NULL;
+  ky_jk = (double *)malloc(num_obs_wj_alloc*num_obs_wk_alloc*sizeof(double));
   pky_jk = ky_jk;
 
   if(ky_jk == NULL)
     error("failed to allocate ky_jk, tried to allocate: %" PRIi64 "bytes\n", num_obs_wj_alloc*num_obs_wk_alloc*sizeof(double));
-    
-  for(iwi = 0; iwi < nwi; iwi++){
+
+  if(gate_x_all_large_fixed && (BANDWIDTH_den == BW_FIXED)){
+    double *row_sum = (double *)calloc((size_t)num_obs_train_alloc, sizeof(double));
+    double *col_sum = (double *)calloc((size_t)num_obs_train_alloc, sizeof(double));
+    double *diag_sum = (double *)calloc((size_t)num_obs_train_alloc, sizeof(double));
+    double total_sum = 0.0;
+
+    if((row_sum == NULL) || (col_sum == NULL) || (diag_sum == NULL))
+      error("failed to allocate fast-path aggregate buffers");
+
+    if(gate_y_active){
+      np_gate_ctx_set(&gate_y_ctx,
+                      num_var_continuous,
+                      num_var_unordered,
+                      num_var_ordered,
+                      kernel_cy,
+                      kernel_uy,
+                      kernel_oy,
+                      y_operator,
+                      y_cont_ok,
+                      y_cont_hmin,
+                      y_cont_k0,
+                      y_disc_uno_ok,
+                      y_disc_uno_const,
+                      y_disc_ord_ok,
+                      y_disc_ord_const);
+    } else {
+      np_gate_ctx_clear(&gate_y_ctx);
+    }
+
+    for(iwj = 0; iwj < nwj; iwj++){
+      const int64_t wjo = iwj*wj;
+      const int64_t dwj = (iwj != (nwj - 1)) ? wj : num_obs_train - (nwj - 1)*wj;
+
+      idxj[0] = wjo;
+      idxj[1] = wjo + dwj -1;
+
+      for(l = 0; l < num_var_continuous; l++)
+        matrix_Yj_continuous_train[l] = matrix_XY_continuous_train[l+num_reg_continuous] + wjo;
+
+      for(l = 0; l < num_var_unordered; l++)
+        matrix_Yj_unordered_train[l] = matrix_XY_unordered_train[l+num_reg_unordered] + wjo;
+
+      for(l = 0; l < num_var_ordered; l++)
+        matrix_Yj_ordered_train[l] = matrix_XY_ordered_train[l+num_reg_ordered] + wjo;
+
+      for(iwk = 0; iwk < nwk; iwk++){
+        const int64_t wko = iwk*wk;
+        const int64_t dwk = (iwk != (nwk - 1)) ? wk : num_obs_train - (nwk - 1)*wk;
+
+        idxk[0] = wko;
+        idxk[1] = wko + dwk -1;
+
+        for(l = 0; l < num_var_continuous; l++)
+          matrix_Yk_continuous_train[l] = matrix_XY_continuous_train[l+num_reg_continuous] + wko;
+
+        for(l = 0; l < num_var_unordered; l++)
+          matrix_Yk_unordered_train[l] = matrix_XY_unordered_train[l+num_reg_unordered] + wko;
+
+        for(l = 0; l < num_var_ordered; l++)
+          matrix_Yk_ordered_train[l] = matrix_XY_ordered_train[l+num_reg_ordered] + wko;
+
+        np_activate_bounds_y();
+        kernel_weighted_sum_np_ctx(kernel_cy,
+                               kernel_uy,
+                               kernel_oy,
+                               BANDWIDTH_den,
+                               dwk,
+                               dwj,
+                               num_var_unordered,
+                               num_var_ordered,
+                               num_var_continuous,
+                               0,
+                               0,
+                               1,
+                               1,
+                               1,
+                               0,
+                               0,
+                               0,
+                               0,
+                               y_operator,
+                               OP_NOOP,
+                               0,
+                               0,
+                               NULL,
+                               0,
+                               0,
+                               0,
+                               int_TREE_XY,
+                               1,
+                               kdt_extern_XY,
+                               &nls,
+                               xyd + num_reg_continuous,
+                               idxk,
+                               matrix_Yk_unordered_train,
+                               matrix_Yk_ordered_train,
+                               matrix_Yk_continuous_train,
+                               matrix_Yj_unordered_train,
+                               matrix_Yj_ordered_train,
+                               matrix_Yj_continuous_train,
+                               NULL,
+                               NULL,
+                               NULL,
+                               vsfy,
+                               bandwidth_provided,
+                               matrix_bandwidth_yj,
+                               matrix_bandwidth_yk,
+                               lambday,
+                               num_categories_extern_Y,
+                               matrix_categorical_vals_extern_Y,
+                               NULL,
+                               NULL,
+                               NULL,
+                               ky_jk,
+                               &gate_y_ctx);
+
+        for(j = 0; j < dwj; j++){
+          const int64_t jg = wjo + j;
+          const int64_t joff = j*dwk;
+          for(k = 0; k < dwk; k++){
+            const int64_t kg = wko + k;
+            const double v = ky_jk[joff + k];
+            total_sum += v;
+            row_sum[jg] += v;
+            col_sum[kg] += v;
+            if(jg == kg) diag_sum[jg] += v;
+          }
+        }
+      }
+    }
+
+    {
+      const double inv_m2 = 1.0/(((double)(num_obs_train - 1))*((double)(num_obs_train - 1)) + DBL_MIN);
+      for(i = is_i2n; i < ie_i2n; i++){
+        *cv += (total_sum - row_sum[i] - col_sum[i] + diag_sum[i])*inv_m2;
+      }
+    }
+
+    free(row_sum);
+    free(col_sum);
+    free(diag_sum);
+  } else {
+    double * kx_ij = (double *)malloc(num_obs_wi_alloc*num_obs_wj_alloc*sizeof(double));
+    pkx_ij = kx_ij;
+
+    if(kx_ij == NULL)
+      error("failed to allocate kx_ij, tried to allocate: %" PRIi64 "bytes\n", num_obs_wi_alloc*num_obs_wj_alloc*sizeof(double));
+
+    double * kx_ik = (double *)malloc(num_obs_wi_alloc*num_obs_wk_alloc*sizeof(double));
+    pkx_ik = kx_ik;
+
+    if(kx_ik == NULL)
+      error("failed to allocate kx_ik, tried to allocate: %" PRIi64 "bytes\n", num_obs_wi_alloc*num_obs_wk_alloc*sizeof(double));
+
+    if(gate_x_active){
+      np_gate_ctx_set(&gate_x_ctx,
+                      num_reg_continuous,
+                      num_reg_unordered,
+                      num_reg_ordered,
+                      kernel_cx,
+                      kernel_ux,
+                      kernel_ox,
+                      x_operator,
+                      x_cont_ok,
+                      x_cont_hmin,
+                      x_cont_k0,
+                      x_disc_uno_ok,
+                      x_disc_uno_const,
+                      x_disc_ord_ok,
+                      x_disc_ord_const);
+    } else {
+      np_gate_ctx_clear(&gate_x_ctx);
+    }
+
+    if(gate_y_active){
+      np_gate_ctx_set(&gate_y_ctx,
+                      num_var_continuous,
+                      num_var_unordered,
+                      num_var_ordered,
+                      kernel_cy,
+                      kernel_uy,
+                      kernel_oy,
+                      y_operator,
+                      y_cont_ok,
+                      y_cont_hmin,
+                      y_cont_k0,
+                      y_disc_uno_ok,
+                      y_disc_uno_const,
+                      y_disc_ord_ok,
+                      y_disc_ord_const);
+    } else {
+      np_gate_ctx_clear(&gate_y_ctx);
+    }
+
+    for(iwi = 0; iwi < nwi; iwi++){
     const int64_t wio = iwi*wi;
     const int64_t dwi = (iwi != (nwi - 1)) ? wi : num_obs_train - (nwi - 1)*wi;
 
@@ -11202,25 +11451,6 @@ double *cv){
         for(i = 0; i < (dwi*dwj); i++)
           kx_ij[i] = x_all_large_fixed_const;
       } else {
-        if(gate_x_active){
-          np_gate_ctx_set(&gate_x_ctx,
-                          num_reg_continuous,
-                          num_reg_unordered,
-                          num_reg_ordered,
-                          kernel_cx,
-                          kernel_ux,
-                          kernel_ox,
-                          x_operator,
-                          x_cont_ok,
-                          x_cont_hmin,
-                          x_cont_k0,
-                          x_disc_uno_ok,
-                          x_disc_uno_const,
-                          x_disc_ord_ok,
-                          x_disc_ord_const);
-        } else {
-          np_gate_ctx_clear(&gate_x_ctx);
-        }
         np_activate_bounds_x();
         kernel_weighted_sum_np_ctx(kernel_cx,
                                kernel_ux,
@@ -11321,25 +11551,6 @@ double *cv){
             for(i = 0; i < (dwi*dwk); i++)
               kx_ik[i] = x_all_large_fixed_const;
           } else {
-            if(gate_x_active){
-              np_gate_ctx_set(&gate_x_ctx,
-                              num_reg_continuous,
-                              num_reg_unordered,
-                              num_reg_ordered,
-                              kernel_cx,
-                              kernel_ux,
-                              kernel_ox,
-                              x_operator,
-                              x_cont_ok,
-                              x_cont_hmin,
-                              x_cont_k0,
-                              x_disc_uno_ok,
-                              x_disc_uno_const,
-                              x_disc_ord_ok,
-                              x_disc_ord_const);
-            } else {
-              np_gate_ctx_clear(&gate_x_ctx);
-            }
             np_activate_bounds_x();
             kernel_weighted_sum_np_ctx(kernel_cx,
                                    kernel_ux,
@@ -11401,25 +11612,6 @@ double *cv){
         }
         // compute block ky_jk
 
-        if(gate_y_active){
-          np_gate_ctx_set(&gate_y_ctx,
-                          num_var_continuous,
-                          num_var_unordered,
-                          num_var_ordered,
-                          kernel_cy,
-                          kernel_uy,
-                          kernel_oy,
-                          y_operator,
-                          y_cont_ok,
-                          y_cont_hmin,
-                          y_cont_k0,
-                          y_disc_uno_ok,
-                          y_disc_uno_const,
-                          y_disc_ord_ok,
-                          y_disc_ord_const);
-        } else {
-          np_gate_ctx_clear(&gate_y_ctx);
-        }
         np_activate_bounds_y();
         kernel_weighted_sum_np_ctx(kernel_cy,
                                kernel_uy,
@@ -11580,6 +11772,7 @@ double *cv){
         }
       }
     }
+  }
   }
 
 
