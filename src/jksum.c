@@ -7427,8 +7427,8 @@ int gate_override_active = 0;
       goto finish_cv_path;
     }
 
-	    for(i = 0; i < num_obs; i++)
-	      y2[i] = vector_Y[i]*vector_Y[i];
+    for(i = 0; i < num_obs; i++)
+      y2[i] = vector_Y[i]*vector_Y[i];
 
     Ycols[0] = y2;
     Ycols[1] = vector_Y;
@@ -7507,7 +7507,7 @@ int gate_override_active = 0;
       for(l = 0; l < num_reg_ordered; l++)
         TORD[l][0] = matrix_X_ordered[l][j];
 
-	      kernel_weighted_sum_np_ctx(kernel_c,
+      kernel_weighted_sum_np_ctx(kernel_c,
                                  kernel_u,
                                  kernel_o,
                                  BANDWIDTH_reg,
@@ -9552,15 +9552,24 @@ double *cv){
   *cv = 0;
 
   if(!int_TREE_XY || gate_x_all_large_fixed){
-    double * kwx = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
-
-    if(kwx == NULL)
-      error("failed to allocate kwx, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
+    double * kwx = NULL;
 
     double * kwy = (double *)malloc(num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
 
     if(kwy == NULL)
       error("failed to allocate kwy, try reducing num_obs_eval, tried to allocate: %" PRIi64 "bytes\n", num_obs_train_alloc*num_obs_wy_alloc*sizeof(double));
+
+    double *kwy_row_sum = NULL;
+
+    if(!gate_x_all_large_fixed){
+      kwx = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
+      if(kwx == NULL)
+        error("failed to allocate kwx, tried to allocate: %" PRIi64 "bytes\n", num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
+    } else {
+      kwy_row_sum = (double *)malloc(num_obs_wy_alloc*sizeof(double));
+      if(kwy_row_sum == NULL)
+        error("failed to allocate kwy_row_sum");
+    }
     
     for(iwx = 0; iwx < nwx; iwx++){
       const int64_t wxo = iwx*wx;
@@ -9576,13 +9585,7 @@ double *cv){
         matrix_wX_ordered_train[l] = matrix_X_ordered_train[l] + wxo;
 
 
-      if(gate_x_all_large_fixed){
-        const double mconst = ((double)num_obs_train)*x_all_large_fixed_const;
-        for(i = 0; i < dwx; i++)
-          mean[i] = mconst;
-        for(i = 0; i < (dwx*num_obs_train); i++)
-          kwx[i] = x_all_large_fixed_const;
-      } else {
+      if(!gate_x_all_large_fixed){
         if(gate_x_active){
           np_gate_ctx_set(&gate_x_ctx,
                           num_reg_continuous,
@@ -9739,39 +9742,69 @@ double *cv){
 
         const int64_t je_dwy = MIN(je,dwy);
 
-        for(i = wxo; i < (wxo + dwx); i++){     
-          const int64_t io = i - wxo;
-
+        if(gate_x_all_large_fixed){
+          const double inv_nmo = 1.0/(((double)(num_obs_train - 1)) + DBL_MIN);
           for(j = (wyo + js); j < (wyo + je_dwy); j++){
-            if(cdfontrain && (j == i)) continue;
             const int64_t jo = j - wyo;
-            indy = 1;
-            for(l = 0; l < num_var_ordered; l++){
-              indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
+            double rows = 0.0;
+            for(l = 0; l < num_obs_train; l++)
+              rows += kwy[jo*num_obs_train+l];
+            kwy_row_sum[jo] = rows;
+          }
+
+          for(i = wxo; i < (wxo + dwx); i++){
+            for(j = (wyo + js); j < (wyo + je_dwy); j++){
+              if(cdfontrain && (j == i)) continue;
+              const int64_t jo = j - wyo;
+              indy = 1;
+              for(l = 0; l < num_var_ordered; l++){
+                indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
+              }
+              for(l = 0; l < num_var_continuous; l++){
+                indy *= (matrix_Y_continuous_train[l][i] <= matrix_Y_continuous_eval[l][j]);
+              }
+              xyj = kwy_row_sum[jo] - kwy[jo*num_obs_train+i];
+              {
+                const double tvd = (indy - xyj*inv_nmo);
+                *cv += tvd*tvd;
+              }
             }
-            for(l = 0; l < num_var_continuous; l++){
-              indy *= (matrix_Y_continuous_train[l][i] <= matrix_Y_continuous_eval[l][j]);
-            }
-            xyj = 0.0;
+          }
+        } else {
+          for(i = wxo; i < (wxo + dwx); i++){
+            const int64_t io = i - wxo;
 
-            if(BANDWIDTH_den != BW_ADAP_NN){
-              // leave-one-out joint density
+            for(j = (wyo + js); j < (wyo + je_dwy); j++){
+              if(cdfontrain && (j == i)) continue;
+              const int64_t jo = j - wyo;
+              indy = 1;
+              for(l = 0; l < num_var_ordered; l++){
+                indy *= (matrix_Y_ordered_train[l][i] <= matrix_Y_ordered_eval[l][j]);
+              }
+              for(l = 0; l < num_var_continuous; l++){
+                indy *= (matrix_Y_continuous_train[l][i] <= matrix_Y_continuous_eval[l][j]);
+              }
+              xyj = 0.0;
 
-              for(l = 0; l < num_obs_train; l++)
-                xyj += kwy[jo*num_obs_train+l]*kwx[io*num_obs_train+l];
-              xyj -= kwy[jo*num_obs_train+i]*kwx[io*num_obs_train+i];
+              if(BANDWIDTH_den != BW_ADAP_NN){
+                // leave-one-out joint density
 
-              const double tvd = (indy - xyj/(mean[io] - kwx[io*num_obs_train+i] + DBL_MIN));
-              *cv += tvd*tvd;
-            } else {
-              // leave-one-out joint density
+                for(l = 0; l < num_obs_train; l++)
+                  xyj += kwy[jo*num_obs_train+l]*kwx[io*num_obs_train+l];
+                xyj -= kwy[jo*num_obs_train+i]*kwx[io*num_obs_train+i];
 
-              for(l = 0; l < num_obs_train; l++)
-                xyj += kwy[l*dwy+jo]*kwx[l*dwx+io];
-              xyj -= kwy[i*dwy+jo]*kwx[i*dwx+io];
+                const double tvd = (indy - xyj/(mean[io] - kwx[io*num_obs_train+i] + DBL_MIN));
+                *cv += tvd*tvd;
+              } else {
+                // leave-one-out joint density
 
-              const double tvd = (indy - xyj/(mean[io] - kwx[i*dwx + io] + DBL_MIN));
-              *cv += tvd*tvd;
+                for(l = 0; l < num_obs_train; l++)
+                  xyj += kwy[l*dwy+jo]*kwx[l*dwx+io];
+                xyj -= kwy[i*dwy+jo]*kwx[i*dwx+io];
+
+                const double tvd = (indy - xyj/(mean[io] - kwx[i*dwx + io] + DBL_MIN));
+                *cv += tvd*tvd;
+              }
             }
           }
         }
@@ -9785,6 +9818,7 @@ double *cv){
 
     free(kwx);
     free(kwy);
+    free(kwy_row_sum);
   } else {
     NL nls = {.node = NULL, .n = 0, .nalloc = 0};
     NL nlps = {.node = NULL, .n = 0, .nalloc = 0};
