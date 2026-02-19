@@ -1,0 +1,4 @@
+*.o
+*.so
+*.plist
+.DS_Store
