@@ -15,6 +15,7 @@ extern void np_density_conditional_bw(void *, void *, void *, void *, void *, vo
 extern void np_distribution_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_distribution_conditional_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_kernelsum(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void np_mpi_init(void *);
 extern void np_quantile_conditional(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_regression(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_regression_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
@@ -32,6 +33,7 @@ static const R_CMethodDef CEntries[] = {
     {"np_distribution_bw",             (DL_FUNC) &np_distribution_bw,             19},
     {"np_distribution_conditional_bw", (DL_FUNC) &np_distribution_conditional_bw, 24},
     {"np_kernelsum",                   (DL_FUNC) &np_kernelsum,                   19},
+    {"np_mpi_init",                    (DL_FUNC) &np_mpi_init,                     1},
     {"np_quantile_conditional",        (DL_FUNC) &np_quantile_conditional,        19},
     {"np_regression",                  (DL_FUNC) &np_regression,                  24},
     {"np_regression_bw",               (DL_FUNC) &np_regression_bw,               21},
@@ -41,8 +43,9 @@ static const R_CMethodDef CEntries[] = {
     {NULL, NULL, 0}
 };
 
-void R_init_np(DllInfo *dll)
+void R_init_npRmpi(DllInfo *dll)
 {
     R_registerRoutines(dll, CEntries, NULL, NULL, NULL);
-    R_useDynamicSymbols(dll, FALSE);
+    /* Keep dynamic lookup enabled for legacy .Call("mpi_*", ...) symbols. */
+    R_useDynamicSymbols(dll, TRUE);
 }

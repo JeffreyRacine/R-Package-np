@@ -58,6 +58,7 @@ npunitest <- function(data.x = NULL,
     if(is.null(bw.x)) {
       n <- length(data.x)
       c <- length(unique(data.x))
+      if(c <= 1) stop("data.x must contain at least two distinct factor levels")
       xeval <- unique(data.x)
       p <- fitted(npudens(tdat=data.x,edat=xeval,bws=0,...))
       sum.Lambda3 <- c/(c-1)*sum(p*(1-p))
@@ -68,6 +69,7 @@ npunitest <- function(data.x = NULL,
     if(is.null(bw.y)) {
       n <- length(data.y)
       c <- length(unique(data.y))
+      if(c <= 1) stop("data.y must contain at least two distinct factor levels")
       yeval <- unique(data.y)
       p <- fitted(npudens(tdat=data.y,edat=xeval,bws=0,...))
       sum.Lambda3 <- c/(c-1)*sum(p*(1-p))

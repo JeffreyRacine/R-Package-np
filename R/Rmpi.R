@@ -59,7 +59,7 @@ mpi.info.set <- function(info=0, key, value){
 
 mpi.info.get <- function(info=0, key, valuelen){
     .Call("mpi_info_get",as.integer(info), as.character(key), 
-	as.integer(valuelen), as.integer(valuelen),PACKAGE = "npRmpi")
+	as.integer(valuelen),PACKAGE = "npRmpi")
 }
 
 mpi.info.free <- function(info=0){

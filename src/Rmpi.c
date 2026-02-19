@@ -1308,7 +1308,8 @@ SEXP mpi_sendrecv_replace(SEXP sexp_data,
                 slen=LENGTH(STRING_ELT(sexp_data,0));
 		PROTECT (sexp_data2  = allocVector (STRSXP, 1));
 		srdata= (char *)Calloc((size_t)slen + 1, char);
-		strcpy(srdata, CHAR(STRING_ELT(sexp_data,0)));
+		memcpy(srdata, CHAR(STRING_ELT(sexp_data,0)), (size_t)slen);
+		srdata[slen] = '\0';
                 MPI_Sendrecv_replace(srdata, slen,MPI_CHAR, dest, sendtag, source, recvtag, 
 				comm[commn], &status[statusn]); 
 		UNPROTECT(1);

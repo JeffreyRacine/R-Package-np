@@ -5601,8 +5601,25 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
       ipe = ipt;
     }
   } else {
-    ipt = NULL;
-    ipe = NULL;
+    ipt = (int *)malloc(num_obs_train_extern*sizeof(int));
+    if(!(ipt != NULL))
+      error("!(ipt != NULL)");
+
+    for(i = 0; i < num_obs_train_extern; i++){
+      ipt[i] = i;
+    }
+
+    if(!train_is_eval){
+      ipe = (int *)malloc(num_obs_eval_extern*sizeof(int));
+      if(!(ipe != NULL))
+        error("!(ipe != NULL)");
+
+      for(i = 0; i < num_obs_eval_extern; i++){
+        ipe[i] = i;
+      }
+    } else {
+      ipe = ipt;
+    }
   }
 
   // attempt tree build, if enabled 
@@ -5758,7 +5775,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   }
   
   
-  if((npks_err=kernel_weighted_sum_np(kernel_c,
+  npks_err = kernel_weighted_sum_np(kernel_c,
                                       kernel_u,
                                       kernel_o,
                                       BANDWIDTH_reg_extern,
@@ -5806,8 +5823,9 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       matrix_ordered_indices,
                                       ksum,
                                       p_ksum,
-                                      kw)) == 1){
-    Rprintf("kernel_weighted_sum_np has reported an error, probably due to invalid bandwidths\n");
+                                      kw);
+  if(npks_err != 0){
+    error("kernel_weighted_sum_np failed with code %d", npks_err);
   }
 
 
