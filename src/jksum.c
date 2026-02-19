@@ -7078,6 +7078,72 @@ void np_glp_cv_clear_extern(void){
   np_glp_cv_cache_clear();
 }
 
+typedef struct {
+  int ready;
+  int num_obs;
+  int ncon;
+  double **matrix_X_continuous_ptr;
+  double *vector_Y_ptr;
+  MATRIX xtkx_base;
+} NPLLCVCache;
+
+static NPLLCVCache np_ll_cv_cache = {0, 0, 0, NULL, NULL, NULL};
+
+static void np_ll_cv_cache_clear(void){
+  if(np_ll_cv_cache.xtkx_base != NULL)
+    mat_free(np_ll_cv_cache.xtkx_base);
+  np_ll_cv_cache.ready = 0;
+  np_ll_cv_cache.num_obs = 0;
+  np_ll_cv_cache.ncon = 0;
+  np_ll_cv_cache.matrix_X_continuous_ptr = NULL;
+  np_ll_cv_cache.vector_Y_ptr = NULL;
+  np_ll_cv_cache.xtkx_base = NULL;
+}
+
+static int np_ll_cv_cache_prepare(const int int_ll,
+                                  const int num_obs,
+                                  const int ncon,
+                                  double **matrix_X_continuous,
+                                  double *vector_Y){
+  int i, l;
+  MATRIX XTKX;
+
+  np_ll_cv_cache_clear();
+
+  if(int_ll != LL_LL) return 1;
+  if((num_obs <= 0) || (vector_Y == NULL)) return 0;
+
+  XTKX = mat_creat(ncon + 2, num_obs, UNDEFINED);
+  if(XTKX == NULL) return 0;
+
+  for(i = 0; i < num_obs; i++){
+    XTKX[0][i] = vector_Y[i];
+    XTKX[1][i] = 1.0;
+    for(l = 0; l < ncon; l++)
+      XTKX[l+2][i] = matrix_X_continuous[l][i];
+  }
+
+  np_ll_cv_cache.ready = 1;
+  np_ll_cv_cache.num_obs = num_obs;
+  np_ll_cv_cache.ncon = ncon;
+  np_ll_cv_cache.matrix_X_continuous_ptr = matrix_X_continuous;
+  np_ll_cv_cache.vector_Y_ptr = vector_Y;
+  np_ll_cv_cache.xtkx_base = XTKX;
+  return 1;
+}
+
+int np_ll_cv_prepare_extern(const int int_ll,
+                            const int num_obs,
+                            const int ncon,
+                            double **matrix_X_continuous,
+                            double *vector_Y){
+  return np_ll_cv_cache_prepare(int_ll, num_obs, ncon, matrix_X_continuous, vector_Y);
+}
+
+void np_ll_cv_clear_extern(void){
+  np_ll_cv_cache_clear();
+}
+
 // Regression CV objective for local-constant/local-linear models.
 // The LL branch solves weighted normal equations with ridge fallback if singular.
 
@@ -7927,8 +7993,8 @@ int gate_override_active = 0;
       vsf = vector_scale_factor;
     }
 
-    MATRIX XTKX = mat_creat( num_reg_continuous + 2, num_obs, UNDEFINED );
-    MATRIX XTKXINV = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
+    MATRIX XTKX = NULL;
+    MATRIX XTKX_local = NULL;
     MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
     MATRIX DELTA = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
 
@@ -7970,14 +8036,12 @@ int gate_override_active = 0;
       kwm[ii] = 0.0;
 
     double * sgn = (double *)malloc((nrc2)*sizeof(double));
+    double *evalv = (double *)malloc((size_t)nrc1*sizeof(double));
 
     sgn[0] = sgn[1] = 1.0;
     
     for(int ii = 0; ii < (num_reg_continuous); ii++)
-      sgn[ii+2] = -1.0;
-    
-    for(int ii = 0; ii < (nrc2); ii++)
-      PXTKX[ii] = XTKX[ii];
+      sgn[ii+2] = 1.0;
     
     for(int ii = 0; ii < (nrc1); ii++){
       PKWM[ii] = KWM[ii];
@@ -7995,12 +8059,26 @@ int gate_override_active = 0;
 
     //    matrix_bandwidth = alloc_matd(num_obs,num_reg_continuous);
 
-    // populate the xtkx matrix first 
-    
-    for(i = 0; i < num_obs; i++){
-      XTKX[0][i] = vector_Y[i];
-      XTKX[1][i] = 1.0;
+    if(np_ll_cv_cache.ready &&
+       np_ll_cv_cache.num_obs == num_obs &&
+       np_ll_cv_cache.ncon == num_reg_continuous &&
+       np_ll_cv_cache.matrix_X_continuous_ptr == matrix_X_continuous &&
+       np_ll_cv_cache.vector_Y_ptr == vector_Y &&
+       np_ll_cv_cache.xtkx_base != NULL){
+      XTKX = np_ll_cv_cache.xtkx_base;
+    } else {
+      XTKX_local = mat_creat( num_reg_continuous + 2, num_obs, UNDEFINED );
+      XTKX = XTKX_local;
+      for(i = 0; i < num_obs; i++){
+        XTKX[0][i] = vector_Y[i];
+        XTKX[1][i] = 1.0;
+        for(l = 0; l < num_reg_continuous; l++)
+          XTKX[l+2][i] = matrix_X_continuous[l][i];
+      }
     }
+
+    for(int ii = 0; ii < (nrc2); ii++)
+      PXTKX[ii] = XTKX[ii];
 
 
     for(j = 0; j < num_obs; j++){ // main loop
@@ -8016,10 +8094,6 @@ int gate_override_active = 0;
         if((j % iNum_Processors) == 0){
           if((j+my_rank) < (num_obs)){
             for(l = 0; l < num_reg_continuous; l++){
-          
-              for(i = 0; i < num_obs; i++){
-                XTKX[l+2][i] = matrix_X_continuous[l][i]-matrix_X_continuous[l][j+my_rank];
-              }
               TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
 
               if(BANDWIDTH_reg == BW_GEN_NN)
@@ -8112,10 +8186,6 @@ int gate_override_active = 0;
               PXO[l] = matrix_X_ordered[l] + j + my_rank + 1;
         
             for(l = 0; l < num_reg_continuous; l++){
-        
-              for(i = 0; i < (num_obs-j-1-my_rank); i++){
-                XTKX[l+2][i] = matrix_X_continuous[l][i+j+1+my_rank]-matrix_X_continuous[l][j+my_rank];
-              }
               TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
 
               if(BANDWIDTH_reg == BW_GEN_NN)
@@ -8208,10 +8278,6 @@ int gate_override_active = 0;
       if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
 
         for(l = 0; l < num_reg_continuous; l++){
-          
-          for(i = 0; i < num_obs; i++){
-            XTKX[l+2][i] = matrix_X_continuous[l][i]-matrix_X_continuous[l][j];
-          }
           TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
 
           if(BANDWIDTH_reg == BW_GEN_NN)
@@ -8294,10 +8360,6 @@ int gate_override_active = 0;
             PXO[l]++;
 
           for(l = 0; l < num_reg_continuous; l++){
-          
-            for(i = 0; i < (num_obs-j-1); i++){
-              XTKX[l+2][i] = matrix_X_continuous[l][i+j+1]-matrix_X_continuous[l][j];
-            }
             TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
 
             if(BANDWIDTH_reg == BW_GEN_NN)
@@ -8398,20 +8460,30 @@ int gate_override_active = 0;
         nepsilon += epsilon;
       }
 
-      if(bwm == RBWM_CVAIC){
-        int ok00 = 0;
-        const double inv00 = mat_inv00(KWM, &ok00);
-        if(!ok00)
-          error("mat_inv00 failed after ridge adjustment");
-        traceH += inv00*pnh*aicc;
-      }
-
       XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
       if(nepsilon > 0.0){
         if(mat_solve(KWM, XTKY, DELTA) == NULL)
           error("mat_solve failed after ridge adjustment");
       }
-      const double dy = vector_Y[j]-DELTA[0][0];
+      evalv[0] = 1.0;
+      for(int ii = 1; ii < nrc1; ii++)
+        evalv[ii] = matrix_X_continuous[ii-1][j];
+      double mhat = 0.0;
+      for(int ii = 0; ii < nrc1; ii++)
+        mhat += evalv[ii]*DELTA[ii][0];
+      if(bwm == RBWM_CVAIC){
+        for(int ii = 0; ii < nrc1; ii++)
+          XTKY[ii][0] = evalv[ii];
+        if(mat_solve(KWM, XTKY, DELTA) == NULL)
+          error("mat_solve failed for ll leverage");
+        {
+          double hii = 0.0;
+          for(int ii = 0; ii < nrc1; ii++)
+            hii += evalv[ii]*DELTA[ii][0];
+          traceH += hii*pnh*aicc;
+        }
+      }
+      const double dy = vector_Y[j]-mhat;
       cv += dy*dy; 
     }
     
@@ -8429,8 +8501,8 @@ int gate_override_active = 0;
     }
 
     
-    mat_free(XTKX);
-    mat_free(XTKXINV);
+    if(XTKX_local != NULL)
+      mat_free(XTKX_local);
     mat_free(XTKY);
     mat_free(DELTA);
     mat_free(KWM);
@@ -8441,6 +8513,7 @@ int gate_override_active = 0;
 
     free(kwm);
     free(sgn);
+    free(evalv);
 
     free_tmat(matrix_bandwidth_eval);
   }
