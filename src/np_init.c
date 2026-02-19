@@ -13,7 +13,7 @@ extern void np_density_bw(void *, void *, void *, void *, void *, void *, void *
 extern void np_density_conditional(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_density_conditional_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_distribution_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
-extern void np_distribution_conditional_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void np_distribution_conditional_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_kernelsum(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_quantile_conditional(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_regression(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
@@ -30,7 +30,7 @@ static const R_CMethodDef CEntries[] = {
     {"np_density_conditional",         (DL_FUNC) &np_density_conditional,         30},
     {"np_density_conditional_bw",      (DL_FUNC) &np_density_conditional_bw,      23},
     {"np_distribution_bw",             (DL_FUNC) &np_distribution_bw,             19},
-    {"np_distribution_conditional_bw", (DL_FUNC) &np_distribution_conditional_bw, 24},
+    {"np_distribution_conditional_bw", (DL_FUNC) &np_distribution_conditional_bw, 26},
     {"np_kernelsum",                   (DL_FUNC) &np_kernelsum,                   19},
     {"np_quantile_conditional",        (DL_FUNC) &np_quantile_conditional,        19},
     {"np_regression",                  (DL_FUNC) &np_regression,                  24},

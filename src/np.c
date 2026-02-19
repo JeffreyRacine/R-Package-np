@@ -2643,6 +2643,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     int * myopti, double * myoptd, double * myans, double * fval,
                                     double * objective_function_values, double * objective_function_evals,
                                     double * objective_function_invalid, double * timing,
+                                    double * objective_function_fast,
+                                    double * objective_function_fallback,
                                     int * penalty_mode, double * penalty_mult,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub){
@@ -2666,6 +2668,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int dfc_dir;
   
   int i,j;
+  double fast_eval_total = 0.0, fallback_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int itmax, iter;
@@ -3303,6 +3306,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   objective_function_values[0]=fret;
   objective_function_evals[0]=bwm_eval_count;
   objective_function_invalid[0]=bwm_invalid_count;
+  fast_eval_total += bwm_fast_eval_count;
+  fallback_eval_total += bwm_fallback_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -3427,6 +3432,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       objective_function_values[iMs_counter]=fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
+      fast_eval_total += bwm_fast_eval_count;
+      fallback_eval_total += bwm_fallback_eval_count;
     }
 
     /* Save best for estimation */
@@ -3452,6 +3459,8 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   fval[0] = fret;
   fval[1] = iImproved;
+  objective_function_fast[0] = fast_eval_total;
+  objective_function_fallback[0] = fallback_eval_total;
   /* end return data */
 
   /* Free data objects */
