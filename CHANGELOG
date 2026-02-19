@@ -1,4 +1,4 @@
-Changes from Version 0.60-20 to 0.60-21 [16-Feb-2026]
+Changes from Version 0.60-20 to 0.70-0 [19-Feb-2026]
 
 * Added bounded continuous-kernel support across the package with a unified
   interface for Gaussian-family kernels using per-variable bounds:
@@ -77,18 +77,43 @@ Changes from Version 0.60-20 to 0.60-21 [16-Feb-2026]
 * Added new documentation page np.options.Rd and cross-references from
   np-package and np.plot man pages; set default option values at package load.
 
-* Updated bootstrap quantile error-band API in npplot():
-  - replaced `plot.errors.quantiles` with scalar `plot.errors.alpha` (default 0.05)
-  - expanded `plot.errors.type` quantile options to `pointwise`,
-    `bonferroni`, `simultaneous`, and `all` (in addition to `standard`)
-  - simultaneous bands now use a vendored, attributed rank-based
-    `SCSrank` implementation (from MCPAN::SCSrank)
-  - `plot.errors.type="all"` overlays pointwise/bonferroni/simultaneous
-    bands with color coding and legend (`bty="n"`)
-  - updated associated documentation/examples to use the new interface.
+* Added C-level generalized local polynomial regression support in `npreg`:
+  - new `regtype="glp"` path in shared core code
+  - per-continuous-variable degree vectors (`glp.degree`)
+  - GLP derivative extraction/plotting controls synchronized with
+    regression/gradient interfaces.
 
-  * Removed unused legacy sources and prototypes (RuniqueCombs, pgplot
-    placeholder) and restored B-spline error handling in bspline.c.
+* Refactored regression CV setup for `ll`/`glp`:
+  - moved invariant basis/buffer setup outside hot objective loops
+  - standardized raw-basis handling in fit/predict/CV pathways
+  - reduced redundant recomputation during `cv.ls`/`cv.aic` optimization.
+
+* Replaced inverse-heavy local-linear matrix workflows with solve-based linear
+  algebra backends in hot paths (LAPACK/BLAS-oriented), improving numerical
+  robustness and reducing overhead.
+
+* Expanded all-large (`h`/`lambda`) fast-path instrumentation and reporting:
+  - `num.feval.fast` and `num.feval.fallback` now reported alongside
+    `num.feval` for relevant bandwidth summaries
+  - all-large shortcut logic extended to conditional density/distribution CV
+    pathways with explicit counter accounting
+  - simplified all-large accumulation branches and bypassed residual tree-list
+    overhead when the all-large regime is already known.
+
+* Updated `npplot()` error-type semantics and docs:
+  - renamed bootstrap error type `standard` to `pmzsd`
+  - `pmzsd` now uses plus/minus the `1-alpha/2` normal quantile
+    (`qnorm(alpha/2, lower.tail=FALSE)` semantics).
+
+* Fixed remaining bootstrap `plot.errors.type="all"` rendering gaps across
+  perspective/non-perspective plotting branches for regression, conditional
+  density, and conditional distribution objects.
+
+* Tightened discrete upper-bound gate semantics to strict relative tolerance
+  handling for near-upper-bound lambda shortcuts.
+
+* Removed unused legacy sources and prototypes (RuniqueCombs, pgplot
+  placeholder) and restored B-spline error handling in bspline.c.
 
 Changes from Version 0.60-19 to 0.60-20 [06-Feb-2026]
 
