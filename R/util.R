@@ -874,6 +874,41 @@ genRegEstStr <- function(x){
         sep = "")
 }
 
+npFormatRegressionType <- function(x){
+  regtype <- if (!is.null(x$regtype)) {
+    x$regtype
+  } else if (!is.null(x$bws) && !is.null(x$bws$regtype)) {
+    x$bws$regtype
+  } else {
+    NULL
+  }
+
+  pregtype <- if (!is.null(x$pregtype)) {
+    x$pregtype
+  } else if (!is.null(x$bws) && !is.null(x$bws$pregtype)) {
+    x$bws$pregtype
+  } else {
+    NULL
+  }
+
+  if (!identical(regtype, "glp"))
+    return(pregtype)
+
+  glp.degree <- if (!is.null(x$glp.degree)) {
+    x$glp.degree
+  } else if (!is.null(x$bws) && !is.null(x$bws$glp.degree)) {
+    x$bws$glp.degree
+  } else {
+    NULL
+  }
+
+  if (is.null(glp.degree) || length(glp.degree) == 0)
+    return("Generalized Local-Polynomial")
+
+  sprintf("Generalized Local-Polynomial (degree = %s)",
+          paste(glp.degree, collapse = ","))
+}
+
 
 ## bandwidth-related report generating functions
 genBwSelStr <- function(x){
@@ -903,7 +938,9 @@ genBwSelStr <- function(x){
     }
   }
 
-  paste(ifelse(is.null(x$pregtype),"",paste("\nRegression Type:", x$pregtype)),
+  pregtype <- npFormatRegressionType(x)
+
+  paste(ifelse(is.null(pregtype),"",paste("\nRegression Type:", pregtype)),
         ifelse(is.null(x$pmethod),"",paste("\nBandwidth Selection Method:",
                                            x$pmethod)),
         if (!identical(x$formula,NULL)) paste("\nFormula:",

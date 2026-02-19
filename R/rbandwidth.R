@@ -181,16 +181,31 @@ as.double.rbandwidth <- function(x, ...){
   x$bw
 }
 
+npInsertGlpSummary <- function(txt, degree, bernstein){
+  lines <- strsplit(txt, "\n", fixed = TRUE)[[1]]
+  reg.idx <- grep("^Regression Type:", lines)
+
+  if (length(reg.idx) != 1L)
+    return(txt)
+
+  glp.lines <- paste("GLP Bernstein Basis:", ifelse(isTRUE(bernstein), "TRUE", "FALSE"))
+
+  lines <- append(lines, glp.lines, after = reg.idx)
+  paste(lines, collapse = "\n")
+}
+
 ## feature: when using dataframe interface, summary and print methods don't 
 ## provide info on the dependent variable
 print.rbandwidth <- function(x, digits=NULL, ...){
   cat("\nRegression Data (",x$nobs," observations, ",x$ndim," variable(s)):\n\n",sep="")
   print(matrix(x$bw,ncol=x$ndim,dimnames=list(paste(x$pscaling,":",sep=""),x$xnames)))
 
-  cat(genBwSelStr(x))
+  bw.sel.str <- genBwSelStr(x)
   if (identical(x$regtype, "glp") && x$ncon > 0)
-    cat("\nGLP polynomial degree(s):", paste(x$glp.degree, collapse = " "),
-        "\nGLP Bernstein basis:", ifelse(isTRUE(x$glp.bernstein), "TRUE", "FALSE"))
+    bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
+                                     degree = x$glp.degree,
+                                     bernstein = x$glp.bernstein)
+  cat(bw.sel.str)
   cat(genBwKerStrs(x))
 
   cat("\n\n")
@@ -207,13 +222,15 @@ summary.rbandwidth <- function(object, ...){
   cat("\nRegression Data (",object$nobs," observations, ",object$ndim," variable(s)):\n",sep="")
 
   cat(genOmitStr(object))
-  cat(genBwSelStr(object))
+  bw.sel.str <- genBwSelStr(object)
+  if (identical(object$regtype, "glp") && object$ncon > 0)
+    bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
+                                     degree = object$glp.degree,
+                                     bernstein = object$glp.bernstein)
+  cat(bw.sel.str)
 
   cat('\n')
   cat(genBwScaleStrs(object))
-  if (identical(object$regtype, "glp") && object$ncon > 0)
-    cat("\nGLP polynomial degree(s):", paste(object$glp.degree, collapse = " "),
-        "\nGLP Bernstein basis:", ifelse(isTRUE(object$glp.bernstein), "TRUE", "FALSE"), "\n")
   cat(genBwKerStrs(object))
 
   cat(genTimingStr(object))
