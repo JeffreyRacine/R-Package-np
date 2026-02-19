@@ -1305,12 +1305,14 @@ npplot.rbandwidth <-
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
+      lerr.all <- NULL
+      herr.all <- NULL
       
       treg = matrix(data = tobj$mean,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       if (plot.errors.method == "bootstrap"){
-        terr <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+        terr.obj <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = x.eval,
           gradients = FALSE,
           gradient.order = gradient.order,
@@ -1321,17 +1323,25 @@ npplot.rbandwidth <-
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
-          bws = bws)[["boot.err"]]
+          bws = bws)
+        terr <- terr.obj[["boot.err"]]
+        terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
+        center.val <- if(pc) terr[,3] else tobj$mean
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
-          -terr[,1],
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
-          +terr[,2],
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
 
       } else if (plot.errors.method == "asymptotic") {
         lerr = matrix(data = tobj$mean - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
@@ -1344,8 +1354,12 @@ npplot.rbandwidth <-
 
       if(is.null(zlim)) {
           zlim =
-              if (plot.errors)
-                  c(min(lerr),max(herr))
+              if (plot.errors){
+                  if (plot.errors.type == "all" && !is.null(lerr.all))
+                    c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+                  else
+                    c(min(lerr),max(herr))
+              }
               else
                   c(min(tobj$mean),max(tobj$mean))
       }
@@ -1373,24 +1387,48 @@ npplot.rbandwidth <-
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
-            persp(x1.eval,
-                  x2.eval,
-                  lerr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
-            par(new = TRUE)
+            if (plot.errors.type == "all" && !is.null(lerr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      lerr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                par(new = TRUE)
+              }
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    lerr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+              par(new = TRUE)
+            }
           }
 
           persp(x1.eval,
@@ -1413,23 +1451,50 @@ npplot.rbandwidth <-
 
           if (plot.errors){
             par(new = TRUE)
-            persp(x1.eval,
-                  x2.eval,
-                  herr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            if (plot.errors.type == "all" && !is.null(herr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      herr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                if (bn != "bonferroni") par(new = TRUE)
+              }
+              legend("topleft",
+                     legend = c("Pointwise","Simultaneous","Bonferroni"),
+                     lty = 1, col = c("red","green3","blue"), lwd = 2, bty = "n")
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    herr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            }
           }
 
           Sys.sleep(0.5)
@@ -4852,9 +4917,11 @@ npplot.conbandwidth <-
 
       terr = matrix(data = eval(tcerr), nrow = length(eval(tcomp)), ncol = 3)
       terr[,3] = NA
+      lerr.all <- NULL
+      herr.all <- NULL
       
       if (plot.errors.method == "bootstrap"){
-        terr <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+        terr.obj <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = eval(tex), eydat = eval(tey),
           cdf = cdf,
           quantreg = quantreg,
@@ -4868,17 +4935,25 @@ npplot.conbandwidth <-
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
-          bws = bws)[["boot.err"]]
+          bws = bws)
+        terr <- terr.obj[["boot.err"]]
+        terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
+        center.val <- if(pc) terr[,3] else eval(tcomp)
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {eval(tcomp)}
-          -terr[,1],
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {eval(tcomp)}
-          +terr[,2],
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
 
       } else if (plot.errors.method == "asymptotic") {
         lerr = matrix(data = eval(tcomp) - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
@@ -4891,10 +4966,13 @@ npplot.conbandwidth <-
 
       if(is.null(zlim)) {
           zlim =
-              if (plot.errors)
-                  c(min(lerr),max(herr))
-              else
-                  c(min(eval(tcomp)),max(eval(tcomp)))
+              if (plot.errors){
+                  if (plot.errors.type == "all" && !is.null(lerr.all))
+                    c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+                  else
+                    c(min(lerr),max(herr))
+              } else
+                c(min(eval(tcomp)),max(eval(tcomp)))
       }
 
       ## I am sorry it had to come to this ...
@@ -4931,24 +5009,48 @@ npplot.conbandwidth <-
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
-            persp(x1.eval,
-                  x2.eval,
-                  lerr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
-            par(new = TRUE)
+            if (plot.errors.type == "all" && !is.null(lerr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      lerr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                par(new = TRUE)
+              }
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    lerr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+              par(new = TRUE)
+            }
           }
 
           persp(x1.eval,
@@ -4971,23 +5073,50 @@ npplot.conbandwidth <-
 
           if (plot.errors){
             par(new = TRUE)
-            persp(x1.eval,
-                  x2.eval,
-                  herr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            if (plot.errors.type == "all" && !is.null(herr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      herr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                if (bn != "bonferroni") par(new = TRUE)
+              }
+              legend("topleft",
+                     legend = c("Pointwise","Simultaneous","Bonferroni"),
+                     lty = 1, col = c("red","green3","blue"), lwd = 2, bty = "n")
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    herr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            }
           }
 
           Sys.sleep(0.5)
@@ -5027,7 +5156,6 @@ npplot.conbandwidth <-
         
         data.err = matrix(data = NA, nrow = maxneval,
           ncol = 3*tot.dim*dsf)
-        data.err.all = vector("list", tot.dim*dsf)
         data.err.all = vector("list", tot.dim*dsf)
 
         allei = as.data.frame(matrix(data = NA, nrow = maxneval,
@@ -5698,9 +5826,11 @@ npplot.condbandwidth <-
 
       terr = matrix(data = eval(tcerr), nrow = length(eval(tcomp)), ncol = 3)
       terr[,3] = NA
+      lerr.all <- NULL
+      herr.all <- NULL
       
       if (plot.errors.method == "bootstrap"){
-        terr <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
+        terr.obj <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
           exdat = eval(tex), eydat = eval(tey),
           cdf = cdf,
           quantreg = quantreg,
@@ -5714,17 +5844,25 @@ npplot.condbandwidth <-
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
-          bws = bws)[["boot.err"]]
+          bws = bws)
+        terr <- terr.obj[["boot.err"]]
+        terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
+        center.val <- if(pc) terr[,3] else eval(tcomp)
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {eval(tcomp)}
-          -terr[,1],
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {eval(tcomp)}
-          +terr[,2],
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
 
       } else if (plot.errors.method == "asymptotic") {
         lerr = matrix(data = eval(tcomp) - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
@@ -5735,11 +5873,16 @@ npplot.condbandwidth <-
 
       }
 
-      zlim =
-        if (plot.errors)
-          c(min(lerr),max(herr))
-        else
-          c(min(eval(tcomp)),max(eval(tcomp)))
+      if(is.null(zlim)) {
+        zlim =
+          if (plot.errors){
+            if (plot.errors.type == "all" && !is.null(lerr.all))
+              c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
+            else
+              c(min(lerr),max(herr))
+          } else
+            c(min(eval(tcomp)),max(eval(tcomp)))
+      }
 
       ## I am sorry it had to come to this ...
       tret = parse(text=paste(
@@ -5775,24 +5918,48 @@ npplot.condbandwidth <-
       
       for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
-            persp(x1.eval,
-                  x2.eval,
-                  lerr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
-            par(new = TRUE)
+            if (plot.errors.type == "all" && !is.null(lerr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      lerr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                par(new = TRUE)
+              }
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    lerr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+              par(new = TRUE)
+            }
           }
 
           persp(x1.eval,
@@ -5815,23 +5982,50 @@ npplot.condbandwidth <-
 
           if (plot.errors){
             par(new = TRUE)
-            persp(x1.eval,
-                  x2.eval,
-                  herr,
-                  zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                  col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
-                  ticktype = "detailed",
-                  xlab = "",
-                  ylab = "",
-                  zlab = "",
-                  theta = i,
-                  phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            if (plot.errors.type == "all" && !is.null(herr.all)) {
+              band.cols <- c(pointwise = "red", simultaneous = "green3", bonferroni = "blue")
+              for (bn in c("pointwise", "simultaneous", "bonferroni")) {
+                persp(x1.eval,
+                      x2.eval,
+                      herr.all[[bn]],
+                      zlim = zlim,
+                      cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                      cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                      cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                      cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                      col = persp.col,
+                      border = band.cols[bn],
+                      ticktype = "detailed",
+                      xlab = "",
+                      ylab = "",
+                      zlab = "",
+                      theta = i,
+                      phi = phi,
+                      lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                if (bn != "bonferroni") par(new = TRUE)
+              }
+              legend("topleft",
+                     legend = c("Pointwise","Simultaneous","Bonferroni"),
+                     lty = 1, col = c("red","green3","blue"), lwd = 2, bty = "n")
+            } else {
+              persp(x1.eval,
+                    x2.eval,
+                    herr,
+                    zlim = zlim,
+                    cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
+                    cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
+                    cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
+                    cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                    col = persp.col,
+                    border = ifelse(!is.null(border),border,"grey"),
+                    ticktype = "detailed",
+                    xlab = "",
+                    ylab = "",
+                    zlab = "",
+                    theta = i,
+                    phi = phi,
+                    lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+            }
           }
 
           Sys.sleep(0.5)
@@ -5871,6 +6065,7 @@ npplot.condbandwidth <-
         
         data.err = matrix(data = NA, nrow = maxneval,
           ncol = 3*tot.dim*dsf)
+        data.err.all = vector("list", tot.dim*dsf)
 
         allei = as.data.frame(matrix(data = NA, nrow = maxneval,
           ncol = tot.dim))
