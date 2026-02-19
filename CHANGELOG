@@ -1,4 +1,4 @@
-Changes from Version 0.60-20 to 0.60-21 [16-Feb-2026]
+Changes from Version 0.60-20 to 0.70-0 [19-Feb-2026]
 
 * Ported bounded continuous-kernel support from np master across npRmpi
   interfaces and C pathways with unified bound controls:
@@ -71,6 +71,40 @@ Changes from Version 0.60-20 to 0.60-21 [16-Feb-2026]
 
 * Added new np.options.Rd man page and linked it from np-package and np.plot
   documentation to expose and document global option controls.
+
+* Synchronized C-level generalized local polynomial regression support from
+  np master into npRmpi:
+  - `regtype="glp"` in shared regression core
+  - per-continuous-variable degree vectors (`glp.degree`)
+  - GLP derivative extraction/plotting control support.
+
+* Refactored/synchronized regression CV setup for `ll`/`glp` by hoisting
+  invariant basis and workspace preparation out of hot objective loops,
+  reducing redundant work in `cv.ls`/`cv.aic` evaluation.
+
+* Synchronized solve-based local-linear matrix workflows (LAPACK/BLAS-oriented
+  backend) from np master, replacing inverse-heavy hot-path operations.
+
+* Expanded all-large (`h`/`lambda`) fast-path accounting/reporting across
+  conditional estimators:
+  - exposed `num.feval.fast` and `num.feval.fallback` alongside `num.feval`
+    in relevant summaries
+  - synchronized all-large fast branches for conditional density/distribution
+    CV pathways
+  - reduced all-large branch overhead, including tree-list bypass where the
+    all-large regime is already known.
+
+* Updated `npplot()` error-type semantics/documentation in sync with master:
+  - renamed bootstrap error type `standard` to `pmzsd`
+  - `pmzsd` now uses plus/minus the `1-alpha/2` normal quantile
+    (`qnorm(alpha/2, lower.tail=FALSE)` semantics).
+
+* Fixed remaining bootstrap `plot.errors.type="all"` rendering gaps across
+  perspective/non-perspective branches for regression, conditional density,
+  and conditional distribution plotting.
+
+* Tightened discrete upper-bound gate handling to strict relative-tolerance
+  semantics for near-upper-bound lambda shortcuts.
 
 * Removed unused legacy sources and prototypes (RuniqueCombs, pgplot
   placeholder) and restored B-spline error handling in bspline.c.
