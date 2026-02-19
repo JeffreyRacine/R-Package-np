@@ -27,8 +27,11 @@
 
     \item \code{np.disc.upper.rel.tol} (numeric): relative tolerance used by
     the discrete upper-bound shortcut for bandwidths near their feasible upper
-    bounds. When same/different-category kernel values are numerically close,
-    the corresponding discrete kernel factor is treated as constant to reduce
+    bounds. The near-upper check is applied relative to each kernel's own
+    feasible upper bound (e.g., Aitchison-Aitken depends on category
+    cardinality), with a tiny machine-precision floor for numerical robustness.
+    When same/different-category kernel values are numerically close, the
+    corresponding discrete kernel factor is treated as constant to reduce
     repeated category comparisons. Default is \code{1e-2}. Valid range is
     \code{(0, 0.5)}.
 

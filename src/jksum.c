@@ -1485,7 +1485,9 @@ static inline int np_disc_near_upper(const int kernel, const double lambda, cons
   if(!isfinite(lambda) || !np_disc_unordered_has_upper(kernel))
     return 0;
   const double up = np_disc_unordered_upper(kernel, ncat);
-  const double tol = np_disc_rel_tol()*fmax(1.0, fabs(up));
+  double tol = np_disc_rel_tol()*fabs(up);
+  /* Keep a tiny absolute floor for numerical robustness near machine precision. */
+  tol = fmax(tol, 16.0*DBL_EPSILON*fmax(1.0, fabs(up)));
   return fabs(lambda - up) <= tol;
 }
 
@@ -1671,7 +1673,8 @@ static inline int np_disc_ordered_near_upper(const int kernel, const double lamb
   if(!isfinite(lambda) || !np_disc_ordered_has_upper(kernel))
     return 0;
   const double up = 1.0;
-  const double tol = np_disc_rel_tol()*fmax(1.0, fabs(up));
+  double tol = np_disc_rel_tol()*fabs(up);
+  tol = fmax(tol, 16.0*DBL_EPSILON*fmax(1.0, fabs(up)));
   return fabs(lambda - up) <= tol;
 }
 
