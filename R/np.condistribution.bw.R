@@ -294,7 +294,7 @@ npcdistbw.condbandwidth <-
 
       if (bws$method != "normal-reference"){
         total.time <-
-          system.time(myout <- 
+          system.time(myout.raw <- 
           .C("np_distribution_conditional_bw", as.double(yuno), as.double(yord), as.double(ycon),
              as.double(xuno), as.double(xord), as.double(xcon),
              as.double(gyuno), as.double(gyord), as.double(gycon),
@@ -306,13 +306,25 @@ npcdistbw.condbandwidth <-
              fval = double(2),fval.history = double(max(1,nmulti)),
              eval.history = double(max(1,nmulti)), invalid.history = double(max(1,nmulti)),
              timing = double(1),
+             fast.history = double(1),
+             fallback.history = double(1),
              penalty.mode = as.integer(penalty_mode),
              penalty.multiplier = as.double(penalty.multiplier),
              cxkerlb = as.double(cxker.bounds.c$lb),
              cxkerub = as.double(cxker.bounds.c$ub),
              cykerlb = as.double(cyker.bounds.c$lb),
              cykerub = as.double(cyker.bounds.c$ub),
-             PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
+             PACKAGE="npRmpi" ))[1]
+        myout <- list(
+          bw = myout.raw$bw,
+          fval = myout.raw$fval,
+          fval.history = myout.raw$fval.history,
+          eval.history = myout.raw$eval.history,
+          invalid.history = myout.raw$invalid.history,
+          timing = myout.raw$timing,
+          fast.history = if(!is.null(myout.raw$fast.history)) myout.raw$fast.history else myout.raw[[19]],
+          fallback.history = if(!is.null(myout.raw$fallback.history)) myout.raw$fallback.history else myout.raw[[20]]
+        )
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
@@ -351,6 +363,8 @@ npcdistbw.condbandwidth <-
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
+      tbw$num.feval.fast <- myout$fast.history[1]
+      tbw$num.feval.fallback <- myout$fallback.history[1]
       tbw$fval.history <- myout$fval.history
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
@@ -418,10 +432,12 @@ npcdistbw.condbandwidth <-
                          cykerub = tbw$cykerub,
                          uykertype = tbw$uykertype,
                          oykertype = tbw$oykertype,
-                         fval = tbw$fval,
-                         ifval = tbw$ifval,
-                         num.feval = tbw$num.feval,
-                         fval.history = tbw$fval.history,
+                        fval = tbw$fval,
+                        ifval = tbw$ifval,
+                        num.feval = tbw$num.feval,
+                        num.feval.fast = tbw$num.feval.fast,
+                        num.feval.fallback = tbw$num.feval.fallback,
+                        fval.history = tbw$fval.history,
                          eval.history = tbw$eval.history,
                          invalid.history = tbw$invalid.history,
                          nobs = tbw$nobs,

@@ -9035,9 +9035,11 @@ double *cv){
 
   int * x_operator = NULL, * y_operator = NULL, * xy_operator = NULL;
   int gate_x_active = 0, gate_y_active = 0;
+  int gate_x_all_large_fixed = 0;
   int *x_cont_ok = NULL, *x_disc_uno_ok = NULL, *x_disc_ord_ok = NULL;
   int *y_cont_ok = NULL, *y_disc_uno_ok = NULL, *y_disc_ord_ok = NULL;
   double *x_cont_hmin = NULL, *x_cont_k0 = NULL, *x_disc_uno_const = NULL, *x_disc_ord_const = NULL;
+  double x_all_large_fixed_const = 1.0;
   double *y_cont_hmin = NULL, *y_cont_k0 = NULL, *y_disc_uno_const = NULL, *y_disc_ord_const = NULL;
 
   double vsfx[num_reg_tot];
@@ -9360,6 +9362,86 @@ double *cv){
     }
   }
 
+  if((BANDWIDTH_den == BW_FIXED) && (num_reg_tot > 0)){
+    int ok_all_large = 1;
+    double kconst = 1.0;
+
+    for(l = 0; l < num_reg_continuous; l++){
+      const double bw = matrix_bandwidth_x[l][0];
+      if((x_cont_ok == NULL) || (!x_cont_ok[l]) || (!isfinite(bw)) ||
+         (bw <= 0.0) || (bw < x_cont_hmin[l])){
+        ok_all_large = 0;
+        break;
+      }
+      kconst *= x_cont_k0[l]/bw;
+    }
+
+    if(ok_all_large){
+      double (* const ukf[])(int, double, int) = {
+        np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+        np_score_uaa, np_score_unli_racine
+      };
+      const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
+      for(l = 0; l < num_reg_unordered; l++){
+        const int ku = kernel_ux[l];
+        const int ncat = (num_categories_extern_X != NULL) ? num_categories_extern_X[l] : 0;
+        const double lam = lambdax[l];
+        if((ku < 0) || (ku >= nuk) || (!isfinite(lam)) || (!np_disc_near_upper(ku, lam, ncat))){
+          ok_all_large = 0;
+          break;
+        }
+        {
+          const double ks = ukf[ku](1, lam, ncat);
+          const double kd = ukf[ku](0, lam, ncat);
+          if(!np_disc_near_const_kernel(ks, kd)){
+            ok_all_large = 0;
+            break;
+          }
+          kconst *= 0.5*(ks + kd);
+        }
+      }
+    }
+
+    if(ok_all_large){
+      double (* const okf[])(double, double, double, double, double) = {
+        np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+        np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+        np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+        np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
+      };
+      const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
+      for(l = 0; l < num_reg_ordered; l++){
+        const int oi = num_reg_unordered + l;
+        const int ko = kernel_ox[l];
+        const int ncat = (num_categories_extern_X != NULL) ? num_categories_extern_X[oi] : 0;
+        const double lam = lambdax[oi];
+        if((ko < 0) || (ko >= nok) || (!isfinite(lam)) || (!np_disc_ordered_near_upper(ko, lam)) ||
+           (ncat <= 0) || (matrix_categorical_vals_extern_X == NULL)){
+          ok_all_large = 0;
+          break;
+        }
+        {
+          const double cl = matrix_categorical_vals_extern_X[oi][0];
+          const double ch = matrix_categorical_vals_extern_X[oi][ncat - 1];
+          const double k0 = okf[ko](cl, cl, lam, cl, ch);
+          const double k1 = okf[ko](cl, ch, lam, cl, ch);
+          if(!np_disc_near_const_kernel(k0, k1)){
+            ok_all_large = 0;
+            break;
+          }
+          kconst *= 0.5*(k0 + k1);
+        }
+      }
+    }
+
+    if(ok_all_large && isfinite(kconst) && (kconst > 0.0)){
+      gate_x_all_large_fixed = 1;
+      x_all_large_fixed_const = kconst;
+    }
+  }
+  if(gate_x_all_large_fixed)
+    np_fastcv_alllarge_hits++;
+
   if(num_var_continuous > 0 || num_var_unordered > 0 || num_var_ordered > 0){
     int ok_all = 1;
 
@@ -9469,7 +9551,7 @@ double *cv){
   
   *cv = 0;
 
-  if(!int_TREE_XY){
+  if(!int_TREE_XY || gate_x_all_large_fixed){
     double * kwx = (double *)malloc(num_obs_wx_alloc*num_obs_train_alloc*sizeof(double));
 
     if(kwx == NULL)
@@ -9494,74 +9576,82 @@ double *cv){
         matrix_wX_ordered_train[l] = matrix_X_ordered_train[l] + wxo;
 
 
-      if(gate_x_active){
-        np_gate_ctx_set(&gate_x_ctx,
-                        num_reg_continuous,
-                        num_reg_unordered,
-                        num_reg_ordered,
-                        kernel_cx,
-                        kernel_ux,
-                        kernel_ox,
-                        x_operator,
-                        x_cont_ok,
-                        x_cont_hmin,
-                        x_cont_k0,
-                        x_disc_uno_ok,
-                        x_disc_uno_const,
-                        x_disc_ord_ok,
-                        x_disc_ord_const);
+      if(gate_x_all_large_fixed){
+        const double mconst = ((double)num_obs_train)*x_all_large_fixed_const;
+        for(i = 0; i < dwx; i++)
+          mean[i] = mconst;
+        for(i = 0; i < (dwx*num_obs_train); i++)
+          kwx[i] = x_all_large_fixed_const;
       } else {
-        np_gate_ctx_clear(&gate_x_ctx);
+        if(gate_x_active){
+          np_gate_ctx_set(&gate_x_ctx,
+                          num_reg_continuous,
+                          num_reg_unordered,
+                          num_reg_ordered,
+                          kernel_cx,
+                          kernel_ux,
+                          kernel_ox,
+                          x_operator,
+                          x_cont_ok,
+                          x_cont_hmin,
+                          x_cont_k0,
+                          x_disc_uno_ok,
+                          x_disc_uno_const,
+                          x_disc_ord_ok,
+                          x_disc_ord_const);
+        } else {
+          np_gate_ctx_clear(&gate_x_ctx);
+        }
+        np_activate_bounds_x();
+        kernel_weighted_sum_np_ctx(kernel_cx,
+                               kernel_ux,
+                               kernel_ox,
+                               BANDWIDTH_den,
+                               num_obs_train,
+                               dwx,
+                               num_reg_unordered,
+                               num_reg_ordered,
+                               num_reg_continuous,
+                               0, // (do not) compute the leave-one-out marginals
+                               0, // '' offset
+                               1, // kernel power
+                               0, // bandwidth_divide
+                               0, // '' weights
+                               0, // symmetric
+                               0, // gather_scatter sum
+                               0, // drop train
+                               0, // drop which train
+                               x_operator,
+                               OP_NOOP, // no permutations
+                               0, // no score
+                               0, // no ocg
+                               NULL, // explicit bpso
+                               0, // don't explicity suppress parallel
+                               0, // ncol y 
+                               0, // ncol w
+                               int_TREE_X, // do tree
+                               0, // do partial tree 
+                               kdt_extern_X, // which tree
+                               NULL, NULL, NULL, // partial tree data
+                               matrix_X_unordered_train, 
+                               matrix_X_ordered_train,
+                               matrix_X_continuous_train,
+                               matrix_wX_unordered_train,
+                               matrix_wX_ordered_train,
+                               matrix_wX_continuous_train,
+                               NULL, // matrix y
+                               NULL, // matrix w
+                               NULL, // sgn
+                               vsfx,
+                               1,matrix_bandwidth_x,matrix_bandwidth_x,lambdax,
+                               num_categories_extern_X,
+                               matrix_categorical_vals_extern_X,
+                               NULL, // moo
+                               mean,
+                               NULL, // no permutations
+                               kwx,
+                               &gate_x_ctx);
       }
-      np_activate_bounds_x();
-      kernel_weighted_sum_np_ctx(kernel_cx,
-                             kernel_ux,
-                             kernel_ox,
-                             BANDWIDTH_den,
-                             num_obs_train,
-                             dwx,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             num_reg_continuous,
-                             0, // (do not) compute the leave-one-out marginals
-                             0, // '' offset
-                             1, // kernel power
-                             0, // bandwidth_divide
-                             0, // '' weights
-                             0, // symmetric
-                             0, // gather_scatter sum
-                             0, // drop train
-                             0, // drop which train
-                             x_operator,
-                             OP_NOOP, // no permutations
-                             0, // no score
-                             0, // no ocg
-                             NULL, // explicit bpso
-                             0, // don't explicity suppress parallel
-                             0, // ncol y 
-                             0, // ncol w
-                             int_TREE_X, // do tree
-                             0, // do partial tree 
-                             kdt_extern_X, // which tree
-                             NULL, NULL, NULL, // partial tree data
-                             matrix_X_unordered_train, 
-                             matrix_X_ordered_train,
-                             matrix_X_continuous_train,
-                             matrix_wX_unordered_train,
-                             matrix_wX_ordered_train,
-                             matrix_wX_continuous_train,
-                             NULL, // matrix y
-                             NULL, // matrix w
-                             NULL, // sgn
-                             vsfx,
-                             1,matrix_bandwidth_x,matrix_bandwidth_x,lambdax,
-                             num_categories_extern_X,
-                             matrix_categorical_vals_extern_X,
-                             NULL, // moo
-                             mean,
-                             NULL, // no permutations
-                             kwx,
-                             &gate_x_ctx);
 
       for(iwy = 0; iwy < nwy; iwy++){
 
@@ -9749,74 +9839,82 @@ double *cv){
         matrix_wX_ordered_train[l] = matrix_XY_ordered_train[l] + wxo;
 
 
-      if(gate_x_active){
-        np_gate_ctx_set(&gate_x_ctx,
-                        num_reg_continuous,
-                        num_reg_unordered,
-                        num_reg_ordered,
-                        kernel_cx,
-                        kernel_ux,
-                        kernel_ox,
-                        x_operator,
-                        x_cont_ok,
-                        x_cont_hmin,
-                        x_cont_k0,
-                        x_disc_uno_ok,
-                        x_disc_uno_const,
-                        x_disc_ord_ok,
-                        x_disc_ord_const);
+      if(gate_x_all_large_fixed){
+        const double mconst = ((double)num_obs_train)*x_all_large_fixed_const;
+        for(i = 0; i < dwx; i++)
+          mean[i] = mconst;
+        for(i = 0; i < (dwx*num_obs_train); i++)
+          kwx[i] = x_all_large_fixed_const;
       } else {
-        np_gate_ctx_clear(&gate_x_ctx);
+        if(gate_x_active){
+          np_gate_ctx_set(&gate_x_ctx,
+                          num_reg_continuous,
+                          num_reg_unordered,
+                          num_reg_ordered,
+                          kernel_cx,
+                          kernel_ux,
+                          kernel_ox,
+                          x_operator,
+                          x_cont_ok,
+                          x_cont_hmin,
+                          x_cont_k0,
+                          x_disc_uno_ok,
+                          x_disc_uno_const,
+                          x_disc_ord_ok,
+                          x_disc_ord_const);
+        } else {
+          np_gate_ctx_clear(&gate_x_ctx);
+        }
+        np_activate_bounds_x();
+        kernel_weighted_sum_np_ctx(kernel_cx,
+                               kernel_ux,
+                               kernel_ox,
+                               BANDWIDTH_den,
+                               num_obs_train,
+                               dwx,
+                               num_reg_unordered,
+                               num_reg_ordered,
+                               num_reg_continuous,
+                               0, // compute the leave-one-out marginals
+                               0,
+                               1,
+                               0,
+                               0, 
+                               0,
+                               0,
+                               0,
+                               0,
+                               x_operator,
+                               OP_NOOP, // no permutations
+                               0, // no score
+                               0, // no ocg
+                               NULL,
+                               0, // don't explicity suppress parallel
+                               0,
+                               0,
+                               int_TREE_XY,
+                               1,
+                               kdt_extern_XY,
+                               &nls, icx, NULL,
+                               matrix_XY_unordered_train,
+                               matrix_XY_ordered_train,
+                               matrix_XY_continuous_train,
+                               matrix_wX_unordered_train,
+                               matrix_wX_ordered_train,
+                               matrix_wX_continuous_train,
+                               NULL,
+                               NULL,
+                               NULL,
+                               vsfx,
+                               1,matrix_bandwidth_x,matrix_bandwidth_x,lambdax,
+                               num_categories_extern_X,
+                               matrix_categorical_vals_extern_X,
+                               NULL,
+                               mean,
+                               NULL, // no permutations
+                               kwx,
+                               &gate_x_ctx);
       }
-      np_activate_bounds_x();
-      kernel_weighted_sum_np_ctx(kernel_cx,
-                             kernel_ux,
-                             kernel_ox,
-                             BANDWIDTH_den,
-                             num_obs_train,
-                             dwx,
-                             num_reg_unordered,
-                             num_reg_ordered,
-                             num_reg_continuous,
-                             0, // compute the leave-one-out marginals
-                             0,
-                             1,
-                             0,
-                             0, 
-                             0,
-                             0,
-                             0,
-                             0,
-                             x_operator,
-                             OP_NOOP, // no permutations
-                             0, // no score
-                             0, // no ocg
-                             NULL,
-                             0, // don't explicity suppress parallel
-                             0,
-                             0,
-                             int_TREE_XY,
-                             1,
-                             kdt_extern_XY,
-                             &nls, icx, NULL,
-                             matrix_XY_unordered_train,
-                             matrix_XY_ordered_train,
-                             matrix_XY_continuous_train,
-                             matrix_wX_unordered_train,
-                             matrix_wX_ordered_train,
-                             matrix_wX_continuous_train,
-                             NULL,
-                             NULL,
-                             NULL,
-                             vsfx,
-                             1,matrix_bandwidth_x,matrix_bandwidth_x,lambdax,
-                             num_categories_extern_X,
-                             matrix_categorical_vals_extern_X,
-                             NULL,
-                             mean,
-                             NULL, // no permutations
-                             kwx,
-                             &gate_x_ctx);
 
       for(iwy = 0; iwy < nwy; iwy++){
         const int64_t wyo = iwy*wy;
