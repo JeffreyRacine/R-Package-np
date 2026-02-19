@@ -581,7 +581,10 @@ double *kernel_sum)
 
 	}
 
-	MPI_Gather(kernel_sum, stride, MPI_DOUBLE, kernel_sum, stride, MPI_DOUBLE, 0, comm[1]);
+	if(my_rank == 0)
+		MPI_Gather(MPI_IN_PLACE, stride, MPI_DOUBLE, kernel_sum, stride, MPI_DOUBLE, 0, comm[1]);
+	else
+		MPI_Gather(kernel_sum, stride, MPI_DOUBLE, NULL, stride, MPI_DOUBLE, 0, comm[1]);
 	MPI_Bcast(kernel_sum, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 #endif
 
@@ -644,10 +647,14 @@ double np_rect(const double z){
 }
 
 double np_uaa(const int same_cat,const double lambda, const int c){
+  if(c < 2)
+    return same_cat ? 1.0 : 0.0;
   return (same_cat)?(1.0-lambda):lambda/((double)c-1.0);
 }
 
 double np_score_uaa(const int same_cat,const double lambda, const int c){
+  if(c < 2)
+    return 0.0;
   return (same_cat)?-1.0:(1.0/((double)c-1.0));
 }
 
@@ -673,7 +680,10 @@ double np_owang_van_ryzin(const double x, const double y, const double lambda, c
 }
 
 double np_score_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
-  return (x == y) ? -1.0 : (0.5*ipow(lambda, (int)fabs(x-y))*(fabs(x-y)/lambda - 2.0));
+  const int cxy = (int)fabs(x-y);
+  if(cxy == 0) return -1.0;
+  if(lambda == 0.0) return (cxy == 1) ? 0.5 : 0.0;
+  return 0.5*ipow(lambda, cxy - 1)*(cxy - 2.0*lambda);
 }
 
 double np_oli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
@@ -692,7 +702,8 @@ double np_onli_racine(const double x, const double y, const double lambda, const
 
 double np_score_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
   const int cxy = (int)fabs(x-y);
-  return ((cxy != 0) || (lambda != 0.0)) ? ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0 *lambda) : -2.0;
+  if(cxy == 0) return -2.0;
+  return ipow(lambda, cxy - 1)*(cxy*(1.0 - lambda*lambda) - 2.0*lambda);
 }
 
 static inline void np_orly_term_deriv(const int d, const double lambda, double *term, double *dterm){
@@ -845,16 +856,16 @@ static inline uint64_t np_hash_discrete_profile_idx(const int idx,
                                                     double * const * const xtu,
                                                     double * const * const xto){
   uint64_t h = UINT64_C(0x9e3779b97f4a7c15);
-  union { double d; uint64_t u; } v;
+  uint64_t bits;
 
   for(int u = 0; u < num_reg_unordered; u++){
-    v.d = xtu[u][idx];
-    h ^= np_mix_u64(v.u + UINT64_C(0x9e3779b97f4a7c15) + ((uint64_t)u << 1));
+    memcpy(&bits, &xtu[u][idx], sizeof(bits));
+    h ^= np_mix_u64(bits + UINT64_C(0x9e3779b97f4a7c15) + ((uint64_t)u << 1));
   }
 
   for(int o = 0; o < num_reg_ordered; o++){
-    v.d = xto[o][idx];
-    h ^= np_mix_u64(v.u + UINT64_C(0x517cc1b727220a95) + ((uint64_t)o << 1));
+    memcpy(&bits, &xto[o][idx], sizeof(bits));
+    h ^= np_mix_u64(bits + UINT64_C(0x517cc1b727220a95) + ((uint64_t)o << 1));
   }
 
   return h;
@@ -1786,6 +1797,9 @@ double np_econvol_epan8(const double z){
 }
 
 double np_econvol_uaa(const int same_cat, const double lambda, const int c){
+  if(c < 2)
+    return same_cat ? 1.0 : 0.0;
+
   const double dcm1 = (double)(c-1);
   const double oml = 1.0-lambda;
   return (same_cat)?(oml*oml+lambda*lambda/dcm1):(lambda/dcm1*(2.0*oml+((double)(c-2))*lambda/dcm1));
@@ -1801,6 +1815,9 @@ double np_econvol_unli_racine(const int same_cat, const double lambda, const int
 }
 
 double np_econvol_onli_racine(const double x, const double y, const double lambda, const double cl, const double ch){
+  if(lambda == 1.0)
+    return 0.0;
+
   const int cxy = (int)fabs(x-y);
   const double lnorm = (1.0 - lambda)/(1.0 + lambda);
   const double l2 = lambda*lambda;
@@ -1827,6 +1844,9 @@ double np_econvol_oracine_li_yan(const double x, const double y, const double la
 }
 
 double np_econvol_owang_van_ryzin(const double x, const double y, const double lambda, const double cl, const double ch){
+  if(lambda == 1.0)
+    return 0.0;
+
   if(x == y) return 0.5*(1.0-lambda)*(1.0-lambda)*(1.0 + 1.0/(1.0-lambda*lambda));
 
   const int cxy = (int)fabs(x-y);
@@ -2009,14 +2029,29 @@ double np_cdf_owang_van_ryzin(const double y, const double x, const double lambd
   return (x < y) ? 0.5*gee : (1.0 - gee);
 }
 
+static inline double np_geom_sum_nonneg_lambda(const int n, const double lambda){
+  if(n < 0)
+    return 0.0;
+  if(lambda == 1.0)
+    return (double)(n + 1);
+  return (1.0 - R_pow_di(lambda, n + 1))/(1.0 - lambda);
+}
+
 double np_cdf_oli_racine(const double y, const double x, const double lambda, const double cl, const double ch){
-  const int xh = (x > ch) ? ch : x;
-  const int cxy = (int)fabs(xh-y);
-  const double gee = R_pow_di(lambda, cxy)/(1.0-lambda);
+  const int xh = (x > ch) ? (int)ch : (int)x;
+  const int yi = (int)y;
+  const int cli = (int)cl;
+  const int cxy = abs(xh - yi);
+
   if(x < y){
-    return (x < cl) ? 0.0 : gee*(1.0-R_pow_di(lambda,(int)(x-cl+1)));
-  } else {
-    return (1.0 + lambda - R_pow_di(lambda,(int)(y-cl+1)))/(1.0 - lambda) - lambda*gee;
+    const int nx = (int)x - cli;
+    if(x < cl)
+      return 0.0;
+    return R_pow_di(lambda, cxy) * np_geom_sum_nonneg_lambda(nx, lambda);
+  } else{
+    const int n1 = yi - cli;
+    const int n2 = xh - yi;
+    return np_geom_sum_nonneg_lambda(n1, lambda) + np_geom_sum_nonneg_lambda(n2, lambda) - 1.0;
   }
 }
 
@@ -2059,7 +2094,7 @@ double np_aconvol_gauss4(const double x, const double y,const double hx,const do
   const double hy2 = hy*hy;
   const double hxy2 = hx2+hy2;
   const double x2 = x*x;
-  const double y2 = y*x;
+  const double y2 = y*y;
   const double hx3 = hx2*hx;
   const double hy3 = hy2*hy;
   const double hx5 = hx3*hx2;
@@ -3436,7 +3471,7 @@ void np_p_ckernelv(const int KERNEL,
   const int own_kbuf = (kbuf == NULL);
   if(own_kbuf){
     kbuf = (double *)malloc(num_xt*sizeof(double));
-    assert(kbuf != NULL);
+    if(kbuf == NULL) error("memory allocation failed");
   }
 
   /* Base-kernel large-h decision is precomputed by caller once per (j,i). */
@@ -3827,7 +3862,7 @@ void np_p_ukernelv(const int KERNEL,
   const int own_kbuf = (kbuf == NULL);
   if(own_kbuf){
     kbuf = (double *)malloc(num_xt*sizeof(double));
-    assert(kbuf != NULL);
+    if(kbuf == NULL) error("memory allocation failed");
   }
 
   if(xl == NULL){
@@ -4023,7 +4058,7 @@ void np_p_okernelv(const int KERNEL,
   const int own_kbuf = (kbuf == NULL);
   if(own_kbuf){
     kbuf = (double *)malloc(num_xt*sizeof(double));
-    assert(kbuf != NULL);
+    if(kbuf == NULL) error("memory allocation failed");
   }
 
   double s_cat = 0.0;
@@ -4041,7 +4076,7 @@ void np_p_okernelv(const int KERNEL,
 
   if((fast_kernel || fast_p_kernel) && max_cxy >= 0){
     lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
-    assert(lpow != NULL);
+    if(lpow == NULL) error("memory allocation failed");
     lpow[0] = 1.0;
     for(int c = 1; c <= max_cxy; c++)
       lpow[c] = lpow[c-1]*lambda;
@@ -4152,7 +4187,7 @@ void np_okernelv(const int KERNEL,
 
   if(fast_kernel && max_cxy >= 0){
     double *lpow = (double *)malloc((size_t)(max_cxy+1)*sizeof(double));
-    assert(lpow != NULL);
+    if(lpow == NULL) error("memory allocation failed");
     lpow[0] = 1.0;
     for(int c = 1; c <= max_cxy; c++)
       lpow[c] = lpow[c-1]*lambda;
@@ -4402,7 +4437,7 @@ void np_outer_weighted_sum(double * const * const mat_A, double * const sgn_A, c
 
   if(use_wpow){
     wbuf = (double *)malloc((size_t)num_weights*sizeof(double));
-    assert(wbuf != NULL);
+    if(wbuf == NULL) error("memory allocation failed");
     for(k = 0; k < num_weights; k++){
       wbuf[k] = (weights[k] == 0.0) ? 0.0 : ipow(weights[k]/db, kpow);
     }
@@ -4739,6 +4774,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   /* Declarations */
 
   int i, ii, j, kk, k, l, mstep, js, je, num_obs_eval_alloc, sum_element_length, ip;
+  int status = 0;
   int do_psum, swap_xxt;
 
   int * permutation_kernel = NULL;
@@ -4835,9 +4871,9 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   int * igatherv = NULL, * idisplsv = NULL;
 
   igatherv = (int *)malloc(iNum_Processors*sizeof(int));
-  assert(igatherv != NULL);
+  if(igatherv == NULL) error("memory allocation failed");
   idisplsv = (int *)malloc(iNum_Processors*sizeof(int));
-  assert(idisplsv != NULL);
+  if(idisplsv == NULL) error("memory allocation failed");
 #else
   num_obs_eval_alloc = num_obs_eval;
 #endif
@@ -4864,7 +4900,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                                  (MAX(ncol_Y, 1) * MAX(ncol_W, 1));
 
   double *lambda, **matrix_bandwidth, **matrix_alt_bandwidth = NULL, **m = NULL;
-  double *tprod, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
+  double *tprod = NULL, dband, *ws, * p_ws, * tprod_mp = NULL, * p_dband = NULL;
   double *perm_kbuf = NULL;
   int use_disc_profile_cache = 0, disc_nprof = 0, disc_mark_token = 1;
   int disc_profile_from_override = 0;
@@ -4906,7 +4942,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     matrix_X_ordered_train:matrix_X_ordered_eval;
 
   if (num_obs_eval == 0) {
-    return(KWSNP_ERR_NOEVAL);
+    status = KWSNP_ERR_NOEVAL;
+    goto cleanup;
   }
 
   do_psum = BANDWIDTH_reg == BW_ADAP_NN;
@@ -4946,7 +4983,10 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   /* Generate bandwidth vector given scale factors, nearest neighbors, or lambda */
 
   bpow = (int *) malloc(num_reg_continuous*sizeof(int));
-  assert(bpow != NULL);
+  if(bpow == NULL){
+    status = KWSNP_ERR_BADINVOC;
+    goto cleanup;
+  }
 
   for(i = 0; i < num_reg_continuous; i++){
     bpow[i] = (bandwidth_divide ? 1 : 0) + ((operator[i] == OP_DERIVATIVE) ? 1 : ((operator[i] == OP_INTEGRAL) ? -1 : 0));
@@ -4976,17 +5016,24 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     }
 
     tprod_mp = (double *)malloc(((BANDWIDTH_reg==BW_ADAP_NN)?num_obs_eval:num_obs_train)*p_nvar*sizeof(double));
-
-    assert(tprod_mp != NULL);
+    if(tprod_mp == NULL){
+      status = KWSNP_ERR_BADINVOC;
+      goto cleanup;
+    }
 
     p_dband = (double *)malloc(p_nvar*sizeof(double));
-
-    assert(p_dband != NULL);
+    if(p_dband == NULL){
+      status = KWSNP_ERR_BADINVOC;
+      goto cleanup;
+    }
 
     p_ipow = (bandwidth_divide ? 1 : 0) + ((permutation_operator == OP_DERIVATIVE) ? 1 : ((permutation_operator == OP_INTEGRAL) ? -1 : 0));
 
     perm_kbuf = (double *)malloc((size_t)num_xt*sizeof(double));
-    assert(perm_kbuf != NULL);
+    if(perm_kbuf == NULL){
+      status = KWSNP_ERR_BADINVOC;
+      goto cleanup;
+    }
 
   }
 
@@ -5011,11 +5058,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                              matrix_bandwidth,
                              lambda)==1){
 
-      free(lambda);
-      free_tmat(matrix_bandwidth);
-      free(tprod);
-
-      return(KWSNP_ERR_BADBW);
+      status = KWSNP_ERR_BADBW;
+      goto cleanup;
     }
   }
 
@@ -5043,12 +5087,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
                              matrix_alt_bandwidth,
                              lambda)==1){
 
-      free(lambda);
-      free_tmat(matrix_bandwidth);
-      free_tmat(matrix_alt_bandwidth);
-      free(tprod);
-
-      return(KWSNP_ERR_BADBW);
+      status = KWSNP_ERR_BADBW;
+      goto cleanup;
     }
 
   }
@@ -5290,20 +5330,16 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   
   if (leave_one_out && drop_one_train) {
     REprintf("\n error, leave one out estimator and drop-one estimator can't be enabled simultaneously");
-    free(lambda);
-    free_tmat(matrix_bandwidth);
-    free(tprod);
-    return(KWSNP_ERR_BADINVOC);
+    status = KWSNP_ERR_BADINVOC;
+    goto cleanup;
 
   }
 
   if ((num_obs_train < (num_obs_eval + leave_one_out_offset)) && leave_one_out){
     
     REprintf("\nnumber of training points must be >= number of evaluation points to use the 'leave one out' estimator");
-    free(lambda);
-    free_tmat(matrix_bandwidth);
-    free(tprod);
-    return(KWSNP_ERR_BADINVOC);
+    status = KWSNP_ERR_BADINVOC;
+    goto cleanup;
   }
 
   if(!gather_scatter && !nws)
@@ -5469,8 +5505,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
       if((disc_prof_rep != NULL) && (!disc_profile_from_override) && (!disc_profile_from_global_cache)){ free(disc_prof_rep); disc_prof_rep = NULL; }
       disc_nprof = 0;
     }
-    if(use_disc_profile_cache)
-      assert((disc_prof_id != NULL) && (disc_prof_rep != NULL));
+    if(use_disc_profile_cache && ((disc_prof_id == NULL) || (disc_prof_rep == NULL)))
+      error("discrete profile cache setup failed");
   }
 
   const int leave_or_drop = leave_one_out || (drop_one_train && (BANDWIDTH_reg != BW_ADAP_NN));
@@ -6058,6 +6094,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 #endif
   }
 
+cleanup:
 #ifdef MPI2
   free(igatherv);
   free(idisplsv);
@@ -6132,7 +6169,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
     free(bpso);
 
 
-  return(0);
+  return(status);
 }
 
 int kernel_weighted_sum_np(
@@ -6312,9 +6349,9 @@ double *cv){
 
   uint64_t W = Wi;
 
-  k = (int)uki;
-  j = (int)uji;
-  i = (int)uii;
+  k = (int)(uki*(uint64_t)blklen);
+  j = (int)(uji*(uint64_t)blklen);
+  i = (int)(uii*(uint64_t)blklen);
 
   sum_kerf = (double *)malloc(num_obs*sizeof(double));
   if(!(sum_kerf != NULL))
@@ -11310,8 +11347,9 @@ double *SIGN){
 
       // now do lookups
       struct th_entry te;
-      te.key.dkey = ret->key.dkey;
-      te.data = ret->data;
+      te.key.dkey = 0.0;
+      te.data = -1;
+      ret = &te;
 
       for(i = 0; i < num_obs_eval; i++){
         if(ret->key.dkey != matrix_X_ordered_eval[l][i]){
@@ -11341,7 +11379,8 @@ double *SIGN){
   
     if(do_grad){
       permy = (double *)malloc(NCOL_Y*num_obs_eval_alloc*p_nvar*sizeof(double));
-      assert(permy != NULL);
+      if(permy == NULL)
+        error("\n** Error: memory allocation failed.");
       pop = OP_DERIVATIVE;
     }
     
@@ -11795,7 +11834,8 @@ double *SIGN){
 
     if(do_ocg){
       permy = (double *)malloc(nrcc33*num_obs_eval_alloc*p_nvar*sizeof(double));
-      assert(permy != NULL);
+      if(permy == NULL)
+        error("\n** Error: memory allocation failed.");
     }
 
     double * sgn = (double *)malloc((nrc3)*sizeof(double));
@@ -11921,7 +11961,9 @@ double *SIGN){
         }
         // synchro step
         MPI_Allgather(MPI_IN_PLACE, nrcc33, MPI_DOUBLE, kwm+j*nrcc33, nrcc33, MPI_DOUBLE, comm[1]);          
-        MPI_Allgather(MPI_IN_PLACE, nrcc33*p_nvar, MPI_DOUBLE, permy+j*nrcc33*p_nvar, nrcc33*p_nvar, MPI_DOUBLE, comm[1]);    
+        if(do_ocg){
+          MPI_Allgather(MPI_IN_PLACE, nrcc33*p_nvar, MPI_DOUBLE, permy+j*nrcc33*p_nvar, nrcc33*p_nvar, MPI_DOUBLE, comm[1]);
+        }
       }
       
 #else
@@ -12022,7 +12064,10 @@ double *SIGN){
       const double ey = (kwm+j*nrcc33)[nrc3+2]/sk;
       const double ey2 = (kwm+j*nrcc33)[nrc3+1]/sk;
 
-      mean_stderr[j] = sqrt((ey2 - ey*ey)*K_INT_KERNEL_P / (sk*hprod));
+      {
+        const double v = (ey2 - ey*ey)*K_INT_KERNEL_P / (sk*hprod);
+        mean_stderr[j] = (v <= 0.0) ? 0.0 : sqrt(v);
+      }
 
       if(do_grad){
         for(int ii = 0; ii < num_reg_continuous; ii++){
@@ -13479,8 +13524,9 @@ double * log_likelihood
 
       // now do lookups
       struct th_entry te;
-      te.key.dkey = ret->key.dkey;
-      te.data = ret->data;
+      te.key.dkey = 0.0;
+      te.data = -1;
+      ret = &te;
 
       for(i = 0; i < num_obs_eval; i++){
         if(ret->key.dkey != matrix_XY_ordered_eval[l][i]){

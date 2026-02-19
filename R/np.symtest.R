@@ -71,6 +71,7 @@ npsymtest <- function(data = NULL,
     if(is.null(bw)) {
       n <- length(data)
       c <- length(unique(data))
+      if(c <= 1) stop("data must contain at least two distinct factor levels")
       xeval <- unique(data)
       p <- fitted(npudens(tdat=data,edat=xeval,bws=0,...))
       sum.Lambda3 <- c/(c-1)*sum(p*(1-p))

@@ -1267,6 +1267,10 @@ double kernel_unordered(int KERNEL, double x, double y, double lambda, int c)
 
 	double return_value = 0.0;
 
+	if(c < 2){
+		return (x == y) ? 1.0 : 0.0;
+	}
+
 	switch(KERNEL)
 	{
 
@@ -1313,6 +1317,10 @@ double kernel_unordered_ratio(int KERNEL, double x, double y, double lambda, int
 
 	double return_value = 1.0;
   const double dc = (double) c;
+
+	if(c < 2){
+		return (x == y) ? 1.0 : 0.0;
+	}
 
 	switch(KERNEL)	{
 

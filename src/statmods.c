@@ -1198,7 +1198,7 @@ double **matrix_categorical_vals)
         if(my_rank == 0)
         {
 #endif
-            if(int_DEBUG == 1)
+            if((int_DEBUG == 1) && (File10 != NULL))
             {
 
                 fprintf(File10, "\nThere are %d unique values for unordered variable %d.", l, k+1);
@@ -1262,7 +1262,7 @@ double **matrix_categorical_vals)
         if(my_rank == 0)
         {
 #endif
-            if(int_DEBUG == 1)
+            if((int_DEBUG == 1) && (File10 != NULL))
             {
 
                 fprintf(File10, "\nThere are %d unique values for ordered variable %d.", l, k+1);
@@ -1328,7 +1328,7 @@ double **matrix_categorical_vals)
         if(my_rank == 0)
         {
 #endif
-            if(int_DEBUG == 1)
+            if((int_DEBUG == 1) && (File10 != NULL))
             {
 
                 fprintf(File10, "\nThere are %d unique values for unordered predictor %d.", l, k+1);
@@ -1392,7 +1392,7 @@ double **matrix_categorical_vals)
         if(my_rank == 0)
         {
 #endif
-            if(int_DEBUG == 1)
+            if((int_DEBUG == 1) && (File10 != NULL))
             {
 
                 fprintf(File10, "\nThere are %d unique values for ordered predictor %d.", l, k+1);
@@ -1425,7 +1425,7 @@ double **matrix_categorical_vals)
     if(my_rank == 0)
     {
 #endif
-        if(int_DEBUG == 1)
+        if((int_DEBUG == 1) && (File10 != NULL))
         {
             fclose(File10);
         }
@@ -1867,7 +1867,7 @@ double *x)
 
     for(i=1; i < num_obs; i++)
     {
-        if(x[i]>x[i-1]) x_max = x[i];
+        if(x[i] > x_max) x_max = x[i];
     }
 
 /* Compute maximum number of unique distances (could be minimum?) */
