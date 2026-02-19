@@ -1,2 +1,7 @@
 *.o
 *.so
+*.plist
+.DS_Store
+config.log
+config.status
+src/Makevars
