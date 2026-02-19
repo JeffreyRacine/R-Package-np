@@ -7089,6 +7089,114 @@ typedef struct {
 
 static NPLLCVCache np_ll_cv_cache = {0, 0, 0, NULL, NULL, NULL};
 
+typedef struct {
+  int ready;
+  int ncon;
+  int nuno;
+  int nord;
+  int bw_rows;
+  int total_reg;
+  int kernel_reg;
+  int kernel_unordered_reg;
+  int kernel_ordered_reg;
+  int *operator;
+  int *kernel_c;
+  int *kernel_u;
+  int *kernel_o;
+  double *lambda;
+  double **matrix_bandwidth;
+} NPRegCVCachedCore;
+
+static NPRegCVCachedCore np_reg_cv_core_cache =
+  {0, 0, 0, 0, 0, 0, -1, -1, -1, NULL, NULL, NULL, NULL, NULL, NULL};
+
+static void np_reg_cv_core_cache_clear(void){
+  if(np_reg_cv_core_cache.operator != NULL) free(np_reg_cv_core_cache.operator);
+  if(np_reg_cv_core_cache.kernel_c != NULL) free(np_reg_cv_core_cache.kernel_c);
+  if(np_reg_cv_core_cache.kernel_u != NULL) free(np_reg_cv_core_cache.kernel_u);
+  if(np_reg_cv_core_cache.kernel_o != NULL) free(np_reg_cv_core_cache.kernel_o);
+  if(np_reg_cv_core_cache.lambda != NULL) free(np_reg_cv_core_cache.lambda);
+  if(np_reg_cv_core_cache.matrix_bandwidth != NULL) free_tmat(np_reg_cv_core_cache.matrix_bandwidth);
+  np_reg_cv_core_cache.ready = 0;
+  np_reg_cv_core_cache.ncon = 0;
+  np_reg_cv_core_cache.nuno = 0;
+  np_reg_cv_core_cache.nord = 0;
+  np_reg_cv_core_cache.bw_rows = 0;
+  np_reg_cv_core_cache.total_reg = 0;
+  np_reg_cv_core_cache.kernel_reg = -1;
+  np_reg_cv_core_cache.kernel_unordered_reg = -1;
+  np_reg_cv_core_cache.kernel_ordered_reg = -1;
+  np_reg_cv_core_cache.operator = NULL;
+  np_reg_cv_core_cache.kernel_c = NULL;
+  np_reg_cv_core_cache.kernel_u = NULL;
+  np_reg_cv_core_cache.kernel_o = NULL;
+  np_reg_cv_core_cache.lambda = NULL;
+  np_reg_cv_core_cache.matrix_bandwidth = NULL;
+}
+
+static int np_reg_cv_core_cache_prepare(const int KERNEL_reg,
+                                        const int KERNEL_unordered_reg,
+                                        const int KERNEL_ordered_reg,
+                                        const int BANDWIDTH_reg,
+                                        const int num_obs,
+                                        const int num_reg_continuous,
+                                        const int num_reg_unordered,
+                                        const int num_reg_ordered){
+  const int total_reg = num_reg_continuous + num_reg_unordered + num_reg_ordered;
+  const int bw_rows = (BANDWIDTH_reg == BW_FIXED) ? 1 : num_obs;
+  int i;
+  int need_realloc = 0;
+
+  if(!np_reg_cv_core_cache.ready) {
+    need_realloc = 1;
+  } else if(np_reg_cv_core_cache.ncon != num_reg_continuous ||
+            np_reg_cv_core_cache.nuno != num_reg_unordered ||
+            np_reg_cv_core_cache.nord != num_reg_ordered ||
+            np_reg_cv_core_cache.bw_rows != bw_rows) {
+    need_realloc = 1;
+  }
+
+  if(need_realloc){
+    np_reg_cv_core_cache_clear();
+    np_reg_cv_core_cache.operator = (int *)malloc(sizeof(int)*MAX(1,total_reg));
+    np_reg_cv_core_cache.kernel_c = (int *)malloc(sizeof(int)*MAX(1,num_reg_continuous));
+    np_reg_cv_core_cache.kernel_u = (int *)malloc(sizeof(int)*MAX(1,num_reg_unordered));
+    np_reg_cv_core_cache.kernel_o = (int *)malloc(sizeof(int)*MAX(1,num_reg_ordered));
+    np_reg_cv_core_cache.lambda = alloc_vecd(MAX(1, num_reg_unordered + num_reg_ordered));
+    np_reg_cv_core_cache.matrix_bandwidth = alloc_tmatd(bw_rows, num_reg_continuous);
+    if(np_reg_cv_core_cache.operator == NULL ||
+       np_reg_cv_core_cache.kernel_c == NULL ||
+       np_reg_cv_core_cache.kernel_u == NULL ||
+       np_reg_cv_core_cache.kernel_o == NULL ||
+       np_reg_cv_core_cache.lambda == NULL ||
+       np_reg_cv_core_cache.matrix_bandwidth == NULL){
+      np_reg_cv_core_cache_clear();
+      return 0;
+    }
+    np_reg_cv_core_cache.ready = 1;
+    np_reg_cv_core_cache.ncon = num_reg_continuous;
+    np_reg_cv_core_cache.nuno = num_reg_unordered;
+    np_reg_cv_core_cache.nord = num_reg_ordered;
+    np_reg_cv_core_cache.bw_rows = bw_rows;
+    np_reg_cv_core_cache.total_reg = total_reg;
+  }
+
+  np_reg_cv_core_cache.kernel_reg = KERNEL_reg;
+  np_reg_cv_core_cache.kernel_unordered_reg = KERNEL_unordered_reg;
+  np_reg_cv_core_cache.kernel_ordered_reg = KERNEL_ordered_reg;
+
+  for(i = 0; i < total_reg; i++)
+    np_reg_cv_core_cache.operator[i] = OP_NORMAL;
+  for(i = 0; i < num_reg_continuous; i++)
+    np_reg_cv_core_cache.kernel_c[i] = KERNEL_reg;
+  for(i = 0; i < num_reg_unordered; i++)
+    np_reg_cv_core_cache.kernel_u[i] = KERNEL_unordered_reg;
+  for(i = 0; i < num_reg_ordered; i++)
+    np_reg_cv_core_cache.kernel_o[i] = KERNEL_ordered_reg;
+
+  return 1;
+}
+
 static void np_ll_cv_cache_clear(void){
   if(np_ll_cv_cache.xtkx_base != NULL)
     mat_free(np_ll_cv_cache.xtkx_base);
@@ -7144,6 +7252,10 @@ void np_ll_cv_clear_extern(void){
   np_ll_cv_cache_clear();
 }
 
+void np_reg_cv_core_clear_extern(void){
+  np_reg_cv_core_cache_clear();
+}
+
 // Regression CV objective for local-constant/local-linear models.
 // The LL branch solves weighted normal equations with ridge fallback if singular.
 
@@ -7188,25 +7300,22 @@ int gate_override_active = 0;
   const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
   np_gate_ctx_clear(&gate_ctx_local);
 
-  operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
+  if(!np_reg_cv_core_cache_prepare(KERNEL_reg,
+                                   KERNEL_unordered_reg,
+                                   KERNEL_ordered_reg,
+                                   BANDWIDTH_reg,
+                                   num_obs,
+                                   num_reg_continuous,
+                                   num_reg_unordered,
+                                   num_reg_ordered))
+    return DBL_MAX;
 
-  for(i = 0; i < (num_reg_continuous+num_reg_unordered+num_reg_ordered); i++)
-    operator[i] = OP_NORMAL;
-
-  kernel_c = (int *)malloc(sizeof(int)*num_reg_continuous);
-
-  for(i = 0; i < num_reg_continuous; i++)
-    kernel_c[i] = KERNEL_reg;
-
-  kernel_u = (int *)malloc(sizeof(int)*num_reg_unordered);
-
-  for(i = 0; i < num_reg_unordered; i++)
-    kernel_u[i] = KERNEL_unordered_reg;
-
-  kernel_o = (int *)malloc(sizeof(int)*num_reg_ordered);
-
-  for(i = 0; i < num_reg_ordered; i++)
-    kernel_o[i] = KERNEL_ordered_reg;
+  operator = np_reg_cv_core_cache.operator;
+  kernel_c = np_reg_cv_core_cache.kernel_c;
+  kernel_u = np_reg_cv_core_cache.kernel_u;
+  kernel_o = np_reg_cv_core_cache.kernel_o;
+  lambda = np_reg_cv_core_cache.lambda;
+  matrix_bandwidth = np_reg_cv_core_cache.matrix_bandwidth;
 
 #ifdef MPI2
     int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
@@ -7216,11 +7325,6 @@ int gate_override_active = 0;
 #endif
 
     int ks_tree_use = (int_TREE_X == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll == LL_LL)));
-
-  // Allocate memory for objects 
-
-  lambda = alloc_vecd(num_reg_unordered+num_reg_ordered);
-  matrix_bandwidth = alloc_tmatd(BANDWIDTH_reg==BW_FIXED?1:num_obs, num_reg_continuous);  
 
   if(kernel_bandwidth_mean(KERNEL_reg,
                            BANDWIDTH_reg,
@@ -7241,9 +7345,6 @@ int gate_override_active = 0;
                            NULL,					 // Not used 
                            matrix_bandwidth,
                            lambda)==1){
-    
-    free(lambda);
-    free_tmat(matrix_bandwidth);
     
     return(DBL_MAX);
   }
@@ -7326,8 +7427,15 @@ int gate_override_active = 0;
       goto finish_cv_path;
     }
 
-    for(i = 0; i < num_obs; i++)
-      y2[i] = vector_Y[i]*vector_Y[i];
+	    for(i = 0; i < num_obs; i++)
+	      y2[i] = vector_Y[i]*vector_Y[i];
+
+    Ycols[0] = y2;
+    Ycols[1] = vector_Y;
+    for(l = 0; l < glp_nterms; l++){
+      Ycols[l + 2] = basis[l];
+      Wcols[l] = basis[l];
+    }
 
     if(bwm == RBWM_CVAIC){
       tsf = int_LARGE_SF;
@@ -7399,14 +7507,7 @@ int gate_override_active = 0;
       for(l = 0; l < num_reg_ordered; l++)
         TORD[l][0] = matrix_X_ordered[l][j];
 
-      Ycols[0] = y2;
-      Ycols[1] = vector_Y;
-      for(l = 0; l < glp_nterms; l++){
-        Ycols[l + 2] = basis[l];
-        Wcols[l] = basis[l];
-      }
-
-      kernel_weighted_sum_np_ctx(kernel_c,
+	      kernel_weighted_sum_np_ctx(kernel_c,
                                  kernel_u,
                                  kernel_o,
                                  BANDWIDTH_reg,
@@ -8519,12 +8620,6 @@ int gate_override_active = 0;
   }
 
 finish_cv_path:
-  free(operator);
-  free(kernel_c);
-  free(kernel_u);
-  free(kernel_o);
-  free(lambda);
-  free_tmat(matrix_bandwidth);
   if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
   if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
   if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);

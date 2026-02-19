@@ -163,6 +163,7 @@ int np_glp_cv_prepare_extern(const int int_ll, const int num_obs, const int ncon
 void np_glp_cv_clear_extern(void);
 int np_ll_cv_prepare_extern(const int int_ll, const int num_obs, const int ncon, double **matrix_X_continuous, double *vector_Y);
 void np_ll_cv_clear_extern(void);
+void np_reg_cv_core_clear_extern(void);
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor);
 
 int kernel_estimate_regression_categorical_no_stderr(int int_compute_gradient, int int_ll, int KERNEL_reg, int KERNEL_unordered_reg, int KERNEL_ordered_reg, int BANDWIDTH_reg, int int_WEIGHTS, int *var_index_int, int num_var_test_int, double **matrix_weights_K, double ***matrix_weights_K_deriv, int num_obs_train, int num_obs_eval, int num_reg_unordered, int num_reg_ordered, int num_reg_continuous, double **matrix_X_unordered_train, double **matrix_X_ordered_train, double **matrix_X_continuous_train, double **matrix_X_unordered_eval, double **matrix_X_ordered_eval, double **matrix_X_continuous_eval, double **matrix_bandwidth, double **matrix_bandwidth_deriv, double *vector_Y, double *lambda, int *num_categories, double *mean, double **gradient);

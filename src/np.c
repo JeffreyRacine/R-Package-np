@@ -4908,6 +4908,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   np_glp_cv_clear_extern();
   np_ll_cv_clear_extern();
+  np_reg_cv_core_clear_extern();
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
