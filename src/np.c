@@ -4552,6 +4552,14 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                                 matrix_X_continuous_train_extern))){
     error("failed to prepare GLP CV basis cache");
   }
+  if((int_ll_extern == LL_LL) &&
+     (!np_ll_cv_prepare_extern(int_ll_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
+                               matrix_X_continuous_train_extern,
+                               vector_Y_extern))){
+    error("failed to prepare LL CV basis cache");
+  }
 
 
   /* Initialize scale factors and Directions for NR modules */
@@ -4899,6 +4907,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
     Rprintf("\r                   \r");
 
   np_glp_cv_clear_extern();
+  np_ll_cv_clear_extern();
 
   int_cker_bound_extern = 0;
   vector_ckerlb_extern = NULL;
