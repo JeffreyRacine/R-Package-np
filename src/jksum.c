@@ -6759,29 +6759,12 @@ static int np_glp_build_terms(const int ncon,
   return 1;
 }
 
-static int np_glp_find_linear_term(const int ncon, const int *terms, const int nterms, const int which){
-  int t, j;
-  for(t = 0; t < nterms; t++){
-    const int *et = terms + t*ncon;
-    int ok = (et[which] == 1);
-    if(!ok) continue;
-    for(j = 0; j < ncon; j++){
-      if(j == which) continue;
-      if(et[j] != 0){ ok = 0; break; }
-    }
-    if(ok) return t;
-  }
-  return -1;
-}
-
-static void np_glp_fill_basis_raw(const int ncon,
-                                  const int *terms,
-                                  const int nterms,
-                                  double **matrix_X_continuous_train,
-                                  double **matrix_X_continuous_eval,
-                                  const int eval_index,
-                                  const int num_obs_train,
-                                  double **basis){
+static void np_glp_fill_basis_raw_train(const int ncon,
+                                        const int *terms,
+                                        const int nterms,
+                                        double **matrix_X_continuous_train,
+                                        const int num_obs_train,
+                                        double **basis){
   int t, i, j;
   for(t = 0; t < nterms; t++){
     const int *et = terms + t*ncon;
@@ -6789,13 +6772,58 @@ static void np_glp_fill_basis_raw(const int ncon,
       double b = 1.0;
       for(j = 0; j < ncon; j++){
         const int p = et[j];
-        if(p > 0){
-          const double dx = matrix_X_continuous_train[j][i] - matrix_X_continuous_eval[j][eval_index];
-          b *= ipow(dx, p);
-        }
+        if(p > 0)
+          b *= ipow(matrix_X_continuous_train[j][i], p);
       }
       basis[t][i] = b;
     }
+  }
+}
+
+static void np_glp_fill_basis_eval_raw(const int ncon,
+                                       const int *terms,
+                                       const int nterms,
+                                       double **matrix_X_continuous_eval,
+                                       const int eval_index,
+                                       double *eval_basis){
+  int t, j;
+  for(t = 0; t < nterms; t++){
+    const int *et = terms + t*ncon;
+    double b = 1.0;
+    for(j = 0; j < ncon; j++){
+      const int p = et[j];
+      if(p > 0)
+        b *= ipow(matrix_X_continuous_eval[j][eval_index], p);
+    }
+    eval_basis[t] = b;
+  }
+}
+
+static void np_glp_fill_basis_eval_deriv_raw(const int which_var,
+                                             const int ncon,
+                                             const int *terms,
+                                             const int nterms,
+                                             double **matrix_X_continuous_eval,
+                                             const int eval_index,
+                                             double *eval_deriv){
+  int t, j;
+  for(t = 0; t < nterms; t++){
+    const int *et = terms + t*ncon;
+    double b = 1.0;
+    for(j = 0; j < ncon; j++){
+      const int p = et[j];
+      const double x = matrix_X_continuous_eval[j][eval_index];
+      if(j == which_var){
+        if(p <= 0){
+          b = 0.0;
+          break;
+        }
+        b *= ((double)p)*ipow(x, p - 1);
+      } else if(p > 0){
+        b *= ipow(x, p);
+      }
+    }
+    eval_deriv[t] = b;
   }
 }
 
@@ -6935,6 +6963,121 @@ static void np_glp_fill_basis_eval_deriv(const int which_var,
   }
 }
 
+typedef struct {
+  int ready;
+  int use_bernstein;
+  int num_obs;
+  int ncon;
+  int nterms;
+  int *terms;
+  double **basis;
+  NPGLPBasisCtx *basis_ctx;
+  double **matrix_X_continuous_train_ptr;
+} NPGLPCVCache;
+
+static NPGLPCVCache np_glp_cv_cache = {0, 0, 0, 0, 0, NULL, NULL, NULL, NULL};
+
+static void np_glp_cv_cache_clear(void){
+  int l;
+  if(np_glp_cv_cache.basis != NULL)
+    free_mat(np_glp_cv_cache.basis, np_glp_cv_cache.nterms);
+  if(np_glp_cv_cache.basis_ctx != NULL){
+    for(l = 0; l < np_glp_cv_cache.ncon; l++)
+      np_glp_basis_ctx_free(&np_glp_cv_cache.basis_ctx[l]);
+    free(np_glp_cv_cache.basis_ctx);
+  }
+  free(np_glp_cv_cache.terms);
+  np_glp_cv_cache.ready = 0;
+  np_glp_cv_cache.use_bernstein = 0;
+  np_glp_cv_cache.num_obs = 0;
+  np_glp_cv_cache.ncon = 0;
+  np_glp_cv_cache.nterms = 0;
+  np_glp_cv_cache.terms = NULL;
+  np_glp_cv_cache.basis = NULL;
+  np_glp_cv_cache.basis_ctx = NULL;
+  np_glp_cv_cache.matrix_X_continuous_train_ptr = NULL;
+}
+
+static int np_glp_cv_cache_prepare(const int int_ll,
+                                   const int num_obs,
+                                   const int ncon,
+                                   double **matrix_X_continuous_train){
+  int l, i;
+  int *terms = NULL;
+  int nterms = 0;
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
+  double **basis = NULL;
+  NPGLPBasisCtx *basis_ctx = NULL;
+
+  np_glp_cv_cache_clear();
+
+  if(int_ll != LL_GLP) return 1;
+  if((vector_glp_degree_extern == NULL) || (ncon <= 0) || (num_obs <= 0))
+    return 0;
+  if(!np_glp_build_terms(ncon, vector_glp_degree_extern, &terms, &nterms))
+    return 0;
+  if(nterms <= 0){
+    free(terms);
+    return 0;
+  }
+
+  basis = alloc_matd(num_obs, nterms);
+  if(basis == NULL){
+    free(terms);
+    return 0;
+  }
+
+  if(use_bernstein){
+    basis_ctx = (NPGLPBasisCtx *)calloc((size_t)ncon, sizeof(NPGLPBasisCtx));
+    if(basis_ctx == NULL){
+      free_mat(basis, nterms);
+      free(terms);
+      return 0;
+    }
+    for(l = 0; l < ncon; l++){
+      double xmin = matrix_X_continuous_train[l][0];
+      double xmax = matrix_X_continuous_train[l][0];
+      for(i = 1; i < num_obs; i++){
+        const double xi = matrix_X_continuous_train[l][i];
+        if(xi < xmin) xmin = xi;
+        if(xi > xmax) xmax = xi;
+      }
+      if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax)){
+        for(i = 0; i <= l; i++) np_glp_basis_ctx_free(&basis_ctx[i]);
+        free(basis_ctx);
+        free_mat(basis, nterms);
+        free(terms);
+        return 0;
+      }
+    }
+    np_glp_fill_basis_train(ncon, terms, nterms, matrix_X_continuous_train, num_obs, basis_ctx, basis);
+  } else {
+    np_glp_fill_basis_raw_train(ncon, terms, nterms, matrix_X_continuous_train, num_obs, basis);
+  }
+
+  np_glp_cv_cache.ready = 1;
+  np_glp_cv_cache.use_bernstein = use_bernstein;
+  np_glp_cv_cache.num_obs = num_obs;
+  np_glp_cv_cache.ncon = ncon;
+  np_glp_cv_cache.nterms = nterms;
+  np_glp_cv_cache.terms = terms;
+  np_glp_cv_cache.basis = basis;
+  np_glp_cv_cache.basis_ctx = basis_ctx;
+  np_glp_cv_cache.matrix_X_continuous_train_ptr = matrix_X_continuous_train;
+  return 1;
+}
+
+int np_glp_cv_prepare_extern(const int int_ll,
+                             const int num_obs,
+                             const int ncon,
+                             double **matrix_X_continuous_train){
+  return np_glp_cv_cache_prepare(int_ll, num_obs, ncon, matrix_X_continuous_train);
+}
+
+void np_glp_cv_clear_extern(void){
+  np_glp_cv_cache_clear();
+}
+
 // Regression CV objective for local-constant/local-linear models.
 // The LL branch solves weighted normal equations with ridge fallback if singular.
 
@@ -7040,15 +7183,15 @@ int gate_override_active = 0;
   }
 
   if(int_ll == LL_GLP){
-    int *glp_terms = NULL;
-    int glp_nterms = 0;
     const int use_bernstein = (int_glp_bernstein_extern != 0);
-    MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+    const int *glp_terms = NULL;
+    int glp_nterms = 0;
     double **basis = NULL;
+    NPGLPBasisCtx *basis_ctx = NULL;
+    MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
     double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
     double **Ycols = NULL, **Wcols = NULL;
     double *y2 = NULL, *out = NULL;
-    NPGLPBasisCtx *basis_ctx = NULL;
     double *eval_basis = NULL;
     const double epsilon = 1.0/(double)MAX(1, num_obs);
     int glp_ok = 1;
@@ -7058,13 +7201,28 @@ int gate_override_active = 0;
       goto finish_cv_path;
     }
 
-    if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, &glp_terms, &glp_nterms)){
+    if(!np_glp_cv_cache.ready ||
+       (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+       (np_glp_cv_cache.num_obs != num_obs) ||
+       (np_glp_cv_cache.ncon != num_reg_continuous) ||
+       (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous)){
+      if(!np_glp_cv_cache_prepare(int_ll, num_obs, num_reg_continuous, matrix_X_continuous)){
+        cv = DBL_MAX;
+        goto finish_cv_path;
+      }
+    }
+
+    if(!np_glp_cv_cache.ready){
       cv = DBL_MAX;
       goto finish_cv_path;
     }
 
-    if(glp_nterms <= 0){
-      free(glp_terms);
+    glp_terms = np_glp_cv_cache.terms;
+    glp_nterms = np_glp_cv_cache.nterms;
+    basis = np_glp_cv_cache.basis;
+    basis_ctx = np_glp_cv_cache.basis_ctx;
+
+    if((glp_terms == NULL) || (basis == NULL) || (glp_nterms <= 0)){
       cv = DBL_MAX;
       goto finish_cv_path;
     }
@@ -7072,7 +7230,6 @@ int gate_override_active = 0;
     KWM = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
     XTKY = mat_creat(glp_nterms, 1, UNDEFINED);
     DELTA = mat_creat(glp_nterms, 1, UNDEFINED);
-    basis = alloc_matd(num_obs, glp_nterms);
     TCON = alloc_matd(1, num_reg_continuous);
     TUNO = alloc_matd(1, num_reg_unordered);
     TORD = alloc_matd(1, num_reg_ordered);
@@ -7080,73 +7237,31 @@ int gate_override_active = 0;
     Wcols = (double **)malloc((size_t)glp_nterms*sizeof(double *));
     y2 = (double *)malloc((size_t)num_obs*sizeof(double));
     out = (double *)malloc((size_t)(glp_nterms + 2)*(size_t)glp_nterms*sizeof(double));
-    if(use_bernstein){
-      basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
-      eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
-    }
+    eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
 
     glp_ok = (KWM != NULL) && (XTKY != NULL) && (DELTA != NULL) &&
-      (basis != NULL) &&
       ((num_reg_continuous == 0) || (TCON != NULL)) &&
       ((num_reg_unordered == 0) || (TUNO != NULL)) &&
       ((num_reg_ordered == 0) || (TORD != NULL)) &&
       (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) &&
-      (!use_bernstein || ((basis_ctx != NULL) && (eval_basis != NULL)));
+      (eval_basis != NULL) &&
+      (!use_bernstein || (basis_ctx != NULL));
 
     if(!glp_ok){
       if(KWM != NULL) mat_free(KWM);
       if(XTKY != NULL) mat_free(XTKY);
       if(DELTA != NULL) mat_free(DELTA);
-      if(basis != NULL) free_mat(basis, glp_nterms);
       if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
       if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
       if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
       free(Ycols); free(Wcols); free(y2); free(out);
-      free(basis_ctx); free(eval_basis);
-      free(glp_terms);
+      free(eval_basis);
       cv = DBL_MAX;
       goto finish_cv_path;
     }
 
     for(i = 0; i < num_obs; i++)
       y2[i] = vector_Y[i]*vector_Y[i];
-
-    if(use_bernstein){
-      for(l = 0; l < num_reg_continuous; l++){
-        double xmin = matrix_X_continuous[l][0];
-        double xmax = matrix_X_continuous[l][0];
-        for(i = 1; i < num_obs; i++){
-          const double xi = matrix_X_continuous[l][i];
-          if(xi < xmin) xmin = xi;
-          if(xi > xmax) xmax = xi;
-        }
-        if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax)){
-          glp_ok = 0;
-          break;
-        }
-      }
-      if(!glp_ok){
-        mat_free(KWM);
-        mat_free(XTKY);
-        mat_free(DELTA);
-        free_mat(basis, glp_nterms);
-        if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
-        if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
-        if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
-        free(Ycols); free(Wcols); free(y2); free(out);
-        for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
-        free(basis_ctx); free(eval_basis); free(glp_terms);
-        cv = DBL_MAX;
-        goto finish_cv_path;
-      }
-      np_glp_fill_basis_train(num_reg_continuous,
-                              glp_terms,
-                              glp_nterms,
-                              matrix_X_continuous,
-                              num_obs,
-                              basis_ctx,
-                              basis);
-    }
 
     if(bwm == RBWM_CVAIC){
       tsf = int_LARGE_SF;
@@ -7207,12 +7322,6 @@ int gate_override_active = 0;
     for(j = 0; j < num_obs; j++){
       double nepsilon = 0.0;
       double pnh = 1.0;
-
-      if(!use_bernstein){
-        np_glp_fill_basis_raw(num_reg_continuous, glp_terms, glp_nterms,
-                              matrix_X_continuous, matrix_X_continuous,
-                              j, num_obs, basis);
-      }
 
       for(l = 0; l < num_reg_continuous; l++){
         TCON[l][0] = matrix_X_continuous[l][j];
@@ -7316,9 +7425,8 @@ int gate_override_active = 0;
       }
 
       {
-        double mhat = DELTA[0][0];
-        if(use_bernstein){
-          mhat = 0.0;
+        double mhat = 0.0;
+        if(use_bernstein)
           np_glp_fill_basis_eval(num_reg_continuous,
                                  glp_terms,
                                  glp_nterms,
@@ -7326,9 +7434,15 @@ int gate_override_active = 0;
                                  j,
                                  basis_ctx,
                                  eval_basis);
-          for(i = 0; i < glp_nterms; i++)
-            mhat += eval_basis[i]*DELTA[i][0];
-        }
+        else
+          np_glp_fill_basis_eval_raw(num_reg_continuous,
+                                     glp_terms,
+                                     glp_nterms,
+                                     matrix_X_continuous,
+                                     j,
+                                     eval_basis);
+        for(i = 0; i < glp_nterms; i++)
+          mhat += eval_basis[i]*DELTA[i][0];
         const double dy = vector_Y[j] - mhat;
         cv += dy*dy;
       }
@@ -7344,16 +7458,11 @@ int gate_override_active = 0;
     mat_free(KWM);
     mat_free(XTKY);
     mat_free(DELTA);
-    free_mat(basis, glp_nterms);
     if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
     if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
     if((TORD != NULL) && (num_reg_ordered > 0)) free_mat(TORD, num_reg_ordered);
     free(Ycols); free(Wcols); free(y2); free(out);
-    if(use_bernstein){
-      for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
-      free(basis_ctx); free(eval_basis);
-    }
-    free(glp_terms);
+    free(eval_basis);
 
     if(!glp_ok){
       cv = DBL_MAX;
@@ -11527,7 +11636,6 @@ double *SIGN){
 #undef NCOL_Y
   } else if(int_ll == LL_GLP) { // Generalized Local Polynomial
     int *glp_terms = NULL;
-    int *lin_idx = NULL;
     int glp_nterms = 0;
     const int use_bernstein = (int_glp_bernstein_extern != 0);
     MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
@@ -11558,13 +11666,10 @@ double *SIGN){
     Wcols = (double **)malloc((size_t)glp_nterms*sizeof(double *));
     y2 = (double *)malloc((size_t)num_obs_train*sizeof(double));
     out = (double *)malloc((size_t)(glp_nterms + 2)*(size_t)glp_nterms*sizeof(double));
-    if(use_bernstein){
+    eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
+    eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
+    if(use_bernstein)
       basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
-      eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
-      eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
-    } else {
-      lin_idx = (int *)malloc((size_t)MAX(1, num_reg_continuous)*sizeof(int));
-    }
 
     if(!((KWM != NULL) && (XTKY != NULL) && (DELTA != NULL) &&
       (basis != NULL) &&
@@ -11572,8 +11677,8 @@ double *SIGN){
       ((num_reg_unordered == 0) || (TUNO != NULL)) &&
       ((num_reg_ordered == 0) || (TORD != NULL)) &&
       (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) &&
-      ((!use_bernstein && (lin_idx != NULL)) ||
-       (use_bernstein && (basis_ctx != NULL) && (eval_basis != NULL) && (eval_deriv != NULL)))))
+      (eval_basis != NULL) && (eval_deriv != NULL) &&
+      (!use_bernstein || (basis_ctx != NULL))))
       error("memory allocation failed in glp path");
 
     for(i = 0; i < num_obs_train; i++)
@@ -11600,19 +11705,17 @@ double *SIGN){
                               basis_ctx,
                               basis);
     } else {
-      for(l = 0; l < num_reg_continuous; l++)
-        lin_idx[l] = np_glp_find_linear_term(num_reg_continuous, glp_terms, glp_nterms, l);
+      np_glp_fill_basis_raw_train(num_reg_continuous,
+                                  glp_terms,
+                                  glp_nterms,
+                                  matrix_X_continuous_train,
+                                  num_obs_train,
+                                  basis);
     }
 
     for(j = 0; j < num_obs_eval; j++){
       double nepsilon = 0.0;
       double sk, ey, ey2;
-
-      if(!use_bernstein){
-        np_glp_fill_basis_raw(num_reg_continuous, glp_terms, glp_nterms,
-                              matrix_X_continuous_train, matrix_X_continuous_eval,
-                              j, num_obs_train, basis);
-      }
 
       for(l = 0; l < num_reg_continuous; l++)
         TCON[l][0] = matrix_X_continuous_eval[l][j];
@@ -11699,7 +11802,7 @@ double *SIGN){
           error("mat_solve failed in glp path");
       }
 
-      if(use_bernstein){
+      if(use_bernstein)
         np_glp_fill_basis_eval(num_reg_continuous,
                                glp_terms,
                                glp_nterms,
@@ -11707,12 +11810,16 @@ double *SIGN){
                                j,
                                basis_ctx,
                                eval_basis);
-        mean[j] = 0.0;
-        for(i = 0; i < glp_nterms; i++)
-          mean[j] += eval_basis[i]*DELTA[i][0];
-      } else {
-        mean[j] = DELTA[0][0];
-      }
+      else
+        np_glp_fill_basis_eval_raw(num_reg_continuous,
+                                   glp_terms,
+                                   glp_nterms,
+                                   matrix_X_continuous_eval,
+                                   j,
+                                   eval_basis);
+      mean[j] = 0.0;
+      for(i = 0; i < glp_nterms; i++)
+        mean[j] += eval_basis[i]*DELTA[i][0];
       /* Row 0 corresponds to the constant basis term W0. */
       sk = copysign(DBL_MIN, out[2]) + out[2]; /* sum K * W0 * W0 */
       ey = out[1]/sk;  /* sum K * W0 * y / sk */
@@ -11722,7 +11829,7 @@ double *SIGN){
 
       if(do_grad){
         for(l = 0; l < num_reg_continuous; l++){
-          if(use_bernstein){
+          if(use_bernstein)
             np_glp_fill_basis_eval_deriv(l,
                                          num_reg_continuous,
                                          glp_terms,
@@ -11731,12 +11838,17 @@ double *SIGN){
                                          j,
                                          basis_ctx,
                                          eval_deriv);
-            gradient[l][j] = 0.0;
-            for(i = 0; i < glp_nterms; i++)
-              gradient[l][j] += eval_deriv[i]*DELTA[i][0];
-          } else {
-            gradient[l][j] = (lin_idx[l] >= 0) ? DELTA[lin_idx[l]][0] : 0.0;
-          }
+          else
+            np_glp_fill_basis_eval_deriv_raw(l,
+                                             num_reg_continuous,
+                                             glp_terms,
+                                             glp_nterms,
+                                             matrix_X_continuous_eval,
+                                             j,
+                                             eval_deriv);
+          gradient[l][j] = 0.0;
+          for(i = 0; i < glp_nterms; i++)
+            gradient[l][j] += eval_deriv[i]*DELTA[i][0];
           if(do_gerr)
             gradient_stderr[l][j] = 0.0;
         }
@@ -11761,11 +11873,9 @@ double *SIGN){
     if(use_bernstein){
       for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
       free(basis_ctx);
-      free(eval_basis);
-      free(eval_deriv);
-    } else {
-      free(lin_idx);
     }
+    free(eval_basis);
+    free(eval_deriv);
     free(glp_terms);
 
   } else { // Local Linear 
