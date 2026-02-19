@@ -508,7 +508,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   int dfc_dir;
   
   int i,j;
-  double fast_eval_total = 0.0, fallback_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int itmax, iter;
@@ -873,8 +872,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
   objective_function_values[0]=-fret;
   objective_function_evals[0]=bwm_eval_count;
   objective_function_invalid[0]=bwm_invalid_count;
-  fast_eval_total += bwm_fast_eval_count;
-  fallback_eval_total += bwm_fallback_eval_count;
 
   if(iMultistart == IMULTI_TRUE){
     fret_best = fret;
@@ -1002,8 +999,6 @@ void np_density_bw(double * myuno, double * myord, double * mycon,
       objective_function_values[iMs_counter]=-fret;
       objective_function_evals[iMs_counter]=bwm_eval_count;
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
-      fast_eval_total += bwm_fast_eval_count;
-      fallback_eval_total += bwm_fallback_eval_count;
     }
 
     /* Save best for estimation */
