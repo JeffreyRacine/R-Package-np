@@ -303,7 +303,7 @@
     for (i in seq_len(length(x))) {
       xi <- try(x[[i]], silent = TRUE)
       if (!inherits(xi, "try-error"))
-        x[[i]] <- .npRmpi_autodispatch_untag(xi)
+        x[i] <- list(.npRmpi_autodispatch_untag(xi))
     }
   }
   attr(x, "npRmpi.dispatch.mode") <- NULL

@@ -29,6 +29,8 @@ npreg.formula <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
+    if (!missing(data) && !is.null(data))
+      tmf[["data"]] <- substitute(data)
     umf <- tmf <- eval(tmf, envir = environment(tt))
 
     tydat <- model.response(tmf)
