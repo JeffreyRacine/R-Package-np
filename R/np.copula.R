@@ -11,8 +11,6 @@ npcopula <- function(bws,
                      n.quasi.inv=1000,
                      er.quasi.inv=1) {
   .npRmpi_require_active_slave_pool(where = "npcopula()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   ## Basic error checking
 
@@ -35,6 +33,11 @@ npcopula <- function(bws,
   if(bws$nuno>0) stop("unordered factors not suitable for copula estimation")
 
   u.provided <- ifelse(is.null(u),FALSE,TRUE)
+  bw.type <- bws$type
+  bw.ckerorder <- bws$ckerorder
+  bw.ckertype <- bws$ckertype
+  bw.okertype <- bws$okertype
+  bw.ukertype <- bws$ukertype
   
   ## Test for compatible quantile vector/matrix if provided
   if(!is.null(u)) {
@@ -61,27 +64,28 @@ npcopula <- function(bws,
     for(j in 1:num.var) {
       console <- printClear(console)
       console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the sample realizations...",sep=""), console)
-      bws.F.marginal <- npudistbw(formula(paste("~",bws$xnames[j])),
-                         bws=bws$bw[j],
-                         bandwidth.compute=FALSE,
-                         bwtype=bws$type,
-                         ckerorder=bws$ckerorder,
-                         ckertype=bws$ckertype,
-                         okertype=bws$okertype,
-                         data=data)
+      bw.j <- bws$bw[j]
+      bws.F.marginal <- do.call(npudistbw, list(
+                         dat = data[, bws$xnames[j], drop = FALSE],
+                         bws = bw.j,
+                         bandwidth.compute = FALSE,
+                         bwtype = bw.type,
+                         ckerorder = bw.ckerorder,
+                         ckertype = bw.ckertype,
+                         okertype = bw.okertype))
 
       u[,j] <- fitted(npudist(bws=bws.F.marginal,data=data))
       ## For the copula density we require marginal densities.
       if(density) {
-        bws.f.marginal <- npudensbw(formula(paste("~",bws$xnames[j])),
-                           bws=bws$bw[j],
-                           bandwidth.compute=FALSE,
-                           bwtype=bws$type,
-                           ckerorder=bws$ckerorder,
-                           ckertype=bws$ckertype,
-                           okertype=bws$okertype,
-                           ukertype=bws$ukertype,
-                           data=data)
+        bws.f.marginal <- do.call(npudensbw, list(
+                           dat = data[, bws$xnames[j], drop = FALSE],
+                           bws = bw.j,
+                           bandwidth.compute = FALSE,
+                           bwtype = bw.type,
+                           ckerorder = bw.ckerorder,
+                           ckertype = bw.ckertype,
+                           okertype = bw.okertype,
+                           ukertype = bw.ukertype))
         ## Divide the copula density by its marginals
         copula <- copula/NZD(fitted(npudens(bws=bws.f.marginal,data=data)))
 
@@ -122,14 +126,19 @@ npcopula <- function(bws,
         x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
       }
       ## Compute the CDF at this set of evaluation points.
-      F <- fitted(npudist(tdat=x.marginal,
-                          edat=x.eval,
-                          bws=bws$bw[j],
-                          bwtype=bws$type,
-                          ckerorder=bws$ckerorder,
-                          ckertype=bws$ckertype,
-                          okertype=bws$okertype,
-                          ukertype=bws$ukertype,data=data))
+      bw.j <- bws$bw[j]
+      bws.F.marginal <- do.call(npudistbw, list(
+                                  dat = x.marginal,
+                                  bws = bw.j,
+                                  bandwidth.compute = FALSE,
+                                  bwtype = bw.type,
+                                  ckerorder = bw.ckerorder,
+                                  ckertype = bw.ckertype,
+                                  okertype = bw.okertype,
+                                  ukertype = bw.ukertype))
+      F <- fitted(npudist(tdat = x.marginal,
+                          edat = x.eval,
+                          bws = bws.F.marginal))
       ## Now compute the quasi-inverse from the estimated F for the
       ## evaluation points. If u is input and any value lies beyond
       ## the CDF values for the evaluation points, reset them to the
@@ -163,15 +172,16 @@ npcopula <- function(bws,
       for(j in 1:num.var) {
         console <- printClear(console)
         console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the expanded grid...",sep=""), console)
-        bws.f.marginal <- npudensbw(formula(paste("~",bws$xnames[j])),
-                           bws=bws$bw[j],
-                           bandwidth.compute=FALSE,
-                           bwtype=bws$type,
-                           ckerorder=bws$ckerorder,
-                           ckertype=bws$ckertype,
-                           okertype=bws$okertype,
-                           ukertype=bws$ukertype,
-                           data=data)
+        bw.j <- bws$bw[j]
+        bws.f.marginal <- do.call(npudensbw, list(
+                           dat = data[, bws$xnames[j], drop = FALSE],
+                           bws = bw.j,
+                           bandwidth.compute = FALSE,
+                           bwtype = bw.type,
+                           ckerorder = bw.ckerorder,
+                           ckertype = bw.ckertype,
+                           okertype = bw.okertype,
+                           ukertype = bw.ukertype))
         xeval <- data.frame(x.u[,j])
         names(xeval) <- bws$xnames[j]
         ## Divide copula density by its marginals

@@ -1099,8 +1099,6 @@ trim.quantiles <- function(dat, trim){
 
 npplot <- function(bws = stop("'bws' has not been set"), ..., random.seed = 42){
   .npRmpi_require_active_slave_pool(where = "npplot()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   ## Save seed prior to setting
   if(exists(".Random.seed", .GlobalEnv)) {
     save.seed <- get(".Random.seed", .GlobalEnv)

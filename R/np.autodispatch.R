@@ -107,9 +107,29 @@
 
 .npRmpi_autodispatch_target_args <- function() {
   c("formula", "data", "bws",
+    "dat", "tdat", "edat",
     "xdat", "ydat", "txdat", "tydat",
     "exdat", "eydat", "newdata",
-    "gydat", "zdat", "wdat", "gdata")
+    "gydat", "zdat", "wdat", "gdata",
+    "gradients", "residuals", "errors", "gradient.order")
+}
+
+.npRmpi_autodispatch_eval_arg <- function(expr, caller_env) {
+  val <- try(eval(expr, envir = caller_env), silent = TRUE)
+  if (!inherits(val, "try-error"))
+    return(val)
+
+  frames <- sys.frames()
+  for (i in rev(seq_along(frames))) {
+    env_i <- frames[[i]]
+    if (identical(env_i, caller_env))
+      next
+    val_i <- try(eval(expr, envir = env_i), silent = TRUE)
+    if (!inherits(val_i, "try-error"))
+      return(val_i)
+  }
+
+  stop(attr(val, "condition")$message)
 }
 
 .npRmpi_autodispatch_materialize_call <- function(mc, caller_env, comm = 1L) {
@@ -133,7 +153,7 @@
     if (is.null(nm) || identical(nm, "")) next
     if (!nm %in% targets) next
 
-    val <- eval(arg.list[[i]], envir = caller_env)
+    val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
     idx <- idx + 1L
     tmp <- sprintf(".__npRmpi_autod_%s_%d", nm, idx)
     assign(tmp, val, envir = .GlobalEnv)

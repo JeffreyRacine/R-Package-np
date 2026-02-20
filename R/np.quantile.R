@@ -5,8 +5,6 @@ npquantile <- function(x=NULL,
                        f=1,
                        ...) {
   .npRmpi_require_active_slave_pool(where = "npquantile()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   ## Some basic error checking.
 
