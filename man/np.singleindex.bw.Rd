@@ -346,9 +346,8 @@ npindexbw(\dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
-
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+set.seed(42)
 
 n <- 500
 
@@ -358,13 +357,10 @@ y <- x1 - x2 + rnorm(n)
 mydat <- data.frame(x1,x2,y)
 rm(y,x1,x2)
 
-mpi.bcast.Robj2slave(mydat)
-
 ## Ichimura, continuous y
 
-mpi.bcast.cmd(bw <- npindexbw(formula=y~x1+x2,
-                              data=mydat),
-              caller.execute=TRUE)
+bw <- npindexbw(formula=y~x1+x2,
+                data=mydat)
 
 summary(bw)
 

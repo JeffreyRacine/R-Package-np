@@ -261,19 +261,17 @@ npqreg(bws, \dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("Italy")
-mpi.bcast.Robj2slave(Italy)
 
 ## A quantile regression example
 
-mpi.bcast.cmd(bw <- npcdistbw(gdp~ordered(year),data=Italy),
-              caller.execute=TRUE)
+bw <- npcdistbw(gdp~ordered(year),data=Italy)
 
 summary(bw)
 
-mpi.bcast.cmd(model <- npqreg(bws=bw, tau=0.50),
-              caller.execute=TRUE)
+model <- npqreg(bws=bw, tau=0.50)
 
 summary(model)
 

@@ -483,9 +483,8 @@ npscoefbw(\dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
-
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+set.seed(42)
 
 n <- 500
 
@@ -495,17 +494,13 @@ y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
 mydat <- data.frame(x,y,z)
 rm(x,y,z)
 
-mpi.bcast.Robj2slave(mydat)
-
 ## A smooth coefficient model example
 
-mpi.bcast.cmd(bw <- npscoefbw(y~x|z,data=mydat),
-              caller.execute=TRUE)
+bw <- npscoefbw(y~x|z,data=mydat)
 
 summary(bw)
 
-mpi.bcast.cmd(model <- npscoef(bws=bw, gradients=TRUE),
-              caller.execute=TRUE)
+model <- npscoef(bws=bw, gradients=TRUE)
 
 summary(model)
 
