@@ -236,17 +236,14 @@ npcdist(bws, \dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("Italy")
 
-mpi.bcast.Robj2slave(Italy)
+bw <- npcdistbw(formula=gdp~ordered(year),
+                data=Italy)
 
-mpi.bcast.cmd(bw <- npcdistbw(formula=gdp~ordered(year),
-                              data=Italy),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(F <- npcdist(bws=bw),
-              caller.execute=TRUE)
+F <- npcdist(bws=bw)
 
 summary(F)
 

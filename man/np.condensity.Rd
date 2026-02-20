@@ -226,17 +226,13 @@ npcdens(bws, \dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(data("Italy"),
-              caller.execute=TRUE)
-mpi.bcast.cmd(attach(Italy),
-              caller.execute=TRUE)
+data("Italy")
 
-mpi.bcast.cmd(bw <- npcdensbw(formula=gdp~ordered(year)),
-              caller.execute=TRUE)
+bw <- npcdensbw(formula=gdp~ordered(year), data=Italy)
 
-mpi.bcast.cmd(fhat <- npcdens(bws=bw),
-              caller.execute=TRUE)
+fhat <- npcdens(bws=bw)
 
 summary(fhat)
 
