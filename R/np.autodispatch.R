@@ -495,36 +495,60 @@
     on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
 
     p <- .__npRmpi_boot_payload
-    n <- nrow(p$xdat)
     B <- nrow(p$indices)
-    comp <- if (isTRUE(p$gradients)) "grad" else "mean"
+    if (is.null(p$family) || is.null(p$out.field))
+      stop("invalid bootstrap payload: missing family/out.field")
 
-    base.fit <- suppressWarnings(npreg(txdat = p$xdat,
-                                       tydat = p$ydat,
-                                       exdat = p$exdat,
-                                       bws = p$bws,
-                                       gradients = p$gradients,
-                                       gradient.order = p$gradient.order,
-                                       warn.glp.gradient = FALSE))
-    t0 <- if (isTRUE(p$gradients))
-      base.fit$grad[, p$slice.index]
-    else
-      base.fit$mean
+    fit_one <- function(ix) {
+      switch(
+        p$family,
+        npreg = suppressWarnings(npreg(
+          txdat = p$xdat[ix, , drop = FALSE],
+          tydat = p$ydat[ix],
+          exdat = p$exdat,
+          bws = p$bws,
+          gradients = p$gradients,
+          gradient.order = p$gradient.order,
+          warn.glp.gradient = FALSE)),
+        npcdens = suppressWarnings(npcdens(
+          txdat = p$xdat[ix, , drop = FALSE],
+          tydat = p$ydat[ix, , drop = FALSE],
+          exdat = p$exdat,
+          eydat = p$eydat,
+          bws = p$bws,
+          gradients = p$gradients)),
+        npcdist = suppressWarnings(npcdist(
+          txdat = p$xdat[ix, , drop = FALSE],
+          tydat = p$ydat[ix, , drop = FALSE],
+          exdat = p$exdat,
+          eydat = p$eydat,
+          bws = p$bws,
+          gradients = p$gradients)),
+        npqreg = suppressWarnings(npqreg(
+          txdat = p$xdat[ix, , drop = FALSE],
+          tydat = p$ydat[ix, , drop = FALSE],
+          exdat = p$exdat,
+          tau = p$tau,
+          bws = p$bws,
+          gradients = p$gradients)),
+        stop("unsupported bootstrap payload family"))
+    }
+
+    extract_stat <- function(obj) {
+      out <- obj[[p$out.field]]
+      if (!is.null(p$out.index))
+        out <- out[, p$out.index]
+      as.numeric(out)
+    }
+
+    base.fit <- fit_one(seq_len(nrow(p$xdat)))
+    t0 <- extract_stat(base.fit)
 
     t.mat <- matrix(NA_real_, nrow = B, ncol = length(t0))
     for (b in seq_len(B)) {
       idx <- as.integer(p$indices[b, ])
-      fit.b <- suppressWarnings(npreg(txdat = p$xdat[idx, , drop = FALSE],
-                                      tydat = p$ydat[idx],
-                                      exdat = p$exdat,
-                                      bws = p$bws,
-                                      gradients = p$gradients,
-                                      gradient.order = p$gradient.order,
-                                      warn.glp.gradient = FALSE))
-      t.mat[b, ] <- if (isTRUE(p$gradients))
-        fit.b$grad[, p$slice.index]
-      else
-        fit.b$mean
+      fit.b <- fit_one(idx)
+      t.mat[b, ] <- extract_stat(fit.b)
     }
 
     list(t0 = as.numeric(t0), t = t.mat)

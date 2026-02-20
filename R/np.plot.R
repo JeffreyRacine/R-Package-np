@@ -369,13 +369,15 @@ compute.bootstrap.errors.rbandwidth =
         boot.blocklen = plot.errors.boot.blocklen)
 
       payload <- list(
+        family = "npreg",
         xdat = xdat,
         ydat = ydat,
         exdat = exdat,
         bws = .npRmpi_autodispatch_untag(bws),
         gradients = gradients,
         gradient.order = gradient.order,
-        slice.index = slice.index,
+        out.field = if (gradients) "grad" else "mean",
+        out.index = if (gradients) slice.index else NULL,
         indices = idx.mat
       )
       boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
@@ -882,7 +884,9 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
+                                              where = "compute.bootstrap.errors(...)",
+                                              allow.direct.bootstrap = TRUE)
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -892,37 +896,77 @@ compute.bootstrap.errors.conbandwidth =
       else if (cdf) "dist"
       else "dens"
 
+    use.payload <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast()
+
     is.inid = plot.errors.boot.method=="inid"
 
-    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-      "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
-    strty = ifelse(is.inid, "tydat = ydat[indices,],",
-      "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
-    
-    
-    boofun = eval(parse(text=paste(strf, 
-                          switch(tboo,
-                                 "quant" = "npqreg(",
-                                 "dist" = "npcdist(",
-                                 "dens" = "npcdens("),
-                          strtx, strty,
-                          "exdat = exdat,",
-                          ifelse(quantreg, "tau = tau", "eydat = eydat"),
-                          ", bws = bws, gradients = gradients)$",
-                          switch(tboo,
-                                 "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
-                                 "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
-                                 "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
-                          "}", sep="")))
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num)
+    if (use.payload) {
+      idx.mat <- .npRmpi_bootstrap_make_indices(
+        n = nrow(xdat),
+        boot.num = plot.errors.boot.num,
+        boot.method = plot.errors.boot.method,
+        boot.blocklen = plot.errors.boot.blocklen)
+
+      out.field <- switch(tboo,
+                          quant = if (gradients) "yqgrad" else "quantile",
+                          dist = if (gradients) "congrad" else "condist",
+                          dens = if (gradients) "congrad" else "condens")
+      out.index <- if (gradients) gradient.index else NULL
+      family <- switch(tboo,
+                       quant = "npqreg",
+                       dist = "npcdist",
+                       dens = "npcdens")
+
+      payload <- list(
+        family = family,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = exdat,
+        eydat = eydat,
+        tau = tau,
+        bws = .npRmpi_autodispatch_untag(bws),
+        gradients = gradients,
+        out.field = out.field,
+        out.index = out.index,
+        indices = idx.mat
+      )
+      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
+      boot.out$t0 <- as.numeric(boot.out$t0)
+      boot.out$t <- as.matrix(boot.out$t)
     } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+
+      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+        "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
+      strty = ifelse(is.inid, "tydat = ydat[indices,],",
+        "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
+      
+      
+      boofun = eval(parse(text=paste(strf, 
+                            switch(tboo,
+                                   "quant" = "npqreg(",
+                                   "dist" = "npcdist(",
+                                   "dens" = "npcdens("),
+                            strtx, strty,
+                            "exdat = exdat,",
+                            ifelse(quantreg, "tau = tau", "eydat = eydat"),
+                            ", bws = bws, gradients = gradients)$",
+                            switch(tboo,
+                                   "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
+                                   "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
+                                   "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
+                            "}", sep="")))
+      if (is.inid){
+        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -1005,7 +1049,9 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
+                                              where = "compute.bootstrap.errors(...)",
+                                              allow.direct.bootstrap = TRUE)
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1015,37 +1061,77 @@ compute.bootstrap.errors.condbandwidth =
       else if (cdf) "dist"
       else "dens"
 
+    use.payload <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast()
+
     is.inid = plot.errors.boot.method=="inid"
 
-    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-      "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
-    strty = ifelse(is.inid, "tydat = ydat[indices,],",
-      "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
-    
-    
-    boofun = eval(parse(text=paste(strf, 
-                          switch(tboo,
-                                 "quant" = "npqreg(",
-                                 "dist" = "npcdist(",
-                                 "dens" = "npcdens("),
-                          strtx, strty,
-                          "exdat = exdat,",
-                          ifelse(quantreg, "tau = tau", "eydat = eydat"),
-                          ", bws = bws, gradients = gradients)$",
-                          switch(tboo,
-                                 "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
-                                 "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
-                                 "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
-                          "}", sep="")))
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num)
+    if (use.payload) {
+      idx.mat <- .npRmpi_bootstrap_make_indices(
+        n = nrow(xdat),
+        boot.num = plot.errors.boot.num,
+        boot.method = plot.errors.boot.method,
+        boot.blocklen = plot.errors.boot.blocklen)
+
+      out.field <- switch(tboo,
+                          quant = if (gradients) "yqgrad" else "quantile",
+                          dist = if (gradients) "congrad" else "condist",
+                          dens = if (gradients) "congrad" else "condens")
+      out.index <- if (gradients) gradient.index else NULL
+      family <- switch(tboo,
+                       quant = "npqreg",
+                       dist = "npcdist",
+                       dens = "npcdens")
+
+      payload <- list(
+        family = family,
+        xdat = xdat,
+        ydat = ydat,
+        exdat = exdat,
+        eydat = eydat,
+        tau = tau,
+        bws = .npRmpi_autodispatch_untag(bws),
+        gradients = gradients,
+        out.field = out.field,
+        out.index = out.index,
+        indices = idx.mat
+      )
+      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
+      boot.out$t0 <- as.numeric(boot.out$t0)
+      boot.out$t <- as.matrix(boot.out$t)
     } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+
+      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+        "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
+      strty = ifelse(is.inid, "tydat = ydat[indices,],",
+        "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
+      
+      
+      boofun = eval(parse(text=paste(strf, 
+                            switch(tboo,
+                                   "quant" = "npqreg(",
+                                   "dist" = "npcdist(",
+                                   "dens" = "npcdens("),
+                            strtx, strty,
+                            "exdat = exdat,",
+                            ifelse(quantreg, "tau = tau", "eydat = eydat"),
+                            ", bws = bws, gradients = gradients)$",
+                            switch(tboo,
+                                   "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
+                                   "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
+                                   "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
+                            "}", sep="")))
+      if (is.inid){
+        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -2074,7 +2160,9 @@ npplot.scbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -2888,7 +2976,9 @@ npplot.plbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -3619,7 +3709,9 @@ npplot.bandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -4254,7 +4346,9 @@ npplot.dbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -4904,7 +4998,9 @@ npplot.conbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -5804,7 +5900,9 @@ npplot.condbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
