@@ -477,40 +477,70 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
+                                              where = "compute.bootstrap.errors(...)",
+                                              allow.direct.bootstrap = TRUE)
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
+    use.payload <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast()
+
     is.inid = plot.errors.boot.method=="inid"
 
-    xi <- 1:ncol(xdat)
-    yi <- ncol(xdat)+1
-    if (!miss.z)
-      zi <- yi+1:ncol(zdat)
+    if (use.payload) {
+      idx.mat <- .npRmpi_bootstrap_make_indices(
+        n = nrow(xdat),
+        boot.num = plot.errors.boot.num,
+        boot.method = plot.errors.boot.method,
+        boot.blocklen = plot.errors.boot.blocklen)
+      payload <- list(
+        family = "npscoef",
+        xdat = xdat,
+        ydat = ydat,
+        zdat = if (miss.z) NULL else zdat,
+        exdat = exdat,
+        ezdat = if (miss.z) NULL else ezdat,
+        bws = .npRmpi_autodispatch_untag(bws),
+        gradients = gradients,
+        out.field = "mean",
+        out.index = NULL,
+        indices = idx.mat
+      )
+      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
+      boot.out$t0 <- as.numeric(boot.out$t0)
+      boot.out$t <- as.matrix(boot.out$t)
+    } else {
+      xi <- 1:ncol(xdat)
+      yi <- ncol(xdat)+1
+      if (!miss.z)
+        zi <- yi+1:ncol(zdat)
 
-    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-    strtx = ifelse(is.inid, "txdat = xdat[indices,, drop = FALSE],",
-      "txdat = tsb[,xi,drop=FALSE],")
-    strty = ifelse(is.inid, "tydat = ydat[indices],",
-      "tydat = tsb[,yi],")
-    strtz <-
-      ifelse(miss.z, '',
-             ifelse(is.inid, 'tzdat = zdat[indices,, drop = FALSE],',
-                    'tzdat = tsb[,zi, drop = FALSE],'))
-    
-    boofun = eval(parse(text=paste(strf, "npscoef(", strtx, strty, strtz,
-                          "exdat = exdat,", ifelse(miss.z,"", "ezdat = ezdat,"),
-                          "bws = bws, iterate = FALSE)$",
-                          "mean", "}", sep="")))
+      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+      strtx = ifelse(is.inid, "txdat = xdat[indices,, drop = FALSE],",
+        "txdat = tsb[,xi,drop=FALSE],")
+      strty = ifelse(is.inid, "tydat = ydat[indices],",
+        "tydat = tsb[,yi],")
+      strtz <-
+        ifelse(miss.z, '',
+               ifelse(is.inid, 'tzdat = zdat[indices,, drop = FALSE],',
+                      'tzdat = tsb[,zi, drop = FALSE],'))
+
+      boofun = eval(parse(text=paste(strf, "npscoef(", strtx, strty, strtz,
+                            "exdat = exdat,", ifelse(miss.z,"", "ezdat = ezdat,"),
+                            "bws = bws, iterate = FALSE)$",
+                            "mean", "}", sep="")))
 
 
-    boot.out <-
-      eval(parse(text = paste(ifelse(is.inid, 'boot(data = ',
-                   'tsboot(tseries ='), 'data.frame(xdat,ydat',
-                   ifelse(miss.z,'', ',zdat'),
-                   '), statistic = boofun, R = plot.errors.boot.num',
-                   ifelse(is.inid,'','l = plot.errors.boot.blocklen, sim = plot.errors.boot.method'),')')))
+      boot.out <-
+        eval(parse(text = paste(ifelse(is.inid, 'boot(data = ',
+                     'tsboot(tseries ='), 'data.frame(xdat,ydat',
+                     ifelse(miss.z,'', ',zdat'),
+                     '), statistic = boofun, R = plot.errors.boot.num',
+                     ifelse(is.inid,'','l = plot.errors.boot.blocklen, sim = plot.errors.boot.method'),')')))
+    }
 
     all.bp <- list()
 
@@ -589,32 +619,62 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
+                                              where = "compute.bootstrap.errors(...)",
+                                              allow.direct.bootstrap = TRUE)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
+    use.payload <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast()
+
     is.inid = plot.errors.boot.method=="inid"
 
-    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-      "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
-    strty = ifelse(is.inid, "tydat = ydat[indices],",
-      "tydat = tsb[,ncol(xdat)+1],")
-    strtz = ifelse(is.inid, "tzdat = zdat[indices,],",
-      "tzdat = tsb[,(ncol(xdat)+2):ncol(tsb), drop=FALSE],")
-
-
-    boofun = eval(parse(text=paste(strf, "npplreg(", strtx, strty, strtz,
-                          "exdat = exdat, ezdat = ezdat, bws = bws)$mean}", sep="")))
-
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat,zdat), statistic = boofun,
-        R = plot.errors.boot.num)
+    if (use.payload) {
+      idx.mat <- .npRmpi_bootstrap_make_indices(
+        n = nrow(xdat),
+        boot.num = plot.errors.boot.num,
+        boot.method = plot.errors.boot.method,
+        boot.blocklen = plot.errors.boot.blocklen)
+      payload <- list(
+        family = "npplreg",
+        xdat = xdat,
+        ydat = ydat,
+        zdat = zdat,
+        exdat = exdat,
+        ezdat = ezdat,
+        bws = .npRmpi_autodispatch_untag(bws),
+        gradients = gradients,
+        out.field = "mean",
+        out.index = NULL,
+        indices = idx.mat
+      )
+      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
+      boot.out$t0 <- as.numeric(boot.out$t0)
+      boot.out$t <- as.matrix(boot.out$t)
     } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat,zdat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+        "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
+      strty = ifelse(is.inid, "tydat = ydat[indices],",
+        "tydat = tsb[,ncol(xdat)+1],")
+      strtz = ifelse(is.inid, "tzdat = zdat[indices,],",
+        "tzdat = tsb[,(ncol(xdat)+2):ncol(tsb), drop=FALSE],")
+
+
+      boofun = eval(parse(text=paste(strf, "npplreg(", strtx, strty, strtz,
+                            "exdat = exdat, ezdat = ezdat, bws = bws)$mean}", sep="")))
+
+      if (is.inid){
+        boot.out = boot(data = data.frame(xdat,ydat,zdat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat,ydat,zdat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -1262,34 +1322,62 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
+                                              where = "compute.bootstrap.errors(...)",
+                                              allow.direct.bootstrap = TRUE)
 
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
     boot.all.err <- NULL
 
+    use.payload <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast()
+
     is.inid = plot.errors.boot.method=="inid"
 
-    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-      "txdat = tsb[,1:(ncol(tsb)-1),drop=FALSE],")
-    strty = ifelse(is.inid, "tydat = ydat[indices],",
-      "tydat = tsb[,ncol(tsb)],")
-    
-    ## beta[1] is always 1.0, so use first column of gradients matrix ... 
-    
-    boofun = eval(parse(text=paste(strf, "npindex(", strtx, strty,
-                          "exdat = xdat, bws = bws,",
-                          "gradients = gradients)$",
-                          ifelse(gradients, "grad[,1]", "mean"), "}", sep="")))
-
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num)
+    if (use.payload) {
+      idx.mat <- .npRmpi_bootstrap_make_indices(
+        n = nrow(xdat),
+        boot.num = plot.errors.boot.num,
+        boot.method = plot.errors.boot.method,
+        boot.blocklen = plot.errors.boot.blocklen)
+      payload <- list(
+        family = "npindex",
+        xdat = xdat,
+        ydat = ydat,
+        exdat = xdat,
+        bws = .npRmpi_autodispatch_untag(bws),
+        gradients = gradients,
+        out.field = if (gradients) "grad" else "mean",
+        out.index = if (gradients) 1L else NULL,
+        indices = idx.mat
+      )
+      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
+      boot.out$t0 <- as.numeric(boot.out$t0)
+      boot.out$t <- as.matrix(boot.out$t)
     } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+        "txdat = tsb[,1:(ncol(tsb)-1),drop=FALSE],")
+      strty = ifelse(is.inid, "tydat = ydat[indices],",
+        "tydat = tsb[,ncol(tsb)],")
+
+      ## beta[1] is always 1.0, so use first column of gradients matrix ...
+
+      boofun = eval(parse(text=paste(strf, "npindex(", strtx, strty,
+                            "exdat = xdat, bws = bws,",
+                            "gradients = gradients)$",
+                            ifelse(gradients, "grad[,1]", "mean"), "}", sep="")))
+
+      if (is.inid){
+        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
     
     if (plot.errors.type == "pmzsd") {
@@ -2214,7 +2302,9 @@ npplot.scbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -3028,7 +3118,9 @@ npplot.plbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -6828,7 +6920,9 @@ npplot.sibandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
+                                              where = "plot(...)",
+                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center

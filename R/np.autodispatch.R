@@ -531,6 +531,26 @@
           tau = p$tau,
           bws = p$bws,
           gradients = p$gradients)),
+        npscoef = suppressWarnings(npscoef(
+          txdat = p$xdat[ix, , drop = FALSE],
+          tydat = p$ydat[ix],
+          tzdat = if (is.null(p$zdat)) NULL else p$zdat[ix, , drop = FALSE],
+          exdat = p$exdat,
+          ezdat = p$ezdat,
+          bws = p$bws)),
+        npplreg = suppressWarnings(npplreg(
+          txdat = p$xdat[ix, , drop = FALSE],
+          tydat = p$ydat[ix],
+          tzdat = p$zdat[ix, , drop = FALSE],
+          exdat = p$exdat,
+          ezdat = p$ezdat,
+          bws = p$bws)),
+        npindex = suppressWarnings(npindex(
+          txdat = p$xdat[ix, , drop = FALSE],
+          tydat = p$ydat[ix],
+          exdat = p$exdat,
+          bws = p$bws,
+          gradients = p$gradients)),
         npudens = suppressWarnings(npudens(
           tdat = p$xdat[ix, , drop = FALSE],
           edat = p$exdat,
