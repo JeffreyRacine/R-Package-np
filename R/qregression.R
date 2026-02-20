@@ -64,7 +64,6 @@ fitted.qregression <- function(object, ...){
  object$quantile 
 }
 quantile.qregression <- function(x, ...){ x$quantile }
-plot.qregression <- function(x, ...) { .np_plot_qregression(x, ...) }
 predict.qregression <- function(object, se.fit = FALSE, ...) {
   tr <- eval(npqreg(bws = object$bws, ...), envir = parent.frame())
   if(se.fit)

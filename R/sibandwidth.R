@@ -155,7 +155,6 @@ coef.sibandwidth <- function(object, ...) {
  names(tc) <- object$xnames
  return(tc)
 }
-plot.sibandwidth <- function(...) { .np_plot_sibandwidth(...) }
 predict.sibandwidth <- function(...) { eval(npindex(...), envir = parent.frame()) }
 
 summary.sibandwidth <- function(object, ...){

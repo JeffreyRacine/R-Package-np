@@ -62,7 +62,6 @@ fitted.npdensity <- function(object, ...){
  object$dens 
 }
 se.npdensity <- function(x){ x$derr }
-plot.npdensity <- function(x, ...) { .np_plot_npdensity(x, ...) }
 
 predict.npdensity <- function(object, se.fit = FALSE, ...) {
   tr <- eval(npudens(bws = object$bws, ...), envir = parent.frame())
