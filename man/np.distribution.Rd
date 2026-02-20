@@ -92,7 +92,7 @@ npudist(bws, \dots)
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
-    bw <- npudistbw(~y)
+    bw <- npudistbw(formula = ~y, data = mydat)
     Fhat <- npudist(bw)
     npRmpi.stop()
     
@@ -104,7 +104,7 @@ npudist(bws, \dots)
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
-    Fhat <- npudist(~y)
+    Fhat <- npudist(formula = ~y, data = mydat)
     npRmpi.stop()
     
     Usage 3: modify the default kernel and order:
@@ -115,7 +115,7 @@ npudist(bws, \dots)
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
-    Fhat <- npudist(~y, ckertype="epanechnikov", ckerorder=4)
+    Fhat <- npudist(formula = ~y, data = mydat, ckertype="epanechnikov", ckerorder=4)
     npRmpi.stop()
 
     Usage 4: use the data frame interface rather than the formula

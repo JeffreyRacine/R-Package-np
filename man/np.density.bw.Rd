@@ -344,7 +344,7 @@ npudensbw(\dots)
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
-    bw <- npudensbw(~y)
+    bw <- npudensbw(formula = ~y, data = mydat)
     npRmpi.stop()
     
     Usage 2: compute a bandwidth object using the data frame interface

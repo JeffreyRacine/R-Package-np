@@ -94,7 +94,7 @@ npudens(bws, \dots)
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
-    bw <- npudensbw(~y)
+    bw <- npudensbw(formula = ~y, data = mydat)
     fhat <- npudens(bw)
     npRmpi.stop()
     
@@ -106,7 +106,7 @@ npudens(bws, \dots)
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
-    fhat <- npudens(~y)
+    fhat <- npudens(formula = ~y, data = mydat)
     npRmpi.stop()
     
     Usage 3: modify the default kernel and order:
@@ -117,7 +117,7 @@ npudens(bws, \dots)
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
-    fhat <- npudens(~y, ckertype="epanechnikov", ckerorder=4)
+    fhat <- npudens(formula = ~y, data = mydat, ckertype="epanechnikov", ckerorder=4)
     npRmpi.stop()
 
     Usage 4: use the data frame interface rather than the formula
