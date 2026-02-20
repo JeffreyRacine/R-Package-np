@@ -97,7 +97,7 @@ plot.npdensity <- function(x, ...) {
     }
   }
 
-  npplot(bws = x$bws, ...)
+  .np_plot_from_slot(x, "bws", ...)
 }
 
 predict.npdensity <- function(object, se.fit = FALSE, ...) {

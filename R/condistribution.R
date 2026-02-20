@@ -91,7 +91,7 @@ predict.condistribution <- function(object, se.fit = FALSE, ...) {
     return(fitted(tr))
 }
 
-plot.condistribution <- function(x, ...) { npplot(bws = x$bws, ...) }
+plot.condistribution <- function(x, ...) { .np_plot_condistribution(x, ...) }
 
 summary.condistribution <- function(object, ...){
   cat("\nConditional Distribution Data: ", object$ntrain, " training points,",

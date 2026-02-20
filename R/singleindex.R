@@ -102,7 +102,7 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
   else
     return(fitted(tr))
 }
-plot.singleindex <- function(x, ...) { npplot(bws = x$bws, ...) }
+plot.singleindex <- function(x, ...) { .np_plot_singleindex(x, ...) }
 se.singleindex <- function(x){ x$merr }
 gradients.singleindex <- function(x, errors = FALSE, ...) {
   if(!errors)

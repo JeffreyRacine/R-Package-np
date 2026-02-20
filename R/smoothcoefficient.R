@@ -79,7 +79,7 @@ coef.smoothcoefficient <- function(object, ...) {
 fitted.smoothcoefficient <- function(object, ...){
  object$mean 
 }
-plot.smoothcoefficient <- function(x, ...) { npplot(bws = x$bws, ...) }
+plot.smoothcoefficient <- function(x, ...) { .np_plot_smoothcoefficient(x, ...) }
 residuals.smoothcoefficient <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npscoef(bws = object$bws, residuals =TRUE)$resid) } 
 }
