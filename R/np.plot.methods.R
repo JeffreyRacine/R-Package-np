@@ -13,3 +13,12 @@
 .np_plot_singleindex <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_smoothcoefficient <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_plregression <- function(object, ...) .np_plot_from_slot(object, "bw", ...)
+
+.np_plot_bandwidth <- function(...) npplot(...)
+.np_plot_rbandwidth <- function(...) npplot(...)
+.np_plot_dbandwidth <- function(...) npplot(...)
+.np_plot_conbandwidth <- function(...) npplot(...)
+.np_plot_condbandwidth <- function(...) npplot(...)
+.np_plot_plbandwidth <- function(...) npplot(...)
+.np_plot_sibandwidth <- function(...) npplot(...)
+.np_plot_scbandwidth <- function(...) npplot(...)

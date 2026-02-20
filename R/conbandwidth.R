@@ -283,7 +283,7 @@ print.conbandwidth <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-plot.conbandwidth <- function(...) { npplot(...) }
+plot.conbandwidth <- function(...) { .np_plot_conbandwidth(...) }
 
 summary.conbandwidth <- function(object, ...) {
   cat("\nConditional density data (",object$nobs," observations, ",
