@@ -243,6 +243,69 @@ compute.default.error.range <- function(center, err) {
   c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
 }
 
+.npplot_normalize_common_options <- function(plot.behavior,
+                                             plot.errors.method,
+                                             plot.errors.boot.method,
+                                             plot.errors.boot.blocklen,
+                                             plot.errors.center,
+                                             plot.errors.type,
+                                             plot.errors.alpha,
+                                             plot.errors.style,
+                                             plot.errors.bar,
+                                             xdat,
+                                             common.scale,
+                                             ylim) {
+  plot.behavior <- match.arg(plot.behavior)
+  plot.errors.method <- match.arg(plot.errors.method)
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method)
+  plot.errors.center <- match.arg(plot.errors.center)
+  plot.errors.type <- match.arg(plot.errors.type)
+
+  if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+      is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+    stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
+
+  plot.errors.style <- match.arg(plot.errors.style)
+  plot.errors.bar <- match.arg(plot.errors.bar)
+
+  common.scale <- common.scale | (!is.null(ylim))
+
+  if (plot.errors.method == "none" && plot.errors.type == "all") {
+    warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+    plot.errors.method <- "bootstrap"
+  }
+
+  if (plot.errors.method == "asymptotic") {
+    if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+      plot.errors.type <- "pmzsd"
+    }
+
+    if (plot.errors.center == "bias-corrected") {
+      warning("no bias corrections can be calculated with asymptotics, centering on estimate")
+      plot.errors.center <- "estimate"
+    }
+  }
+
+  if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
+      is.null(plot.errors.boot.blocklen))
+    plot.errors.boot.blocklen <- b.star(xdat, round = TRUE)[1,1]
+
+  list(
+    plot.behavior = plot.behavior,
+    plot.errors.method = plot.errors.method,
+    plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+    plot.errors.center = plot.errors.center,
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    plot.errors.style = plot.errors.style,
+    plot.errors.bar = plot.errors.bar,
+    common.scale = common.scale,
+    plot.errors = (plot.errors.method != "none")
+  )
+}
+
 
 compute.bootstrap.errors = function(...,bws){
   UseMethod("compute.bootstrap.errors",bws)
@@ -1216,42 +1279,32 @@ npplot.rbandwidth <-
     }
 
     
-    plot.behavior = match.arg(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim
+    )
 
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
-
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
-    }
-
-    if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
-        plot.errors.type = "pmzsd"
-      }
-
-      if (plot.errors.center == "bias-corrected") {
-        warning("no bias corrections can be calculated with asymptotics, centering on estimate")
-        plot.errors.center = "estimate"
-      }
-    }
-
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]    
-
-    plot.errors = (plot.errors.method != "none")
+    plot.behavior <- normalized.opts$plot.behavior
+    plot.errors.method <- normalized.opts$plot.errors.method
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
+    plot.errors <- normalized.opts$plot.errors
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
     if (gradients && identical(bws$regtype, "glp")) {
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
