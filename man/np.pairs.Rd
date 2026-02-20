@@ -54,18 +54,15 @@ scatterplots and smoothers.
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("USArrests")
 y_vars <- c("Murder", "UrbanPop")
 names(y_vars) <- c("Murder Arrests per 100K", "Pop. Percent Urban")
 
-mpi.bcast.Robj2slave(USArrests)
-mpi.bcast.Robj2slave(y_vars)
-
-mpi.bcast.cmd(pair_list <- np.pairs(y_vars = y_vars, y_dat = USArrests,
-                                    ckertype = "epanechnikov", 
-                                    bwscaling = TRUE),
-              caller.execute=TRUE)
+pair_list <- np.pairs(y_vars = y_vars, y_dat = USArrests,
+                      ckertype = "epanechnikov", 
+                      bwscaling = TRUE)
 
 np.pairs.plot(pair_list)
 

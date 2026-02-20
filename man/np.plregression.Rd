@@ -265,6 +265,7 @@ FALSE, \dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 set.seed(42)
 
@@ -280,17 +281,9 @@ y <- 1 + x1 + x2 + z1 + sin(z2) + rnorm(n)
 x2 <- factor(x2)
 z1 <- factor(z1)
 
-mpi.bcast.Robj2slave(x1)
-mpi.bcast.Robj2slave(x2)
-mpi.bcast.Robj2slave(z1)
-mpi.bcast.Robj2slave(z2)
-mpi.bcast.Robj2slave(y)
+bw <- npplregbw(formula=y~x1+x2|z1+z2)
 
-mpi.bcast.cmd(bw <- npplregbw(formula=y~x1+x2|z1+z2),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(pl <- npplreg(bws=bw),
-              caller.execute=TRUE)
+pl <- npplreg(bws=bw)
 
 summary(pl)
 

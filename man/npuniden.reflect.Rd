@@ -110,24 +110,20 @@ The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 ## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
 ## unadjusted density, and DGP
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+set.seed(42)
 
 n <- 100
 X <- sort(rbeta(n,5,1))
 dgp <- dbeta(X,5,1)
 
-mpi.bcast.Robj2slave(X)
+model <- npuniden.reflect(X)
 
-mpi.bcast.cmd(model <- npuniden.reflect(X),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf),
-              caller.execute=TRUE)
+model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
 
 ylim <- c(0,max(c(dgp,model$f,model.unadjusted$f)))
 plot(X,model$f,ylab="Density",ylim=ylim,type="l")
@@ -139,15 +135,11 @@ legend("topleft",c("Data-Reflection","Unadjusted","DGP"),col=1:3,lty=1:3,bty="n"
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
 ## asymptotic point-wise confidence intervals
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+set.seed(42)
 
 X <- sort(rbeta(100,5,3))
 
-mpi.bcast.Robj2slave(X)
-
-mpi.bcast.cmd(model <- npuniden.reflect(X),
-              caller.execute=TRUE)
+model <- npuniden.reflect(X)
 
 oldpar <- par(no.readonly = TRUE)
 on.exit(par(oldpar), add = TRUE)
@@ -171,11 +163,9 @@ legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
 ## Example 3: Age for working age males in the cps71 data set bounded
 ## below by 21 and above by 65
 
-mpi.bcast.cmd(data(cps71),
-              caller.execute=TRUE)
+data(cps71)
 
-mpi.bcast.cmd(model <- npuniden.reflect(cps71$age,a=21,b=65),
-              caller.execute=TRUE)
+model <- npuniden.reflect(cps71$age,a=21,b=65)
 
 par(mfrow=c(1,1))
 hist(cps71$age,prob=TRUE,main="",ylim=c(0,max(model$f)))

@@ -148,23 +148,19 @@ npunitest(data.x = NULL,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+set.seed(42)
 
 n <- 250
 
 x <- rnorm(n)
 y <- rnorm(n)
 
-mpi.bcast.Robj2slave(x)
-mpi.bcast.Robj2slave(y)
-
-mpi.bcast.cmd(output <- npunitest(x,y,
-                                  method="summation",
-                                  bootstrap=TRUE,
-                                  boot.num=29),
-              caller.execute=TRUE)
+output <- npunitest(x,y,
+                    method="summation",
+                    bootstrap=TRUE,
+                    boot.num=29)
 
 summary(output)
 

@@ -148,9 +148,9 @@ npsymtest(data = NULL,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+set.seed(42)
 
 ## A function to create a time series
 
@@ -170,15 +170,12 @@ n <- 250
 
 yt <- ar.series(0.5,rnorm(n))
 
-mpi.bcast.Robj2slave(yt)
-
 ## A simple example of the test for symmetry
 
-mpi.bcast.cmd(output <- npsymtest(yt,
-                                  boot.num=29,
-                                  boot.method="geom",
-                                  method="summation"),
-              caller.execute=TRUE)
+output <- npsymtest(yt,
+                    boot.num=29,
+                    boot.method="geom",
+                    method="summation")
 
 summary(output)
 

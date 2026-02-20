@@ -69,19 +69,16 @@ npseed(seed)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(npseed(712),
-              caller.execute=TRUE)
+npseed(712)
 
 x <- runif(10)
 y <- x + rnorm(10, sd = 0.1)
 mydat <- data.frame(x,y)
 rm(x,y)
 
-mpi.bcast.Robj2slave(mydat)
-
-mpi.bcast.cmd(bw <- npregbw(y~x, data=mydat),
-              caller.execute=TRUE)
+bw <- npregbw(y~x, data=mydat)
 
 summary(bw)
 

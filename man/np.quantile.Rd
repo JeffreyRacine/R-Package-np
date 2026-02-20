@@ -65,10 +65,10 @@ npquantile(x = NULL,
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
+    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     set.seed(42)
     x <- rchisq(100,df=10)
-    mpi.bcast.Robj2slave(x)
-    mpi.bcast.cmd(npquantile(x),caller.execute=TRUE)
+    npquantile(x)
     npRmpi.stop()
   }
 
@@ -183,6 +183,7 @@ npquantile(x = NULL,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 set.seed(42)
 
@@ -193,12 +194,8 @@ x <- rchisq(100,df=df)
 ## Vector of quantiles desired
 tau <- c(0.01,0.05,0.25,0.50,0.75,0.95,0.99)
 
-mpi.bcast.Robj2slave(x)
-mpi.bcast.Robj2slave(tau)
-
 ## Compute kernel smoothed sample quantiles
-mpi.bcast.cmd(q <- npquantile(x,tau),
-              caller.execute=TRUE)
+q <- npquantile(x,tau)
 
 q
 
