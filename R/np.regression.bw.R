@@ -43,7 +43,8 @@ npregbw.formula <-
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
     
-    tbw <- npregbw(xdat = xdat, ydat = ydat, ...)
+    dots <- list(...)
+    tbw <- do.call(npregbw, c(list(xdat = xdat, ydat = ydat), dots))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)
@@ -365,41 +366,61 @@ npregbw.default <-
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("regtype", "glp.degree", "glp.bernstein", "bwmethod", "bwscaling", "bwtype",
-               "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
+    rb.args <- list(
+      bw = bws,
+      nobs = dim(xdat)[1],
+      xdati = untangle(xdat),
+      ydati = untangle(data.frame(ydat)),
+      xnames = names(xdat),
+      ynames = deparse(substitute(ydat)),
+      bandwidth.compute = bandwidth.compute
+    )
 
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
+    if (!missing(regtype)) rb.args$regtype <- regtype
+    if (!missing(glp.degree)) rb.args$glp.degree <- glp.degree
+    if (!missing(glp.bernstein)) rb.args$glp.bernstein <- glp.bernstein
+    if (!missing(bwmethod)) rb.args$bwmethod <- bwmethod
+    if (!missing(bwscaling)) rb.args$bwscaling <- bwscaling
+    if (!missing(bwtype)) rb.args$bwtype <- bwtype
+    if (!missing(ckertype)) rb.args$ckertype <- ckertype
+    if (!missing(ckerorder)) rb.args$ckerorder <- ckerorder
+    if (!missing(ckerbound)) rb.args$ckerbound <- ckerbound
+    if (!missing(ckerlb)) rb.args$ckerlb <- ckerlb
+    if (!missing(ckerub)) rb.args$ckerub <- ckerub
+    if (!missing(ukertype)) rb.args$ukertype <- ukertype
+    if (!missing(okertype)) rb.args$okertype <- okertype
 
-    tbw <- eval(parse(text=paste("rbandwidth(bws",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ", nobs = dim(xdat)[1],",
-                        "xdati = untangle(xdat),",
-                        "ydati = untangle(data.frame(ydat)),",
-                        "xnames = names(xdat),",
-                        "ynames = deparse(substitute(ydat)),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    tbw <- do.call(rbandwidth, rb.args)
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
-               "small",
-               "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
-               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
-               "lbc.init", "hbc.init", "cfac.init", 
-               "lbd.init", "hbd.init", "dfac.init", 
-               "scale.init.categorical.sample",
-               "transform.bounds",
-               "invalid.penalty",
-               "penalty.multiplier")
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
+    opt.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (!missing(bandwidth.compute)) opt.args$bandwidth.compute <- bandwidth.compute
+    if (!missing(nmulti)) opt.args$nmulti <- nmulti
+    if (!missing(remin)) opt.args$remin <- remin
+    if (!missing(itmax)) opt.args$itmax <- itmax
+    if (!missing(ftol)) opt.args$ftol <- ftol
+    if (!missing(tol)) opt.args$tol <- tol
+    if (!missing(small)) opt.args$small <- small
+    if (!missing(lbc.dir)) opt.args$lbc.dir <- lbc.dir
+    if (!missing(dfc.dir)) opt.args$dfc.dir <- dfc.dir
+    if (!missing(cfac.dir)) opt.args$cfac.dir <- cfac.dir
+    if (!missing(initc.dir)) opt.args$initc.dir <- initc.dir
+    if (!missing(lbd.dir)) opt.args$lbd.dir <- lbd.dir
+    if (!missing(hbd.dir)) opt.args$hbd.dir <- hbd.dir
+    if (!missing(dfac.dir)) opt.args$dfac.dir <- dfac.dir
+    if (!missing(initd.dir)) opt.args$initd.dir <- initd.dir
+    if (!missing(lbc.init)) opt.args$lbc.init <- lbc.init
+    if (!missing(hbc.init)) opt.args$hbc.init <- hbc.init
+    if (!missing(cfac.init)) opt.args$cfac.init <- cfac.init
+    if (!missing(lbd.init)) opt.args$lbd.init <- lbd.init
+    if (!missing(hbd.init)) opt.args$hbd.init <- hbd.init
+    if (!missing(dfac.init)) opt.args$dfac.init <- dfac.init
+    if (!missing(scale.init.categorical.sample))
+      opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
+    if (!missing(transform.bounds)) opt.args$transform.bounds <- transform.bounds
+    if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
+    if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
 
-    tbw <- eval(parse(text=paste("npregbw.rbandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    tbw <- do.call(npregbw.rbandwidth, opt.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
