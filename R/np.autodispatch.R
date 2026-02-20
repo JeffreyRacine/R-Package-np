@@ -108,9 +108,11 @@
 .npRmpi_autodispatch_target_args <- function() {
   c("formula", "data", "bws",
     "dat", "tdat", "edat",
-    "xdat", "ydat", "txdat", "tydat",
-    "exdat", "eydat", "newdata",
-    "gydat", "zdat", "wdat", "gdata",
+    "xdat", "ydat", "zdat", "txdat", "tydat", "tzdat",
+    "exdat", "eydat", "ezdat", "newdata",
+    "gydat", "wdat", "gdata",
+    "data.x", "data.y", "model",
+    "y", "z", "w", "x", "zeval", "weval", "xeval", "bw",
     "gradients", "residuals", "errors", "gradient.order")
 }
 
