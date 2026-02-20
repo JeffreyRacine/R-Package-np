@@ -230,7 +230,7 @@
     val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
     idx <- idx + 1L
     tmp <- sprintf(".__npRmpi_autod_%s_%d", nm, idx)
-    assign(tmp, val, envir = .GlobalEnv)
+    .GlobalEnv[[tmp]] <- val
     .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
 
     out[[i]] <- as.name(tmp)
@@ -372,7 +372,7 @@
     for (nm in prepared$tmpnames) {
       val <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
       prepared$tmpvals[[nm]] <- val
-      assign(nm, val, envir = .GlobalEnv)
+      .GlobalEnv[[nm]] <- val
       .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
     }
   }
@@ -425,7 +425,7 @@
     for (nm in prepared$tmpnames) {
       val <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
       prepared$tmpvals[[nm]] <- val
-      assign(nm, val, envir = .GlobalEnv)
+      .GlobalEnv[[nm]] <- val
       .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
     }
   }
@@ -495,7 +495,7 @@
     stop("bootstrap payload must be a list")
 
   tmp <- ".__npRmpi_boot_payload"
-  assign(tmp, payload, envir = .GlobalEnv)
+  .GlobalEnv[[tmp]] <- payload
   .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
   on.exit({
     rm(list = tmp, envir = .GlobalEnv)
