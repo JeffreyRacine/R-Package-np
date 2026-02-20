@@ -286,6 +286,20 @@
   x
 }
 
+.npRmpi_guard_no_auto_object_in_manual_bcast <- function(obj, where = "this call") {
+  if (.npRmpi_autodispatch_in_context())
+    return(invisible(FALSE))
+  if (!.npRmpi_autodispatch_called_from_bcast())
+    return(invisible(FALSE))
+  mode <- try(attr(obj, "npRmpi.dispatch.mode", exact = TRUE), silent = TRUE)
+  if (inherits(mode, "try-error") || is.null(mode))
+    return(invisible(FALSE))
+  if (identical(mode, "auto")) {
+    stop(sprintf("%s received an object created under npRmpi.autodispatch and cannot be executed inside mpi.bcast.cmd(...): avoid mixing dispatch modes; either rerun the full workflow in manual broadcast mode or keep this call outside mpi.bcast.cmd", where))
+  }
+  invisible(FALSE)
+}
+
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()

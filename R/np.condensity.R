@@ -73,6 +73,7 @@ npcdens.conbandwidth <- function(bws,
                                  tydat = stop("invoked without training data 'tydat'"),
                                  exdat, eydat, gradients = FALSE, ...){
   .npRmpi_require_active_slave_pool(where = "npcdens()")
+  .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -303,6 +304,7 @@ npcdens.conbandwidth <- function(bws,
 
 npcdens.default <- function(bws, txdat, tydat, ...){
   .npRmpi_require_active_slave_pool(where = "npcdens()")
+  .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()

@@ -107,6 +107,7 @@ npreg.rbandwidth <-
            residuals = FALSE,
            ...){
     .npRmpi_require_active_slave_pool(where = "npreg()")
+    .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -410,6 +411,7 @@ npreg.rbandwidth <-
 
 npreg.default <- function(bws, txdat, tydat, ...){
   .npRmpi_require_active_slave_pool(where = "npreg()")
+  .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()
