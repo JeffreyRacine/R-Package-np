@@ -320,41 +320,55 @@ npudensbw.default <-
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
-               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
-
-
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
-
-    tbw <- eval(parse(text=paste("bandwidth(bws",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ", nobs = dim(dat)[1], xdati = untangle(dat),",
-                        "xnames = names(dat),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    bw.args <- list(
+      bw = bws,
+      nobs = dim(dat)[1],
+      xdati = untangle(dat),
+      xnames = names(dat),
+      bandwidth.compute = bandwidth.compute
+    )
+    if (!missing(bwmethod)) bw.args$bwmethod <- bwmethod
+    if (!missing(bwscaling)) bw.args$bwscaling <- bwscaling
+    if (!missing(bwtype)) bw.args$bwtype <- bwtype
+    if (!missing(ckertype)) bw.args$ckertype <- ckertype
+    if (!missing(ckerorder)) bw.args$ckerorder <- ckerorder
+    if (!missing(ckerbound)) bw.args$ckerbound <- ckerbound
+    if (!missing(ckerlb)) bw.args$ckerlb <- ckerlb
+    if (!missing(ckerub)) bw.args$ckerub <- ckerub
+    if (!missing(ukertype)) bw.args$ukertype <- ukertype
+    if (!missing(okertype)) bw.args$okertype <- okertype
+    tbw <- do.call(bandwidth, bw.args)
 
 
     ## next grab dummies for actual bandwidth selection and perform call
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
-               "small",
-               "lbc.dir","dfc.dir","cfac.dir", "initc.dir", 
-               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
-               "lbc.init", "hbc.init", "cfac.init", 
-               "lbd.init", "hbd.init", "dfac.init", 
-               "scale.init.categorical.sample",
-               "invalid.penalty",
-               "penalty.multiplier")
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
-
-    tbw <- eval(parse(text=paste("npudensbw.bandwidth(dat=dat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    opt.args <- list(dat = dat, bws = tbw)
+    if (!missing(bandwidth.compute)) opt.args$bandwidth.compute <- bandwidth.compute
+    if (!missing(nmulti)) opt.args$nmulti <- nmulti
+    if (!missing(remin)) opt.args$remin <- remin
+    if (!missing(itmax)) opt.args$itmax <- itmax
+    if (!missing(ftol)) opt.args$ftol <- ftol
+    if (!missing(tol)) opt.args$tol <- tol
+    if (!missing(small)) opt.args$small <- small
+    if (!missing(lbc.dir)) opt.args$lbc.dir <- lbc.dir
+    if (!missing(dfc.dir)) opt.args$dfc.dir <- dfc.dir
+    if (!missing(cfac.dir)) opt.args$cfac.dir <- cfac.dir
+    if (!missing(initc.dir)) opt.args$initc.dir <- initc.dir
+    if (!missing(lbd.dir)) opt.args$lbd.dir <- lbd.dir
+    if (!missing(hbd.dir)) opt.args$hbd.dir <- hbd.dir
+    if (!missing(dfac.dir)) opt.args$dfac.dir <- dfac.dir
+    if (!missing(initd.dir)) opt.args$initd.dir <- initd.dir
+    if (!missing(lbc.init)) opt.args$lbc.init <- lbc.init
+    if (!missing(hbc.init)) opt.args$hbc.init <- hbc.init
+    if (!missing(cfac.init)) opt.args$cfac.init <- cfac.init
+    if (!missing(lbd.init)) opt.args$lbd.init <- lbd.init
+    if (!missing(hbd.init)) opt.args$hbd.init <- hbd.init
+    if (!missing(dfac.init)) opt.args$dfac.init <- dfac.init
+    if (!missing(scale.init.categorical.sample))
+      opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
+    if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
+    if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
+    tbw <- do.call(npudensbw.bandwidth, opt.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

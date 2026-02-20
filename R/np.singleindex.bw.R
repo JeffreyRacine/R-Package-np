@@ -131,18 +131,18 @@ npindexbw.default <-
     if (tbw$method == "kleinspady" & !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("nmulti","random.seed", "optim.method", "optim.maxattempts",
-               "optim.reltol", "optim.abstol", "optim.maxit", "only.optimize.beta")
-
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
-
-    if (bandwidth.compute)
-      tbw <- eval(parse(text=paste("npindexbw.sibandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                          ifelse(any.m, ",",""),
-                          paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                          ")")))
+    if (bandwidth.compute) {
+      opt.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+      if (!missing(nmulti)) opt.args$nmulti <- nmulti
+      if (!missing(random.seed)) opt.args$random.seed <- random.seed
+      if (!missing(optim.method)) opt.args$optim.method <- optim.method
+      if (!missing(optim.maxattempts)) opt.args$optim.maxattempts <- optim.maxattempts
+      if (!missing(optim.reltol)) opt.args$optim.reltol <- optim.reltol
+      if (!missing(optim.abstol)) opt.args$optim.abstol <- optim.abstol
+      if (!missing(optim.maxit)) opt.args$optim.maxit <- optim.maxit
+      if (!missing(only.optimize.beta)) opt.args$only.optimize.beta <- only.optimize.beta
+      tbw <- do.call(npindexbw.sibandwidth, opt.args)
+    }
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

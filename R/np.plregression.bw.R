@@ -268,16 +268,16 @@ npplregbw.default =
                        bandwidth.compute = bandwidth.compute)
 
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("nmulti", "remin", "itmax", "ftol", "tol", "small")
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
-
-    if (bandwidth.compute)
-      tbw <- eval(parse(text=paste("npplregbw.plbandwidth(xdat=xdat, ydat=ydat, zdat = zdat, bws=tbw",
-                          ifelse(any.m, ",",""),
-                          paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                          ")")))
+    if (bandwidth.compute) {
+      opt.args <- list(xdat = xdat, ydat = ydat, zdat = zdat, bws = tbw)
+      if (!missing(nmulti)) opt.args$nmulti <- nmulti
+      if (!missing(remin)) opt.args$remin <- remin
+      if (!missing(itmax)) opt.args$itmax <- itmax
+      if (!missing(ftol)) opt.args$ftol <- ftol
+      if (!missing(tol)) opt.args$tol <- tol
+      if (!missing(small)) opt.args$small <- small
+      tbw <- do.call(npplregbw.plbandwidth, opt.args)
+    }
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

@@ -82,8 +82,11 @@ npcdistbw.formula <-
       gydat <- gmf[, variableNames[[1]], drop = FALSE]
     }
     
-    tbw = eval(parse(text=paste("npcdistbw(xdat = xdat, ydat = ydat,",
-                       ifelse(has.gval, "gydat = gydat",""), "...)")))
+    dots <- list(...)
+    seed.args <- c(list(xdat = xdat, ydat = ydat),
+                   if (has.gval) list(gydat = gydat) else list(),
+                   dots)
+    tbw <- do.call(npcdistbw, seed.args)
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)
@@ -526,48 +529,69 @@ npcdistbw.default <-
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bwmethod", "bwscaling", "bwtype", "cxkertype", "cxkerorder",
-               "cxkerbound", "cxkerlb", "cxkerub",
-               "cykertype", "cykerorder", "cykerbound", "cykerlb", "cykerub",
-               "uxkertype", "oxkertype", "oykertype")
-
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
-
-    tbw <- eval(parse(text=paste("condbandwidth(",
-                        "xbw = bws[length(ydat)+1:length(xdat)],",
-                        "ybw = bws[1:length(ydat)],",
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ifelse(any.m, ",",""),
-                        "uykertype = 'aitchisonaitken',",
-                        "nobs = nrow(xdat),",
-                        "xdati = untangle(xdat),",
-                        "ydati = untangle(ydat),",
-                        "xnames = names(xdat),",
-                        "ynames = names(ydat),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    bw.args <- list(
+      xbw = bws[length(ydat)+1:length(xdat)],
+      ybw = bws[1:length(ydat)],
+      uykertype = "aitchisonaitken",
+      nobs = nrow(xdat),
+      xdati = untangle(xdat),
+      ydati = untangle(ydat),
+      xnames = names(xdat),
+      ynames = names(ydat),
+      bandwidth.compute = bandwidth.compute
+    )
+    if (!missing(bwmethod)) bw.args$bwmethod <- bwmethod
+    if (!missing(bwscaling)) bw.args$bwscaling <- bwscaling
+    if (!missing(bwtype)) bw.args$bwtype <- bwtype
+    if (!missing(cxkertype)) bw.args$cxkertype <- cxkertype
+    if (!missing(cxkerorder)) bw.args$cxkerorder <- cxkerorder
+    if (!missing(cxkerbound)) bw.args$cxkerbound <- cxkerbound
+    if (!missing(cxkerlb)) bw.args$cxkerlb <- cxkerlb
+    if (!missing(cxkerub)) bw.args$cxkerub <- cxkerub
+    if (!missing(cykertype)) bw.args$cykertype <- cykertype
+    if (!missing(cykerorder)) bw.args$cykerorder <- cykerorder
+    if (!missing(cykerbound)) bw.args$cykerbound <- cykerbound
+    if (!missing(cykerlb)) bw.args$cykerlb <- cykerlb
+    if (!missing(cykerub)) bw.args$cykerub <- cykerub
+    if (!missing(uxkertype)) bw.args$uxkertype <- uxkertype
+    if (!missing(oxkertype)) bw.args$oxkertype <- oxkertype
+    if (!missing(oykertype)) bw.args$oykertype <- oykertype
+    tbw <- do.call(condbandwidth, bw.args)
                         
     ## next grab dummies for actual bandwidth selection and perform call
 
-    mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("gydat", "bandwidth.compute", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
-               "tol", "small", "memfac",
-               "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
-               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
-               "lbc.init", "hbc.init", "cfac.init", 
-               "lbd.init", "hbd.init", "dfac.init", 
-               "scale.init.categorical.sample",
-               "transform.bounds",
-               "invalid.penalty",
-               "penalty.multiplier")
-    m <- match(margs, mc.names, nomatch = 0)
-    any.m <- any(m != 0)
-
-    tbw <- eval(parse(text=paste("npcdistbw.condbandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    opt.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (!missing(gydat)) opt.args$gydat <- gydat
+    if (!missing(bandwidth.compute)) opt.args$bandwidth.compute <- bandwidth.compute
+    if (!missing(nmulti)) opt.args$nmulti <- nmulti
+    if (!missing(remin)) opt.args$remin <- remin
+    if (!missing(itmax)) opt.args$itmax <- itmax
+    if (!missing(do.full.integral)) opt.args$do.full.integral <- do.full.integral
+    if (!missing(ngrid)) opt.args$ngrid <- ngrid
+    if (!missing(ftol)) opt.args$ftol <- ftol
+    if (!missing(tol)) opt.args$tol <- tol
+    if (!missing(small)) opt.args$small <- small
+    if (!missing(memfac)) opt.args$memfac <- memfac
+    if (!missing(lbc.dir)) opt.args$lbc.dir <- lbc.dir
+    if (!missing(dfc.dir)) opt.args$dfc.dir <- dfc.dir
+    if (!missing(cfac.dir)) opt.args$cfac.dir <- cfac.dir
+    if (!missing(initc.dir)) opt.args$initc.dir <- initc.dir
+    if (!missing(lbd.dir)) opt.args$lbd.dir <- lbd.dir
+    if (!missing(hbd.dir)) opt.args$hbd.dir <- hbd.dir
+    if (!missing(dfac.dir)) opt.args$dfac.dir <- dfac.dir
+    if (!missing(initd.dir)) opt.args$initd.dir <- initd.dir
+    if (!missing(lbc.init)) opt.args$lbc.init <- lbc.init
+    if (!missing(hbc.init)) opt.args$hbc.init <- hbc.init
+    if (!missing(cfac.init)) opt.args$cfac.init <- cfac.init
+    if (!missing(lbd.init)) opt.args$lbd.init <- lbd.init
+    if (!missing(hbd.init)) opt.args$hbd.init <- hbd.init
+    if (!missing(dfac.init)) opt.args$dfac.init <- dfac.init
+    if (!missing(scale.init.categorical.sample))
+      opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
+    if (!missing(transform.bounds)) opt.args$transform.bounds <- transform.bounds
+    if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
+    if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
+    tbw <- do.call(npcdistbw.condbandwidth, opt.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
