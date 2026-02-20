@@ -116,6 +116,27 @@
     "gradients", "residuals", "errors", "gradient.order")
 }
 
+.npRmpi_autodispatch_failfast_formula_data <- function(mc, caller_env) {
+  if (!is.call(mc))
+    return(invisible(FALSE))
+
+  nms <- names(mc)
+  has_formula <- !is.null(nms) && any(nms == "formula")
+  if (!has_formula && !is.null(nms) && any(nms == "bws")) {
+    bws.expr <- mc[[which(nms == "bws")[1L]]]
+    bws.val <- try(eval(bws.expr, envir = caller_env), silent = TRUE)
+    has_formula <- !inherits(bws.val, "try-error") && inherits(bws.val, "formula")
+  }
+  if (!has_formula)
+    return(invisible(FALSE))
+
+  has.data <- any(nms %in% c("data", "xdat", "ydat", "txdat", "tydat", "zdat"))
+  if (has.data)
+    return(invisible(FALSE))
+
+  stop("npRmpi autodispatch formula interface currently requires explicit data= (or xdat/ydat-style inputs); this avoids unresolved-symbol hangs on slave ranks")
+}
+
 .npRmpi_autodispatch_eval_arg <- function(expr, caller_env) {
   val <- try(eval(expr, envir = caller_env), silent = TRUE)
   if (!inherits(val, "try-error"))
@@ -255,6 +276,8 @@
     .npRmpi_autodispatch_warn_nested()
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
   }
+
+  .npRmpi_autodispatch_failfast_formula_data(mc, caller_env = caller_env)
 
   if (!.npRmpi_autodispatch_preflight(comm = comm))
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
