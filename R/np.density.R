@@ -202,6 +202,12 @@ npudens.default <- function(bws, tdat, ...){
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
+  if (inherits(bws, "formula")) {
+    dots <- list(...)
+    tbw <- do.call(npudensbw, c(list(formula = bws), dots))
+    return(npudens(bws = tbw, ...))
+  }
+
   sc <- sys.call()
   sc.names <- names(sc)
 

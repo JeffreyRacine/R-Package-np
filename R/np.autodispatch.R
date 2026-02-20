@@ -150,24 +150,7 @@
 }
 
 .npRmpi_autodispatch_failfast_formula_data <- function(mc, caller_env) {
-  if (!is.call(mc))
-    return(invisible(FALSE))
-
-  nms <- names(mc)
-  has_formula <- !is.null(nms) && any(nms == "formula")
-  if (!has_formula && !is.null(nms) && any(nms == "bws")) {
-    bws.expr <- mc[[which(nms == "bws")[1L]]]
-    bws.val <- try(eval(bws.expr, envir = caller_env), silent = TRUE)
-    has_formula <- !inherits(bws.val, "try-error") && inherits(bws.val, "formula")
-  }
-  if (!has_formula)
-    return(invisible(FALSE))
-
-  has.data <- any(nms %in% c("data", "xdat", "ydat", "txdat", "tydat", "zdat"))
-  if (has.data)
-    return(invisible(FALSE))
-
-  stop("npRmpi autodispatch formula interface currently requires explicit data= (or xdat/ydat-style inputs); this avoids unresolved-symbol hangs on slave ranks")
+  invisible(FALSE)
 }
 
 .npRmpi_autodispatch_eval_arg <- function(expr, caller_env) {
@@ -203,6 +186,40 @@
   tmpnames <- character(0)
   tmpvals <- list()
   idx <- 0L
+
+  has_data_inputs <- !is.null(nms) && any(nms %in% c("data", "xdat", "ydat", "txdat", "tydat", "zdat"))
+
+  formula.expr <- NULL
+  if (!is.null(nms) && any(nms == "formula")) {
+    formula.expr <- arg.list[[which(nms == "formula")[1L]]]
+  } else if (!is.null(nms) && any(nms == "bws")) {
+    bexpr <- arg.list[[which(nms == "bws")[1L]]]
+    bval <- try(.npRmpi_autodispatch_eval_arg(bexpr, caller_env = caller_env), silent = TRUE)
+    if (!inherits(bval, "try-error") && inherits(bval, "formula"))
+      formula.expr <- bexpr
+  } else if (length(arg.list) >= 2L) {
+    nm2 <- if (!is.null(nms) && length(nms) >= 2L) nms[[2L]] else ""
+    if (is.null(nm2) || identical(nm2, "")) {
+      fval <- try(.npRmpi_autodispatch_eval_arg(arg.list[[2L]], caller_env = caller_env), silent = TRUE)
+      if (!inherits(fval, "try-error") && inherits(fval, "formula"))
+        formula.expr <- arg.list[[2L]]
+    }
+  }
+
+  if (!has_data_inputs && !is.null(formula.expr)) {
+    fval <- .npRmpi_autodispatch_eval_arg(formula.expr, caller_env = caller_env)
+    vars <- all.vars(fval)
+    if (length(vars)) {
+      dlist <- setNames(lapply(vars, function(v) {
+        .npRmpi_autodispatch_eval_arg(as.name(v), caller_env = caller_env)
+      }), vars)
+      idx <- idx + 1L
+      tmp <- sprintf(".__npRmpi_autod_data_%d", idx)
+      out[["data"]] <- as.name(tmp)
+      tmpnames <- c(tmpnames, tmp)
+      tmpvals[[tmp]] <- as.data.frame(dlist, stringsAsFactors = FALSE)
+    }
+  }
 
   for (i in seq_along(arg.list)) {
     if (i == 1L) next
