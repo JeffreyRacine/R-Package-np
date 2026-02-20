@@ -144,7 +144,10 @@ plotFactor <- function(f, y, ...){
       !.npRmpi_autodispatch_in_context() &&
       !.npRmpi_autodispatch_called_from_bcast() &&
       identical(plot.errors.method, "bootstrap")) {
-    stop(sprintf("%s with plot.errors.method='bootstrap' does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
+    if (!isTRUE(getOption("npRmpi.autodispatch.warned.bootstrap.plot", FALSE))) {
+      warning(sprintf("%s with plot.errors.method='bootstrap' is executing with npRmpi.autodispatch enabled; this may be slower than explicit mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
+      options(npRmpi.autodispatch.warned.bootstrap.plot = TRUE)
+    }
   }
 }
 
