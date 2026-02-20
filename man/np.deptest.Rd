@@ -152,9 +152,8 @@ npdeptest(data.x = NULL,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
-
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+set.seed(42)
 
 n <- 100
 
@@ -162,15 +161,11 @@ x <- rnorm(n)
 y <- 1 + x + rnorm(n)
 model <- lm(y~x)
 y.fit <- fitted(model)
-     
-mpi.bcast.Robj2slave(y)
-mpi.bcast.Robj2slave(y.fit)
 
-mpi.bcast.cmd(output <- npdeptest(y,
-                                  y.fit,
-                                  boot.num=29,
-                                  method="summation"),
-              caller.execute=TRUE)
+output <- npdeptest(y,
+                    y.fit,
+                    boot.num=29,
+                    method="summation")
 
 summary(output)
 

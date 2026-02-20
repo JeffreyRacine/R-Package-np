@@ -201,19 +201,14 @@ npcmstest(formula,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(data(cps71),
-              caller.execute=TRUE)
+data(cps71)
 
-mpi.bcast.cmd(attach(cps71),
-              caller.execute=TRUE)
+model <- lm(logwage~age+I(age^2), data=cps71, x=TRUE, y=TRUE)
 
-mpi.bcast.cmd(model <- lm(logwage~age+I(age^2), x=TRUE, y=TRUE),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(npcmstest(model = model, xdat = age, ydat = logwage,
-                        boot.num = 29),
-              caller.execute=TRUE)
+npcmstest(model = model, xdat = cps71$age, ydat = cps71$logwage,
+          boot.num = 29)
 
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.

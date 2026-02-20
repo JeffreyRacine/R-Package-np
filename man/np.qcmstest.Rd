@@ -208,28 +208,22 @@ npqcmstest(formula,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(library("quantreg"),
-              caller.execute=TRUE)
+library("quantreg")
 
-mpi.bcast.cmd(data("cps71"),
-              caller.execute=TRUE)
-mpi.bcast.cmd(attach(cps71),
-              caller.execute=TRUE)
+data("cps71")
 
-mpi.bcast.cmd(model <- rq(logwage~age+I(age^2), tau=0.5, model=TRUE),
-              caller.execute=TRUE)
+model <- rq(logwage~age+I(age^2), data=cps71, tau=0.5, model=TRUE)
 
-mpi.bcast.cmd(X <- data.frame(age),
-              caller.execute=TRUE)
+X <- data.frame(age=cps71$age)
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-mpi.bcast.cmd(output <- npqcmstest(model=model, xdat=X,
-                                   ydat=logwage, tau=0.5,
-                                   boot.num=29),
-              caller.execute=TRUE)
+output <- npqcmstest(model=model, xdat=X,
+                     ydat=cps71$logwage, tau=0.5,
+                     boot.num=29)
 
 summary(output)
 

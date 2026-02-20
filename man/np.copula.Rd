@@ -151,8 +151,9 @@ npcopula(bws,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(library(MASS),caller.execute=TRUE)
+library(MASS)
 
 set.seed(42)
 
@@ -173,15 +174,10 @@ q.max <- 1.0
 grid.seq <- seq(q.min,q.max,length=n.eval)
 grid.dat <- cbind(grid.seq,grid.seq)
 
-mpi.bcast.Robj2slave(mydat)
-mpi.bcast.Robj2slave(grid.dat)
-
 ## Estimate the copula (bw object obtained from npudistbw())
 
-mpi.bcast.cmd(bw.cdf <- npudistbw(~x+y,data=mydat),
-              caller.execute=TRUE)
-mpi.bcast.cmd(copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat),
-              caller.execute=TRUE)
+bw.cdf <- npudistbw(~x+y,data=mydat)
+copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat)
 
 ## Plot the copula
 
@@ -199,16 +195,13 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
 
 ## Plot the empirical copula
 
-mpi.bcast.cmd(copula.emp <- npcopula(bws=bw.cdf,data=mydat),
-              caller.execute=TRUE)
+copula.emp <- npcopula(bws=bw.cdf,data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
-mpi.bcast.cmd(bw.pdf <- npudensbw(~x+y,data=mydat),
-              caller.execute=TRUE)
-mpi.bcast.cmd(copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat),
-              caller.execute=TRUE)
+bw.pdf <- npudensbw(~x+y,data=mydat)
+copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat)
 
 ## Plot the copula density
 
@@ -255,8 +248,9 @@ npRmpi.stop()               ## soft close (may keep slaves alive)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(library(MASS),caller.execute=TRUE)
+library(MASS)
 
 set.seed(42)
 
@@ -275,15 +269,10 @@ q.max <- 1.0
 grid.seq <- seq(q.min,q.max,length=n.eval)
 grid.dat <- cbind(grid.seq,grid.seq)
 
-mpi.bcast.Robj2slave(mydat)
-mpi.bcast.Robj2slave(grid.dat)
-
 ## Estimate the copula (bw object obtained from npudistbw())
 
-mpi.bcast.cmd(bw.cdf <- npudistbw(~x+y,data=mydat),
-              caller.execute=TRUE)
-mpi.bcast.cmd(copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat),
-              caller.execute=TRUE)
+bw.cdf <- npudistbw(~x+y,data=mydat)
+copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat)
 
 ## Plot the copula
 
@@ -301,16 +290,13 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
 
 ## Plot the empirical copula
 
-mpi.bcast.cmd(copula.emp <- npcopula(bws=bw.cdf,data=mydat),
-              caller.execute=TRUE)
+copula.emp <- npcopula(bws=bw.cdf,data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
-mpi.bcast.cmd(bw.pdf <- npudensbw(~x+y,data=mydat),
-              caller.execute=TRUE)
-mpi.bcast.cmd(copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat),
-              caller.execute=TRUE)
+bw.pdf <- npudensbw(~x+y,data=mydat)
+copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat)
 
 ## Plot the copula density
 

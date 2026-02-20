@@ -115,20 +115,15 @@ npdeneqtest(x = NULL,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
-
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+set.seed(42)
 
 n <- 100
 
 sample.A <- data.frame(x=rnorm(n))
 sample.B <- data.frame(x=rnorm(n))
 
-mpi.bcast.Robj2slave(sample.A)
-mpi.bcast.Robj2slave(sample.B)
-
-mpi.bcast.cmd(output <- npdeneqtest(sample.A,sample.B,boot.num=29),
-              caller.execute=TRUE)
+output <- npdeneqtest(sample.A,sample.B,boot.num=29)
 
 output
 

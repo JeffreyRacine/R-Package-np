@@ -184,9 +184,10 @@ npconmode(bws, \dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(library(MASS),caller.execute=TRUE)
-mpi.bcast.cmd(data(birthwt),caller.execute=TRUE)
+library(MASS)
+data(birthwt)
 
 birthwt$low <- factor(birthwt$low)
 birthwt$smoke <- factor(birthwt$smoke)
@@ -195,23 +196,19 @@ birthwt$ht <- factor(birthwt$ht)
 birthwt$ui <- factor(birthwt$ui)
 birthwt$ftv <- ordered(birthwt$ftv)
 
-mpi.bcast.Robj2slave(birthwt)
-
-mpi.bcast.cmd(bw <- npcdensbw(low~
-                              smoke+ 
-                              race+ 
-                              ht+ 
-                              ui+    
-                              ftv+  
-                              age+           
-                              lwt,
-                              data=birthwt),
-              caller.execute=TRUE)
+bw <- npcdensbw(low~
+                smoke+ 
+                race+ 
+                ht+ 
+                ui+    
+                ftv+  
+                age+           
+                lwt,
+                data=birthwt)
 
 summary(bw)
 
-mpi.bcast.cmd(model <- npconmode(bws=bw),
-              caller.execute=TRUE)
+model <- npconmode(bws=bw)
 
 summary(model)
 
