@@ -55,7 +55,14 @@
   any(vapply(calls, function(cl) {
     if (!is.call(cl) || length(cl) < 1) return(FALSE)
     fn <- cl[[1]]
-    is.symbol(fn) && identical(as.character(fn), "mpi.bcast.cmd")
+    if (is.symbol(fn) && identical(as.character(fn), "mpi.bcast.cmd"))
+      return(TRUE)
+    if (is.call(fn) && length(fn) >= 3 && is.symbol(fn[[1]]) &&
+        as.character(fn[[1]]) %in% c("::", ":::")) {
+      tgt <- fn[[3]]
+      return(is.symbol(tgt) && identical(as.character(tgt), "mpi.bcast.cmd"))
+    }
+    FALSE
   }, logical(1)))
 }
 

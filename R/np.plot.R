@@ -142,13 +142,20 @@ plotFactor <- function(f, y, ...){
                                                       where = "plot()") {
   if (.npRmpi_autodispatch_active() &&
       !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast() &&
-      identical(plot.errors.method, "bootstrap")) {
-    if (!isTRUE(getOption("npRmpi.autodispatch.warned.bootstrap.plot", FALSE))) {
-      warning(sprintf("%s with plot.errors.method='bootstrap' is executing with npRmpi.autodispatch enabled; this may be slower than explicit mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
-      options(npRmpi.autodispatch.warned.bootstrap.plot = TRUE)
-    }
+      !.npRmpi_autodispatch_called_from_bcast()) {
+    stop(sprintf("%s does not currently support direct npRmpi.autodispatch execution; use mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
   }
+}
+
+.npRmpi_plot_behavior_for_rank <- function(plot.behavior) {
+  if (!.npRmpi_autodispatch_called_from_bcast())
+    return(plot.behavior)
+
+  rank <- try(mpi.comm.rank(), silent = TRUE)
+  if (inherits(rank, "try-error") || is.na(rank) || rank == 0L)
+    return(plot.behavior)
+
+  "data"
 }
 
 ## Rank-based simultaneous confidence set helper, vendored from
@@ -1239,6 +1246,7 @@ npplot.rbandwidth <-
 
     
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
@@ -1962,6 +1970,7 @@ npplot.scbandwidth <-
 
     
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
@@ -2785,6 +2794,7 @@ npplot.plbandwidth <-
     }
     
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
@@ -3514,6 +3524,7 @@ npplot.bandwidth <-
     }
 
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
@@ -4160,6 +4171,7 @@ npplot.dbandwidth <-
     }
 
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
@@ -4821,6 +4833,7 @@ npplot.conbandwidth <-
     }
     
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
@@ -5731,6 +5744,7 @@ npplot.condbandwidth <-
     }
     
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
@@ -6616,6 +6630,7 @@ npplot.sibandwidth <-
     }
 
     plot.behavior = match.arg(plot.behavior)
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
