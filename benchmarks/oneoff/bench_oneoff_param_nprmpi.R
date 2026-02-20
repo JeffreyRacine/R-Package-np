@@ -208,7 +208,7 @@ run_one <- function(fun, n, seed) {
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npsigtest") {
-      options(npRmpi.autodispatch = FALSE)
+      options(npRmpi.autodispatch = TRUE)
       set.seed(seed)
       out$n_actual <- as.integer(n)
       z <- factor(rbinom(n, 1, 0.5))
@@ -216,14 +216,13 @@ run_one <- function(fun, n, seed) {
       x2 <- runif(n, -2, 2)
       y <- x1 + x2 + rnorm(n)
       d <- data.frame(z = z, x1 = x1, x2 = x2, y = y)
-      mpi.bcast.Robj2slave(d)
 
       t0 <- proc.time()[["elapsed"]]
-      model <- mpi.bcast.cmd(npreg(y ~ z + x1 + x2, regtype = "ll", bwmethod = "cv.aic", data = d), caller.execute = TRUE)
+      model <- npreg(y ~ z + x1 + x2, regtype = "ll", bwmethod = "cv.aic", data = d)
       out$elapsed_setup <- proc.time()[["elapsed"]] - t0
 
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npsigtest(model), caller.execute = TRUE)
+      ans <- npsigtest(model)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
       out$sig_aux <- sig_numeric(model)

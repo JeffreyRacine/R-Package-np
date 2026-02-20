@@ -751,6 +751,9 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
 \examples{
 \dontrun{
+npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+
 # EXAMPLE 1: For this example, we load Giovanni Baiocchi's Italian GDP
 # panel (see Italy for details), then create a data frame in which year
 # is an ordered factor, GDP is continuous, compute bandwidths using
@@ -958,6 +961,7 @@ lines(age.eval,grad.lower.ci,lty=3)
 lines(age.eval,grad.upper.ci,lty=3)
 
 detach(cps71)
+npRmpi.stop()
 } % enddontrun
 }
 
