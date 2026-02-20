@@ -274,7 +274,8 @@ compute.default.error.range <- function(center, err) {
                                              plot.errors.bar,
                                              xdat,
                                              common.scale,
-                                             ylim) {
+                                             ylim,
+                                             allow_asymptotic_quantile = TRUE) {
   plot.behavior <- match.arg(plot.behavior, c("plot", "plot-data", "data"))
   plot.errors.method <- match.arg(plot.errors.method, c("none", "bootstrap", "asymptotic"))
   plot.errors.boot.method <- match.arg(plot.errors.boot.method, c("inid", "fixed", "geom"))
@@ -295,7 +296,7 @@ compute.default.error.range <- function(center, err) {
     plot.errors.method <- "bootstrap"
   }
 
-  if (plot.errors.method == "asymptotic") {
+  if (allow_asymptotic_quantile && plot.errors.method == "asymptotic") {
     if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
       warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
       plot.errors.type <- "pmzsd"
@@ -2022,44 +2023,33 @@ npplot.scbandwidth <-
     }
 
     
-    plot.behavior = match.arg(plot.behavior)
-    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim
+    )
+
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    plot.errors.method <- normalized.opts$plot.errors.method
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
-
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
-
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
-    }
-
-    if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
-        plot.errors.type = "pmzsd"
-      }
-
-      if (plot.errors.center == "bias-corrected") {
-        warning("no bias corrections can be calculated with asymptotics, centering on estimate")
-        plot.errors.center = "estimate"
-      }
-    }
-
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
-
-    plot.errors = (plot.errors.method != "none")
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
+    plot.errors <- normalized.opts$plot.errors
 
     if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) & (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) & perspective & !gradients &
         !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
@@ -2846,37 +2836,39 @@ npplot.plbandwidth <-
                     "\nProceeding without bootstrapping."))
     }
     
-    plot.behavior = match.arg(plot.behavior)
-    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim,
+      allow_asymptotic_quantile = FALSE
+    )
+
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    plot.errors.method <- normalized.opts$plot.errors.method
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
-
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
-
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
-    }
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
 
     if (plot.errors.method == "asymptotic") {
       warning(paste("asymptotic errors are not supported with partially linear regression.\n",
                     "Proceeding without calculating errors"))
       plot.errors.method = "none"
     }
-
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
-
 
     plot.errors = (plot.errors.method != "none")
 
@@ -3576,45 +3568,33 @@ npplot.bandwidth <-
                     "\nProceeding without bootstrapping."))
     }
 
-    plot.behavior = match.arg(plot.behavior)
-    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim
+    )
+
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    plot.errors.method <- normalized.opts$plot.errors.method
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
-
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
-
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
-    }
-
-    if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
-        plot.errors.type = "pmzsd"
-      }
-
-      if (plot.errors.center == "bias-corrected") {
-        warning("no bias corrections can be calculated with asymptotics, centering on estimate")
-        plot.errors.center = "estimate"
-      }
-    }
-
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
-
-
-    plot.errors = (plot.errors.method != "none")
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
+    plot.errors <- normalized.opts$plot.errors
 
     if ((bws$ncon + bws$nord == 2) & (bws$nuno == 0) & perspective &
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
@@ -4223,45 +4203,33 @@ npplot.dbandwidth <-
                     "\nProceeding without bootstrapping."))
     }
 
-    plot.behavior = match.arg(plot.behavior)
-    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim
+    )
+
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    plot.errors.method <- normalized.opts$plot.errors.method
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
-
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
-
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
-    }
-
-    if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
-        plot.errors.type = "pmzsd"
-      }
-
-      if (plot.errors.center == "bias-corrected") {
-        warning("no bias corrections can be calculated with asymptotics, centering on estimate")
-        plot.errors.center = "estimate"
-      }
-    }
-
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
-
-
-    plot.errors = (plot.errors.method != "none")
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
+    plot.errors <- normalized.opts$plot.errors
 
     if ((bws$ncon + bws$nord == 2) & (bws$nuno == 0) & perspective &
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
@@ -4885,49 +4853,38 @@ npplot.conbandwidth <-
                     "\nProceeding without bootstrapping."))
     }
     
-    plot.behavior = match.arg(plot.behavior)
-    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim
+    )
+
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    plot.errors.method <- normalized.opts$plot.errors.method
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
 
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
-
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
+    if (plot.errors.method == "asymptotic" && quantreg && gradients){
+      warning(paste("no asymptotic errors available for quantile regression gradients.",
+                    "\nOne must instead use bootstrapping."))
+      plot.errors.method = "none"
     }
-
-    if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
-        plot.errors.type = "pmzsd"
-      }
-
-      if (plot.errors.center == "bias-corrected") {
-        warning("no bias corrections can be calculated with asymptotics, centering on estimate")
-        plot.errors.center = "estimate"
-      }
-
-      if (quantreg & gradients){
-        warning(paste("no asymptotic errors available for quantile regression gradients.",
-                      "\nOne must instead use bootstrapping."))
-        plot.errors.method = "none"
-      }
-    }
-
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
-
 
     plot.errors = (plot.errors.method != "none")
 
@@ -5796,49 +5753,38 @@ npplot.condbandwidth <-
                     "\nProceeding without bootstrapping."))
     }
     
-    plot.behavior = match.arg(plot.behavior)
-    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim
+    )
+
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    plot.errors.method <- normalized.opts$plot.errors.method
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
 
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
-
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
+    if (plot.errors.method == "asymptotic" && quantreg && gradients){
+      warning(paste("no asymptotic errors available for quantile regression gradients.",
+                    "\nOne must instead use bootstrapping."))
+      plot.errors.method = "none"
     }
-
-    if (plot.errors.method == "asymptotic") {
-      if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")){
-        warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
-        plot.errors.type = "pmzsd"
-      }
-
-      if (plot.errors.center == "bias-corrected") {
-        warning("no bias corrections can be calculated with asymptotics, centering on estimate")
-        plot.errors.center = "estimate"
-      }
-
-      if (quantreg & gradients){
-        warning(paste("no asymptotic errors available for quantile regression gradients.",
-                      "\nOne must instead use bootstrapping."))
-        plot.errors.method = "none"
-      }
-    }
-
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
-
 
     plot.errors = (plot.errors.method != "none")
 
@@ -6682,35 +6628,38 @@ npplot.sibandwidth <-
                     "\nProceeding without bootstrapping."))
     }
 
-    plot.behavior = match.arg(plot.behavior)
-    plot.behavior <- .npRmpi_plot_behavior_for_rank(plot.behavior)
-    plot.errors.method = match.arg(plot.errors.method)
+    normalized.opts <- .npplot_normalize_common_options(
+      plot.behavior = plot.behavior,
+      plot.errors.method = plot.errors.method,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      plot.errors.style = plot.errors.style,
+      plot.errors.bar = plot.errors.bar,
+      xdat = xdat,
+      common.scale = common.scale,
+      ylim = ylim,
+      allow_asymptotic_quantile = FALSE
+    )
+
+    plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
+    plot.errors.method <- normalized.opts$plot.errors.method
     .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
-    plot.errors.boot.method = match.arg(plot.errors.boot.method)
-    plot.errors.center = match.arg(plot.errors.center)
-    plot.errors.type = match.arg(plot.errors.type)
-
-    if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
-        is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
-      stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
-    plot.errors.style = match.arg(plot.errors.style)
-    plot.errors.bar = match.arg(plot.errors.bar)
-
-    common.scale = common.scale | (!is.null(ylim))
+    plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
+    plot.errors.center <- normalized.opts$plot.errors.center
+    plot.errors.type <- normalized.opts$plot.errors.type
+    plot.errors.alpha <- normalized.opts$plot.errors.alpha
+    plot.errors.style <- normalized.opts$plot.errors.style
+    plot.errors.bar <- normalized.opts$plot.errors.bar
+    common.scale <- normalized.opts$common.scale
 
     if (plot.errors.method == "asymptotic") {
       warning(paste("asymptotic errors are not supported with single index regression.\n",
                     "Proceeding without calculating errors"))
       plot.errors.method = "none"
-    }
-    
-    if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
-        is.null(plot.errors.boot.blocklen))
-      plot.errors.boot.blocklen = b.star(xdat,round=TRUE)[1,1]
-    
-    if (plot.errors.method == "none" && plot.errors.type == "all") {
-      warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
-      plot.errors.method <- "bootstrap"
     }
 
     plot.errors = (plot.errors.method != "none")
