@@ -69,7 +69,7 @@ b.star(data,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 set.seed(12345)
 
@@ -90,7 +90,7 @@ b.star(yt,round=TRUE)
 
 yt <- ar.series(0.9,rnorm(10000))
 b.star(yt,round=TRUE)
-} % enddontrun
+% } % enddontrun
 }
 
 \keyword{univar}

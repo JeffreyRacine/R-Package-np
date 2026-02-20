@@ -186,7 +186,7 @@ npcmstest(formula,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -225,12 +225,6 @@ npcmstest(model = model, xdat = cps71$age, ydat = cps71$logwage,
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
-
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{ nonparametric }

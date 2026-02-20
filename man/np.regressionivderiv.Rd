@@ -237,7 +237,7 @@ npregivderiv(y,
 \code{\link{npregiv},\link{npreg}}
 }
 \examples{
-\dontrun{
+% \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -307,12 +307,7 @@ npRmpi.start(nslaves=1)
 # ivdata <- ivdata[order(ivdata$z),]
 # rm(y,z,w,u,v)
 # 
-# mpi.bcast.Robj2slave(ivdata)
-# mpi.bcast.cmd(attach(ivdata),
-#               caller.execute=TRUE)
-# 
-# mpi.bcast.cmd(model.ivderiv <- npregivderiv(y=y,z=z,w=w),
-#               caller.execute=TRUE)
+# model.ivderiv <- with(ivdata, npregivderiv(y=y, z=z, w=w))
 # 
 # ylim <-c(quantile(model.ivderiv$phi.prime,trim),
 #          quantile(model.ivderiv$phi.prime,1-trim))
@@ -342,12 +337,6 @@ npRmpi.start(nslaves=1)
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
-
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{ instrument }

@@ -15,9 +15,13 @@ np.pairs <- function(y_vars, y_dat, ...) {
     y1 <- pair_names[i, 1]
     y2 <- pair_names[i, 2]
     if (y1 == y2) {
-      npudens(tdat = y_dat[, y1], ...)
+      ddat <- data.frame(v = y_dat[, y1])
+      bw <- npudensbw(formula = ~v, dat = ddat, ...)
+      npudens(bws = bw, dat = ddat, ...)
     } else {
-      npreg(tydat = y_dat[, y2], txdat = y_dat[, y1], residuals = TRUE, ...)
+      rdat <- data.frame(y = y_dat[, y2], x = y_dat[, y1])
+      bw <- npregbw(formula = y ~ x, data = rdat, ...)
+      npreg(bws = bw, data = rdat, residuals = TRUE, ...)
     }
   })
   list(y_vars = y_vars, pair_names = pair_names, pair_kerns = pair_kerns)

@@ -134,7 +134,7 @@ npcopula(bws,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## Example 1: Bivariate Mixed Data
 
@@ -227,12 +227,6 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
 
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
-
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-
 ## Example 2: Bivariate Continuous Data
 
 ## The following example is adapted for interactive parallel execution
@@ -318,13 +312,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
-
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddontrun
+% } % enddontrun
 }
 
 \keyword{ nonparametric }

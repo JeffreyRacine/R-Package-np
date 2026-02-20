@@ -125,14 +125,14 @@
   .npRmpi_bcast_cmd_expr(cmd.sync, comm = comm, caller.execute = TRUE)
 
   if (isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))) {
-    for (i in seq_along(keys)) {
-      k <- keys[[i]]
-      mval <- vals[[i]]
-      sval <- mpi.remote.exec(getOption, k, simplify = TRUE, comm = comm, ret = TRUE)
-      svals <- unname(unlist(sval, recursive = TRUE, use.names = FALSE))
-      if (!all(vapply(as.list(svals), identical, logical(1), mval)))
-        stop(sprintf("failed to synchronize option '%s' across MPI ranks", k))
-    }
+    cmd.verify <- substitute({
+      for (i in seq_along(KEYS)) {
+        lval <- getOption(KEYS[[i]])
+        if (!identical(lval, VALS[[i]]))
+          stop(sprintf("failed to synchronize option '%s' across MPI ranks", KEYS[[i]]))
+      }
+    }, list(KEYS = keys, VALS = vals))
+    .npRmpi_bcast_cmd_expr(cmd.verify, comm = comm, caller.execute = TRUE)
   }
 
   invisible(TRUE)

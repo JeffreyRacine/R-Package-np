@@ -433,7 +433,7 @@ This function should be considered to be in \sQuote{beta test} status until furt
 \code{\link{npregivderiv},\link{npreg}}
 }
 \examples{
-\dontrun{
+% \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -499,18 +499,12 @@ npRmpi.start(nslaves=1)
 # ivdata <- ivdata[order(ivdata$z),]
 # rm(y,z,w)
 # 
-# mpi.bcast.Robj2slave(ivdata)
-# mpi.bcast.cmd(attach(ivdata),
-#               caller.execute=TRUE)
-# 
-# mpi.bcast.cmd(model.iv <- npregiv(y=y,z=z,w=w),
-#               caller.execute=TRUE)
+# model.iv <- with(ivdata, npregiv(y=y, z=z, w=w))
 # phi.iv <- model.iv$phi
 # 
 # ## Now the non-iv local linear estimator of E(y|z)
 # 
-# mpi.bcast.cmd(ll.mean <- fitted(npreg(y~z,regtype="ll")),
-#               caller.execute=TRUE)
+# ll.mean <- with(ivdata, fitted(npreg(y~z, regtype="ll")))
 # 
 # ## For the plots, restrict focal attention to the bulk of the data
 # ## (i.e. for the plotting area trim out 1/4 of one percent from each
@@ -555,12 +549,6 @@ npRmpi.start(nslaves=1)
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-
-## Note that in order to exit npRmpi properly avoid quit(), and instead
-## use mpi.quit() as follows.
-
-## mpi.bcast.cmd(mpi.quit(),
-##               caller.execute=TRUE)
-} % enddontrun     
+% } % enddontrun     
 }
 \keyword{ instrument }

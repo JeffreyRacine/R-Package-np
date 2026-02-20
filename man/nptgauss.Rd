@@ -53,9 +53,9 @@ where \eqn{a_0}{a0} is determined by the normalisation condition on H,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The default kernel, a gaussian truncated at +- 3
 nptgauss(b = 3.0)
-} % enddontrun
+% } % enddontrun
 }

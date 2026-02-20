@@ -742,13 +742,13 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
   For \code{npRmpi}, plotting calls (including bootstrap error paths)
   are supported directly under \code{npRmpi.autodispatch}. Manual
-  \code{mpi.bcast.cmd(plot(...), caller.execute=TRUE)} wrapping remains
+  no\ explicit\ MPI\ wrapping\ is\ required\ when\ autodispatch\ is\ enabled
   available for advanced workflows but is not required for standard
   autodispatch use.
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 npRmpi.start(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
@@ -960,7 +960,7 @@ lines(age.eval,grad.upper.ci,lty=3)
 
 detach(cps71)
 npRmpi.stop()
-} % enddontrun
+% } % enddontrun
 }
 
 \seealso{
