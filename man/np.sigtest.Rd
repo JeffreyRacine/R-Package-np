@@ -162,7 +162,9 @@ npsigtest(bws, \dots)
 
   For \code{npRmpi}, \code{npsigtest} currently requires explicit MPI
   broadcast execution via \code{mpi.bcast.cmd(..., caller.execute=TRUE)}
-  (it is not yet supported by \code{npRmpi.autodispatch}).
+  (it is not yet supported by \code{npRmpi.autodispatch}). This is a
+  temporary policy while significance-testing code is being rebuilt on
+  the new dispatch architecture.
   
 }  
 
