@@ -375,8 +375,8 @@ npudistbw(\dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
-    mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(bw <- npudistbw(~y),caller.execute=TRUE)
+    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+    bw <- npudistbw(~y)
     npRmpi.stop()
     
     Usage 2: compute a bandwidth object using the data frame interface
@@ -387,9 +387,8 @@ npudistbw(\dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
-    mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(Fhat <- npudistbw(tdat = y, ckertype="epanechnikov", ckerorder=4),
-                  caller.execute=TRUE)
+    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+    Fhat <- npudistbw(tdat = y, ckertype="epanechnikov", ckerorder=4)
     npRmpi.stop()
     
   }
@@ -578,14 +577,12 @@ npudistbw(\dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("Italy")
 
-mpi.bcast.Robj2slave(Italy)
-
-mpi.bcast.cmd(bw <- npudistbw(formula=~ordered(year)+gdp,
-                              data=Italy),
-              caller.execute=TRUE)
+bw <- npudistbw(formula=~ordered(year)+gdp,
+                data=Italy)
 
 summary(bw)
 

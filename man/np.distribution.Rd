@@ -91,9 +91,9 @@ npudist(bws, \dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
-    mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(bw <- npudistbw(~y),caller.execute=TRUE)
-    mpi.bcast.cmd(Fhat <- npudist(bw),caller.execute=TRUE)
+    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+    bw <- npudistbw(~y)
+    Fhat <- npudist(bw)
     npRmpi.stop()
     
     Usage 2: alternatively, compute the bandwidth object indirectly:
@@ -103,8 +103,8 @@ npudist(bws, \dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
-    mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(Fhat <- npudist(~y),caller.execute=TRUE)
+    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+    Fhat <- npudist(~y)
     npRmpi.stop()
     
     Usage 3: modify the default kernel and order:
@@ -114,9 +114,8 @@ npudist(bws, \dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
-    mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(Fhat <- npudist(~y, ckertype="epanechnikov", ckerorder=4),
-                  caller.execute=TRUE)
+    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+    Fhat <- npudist(~y, ckertype="epanechnikov", ckerorder=4)
     npRmpi.stop()
 
     Usage 4: use the data frame interface rather than the formula
@@ -127,9 +126,8 @@ npudist(bws, \dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
     npRmpi.start(nslaves=1)
-    mpi.bcast.Robj2slave(y)
-    mpi.bcast.cmd(Fhat <- npudist(tdat = y, ckertype="epanechnikov", ckerorder=4),
-                  caller.execute=TRUE)
+    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+    Fhat <- npudist(tdat = y, ckertype="epanechnikov", ckerorder=4)
     npRmpi.stop()
   }
 
@@ -241,17 +239,14 @@ npudist(bws, \dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("Italy")
 
-mpi.bcast.Robj2slave(Italy)
+bw <- npudistbw(formula=~ordered(year)+gdp,
+                data=Italy)
 
-mpi.bcast.cmd(bw <- npudistbw(formula=~ordered(year)+gdp,
-                              data=Italy),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(F <- npudist(bws=bw),
-              caller.execute=TRUE)
+F <- npudist(bws=bw)
 
 summary(F)
 
