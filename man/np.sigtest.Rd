@@ -162,9 +162,7 @@ npsigtest(bws, \dots)
 
   For \code{npRmpi}, \code{npsigtest} currently requires explicit MPI
   broadcast execution via \code{mpi.bcast.cmd(..., caller.execute=TRUE)}
-  (it is not yet supported by \code{npRmpi.autodispatch}). In addition,
-  multivariate \code{xdat} (\code{NCOL(xdat) > 1}) is currently blocked
-  under MPI to avoid known deadlock behavior.
+  (it is not yet supported by \code{npRmpi.autodispatch}).
   
 }  
 

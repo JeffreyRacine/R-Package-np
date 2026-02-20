@@ -84,9 +84,6 @@ npsigtest.rbandwidth <- function(bws,
     stop("npsigtest() does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(npsigtest(...), caller.execute=TRUE)")
 
   xdat <- toFrame(xdat)
-  if (NCOL(xdat) > 1L && .npRmpi_has_active_slave_pool()) {
-    stop("npsigtest() with more than one explanatory variable is not currently safe under MPI (can deadlock); use one explanatory variable or run serial np for this call")
-  }
 
   if(boot.num < 9) stop("number of bootstrap replications must be >= 9")
 
@@ -188,10 +185,7 @@ npsigtest.rbandwidth <- function(bws,
 
       ## Compute scale and mean of unrestricted residuals
 
-      ei.unres <- scale(ydat - npreg(txdat = xdat,
-                                     tydat = ydat,
-                                     bws = bws,
-                                     ...)$mean)
+      ei.unres <- scale(residuals(npreg(bws=bws)))
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
 
@@ -400,10 +394,7 @@ npsigtest.rbandwidth <- function(bws,
 
         ## Compute scale and mean of unrestricted residuals
 
-        ei.unres <- scale(ydat - npreg(txdat = xdat,
-                                       tydat = ydat,
-                                       bws = bws,
-                                       ...)$mean)
+        ei.unres <- scale(residuals(npreg(bws=bws)))
         ei.unres.scale <- attr(ei.unres,"scaled:scale")
         ei.unres.center <- attr(ei.unres,"scaled:center")      
 
