@@ -184,7 +184,7 @@ print.scbandwidth <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-plot.scbandwidth <- function(...) { npplot(...)  }
+plot.scbandwidth <- function(...) { .np_plot_scbandwidth(...) }
 predict.scbandwidth <- function(...) { eval(npscoef(...), envir = parent.frame()) }
 
 summary.scbandwidth <- function(object, ...){

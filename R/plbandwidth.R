@@ -159,7 +159,7 @@ print.plbandwidth <- function(x, digits=NULL, ...){
 }
 
 predict.plbandwidth <- function(...) { eval(npplreg(...), envir = parent.frame()) }
-plot.plbandwidth <- function(...) { npplot(...) }
+plot.plbandwidth <- function(...) { .np_plot_plbandwidth(...) }
 
 summary.plbandwidth <- function(object, ...){
   cat("\nPartially Linear Model",
