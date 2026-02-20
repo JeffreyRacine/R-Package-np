@@ -51,5 +51,7 @@
 mknpkg.sh
 npver
 ^AGENTS\.md$
+^MPI_CALLABLE_INVENTORY\.md$
+^REVISION_SUMMARY_.*\.md$
 
 ^benchmarks/oneoff
