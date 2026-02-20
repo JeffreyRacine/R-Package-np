@@ -8,19 +8,15 @@
 
 ## Initialize master and slaves.
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+npRmpi.start(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(data("oecdpanel"),
-              caller.execute=TRUE)
-mpi.bcast.cmd(attach(oecdpanel),
-              caller.execute=TRUE)
+data("oecdpanel")
+attach(oecdpanel)
 
 n <- 616 # n <- nrow(oecdpanel)
 
@@ -42,20 +38,15 @@ model <- lm(growth ~ oecd +
             y=TRUE)
 
 X <- data.frame(oecd, year, initgdp, popgro, inv, humancap)
-
-mpi.bcast.Robj2slave(model)
-mpi.bcast.Robj2slave(X)
-
 ## Consistent model specification test (we override defaults for
 ## demonstration purposes - don't do this for real problems).
 
-t <- system.time(mpi.bcast.cmd(output <- npcmstest(model = model,
+t <- system.time(output <- npcmstest(model = model,
                                                    xdat = X,
                                                    ydat = growth,
                                                    nmulti=1,
                                                    ftol=.01,
-                                                   tol=.01),
-                               caller.execute=TRUE))
+                                                   tol=.01))
 
 output
 
@@ -63,5 +54,4 @@ cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
 
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+npRmpi.stop(force=TRUE)

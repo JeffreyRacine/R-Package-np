@@ -19,27 +19,20 @@ library(npRmpi)
 ## vignette for further details on running parallel np programs via
 ## vignette("npRmpi",package="npRmpi").
 
-mpi.spawn.Rslaves(nslaves=1)
-mpi.bcast.cmd(np.mpi.initialize(),caller.execute=TRUE)
+npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data(Engel95)
 
 ## Sort on logexp (the endogenous regressor) for plotting purposes
 
 Engel95 <- Engel95[order(Engel95$logexp),] 
-mpi.bcast.Robj2slave(Engel95)
-
-mpi.bcast.cmd(attach(Engel95),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(model.iv <- npregiv(y=food,z=logexp,w=logwages,method="Landweber-Fridman"),
-              caller.execute=TRUE)
+model.iv <- npregiv(y=Engel95$food,z=Engel95$logexp,w=Engel95$logwages,method="Landweber-Fridman")
 phi <- model.iv$phi
 
 ## Compute the non-IV regression (i.e. regress y on z)
 
-mpi.bcast.cmd(ghat <- npreg(food~logexp,regtype="ll"),
-              caller.execute=TRUE)
+ghat <- npreg(Engel95$food~Engel95$logexp,regtype="ll")
 
 ## For the plots, restrict focal attention to the bulk of the data
 ## (i.e. for the plotting area trim out 1/4 of one percent from each
@@ -71,7 +64,7 @@ legend(quantile(Engel95$logexp,trim),quantile(Engel95$food,1-trim),
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
 
-mpi.close.Rslaves()
+npRmpi.stop(force=TRUE)
 
 ## Note that in order to exit npRmpi properly avoid quit(), and instead
 ## use mpi.quit() as follows.

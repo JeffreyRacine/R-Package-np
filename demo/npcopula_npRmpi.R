@@ -8,23 +8,19 @@
 
 ## Initialize master and slaves.
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+npRmpi.start(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 ## Generate some data and broadcast it to all slaves (it will be known
 ## to the master node)
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+set.seed(42)
 
-mpi.bcast.cmd(library(MASS),
-              caller.execute=TRUE)
+library(MASS)
 
 set.seed(42)
 
@@ -40,16 +36,10 @@ q.minm <- 0.0
 q.max <- 1.0
 grid.seq <- seq(q.minm,q.max,length=n.eval)
 grid.dat <- cbind(grid.seq,grid.seq)
-
-mpi.bcast.Robj2slave(mydat)
-mpi.bcast.Robj2slave(grid.dat)
-
 ## Estimate the copula
 
-t.0 <- system.time(mpi.bcast.cmd(bw <- npudistbw(~x+y,data=mydat),
-                                 caller.execute=TRUE))
-t.1 <- system.time(mpi.bcast.cmd(copula <- npcopula(bws=bw,data=mydat,u=grid.dat),
-                                 caller.execute=TRUE))
+t.0 <- system.time(bw <- npudistbw(~x+y,data=mydat))
+t.1 <- system.time(copula <- npcopula(bws=bw,data=mydat,u=grid.dat))
 
 t <- t.0+t.1
 
@@ -59,5 +49,4 @@ cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
 
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+npRmpi.stop(force=TRUE)

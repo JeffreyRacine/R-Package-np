@@ -8,33 +8,25 @@
 
 ## Initialize master and slaves.
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+npRmpi.start(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 ## Generate some data and broadcast it to all slaves (it will be known
 ## to the master node)
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+set.seed(42)
 
 n <- 2500
 
 sample.A <- data.frame(x=rnorm(n))
 sample.B <- data.frame(x=rnorm(n))
-
-mpi.bcast.Robj2slave(sample.A)
-mpi.bcast.Robj2slave(sample.B)
-
 ## A consistent density equality test example
 
-t <- system.time(mpi.bcast.cmd(output <- npdeneqtest(sample.A,sample.B,boot.num=99),
-                               caller.execute=TRUE))
+t <- system.time(output <- npdeneqtest(sample.A,sample.B,boot.num=99))
 
 output
 
@@ -42,5 +34,4 @@ cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
 
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+npRmpi.stop(force=TRUE)

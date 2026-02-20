@@ -8,14 +8,12 @@
 
 ## Initialize master and slaves.
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+npRmpi.start(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 ## Generate data and broadcast it to all slave nodes in the form of a
 ## data frame
@@ -32,22 +30,17 @@ z1 <- factor(z1)
 z2 <- factor(z2)
 mydat <- data.frame(y,x,z1,z2)
 rm(x,y,z1,z2)
-
-mpi.bcast.Robj2slave(mydat)
-
 ## A regression example (local constant, least-squares cross-validation)
 
-t <- system.time(mpi.bcast.cmd(bw <- npregbw(y~x+z1+z2,
+t <- system.time(bw <- npregbw(y~x+z1+z2,
                                              regtype="lc",
                                              bwmethod="cv.ls",
-                                             data=mydat),
-                               caller.execute=TRUE))
+                                             data=mydat))
 
 summary(bw)
 
-t <- t + system.time(mpi.bcast.cmd(model <- npreg(bws=bw,
-                                                  data=mydat),
-                                   caller.execute=TRUE))
+t <- t + system.time(model <- npreg(bws=bw,
+                                                  data=mydat))
 
 summary(model)
 
@@ -55,5 +48,4 @@ cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
 
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+npRmpi.stop(force=TRUE)

@@ -288,25 +288,19 @@ Below is the same code modified to run in parallel using the
     directory of the tarball/zip file into either your root directory
     or current working directory and rename it \code{.Rprofile}. 
     
-  \item You will notice that there are some \code{mpi.foo} commands
-    where \code{foo} is, for example, \code{bcast.cmd}. These are the
-    \pkg{Rmpi} commands for telling the slave nodes what to run.
-      
-      The first thing we do is initialize the master and slave nodes
-      using the \code{np.mpi.initialize()} command.
-      
-    \item Next we broadcast our data to the slave nodes using the
-      \code{mpi.bcast.Robj2slave()} command which sends an
-      \proglang{R} object to the slaves.
-      
-    \item After this, we might compute the data-driven
-      bandwidths. Note we have wrapped the \pkg{np} command
-      \code{npudensbw()} in the \code{mpi.bcast.cmd()} with the option
-      \code{caller.execute=TRUE} which indicates it is to execute on
-      the master and slave nodes simultaneously.
-      
-    \item Finally, we clean up gracefully by broadcasting the
-      \code{mpi.quit()} command.
+  \item Start and stop the MPI session using
+    \code{npRmpi.start(nslaves=...)} and \code{npRmpi.stop(force=TRUE)}.
+
+  \item Enable auto-dispatch with
+    \code{options(npRmpi.autodispatch=TRUE, np.messages=FALSE)} so
+    standard \pkg{np} calls run across ranks without manual wrapping.
+
+  \item For most estimators you can call \code{np*} functions directly
+    (e.g., \code{npudensbw()}, \code{npregbw()}, \code{npcdensbw()}).
+
+  \item Guarded exceptions still require explicit
+    \code{mpi.bcast.cmd(..., caller.execute=TRUE)} (currently
+    \code{npsigtest()} and bootstrap-error plotting paths).
       
     \item There are a number of example files (including that above
       and below) in the \code{npRmpi/demo} directory that you may wish
@@ -327,36 +321,31 @@ Below is the same code modified to run in parallel using the
 ## .Rout), then try with, say, 4 processors and compare run time.
 
 ## Initialize master and slaves.
-
-mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
+npRmpi.start(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 ## Generate some data and broadcast it to all slaves (it will be known
 ## to the master node)
 
 n <- 2500
-
-mpi.bcast.cmd(set.seed(42), caller.execute=TRUE)
+set.seed(42)
 
 x <- rnorm(n)
-mpi.bcast.Robj2slave(x)
 
 ## A simple example with likelihood cross-validation
 
-t <- system.time(mpi.bcast.cmd(bw <- npudensbw(~x, bwmethod="cv.ml"),
-                               caller.execute=TRUE))
+t <- system.time(bw <- npudensbw(~x, bwmethod="cv.ml"))
 
 summary(bw)
 
 cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
-
-mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)
+npRmpi.stop(force=TRUE)
 \end{verbatim}
 
 For more examples including regression, conditional density
@@ -454,4 +443,3 @@ ought to see an improvement in run time that is inversely related to
 the number of processors.
 
 \end{document}
-

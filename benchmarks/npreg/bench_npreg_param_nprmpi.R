@@ -93,25 +93,20 @@ run_case <- function(seed, cfg) {
       s <- iter_seeds[[idx]]
       out <- tryCatch({
         d <- mk_data(s, cfg$n)
-        mpi.bcast.Robj2slave(d)
-
         t0 <- proc.time()[["elapsed"]]
         bw <- eval(substitute(
-          mpi.bcast.cmd(
-            bw <- npregbw(y ~ x1 + x2 + z1 + z2,
-                          regtype = REGTYPE,
-                          bwmethod = BWMETHOD,
-                          nmulti = NMULTI,
-                          ckertype = CKERTYPE,
-                          data = d),
-            caller.execute = TRUE
-          ),
+          npregbw(y ~ x1 + x2 + z1 + z2,
+                  regtype = REGTYPE,
+                  bwmethod = BWMETHOD,
+                  nmulti = NMULTI,
+                  ckertype = CKERTYPE,
+                  data = d),
           list(REGTYPE = cfg$regtype, BWMETHOD = cfg$bwmethod, NMULTI = cfg$nmulti, CKERTYPE = cfg$ckertype)
         ))
         bw_elapsed <- proc.time()[["elapsed"]] - t0
 
         t1 <- proc.time()[["elapsed"]]
-        fit <- mpi.bcast.cmd(npreg(bws = bw, data = d), caller.execute = TRUE)
+        fit <- npreg(bws = bw, data = d)
         fit_elapsed <- proc.time()[["elapsed"]] - t1
 
         list(
@@ -214,9 +209,9 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   npRmpi.start(nslaves = cfg$nslaves)
   on.exit(try(npRmpi.stop(force = TRUE), silent = TRUE), add = TRUE)
 
-  options(np.messages = FALSE, np.tree = cfg$np_tree)
+  options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = cfg)
   eval(substitute(
-    mpi.bcast.cmd(options(np.messages = FALSE, np.tree = TF), caller.execute = TRUE),
+    options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = TF),
     list(TF = cfg$np_tree)
   ))
 

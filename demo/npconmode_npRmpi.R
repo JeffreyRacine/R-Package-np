@@ -8,20 +8,16 @@
 
 ## Initialize master and slaves.
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+npRmpi.start(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(library(MASS),
-              caller.execute=TRUE)
+library(MASS)
 
-mpi.bcast.cmd(data(birthwt),
-              caller.execute=TRUE)              
+data(birthwt)              
 
 n <- 189 # n <- nrow(birthwt)
 
@@ -31,12 +27,9 @@ birthwt$race <- factor(birthwt$race)
 birthwt$ht <- factor(birthwt$ht)
 birthwt$ui <- factor(birthwt$ui)
 birthwt$ftv <- ordered(birthwt$ftv)
-
-mpi.bcast.Robj2slave(birthwt)
-
 ## A conditional mode example
 
-t <- system.time(mpi.bcast.cmd(bw <- npcdensbw(low~
+t <- system.time(bw <- npcdensbw(low~
                                                smoke+ 
                                                race+ 
                                                ht+ 
@@ -44,13 +37,11 @@ t <- system.time(mpi.bcast.cmd(bw <- npcdensbw(low~
                                                ftv+  
                                                age+           
                                                lwt,
-                                               data=birthwt),
-                               caller.execute=TRUE))
+                                               data=birthwt))
 
 summary(bw)
 
-t <- t + system.time(mpi.bcast.cmd(model <- npconmode(bws=bw),
-                                   caller.execute=TRUE))
+t <- t + system.time(model <- npconmode(bws=bw))
 
 summary(model)
 
@@ -58,5 +49,4 @@ cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
 
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+npRmpi.stop(force=TRUE)

@@ -8,33 +8,27 @@
 
 ## Initialize master and slaves.
 
-mpi.bcast.cmd(np.mpi.initialize(),
-              caller.execute=TRUE)
+npRmpi.start(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 ## Generate some data and broadcast it to all slaves (it will be known
 ## to the master node)
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+set.seed(42)
 
 n <- 10000
 
 mydat <- data.frame(x=rnorm(n))
-mpi.bcast.Robj2slave(mydat)
-
 ## A simple example with cross-validation
 
-t <- system.time(mpi.bcast.cmd(bw <- npudistbw(~x,
+t <- system.time(bw <- npudistbw(~x,
                                                bwmethod="cv.cdf",
                                                do.full.integral = TRUE,
-                                               data=mydat),
-                               caller.execute=TRUE))
+                                               data=mydat))
 
 summary(bw)
 
@@ -42,5 +36,4 @@ cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
 
-mpi.bcast.cmd(mpi.quit(),
-              caller.execute=TRUE)
+npRmpi.stop(force=TRUE)

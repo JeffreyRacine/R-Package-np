@@ -98,7 +98,7 @@ run_case <- function(seed, cfg) {
       out <- tryCatch({
         t0 <- proc.time()[["elapsed"]]
         eval(substitute(
-          mpi.bcast.cmd({
+          {
             set.seed(S)
             x <- runif(N)
             z <- ordered(rbinom(N, 3, .5))
@@ -109,16 +109,16 @@ run_case <- function(seed, cfg) {
                             bwtype = BWT,
                             ckertype = CK,
                             data = dat)
-          }, caller.execute = TRUE),
+          },
           list(S = s, N = cfg$n, BWM = cfg$bwmethod, NM = cfg$nmulti, BWT = cfg$bwtype, CK = cfg$ckertype)
         ))
         bw_elapsed <- proc.time()[["elapsed"]] - t0
 
         t1 <- proc.time()[["elapsed"]]
         eval(substitute(
-          mpi.bcast.cmd({
+          {
             fit <- npudist(bws = bw, data = dat)
-          }, caller.execute = TRUE),
+          },
           list()
         ))
         fit_elapsed <- proc.time()[["elapsed"]] - t1
@@ -229,9 +229,9 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   npRmpi.start(nslaves = cfg$nslaves)
   on.exit(try(npRmpi.stop(force = TRUE), silent = TRUE), add = TRUE)
 
-  options(np.messages = FALSE, np.tree = cfg$np_tree)
+  options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = cfg)
   eval(substitute(
-    mpi.bcast.cmd(options(np.messages = FALSE, np.tree = TF), caller.execute = TRUE),
+    options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = TF),
     list(TF = cfg$np_tree)
   ))
 
