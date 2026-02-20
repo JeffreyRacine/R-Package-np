@@ -67,6 +67,9 @@ first_num_or_na <- function(x) {
 }
 
 run_one <- function(fun, n, seed) {
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+
   out <- list(
     ok = FALSE,
     n_actual = NA_integer_,
@@ -93,13 +96,8 @@ run_one <- function(fun, n, seed) {
       names(X) <- c("oecd", "year", "initgdp", "popgro", "inv", "humancap")
       ydat <- d$growth
 
-      mpi.bcast.Robj2slave(model)
-      mpi.bcast.Robj2slave(X)
-      mpi.bcast.Robj2slave(ydat)
-
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npcmstest(model = model, xdat = X, ydat = ydat, nmulti = 1L, ftol = 0.01, tol = 0.01),
-                           caller.execute = TRUE)
+      ans <- npcmstest(model = model, xdat = X, ydat = ydat, nmulti = 1L, ftol = 0.01, tol = 0.01)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npconmode") {
@@ -114,14 +112,12 @@ run_one <- function(fun, n, seed) {
       d$ftv <- ordered(d$ftv)
       out$n_actual <- nrow(d)
 
-      mpi.bcast.Robj2slave(d)
-
       t0 <- proc.time()[["elapsed"]]
-      bw <- mpi.bcast.cmd(npcdensbw(low ~ smoke + race + ht + ui + ftv + age + lwt, data = d), caller.execute = TRUE)
+      bw <- npcdensbw(low ~ smoke + race + ht + ui + ftv + age + lwt, data = d)
       out$elapsed_setup <- proc.time()[["elapsed"]] - t0
 
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npconmode(bws = bw), caller.execute = TRUE)
+      ans <- npconmode(bws = bw)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$fval <- first_num_or_na(bw$fval)
       out$sig_aux <- sig_numeric(bw$bw)
@@ -138,15 +134,12 @@ run_one <- function(fun, n, seed) {
       grid.seq <- seq(0, 1, length.out = 25L)
       grid.dat <- cbind(grid.seq, grid.seq)
 
-      mpi.bcast.Robj2slave(mydat)
-      mpi.bcast.Robj2slave(grid.dat)
-
       t0 <- proc.time()[["elapsed"]]
-      bw <- mpi.bcast.cmd(npudistbw(~ x + y, data = mydat), caller.execute = TRUE)
+      bw <- npudistbw(~ x + y, data = mydat)
       out$elapsed_setup <- proc.time()[["elapsed"]] - t0
 
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npcopula(bws = bw, data = mydat, u = grid.dat), caller.execute = TRUE)
+      ans <- npcopula(bws = bw, data = mydat, u = grid.dat)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$fval <- first_num_or_na(bw$fval)
       out$sig_aux <- sig_numeric(bw$bw)
@@ -156,11 +149,8 @@ run_one <- function(fun, n, seed) {
       out$n_actual <- as.integer(n)
       sample.A <- data.frame(x = rnorm(n))
       sample.B <- data.frame(x = rnorm(n))
-      mpi.bcast.Robj2slave(sample.A)
-      mpi.bcast.Robj2slave(sample.B)
-
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npdeneqtest(sample.A, sample.B, boot.num = 99), caller.execute = TRUE)
+      ans <- npdeneqtest(sample.A, sample.B, boot.num = 99)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npdeptest") {
@@ -169,27 +159,22 @@ run_one <- function(fun, n, seed) {
       x <- rnorm(n)
       y <- 1 + x + rnorm(n)
       y.fit <- fitted(lm(y ~ x))
-      mpi.bcast.Robj2slave(y)
-      mpi.bcast.Robj2slave(y.fit)
-
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npdeptest(y, y.fit, boot.num = 99, method = "summation"), caller.execute = TRUE)
+      ans <- npdeptest(y, y.fit, boot.num = 99, method = "summation")
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npqreg") {
       data("Italy", package = "npRmpi")
       d <- Italy
       out$n_actual <- nrow(d)
-      mpi.bcast.Robj2slave(d)
-
       t0 <- proc.time()[["elapsed"]]
-      bw <- mpi.bcast.cmd(npcdistbw(gdp ~ ordered(year), data = d), caller.execute = TRUE)
+      bw <- npcdistbw(gdp ~ ordered(year), data = d)
       out$elapsed_setup <- proc.time()[["elapsed"]] - t0
 
       t1 <- proc.time()[["elapsed"]]
-      m25 <- mpi.bcast.cmd(npqreg(bws = bw, tau = 0.25), caller.execute = TRUE)
-      m50 <- mpi.bcast.cmd(npqreg(bws = bw, tau = 0.50), caller.execute = TRUE)
-      m75 <- mpi.bcast.cmd(npqreg(bws = bw, tau = 0.75), caller.execute = TRUE)
+      m25 <- npqreg(bws = bw, tau = 0.25)
+      m50 <- npqreg(bws = bw, tau = 0.50)
+      m75 <- npqreg(bws = bw, tau = 0.75)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$fval <- first_num_or_na(bw$fval)
       out$sig_aux <- sig_numeric(bw$bw)
@@ -203,12 +188,8 @@ run_one <- function(fun, n, seed) {
       w <- rnorm(n, mean = 0, sd = 1)
       z <- 0.2 * w + v
       y <- z^2 + u
-      mpi.bcast.Robj2slave(y)
-      mpi.bcast.Robj2slave(z)
-      mpi.bcast.Robj2slave(w)
-
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npregiv(y = y, z = z, w = w), caller.execute = TRUE)
+      ans <- npregiv(y = y, z = z, w = w)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npsdeptest") {
@@ -222,13 +203,12 @@ run_one <- function(fun, n, seed) {
         series
       }
       yt <- ar.series(0.95, rnorm(n))
-      mpi.bcast.Robj2slave(yt)
-
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npsdeptest(yt, lag.num = 2, boot.num = 399, method = "summation"), caller.execute = TRUE)
+      ans <- npsdeptest(yt, lag.num = 2, boot.num = 399, method = "summation")
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npsigtest") {
+      options(npRmpi.autodispatch = FALSE)
       set.seed(seed)
       out$n_actual <- as.integer(n)
       z <- factor(rbinom(n, 1, 0.5))
@@ -258,10 +238,8 @@ run_one <- function(fun, n, seed) {
         series
       }
       yt <- ar.series(0.5, rnorm(n))
-      mpi.bcast.Robj2slave(yt)
-
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npsymtest(yt, boot.num = 399, boot.method = "geom", method = "summation"), caller.execute = TRUE)
+      ans <- npsymtest(yt, boot.num = 399, boot.method = "geom", method = "summation")
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     } else if (fun == "npunitest") {
@@ -269,11 +247,8 @@ run_one <- function(fun, n, seed) {
       out$n_actual <- as.integer(n)
       x <- rnorm(n)
       y <- rnorm(n)
-      mpi.bcast.Robj2slave(x)
-      mpi.bcast.Robj2slave(y)
-
       t1 <- proc.time()[["elapsed"]]
-      ans <- mpi.bcast.cmd(npunitest(x, y, method = "summation", bootstrap = TRUE), caller.execute = TRUE)
+      ans <- npunitest(x, y, method = "summation", bootstrap = TRUE)
       out$elapsed_main <- proc.time()[["elapsed"]] - t1
       out$sig_main <- sig_numeric(ans)
     }
@@ -355,8 +330,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   npRmpi.start(nslaves = cfg$nslaves)
   on.exit(try(npRmpi.stop(force = TRUE), silent = TRUE), add = TRUE)
 
-  options(np.messages = FALSE)
-  mpi.bcast.cmd(options(np.messages = FALSE), caller.execute = TRUE)
+  options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
 
   seeds <- make_seeds(cfg)
   if (cfg$show_progress) {
