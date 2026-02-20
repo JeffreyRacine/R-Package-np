@@ -346,3 +346,41 @@ Implication for helper/guardrail scope:
 
 Implication:
 - inventory should explicitly mark `npregiv`/`npregivderiv` as example-critical callable chains.
+
+## 14) Current Coverage Status (Auto-Dispatch)
+Implemented constructor/method interception currently includes:
+1. `npudensbw`, `npudens`
+2. `npudistbw`, `npudist`
+3. `npregbw`, `npreg`
+4. `npcdensbw`, `npcdens`
+5. `npcdistbw`, `npcdist`
+6. `npscoefbw`, `npscoef`
+7. `npindexbw`, `npindex`
+8. `npplregbw`, `npplreg`
+9. `npconmode`
+10. `npksum`
+11. `npcopula`
+12. `npquantile`
+13. `np.pairs`, `np.pairs.plot`
+14. `npplot`
+15. `npregiv`, `npregivderiv`
+16. `npqreg`
+17. `npcmstest`, `npqcmstest`, `npdeneqtest`
+18. `npdeptest`, `npsdeptest`, `npsymtest`, `npunitest`, `npsigtest`
+
+Still pending for equivalent treatment:
+1. confirm end-to-end method chains for accessor-driven re-entry (`predict.*`/`plot.*`) beyond currently wrapped constructors.
+2. validate desired semantics for unconditional helper utilities (`npseed`, `nptgauss`, `uocquantile`, `npuniden.*`) that are not distributed estimators but can appear in user pipelines.
+
+## 15) Known Open Issue
+1. `npplreg` crash mode observed when called without an active slave pool (`npRmpi.start(...)` not invoked), with native trace reaching `kernel_weighted_sum_np` in `jksum.c`.
+2. Early guardrail added in R-layer for `npplregbw*` and `npplreg*` to fail fast with a startup instruction instead of entering undefined native execution.
+3. Keep this tracked separately as `npplreg crash issue` for focused C-level forensic analysis; do not block broader user-facing dispatch/guardrail rollout.
+
+## 16) Transitive Audit Status (predict/plot chains)
+Static audit status:
+1. All `predict.*` and bandwidth `predict.*` methods that re-enter estimators (`eval(np*...)`) now route through constructor entry points with both:
+- `.npRmpi_require_active_slave_pool(...)`
+- `.npRmpi_autodispatch_call(...)` (when active)
+2. All `plot.*` methods that delegate to `npplot(...)` are covered by `npplot()` guard + autodispatch.
+3. No remaining autodispatch call sites were found without a nearby active-pool guard (excluding helper internals in `R/np.autodispatch.R` by design).

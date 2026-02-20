@@ -66,6 +66,7 @@ npregbw.NULL <-
   function(xdat = stop("invoked without data 'xdat'"),
            ydat = stop("invoked without data 'ydat'"),
            bws, ...){
+    .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -99,9 +100,10 @@ npregbw.rbandwidth <-
            lbd.init = 0.1, hbd.init = 0.9, dfac.init = 0.375, 
           scale.init.categorical.sample = FALSE,
           transform.bounds = FALSE,
-          invalid.penalty = c("baseline","dbmax"),
+           invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -351,6 +353,7 @@ npregbw.default <-
            regtype, glp.degree, glp.bernstein, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

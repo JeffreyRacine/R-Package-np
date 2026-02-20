@@ -72,6 +72,7 @@ npcdist.condbandwidth <-
            txdat = stop("invoked without training data 'txdat'"),
            tydat = stop("invoked without training data 'tydat'"),
            exdat, eydat, gradients = FALSE, ...){
+    .npRmpi_require_active_slave_pool(where = "npcdist()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -299,6 +300,7 @@ npcdist.condbandwidth <-
   }
 
 npcdist.default <- function(bws, txdat, tydat, ...){
+  .npRmpi_require_active_slave_pool(where = "npcdist()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()

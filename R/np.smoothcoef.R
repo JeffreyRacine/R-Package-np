@@ -101,6 +101,7 @@ npscoef.call <-
   }
 
 npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
+  .npRmpi_require_active_slave_pool(where = "npscoef()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -191,6 +192,7 @@ npscoef.scbandwidth <-
            tol = .Machine$double.eps,
            leave.one.out = FALSE,
            betas = FALSE, ...){
+    .npRmpi_require_active_slave_pool(where = "npscoef()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

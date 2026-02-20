@@ -11,6 +11,9 @@ npdeneqtest <- function(x = NULL,
                         boot.num = 399,
                         random.seed = 42,
                         ...) {
+  .npRmpi_require_active_slave_pool(where = "npdeneqtest()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   ## Some testing of input values
 

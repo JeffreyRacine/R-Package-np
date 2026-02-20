@@ -79,6 +79,9 @@ npsigtest.rbandwidth <- function(bws,
                                  index = seq(1,ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
+  .npRmpi_require_active_slave_pool(where = "npsigtest()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   xdat <- toFrame(xdat)
 
@@ -589,6 +592,10 @@ npsigtest.rbandwidth <- function(bws,
 }
 
 npsigtest.default <- function(bws, xdat, ydat, ...){
+  .npRmpi_require_active_slave_pool(where = "npsigtest()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   sc <- sys.call()
   sc.names <- names(sc)
 

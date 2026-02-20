@@ -1,4 +1,8 @@
 np.pairs <- function(y_vars, y_dat, ...) {
+  .npRmpi_require_active_slave_pool(where = "np.pairs()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   if (missing(y_vars) || missing(y_dat))
     stop("'y_vars' and 'y_dat' are required")
   if (!is.data.frame(y_dat))
@@ -22,6 +26,10 @@ np.pairs <- function(y_vars, y_dat, ...) {
 }
 
 np.pairs.plot <- function(pair_list) {
+  .npRmpi_require_active_slave_pool(where = "np.pairs.plot()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   if (length(pair_list) < 3)
     stop("pair_list must be created by np.pairs")
 

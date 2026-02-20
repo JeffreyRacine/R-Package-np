@@ -9,6 +9,9 @@ npsdeptest <- function(data = NULL,
                        bootstrap = TRUE,
                        boot.num = 399,
                        random.seed = 42) {
+  .npRmpi_require_active_slave_pool(where = "npsdeptest()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   
   ## Trap fatal errors
 

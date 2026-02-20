@@ -57,6 +57,9 @@ npregiv <- function(y,
                     starting.values=NULL,
                     stop.on.increase=TRUE,
                     ...) {
+  .npRmpi_require_active_slave_pool(where = "npregiv()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   ptm.start <- proc.time()
   cl <- match.call()

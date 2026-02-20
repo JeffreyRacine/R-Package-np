@@ -63,6 +63,9 @@ npudist.dbandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
            edat, ...){
+    .npRmpi_require_active_slave_pool(where = "npudist()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     no.e = missing(edat)
 
@@ -186,6 +189,10 @@ npudist.dbandwidth <-
   }
 
 npudist.default <- function(bws, tdat, ...){
+  .npRmpi_require_active_slave_pool(where = "npudist()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   sc <- sys.call()
   sc.names <- names(sc)
 

@@ -82,6 +82,9 @@ npqreg.condbandwidth <-
            lbc.dir = 0.5, dfc.dir = 3, cfac.dir = 2.5*(3.0-sqrt(5)),initc.dir = 1.0, 
            lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
            ...){
+    .npRmpi_require_active_slave_pool(where = "npqreg()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     no.ex = missing(exdat)
 
@@ -275,6 +278,10 @@ npqreg.condbandwidth <-
 
 
 npqreg.default <- function(bws, txdat, tydat, ...){
+  .npRmpi_require_active_slave_pool(where = "npqreg()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   sc <- sys.call()
   sc.names <- names(sc)
 

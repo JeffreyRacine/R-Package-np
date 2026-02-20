@@ -94,6 +94,7 @@ npcdensbw.conbandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npcdensbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -398,6 +399,7 @@ npcdensbw.NULL <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            bws, ...){
+    .npRmpi_require_active_slave_pool(where = "npcdensbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -445,6 +447,7 @@ npcdensbw.default <-
            uxkertype, uykertype,
            oxkertype, oykertype,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npcdensbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

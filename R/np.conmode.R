@@ -77,6 +77,7 @@ npconmode.conbandwidth <-
             tydat = stop("invoked without training data 'tydat'"),
             exdat, eydat,
             ...){
+    .npRmpi_require_active_slave_pool(where = "npconmode()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -193,6 +194,7 @@ npconmode.conbandwidth <-
   }
 
 npconmode.default <- function(bws, txdat, tydat, ...){
+  .npRmpi_require_active_slave_pool(where = "npconmode()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

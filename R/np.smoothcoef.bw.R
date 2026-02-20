@@ -88,6 +88,7 @@ npscoefbw.NULL <-
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
            bws, ...){
+    .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -134,6 +135,7 @@ npscoefbw.scbandwidth <-
            optim.abstol = .Machine$double.eps,
            optim.maxit = 500,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     
@@ -599,6 +601,7 @@ npscoefbw.default <-
            optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npscoefbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

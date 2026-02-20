@@ -54,15 +54,24 @@
   }
 }
 
-.npRmpi_autodispatch_preflight <- function(comm = 1L) {
-  strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
+.npRmpi_has_active_slave_pool <- function(comm = 1L) {
   size <- try(mpi.comm.size(comm), silent = TRUE)
   rank <- try(mpi.comm.rank(comm), silent = TRUE)
+  if (inherits(size, "try-error") || inherits(rank, "try-error") ||
+      is.na(size) || is.na(rank))
+    return(FALSE)
+  size >= 2L
+}
 
-  bad <- inherits(size, "try-error") || inherits(rank, "try-error") ||
-    is.na(size) || is.na(rank)
+.npRmpi_require_active_slave_pool <- function(comm = 1L, where = "this call") {
+  if (.npRmpi_has_active_slave_pool(comm = comm))
+    return(invisible(TRUE))
+  stop(sprintf("%s requires an active MPI slave pool; call npRmpi.start(nslaves=...) first", where))
+}
 
-  if (bad || size < 2L) {
+.npRmpi_autodispatch_preflight <- function(comm = 1L) {
+  strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
+  if (!.npRmpi_has_active_slave_pool(comm = comm)) {
     msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.start(nslaves=...) first"
     if (strict) stop(msg)
     warning(msg)

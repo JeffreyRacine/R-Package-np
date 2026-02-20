@@ -114,6 +114,7 @@ npplregbw.NULL =
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
            bws, ...){
+    .npRmpi_require_active_slave_pool(where = "npplregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -147,6 +148,7 @@ npplregbw.plbandwidth =
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
            bws, nmulti, ...){
+    .npRmpi_require_active_slave_pool(where = "npplregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -229,6 +231,7 @@ npplregbw.default =
            bandwidth.compute = TRUE,
            nmulti, remin, itmax,
            ftol, tol, small){
+    .npRmpi_require_active_slave_pool(where = "npplregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

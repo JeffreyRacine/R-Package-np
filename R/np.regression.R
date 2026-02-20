@@ -106,6 +106,7 @@ npreg.rbandwidth <-
            exdat, eydat, gradients = FALSE, gradient.order = 1L,
            residuals = FALSE,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npreg()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -408,6 +409,7 @@ npreg.rbandwidth <-
   }
 
 npreg.default <- function(bws, txdat, tydat, ...){
+  .npRmpi_require_active_slave_pool(where = "npreg()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()

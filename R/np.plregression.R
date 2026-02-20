@@ -119,6 +119,7 @@ npplreg.plbandwidth <-
            tydat = stop("training data tydat missing"),
            tzdat = stop("training data tzdat missing"),
            exdat, eydat, ezdat, residuals = FALSE, ...){
+    .npRmpi_require_active_slave_pool(where = "npplreg()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -269,6 +270,7 @@ npplreg.plbandwidth <-
 
 
 npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
+  .npRmpi_require_active_slave_pool(where = "npplreg()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

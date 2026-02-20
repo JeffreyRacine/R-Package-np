@@ -13,6 +13,9 @@ npqcmstest <- function(formula,
                        density.weighted = TRUE,
                        random.seed = 42,
                        ...) {
+  .npRmpi_require_active_slave_pool(where = "npqcmstest()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
   pcall = paste(deparse(model$call),collapse="")
   if(length(grep("model = TRUE", pcall)) == 0)
@@ -314,4 +317,3 @@ npqcmstest <- function(formula,
           boot.num = boot.num,
           na.index = na.index)
 }
-

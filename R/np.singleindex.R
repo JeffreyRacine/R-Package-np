@@ -112,6 +112,7 @@ npindex.call <-
   }
 
 npindex.default <- function(bws, txdat, tydat, ...){
+  .npRmpi_require_active_slave_pool(where = "npindex()")
   if (.npRmpi_autodispatch_active())
     return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -180,6 +181,7 @@ npindex.sibandwidth <-
            residuals = FALSE,
            errors = FALSE,
            boot.num = 399, ...) {
+    .npRmpi_require_active_slave_pool(where = "npindex()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

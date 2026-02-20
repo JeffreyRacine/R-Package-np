@@ -67,6 +67,7 @@ npindexbw.NULL <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
            bws, ...){
+    .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -96,6 +97,7 @@ npindexbw.default <-
            bws, bandwidth.compute = TRUE,
            nmulti, random.seed, optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit, only.optimize.beta, ...){
+    .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
@@ -160,6 +162,7 @@ npindexbw.sibandwidth <-
            optim.maxit = 500,
            only.optimize.beta = FALSE,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 

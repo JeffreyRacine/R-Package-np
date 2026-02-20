@@ -11,6 +11,9 @@ npksum <-
 
 npksum.formula <-
   function(formula, data, newdata, subset, na.action, ...){
+    .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),
@@ -54,6 +57,9 @@ npksum.numeric <-
            leave.one.out, kernel.pow, bandwidth.divide,
            operator, permutation.operator, compute.score, compute.ocg, return.kernel.weights,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     txdat <- toFrame(txdat)
     if (!missing(exdat)) {
@@ -120,6 +126,9 @@ npksum.default <-
            compute.ocg = FALSE,
            return.kernel.weights = FALSE,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npksum()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     miss.ty <- missing(tydat)
     miss.ex <- missing(exdat)

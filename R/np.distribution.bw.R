@@ -72,6 +72,9 @@ npudistbw.formula <-
 npudistbw.NULL <-
   function(dat = stop("invoked without input data 'dat'"),
            bws, ...){
+    .npRmpi_require_active_slave_pool(where = "npudistbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
@@ -108,6 +111,9 @@ npudistbw.dbandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npudistbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     dat = toFrame(dat)
 
@@ -357,6 +363,9 @@ npudistbw.default <-
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ckerbound, ckerlb, ckerub, okertype,
            ...){
+    .npRmpi_require_active_slave_pool(where = "npudistbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))

@@ -11,6 +11,9 @@ npcmstest <- function(formula,
                       density.weighted = TRUE,
                       random.seed = 42,
                       ...) {
+  .npRmpi_require_active_slave_pool(where = "npcmstest()")
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   
   pcall = paste(deparse(model$call),collapse="")
   if(length(grep("x = (T|TRUE)[ ,)]", pcall)) == 0 | length(grep("y = (T|TRUE)[ ,)]", pcall)) == 0)
@@ -309,4 +312,3 @@ npcmstest <- function(formula,
           boot.num = boot.num,
           na.index = na.index)
 }
-
