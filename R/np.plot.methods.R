@@ -1,9 +1,29 @@
+.np_plot_call_method <- function(method, bws, ..., where = "npplot()") {
+  dots <- list(...)
+  random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
+  dots$random.seed <- NULL
+
+  .npRmpi_require_active_slave_pool(where = where)
+  .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = where)
+
+  if (exists(".Random.seed", .GlobalEnv)) {
+    save.seed <- get(".Random.seed", .GlobalEnv)
+    exists.seed <- TRUE
+  } else {
+    exists.seed <- FALSE
+  }
+
+  set.seed(random.seed)
+  on.exit(if (exists.seed) assign(".Random.seed", save.seed, .GlobalEnv), add = TRUE)
+
+  do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))
+}
+
 .np_plot_from_slot <- function(object, slot = "bws", ...) {
   bws <- object[[slot]]
   if (is.null(bws))
     stop("plot object does not contain expected bandwidth slot")
-  bws <- .npRmpi_autodispatch_untag(bws)
-  npplot(bws = bws, ...)
+  .np_plot_call_method(npplot, bws = bws, ..., where = "npplot()")
 }
 
 .np_plot_npregression <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
@@ -50,23 +70,39 @@
 .np_plot_smoothcoefficient <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_plregression <- function(object, ...) .np_plot_from_slot(object, "bw", ...)
 
-.np_plot_bandwidth <- function(...) npplot(...)
-.np_plot_rbandwidth <- function(...) npplot(...)
-.np_plot_dbandwidth <- function(...) npplot(...)
-.np_plot_conbandwidth <- function(...) npplot(...)
-.np_plot_condbandwidth <- function(...) npplot(...)
-.np_plot_plbandwidth <- function(...) npplot(...)
-.np_plot_sibandwidth <- function(...) npplot(...)
-.np_plot_scbandwidth <- function(...) npplot(...)
+.np_plot_bandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.bandwidth, bws = bws, ..., where = "plot.bandwidth()")
+}
+.np_plot_rbandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.rbandwidth, bws = bws, ..., where = "plot.rbandwidth()")
+}
+.np_plot_dbandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.dbandwidth, bws = bws, ..., where = "plot.dbandwidth()")
+}
+.np_plot_conbandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.conbandwidth, bws = bws, ..., where = "plot.conbandwidth()")
+}
+.np_plot_condbandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.condbandwidth, bws = bws, ..., where = "plot.condbandwidth()")
+}
+.np_plot_plbandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.plbandwidth, bws = bws, ..., where = "plot.plbandwidth()")
+}
+.np_plot_sibandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.sibandwidth, bws = bws, ..., where = "plot.sibandwidth()")
+}
+.np_plot_scbandwidth <- function(bws, ...) {
+  .np_plot_call_method(npplot.scbandwidth, bws = bws, ..., where = "plot.scbandwidth()")
+}
 
-plot.bandwidth <- function(...) .np_plot_bandwidth(...)
-plot.rbandwidth <- function(...) .np_plot_rbandwidth(...)
-plot.dbandwidth <- function(...) .np_plot_dbandwidth(...)
-plot.conbandwidth <- function(...) .np_plot_conbandwidth(...)
-plot.condbandwidth <- function(...) .np_plot_condbandwidth(...)
-plot.plbandwidth <- function(...) .np_plot_plbandwidth(...)
-plot.sibandwidth <- function(...) .np_plot_sibandwidth(...)
-plot.scbandwidth <- function(...) .np_plot_scbandwidth(...)
+plot.bandwidth <- function(x, ...) .np_plot_bandwidth(x, ...)
+plot.rbandwidth <- function(x, ...) .np_plot_rbandwidth(x, ...)
+plot.dbandwidth <- function(x, ...) .np_plot_dbandwidth(x, ...)
+plot.conbandwidth <- function(x, ...) .np_plot_conbandwidth(x, ...)
+plot.condbandwidth <- function(x, ...) .np_plot_condbandwidth(x, ...)
+plot.plbandwidth <- function(x, ...) .np_plot_plbandwidth(x, ...)
+plot.sibandwidth <- function(x, ...) .np_plot_sibandwidth(x, ...)
+plot.scbandwidth <- function(x, ...) .np_plot_scbandwidth(x, ...)
 
 plot.npregression <- function(x, ...) .np_plot_npregression(x, ...)
 plot.npdensity <- function(x, ...) .np_plot_npdensity(x, ...)
