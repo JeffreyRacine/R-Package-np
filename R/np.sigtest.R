@@ -5,8 +5,38 @@
 # npregbw object, and a set of indices for the columns of X for which
 # the test is to be run (default = all).
 
+.npRmpi_npsig_extract_xy_from_npreg <- function(obj) {
+  if (is.null(obj$bws$formula) || is.null(obj$bws$call))
+    stop("unable to extract xdat/ydat from npreg object")
+
+  tt <- terms(obj$bws$formula)
+  m <- match(c("formula", "data", "subset", "na.action"),
+             names(obj$bws$call), nomatch = 0)
+  tmf <- obj$bws$call[c(1, m)]
+  tmf[[1]] <- as.name("model.frame")
+  tmf[["formula"]] <- tt
+  tmf <- eval(tmf, envir = environment(tt))
+
+  ydat <- model.response(tmf)
+  xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
+  list(xdat = xdat, ydat = ydat)
+}
+
 npsigtest <-
   function(bws, ...){
+    if (.npRmpi_autodispatch_active() &&
+        !.npRmpi_autodispatch_in_context() &&
+        !.npRmpi_autodispatch_called_from_bcast()) {
+      mc <- match.call()
+      if (!missing(bws) && isa(bws, "npregression")) {
+        xy <- .npRmpi_npsig_extract_xy_from_npreg(bws)
+        mc$bws <- bws$bws
+        mc$xdat <- xy$xdat
+        mc$ydat <- xy$ydat
+      }
+      return(.npRmpi_manual_distributed_call(mc, parent.frame()))
+    }
+
     args <- list(...)
 
     if (!missing(bws)){
@@ -80,10 +110,6 @@ npsigtest.rbandwidth <- function(bws,
                                  random.seed = 42,
                                  ...) {
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
-  if (.npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast())
-    stop("npsigtest() does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(npsigtest(...), caller.execute=TRUE)")
 
   xdat <- toFrame(xdat)
 
@@ -99,6 +125,7 @@ npsigtest.rbandwidth <- function(bws,
 
   xdat <- xdat[goodrows,,drop = FALSE]
   ydat <- ydat[goodrows]
+  bws <- npregbw(xdat = xdat, ydat = ydat, bws = bws, bandwidth.compute = FALSE)
 
   if (is.factor(ydat))
     stop("dependent variable must be continuous.")
@@ -187,7 +214,11 @@ npsigtest.rbandwidth <- function(bws,
 
       ## Compute scale and mean of unrestricted residuals
 
-      ei.unres <- scale(residuals(npreg(bws=bws)))
+      npreg.unres <- npreg(txdat = xdat,
+                           tydat = ydat,
+                           bws = bws,
+                           residuals = TRUE)
+      ei.unres <- scale(npreg.unres$resid)
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
 
@@ -396,7 +427,11 @@ npsigtest.rbandwidth <- function(bws,
 
         ## Compute scale and mean of unrestricted residuals
 
-        ei.unres <- scale(residuals(npreg(bws=bws)))
+        npreg.unres <- npreg(txdat = xdat,
+                             tydat = ydat,
+                             bws = bws,
+                             residuals = TRUE)
+        ei.unres <- scale(npreg.unres$resid)
         ei.unres.scale <- attr(ei.unres,"scaled:scale")
         ei.unres.center <- attr(ei.unres,"scaled:center")      
 
@@ -595,10 +630,6 @@ npsigtest.rbandwidth <- function(bws,
 
 npsigtest.default <- function(bws, xdat, ydat, ...){
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
-  if (.npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast())
-    stop("npsigtest() does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(npsigtest(...), caller.execute=TRUE)")
 
   sc <- sys.call()
   sc.names <- names(sc)

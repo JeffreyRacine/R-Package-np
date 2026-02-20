@@ -222,8 +222,8 @@
 }
 
 .npRmpi_autodispatch_cleanup <- function(tmpnames, comm = 1L) {
-  if (!length(tmpnames)) return(invisible(TRUE))
-
+  if (!length(tmpnames))
+    return(invisible(TRUE))
   rm(list = tmpnames, envir = .GlobalEnv)
   cmd.rm <- substitute(rm(list = TMPS, envir = .GlobalEnv),
                        list(TMPS = tmpnames))
@@ -295,6 +295,18 @@
   x
 }
 
+.npRmpi_autodispatch_untag <- function(x) {
+  if (is.list(x) && !is.pairlist(x) && !is.call(x)) {
+    for (i in seq_len(length(x))) {
+      xi <- try(x[[i]], silent = TRUE)
+      if (!inherits(xi, "try-error"))
+        x[[i]] <- .npRmpi_autodispatch_untag(xi)
+    }
+  }
+  attr(x, "npRmpi.dispatch.mode") <- NULL
+  x
+}
+
 .npRmpi_guard_no_auto_object_in_manual_bcast <- function(obj, where = "this call") {
   if (.npRmpi_autodispatch_in_context())
     return(invisible(FALSE))
@@ -336,6 +348,17 @@
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
   on.exit(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm), add = TRUE)
 
+  if (length(prepared$tmpnames)) {
+    for (nm in prepared$tmpnames) {
+      val <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
+      prepared$tmpvals[[nm]] <- val
+      assign(nm, val, envir = .GlobalEnv)
+      cmd.assign <- substitute(assign(TMP, VAL, envir = .GlobalEnv),
+                               list(TMP = nm, VAL = val))
+      .npRmpi_bcast_cmd_expr(cmd.assign, comm = comm, caller.execute = FALSE)
+    }
+  }
+
   cmd <- substitute({
     old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
     old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -344,6 +367,50 @@
     on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
     on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
     eval(CALL, envir = .GlobalEnv)
+  }, list(CALL = prepared$call))
+
+  result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
+
+  if (is.list(result))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto"))
+
+  if (is.call(result))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto"))
+
+  .npRmpi_autodispatch_tag_result(result, mode = "auto")
+}
+
+.npRmpi_manual_distributed_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
+  .npRmpi_warn_pkg_conflict_once()
+  .npRmpi_warn_rmpi_conflict_once()
+
+  if (.npRmpi_autodispatch_in_context())
+    return(.npRmpi_eval_without_dispatch(mc, caller_env))
+
+  rank <- try(mpi.comm.rank(comm), silent = TRUE)
+  if (!inherits(rank, "try-error") && !is.na(rank) && rank != 0L)
+    return(.npRmpi_eval_without_dispatch(mc, caller_env))
+
+  if (.npRmpi_autodispatch_called_from_bcast())
+    return(.npRmpi_eval_without_dispatch(mc, caller_env))
+
+  .npRmpi_autodispatch_failfast_formula_data(mc, caller_env = caller_env)
+
+  if (!.npRmpi_autodispatch_preflight(comm = comm))
+    return(.npRmpi_eval_without_dispatch(mc, caller_env))
+
+  .npRmpi_autodispatch_sync_options(comm = comm)
+  prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
+  on.exit(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm), add = TRUE)
+
+  cmd <- substitute({
+    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+    options(npRmpi.autodispatch.context = TRUE)
+    options(npRmpi.autodispatch.disable = TRUE)
+    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+    CALL
   }, list(CALL = prepared$call))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)

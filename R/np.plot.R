@@ -143,7 +143,9 @@ plotFactor <- function(f, y, ...){
   if (.npRmpi_autodispatch_active() &&
       !.npRmpi_autodispatch_in_context() &&
       !.npRmpi_autodispatch_called_from_bcast()) {
-    stop(sprintf("%s does not currently support direct npRmpi.autodispatch execution; use mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
+    if (identical(plot.errors.method, "bootstrap")) {
+      stop(sprintf("%s with plot.errors.method='bootstrap' does not currently support direct npRmpi.autodispatch execution; use mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
+    }
   }
 }
 

@@ -745,8 +745,8 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   executed explicitly via
   \code{mpi.bcast.cmd(plot(...), caller.execute=TRUE)} with a fully
   manual MPI workflow (do not mix autodispatch-created objects with
-  manual-broadcast plotting calls). This is a temporary stability policy
-  while plotting is being rebuilt on the new dispatch architecture.
+  manual-broadcast plotting calls). Non-bootstrap plotting paths are
+  supported directly under \code{npRmpi.autodispatch}.
 }
 
 \examples{

@@ -49,3 +49,29 @@ test_that("npsigtest formula path works under manual broadcast", {
   expect_s3_class(sig, "sigtest")
   expect_true(is.numeric(sig$P))
 })
+
+test_that("npsigtest npregression path works under autodispatch", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  options(npRmpi.autodispatch = TRUE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  mpi.bcast.cmd(options(npRmpi.autodispatch = TRUE), caller.execute = TRUE)
+
+  set.seed(42)
+  n <- 80
+  z <- factor(rbinom(n, 1, .5))
+  x1 <- rnorm(n)
+  x2 <- runif(n, -2, 2)
+  y <- x1 + x2 + rnorm(n, sd = 0.2)
+  mydat <- data.frame(z, x1, x2, y)
+
+  model <- npreg(y ~ z + x1 + x2,
+                 regtype = "ll",
+                 bwmethod = "cv.aic",
+                 data = mydat)
+
+  sig <- npsigtest(model, boot.num = 9)
+
+  expect_s3_class(sig, "sigtest")
+  expect_true(is.numeric(sig$P))
+})
