@@ -46,7 +46,16 @@
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   options(npRmpi.autodispatch.disable = TRUE)
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-  eval(mc, envir = caller_env)
+  mc.eval <- mc
+  if (is.call(mc.eval) && length(mc.eval) >= 1L && is.symbol(mc.eval[[1L]])) {
+    fname <- as.character(mc.eval[[1L]])
+    in.caller <- exists(fname, envir = caller_env, mode = "function", inherits = TRUE)
+    in.ns <- exists(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
+    if (!in.caller && in.ns) {
+      mc.eval[[1L]] <- as.call(list(as.name(":::"), as.name("npRmpi"), as.name(fname)))
+    }
+  }
+  eval(mc.eval, envir = caller_env)
 }
 
 .npRmpi_autodispatch_called_from_bcast <- function() {

@@ -617,12 +617,22 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
 
   ## if bws was passed in explicitly, do not compute bandwidths
 
+  ## autodispatch normalizes calls via match.call(), which can turn an
+  ## originally unnamed formula first argument into named bws=... .
+  ## Preserve legacy formula behavior by rewriting npregbw() call shape.
+  if (bws.named && no.xdat && no.ydat && inherits(bws, "formula")) {
+    sc$`bws` <- NULL
+    sc$formula <- bws
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npregbw)
+    bws.named <- FALSE
+  } else {
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npregbw)
+  }
+
   if(xdat.named)
     xdat <- toFrame(xdat)
-
-  sc.bw <- sc
-  
-  sc.bw[[1]] <- quote(npregbw)
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
