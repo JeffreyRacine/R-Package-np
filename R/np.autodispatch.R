@@ -279,12 +279,12 @@
     nm <- if (!is.null(nms)) nms[[i]] else ""
 
     if (is.list(xi)) {
-      x[[i]] <- .npRmpi_autodispatch_replace_tmp_calls(xi, tmpvals = tmpvals)
+      x[i] <- list(.npRmpi_autodispatch_replace_tmp_calls(xi, tmpvals = tmpvals))
       next
     }
 
     if ((is.call(xi) || is.pairlist(xi)) && identical(nm, "call")) {
-      x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
+      x[i] <- list(.npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals))
     }
   }
 
