@@ -269,6 +269,7 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -365,6 +366,7 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -476,6 +478,7 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -579,6 +582,7 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -673,6 +677,7 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -768,6 +773,7 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -890,6 +896,7 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1006,6 +1013,7 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
 
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
     boot.all.err <- NULL
