@@ -1,0 +1,1163 @@
+## the idea is that you have done bandwidth selection
+## you just need to supply training data and the bandwidth
+## this tool will help you visualize the result
+
+gen.label = function(label, altlabel){
+  paste(ifelse(is.null(label), altlabel, label))
+}
+
+gen.tflabel = function(condition, tlabel, flabel){
+  paste(ifelse(condition,tlabel,flabel))
+}
+
+draw.error.bands = function(ex, ely, ehy, lty = 2, col = par("col")){
+  lines(ex,ely,lty=lty,col=col)
+  lines(ex,ehy,lty=lty,col=col)
+}
+
+draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, col = par("col")){
+  yy = double(3*length(ex))
+  jj = 1:length(ex)*3
+
+  yy[jj-2] = ely
+  yy[jj-1] = ehy
+  yy[jj] = NA
+  
+  xx = double(3*length(ex))
+  xx[jj-2] = ex
+  xx[jj-1] = ex
+  xx[jj] = NA
+
+  lines(xx,yy,lty=lty,col=col)
+
+  if (hbar){
+    ## hbars look silly if they are too wide in relation to their height
+    ## this only matters in the limit of few points, since that is when
+    ## hbardist may get relatively large
+
+    golden = (1+sqrt(5))/2
+    hbardist = abs(max(ex) - min(ex))/length(ex)*hbarscale
+
+    yg = abs(yy[jj-2]-yy[jj-1])/golden
+    htest = (hbardist >= yg)
+    
+    xx[jj-2] = ex - ifelse(htest, yg/2, hbardist/2) 
+    xx[jj-1] = ex + ifelse(htest, yg/2, hbardist/2) 
+    
+    ty = yy[jj-1]
+    yy[jj-1] = yy[jj-2]
+
+    lines(xx,yy,col=col)
+
+    yy[jj-2] = ty
+    yy[jj-1] = ty
+
+    lines(xx,yy,col=col)
+  }
+}
+
+draw.errors =
+  function(ex, ely, ehy,
+           plot.errors.style,
+           plot.errors.bar,
+           plot.errors.bar.num,
+           lty,
+           col = par("col")){
+    if (plot.errors.style == "bar"){
+      ei = seq(1,length(ex),length.out = min(length(ex),plot.errors.bar.num))
+      draw.error.bars(ex = ex[ei],
+                      ely = ely[ei],
+                      ehy = ehy[ei],
+                      hbar = (plot.errors.bar == "I"),
+                      lty = lty,
+                      col = col)
+    } else if (plot.errors.style == "band") {
+      draw.error.bands(ex = ex,
+                       ely = ely,
+                       ehy = ehy,
+                       lty = lty,
+                       col = col)
+    }
+  }
+
+draw.all.error.types <- function(ex, center, all.err,
+                                 plot.errors.style = "band",
+                                 plot.errors.bar = "|",
+                                 plot.errors.bar.num = min(length(ex), 25),
+                                 lty = 2, add.legend = TRUE, legend.loc = "topleft",
+                                 xi.factor = FALSE){
+  if (is.null(all.err)) return(invisible(NULL))
+
+  if (xi.factor) {
+    plot.errors.style <- "bar"
+    plot.errors.bar <- "I"
+  }
+
+  draw_one <- function(err, col) {
+    if (is.null(err)) return(invisible(NULL))
+    lower <- center - err[,1]
+    upper <- center + err[,2]
+    good <- complete.cases(ex, lower, upper)
+    if (!any(good)) return(invisible(NULL))
+    draw.errors(ex = ex[good], ely = lower[good], ehy = upper[good],
+                plot.errors.style = plot.errors.style,
+                plot.errors.bar = plot.errors.bar,
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = lty, col = col)
+  }
+
+  draw_one(all.err$pointwise, "red")
+  draw_one(all.err$simultaneous, "green3")
+  draw_one(all.err$bonferroni, "blue")
+
+  if (add.legend) {
+    legend(legend.loc,
+           legend = c("Pointwise","Simultaneous","Bonferroni"),
+           lty = 2, col = c("red","green3","blue"), lwd = 2, bty = "n")
+  }
+}
+
+plotFactor <- function(f, y, ...){
+  dot.expr <- as.list(substitute(list(...)))[-1L]
+  dot.names <- names(dot.expr)
+  has.user.lty <- !is.null(dot.names) && any(dot.names == "lty")
+
+  if (has.user.lty) {
+    plot.call <- as.call(c(list(quote(plot), x = quote(f), y = quote(y)), dot.expr))
+    eval(plot.call, parent.frame())
+  } else {
+    plot(x = f, y = y, lty = "blank", ...)
+  }
+
+  l.f = rep(f, each=3)
+  l.f[3*(1:length(f))] = NA
+
+  l.y = unlist(lapply(y, function (p) { c(0,p,NA) }))
+
+  lines(x = l.f, y = l.y, lty = 2)
+  points(x = f, y = y)
+}
+
+## Rank-based simultaneous confidence set helper, vendored from
+## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
+np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {
+  alternative <- match.arg(alternative, choices = c("two.sided", "less", "greater"))
+
+  DataMatrix <- x
+  N <- nrow(DataMatrix)
+  k <- round(conf.level * N, 0)
+  RankDat <- apply(DataMatrix, 2, rank)
+
+  switch(alternative,
+    "two.sided" = {
+      W1 <- apply(RankDat, 1, max)
+      W2 <- N + 1 - apply(RankDat, 1, min)
+
+      Wmat <- cbind(W1, W2)
+      w <- apply(Wmat, 1, max)
+      tstar <- round(sort(w)[k], 0)
+
+      SCI <- function(x) {
+        sortx <- sort(x)
+        cbind(sortx[N + 1 - tstar], sortx[tstar])
+      }
+
+      SCS <- t(apply(DataMatrix, 2, SCI))
+    },
+    "less" = {
+      W1 <- apply(RankDat, 1, max)
+      tstar <- round(sort(W1)[k], 0)
+
+      SCI <- function(x) {
+        sortx <- sort(x)
+        cbind(-Inf, sortx[tstar])
+      }
+
+      SCS <- t(apply(DataMatrix, 2, SCI))
+    },
+    "greater" = {
+      W2 <- N + 1 - apply(RankDat, 1, min)
+      tstar <- round(sort(W2)[k], 0)
+
+      SCI <- function(x) {
+        sortx <- sort(x)
+        cbind(sortx[N + 1 - tstar], Inf)
+      }
+
+      SCS <- t(apply(DataMatrix, 2, SCI))
+    }
+  )
+
+  colnames(SCS) <- c("lower", "upper")
+
+  attr(SCS, which = "k") <- k
+  attr(SCS, which = "N") <- N
+  OUT <- list(conf.int = SCS, conf.level = conf.level, alternative = alternative)
+  return(OUT)
+}
+
+compute.bootstrap.quantile.bounds <- function(boot.t, alpha, band.type) {
+  neval <- ncol(boot.t)
+
+  if (band.type == "pointwise") {
+    probs <- c(alpha / 2.0, 1.0 - alpha / 2.0)
+    return(t(apply(boot.t, 2, quantile, probs = probs)))
+  }
+
+  if (band.type == "bonferroni") {
+    probs <- c(alpha / (2.0 * neval), 1.0 - alpha / (2.0 * neval))
+    return(t(apply(boot.t, 2, quantile, probs = probs)))
+  }
+
+  if (band.type == "simultaneous") {
+    return(np.plot.SCSrank(boot.t, conf.level = 1.0 - alpha)$conf.int)
+  }
+
+  if (band.type == "all") {
+    return(list(
+      pointwise = compute.bootstrap.quantile.bounds(boot.t, alpha, "pointwise"),
+      bonferroni = compute.bootstrap.quantile.bounds(boot.t, alpha, "bonferroni"),
+      simultaneous = compute.bootstrap.quantile.bounds(boot.t, alpha, "simultaneous")
+    ))
+  }
+
+  stop("'band.type' must be one of pointwise, bonferroni, simultaneous, all")
+}
+
+compute.all.error.range <- function(center, all.err) {
+  if (is.null(all.err)) {
+    return(c(NA_real_, NA_real_))
+  }
+  lower <- c(center - all.err$pointwise[,1],
+             center - all.err$simultaneous[,1],
+             center - all.err$bonferroni[,1])
+  upper <- c(center + all.err$pointwise[,2],
+             center + all.err$simultaneous[,2],
+             center + all.err$bonferroni[,2])
+  c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
+}
+
+compute.default.error.range <- function(center, err) {
+  lower <- c(center - err[,1], err[,3] - err[,1])
+  upper <- c(center + err[,2], err[,3] + err[,2])
+  c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
+}
+
+.npplot_normalize_common_options <- function(plot.behavior,
+                                             plot.errors.method,
+                                             plot.errors.boot.method,
+                                             plot.errors.boot.blocklen,
+                                             plot.errors.center,
+                                             plot.errors.type,
+                                             plot.errors.alpha,
+                                             plot.errors.style,
+                                             plot.errors.bar,
+                                             xdat,
+                                             common.scale,
+                                             ylim,
+                                             allow_asymptotic_quantile = TRUE) {
+  plot.behavior <- match.arg(plot.behavior, c("plot", "plot-data", "data"))
+  plot.errors.method <- match.arg(plot.errors.method, c("none", "bootstrap", "asymptotic"))
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method, c("inid", "fixed", "geom"))
+  plot.errors.center <- match.arg(plot.errors.center, c("estimate", "bias-corrected"))
+  plot.errors.type <- match.arg(plot.errors.type, c("pmzsd", "pointwise", "bonferroni", "simultaneous", "all"))
+
+  if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
+      is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
+    stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
+
+  plot.errors.style <- match.arg(plot.errors.style, c("band", "bar"))
+  plot.errors.bar <- match.arg(plot.errors.bar, c("|", "I"))
+
+  common.scale <- common.scale | (!is.null(ylim))
+
+  if (plot.errors.method == "none" && plot.errors.type == "all") {
+    warning("plot.errors.type='all' requires bootstrap errors; setting plot.errors.method='bootstrap'")
+    plot.errors.method <- "bootstrap"
+  }
+
+  if (allow_asymptotic_quantile && plot.errors.method == "asymptotic") {
+    if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      warning("bootstrap quantile bands cannot be calculated with asymptotics, calculating pmzsd errors")
+      plot.errors.type <- "pmzsd"
+    }
+
+    if (plot.errors.center == "bias-corrected") {
+      warning("no bias corrections can be calculated with asymptotics, centering on estimate")
+      plot.errors.center <- "estimate"
+    }
+  }
+
+  if (is.element(plot.errors.boot.method, c("fixed", "geom")) &&
+      is.null(plot.errors.boot.blocklen))
+    plot.errors.boot.blocklen <- b.star(xdat, round = TRUE)[1,1]
+
+  list(
+    plot.behavior = plot.behavior,
+    plot.errors.method = plot.errors.method,
+    plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+    plot.errors.center = plot.errors.center,
+    plot.errors.type = plot.errors.type,
+    plot.errors.alpha = plot.errors.alpha,
+    plot.errors.style = plot.errors.style,
+    plot.errors.bar = plot.errors.bar,
+    common.scale = common.scale,
+    plot.errors = (plot.errors.method != "none")
+  )
+}
+
+
+compute.bootstrap.errors = function(...,bws){
+  UseMethod("compute.bootstrap.errors",bws)
+}
+
+compute.bootstrap.errors.rbandwidth =
+  function(xdat, ydat,
+           exdat,
+           gradients,
+           gradient.order,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+      "txdat = tsb[,1:(ncol(tsb)-1),drop=FALSE],")
+    strty = ifelse(is.inid, "tydat = ydat[indices],",
+      "tydat = tsb[,ncol(tsb)],")
+    
+    boofun = eval(parse(text=paste(strf, "suppressWarnings(npreg(", strtx, strty,
+                          "exdat = exdat, bws = bws,",
+                          "gradients = gradients,",
+                          "gradient.order = gradient.order,",
+                          "warn.glp.gradient = FALSE))$",
+                          ifelse(gradients, "grad[,slice.index]", "mean"), "}", sep="")))
+
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+
+    all.bp <- list()
+
+    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+      boot.frame <- as.data.frame(boot.out$t)
+      u.lev <- bws$xdati$all.ulev[[slice.index]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+      all.bp$names <- bws$xdati$all.lev[[slice.index]]
+      rm(boot.frame)
+    }
+    
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+  }
+
+compute.bootstrap.errors.scbandwidth =
+  function(xdat, ydat, zdat,
+           exdat, ezdat,
+           gradients,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+    miss.z <- missing(zdat)
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    xi <- 1:ncol(xdat)
+    yi <- ncol(xdat)+1
+    if (!miss.z)
+      zi <- yi+1:ncol(zdat)
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strtx = ifelse(is.inid, "txdat = xdat[indices,, drop = FALSE],",
+      "txdat = tsb[,xi,drop=FALSE],")
+    strty = ifelse(is.inid, "tydat = ydat[indices],",
+      "tydat = tsb[,yi],")
+    strtz <-
+      ifelse(miss.z, '',
+             ifelse(is.inid, 'tzdat = zdat[indices,, drop = FALSE],',
+                    'tzdat = tsb[,zi, drop = FALSE],'))
+    
+    boofun = eval(parse(text=paste(strf, "npscoef(", strtx, strty, strtz,
+                          "exdat = exdat,", ifelse(miss.z,"", "ezdat = ezdat,"),
+                          "bws = bws, iterate = FALSE)$",
+                          "mean", "}", sep="")))
+
+
+    boot.out <-
+      eval(parse(text = paste(ifelse(is.inid, 'boot(data = ',
+                   'tsboot(tseries ='), 'data.frame(xdat,ydat',
+                   ifelse(miss.z,'', ',zdat'),
+                   '), statistic = boofun, R = plot.errors.boot.num',
+                   ifelse(is.inid,'','l = plot.errors.boot.blocklen, sim = plot.errors.boot.method'),')')))
+
+    all.bp <- list()
+
+    if ((slice.index > 0) && (((slice.index <= ncol(xdat)) && (bws$xdati$iord | bws$xdati$iuno)[slice.index]) ||
+                              ((slice.index > ncol(xdat)) && (bws$zdati$iord | bws$zdati$iuno)[slice.index-ncol(xdat)]))) {
+      boot.frame <- as.data.frame(boot.out$t)
+
+      if(slice.index <= ncol(xdat))
+          u.lev <- bws$xdati$all.ulev[[slice.index]]
+      else
+          u.lev <- bws$zdati$all.ulev[[slice.index-ncol(xdat)]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+
+      if(slice.index <= ncol(xdat))
+          all.bp$names <- bws$xdati$all.lev[[slice.index]]
+      else
+          all.bp$names <- bws$zdati$all.lev[[slice.index-ncol(xdat)]]
+      rm(boot.frame)
+    }
+    
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+  }
+
+compute.bootstrap.errors.plbandwidth =
+  function(xdat, ydat, zdat,
+           exdat, ezdat,
+           gradients,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+      "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
+    strty = ifelse(is.inid, "tydat = ydat[indices],",
+      "tydat = tsb[,ncol(xdat)+1],")
+    strtz = ifelse(is.inid, "tzdat = zdat[indices,],",
+      "tzdat = tsb[,(ncol(xdat)+2):ncol(tsb), drop=FALSE],")
+
+
+    boofun = eval(parse(text=paste(strf, "npplreg(", strtx, strty, strtz,
+                          "exdat = exdat, ezdat = ezdat, bws = bws)$mean}", sep="")))
+
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat,zdat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat,ydat,zdat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+
+    all.bp <- list()
+
+    if (slice.index <= bws$xndim){
+      tdati <- bws$xdati
+      ti <- slice.index
+    } else {
+      tdati <- bws$zdati
+      ti <- slice.index - bws$xndim
+    }
+    
+    if (slice.index > 0 && (tdati$iord | tdati$iuno)[ti]){
+      boot.frame <- as.data.frame(boot.out$t)
+      u.lev <- tdati$all.ulev[[ti]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+      all.bp$names <- tdati$all.lev[[ti]]
+      rm(boot.frame)
+    }
+
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+  }
+
+compute.bootstrap.errors.bandwidth =
+  function(xdat, 
+           exdat,
+           cdf,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strt = ifelse(is.inid, "tdat = xdat[indices,],",
+      "tdat = tsb,")
+
+    
+    boofun = eval(parse(text=paste(strf,
+                          ifelse(cdf, "npudist(", "npudens("),
+                          strt,
+                          "edat = exdat, bws = bws)$",
+                          ifelse(cdf, "dist", "dens"),
+                          "}", sep="")))
+
+    if (is.inid) {
+      boot.out = boot(data = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+
+    all.bp <- list()
+
+    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+      boot.frame <- as.data.frame(boot.out$t)
+      u.lev <- bws$xdati$all.ulev[[slice.index]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+      all.bp$names <- bws$xdati$all.lev[[slice.index]]
+      rm(boot.frame)
+    }
+
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+  }
+
+compute.bootstrap.errors.dbandwidth =
+  function(xdat, 
+           exdat,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strt = ifelse(is.inid, "tdat = xdat[indices,],",
+      "tdat = tsb,")
+
+    
+    boofun = eval(parse(text=paste(strf, "npudist(",
+                          strt, "edat = exdat, bws = bws)$dist}", sep="")))
+
+    if (is.inid) {
+      boot.out = boot(data = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+
+    all.bp <- list()
+
+    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+      boot.frame <- as.data.frame(boot.out$t)
+      u.lev <- bws$xdati$all.ulev[[slice.index]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+      all.bp$names <- bws$xdati$all.lev[[slice.index]]
+      rm(boot.frame)
+    }
+
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+  }
+
+compute.bootstrap.errors.conbandwidth =
+  function(xdat, ydat,
+           exdat, eydat,
+           cdf,
+           quantreg,
+           tau,
+           gradients,
+           gradient.index,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+    exdat = toFrame(exdat)
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
+
+    tboo =
+      if(quantreg) "quant"
+      else if (cdf) "dist"
+      else "dens"
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+      "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
+    strty = ifelse(is.inid, "tydat = ydat[indices,],",
+      "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
+    
+    
+    boofun = eval(parse(text=paste(strf, 
+                          switch(tboo,
+                                 "quant" = "npqreg(",
+                                 "dist" = "npcdist(",
+                                 "dens" = "npcdens("),
+                          strtx, strty,
+                          "exdat = exdat,",
+                          ifelse(quantreg, "tau = tau", "eydat = eydat"),
+                          ", bws = bws, gradients = gradients)$",
+                          switch(tboo,
+                                 "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
+                                 "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
+                                 "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
+                          "}", sep="")))
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+
+    all.bp <- list()
+
+    if (slice.index <= bws$xndim){
+      tdati <- bws$xdati
+      ti <- slice.index
+    } else {
+      tdati <- bws$ydati
+      ti <- slice.index - bws$xndim
+    }
+    
+    if (slice.index > 0 && (tdati$iord | tdati$iuno)[ti]){
+      boot.frame <- as.data.frame(boot.out$t)
+      u.lev <- tdati$all.ulev[[ti]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+      all.bp$names <- tdati$all.lev[[ti]]
+      rm(boot.frame)
+    }
+
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+  }
+
+compute.bootstrap.errors.condbandwidth =
+  function(xdat, ydat,
+           exdat, eydat,
+           cdf,
+           quantreg,
+           tau,
+           gradients,
+           gradient.index,
+           slice.index,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+    exdat = toFrame(exdat)
+    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
+    boot.all.err <- NULL
+
+    tboo =
+      if(quantreg) "quant"
+      else if (cdf) "dist"
+      else "dens"
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+      "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
+    strty = ifelse(is.inid, "tydat = ydat[indices,],",
+      "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
+    
+    
+    boofun = eval(parse(text=paste(strf, 
+                          switch(tboo,
+                                 "quant" = "npqreg(",
+                                 "dist" = "npcdist(",
+                                 "dens" = "npcdens("),
+                          strtx, strty,
+                          "exdat = exdat,",
+                          ifelse(quantreg, "tau = tau", "eydat = eydat"),
+                          ", bws = bws, gradients = gradients)$",
+                          switch(tboo,
+                                 "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
+                                 "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
+                                 "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
+                          "}", sep="")))
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+
+    all.bp <- list()
+
+    if (slice.index <= bws$xndim){
+      tdati <- bws$xdati
+      ti <- slice.index
+    } else {
+      tdati <- bws$ydati
+      ti <- slice.index - bws$xndim
+    }
+    
+    if (slice.index > 0 && (tdati$iord | tdati$iuno)[ti]){
+      boot.frame <- as.data.frame(boot.out$t)
+      u.lev <- tdati$all.ulev[[ti]]
+
+      ## if we are bootstrapping a factor, there should be one
+      ## set of replications for each level
+      stopifnot(length(u.lev)==ncol(boot.frame))
+      
+      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+      for (i in 1:length(u.lev)){
+        t.bp <- boxplot.stats(boot.frame[,i])
+        all.bp$stats[,i] <- t.bp$stats
+        all.bp$conf[,i] <- t.bp$conf
+        all.bp$out <- c(all.bp$out,t.bp$out)
+        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
+      }
+      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
+      all.bp$names <- tdati$all.lev[[ti]]
+      rm(boot.frame)
+    }
+
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+  }
+
+compute.bootstrap.errors.sibandwidth =
+  function(xdat, ydat,
+           gradients,
+           plot.errors.boot.method,
+           plot.errors.boot.blocklen,
+           plot.errors.boot.num,
+           plot.errors.center,
+           plot.errors.type,
+           plot.errors.alpha,
+           ...,
+           bws){
+
+    boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
+    boot.all.err <- NULL
+
+    is.inid = plot.errors.boot.method=="inid"
+
+    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+    strtx = ifelse(is.inid, "txdat = xdat[indices,],",
+      "txdat = tsb[,1:(ncol(tsb)-1),drop=FALSE],")
+    strty = ifelse(is.inid, "tydat = ydat[indices],",
+      "tydat = tsb[,ncol(tsb)],")
+    
+    ## beta[1] is always 1.0, so use first column of gradients matrix ... 
+    
+    boofun = eval(parse(text=paste(strf, "npindex(", strtx, strty,
+                          "exdat = xdat, bws = bws,",
+                          "gradients = gradients)$",
+                          ifelse(gradients, "grad[,1]", "mean"), "}", sep="")))
+
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
+    }
+    
+    if (plot.errors.type == "pmzsd") {
+      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
+    }
+    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
+      if (plot.errors.type == "all") {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "pointwise")
+        boot.all.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = "all")
+        boot.all.err <- lapply(boot.all.bounds, function(bb) {
+          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
+        })
+      } else {
+        boot.bounds <- compute.bootstrap.quantile.bounds(
+          boot.t = boot.out$t,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type)
+      }
+      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
+      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
+    }
+    if (plot.errors.center == "bias-corrected")
+      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
+    list(boot.err = boot.err, bxp = list(), boot.all.err = boot.all.err)
+  }
+
+
+uocquantile <- function(x, prob) {
+  if(any(prob < 0 | prob > 1)) stop("'prob' outside [0,1]")
+  if(any(is.na(x) | is.nan(x))) stop("missing values and NaN's not allowed")
+  if (is.ordered(x)){
+    x <- droplevels(x)
+    tq = unclass(table(x))
+    tq = tq / sum(tq)
+    tq[length(tq)] <- 1.0
+    bscape <- levels(x)
+    tq <- sapply(1:length(tq), function(y){ sum(tq[1:y]) })
+    j <- sapply(prob, function(p){ which(tq >= p)[1] })
+    bscape[j]
+  } else if (is.factor(x)) {
+    ## just returns mode
+    x <- droplevels(x)
+    tq = unclass(table(x))
+    j = which(tq == max(tq))[1]
+    levels(x)[j]
+  } else {
+    quantile(x, probs = prob)
+  }
+}
+
+
+trim.quantiles <- function(dat, trim){
+  if (sign(trim) == sign(-1)){
+    trim <- abs(trim)
+    tq <- quantile(dat, probs = c(0.0, 0.0+trim, 1.0-trim,1.0))
+    tq <- c(2.0*tq[1]-tq[2], 2.0*tq[4]-tq[3])
+  }
+  else {
+    tq <- quantile(dat, probs = c(0.0+trim, 1.0-trim))
+  }
+  tq
+}
+
+
+
