@@ -68,7 +68,8 @@ gradients(x, \dots)
 \dontrun{
 x <- runif(10)
 y <- x + rnorm(10, sd = 0.1)
-gradients(npreg(y~x, gradients=TRUE))
+model <- npreg(y~x, gradients=TRUE)
+gradients(model)
 }
 }
 \keyword{nonparametric}

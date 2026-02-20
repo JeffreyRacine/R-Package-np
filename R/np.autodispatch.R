@@ -57,7 +57,7 @@
     in.caller <- exists(fname, envir = caller_env, mode = "function", inherits = TRUE)
     in.ns <- exists(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
     if (!in.caller && in.ns) {
-      mc.eval[[1L]] <- as.call(list(as.name(":::"), as.name("npRmpi"), as.name(fname)))
+      mc.eval[[1L]] <- get(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
     }
   }
   eval(mc.eval, envir = caller_env)
@@ -180,7 +180,7 @@
   if (is.call(out) && length(out) >= 1L && is.symbol(out[[1L]])) {
     fname <- as.character(out[[1L]])
     if (exists(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)) {
-      out[[1L]] <- as.call(list(as.name(":::"), as.name("npRmpi"), as.name(fname)))
+      out[[1L]] <- get(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
     }
   }
   tmpnames <- character(0)

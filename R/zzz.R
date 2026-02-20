@@ -58,8 +58,6 @@
       options(npRmpi.autodispatch.context = FALSE)
     if (is.null(getOption("npRmpi.autodispatch.warned.nested")))
       options(npRmpi.autodispatch.warned.nested = FALSE)
-    if (is.null(getOption("npRmpi.autodispatch.warned.bootstrap.plot")))
-      options(npRmpi.autodispatch.warned.bootstrap.plot = FALSE)
     if (is.null(getOption("npRmpi.conflicts.warn")))
       options(npRmpi.conflicts.warn = TRUE)
     if (is.null(getOption("npRmpi.conflicts.warned")))
@@ -68,10 +66,18 @@
       options(npRmpi.conflicts.warned.rmpi = FALSE)
 
     setHook(packageEvent("np", "attach"),
-            function(...) try(npRmpi:::.npRmpi_warn_pkg_conflict_once(), silent = TRUE),
+            function(...) try(get(".npRmpi_warn_pkg_conflict_once",
+                                  envir = asNamespace("npRmpi"),
+                                  mode = "function",
+                                  inherits = FALSE)(),
+                              silent = TRUE),
             action = "append")
     setHook(packageEvent("Rmpi", "attach"),
-            function(...) try(npRmpi:::.npRmpi_warn_rmpi_conflict_once(), silent = TRUE),
+            function(...) try(get(".npRmpi_warn_rmpi_conflict_once",
+                                  envir = asNamespace("npRmpi"),
+                                  mode = "function",
+                                  inherits = FALSE)(),
+                              silent = TRUE),
             action = "append")
 
     return(invisible())
@@ -109,8 +115,6 @@
     options(npRmpi.autodispatch.context = FALSE)
   if (is.null(getOption("npRmpi.autodispatch.warned.nested")))
     options(npRmpi.autodispatch.warned.nested = FALSE)
-  if (is.null(getOption("npRmpi.autodispatch.warned.bootstrap.plot")))
-    options(npRmpi.autodispatch.warned.bootstrap.plot = FALSE)
   if (is.null(getOption("npRmpi.conflicts.warn")))
     options(npRmpi.conflicts.warn = TRUE)
   if (is.null(getOption("npRmpi.conflicts.warned")))
@@ -119,9 +123,17 @@
     options(npRmpi.conflicts.warned.rmpi = FALSE)
 
   setHook(packageEvent("np", "attach"),
-          function(...) try(npRmpi:::.npRmpi_warn_pkg_conflict_once(), silent = TRUE),
+          function(...) try(get(".npRmpi_warn_pkg_conflict_once",
+                                envir = asNamespace("npRmpi"),
+                                mode = "function",
+                                inherits = FALSE)(),
+                            silent = TRUE),
           action = "append")
   setHook(packageEvent("Rmpi", "attach"),
-          function(...) try(npRmpi:::.npRmpi_warn_rmpi_conflict_once(), silent = TRUE),
+          function(...) try(get(".npRmpi_warn_rmpi_conflict_once",
+                                envir = asNamespace("npRmpi"),
+                                mode = "function",
+                                inherits = FALSE)(),
+                            silent = TRUE),
           action = "append")
 }

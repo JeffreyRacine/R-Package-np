@@ -79,6 +79,11 @@ residuals.npregression <- function(object, ...) {
 se.npregression <- function(x) { x$merr }
 gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...) {
   gout <- if (!errors) x$grad else x$gerr
+  if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
+    stop(if (!errors)
+      "gradients are not available: fit the model with gradients=TRUE"
+    else
+      "gradient standard errors are not available: fit the model with gradients=TRUE")
 
   if (!identical(x$bws$regtype, "glp") || is.null(gradient.order))
     return(gout)

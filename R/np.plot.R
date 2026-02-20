@@ -141,13 +141,7 @@ plotFactor <- function(f, y, ...){
 .npRmpi_guard_bootstrap_plot_autodispatch <- function(plot.errors.method,
                                                       where = "plot()",
                                                       allow.direct.bootstrap = FALSE) {
-  if (.npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()) {
-    if (identical(plot.errors.method, "bootstrap") && !isTRUE(allow.direct.bootstrap)) {
-      stop(sprintf("%s with plot.errors.method='bootstrap' does not currently support direct npRmpi.autodispatch execution; use mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
-    }
-  }
+  invisible(TRUE)
 }
 
 .npRmpi_plot_behavior_for_rank <- function(plot.behavior) {
@@ -385,18 +379,31 @@ compute.bootstrap.errors.rbandwidth =
       boot.out$t <- as.matrix(boot.out$t)
     } else {
 
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-        "txdat = tsb[,1:(ncol(tsb)-1),drop=FALSE],")
-      strty = ifelse(is.inid, "tydat = ydat[indices],",
-        "tydat = tsb[,ncol(tsb)],")
-      
-      boofun = eval(parse(text=paste(strf, "suppressWarnings(npreg(", strtx, strty,
-                            "exdat = exdat, bws = bws,",
-                            "gradients = gradients,",
-                            "gradient.order = gradient.order,",
-                            "warn.glp.gradient = FALSE))$",
-                            ifelse(gradients, "grad[,slice.index]", "mean"), "}", sep="")))
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          fit <- suppressWarnings(npreg(
+            txdat = xdat[indices, , drop = FALSE],
+            tydat = ydat[indices],
+            exdat = exdat, bws = bws,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            warn.glp.gradient = FALSE
+          ))
+          if (gradients) fit$grad[, slice.index] else fit$mean
+        }
+      } else {
+        function(tsb) {
+          fit <- suppressWarnings(npreg(
+            txdat = tsb[, 1:(ncol(tsb) - 1), drop = FALSE],
+            tydat = tsb[, ncol(tsb)],
+            exdat = exdat, bws = bws,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            warn.glp.gradient = FALSE
+          ))
+          if (gradients) fit$grad[, slice.index] else fit$mean
+        }
+      }
 
       if (is.inid){
         boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
@@ -513,33 +520,45 @@ compute.bootstrap.errors.scbandwidth =
       boot.out$t0 <- as.numeric(boot.out$t0)
       boot.out$t <- as.matrix(boot.out$t)
     } else {
-      xi <- 1:ncol(xdat)
-      yi <- ncol(xdat)+1
-      if (!miss.z)
-        zi <- yi+1:ncol(zdat)
+      xcols <- seq_len(ncol(xdat))
+      ycol <- ncol(xdat) + 1L
+      zcols <- if (miss.z) integer(0) else (ycol + 1L):(ycol + ncol(zdat))
 
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strtx = ifelse(is.inid, "txdat = xdat[indices,, drop = FALSE],",
-        "txdat = tsb[,xi,drop=FALSE],")
-      strty = ifelse(is.inid, "tydat = ydat[indices],",
-        "tydat = tsb[,yi],")
-      strtz <-
-        ifelse(miss.z, '',
-               ifelse(is.inid, 'tzdat = zdat[indices,, drop = FALSE],',
-                      'tzdat = tsb[,zi, drop = FALSE],'))
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          npscoef(
+            txdat = xdat[indices, , drop = FALSE],
+            tydat = ydat[indices],
+            tzdat = if (miss.z) NULL else zdat[indices, , drop = FALSE],
+            exdat = exdat,
+            ezdat = if (miss.z) NULL else ezdat,
+            bws = bws,
+            iterate = FALSE
+          )$mean
+        }
+      } else {
+        function(tsb) {
+          npscoef(
+            txdat = tsb[, xcols, drop = FALSE],
+            tydat = tsb[, ycol],
+            tzdat = if (miss.z) NULL else tsb[, zcols, drop = FALSE],
+            exdat = exdat,
+            ezdat = if (miss.z) NULL else ezdat,
+            bws = bws,
+            iterate = FALSE
+          )$mean
+        }
+      }
 
-      boofun = eval(parse(text=paste(strf, "npscoef(", strtx, strty, strtz,
-                            "exdat = exdat,", ifelse(miss.z,"", "ezdat = ezdat,"),
-                            "bws = bws, iterate = FALSE)$",
-                            "mean", "}", sep="")))
-
-
-      boot.out <-
-        eval(parse(text = paste(ifelse(is.inid, 'boot(data = ',
-                     'tsboot(tseries ='), 'data.frame(xdat,ydat',
-                     ifelse(miss.z,'', ',zdat'),
-                     '), statistic = boofun, R = plot.errors.boot.num',
-                     ifelse(is.inid,'','l = plot.errors.boot.blocklen, sim = plot.errors.boot.method'),')')))
+      boot.data <- if (miss.z) data.frame(xdat, ydat) else data.frame(xdat, ydat, zdat)
+      if (is.inid) {
+        boot.out <- boot(data = boot.data, statistic = boofun, R = plot.errors.boot.num)
+      } else {
+        boot.out <- tsboot(
+          tseries = boot.data, statistic = boofun, R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
+        )
+      }
     }
 
     all.bp <- list()
@@ -654,17 +673,25 @@ compute.bootstrap.errors.plbandwidth =
       boot.out$t0 <- as.numeric(boot.out$t0)
       boot.out$t <- as.matrix(boot.out$t)
     } else {
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-        "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
-      strty = ifelse(is.inid, "tydat = ydat[indices],",
-        "tydat = tsb[,ncol(xdat)+1],")
-      strtz = ifelse(is.inid, "tzdat = zdat[indices,],",
-        "tzdat = tsb[,(ncol(xdat)+2):ncol(tsb), drop=FALSE],")
-
-
-      boofun = eval(parse(text=paste(strf, "npplreg(", strtx, strty, strtz,
-                            "exdat = exdat, ezdat = ezdat, bws = bws)$mean}", sep="")))
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          npplreg(
+            txdat = xdat[indices, , drop = FALSE],
+            tydat = ydat[indices],
+            tzdat = zdat[indices, , drop = FALSE],
+            exdat = exdat, ezdat = ezdat, bws = bws
+          )$mean
+        }
+      } else {
+        function(tsb) {
+          npplreg(
+            txdat = tsb[, 1:ncol(xdat), drop = FALSE],
+            tydat = tsb[, ncol(xdat) + 1L],
+            tzdat = tsb[, (ncol(xdat) + 2L):ncol(tsb), drop = FALSE],
+            exdat = exdat, ezdat = ezdat, bws = bws
+          )$mean
+        }
+      }
 
       if (is.inid){
         boot.out = boot(data = data.frame(xdat,ydat,zdat), statistic = boofun,
@@ -785,17 +812,25 @@ compute.bootstrap.errors.bandwidth =
       boot.out$t0 <- as.numeric(boot.out$t0)
       boot.out$t <- as.matrix(boot.out$t)
     } else {
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strt = ifelse(is.inid, "tdat = xdat[indices,],",
-        "tdat = tsb,")
-
-      
-      boofun = eval(parse(text=paste(strf,
-                            ifelse(cdf, "npudist(", "npudens("),
-                            strt,
-                            "edat = exdat, bws = bws)$",
-                            ifelse(cdf, "dist", "dens"),
-                            "}", sep="")))
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          fit <- if (cdf) {
+            npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+          } else {
+            npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+          }
+          if (cdf) fit$dist else fit$dens
+        }
+      } else {
+        function(tsb) {
+          fit <- if (cdf) {
+            npudist(tdat = tsb, edat = exdat, bws = bws)
+          } else {
+            npudens(tdat = tsb, edat = exdat, bws = bws)
+          }
+          if (cdf) fit$dist else fit$dens
+        }
+      }
 
       if (is.inid) {
         boot.out = boot(data = data.frame(xdat), statistic = boofun,
@@ -907,13 +942,15 @@ compute.bootstrap.errors.dbandwidth =
       boot.out$t0 <- as.numeric(boot.out$t0)
       boot.out$t <- as.matrix(boot.out$t)
     } else {
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strt = ifelse(is.inid, "tdat = xdat[indices,],",
-        "tdat = tsb,")
-
-      
-      boofun = eval(parse(text=paste(strf, "npudist(",
-                            strt, "edat = exdat, bws = bws)$dist}", sep="")))
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
+        }
+      } else {
+        function(tsb) {
+          npudist(tdat = tsb, edat = exdat, bws = bws)$dist
+        }
+      }
 
       if (is.inid) {
         boot.out = boot(data = data.frame(xdat), statistic = boofun,
@@ -1051,27 +1088,33 @@ compute.bootstrap.errors.conbandwidth =
       boot.out$t <- as.matrix(boot.out$t)
     } else {
 
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-        "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
-      strty = ifelse(is.inid, "tydat = ydat[indices,],",
-        "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
-      
-      
-      boofun = eval(parse(text=paste(strf, 
-                            switch(tboo,
-                                   "quant" = "npqreg(",
-                                   "dist" = "npcdist(",
-                                   "dens" = "npcdens("),
-                            strtx, strty,
-                            "exdat = exdat,",
-                            ifelse(quantreg, "tau = tau", "eydat = eydat"),
-                            ", bws = bws, gradients = gradients)$",
-                            switch(tboo,
-                                   "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
-                                   "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
-                                   "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
-                            "}", sep="")))
+      fit.cond <- function(tx, ty) {
+        switch(
+          tboo,
+          quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+          dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+          dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+        )
+      }
+      out.cond <- function(fit) {
+        switch(
+          tboo,
+          quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
+          dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
+          dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
+        )
+      }
+      boofun <- if (is.inid) {
+        function(data, indices) out.cond(fit.cond(
+          tx = xdat[indices, , drop = FALSE],
+          ty = ydat[indices, , drop = FALSE]
+        ))
+      } else {
+        function(tsb) out.cond(fit.cond(
+          tx = tsb[, 1:ncol(xdat), drop = FALSE],
+          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
+        ))
+      }
       if (is.inid){
         boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
           R = plot.errors.boot.num)
@@ -1216,27 +1259,33 @@ compute.bootstrap.errors.condbandwidth =
       boot.out$t <- as.matrix(boot.out$t)
     } else {
 
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-        "txdat = tsb[,1:ncol(xdat),drop=FALSE],")
-      strty = ifelse(is.inid, "tydat = ydat[indices,],",
-        "tydat = tsb[,(ncol(xdat)+1):ncol(tsb), drop=FALSE],")
-      
-      
-      boofun = eval(parse(text=paste(strf, 
-                            switch(tboo,
-                                   "quant" = "npqreg(",
-                                   "dist" = "npcdist(",
-                                   "dens" = "npcdens("),
-                            strtx, strty,
-                            "exdat = exdat,",
-                            ifelse(quantreg, "tau = tau", "eydat = eydat"),
-                            ", bws = bws, gradients = gradients)$",
-                            switch(tboo,
-                                   "quant" = ifelse(gradients, "yqgrad[,gradient.index]", "quantile"),
-                                   "dist" = ifelse(gradients, "congrad[,gradient.index]", "condist"),
-                                   "dens" = ifelse(gradients, "congrad[,gradient.index]", "condens")),
-                            "}", sep="")))
+      fit.cond <- function(tx, ty) {
+        switch(
+          tboo,
+          quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+          dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+          dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+        )
+      }
+      out.cond <- function(fit) {
+        switch(
+          tboo,
+          quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
+          dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
+          dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
+        )
+      }
+      boofun <- if (is.inid) {
+        function(data, indices) out.cond(fit.cond(
+          tx = xdat[indices, , drop = FALSE],
+          ty = ydat[indices, , drop = FALSE]
+        ))
+      } else {
+        function(tsb) out.cond(fit.cond(
+          tx = tsb[, 1:ncol(xdat), drop = FALSE],
+          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
+        ))
+      }
       if (is.inid){
         boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
           R = plot.errors.boot.num)
@@ -1356,18 +1405,30 @@ compute.bootstrap.errors.sibandwidth =
       boot.out$t0 <- as.numeric(boot.out$t0)
       boot.out$t <- as.matrix(boot.out$t)
     } else {
-      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-      strtx = ifelse(is.inid, "txdat = xdat[indices,],",
-        "txdat = tsb[,1:(ncol(tsb)-1),drop=FALSE],")
-      strty = ifelse(is.inid, "tydat = ydat[indices],",
-        "tydat = tsb[,ncol(tsb)],")
-
       ## beta[1] is always 1.0, so use first column of gradients matrix ...
-
-      boofun = eval(parse(text=paste(strf, "npindex(", strtx, strty,
-                            "exdat = xdat, bws = bws,",
-                            "gradients = gradients)$",
-                            ifelse(gradients, "grad[,1]", "mean"), "}", sep="")))
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          fit <- npindex(
+            txdat = xdat[indices, , drop = FALSE],
+            tydat = ydat[indices],
+            exdat = xdat,
+            bws = bws,
+            gradients = gradients
+          )
+          if (gradients) fit$grad[, 1] else fit$mean
+        }
+      } else {
+        function(tsb) {
+          fit <- npindex(
+            txdat = tsb[, 1:(ncol(tsb) - 1), drop = FALSE],
+            tydat = tsb[, ncol(tsb)],
+            exdat = xdat,
+            bws = bws,
+            gradients = gradients
+          )
+          if (gradients) fit$grad[, 1] else fit$mean
+        }
+      }
 
       if (is.inid){
         boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,

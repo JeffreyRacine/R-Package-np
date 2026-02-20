@@ -75,10 +75,12 @@ predict.qregression <- function(object, se.fit = FALSE, ...) {
 
 se.qregression <- function(x) { x$quanterr }
 gradients.qregression <- function(x, errors = FALSE, ...) {
-  if(!errors)
-    return(x$quantgrad)
-  else
-    return(NULL)
+  if (errors)
+    stop("gradient standard errors are not available for qregression")
+  gout <- x$quantgrad
+  if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
+    stop("gradients are not available: fit the model with gradients=TRUE")
+  gout
 }
 
 summary.qregression <- function(object, ...) {

@@ -104,10 +104,13 @@ predict.singleindex <- function(object, se.fit = FALSE, ...) {
 }
 se.singleindex <- function(x){ x$merr }
 gradients.singleindex <- function(x, errors = FALSE, ...) {
-  if(!errors)
-    return(x$grad)
-  else
-    return(x$gerr)
+  gout <- if (!errors) x$grad else x$gerr
+  if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
+    stop(if (!errors)
+      "gradients are not available: fit the model with gradients=TRUE"
+    else
+      "gradient standard errors are not available: fit the model with gradients=TRUE")
+  gout
 }
 
 summary.singleindex <- function(object, ...){

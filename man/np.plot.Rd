@@ -740,13 +740,11 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   intended on mixed data types and will coerce the data to the same
   type.
 
-  For \code{npRmpi}, plotting calls that request bootstrap errors
-  (i.e. \code{plot.errors.method="bootstrap"}) should currently be
-  executed explicitly via
-  \code{mpi.bcast.cmd(plot(...), caller.execute=TRUE)} with a fully
-  manual MPI workflow (do not mix autodispatch-created objects with
-  manual-broadcast plotting calls). Non-bootstrap plotting paths are
-  supported directly under \code{npRmpi.autodispatch}.
+  For \code{npRmpi}, plotting calls (including bootstrap error paths)
+  are supported directly under \code{npRmpi.autodispatch}. Manual
+  \code{mpi.bcast.cmd(plot(...), caller.execute=TRUE)} wrapping remains
+  available for advanced workflows but is not required for standard
+  autodispatch use.
 }
 
 \examples{

@@ -76,10 +76,13 @@ fitted.condensity <- function(object, ...){
 }
 se.condensity <- function(x){ x$conderr }
 gradients.condensity <- function(x, errors = FALSE, ...) {
-  if(!errors)
-    return(x$congrad)
-  else
-    return(x$congerr)
+  gout <- if (!errors) x$congrad else x$congerr
+  if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
+    stop(if (!errors)
+      "gradients are not available: fit the model with gradients=TRUE"
+    else
+      "gradient standard errors are not available: fit the model with gradients=TRUE")
+  gout
 }
 
 predict.condensity <- function(object, se.fit = FALSE, ...) {
