@@ -106,7 +106,7 @@ predict.plregression <- function(object, se.fit = FALSE, ...) {
   else
     return(fitted(tr))
 }
-plot.plregression <- function(x, ...) { npplot(bws = x$bw, ...) }
+plot.plregression <- function(x, ...) { .np_plot_plregression(x, ...) }
 summary.plregression <- function(object, ...){
   cat("\nPartially Linear Model",
       "\nRegression data: ", object$ntrain, " training points,",
