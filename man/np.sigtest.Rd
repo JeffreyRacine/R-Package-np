@@ -159,6 +159,12 @@ npsigtest(bws, \dots)
   also that \code{boot.method="pairwise"} is not recommended for the
   multivariate local linear estimator due to substantial size
   distortions that may arise in certain cases.
+
+  For \code{npRmpi}, \code{npsigtest} currently requires explicit MPI
+  broadcast execution via \code{mpi.bcast.cmd(..., caller.execute=TRUE)}
+  (it is not yet supported by \code{npRmpi.autodispatch}). In addition,
+  multivariate \code{xdat} (\code{NCOL(xdat) > 1}) is currently blocked
+  under MPI to avoid known deadlock behavior.
   
 }  
 

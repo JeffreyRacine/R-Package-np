@@ -81,9 +81,12 @@ npsigtest.rbandwidth <- function(bws,
                                  ...) {
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
   if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    stop("npsigtest() does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(npsigtest(...), caller.execute=TRUE)")
 
   xdat <- toFrame(xdat)
+  if (NCOL(xdat) > 1L && .npRmpi_has_active_slave_pool()) {
+    stop("npsigtest() with more than one explanatory variable is not currently safe under MPI (can deadlock); use one explanatory variable or run serial np for this call")
+  }
 
   if(boot.num < 9) stop("number of bootstrap replications must be >= 9")
 
@@ -185,7 +188,10 @@ npsigtest.rbandwidth <- function(bws,
 
       ## Compute scale and mean of unrestricted residuals
 
-      ei.unres <- scale(residuals(npreg(bws=bws)))
+      ei.unres <- scale(ydat - npreg(txdat = xdat,
+                                     tydat = ydat,
+                                     bws = bws,
+                                     ...)$mean)
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
 
@@ -394,7 +400,10 @@ npsigtest.rbandwidth <- function(bws,
 
         ## Compute scale and mean of unrestricted residuals
 
-        ei.unres <- scale(residuals(npreg(bws=bws)))
+        ei.unres <- scale(ydat - npreg(txdat = xdat,
+                                       tydat = ydat,
+                                       bws = bws,
+                                       ...)$mean)
         ei.unres.scale <- attr(ei.unres,"scaled:scale")
         ei.unres.center <- attr(ei.unres,"scaled:center")      
 
@@ -594,7 +603,7 @@ npsigtest.rbandwidth <- function(bws,
 npsigtest.default <- function(bws, xdat, ydat, ...){
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
   if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    stop("npsigtest() does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(npsigtest(...), caller.execute=TRUE)")
 
   sc <- sys.call()
   sc.names <- names(sc)
