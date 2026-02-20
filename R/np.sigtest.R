@@ -625,7 +625,10 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
   if(!no.ydat)
     call.args$ydat <- ydat
 
-  ev <- do.call("npsigtest", c(call.args, list(...)))
+  dots <- list(...)
+  dots[c("bws", "bandwidth.compute", "formula", "data", "xdat", "ydat")] <- NULL
+
+  ev <- do.call("npsigtest", c(call.args, dots))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()

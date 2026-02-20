@@ -13,3 +13,19 @@ test_that("npsigtest basic functionality works", {
   expect_s3_class(sig, "sigtest")
   expect_output(summary(sig))
 })
+
+test_that("npsigtest formula interface path works", {
+  set.seed(7)
+  n <- 40
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- x1 + rnorm(n, sd = 0.1)
+  mydat <- data.frame(y, x1, x2)
+
+  sig <- npsigtest(y ~ x1 + x2,
+                   data = mydat,
+                   boot.num = 9)
+
+  expect_s3_class(sig, "sigtest")
+  expect_true(is.numeric(sig$P))
+})
