@@ -279,6 +279,13 @@
   x
 }
 
+.npRmpi_autodispatch_tag_result <- function(x, mode = "auto") {
+  if (is.list(x) || is.environment(x)) {
+    attr(x, "npRmpi.dispatch.mode") <- mode
+  }
+  x
+}
+
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
@@ -319,10 +326,10 @@
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 
   if (is.list(result))
-    return(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto"))
 
   if (is.call(result))
-    return(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto"))
 
-  result
+  .npRmpi_autodispatch_tag_result(result, mode = "auto")
 }
