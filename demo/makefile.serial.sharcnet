@@ -11,7 +11,6 @@ all:
 	sqsub -o npcopula_serial.out -r 2h -q serial R CMD BATCH --vanilla ../R/npcopula_serial.R
 	sqsub -o npdeneqtest_serial.out -r 2h -q serial R CMD BATCH --vanilla ../R/npdeneqtest_serial.R
 	sqsub -o npdeptest_serial.out -r 2h -q serial R CMD BATCH --vanilla ../R/npdeptest_serial.R
-	sqsub -o npglpreg_serial.out -r 2h -q serial R CMD BATCH --vanilla	../R/npglpreg_serial.R
 	sqsub -o npindexich_serial.out -r 2h -q serial R CMD BATCH --vanilla ../R/npindexich_serial.R
 	sqsub -o npindexks_serial.out -r 2h -q serial R CMD BATCH --vanilla ../R/npindexks_serial.R
 	sqsub -o npplreg_serial.out -r 2h -q serial R CMD BATCH --vanilla ../R/npplreg_serial.R

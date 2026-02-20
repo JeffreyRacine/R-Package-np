@@ -8,7 +8,6 @@ all:
 	R CMD BATCH --vanilla ../npcopula_serial.R
 	R CMD BATCH --vanilla ../npdeneqtest_serial.R
 	R CMD BATCH --vanilla ../npdeptest_serial.R
-	R CMD BATCH --vanilla ../npglpreg_serial.R
 	R CMD BATCH --vanilla ../npindexich_serial.R
 	R CMD BATCH --vanilla ../npindexks_serial.R
 	R CMD BATCH --vanilla ../npplreg_serial.R
