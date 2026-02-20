@@ -6,6 +6,12 @@
       packageStartupMessage("note: both 'npRmpi' and 'np' are attached; prefer explicit npRmpi:: calls to avoid masking ambiguity")
       options(npRmpi.conflicts.warned = TRUE)
     }
+    if (isTRUE(getOption("npRmpi.conflicts.warn", TRUE)) &&
+        ("package:Rmpi" %in% search()) &&
+        !isTRUE(getOption("npRmpi.conflicts.warned.rmpi", FALSE))) {
+      packageStartupMessage("note: both 'npRmpi' and 'Rmpi' are attached; prefer explicit npRmpi:: calls for estimator APIs")
+      options(npRmpi.conflicts.warned.rmpi = TRUE)
+    }
 }
 
 .onUnload <- function (lpath){
@@ -58,6 +64,15 @@
       options(npRmpi.conflicts.warn = TRUE)
     if (is.null(getOption("npRmpi.conflicts.warned")))
       options(npRmpi.conflicts.warned = FALSE)
+    if (is.null(getOption("npRmpi.conflicts.warned.rmpi")))
+      options(npRmpi.conflicts.warned.rmpi = FALSE)
+
+    setHook(packageEvent("np", "attach"),
+            function(...) try(npRmpi:::.npRmpi_warn_pkg_conflict_once(), silent = TRUE),
+            action = "append")
+    setHook(packageEvent("Rmpi", "attach"),
+            function(...) try(npRmpi:::.npRmpi_warn_rmpi_conflict_once(), silent = TRUE),
+            action = "append")
 
     return(invisible())
   }
@@ -100,4 +115,13 @@
     options(npRmpi.conflicts.warn = TRUE)
   if (is.null(getOption("npRmpi.conflicts.warned")))
     options(npRmpi.conflicts.warned = FALSE)
+  if (is.null(getOption("npRmpi.conflicts.warned.rmpi")))
+    options(npRmpi.conflicts.warned.rmpi = FALSE)
+
+  setHook(packageEvent("np", "attach"),
+          function(...) try(npRmpi:::.npRmpi_warn_pkg_conflict_once(), silent = TRUE),
+          action = "append")
+  setHook(packageEvent("Rmpi", "attach"),
+          function(...) try(npRmpi:::.npRmpi_warn_rmpi_conflict_once(), silent = TRUE),
+          action = "append")
 }

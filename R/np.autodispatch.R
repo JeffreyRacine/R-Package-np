@@ -15,6 +15,18 @@
   invisible(TRUE)
 }
 
+.npRmpi_warn_rmpi_conflict_once <- function() {
+  if (!isTRUE(getOption("npRmpi.conflicts.warn", TRUE)))
+    return(invisible(FALSE))
+  if (!("package:Rmpi" %in% search()))
+    return(invisible(FALSE))
+  if (isTRUE(getOption("npRmpi.conflicts.warned.rmpi", FALSE)))
+    return(invisible(TRUE))
+  warning("both packages 'npRmpi' and 'Rmpi' are attached: prefer explicit npRmpi:: calls in user code to avoid dispatch ambiguity")
+  options(npRmpi.conflicts.warned.rmpi = TRUE)
+  invisible(TRUE)
+}
+
 .npRmpi_bcast_cmd_expr <- function(expr, comm = 1L, caller.execute = TRUE) {
   eval(substitute(mpi.bcast.cmd(cmd = EXPR, comm = COMM, caller.execute = CE),
                   list(EXPR = expr, COMM = comm, CE = caller.execute)),
@@ -262,6 +274,7 @@
 
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
+  .npRmpi_warn_rmpi_conflict_once()
   if (!.npRmpi_autodispatch_active())
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
