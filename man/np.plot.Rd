@@ -741,10 +741,10 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   type.
 
   For \code{npRmpi}, plotting calls that request bootstrap errors
-  (i.e. \code{plot.errors.method="bootstrap"}) should be run with
-  explicit broadcast execution, e.g.
-  \code{mpi.bcast.cmd(plot(..., plot.errors.method="bootstrap"), caller.execute=TRUE)}.
-  This path is not currently supported by \code{npRmpi.autodispatch}.
+  (i.e. \code{plot.errors.method="bootstrap"}) are supported with
+  \code{npRmpi.autodispatch=TRUE}. Explicit broadcast execution, e.g.
+  \code{mpi.bcast.cmd(plot(..., plot.errors.method="bootstrap"), caller.execute=TRUE)},
+  may still be preferable for heavy bootstrap workloads.
 }
 
 \examples{

@@ -47,6 +47,13 @@
     determine whether plotting layout is automatically managed via
     \code{par(mfrow=...)}. If \code{NULL} (default behavior), \pkg{npRmpi} uses
     its internal plotting defaults.
+
+    \item \code{npRmpi.autodispatch} (logical): when \code{TRUE}, eligible
+    \code{np*} calls are auto-dispatched across MPI ranks without explicit
+    \code{mpi.bcast.cmd(...)} wrapping. Default is \code{FALSE}.
+    For formula interfaces under autodispatch, provide explicit
+    \code{data=} (or explicit \code{xdat}/\code{ydat}-style arguments) to
+    avoid unresolved-symbol failures on slave ranks.
   }
 
   Option values can be set globally via \code{\link{options}} and restored

@@ -300,7 +300,11 @@ Below is the same code modified to run in parallel using the
 
   \item Guarded exceptions still require explicit
     \code{mpi.bcast.cmd(..., caller.execute=TRUE)} (currently
-    \code{npsigtest()} and bootstrap-error plotting paths).
+    \code{npsigtest()}).
+
+  \item Bootstrap-error plotting is supported under autodispatch;
+    explicit \code{mpi.bcast.cmd(plot(...), caller.execute=TRUE)}
+    remains a useful option for heavy bootstrap workloads.
       
     \item There are a number of example files (including that above
       and below) in the \code{npRmpi/demo} directory that you may wish
