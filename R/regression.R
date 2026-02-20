@@ -113,7 +113,6 @@ predict.npregression <- function(object, se.fit = FALSE, ...) {
   else
     return(fitted(tr))
 }
-plot.npregression <- function(x, ...) { .np_plot_npregression(x, ...) }
 
 summary.npregression <- function(object, ...) {
   cat("\nRegression Data: ", object$ntrain, " training points,",

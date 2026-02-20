@@ -192,6 +192,5 @@ summary.dbandwidth <- function(object, ...) {
   cat("\n\n")
 }
 
-plot.dbandwidth <- function(...) { .np_plot_dbandwidth(...) }
 
 predict.dbandwidth <- function(...) { eval(npudist(...), envir =parent.frame()) }

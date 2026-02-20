@@ -59,7 +59,6 @@ fitted.npdistribution <- function(object, ...){
  object$dist 
 }
 se.npdistribution <- function(x){ x$derr }
-plot.npdistribution <- function(x, ...) { .np_plot_npdistribution(x, ...) }
 
 predict.npdistribution <- function(object, se.fit = FALSE, ...) {
   tr <- eval(npudist(bws = object$bws, ...), envir = parent.frame())

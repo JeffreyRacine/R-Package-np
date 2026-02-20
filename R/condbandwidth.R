@@ -275,7 +275,6 @@ print.condbandwidth <- function(x, digits=NULL, ...){
   invisible(x)
 }
 
-plot.condbandwidth <- function(...) { .np_plot_condbandwidth(...) }
 
 summary.condbandwidth <- function(object, ...) {
   cat("\nConditional distribution data (",object$nobs," observations, ",

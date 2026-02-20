@@ -92,7 +92,6 @@ predict.condensity <- function(object, se.fit = FALSE, ...) {
 }
 
 
-plot.condensity <- function(x, ...) { .np_plot_condensity(x, ...) }
 
 summary.condensity <- function(object, ...){
   cat("\nConditional Density Data: ", object$ntrain, " training points,",

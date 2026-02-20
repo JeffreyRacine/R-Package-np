@@ -215,7 +215,6 @@ print.rbandwidth <- function(x, digits=NULL, ...){
 }
 
 
-plot.rbandwidth <- function(...) { .np_plot_rbandwidth(...) }
 predict.rbandwidth <- function(...) { eval(npreg(...), envir = parent.frame()) }
 
 summary.rbandwidth <- function(object, ...){
