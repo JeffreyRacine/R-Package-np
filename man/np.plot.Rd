@@ -739,6 +739,12 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   \code{\link{cbind}}, since \code{\link{cbind}} will typically not work as
   intended on mixed data types and will coerce the data to the same
   type.
+
+  For \code{npRmpi}, plotting calls that request bootstrap errors
+  (i.e. \code{plot.errors.method="bootstrap"}) should be run with
+  explicit broadcast execution, e.g.
+  \code{mpi.bcast.cmd(plot(..., plot.errors.method="bootstrap"), caller.execute=TRUE)}.
+  This path is not currently supported by \code{npRmpi.autodispatch}.
 }
 
 \examples{

@@ -138,6 +138,13 @@ plotFactor <- function(f, y, ...){
   points(x = f, y = y)
 }
 
+.npRmpi_guard_bootstrap_plot_autodispatch <- function(plot.errors.method,
+                                                      where = "plot()") {
+  if (.npRmpi_autodispatch_active() && identical(plot.errors.method, "bootstrap")) {
+    stop(sprintf("%s with plot.errors.method='bootstrap' does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
+  }
+}
+
 ## Rank-based simultaneous confidence set helper, vendored from
 ## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
 np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {
@@ -1219,6 +1226,7 @@ npplot.rbandwidth <-
     
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
@@ -1941,6 +1949,7 @@ npplot.scbandwidth <-
     
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
@@ -2763,6 +2772,7 @@ npplot.plbandwidth <-
     
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
@@ -3491,6 +3501,7 @@ npplot.bandwidth <-
 
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
@@ -4136,6 +4147,7 @@ npplot.dbandwidth <-
 
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
@@ -4796,6 +4808,7 @@ npplot.conbandwidth <-
     
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
@@ -5705,6 +5718,7 @@ npplot.condbandwidth <-
     
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
@@ -6589,6 +6603,7 @@ npplot.sibandwidth <-
 
     plot.behavior = match.arg(plot.behavior)
     plot.errors.method = match.arg(plot.errors.method)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method = match.arg(plot.errors.boot.method)
     plot.errors.center = match.arg(plot.errors.center)
     plot.errors.type = match.arg(plot.errors.type)
