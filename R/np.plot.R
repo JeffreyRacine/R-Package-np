@@ -693,32 +693,59 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
+                                              where = "compute.bootstrap.errors(...)",
+                                              allow.direct.bootstrap = TRUE)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
+    use.payload <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast()
+
     is.inid = plot.errors.boot.method=="inid"
 
-    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-    strt = ifelse(is.inid, "tdat = xdat[indices,],",
-      "tdat = tsb,")
+    if (use.payload) {
+      idx.mat <- .npRmpi_bootstrap_make_indices(
+        n = nrow(xdat),
+        boot.num = plot.errors.boot.num,
+        boot.method = plot.errors.boot.method,
+        boot.blocklen = plot.errors.boot.blocklen)
 
-    
-    boofun = eval(parse(text=paste(strf,
-                          ifelse(cdf, "npudist(", "npudens("),
-                          strt,
-                          "edat = exdat, bws = bws)$",
-                          ifelse(cdf, "dist", "dens"),
-                          "}", sep="")))
-
-    if (is.inid) {
-      boot.out = boot(data = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num)
+      payload <- list(
+        family = if (cdf) "npudist" else "npudens",
+        xdat = xdat,
+        exdat = exdat,
+        bws = .npRmpi_autodispatch_untag(bws),
+        out.field = if (cdf) "dist" else "dens",
+        out.index = NULL,
+        indices = idx.mat
+      )
+      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
+      boot.out$t0 <- as.numeric(boot.out$t0)
+      boot.out$t <- as.matrix(boot.out$t)
     } else {
-      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+      strt = ifelse(is.inid, "tdat = xdat[indices,],",
+        "tdat = tsb,")
+
+      
+      boofun = eval(parse(text=paste(strf,
+                            ifelse(cdf, "npudist(", "npudens("),
+                            strt,
+                            "edat = exdat, bws = bws)$",
+                            ifelse(cdf, "dist", "dens"),
+                            "}", sep="")))
+
+      if (is.inid) {
+        boot.out = boot(data = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -788,28 +815,55 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap", where = "compute.bootstrap.errors(...)")
+    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
+                                              where = "compute.bootstrap.errors(...)",
+                                              allow.direct.bootstrap = TRUE)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
+    use.payload <- .npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast()
+
     is.inid = plot.errors.boot.method=="inid"
 
-    strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
-    strt = ifelse(is.inid, "tdat = xdat[indices,],",
-      "tdat = tsb,")
+    if (use.payload) {
+      idx.mat <- .npRmpi_bootstrap_make_indices(
+        n = nrow(xdat),
+        boot.num = plot.errors.boot.num,
+        boot.method = plot.errors.boot.method,
+        boot.blocklen = plot.errors.boot.blocklen)
 
-    
-    boofun = eval(parse(text=paste(strf, "npudist(",
-                          strt, "edat = exdat, bws = bws)$dist}", sep="")))
-
-    if (is.inid) {
-      boot.out = boot(data = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num)
+      payload <- list(
+        family = "npudist",
+        xdat = xdat,
+        exdat = exdat,
+        bws = .npRmpi_autodispatch_untag(bws),
+        out.field = "dist",
+        out.index = NULL,
+        indices = idx.mat
+      )
+      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
+      boot.out$t0 <- as.numeric(boot.out$t0)
+      boot.out$t <- as.matrix(boot.out$t)
     } else {
-      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+      strf = ifelse(is.inid, "function(data,indices){", "function(tsb){")
+      strt = ifelse(is.inid, "tdat = xdat[indices,],",
+        "tdat = tsb,")
+
+      
+      boofun = eval(parse(text=paste(strf, "npudist(",
+                            strt, "edat = exdat, bws = bws)$dist}", sep="")))
+
+      if (is.inid) {
+        boot.out = boot(data = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -2160,9 +2214,7 @@ npplot.scbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
-                                              where = "plot(...)",
-                                              allow.direct.bootstrap = TRUE)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
@@ -2976,9 +3028,7 @@ npplot.plbandwidth <-
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
-                                              where = "plot(...)",
-                                              allow.direct.bootstrap = TRUE)
+    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method, where = "plot(...)")
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center

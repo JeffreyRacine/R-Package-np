@@ -531,6 +531,14 @@
           tau = p$tau,
           bws = p$bws,
           gradients = p$gradients)),
+        npudens = suppressWarnings(npudens(
+          tdat = p$xdat[ix, , drop = FALSE],
+          edat = p$exdat,
+          bws = p$bws)),
+        npudist = suppressWarnings(npudist(
+          tdat = p$xdat[ix, , drop = FALSE],
+          edat = p$exdat,
+          bws = p$bws)),
         stop("unsupported bootstrap payload family"))
     }
 

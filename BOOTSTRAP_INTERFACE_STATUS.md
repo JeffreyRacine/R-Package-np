@@ -9,7 +9,7 @@ This note summarizes what has been learned while migrating `npRmpi` from explici
 1. Core autodispatch workflow works for major `np*` calls.
 2. `npsigtest` direct autodispatch now works in smoke tests (`boot.num=19`).
 3. Non-bootstrap plotting works in direct autodispatch.
-4. `npregression`, `condensity`, and `condistribution` bootstrap plotting now work in direct autodispatch via payload bootstrap engine.
+4. `npregression`, `npdensity`, `npdistribution`, `condensity`, and `condistribution` bootstrap plotting now work in direct autodispatch via payload bootstrap engine.
 5. Remaining bootstrap plotting families still use explicit manual broadcast:
    - `mpi.bcast.cmd(plot(..., plot.errors.method="bootstrap"), caller.execute=TRUE)`
 
@@ -33,7 +33,7 @@ This note summarizes what has been learned while migrating `npRmpi` from explici
 
 ## Problems Still Open
 
-1. Direct autodispatch bootstrap plotting remains unresolved outside `rbandwidth`/`conbandwidth`/`condbandwidth`.
+1. Direct autodispatch bootstrap plotting remains unresolved outside `rbandwidth`/`bandwidth`/`dbandwidth`/`conbandwidth`/`condbandwidth`.
 2. There is still at least one unresolved bridge issue between:
    - autodispatch-created bandwidth/object state, and
    - manual-style distributed bootstrap compute for remaining non-payload plot paths.
@@ -66,13 +66,13 @@ This note summarizes what has been learned while migrating `npRmpi` from explici
 2. Plot policy refinement:
    - non-bootstrap direct autodispatch supported.
    - bootstrap plot explicitly guarded with clear remediation message for non-`rbandwidth` paths.
-3. `rbandwidth`/`conbandwidth`/`condbandwidth` bootstrap payload engine:
-   - synchronized payload bootstrap loop now drives direct autodispatch bootstrap for `plot.npregression`, `plot.condensity`, and `plot.condistribution`,
+3. `rbandwidth`/`bandwidth`/`dbandwidth`/`conbandwidth`/`condbandwidth` bootstrap payload engine:
+   - synchronized payload bootstrap loop now drives direct autodispatch bootstrap for `plot.npregression`, `plot.npdensity`, `plot.npdistribution`, `plot.condensity`, and `plot.condistribution`,
    - smoke-tested under `npRmpi.autodispatch=TRUE` with small bootstrap counts.
 
 ## Best Current Strategy
 
-1. Continue staged migration by method family (`rbandwidth`, `conbandwidth`, `condbandwidth` now enabled).
+1. Continue staged migration by method family (`rbandwidth`, `bandwidth`, `dbandwidth`, `conbandwidth`, `condbandwidth` now enabled).
 2. Keep stable guard for all remaining direct bootstrap plotting until each method gets a payload path.
 3. Build a dedicated synchronized bootstrap compute helper (single execution model):
    - one MPI layer
@@ -86,7 +86,7 @@ This note summarizes what has been learned while migrating `npRmpi` from explici
 
 1. For now, use:
    - direct autodispatch for non-bootstrap plotting and estimators,
-   - direct autodispatch bootstrap plotting for `npregression`, `condensity`, and `condistribution`,
+   - direct autodispatch bootstrap plotting for `npregression`, `npdensity`, `npdistribution`, `condensity`, and `condistribution`,
    - explicit `mpi.bcast.cmd(...)` for bootstrap plotting in remaining method families.
 2. For significance testing:
    - direct `npsigtest` autodispatch path is now available (smoke-tested).
