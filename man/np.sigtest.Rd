@@ -160,11 +160,10 @@ npsigtest(bws, \dots)
   multivariate local linear estimator due to substantial size
   distortions that may arise in certain cases.
 
-  For \code{npRmpi}, \code{npsigtest} currently requires explicit MPI
-  broadcast execution via \code{mpi.bcast.cmd(..., caller.execute=TRUE)}
-  (it is not yet supported by \code{npRmpi.autodispatch}). This is a
-  temporary policy while significance-testing code is being rebuilt on
-  the new dispatch architecture.
+  For \code{npRmpi}, \code{npsigtest} supports direct execution when
+  \code{options(npRmpi.autodispatch=TRUE)} is enabled. In that mode,
+  users can call \code{npregbw}, \code{npreg}, and \code{npsigtest}
+  directly without wrapping calls in \code{mpi.bcast.cmd(...)}.
   
 }  
 
@@ -245,8 +244,8 @@ npsigtest(bws, \dots)
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
 
-mpi.bcast.cmd(set.seed(42),
-              caller.execute=TRUE)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+set.seed(42)
 
 ## Significance testing with z irrelevant
 
@@ -259,16 +258,12 @@ y <- x1 + x2 + rnorm(n)
 mydat <- data.frame(z,x1,x2,y)
 rm(z,x1,x2,y)
 
-mpi.bcast.Robj2slave(mydat)
+model <- npreg(y~z+x1+x2,
+               regtype="ll",
+               bwmethod="cv.aic",
+               data=mydat)
 
-mpi.bcast.cmd(model <- npreg(y~z+x1+x2,
-                             regtype="ll",
-                             bwmethod="cv.aic",
-                             data=mydat),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(output <- npsigtest(model,boot.num=29),
-              caller.execute=TRUE)
+output <- npsigtest(model,boot.num=29)
 
 summary(output)
 
