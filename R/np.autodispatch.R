@@ -33,6 +33,11 @@
        envir = parent.frame())
 }
 
+.npRmpi_bcast_robj_by_name <- function(name, caller_env = parent.frame()) {
+  expr <- parse(text = sprintf("mpi.bcast.Robj2slave(%s)", name))[[1L]]
+  eval(expr, envir = caller_env)
+}
+
 .npRmpi_autodispatch_active <- function() {
   isTRUE(getOption("npRmpi.autodispatch", FALSE)) &&
     !isTRUE(getOption("npRmpi.autodispatch.disable", FALSE))
@@ -209,9 +214,7 @@
     idx <- idx + 1L
     tmp <- sprintf(".__npRmpi_autod_%s_%d", nm, idx)
     assign(tmp, val, envir = .GlobalEnv)
-    cmd.assign <- substitute(assign(TMP, VAL, envir = .GlobalEnv),
-                             list(TMP = tmp, VAL = val))
-    .npRmpi_bcast_cmd_expr(cmd.assign, comm = comm, caller.execute = FALSE)
+    .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
 
     out[[i]] <- as.name(tmp)
     tmpnames <- c(tmpnames, tmp)
@@ -353,9 +356,7 @@
       val <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
       prepared$tmpvals[[nm]] <- val
       assign(nm, val, envir = .GlobalEnv)
-      cmd.assign <- substitute(assign(TMP, VAL, envir = .GlobalEnv),
-                               list(TMP = nm, VAL = val))
-      .npRmpi_bcast_cmd_expr(cmd.assign, comm = comm, caller.execute = FALSE)
+      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
     }
   }
 
@@ -403,6 +404,15 @@
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
   on.exit(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm), add = TRUE)
 
+  if (length(prepared$tmpnames)) {
+    for (nm in prepared$tmpnames) {
+      val <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
+      prepared$tmpvals[[nm]] <- val
+      assign(nm, val, envir = .GlobalEnv)
+      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
+    }
+  }
+
   cmd <- substitute({
     old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
     old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
@@ -422,4 +432,103 @@
     return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto"))
 
   .npRmpi_autodispatch_tag_result(result, mode = "auto")
+}
+
+.npRmpi_bootstrap_make_indices <- function(n,
+                                           boot.num,
+                                           boot.method = c("inid", "fixed", "geom"),
+                                           boot.blocklen = NULL) {
+  boot.method <- match.arg(boot.method)
+
+  if (!is.numeric(n) || length(n) != 1L || is.na(n) || n < 2L)
+    stop("invalid bootstrap sample size")
+  if (!is.numeric(boot.num) || length(boot.num) != 1L || is.na(boot.num) || boot.num < 1L)
+    stop("invalid bootstrap replication count")
+
+  n <- as.integer(n)
+  boot.num <- as.integer(boot.num)
+
+  if (boot.method == "inid") {
+    idx <- matrix(sample.int(n, size = n * boot.num, replace = TRUE),
+                  nrow = boot.num, ncol = n)
+    return(idx)
+  }
+
+  if (is.null(boot.blocklen) || !is.numeric(boot.blocklen) ||
+      length(boot.blocklen) != 1L || is.na(boot.blocklen) || boot.blocklen < 1)
+    stop("invalid block length for bootstrap method")
+
+  boot.blocklen <- as.integer(boot.blocklen)
+  idx.ts <- tsboot(tseries = seq_len(n),
+                   statistic = function(tsb) tsb,
+                   R = boot.num,
+                   l = boot.blocklen,
+                   sim = boot.method)
+  idx <- idx.ts$t
+  if (!is.matrix(idx))
+    idx <- matrix(idx, nrow = boot.num, byrow = TRUE)
+  storage.mode(idx) <- "integer"
+  idx
+}
+
+.npRmpi_bootstrap_compute_payload <- function(payload, comm = 1L) {
+  .npRmpi_require_active_slave_pool(comm = comm, where = "bootstrap payload computation")
+
+  if (!is.list(payload))
+    stop("bootstrap payload must be a list")
+
+  tmp <- ".__npRmpi_boot_payload"
+  assign(tmp, payload, envir = .GlobalEnv)
+  .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
+  on.exit({
+    rm(list = tmp, envir = .GlobalEnv)
+    cmd.rm <- substitute(rm(list = TMP, envir = .GlobalEnv), list(TMP = tmp))
+    .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
+  }, add = TRUE)
+
+  cmd <- substitute({
+    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+    options(npRmpi.autodispatch.context = TRUE)
+    options(npRmpi.autodispatch.disable = TRUE)
+    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+
+    p <- .__npRmpi_boot_payload
+    n <- nrow(p$xdat)
+    B <- nrow(p$indices)
+    comp <- if (isTRUE(p$gradients)) "grad" else "mean"
+
+    base.fit <- suppressWarnings(npreg(txdat = p$xdat,
+                                       tydat = p$ydat,
+                                       exdat = p$exdat,
+                                       bws = p$bws,
+                                       gradients = p$gradients,
+                                       gradient.order = p$gradient.order,
+                                       warn.glp.gradient = FALSE))
+    t0 <- if (isTRUE(p$gradients))
+      base.fit$grad[, p$slice.index]
+    else
+      base.fit$mean
+
+    t.mat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+    for (b in seq_len(B)) {
+      idx <- as.integer(p$indices[b, ])
+      fit.b <- suppressWarnings(npreg(txdat = p$xdat[idx, , drop = FALSE],
+                                      tydat = p$ydat[idx],
+                                      exdat = p$exdat,
+                                      bws = p$bws,
+                                      gradients = p$gradients,
+                                      gradient.order = p$gradient.order,
+                                      warn.glp.gradient = FALSE))
+      t.mat[b, ] <- if (isTRUE(p$gradients))
+        fit.b$grad[, p$slice.index]
+      else
+        fit.b$mean
+    }
+
+    list(t0 = as.numeric(t0), t = t.mat)
+  })
+
+  .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 }

@@ -2,6 +2,7 @@
   bws <- object[[slot]]
   if (is.null(bws))
     stop("plot object does not contain expected bandwidth slot")
+  bws <- .npRmpi_autodispatch_untag(bws)
   npplot(bws = bws, ...)
 }
 
