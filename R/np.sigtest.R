@@ -640,20 +640,13 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
 
   tbw <- eval.parent(sc.bw)
   
-  ## convention: drop 'bws' and up to two unnamed arguments (including bws)
-  if(no.bws){
-    tx.str <- ",xdat = xdat"
-    ty.str <- ",ydat = ydat"
-  } else {
-    tx.str <- ifelse(xdat.named, ",xdat = xdat","")
-    ty.str <- ifelse(ydat.named, ",ydat = ydat","")
-    if((!bws.named) && (!xdat.named)){
-      ty.str <- ifelse(ydat.named, ",ydat = ydat",
-                       ifelse(no.ydat,"",",ydat"))
-    }
-  }
+  call.args <- list(bws = tbw)
+  if(!no.xdat)
+    call.args$xdat <- xdat
+  if(!no.ydat)
+    call.args$ydat <- ydat
 
-  ev <- eval(parse(text=paste("npsigtest(bws = tbw", tx.str, ty.str, ",...)")))
+  ev <- do.call("npsigtest", c(call.args, list(...)))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()
