@@ -347,20 +347,16 @@ npksum(\dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 n <- 100000
 x <- rnorm(n)
 x.eval <- seq(-4, 4, length=50)
 
-mpi.bcast.Robj2slave(x)
-mpi.bcast.Robj2slave(x.eval)
+bw <- npudensbw(dat=x, bwmethod="normal-reference")
 
-mpi.bcast.cmd(bw <- npudensbw(dat=x, bwmethod="normal-reference"),
-              caller.execute=TRUE)
-
-mpi.bcast.cmd(den.ksum <- npksum(txdat=x, exdat=x.eval, bws=bw$bw,
-                   bandwidth.divide=TRUE)$ksum/n,
-              caller.execute=TRUE)
+den.ksum <- npksum(txdat=x, exdat=x.eval, bws=bw$bw,
+                   bandwidth.divide=TRUE)$ksum/n
 
 den.ksum
 

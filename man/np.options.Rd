@@ -62,15 +62,16 @@
 \examples{
 \dontrun{
 npRmpi.start(nslaves=1)
+options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
-mpi.bcast.cmd(old <- options(
+old <- options(
   np.tree = TRUE,
   np.messages = FALSE,
   np.largeh.rel.tol = 1e-3,
   np.disc.upper.rel.tol = 1e-2,
   np.groupcv.fast = TRUE
-), caller.execute=TRUE)
-on.exit(mpi.bcast.cmd(options(old), caller.execute=TRUE), add = TRUE)
+)
+on.exit(options(old), add = TRUE)
 on.exit(npRmpi.stop(force=TRUE), add = TRUE)
 
 ## ... run bandwidth selection / estimation ...
