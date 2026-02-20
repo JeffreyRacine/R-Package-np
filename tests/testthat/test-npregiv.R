@@ -10,11 +10,8 @@ test_that("npregiv basic functionality works", {
   y <- w^2 + rnorm(n, sd=0.1) # outcome
   
   mydat <- data.frame(y, w, z)
-  mpi.bcast.Robj2slave(mydat)
-
   # Let's try a very small example
-  mpi.bcast.cmd(model <- npregiv(y=y, w=w, z=z, method="Landweber-Fridman", iterate.max=10),
-                caller.execute=TRUE)
+  model <- npregiv(y=y, w=w, z=z, method="Landweber-Fridman", iterate.max=10)
   
   expect_s3_class(model, "npregiv")
   expect_true("phi" %in% names(model))
@@ -32,11 +29,8 @@ test_that("npregivderiv basic functionality works", {
   y <- z^2 + rnorm(n, sd=0.1)
   
   mydat <- data.frame(y, z, w)
-  mpi.bcast.Robj2slave(mydat)
-
   # Just check if it runs
-  mpi.bcast.cmd(model <- npregivderiv(y=y, z=z, w=w, iterate.max=2),
-                caller.execute=TRUE)
+  model <- npregivderiv(y=y, z=z, w=w, iterate.max=2)
   expect_s3_class(model, "npregivderiv")
   expect_true("phi.prime" %in% names(model))
   expect_false(is.null(model$call))

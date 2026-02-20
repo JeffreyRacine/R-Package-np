@@ -147,6 +147,7 @@
     }
   }
   tmpnames <- character(0)
+  tmpvals <- list()
   idx <- 0L
 
   for (i in seq_along(arg.list)) {
@@ -165,9 +166,10 @@
 
     out[[i]] <- as.name(tmp)
     tmpnames <- c(tmpnames, tmp)
+    tmpvals[[tmp]] <- val
   }
 
-  list(call = out, tmpnames = unique(tmpnames))
+  list(call = out, tmpnames = unique(tmpnames), tmpvals = tmpvals)
 }
 
 .npRmpi_autodispatch_cleanup <- function(tmpnames, comm = 1L) {
@@ -178,6 +180,44 @@
                        list(TMPS = tmpnames))
   .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
   invisible(TRUE)
+}
+
+.npRmpi_autodispatch_replace_tmps <- function(x, tmpvals) {
+  if (!length(tmpvals))
+    return(x)
+
+  if (is.symbol(x)) {
+    nm <- as.character(x)
+    if (!is.null(tmpvals[[nm]]))
+      return(tmpvals[[nm]])
+    return(x)
+  }
+
+  if (is.call(x)) {
+    parts <- as.list(x)
+    parts <- lapply(parts, .npRmpi_autodispatch_replace_tmps, tmpvals = tmpvals)
+    return(as.call(parts))
+  }
+
+  if (is.pairlist(x)) {
+    parts <- as.list(x)
+    parts <- lapply(parts, .npRmpi_autodispatch_replace_tmps, tmpvals = tmpvals)
+    return(as.pairlist(parts))
+  }
+
+  if (inherits(x, "formula"))
+    return(x)
+
+  if (is.list(x)) {
+    for (i in seq_len(length(x))) {
+      xi <- try(x[[i]], silent = TRUE)
+      if (!inherits(xi, "try-error"))
+        x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
+    }
+    return(x)
+  }
+
+  x
 }
 
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
@@ -214,5 +254,6 @@
     eval(CALL, envir = .GlobalEnv)
   }, list(CALL = prepared$call))
 
-  .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
+  result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
+  .npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals)
 }

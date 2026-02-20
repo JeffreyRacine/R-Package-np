@@ -10,14 +10,11 @@ test_that("npindex basic functionality works", {
   y <- (x1 + x2)^2 + rnorm(n, sd=0.1)
   
   mydat <- data.frame(y, x1, x2)
-  mpi.bcast.Robj2slave(mydat)
-
   # Optimization might be slow, but for n=100 it should be okay.
   # Using a formula interface
-  mpi.bcast.cmd(bw <- npindexbw(y~x1+x2, data=mydat, method="ichimura", nmulti=1),
-                caller.execute=TRUE)
+  bw <- npindexbw(y~x1+x2, data=mydat, method="ichimura", nmulti=1)
   
-  mpi.bcast.cmd(model <- npindex(bws=bw), caller.execute=TRUE)
+  model <- npindex(bws=bw)
   
   expect_s3_class(model, "singleindex")
   expect_type(predict(model), "double")

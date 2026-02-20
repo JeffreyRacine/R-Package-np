@@ -4,15 +4,12 @@ test_that("npqreg basic functionality works", {
 
   data("cps71")
   cps71_sub <- cps71[1:50, ]
-  mpi.bcast.Robj2slave(cps71_sub)
-  
   # Quantile regression needs a condbandwidth object
-  mpi.bcast.cmd(bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
-                                bws=c(0.5, 5), bandwidth.compute=FALSE),
-                caller.execute=TRUE)
+  bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
+                                bws=c(0.5, 5), bandwidth.compute=FALSE)
   
   # Median regression
-  mpi.bcast.cmd(model <- npqreg(bws=bw, tau=0.5), caller.execute=TRUE)
+  model <- npqreg(bws=bw, tau=0.5)
   
   expect_s3_class(model, "qregression")
   expect_type(predict(model), "double")
@@ -28,12 +25,9 @@ test_that("npqreg works with multiple taus", {
 
   data("cps71")
   cps71_sub <- cps71[1:30, ]
-  mpi.bcast.Robj2slave(cps71_sub)
-
-  mpi.bcast.cmd(bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
-                                bws=c(0.5, 5), bandwidth.compute=FALSE),
-                caller.execute=TRUE)
+  bw <- npcdistbw(xdat=cps71_sub$age, ydat=cps71_sub$logwage, 
+                                bws=c(0.5, 5), bandwidth.compute=FALSE)
   
-  mpi.bcast.cmd(model_q25 <- npqreg(bws=bw, tau=0.25), caller.execute=TRUE)
+  model_q25 <- npqreg(bws=bw, tau=0.25)
   expect_equal(model_q25$tau, 0.25)
 })

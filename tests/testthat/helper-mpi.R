@@ -4,10 +4,14 @@ spawn_mpi_slaves <- function(n=1) {
     return(FALSE)
   }
 
+  options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+
   # Prefer the higher-level helper if available.
   if (exists("npRmpi.start", mode="function")) {
     ok <- try({
       npRmpi.start(nslaves=n, needlog=FALSE)
+      mpi.bcast.cmd(options(npRmpi.autodispatch = TRUE, np.messages = FALSE),
+                    caller.execute = TRUE)
       TRUE
     }, silent=TRUE)
     return(isTRUE(ok) && isTRUE(try(mpi.comm.size(1) > 1, silent=TRUE)))
@@ -24,6 +28,10 @@ spawn_mpi_slaves <- function(n=1) {
   }
 
   ok <- try(mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE), silent=TRUE)
+  if (!inherits(ok, "try-error")) {
+    try(mpi.bcast.cmd(options(npRmpi.autodispatch = TRUE, np.messages = FALSE),
+                      caller.execute = TRUE), silent = TRUE)
+  }
   !inherits(ok, "try-error")
 }
 

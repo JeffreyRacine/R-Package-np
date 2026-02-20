@@ -10,12 +10,9 @@ test_that("npscoef basic functionality works", {
   y <- (x1^2) * z1 + rnorm(n, sd=0.1)
   
   mydat <- data.frame(y, x1, z1)
-  mpi.bcast.Robj2slave(mydat)
-
-  mpi.bcast.cmd(bw <- npscoefbw(xdat=x1, zdat=z1, ydat=y, bws=0.1, bandwidth.compute=FALSE),
-                caller.execute=TRUE)
+  bw <- npscoefbw(xdat=x1, zdat=z1, ydat=y, bws=0.1, bandwidth.compute=FALSE)
   
-  mpi.bcast.cmd(model <- npscoef(bws=bw), caller.execute=TRUE)
+  model <- npscoef(bws=bw)
   
   expect_s3_class(model, "smoothcoefficient")
   expect_type(predict(model), "double")

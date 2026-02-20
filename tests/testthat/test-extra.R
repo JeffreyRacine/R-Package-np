@@ -10,14 +10,11 @@ test_that("npconmode basic functionality works", {
   x <- faithful$waiting[1:50]
   
   mydat <- data.frame(y, x)
-  mpi.bcast.Robj2slave(mydat)
-
   # bws[1] is for ydat (discrete), bws[2] is for xdat (continuous)
-  mpi.bcast.cmd(bw <- npcdensbw(xdat=x, ydat=y, 
-                                bws=c(0.1, 5), bandwidth.compute=FALSE),
-                caller.execute=TRUE)
+  bw <- npcdensbw(xdat=x, ydat=y, 
+                                bws=c(0.1, 5), bandwidth.compute=FALSE)
   
-  mpi.bcast.cmd(mode_fit <- npconmode(bws=bw), caller.execute=TRUE)
+  mode_fit <- npconmode(bws=bw)
   
   expect_s3_class(mode_fit, "conmode")
   expect_type(fitted(mode_fit), "double")
@@ -29,14 +26,10 @@ test_that("npquantile basic functionality works", {
 
   data("faithful")
   x <- faithful$waiting[1:50]
-  mpi.bcast.Robj2slave(x)
-
-  mpi.bcast.cmd(bw <- npudistbw(dat=x, bws=5, bandwidth.compute=FALSE),
-                caller.execute=TRUE)
+  bw <- npudistbw(dat=x, bws=5, bandwidth.compute=FALSE)
   
   # npquantile is for unconditional quantile
-  mpi.bcast.cmd(q <- npquantile(x, bws=bw, tau=c(0.25, 0.5, 0.75)),
-                caller.execute=TRUE)
+  q <- npquantile(x, bws=bw, tau=c(0.25, 0.5, 0.75))
   
   expect_type(q, "double")
   expect_length(q, 3)

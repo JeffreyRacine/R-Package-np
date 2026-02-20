@@ -80,7 +80,9 @@ npsigtest.rbandwidth <- function(bws,
                                  random.seed = 42,
                                  ...) {
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
-  if (.npRmpi_autodispatch_active())
+  if (.npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast())
     stop("npsigtest() does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(npsigtest(...), caller.execute=TRUE)")
 
   xdat <- toFrame(xdat)
@@ -593,7 +595,9 @@ npsigtest.rbandwidth <- function(bws,
 
 npsigtest.default <- function(bws, xdat, ydat, ...){
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
-  if (.npRmpi_autodispatch_active())
+  if (.npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast())
     stop("npsigtest() does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(npsigtest(...), caller.execute=TRUE)")
 
   sc <- sys.call()

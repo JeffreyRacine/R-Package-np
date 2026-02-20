@@ -1,6 +1,10 @@
 test_that("npsigtest basic functionality works", {
   # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  options(npRmpi.autodispatch = FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  mpi.bcast.cmd(options(npRmpi.autodispatch = FALSE), caller.execute = TRUE)
 
   set.seed(42)
   n <- 50 # Keep it small for speed

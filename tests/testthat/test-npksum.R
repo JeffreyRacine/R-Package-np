@@ -6,13 +6,10 @@ test_that("npksum numeric and formula interfaces agree", {
   x <- runif(n)
   y <- rnorm(n)
   dat <- data.frame(y = y, x = x)
-
-  mpi.bcast.Robj2slave(dat)
-
-  mpi.bcast.cmd({
+  {
     k1 <- npksum(txdat = dat$x, tydat = dat$y, bws = 0.5)
     k2 <- npksum(y ~ x, data = dat, bws = 0.5)
-  }, caller.execute = TRUE)
+  }
 
   expect_s3_class(k1, "npkernelsum")
   expect_s3_class(k2, "npkernelsum")
@@ -27,9 +24,9 @@ test_that("npksum preserves 1D exdat column naming", {
   x <- runif(n)
   ex <- seq(0, 1, length.out = 3)
 
-  mpi.bcast.cmd({
+  {
     k <- npksum(txdat = x, exdat = ex, bws = 0.5)
-  }, caller.execute = TRUE)
+  }
 
   expect_identical(colnames(k$eval), "exdat")
 })
