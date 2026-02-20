@@ -25,3 +25,27 @@ test_that("npsigtest basic functionality works", {
   expect_s3_class(sig, "sigtest")
   expect_output(summary(sig))
 })
+
+test_that("npsigtest formula path works under manual broadcast", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  options(npRmpi.autodispatch = FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  mpi.bcast.cmd(options(npRmpi.autodispatch = FALSE), caller.execute = TRUE)
+
+  set.seed(7)
+  n <- 40
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- x1 + rnorm(n, sd = 0.1)
+  mydat <- data.frame(y, x1, x2)
+  mpi.bcast.Robj2slave(mydat)
+
+  mpi.bcast.cmd(sig <- npsigtest(y ~ x1 + x2,
+                                 data = mydat,
+                                 boot.num = 9),
+                caller.execute = TRUE)
+
+  expect_s3_class(sig, "sigtest")
+  expect_true(is.numeric(sig$P))
+})
