@@ -194,21 +194,6 @@
   }
 
   if (is.call(x)) {
-    parts <- as.list(x)
-    parts <- lapply(parts, .npRmpi_autodispatch_replace_tmps, tmpvals = tmpvals)
-    return(as.call(parts))
-  }
-
-  if (is.pairlist(x)) {
-    parts <- as.list(x)
-    parts <- lapply(parts, .npRmpi_autodispatch_replace_tmps, tmpvals = tmpvals)
-    return(as.pairlist(parts))
-  }
-
-  if (inherits(x, "formula"))
-    return(x)
-
-  if (is.list(x)) {
     for (i in seq_len(length(x))) {
       xi <- try(x[[i]], silent = TRUE)
       if (!inherits(xi, "try-error"))
@@ -216,6 +201,18 @@
     }
     return(x)
   }
+
+  if (is.pairlist(x)) {
+    for (i in seq_len(length(x))) {
+      xi <- try(x[[i]], silent = TRUE)
+      if (!inherits(xi, "try-error"))
+        x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
+    }
+    return(x)
+  }
+
+  if (inherits(x, "formula"))
+    return(x)
 
   x
 }
@@ -255,5 +252,14 @@
   }, list(CALL = prepared$call))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
-  .npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals)
+
+  if (is.list(result) && !is.null(result$call)) {
+    result$call <- .npRmpi_autodispatch_replace_tmps(result$call, tmpvals = prepared$tmpvals)
+    return(result)
+  }
+
+  if (is.call(result))
+    return(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals))
+
+  result
 }
