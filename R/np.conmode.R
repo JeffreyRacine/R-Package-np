@@ -77,6 +77,8 @@ npconmode.conbandwidth <-
             tydat = stop("invoked without training data 'tydat'"),
             exdat, eydat,
             ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     txdat = toFrame(txdat)
     tydat = toFrame(tydat)
@@ -191,6 +193,9 @@ npconmode.conbandwidth <-
   }
 
 npconmode.default <- function(bws, txdat, tydat, ...){
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   sc <- sys.call()
   sc.names <- names(sc)
 

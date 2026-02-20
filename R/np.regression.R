@@ -106,6 +106,8 @@ npreg.rbandwidth <-
            exdat, eydat, gradients = FALSE, gradient.order = 1L,
            residuals = FALSE,
            ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)
@@ -406,6 +408,8 @@ npreg.rbandwidth <-
   }
 
 npreg.default <- function(bws, txdat, tydat, ...){
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()
   sc.names <- names(sc)
 

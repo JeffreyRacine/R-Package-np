@@ -67,6 +67,8 @@ npindexbw.NULL <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
            bws, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat <- toFrame(xdat)
 
@@ -94,6 +96,8 @@ npindexbw.default <-
            bws, bandwidth.compute = TRUE,
            nmulti, random.seed, optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit, only.optimize.beta, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat <- toFrame(xdat)
 
@@ -156,6 +160,8 @@ npindexbw.sibandwidth <-
            optim.maxit = 500,
            only.optimize.beta = FALSE,
            ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## Save seed prior to setting
 

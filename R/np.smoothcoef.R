@@ -101,6 +101,9 @@ npscoef.call <-
   }
 
 npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   sc <- sys.call()
   sc.names <- names(sc)
 
@@ -188,6 +191,8 @@ npscoef.scbandwidth <-
            tol = .Machine$double.eps,
            leave.one.out = FALSE,
            betas = FALSE, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     miss.z <- missing(tzdat)
 
@@ -502,4 +507,3 @@ npscoef.scbandwidth <-
                         "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN)"),")")))
 
   }
-

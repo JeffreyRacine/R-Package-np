@@ -114,6 +114,8 @@ npcdistbw.condbandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ydat = toFrame(ydat)
     xdat = toFrame(xdat)
@@ -462,6 +464,8 @@ npcdistbw.NULL <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            bws, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -507,6 +511,8 @@ npcdistbw.default <-
            uxkertype, 
            oxkertype, oykertype,
            ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)

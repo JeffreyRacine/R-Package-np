@@ -119,6 +119,8 @@ npplreg.plbandwidth <-
            tydat = stop("training data tydat missing"),
            tzdat = stop("training data tzdat missing"),
            exdat, eydat, ezdat, residuals = FALSE, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)
@@ -267,6 +269,9 @@ npplreg.plbandwidth <-
 
 
 npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+
   sc <- sys.call()
   sc.names <- names(sc)
 
@@ -335,4 +340,3 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
   
   eval(parse(text=paste("npplreg(bws = tbw", tx.str, ty.str, tz.str, ",...)")))
 }
-

@@ -114,6 +114,8 @@ npplregbw.NULL =
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
            bws, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -145,6 +147,8 @@ npplregbw.plbandwidth =
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
            bws, nmulti, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## n observations
     ## rows are observations, columns are variables
@@ -225,6 +229,8 @@ npplregbw.default =
            bandwidth.compute = TRUE,
            nmulti, remin, itmax,
            ftol, tol, small){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)

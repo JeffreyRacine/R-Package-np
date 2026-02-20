@@ -72,6 +72,8 @@ npcdist.condbandwidth <-
            txdat = stop("invoked without training data 'txdat'"),
            tydat = stop("invoked without training data 'tydat'"),
            exdat, eydat, gradients = FALSE, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     if (xor(missing(exdat),missing(eydat)))
       stop("evaluation data must be supplied for both 'exdat' and 'eydat'")
@@ -297,6 +299,8 @@ npcdist.condbandwidth <-
   }
 
 npcdist.default <- function(bws, txdat, tydat, ...){
+  if (.npRmpi_autodispatch_active())
+    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
   sc <- sys.call()
   sc.names <- names(sc)
 

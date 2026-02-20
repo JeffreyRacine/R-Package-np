@@ -1,5 +1,11 @@
 .onAttach <- function (lib, pkg) {
-	packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-0) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
+		packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-0) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
+    if (isTRUE(getOption("npRmpi.conflicts.warn", TRUE)) &&
+        ("package:np" %in% search()) &&
+        !isTRUE(getOption("npRmpi.conflicts.warned", FALSE))) {
+      packageStartupMessage("note: both 'npRmpi' and 'np' are attached; prefer explicit npRmpi:: calls to avoid masking ambiguity")
+      options(npRmpi.conflicts.warned = TRUE)
+    }
 }
 
 .onUnload <- function (lpath){
@@ -36,6 +42,20 @@
       options(np.disc.upper.rel.tol = 1e-2)
     if(is.null(options('np.groupcv.fast')$np.groupcv.fast))
       options(np.groupcv.fast = TRUE)
+    if (is.null(getOption("npRmpi.autodispatch")))
+      options(npRmpi.autodispatch = FALSE)
+    if (is.null(getOption("npRmpi.autodispatch.strict")))
+      options(npRmpi.autodispatch.strict = TRUE)
+    if (is.null(getOption("npRmpi.autodispatch.disable")))
+      options(npRmpi.autodispatch.disable = FALSE)
+    if (is.null(getOption("npRmpi.autodispatch.context")))
+      options(npRmpi.autodispatch.context = FALSE)
+    if (is.null(getOption("npRmpi.autodispatch.warned.nested")))
+      options(npRmpi.autodispatch.warned.nested = FALSE)
+    if (is.null(getOption("npRmpi.conflicts.warn")))
+      options(npRmpi.conflicts.warn = TRUE)
+    if (is.null(getOption("npRmpi.conflicts.warned")))
+      options(npRmpi.conflicts.warned = FALSE)
 
     return(invisible())
   }
@@ -62,4 +82,18 @@
     options(np.disc.upper.rel.tol = 1e-2)
   if(is.null(options('np.groupcv.fast')$np.groupcv.fast))
     options(np.groupcv.fast = TRUE)
+  if (is.null(getOption("npRmpi.autodispatch")))
+    options(npRmpi.autodispatch = FALSE)
+  if (is.null(getOption("npRmpi.autodispatch.strict")))
+    options(npRmpi.autodispatch.strict = TRUE)
+  if (is.null(getOption("npRmpi.autodispatch.disable")))
+    options(npRmpi.autodispatch.disable = FALSE)
+  if (is.null(getOption("npRmpi.autodispatch.context")))
+    options(npRmpi.autodispatch.context = FALSE)
+  if (is.null(getOption("npRmpi.autodispatch.warned.nested")))
+    options(npRmpi.autodispatch.warned.nested = FALSE)
+  if (is.null(getOption("npRmpi.conflicts.warn")))
+    options(npRmpi.conflicts.warn = TRUE)
+  if (is.null(getOption("npRmpi.conflicts.warned")))
+    options(npRmpi.conflicts.warned = FALSE)
 }

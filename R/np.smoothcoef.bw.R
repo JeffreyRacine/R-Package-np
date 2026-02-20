@@ -88,6 +88,8 @@ npscoefbw.NULL <-
            ydat = stop("invoked without data 'ydat'"),
            zdat = NULL,
            bws, ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     miss.z <- missing(zdat)
 
@@ -132,6 +134,8 @@ npscoefbw.scbandwidth <-
            optim.abstol = .Machine$double.eps,
            optim.maxit = 500,
            ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     
     ## Save seed prior to setting
 
@@ -595,6 +599,8 @@ npscoefbw.default <-
            optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit,
            ...){
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
 
     miss.z <- missing(zdat)
