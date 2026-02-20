@@ -62,43 +62,7 @@ fitted.npdensity <- function(object, ...){
  object$dens 
 }
 se.npdensity <- function(x){ x$derr }
-plot.npdensity <- function(x, ...) {
-  dots <- list(...)
-
-  ## For the simple 1D default plot, draw the stored eval/density pairs
-  ## directly so overlays like points(x, fitted(obj)) align exactly.
-  direct.args <- c("plot.behavior", "plot.errors.method", "plot.errors.type",
-                   "plot.errors.boot.num", "plot.errors.boot.method",
-                   "plot.errors.alpha", "perspective", "gradients",
-                   "xdat", "data", "neval", "xtrim", "xq")
-  use.direct <- isTRUE(x$ndim == 1) &&
-    isTRUE(x$trainiseval) &&
-    !any(direct.args %in% names(dots))
-
-  if (use.direct) {
-    ex <- x$eval[[1]]
-    if (!is.factor(ex)) {
-      ord <- order(ex)
-      xlab.val <- if (!is.null(dots$xlab)) dots$xlab else gen.label(x$xnames[1], "X1")
-      ylab.val <- if (!is.null(dots$ylab)) dots$ylab else "Density"
-      type.val <- if (!is.null(dots$type)) dots$type else "l"
-
-      dots$xlab <- NULL
-      dots$ylab <- NULL
-      dots$type <- NULL
-
-      do.call(plot, c(list(x = as.numeric(ex[ord]),
-                           y = as.numeric(x$dens[ord]),
-                           type = type.val,
-                           xlab = xlab.val,
-                           ylab = ylab.val),
-                      dots))
-      return(invisible(x))
-    }
-  }
-
-  .np_plot_from_slot(x, "bws", ...)
-}
+plot.npdensity <- function(x, ...) { .np_plot_npdensity(x, ...) }
 
 predict.npdensity <- function(object, se.fit = FALSE, ...) {
   tr <- eval(npudens(bws = object$bws, ...), envir = parent.frame())
