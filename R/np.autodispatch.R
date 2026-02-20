@@ -217,6 +217,28 @@
   x
 }
 
+.npRmpi_autodispatch_replace_tmp_calls <- function(x, tmpvals) {
+  if (!is.list(x) || !length(tmpvals))
+    return(x)
+
+  nms <- names(x)
+  for (i in seq_along(x)) {
+    xi <- x[[i]]
+    nm <- if (!is.null(nms)) nms[[i]] else ""
+
+    if (is.list(xi)) {
+      x[[i]] <- .npRmpi_autodispatch_replace_tmp_calls(xi, tmpvals = tmpvals)
+      next
+    }
+
+    if ((is.call(xi) || is.pairlist(xi)) && identical(nm, "call")) {
+      x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
+    }
+  }
+
+  x
+}
+
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   if (!.npRmpi_autodispatch_active())
@@ -253,10 +275,8 @@
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 
-  if (is.list(result) && !is.null(result$call)) {
-    result$call <- .npRmpi_autodispatch_replace_tmps(result$call, tmpvals = prepared$tmpvals)
-    return(result)
-  }
+  if (is.list(result))
+    return(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals))
 
   if (is.call(result))
     return(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals))

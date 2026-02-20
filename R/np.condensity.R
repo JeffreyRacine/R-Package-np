@@ -320,6 +320,20 @@ npcdens.default <- function(bws, txdat, tydat, ...){
   no.txdat <- missing(txdat)
   no.tydat <- missing(tydat)
 
+  ## autodispatch normalizes calls via match.call(), which can turn an
+  ## originally unnamed formula first argument into named bws=... .
+  ## Preserve legacy formula behavior by rewriting npcdensbw() call shape.
+  if (bws.named && no.txdat && no.tydat && inherits(bws, "formula")) {
+    sc$`bws` <- NULL
+    sc$formula <- bws
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npcdensbw)
+    bws.named <- FALSE
+  } else {
+    sc.bw <- sc
+    sc.bw[[1]] <- quote(npcdensbw)
+  }
+
   ## if bws was passed in explicitly, do not compute bandwidths
     
   if(txdat.named)
@@ -327,10 +341,6 @@ npcdens.default <- function(bws, txdat, tydat, ...){
 
   if(tydat.named)
     tydat <- toFrame(tydat)
-
-  sc.bw <- sc
-  
-  sc.bw[[1]] <- quote(npcdensbw)
 
   if(bws.named){
     sc.bw$bandwidth.compute <- FALSE
