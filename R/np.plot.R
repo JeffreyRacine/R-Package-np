@@ -140,7 +140,10 @@ plotFactor <- function(f, y, ...){
 
 .npRmpi_guard_bootstrap_plot_autodispatch <- function(plot.errors.method,
                                                       where = "plot()") {
-  if (.npRmpi_autodispatch_active() && identical(plot.errors.method, "bootstrap")) {
+  if (.npRmpi_autodispatch_active() &&
+      !.npRmpi_autodispatch_in_context() &&
+      !.npRmpi_autodispatch_called_from_bcast() &&
+      identical(plot.errors.method, "bootstrap")) {
     stop(sprintf("%s with plot.errors.method='bootstrap' does not currently support npRmpi.autodispatch; use mpi.bcast.cmd(%s, caller.execute=TRUE)", where, where))
   }
 }
