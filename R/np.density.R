@@ -170,19 +170,18 @@ npudens.bandwidth <-
       int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
   
-  myout=
-    .C("np_density", as.double(tuno), as.double(tord), as.double(tcon),
-       as.double(euno),  as.double(eord),  as.double(econ), 
-       as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
-       as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-       as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-       as.integer(myopti),
-       dens = double(enrow),
-       derr = double(enrow),
-       log_likelihood = double(1),
-       cker.bounds.c$lb,
-       cker.bounds.c$ub,
-       PACKAGE="np" )[c("dens","derr", "log_likelihood")]
+  myout <-
+    .Call("C_np_density",
+          as.double(tuno), as.double(tord), as.double(tcon),
+          as.double(euno), as.double(eord), as.double(econ),
+          as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+          as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+          as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+          as.integer(myopti),
+          as.integer(enrow),
+          as.double(cker.bounds.c$lb),
+          as.double(cker.bounds.c$ub),
+          PACKAGE = "np")
 
   ## For purely categorical density with zero bandwidths, the variance of
   ## the sample proportion is p(1-p)/n. The C routine returns p/n; fix here.

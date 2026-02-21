@@ -28,6 +28,8 @@ extern void np_set_tgauss2(void *);
 extern SEXP C_gsl_bspline(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_gsl_bspline_deriv(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_dim_basis(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_density(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_set_seed(SEXP);
@@ -35,9 +37,7 @@ extern SEXP C_np_set_tgauss2(SEXP);
 extern SEXP C_np_release_static_buffers(void);
 
 static const R_CMethodDef CEntries[] = {
-    {"np_density",                     (DL_FUNC) &np_density,                     18},
     {"np_density_bw",                  (DL_FUNC) &np_density_bw,                  16},
-    {"np_density_conditional",         (DL_FUNC) &np_density_conditional,         30},
     {"np_density_conditional_bw",      (DL_FUNC) &np_density_conditional_bw,      23},
     {"np_distribution_bw",             (DL_FUNC) &np_distribution_bw,             19},
     {"np_distribution_conditional_bw", (DL_FUNC) &np_distribution_conditional_bw, 26},
@@ -50,6 +50,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_gsl_bspline",                  (DL_FUNC) &C_gsl_bspline,                   7},
     {"C_gsl_bspline_deriv",            (DL_FUNC) &C_gsl_bspline_deriv,             8},
     {"C_np_dim_basis",                 (DL_FUNC) &C_np_dim_basis,                  6},
+    {"C_np_density",                   (DL_FUNC) &C_np_density,                   16},
+    {"C_np_density_conditional",       (DL_FUNC) &C_np_density_conditional,       27},
     {"C_np_regression_bw",             (DL_FUNC) &C_np_regression_bw,             16},
     {"C_np_regression",                (DL_FUNC) &C_np_regression,                23},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
