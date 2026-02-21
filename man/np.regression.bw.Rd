@@ -174,9 +174,7 @@ npregbw(\dots)
   \item{basis}{
     basis selector relevant only when \code{regtype="lp"}.
     Supported values are \code{"glp"}, \code{"additive"}, and
-    \code{"tensor"}. In the current implementation, only
-    \code{basis="glp"} is available; \code{"additive"} and
-    \code{"tensor"} currently fail fast with an informative error.
+    \code{"tensor"}.
     Let \eqn{d_j}{d[j]} denote the degree for continuous predictor
     \eqn{j}{j} and \eqn{q}{q} the number of continuous predictors.
     With one segment per predictor (no internal knots), basis

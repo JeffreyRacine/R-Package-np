@@ -150,12 +150,15 @@ npValidateLpBasis <- function(regtype, basis, argname = "basis") {
     basis <- "glp"
 
   basis <- match.arg(as.character(basis), c("glp", "additive", "tensor"))
-
-  if (!identical(basis, "glp"))
-    stop(sprintf("%s='%s' is not yet implemented; currently only basis='glp' is supported",
-                 argname, basis))
-
   basis
+}
+
+npLpBasisCode <- function(basis) {
+  switch(tolower(ifelse(is.null(basis) || !length(basis), "glp", basis)),
+         additive = 0L,
+         glp = 1L,
+         tensor = 2L,
+         1L)
 }
 
 npValidateGlpGradientOrder <- function(regtype,
@@ -197,6 +200,7 @@ npValidateGlpGradientOrder <- function(regtype,
 
 npCheckRegressionDesignCondition <- function(reg.code,
                                              xcon,
+                                             basis = "glp",
                                              degree = NULL,
                                              bernstein.basis = FALSE,
                                              where = "npregbw") {
@@ -214,9 +218,10 @@ npCheckRegressionDesignCondition <- function(reg.code,
   B <- if (identical(reg.code, REGTYPE_GLP)) {
     if (is.null(degree))
       stop(sprintf("%s: LP degree vector missing for design-conditioning check", where))
-    W.glp(xdat = xcon,
-          degree = degree,
-          Bernstein = isTRUE(bernstein.basis))
+    W.lp(xdat = xcon,
+         degree = degree,
+         basis = basis,
+         bernstein.basis = isTRUE(bernstein.basis))
   } else {
     cbind(1, as.matrix(xcon))
   }
@@ -1504,18 +1509,54 @@ mypoly <- function(x,
 
 }
 
-## W.glp is a modified version of the polym() function (stats). The
-## function accepts a vector of degrees and provides a generalized
-## polynomial with varying polynomial order.
+## W.lp accepts a vector of degrees and provides local-polynomial bases
+## with selectable term structure (glp/additive/tensor).
 
-W.glp <- function(xdat = NULL,
-                  exdat = NULL,
-                  degree = NULL,
-                  gradient.vec = NULL,
-                  Bernstein = TRUE) {
+npBuildLpTerms <- function(degree, basis = c("glp", "additive", "tensor")) {
+  basis <- match.arg(basis)
+  k <- length(degree)
+  if (k == 0L)
+    return(matrix(integer(0), nrow = 1L, ncol = 0L))
+
+  degree <- as.integer(degree)
+  degree.list <- lapply(degree, function(d) 0:d)
+  z <- as.matrix(do.call("expand.grid", degree.list))
+  s <- rowSums(z)
+
+  if (identical(basis, "glp")) {
+    ind <- (s > 0) & (s <= max(degree))
+    z <- z[ind, , drop = FALSE]
+    if (!all(degree == max(degree))) {
+      for (j in seq_along(degree)) {
+        d <- degree[j]
+        if ((d < max(degree)) && (d > 0)) {
+          s <- rowSums(z)
+          dropj <- (s > d) & (z[, j, drop = FALSE] == matrix(d, nrow(z), 1, byrow = TRUE))
+          z <- z[!dropj, , drop = FALSE]
+        }
+      }
+    }
+  } else if (identical(basis, "additive")) {
+    ind <- (s > 0) & (rowSums(z > 0) == 1L)
+    z <- z[ind, , drop = FALSE]
+  } else if (identical(basis, "tensor")) {
+    z <- z[s > 0, , drop = FALSE]
+  }
+
+  rbind(matrix(0L, nrow = 1L, ncol = k), z)
+}
+
+W.lp <- function(xdat = NULL,
+                 exdat = NULL,
+                 degree = NULL,
+                 gradient.vec = NULL,
+                 basis = c("glp", "additive", "tensor"),
+                 bernstein.basis = TRUE,
+                 Bernstein = bernstein.basis) {
 
   if(is.null(xdat)) stop(" Error: You must provide data")
   if(is.null(degree) || any(degree < 0)) stop(paste(" Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
+  basis <- match.arg(basis)
 
   xdat <- as.data.frame(xdat)
 
@@ -1556,22 +1597,8 @@ W.glp <- function(xdat = NULL,
 
   } else {
 
-    degree.list <- list()
-    for(i in 1:k) degree.list[[i]] <- 0:degree[i]
-    z <- do.call("expand.grid", degree.list, k)
-    s <- rowSums(z)
-    ind <- (s > 0) & (s <= max(degree))
-    z <- z[ind, ,drop=FALSE]
-    if(!all(degree==max(degree))) {
-      for(j in 1:length(degree)) {
-        d <- degree[j]
-        if((d < max(degree)) & (d > 0)) {
-          s <- rowSums(z)
-          d <- (s > d) & (z[,j,drop=FALSE]==matrix(d,nrow(z),1,byrow=TRUE))
-          z <- z[!d, ]
-        }
-      }
-    }
+    z <- npBuildLpTerms(degree = degree, basis = basis)
+    z.noi <- z[-1L, , drop = FALSE]
     if(is.null(exdat)) {
       res <- rep.int(1,nrow(xdat.numeric))
     } else {
@@ -1584,10 +1611,10 @@ W.glp <- function(xdat = NULL,
                              degree=degree[1],
                              gradient.compute=gradient.compute,
                              r=gradient.vec[1],
-                             Bernstein=Bernstein))[, 1 + z[, 1]]
+                             Bernstein=Bernstein))[, 1 + z.noi[, 1]]
 
-      if(gradient.compute && gradient.vec[1] != 0) res.deriv <- cbind(1,matrix(NA,1,degree[1]))[, 1 + z[, 1],drop=FALSE]
-      if(gradient.compute && gradient.vec[1] == 0) res.deriv <- cbind(1,matrix(0,1,degree[1]))[, 1 + z[, 1],drop=FALSE]
+      if(gradient.compute && gradient.vec[1] != 0) res.deriv <- cbind(1,matrix(NA,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
+      if(gradient.compute && gradient.vec[1] == 0) res.deriv <- cbind(1,matrix(0,1,degree[1]))[, 1 + z.noi[, 1],drop=FALSE]
     }
     if(k > 1) for (i in 2:k) if(degree[i] > 0) {
       res <- res * cbind(1, mypoly(x=xdat.numeric[,i],
@@ -1595,9 +1622,9 @@ W.glp <- function(xdat = NULL,
                                    degree=degree[i],
                                    gradient.compute=gradient.compute,
                                    r=gradient.vec[i],
-                                   Bernstein=Bernstein))[, 1 + z[, i]]
-      if(gradient.compute && gradient.vec[i] != 0) res.deriv <- res.deriv * cbind(1,matrix(NA,1,degree[i]))[, 1 + z[, i],drop=FALSE]
-      if(gradient.compute && gradient.vec[i] == 0) res.deriv <- res.deriv *cbind(1,matrix(0,1,degree[i]))[, 1 + z[, i],drop=FALSE]
+                                   Bernstein=Bernstein))[, 1 + z.noi[, i]]
+      if(gradient.compute && gradient.vec[i] != 0) res.deriv <- res.deriv * cbind(1,matrix(NA,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
+      if(gradient.compute && gradient.vec[i] == 0) res.deriv <- res.deriv *cbind(1,matrix(0,1,degree[i]))[, 1 + z.noi[, i],drop=FALSE]
     }
 
     if(is.null(exdat)) {
@@ -1606,8 +1633,8 @@ W.glp <- function(xdat = NULL,
       res <- matrix(res,nrow=NROW(exdat))
     }
     if(gradient.compute) res.deriv <- matrix(res.deriv,nrow=1)
-    colnames(res) <- apply(z, 1L, function(x) paste(x, collapse = "."))
-    if(gradient.compute) colnames(res.deriv) <- apply(z, 1L, function(x) paste(x, collapse = "."))
+    colnames(res) <- apply(z.noi, 1L, function(x) paste(x, collapse = "."))
+    if(gradient.compute) colnames(res.deriv) <- apply(z.noi, 1L, function(x) paste(x, collapse = "."))
 
     if(gradient.compute) {
       res[,!is.na(as.numeric(res.deriv))] <- 0
@@ -1618,6 +1645,19 @@ W.glp <- function(xdat = NULL,
 
   }
 
+}
+
+W.glp <- function(xdat = NULL,
+                  exdat = NULL,
+                  degree = NULL,
+                  gradient.vec = NULL,
+                  Bernstein = TRUE) {
+  W.lp(xdat = xdat,
+       exdat = exdat,
+       degree = degree,
+       gradient.vec = gradient.vec,
+       basis = "glp",
+       bernstein.basis = Bernstein)
 }
 
 ### internal constants used in the c backend

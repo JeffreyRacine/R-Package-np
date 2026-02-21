@@ -173,6 +173,7 @@ npregbw.rbandwidth <-
                           context = "npregbw")
     npCheckRegressionDesignCondition(reg.code = reg.c$code,
                                      xcon = rcon,
+                                     basis = tbw$basis,
                                      degree = tbw$degree,
                                      bernstein.basis = tbw$bernstein.basis,
                                      where = "npregbw")
@@ -246,6 +247,7 @@ npregbw.rbandwidth <-
            penalty.multiplier = as.double(penalty.multiplier),
            degree = degree.c,
            bernstein.basis = as.integer(isTRUE(tbw$bernstein.basis)),
+           basis = as.integer(npLpBasisCode(tbw$basis)),
            ckerlb = as.double(cker.bounds.c$lb),
            ckerub = as.double(cker.bounds.c$ub),
            PACKAGE="np" )[c("bw","fval","fval.history","eval.history","invalid.history","timing","fast.history","fallback.history")])[1]
