@@ -156,8 +156,10 @@ npplreg.plbandwidth <-
       ## c& d NA's, part 2
 
       goodrows = 1:dim(exdat)[1]
-      rows.omit = eval(parse(text=paste('attr(na.omit(data.frame(exdat,',
-                               ifelse(no.ey,"","eydat,"),'ezdat)), "na.action")')))
+      eval.df <- data.frame(exdat, ezdat)
+      if (!no.ey)
+        eval.df <- data.frame(eval.df, eydat)
+      rows.omit <- attr(na.omit(eval.df), "na.action")
       goodrows[rows.omit] = 0
 
       if (all(goodrows==0))
@@ -258,15 +260,22 @@ npplreg.plbandwidth <-
         ply = mmy.eval$mean + resx.eval %*% B
     }
 
-    ev <- eval(parse(text = paste("plregression(bws = bws,",
-                       "xcoef = B, xcoeferr = Berr, xcoefvcov = Bvcov,",
-                       "evalx =  if (no.exz) txdat else exdat,",
-                       "evalz =  if (no.exz) tzdat else ezdat,",
-                       "mean = ply, ntrain = nrow,",
-                       ifelse(residuals, "resid = tmp.ty - ply,", ""),
-                       "trainiseval = no.exz,",
-                       "residuals = residuals,",
-                       "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN))")))
+    ev.args <- list(
+      bws = bws,
+      xcoef = B,
+      xcoeferr = Berr,
+      xcoefvcov = Bvcov,
+      evalx = if (no.exz) txdat else exdat,
+      evalz = if (no.exz) tzdat else ezdat,
+      mean = ply,
+      ntrain = nrow,
+      trainiseval = no.exz,
+      residuals = residuals,
+      xtra = c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
+    )
+    if (residuals)
+      ev.args$resid <- tmp.ty - ply
+    ev <- do.call(plregression, ev.args)
 
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_

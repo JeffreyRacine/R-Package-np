@@ -257,8 +257,10 @@ npindex.sibandwidth <-
 
     if (!no.ex){
       goodrows = 1:dim(exdat)[1]
-      rows.omit = eval(parse(text=paste('attr(na.omit(data.frame(exdat',
-                               ifelse(no.ey,"",",eydat"),')), "na.action")')))
+      eval.df <- data.frame(exdat)
+      if (!no.ey)
+        eval.df <- data.frame(eval.df, eydat)
+      rows.omit <- attr(na.omit(eval.df), "na.action")
 
       goodrows[rows.omit] = 0
 
@@ -590,14 +592,37 @@ npindex.sibandwidth <-
       strres = ""
     }
 
-    ev <- eval(parse(text=paste(
-                 "singleindex(bws = bws, index = index.eval, mean = index.mean,",
-                 ifelse(errors,"merr = index.merr,",""),
-                 ifelse(gradients,"grad = index.grad, mean.grad = colMeans(index.grad), betavcov = Bvcov,",""),
-                 ifelse(errors & gradients,"gerr = index.gerr, mean.gerr = index.mgerr,",""),
-                 strres,
-                 "ntrain = nrow(txdat),", strgof,
-                 "trainiseval = no.ex, residuals = residuals, gradients = gradients)")))
+    ev.args <- list(
+      bws = bws,
+      index = index.eval,
+      mean = index.mean,
+      ntrain = nrow(txdat),
+      trainiseval = no.ex,
+      residuals = residuals,
+      gradients = gradients
+    )
+    if (errors)
+      ev.args$merr <- index.merr
+    if (gradients) {
+      ev.args$grad <- index.grad
+      ev.args$mean.grad <- colMeans(index.grad)
+      ev.args$betavcov <- Bvcov
+    }
+    if (errors && gradients) {
+      ev.args$gerr <- index.gerr
+      ev.args$mean.gerr <- index.mgerr
+    }
+    if (bws$method == "ichimura") {
+      if (residuals)
+        ev.args$resid <- tydat - index.tmean
+      ev.args$xtra <- c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
+    } else if (bws$method == "kleinspady") {
+      ev.args$confusion.matrix <- confusion.matrix
+      ev.args$CCR.overall <- CCR.overall
+      ev.args$CCR.byoutcome <- CCR.byoutcome
+      ev.args$fit.mcfadden <- fit.mcfadden
+    }
+    ev <- do.call(singleindex, ev.args)
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
