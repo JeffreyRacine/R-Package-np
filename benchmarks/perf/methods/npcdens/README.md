@@ -14,7 +14,7 @@ This folder provides a parameterized benchmark harness for `npcdensbw()` + `npcd
 ## One-Configuration Run
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npcdens/bench_npcdens_param.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npcdens/bench_npcdens_param.R \
   --n=100 --times=50 --base_seed=42 \
   --bwmethod=cv.ml --nmulti=1 \
   --cxkertype=gaussian --cykertype=gaussian \
@@ -25,7 +25,7 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npcdens/bench_npcdens_pa
 ## Full Combination Run (16 combos)
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npcdens/run_npcdens_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npcdens/run_npcdens_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=myrun
 ```
 

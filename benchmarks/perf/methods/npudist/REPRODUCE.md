@@ -14,18 +14,18 @@ R CMD INSTALL -l /tmp/Rlib_np_cran20 /Users/jracine/Development/CRAN/np_0.60-20.
 
 ```bash
 R_LIBS=/tmp/Rlib_np_cran20 \
-Rscript /Users/jracine/Development/np-master/benchmarks/npudist/run_npudist_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npudist/run_npudist_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=cran20_t50_n100
 
 R_LIBS=/tmp/Rlib_np_current \
-Rscript /Users/jracine/Development/np-master/benchmarks/npudist/run_npudist_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npudist/run_npudist_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=current_t50_n100
 ```
 
 ## 3) Build comparison tables
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npudist/compare_npudist_versions.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npudist/compare_npudist_versions.R \
   --raw_a=/tmp/RAW_CRAN.csv --label_a=np_0.60-20 \
   --raw_b=/tmp/RAW_CURRENT.csv --label_b=np_current \
   --out_timing=/tmp/npudist_combo48_t50_timing_compare.csv \
@@ -37,7 +37,7 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npudist/compare_npudist_
 ## 4) Generate markdown report
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npudist/make_npudist_report.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npudist/make_npudist_report.R \
   --timing_csv=/tmp/npudist_combo48_t50_timing_compare.csv \
   --objective_csv=/tmp/npudist_combo48_t50_objective_compare.csv \
   --combo_timing_csv=/tmp/npudist_combo48_t50_combo_timing_compare.csv \

@@ -14,7 +14,7 @@ This folder provides a parameterized benchmark harness for `npudistbw()` + `npud
 ## One-Configuration Run
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npudist/bench_npudist_param.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npudist/bench_npudist_param.R \
   --n=100 --times=50 --base_seed=42 \
   --bwmethod=cv.cdf --bwtype=fixed --nmulti=1 --ckertype=gaussian \
   --np_tree=FALSE --seed_policy=fixed \
@@ -24,7 +24,7 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npudist/bench_npudist_pa
 ## Full Combination Run (48 combos)
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npudist/run_npudist_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npudist/run_npudist_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=myrun
 ```
 

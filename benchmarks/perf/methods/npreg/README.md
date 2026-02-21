@@ -14,7 +14,7 @@ This folder provides a parameterized benchmark harness for `npregbw()` + `npreg(
 ## One-Configuration Run
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/bench_npreg_param.R \
   --n=100 --times=50 --base_seed=42 \
   --regtype=lc --bwmethod=cv.ls --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
@@ -24,7 +24,7 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.
 ## Full Combination Run (32 combos)
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npreg/run_npreg_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/run_npreg_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=myrun
 ```
 
@@ -72,17 +72,17 @@ R CMD INSTALL -l /tmp/Rlib_np_cran20 /Users/jracine/Development/CRAN/np_0.60-20.
 2. Run canonical benchmark with each library.
 
 ```bash
-R_LIBS=/tmp/Rlib_np_cran20 Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
+R_LIBS=/tmp/Rlib_np_cran20 Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/bench_npreg_param.R \
   --n=100 --times=50 --out_raw=/tmp/np_cran20_raw.csv --out_summary=/tmp/np_cran20_summary.csv
 
-R_LIBS=/tmp/Rlib_np_current Rscript /Users/jracine/Development/np-master/benchmarks/npreg/bench_npreg_param.R \
+R_LIBS=/tmp/Rlib_np_current Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/bench_npreg_param.R \
   --n=100 --times=50 --out_raw=/tmp/np_current_raw.csv --out_summary=/tmp/np_current_summary.csv
 ```
 
 3. Compare outputs.
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npreg/compare_npreg_versions.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/compare_npreg_versions.R \
   --raw_a=/tmp/np_cran20_raw.csv --label_a=np_0.60-20 \
   --raw_b=/tmp/np_current_raw.csv --label_b=np_current \
   --out_timing=/tmp/np_timing_compare.csv \

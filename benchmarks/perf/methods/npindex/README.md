@@ -32,7 +32,7 @@ y <- ifelse(x1 + x2 + rnorm(n) > 0, 1L, 0L)
 ## One Case
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npindex/bench_npindex_param.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npindex/bench_npindex_param.R \
   --n=100 --times=50 --base_seed=42 --method=ichimura --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
   --out_raw=/tmp/npindex_one_raw.csv --out_summary=/tmp/npindex_one_summary.csv
@@ -41,6 +41,6 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npindex/bench_npindex_pa
 ## Combo Run
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npindex/run_npindex_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npindex/run_npindex_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=myrun
 ```

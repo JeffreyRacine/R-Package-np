@@ -2,5 +2,5 @@
 
 Use this folder for timing-focused scripts and summary utilities.
 
-Current one-off performance harnesses remain in `../oneoff/` and can be
-migrated here incrementally.
+- `methods/`: estimator-family benchmark suites (`npreg`, `npcdens`, etc.).
+- `oneoff/`: one-off benchmark harnesses for methods not covered by combo grids.

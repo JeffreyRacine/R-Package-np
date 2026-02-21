@@ -26,14 +26,6 @@ mknpkg.sh
 ^audit_report\.md$
 ^issue_notes
 ^benchmarks
-^benchmarks/npreg
-^benchmarks/npcdens
-^benchmarks/npudens
-^benchmarks/npcdist
-^benchmarks/npudist
-^benchmarks/npplreg
-^benchmarks/npscoef
-^benchmarks/npindex
 ^AGENTS\.md$
 
 ^benchmarks/oneoff

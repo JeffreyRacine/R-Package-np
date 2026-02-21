@@ -31,7 +31,7 @@ npplregbw(y ~ x1 + x2 | z1 + z2, ...)
 ## One Case
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npplreg/bench_npplreg_param.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npplreg/bench_npplreg_param.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
   --out_raw=/tmp/npplreg_one_raw.csv --out_summary=/tmp/npplreg_one_summary.csv
@@ -40,6 +40,6 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npplreg/bench_npplreg_pa
 ## Combo Run
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npplreg/run_npplreg_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npplreg/run_npplreg_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --tag=myrun
 ```

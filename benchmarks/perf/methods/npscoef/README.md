@@ -29,7 +29,7 @@ npscoefbw(y ~ x | z, ...)
 ## One Case
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npscoef/bench_npscoef_param.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npscoef/bench_npscoef_param.R \
   --n=250 --times=50 --base_seed=42 --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
   --out_raw=/tmp/npscoef_one_raw.csv --out_summary=/tmp/npscoef_one_summary.csv
@@ -38,6 +38,6 @@ Rscript /Users/jracine/Development/np-master/benchmarks/npscoef/bench_npscoef_pa
 ## Combo Run
 
 ```bash
-Rscript /Users/jracine/Development/np-master/benchmarks/npscoef/run_npscoef_combos.R \
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npscoef/run_npscoef_combos.R \
   --n=250 --times=50 --base_seed=42 --nmulti=1 --tag=myrun
 ```
