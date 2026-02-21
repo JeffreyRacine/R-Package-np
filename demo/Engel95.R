@@ -19,7 +19,7 @@ library(npRmpi)
 ## vignette for further details on running parallel np programs via
 ## vignette("npRmpi",package="npRmpi").
 
-npRmpi.start(nslaves=1)
+npRmpi.init(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data(Engel95)
@@ -64,7 +64,7 @@ legend(quantile(Engel95$logexp,trim),quantile(Engel95$food,1-trim),
 ## For the interactive run only we close the slaves perhaps to proceed
 ## with other examples and so forth. This is redundant in batch mode.
 
-npRmpi.stop(force=TRUE)
+npRmpi.quit(force=TRUE)
 
 ## Note that in order to exit npRmpi properly avoid quit(), and instead
 ## use mpi.quit() as follows.

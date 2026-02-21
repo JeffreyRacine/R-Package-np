@@ -34,8 +34,8 @@ are, the more CPUs consume.}
 } 
 \details{
   \code{mpi.bcast.cmd} is a collective call. This means all members in a communicator must 
-  execute it at the same time. Under \code{npRmpi.start(mode="spawn")} this is
-  handled by spawned slave daemons. Under \code{npRmpi.start(mode="attach")}
+  execute it at the same time. Under \code{npRmpi.init(mode="spawn")} this is
+  handled by spawned slave daemons. Under \code{npRmpi.init(mode="attach")}
   (batch \code{mpiexec} workflows), worker ranks enter the same idle-loop
   coordination internally, so no external bootstrap is needed.
   On the master, \code{cmd} and \code{...} are put together as a list which is

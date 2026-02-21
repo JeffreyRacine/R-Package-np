@@ -68,7 +68,7 @@
 }
 \examples{
 \dontrun{
-npRmpi.start(nslaves=1)
+npRmpi.init(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 old <- options(
@@ -79,7 +79,7 @@ old <- options(
   np.groupcv.fast = TRUE
 )
 on.exit(options(old), add = TRUE)
-on.exit(npRmpi.stop(force=TRUE), add = TRUE)
+on.exit(npRmpi.quit(force=TRUE), add = TRUE)
 
 ## ... run bandwidth selection / estimation ...
 }

@@ -15,7 +15,7 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
   - improved diagnostics for nested/unsupported mixed dispatch contexts.
 
 * Expanded run-mode documentation modernization:
-  - converted core `np*` examples to the simplified `npRmpi.start()` +
+  - converted core `np*` examples to the simplified `npRmpi.init()` +
     `options(npRmpi.autodispatch=TRUE)` style where supported
   - updated helper examples (`gradients`, `se`, etc.) to the same model
   - refreshed run/dontrun script workflow for check cycles.
@@ -69,7 +69,7 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
 * Fixed MPI npksum copyback for padded evaluation partitions, eliminating
   a regression affecting repeated-session workflows (e.g. npcmstest).
 
-* Added robust session-management wrappers (npRmpi.start()/npRmpi.stop()) and
+* Added robust session-management wrappers (npRmpi.init()/npRmpi.quit()) and
   slave-reuse controls to improve stability on macOS+MPICH.
 
 * Hardened .Rd example handling for CRAN checks (run/dontrun tooling and MPI

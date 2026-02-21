@@ -128,7 +128,7 @@ npregivderiv(y,
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
 
   Note that Landweber-Fridman iteration presumes that
@@ -250,8 +250,8 @@ npregivderiv(y,
 ## Start npRmpi for interactive execution. If slaves are already running and
 ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
 ## reuse the existing pool instead of respawning. To change the number of
-## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-npRmpi.start(nslaves=1)
+## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+npRmpi.init(nslaves=1)
 
 # ## This illustration was made possible by Samuele Centorrino
 # ## <samuele.centorrino@univ-tlse1.fr>
@@ -328,15 +328,15 @@ npRmpi.start(nslaves=1)
 ## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
 ## tearing down slaves in the same R session can lead to hangs/crashes.
 ## npRmpi may therefore keep slave daemons alive by default and
-## `npRmpi.stop()` performs a "soft close". Use `force=TRUE` to
+## `npRmpi.quit()` performs a "soft close". Use `force=TRUE` to
 ## actually shut down the slaves.
 ##
 ## You can disable reuse via `options(npRmpi.reuse.slaves=FALSE)` or by
 ## setting the environment variable `NP_RMPI_NO_REUSE_SLAVES=1` before
 ## loading the package.
 
-npRmpi.stop()               ## soft close (may keep slaves alive)
-## npRmpi.stop(force=TRUE)  ## hard close
+npRmpi.quit()               ## soft close (may keep slaves alive)
+## npRmpi.quit(force=TRUE)  ## hard close
 } % enddontrun
 }
 \keyword{ instrument }

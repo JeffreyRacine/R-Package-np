@@ -33,7 +33,7 @@ R CMD check --as-cran npRmpi_0.70-0.tar.gz
 
 ```r
 library(npRmpi)
-npRmpi.start(mode = "spawn", nslaves = 1)
+npRmpi.init(mode = "spawn", nslaves = 1)
 options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
 
 set.seed(1)
@@ -43,7 +43,7 @@ bw <- npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls")
 fit <- npreg(bws = bw)
 summary(fit)
 
-npRmpi.stop()
+npRmpi.quit()
 ```
 
 ## 5) Batch/cluster runtime (no external profile bootstrap)
@@ -52,9 +52,9 @@ npRmpi.stop()
 
 ```r
 library(npRmpi)
-npRmpi.start(mode = "attach", autodispatch = TRUE, np.messages = FALSE)
+npRmpi.init(mode = "attach", autodispatch = TRUE, np.messages = FALSE)
 # ... np* calls ...
-npRmpi.stop(mode = "attach")
+npRmpi.quit(mode = "attach")
 ```
 
 Then launch:

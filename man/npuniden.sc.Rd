@@ -93,7 +93,7 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.start}}.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)

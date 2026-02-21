@@ -103,7 +103,7 @@ mpi.spawn.Rslaves <-
          stop(err)
     }
 	if (.Platform$OS=="windows"){
-		stop("Spawning is not implemented on Windows. Launch with mpiexec and use npRmpi.start(mode=\"attach\").")
+		stop("Spawning is not implemented on Windows. Launch with mpiexec and use npRmpi.init(mode=\"attach\").")
     } else {
         tmp <- paste(Sys.getpid(), "+", comm, sep="")   
         if (needlog)

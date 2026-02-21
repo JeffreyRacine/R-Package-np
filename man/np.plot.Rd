@@ -749,7 +749,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 
 \examples{
 \dontrun{
-npRmpi.start(nslaves=1)
+npRmpi.init(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 # EXAMPLE 1: For this example, we load Giovanni Baiocchi's Italian GDP
@@ -930,13 +930,13 @@ lines(age.eval,grad.lower.ci,lty=3)
 lines(age.eval,grad.upper.ci,lty=3)
 
 detach(cps71)
-npRmpi.stop()
+npRmpi.quit()
 } % enddontrun
 }
 
 \seealso{
   \code{\link{np.kernels}}, \code{\link{np.options}},
-  \code{\link{npRmpi.start}}
+  \code{\link{npRmpi.init}}
 }
 
 \keyword{nonparametric}

@@ -21,7 +21,7 @@ No return value, called for side effects (sets kernel constants in the
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.start}}.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
 
   \code{nptgauss} allows one to set the truncation radius of the truncated Gaussian kernel used by \pkg{npRmpi}, which defaults to 3. It automatically computes the constants describing the truncated gaussian kernel for the user.
   

@@ -5,7 +5,7 @@
 
 ## Initialize master and slaves.
 
-npRmpi.start(nslaves=1)
+npRmpi.init(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
@@ -45,4 +45,4 @@ cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
 
-npRmpi.stop(force=TRUE)
+npRmpi.quit(force=TRUE)

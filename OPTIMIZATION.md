@@ -45,7 +45,7 @@ Speedups are reported as `baseline / current` (so `>1` is faster) with percent c
 
 ## 2026-02-12: jksum Port Verification (MPI, nslaves=1)
 - Source change under test: `src/jksum.c` port from `np-master` (unordered/ordered kernel fast paths, cached ordered powers, tree empty-support short-circuit, persistent discrete profile cache).
-- Benchmark driver: case-by-case MPI runs using documented `npRmpi.start()/mpi.bcast.cmd(..., caller.execute=TRUE)` pattern.
+- Benchmark driver: case-by-case MPI runs using documented `npRmpi.init()/mpi.bcast.cmd(..., caller.execute=TRUE)` pattern.
 - Settings: synthetic mixed data, `n = 500, 1000, 2000`, `times = 10` for each case, `ftol = 1e-02`, `tol = 1e-01`.
 - MPI transport note: `FI_TCP_IFACE=en0` used to avoid intermittent OFI timeout on `utun4` during heavy `npcdens` collectives.
 

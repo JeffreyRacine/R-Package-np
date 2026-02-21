@@ -79,7 +79,7 @@ npudens(bws, \dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
 
   Typical usages are (see below for a complete list of options and also
@@ -91,34 +91,34 @@ npudens(bws, \dots)
     ## Start npRmpi for interactive execution. If slaves are already running and
     ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
     ## reuse the existing pool instead of respawning. To change the number of
-    ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-    npRmpi.start(nslaves=1)
+    ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+    npRmpi.init(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     bw <- npudensbw(formula = ~y, data = mydat)
     fhat <- npudens(bw)
-    npRmpi.stop()
+    npRmpi.quit()
     
     Usage 2: alternatively, compute the bandwidth object indirectly:
     
     ## Start npRmpi for interactive execution. If slaves are already running and
     ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
     ## reuse the existing pool instead of respawning. To change the number of
-    ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-    npRmpi.start(nslaves=1)
+    ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+    npRmpi.init(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     fhat <- npudens(formula = ~y, data = mydat)
-    npRmpi.stop()
+    npRmpi.quit()
     
     Usage 3: modify the default kernel and order:
     
     ## Start npRmpi for interactive execution. If slaves are already running and
     ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
     ## reuse the existing pool instead of respawning. To change the number of
-    ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-    npRmpi.start(nslaves=1)
+    ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+    npRmpi.init(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     fhat <- npudens(formula = ~y, data = mydat, ckertype="epanechnikov", ckerorder=4)
-    npRmpi.stop()
+    npRmpi.quit()
 
     Usage 4: use the data frame interface rather than the formula
     interface:
@@ -126,11 +126,11 @@ npudens(bws, \dots)
     ## Start npRmpi for interactive execution. If slaves are already running and
     ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
     ## reuse the existing pool instead of respawning. To change the number of
-    ## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-    npRmpi.start(nslaves=1)
+    ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+    npRmpi.init(nslaves=1)
     options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     fhat <- npudens(tdat = y, ckertype="epanechnikov", ckerorder=4)
-    npRmpi.stop()
+    npRmpi.quit()
   }
 
   \code{npudens} implements a variety of methods for estimating
@@ -237,8 +237,8 @@ npudens(bws, \dots)
 ## Start npRmpi for interactive execution. If slaves are already running and
 ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
 ## reuse the existing pool instead of respawning. To change the number of
-## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-npRmpi.start(nslaves=1)
+## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+npRmpi.init(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("Italy")
@@ -255,15 +255,15 @@ summary(fhat)
 ## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
 ## tearing down slaves in the same R session can lead to hangs/crashes.
 ## npRmpi may therefore keep slave daemons alive by default and
-## `npRmpi.stop()` performs a "soft close". Use `force=TRUE` to
+## `npRmpi.quit()` performs a "soft close". Use `force=TRUE` to
 ## actually shut down the slaves.
 ##
 ## You can disable reuse via `options(npRmpi.reuse.slaves=FALSE)` or by
 ## setting the environment variable `NP_RMPI_NO_REUSE_SLAVES=1` before
 ## loading the package.
 
-npRmpi.stop()               ## soft close (may keep slaves alive)
-## npRmpi.stop(force=TRUE)  ## hard close
+npRmpi.quit()               ## soft close (may keep slaves alive)
+## npRmpi.quit(force=TRUE)  ## hard close
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS

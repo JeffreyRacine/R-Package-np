@@ -4,7 +4,7 @@
 ## then try with, say, 4 processors and compare run time.
 
 ## Initialize master and slaves.
-npRmpi.start(nslaves=1)
+npRmpi.init(nslaves=1)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
@@ -36,4 +36,4 @@ output
 cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly
-npRmpi.stop(force=TRUE)
+npRmpi.quit(force=TRUE)

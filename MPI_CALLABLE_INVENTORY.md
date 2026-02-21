@@ -12,8 +12,8 @@ From `NAMESPACE` export block (lines 130-175), the core `np*` user-facing surfac
 
 1. Runtime/session:
 - `np.mpi.initialize`
-- `npRmpi.start`
-- `npRmpi.stop`
+- `npRmpi.init`
+- `npRmpi.quit`
 - `npRmpi.session.info`
 
 2. Estimation/bandwidth constructors:
@@ -111,7 +111,7 @@ Strong candidates to use inside helper/preflight:
 - `options(np.messages=..., np.tree=..., np.largeh.rel.tol=..., np.disc.upper.rel.tol=...)` can differ by rank if not synchronized.
 
 5. Partial initialization:
-- neither `npRmpi.start()` nor `np.mpi.initialize()` has run in a usable context.
+- neither `npRmpi.init()` nor `np.mpi.initialize()` has run in a usable context.
 - helper should auto-bootstrap where feasible and otherwise fail fast with exact instruction.
 
 ## 6) Implementation Checklist (What Must “Play Nicely”)
@@ -212,7 +212,7 @@ Implication:
 2. Reserved helper temp symbols (`.__npRmpi_*` preferred; avoid existing `.tmp*` collisions).
 3. MPI worker state (`.mpi.err`, pending daemon loop semantics).
 4. Global options affecting kernel/CV paths.
-5. Existing slave pool lifecycle (`npRmpi.reuse.slaves`, `npRmpi.start/stop` semantics).
+5. Existing slave pool lifecycle (`npRmpi.reuse.slaves`, `npRmpi.init/quit` semantics).
 6. S3 transitive paths that re-enter constructors (`predict.*`, `plot.*`, bandwidth `predict.*`).
 
 ## 10) Recommended Additional Validation Before Implementation
@@ -279,7 +279,7 @@ This section maps key production chains from user entry to native/MPI layers.
 
 ### 11.4 Slave execution loop chain
 1. Startup/init:
-- `npRmpi.start()` in `/Users/jracine/Development/np-npRmpi/R/session.R` calls `mpi.spawn.Rslaves(...)` and `mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)`
+- `npRmpi.init()` in `/Users/jracine/Development/np-npRmpi/R/session.R` calls `mpi.spawn.Rslaves(...)` and `mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)`
 2. Slave daemon:
 - `/Users/jracine/Development/np-npRmpi/inst/slavedaemon.R` loops:
   - `tmp.message <- mpi.bcast.cmd(...)`
@@ -373,7 +373,7 @@ Still pending for equivalent treatment:
 2. validate desired semantics for unconditional helper utilities (`npseed`, `nptgauss`, `uocquantile`, `npuniden.*`) that are not distributed estimators but can appear in user pipelines.
 
 ## 15) Known Open Issue
-1. `npplreg` crash mode observed when called without an active slave pool (`npRmpi.start(...)` not invoked), with native trace reaching `kernel_weighted_sum_np` in `jksum.c`.
+1. `npplreg` crash mode observed when called without an active slave pool (`npRmpi.init(...)` not invoked), with native trace reaching `kernel_weighted_sum_np` in `jksum.c`.
 2. Early guardrail added in R-layer for `npplregbw*` and `npplreg*` to fail fast with a startup instruction instead of entering undefined native execution.
 3. Keep this tracked separately as `npplreg crash issue` for focused C-level forensic analysis; do not block broader user-facing dispatch/guardrail rollout.
 

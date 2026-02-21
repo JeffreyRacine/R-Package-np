@@ -128,8 +128,8 @@ export(b.star
        ,string
        ,tailslave.log
        ,np.mpi.initialize
-       ,npRmpi.start
-       ,npRmpi.stop
+       ,npRmpi.init
+       ,npRmpi.quit
        ,npRmpi.session.info
        ,npudensbw
        ,npudistbw

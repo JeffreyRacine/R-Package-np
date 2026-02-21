@@ -49,7 +49,7 @@ gradients(x, \dots)
   \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},
   and \code{\link{se}}, for related methods;
   \code{\link{npRmpi}} for supported objects;
-  \code{\link{npRmpi.start}} for MPI session startup.
+  \code{\link{npRmpi.init}} for MPI session startup.
 }
 \references{
   See the references for the method being interrogated via
@@ -67,7 +67,7 @@ gradients(x, \dots)
 \examples{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 \dontrun{
-npRmpi.start(nslaves=1)
+npRmpi.init(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 x <- runif(10)
@@ -75,7 +75,7 @@ y <- x + rnorm(10, sd = 0.1)
 model <- npreg(y~x, gradients=TRUE)
 gradients(model)
 
-npRmpi.stop()
+npRmpi.quit()
 } % enddontrun     
 }
 \keyword{nonparametric}

@@ -23,7 +23,7 @@ se(x)
   \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},
   and \code{\link{gradients}}, for related methods;
   \code{\link{npRmpi}} for supported objects;
-  \code{\link{npRmpi.start}} for MPI session startup.
+  \code{\link{npRmpi.init}} for MPI session startup.
 }
 
 \author{
@@ -47,8 +47,8 @@ se(x)
 ## Start npRmpi for interactive execution. If slaves are already running and
 ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
 ## reuse the existing pool instead of respawning. To change the number of
-## slaves, call `npRmpi.stop(force=TRUE)` then restart.
-npRmpi.start(nslaves=1)
+## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+npRmpi.init(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 set.seed(42)
@@ -65,15 +65,15 @@ se(fhat)
 ## Note: on some systems (notably macOS+MPICH), repeatedly spawning and
 ## tearing down slaves in the same R session can lead to hangs/crashes.
 ## npRmpi may therefore keep slave daemons alive by default and
-## `npRmpi.stop()` performs a "soft close". Use `force=TRUE` to
+## `npRmpi.quit()` performs a "soft close". Use `force=TRUE` to
 ## actually shut down the slaves.
 ##
 ## You can disable reuse via `options(npRmpi.reuse.slaves=FALSE)` or by
 ## setting the environment variable `NP_RMPI_NO_REUSE_SLAVES=1` before
 ## loading the package.
 
-npRmpi.stop()               ## soft close (may keep slaves alive)
-## npRmpi.stop(force=TRUE)  ## hard close
+npRmpi.quit()               ## soft close (may keep slaves alive)
+## npRmpi.quit(force=TRUE)  ## hard close
 } % enddontrun
 }
 \keyword{nonparametric}

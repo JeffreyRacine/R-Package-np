@@ -243,8 +243,8 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   suppressPackageStartupMessages(library(npRmpi))
   suppressPackageStartupMessages(library(microbenchmark))
 
-  npRmpi.start(nslaves = cfg$nslaves)
-  on.exit(try(npRmpi.stop(force = TRUE), silent = TRUE), add = TRUE)
+  npRmpi.init(nslaves = cfg$nslaves)
+  on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)
 
   options(npRmpi.autodispatch = TRUE, np.messages = FALSE, np.tree = cfg)
   eval(substitute(

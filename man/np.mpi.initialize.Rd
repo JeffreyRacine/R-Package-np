@@ -24,5 +24,5 @@ np.mpi.initialize()
 
 \seealso{
   \code{\link{np.kernels}}, \code{\link{np.options}},
-  \code{\link{npplot}}, \code{\link{npRmpi.start}}.
+  \code{\link{npplot}}, \code{\link{npRmpi.init}}.
 }

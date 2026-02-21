@@ -29,7 +29,7 @@
   invisible(FALSE)
 }
 
-npRmpi.start <- function(...,
+npRmpi.init <- function(...,
                          nslaves = 1,
                          comm = 1,
                          mode = c("auto", "spawn", "attach"),
@@ -72,7 +72,7 @@ npRmpi.start <- function(...,
   .npRmpi_session_attach_worker_loop(comm = comm, nonblock = nonblock, sleep = sleep)
 }
 
-npRmpi.stop <- function(force = FALSE,
+npRmpi.quit <- function(force = FALSE,
                         dellog = TRUE,
                         comm = 1,
                         mode = c("auto", "spawn", "attach")) {

@@ -1315,17 +1315,17 @@ resolved by someone with familiarity of the local installation.
 When your demo program stops at the following point in your file
 \begin{verbatim}
 > npregbw(y~x)
-Error: npRmpi auto-dispatch requires an active MPI slave pool; call npRmpi.start(...) first
+Error: npRmpi auto-dispatch requires an active MPI slave pool; call npRmpi.init(...) first
 \end{verbatim}
 this typically means the MPI session has not been started.
 
 \begin{enumerate}
 
 \item For interactive sessions, call
-  \texttt{npRmpi.start(mode="spawn", nslaves=...)} first.
+  \texttt{npRmpi.init(mode="spawn", nslaves=...)} first.
 
 \item For batch jobs launched with \texttt{mpiexec -n ...},
-  call \texttt{npRmpi.start(mode="attach")} near the top of your script.
+  call \texttt{npRmpi.init(mode="attach")} near the top of your script.
   This replaces the legacy external profile bootstrap workflow.
 
 \item Enable auto-dispatch if desired with

@@ -172,7 +172,7 @@ running parallel programs.
 
 To run a parallel \pkg{np} job having successfully installed the
 \pkg{npRmpi} program, you can launch the script directly under
-\proglang{MPI} and use \code{npRmpi.start(mode="attach")} inside your
+\proglang{MPI} and use \code{npRmpi.init(mode="attach")} inside your
 script. No external bootstrap file is required. To
 run the batch code in the file \code{npudensml_npRmpi.R} using two
 processors on an
@@ -206,7 +206,7 @@ You might instead wish to run your code interactively in an
 \proglang{R} terminal/console rather than in batch mode. Doing so
 requires the essential elements in Section \ref{sec example} below
 with two minor differences. To start an interactive session, load
-\pkg{npRmpi} and call \code{npRmpi.start(mode="spawn", nslaves=foo)}.
+\pkg{npRmpi} and call \code{npRmpi.init(mode="spawn", nslaves=foo)}.
 For example, on a dual-core desktop set \code{foo=1} so that one slave
 is spawned in addition to the master node (two compute nodes total).
 See the file \code{interactive_Rterm.R} in the demo directory for an
@@ -224,7 +224,7 @@ interactively.
 library(npRmpi)
 
 ## Start a spawned interactive session.
-npRmpi.start(mode="spawn", nslaves=1)
+npRmpi.init(mode="spawn", nslaves=1)
 
 ## Then the rest of your program would follow along the lines of that 
 ## in, say, Section \ref{sec example}...
@@ -270,9 +270,9 @@ Below is the same code modified to run in parallel using the
 \begin{enumerate}
     
   \item Start and stop the MPI session using
-    \code{npRmpi.start(mode="attach")} and \code{npRmpi.stop(mode="attach")}
+    \code{npRmpi.init(mode="attach")} and \code{npRmpi.quit(mode="attach")}
     when running under \code{mpiexec}, or
-    \code{npRmpi.start(mode="spawn", nslaves=...)} in interactive sessions.
+    \code{npRmpi.init(mode="spawn", nslaves=...)} in interactive sessions.
 
   \item Enable auto-dispatch with
     \code{options(npRmpi.autodispatch=TRUE, np.messages=FALSE)} so
@@ -305,7 +305,7 @@ Below is the same code modified to run in parallel using the
 ## .Rout), then try with, say, 4 processors and compare run time.
 
 ## Initialize master/worker session in attach mode.
-npRmpi.start(mode="attach", autodispatch=TRUE, np.messages=FALSE)
+npRmpi.init(mode="attach", autodispatch=TRUE, np.messages=FALSE)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
@@ -329,7 +329,7 @@ summary(bw)
 cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
-npRmpi.stop(mode="attach")
+npRmpi.quit(mode="attach")
 \end{verbatim}
 
 For more examples including regression, conditional density

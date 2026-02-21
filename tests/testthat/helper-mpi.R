@@ -7,9 +7,9 @@ spawn_mpi_slaves <- function(n=1) {
   options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
 
   # Prefer the higher-level helper if available.
-  if (exists("npRmpi.start", mode="function")) {
+  if (exists("npRmpi.init", mode="function")) {
     ok <- try({
-      npRmpi.start(nslaves=n, needlog=FALSE)
+      npRmpi.init(nslaves=n, needlog=FALSE)
       TRUE
     }, silent=TRUE)
     return(isTRUE(ok) && isTRUE(try(mpi.comm.size(1) > 1, silent=TRUE)))
@@ -32,8 +32,8 @@ spawn_mpi_slaves <- function(n=1) {
 close_mpi_slaves <- function(force=TRUE) {
   if (requireNamespace("Rmpi", quietly = TRUE)) {
     if (isTRUE(try(mpi.comm.size(1) > 1, silent=TRUE))) {
-      if (exists("npRmpi.stop", mode="function")) {
-        try(npRmpi.stop(force=force), silent=TRUE)
+      if (exists("npRmpi.quit", mode="function")) {
+        try(npRmpi.quit(force=force), silent=TRUE)
       } else {
         try(mpi.close.Rslaves(force=force), silent=TRUE)
       }
