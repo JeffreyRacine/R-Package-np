@@ -1,6 +1,6 @@
 /*
 *-----------------------------------------------------------------------------
-* file: matrix.h
+* file: linalg.h
 * desc: matrix mathematics header file
 * by: ko shu pui, Patrick
 * date: 24 nov 91 v0.1b
