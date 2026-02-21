@@ -75,7 +75,7 @@ and distribution function estimates over the range \eqn{[a,b]}
 }
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.start}}.
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
@@ -214,7 +214,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.reflect}}.
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
 ## unadjusted density, and DGP
@@ -279,7 +279,7 @@ lines(age,model$f)
 lines(density(age,bw=model$h),col=2)
 legend("topright",c("Boundary Kernel","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 detach(cps71)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

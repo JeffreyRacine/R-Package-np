@@ -10,30 +10,59 @@ provide a recommended, robust workflow: initialize a slave pool once and
 reuse it across multiple examples within the same R session.
 }
 \usage{
-npRmpi.start(..., nslaves = 1, comm = 1)
+npRmpi.start(..., nslaves = 1, comm = 1,
+            mode = c("auto", "spawn", "attach"),
+            autodispatch = TRUE, np.messages = FALSE,
+            nonblock = TRUE, sleep = 0.1, quiet = FALSE)
 
-npRmpi.stop(force = FALSE, dellog = TRUE, comm = 1)
+npRmpi.stop(force = FALSE, dellog = TRUE, comm = 1,
+           mode = c("auto", "spawn", "attach"))
 
 npRmpi.session.info(comm = 1)
 }
 \arguments{
   \item{\dots}{Additional arguments passed to \code{mpi.spawn.Rslaves()}.}
-  \item{nslaves}{Number of slaves to spawn for interactive execution.}
+  \item{nslaves}{Number of slaves to spawn for interactive execution (\code{mode="spawn"}).}
   \item{comm}{Communicator used for the master+slaves pool (defaults to \code{1}).}
+  \item{mode}{Startup/stop mode. \code{"spawn"} starts slaves from rank 0.
+    \code{"attach"} attaches to an already-launched MPI world (e.g. started
+    with \code{mpiexec -n ...}) without spawning. \code{"auto"} selects
+    \code{"attach"} when \code{mpi.comm.size(0) > 1}, otherwise \code{"spawn"}.}
+  \item{autodispatch}{Logical; if non-\code{NULL}, sets
+    \code{options(npRmpi.autodispatch=...)} inside \code{npRmpi.start()}.}
+  \item{np.messages}{Logical; if non-\code{NULL}, sets
+    \code{options(np.messages=...)} inside \code{npRmpi.start()}.}
+  \item{nonblock}{Logical passed to the internal attach-mode worker loop
+    receive path.}
+  \item{sleep}{Polling sleep interval (seconds) for nonblocking attach-mode
+    worker-loop receives.}
+  \item{quiet}{Logical; suppress host-info printing when \code{FALSE}.}
   \item{force}{Logical; when \code{TRUE}, force a hard shutdown of slave daemons.}
   \item{dellog}{Logical; when \code{TRUE}, remove slave log files (if applicable).}
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup.
 
-\code{npRmpi.start()} ensures that a slave pool exists (spawning if needed)
-and runs \code{np.mpi.initialize()} on all ranks via \code{mpi.bcast.cmd()}.
+\code{npRmpi.start()} now supports two robust execution models:
+\enumerate{
+  \item Interactive/spawn mode (\code{mode="spawn"}): spawns slaves and
+  initializes all ranks.
+  \item Batch/attach mode (\code{mode="attach"}): attaches to a pre-launched
+  MPI world and runs worker-loop coordination internally (no external
+  bootstrap profile file required).
+}
+
+For cluster/batch jobs, run scripts directly under MPI, e.g.
+\code{mpiexec -n 128 Rscript foo.R}, and call
+\code{npRmpi.start(mode="attach")} inside \code{foo.R}.
 
 \code{npRmpi.stop()} is idempotent: if no slaves are running it returns
 silently. When \code{options(npRmpi.reuse.slaves=TRUE)} (default on some
 systems), \code{force=FALSE} performs a soft-close to keep daemons alive
 for reuse within the session; use \code{force=TRUE} to actually shut down
-the slaves.
+the slaves. In \code{mode="attach"}, \code{npRmpi.stop()} signals worker
+ranks to exit their loop and returns on rank 0 without forcing an R quit
+on the master process.
 
 \code{npRmpi.session.info()} prints and returns a list of useful version,
 platform, and MPI/communicator details to aid reproducibility and bug
@@ -52,7 +81,13 @@ npRmpi.stop()
 
 ## Hard-stop (actually shuts down slaves)
 ## npRmpi.stop(force=TRUE)
+
+## Batch/cluster style (under mpiexec):
+## mpiexec -n 128 Rscript foo.R
+## inside foo.R:
+## npRmpi.start(mode="attach", autodispatch=TRUE, np.messages=FALSE)
+## ... np* calls ...
+## npRmpi.stop(mode="attach")
 }
 }
 \keyword{nonparametric}
-

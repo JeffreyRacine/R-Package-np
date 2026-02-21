@@ -1314,25 +1314,22 @@ resolved by someone with familiarity of the local installation.
 
 When your demo program stops at the following point in your file
 \begin{verbatim}
-> mpi.bcast.cmd(np.mpi.initialize(),
-+               caller.execute=TRUE)
-Error: could not find function "mpi.bcast.cmd"
+> npregbw(y~x)
+Error: npRmpi auto-dispatch requires an active MPI slave pool; call npRmpi.start(...) first
 \end{verbatim}
-this likely means that either you have failed to place the
-\texttt{.Rprofile} file in the current or root directory as directed,
-or the \texttt{.Rprofile} initialization code is not being loaded as
-expected.
+this typically means the MPI session has not been started.
 
 \begin{enumerate}
 
-\item Make sure a copy of the initialization file \texttt{Rprofile}
-  exists in your working or root directory and is named
-  \texttt{.Rprofile}
+\item For interactive sessions, call
+  \texttt{npRmpi.start(mode="spawn", nslaves=...)} first.
 
-\item Make sure you did not run \texttt{R} with either the
-  \texttt{--no-init-file} or \texttt{--vanilla} option (this combines
-  a number of options including \texttt{--no-init-file} which will
-  disable reading of \texttt{.Rprofile})
+\item For batch jobs launched with \texttt{mpiexec -n ...},
+  call \texttt{npRmpi.start(mode="attach")} near the top of your script.
+  This replaces the legacy external profile bootstrap workflow.
+
+\item Enable auto-dispatch if desired with
+  \texttt{options(npRmpi.autodispatch=TRUE, np.messages=FALSE)}.
 
 \end{enumerate}
 

@@ -21,7 +21,7 @@ No return value, called for side effects (sets kernel constants in the
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.start}}.
 
   \code{nptgauss} allows one to set the truncation radius of the truncated Gaussian kernel used by \pkg{npRmpi}, which defaults to 3. It automatically computes the constants describing the truncated gaussian kernel for the user.
   
@@ -53,9 +53,9 @@ where \eqn{a_0}{a0} is determined by the normalisation condition on H,
 }
 
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The default kernel, a gaussian truncated at +- 3
 nptgauss(b = 3.0)
-% } % enddontrun
+} % enddontrun
 }

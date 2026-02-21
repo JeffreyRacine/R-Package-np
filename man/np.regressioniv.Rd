@@ -247,7 +247,7 @@ npregiv(y,
   }
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup.
 
   Tikhonov regularization requires computation of weight matrices of
   dimension \eqn{n\times n}{n x n} which can be computationally costly
@@ -433,7 +433,7 @@ This function should be considered to be in \sQuote{beta test} status until furt
 \code{\link{npregivderiv},\link{npreg}}
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -549,6 +549,6 @@ npRmpi.start(nslaves=1)
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-% } % enddontrun     
+} % enddontrun     
 }
 \keyword{ instrument }

@@ -7,7 +7,7 @@
   compact-support variants used in C-level code paths).
 }
 \details{
-  Documentation guide: see \code{\link{np.options}} for global options
+  Documentation guide: see \code{\link{np.options}} for global options For interactive and cluster batch workflows, see \code{\link{npRmpi.start}}.
   and \code{\link{npplot}} for plotting options.
 
   Kernel option names used in \pkg{npRmpi}:

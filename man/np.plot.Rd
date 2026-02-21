@@ -748,7 +748,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
 }
 
 \examples{
-% \dontrun{
+\dontrun{
 npRmpi.start(nslaves=1)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
@@ -846,35 +846,6 @@ plot(bw,
      plot.errors.center="bias-corrected",
      plot.errors.type="simultaneous")
 
-# Note - if you wished to create, say, a postscript graph for inclusion
-# in, say, a latex document, use R's `postscript' command to switch to
-# the postscript device (turn off the device once completed). The
-# following will create a disk file `graph.ps' that can be pulled into,
-# say, a latex document via \includegraphics[width=5in, height=5in,
-# angle=270]{graph.ps}
-
-# Note - make sure to include the graphicx package in your latex
-# document via adding \usepackage{graphicx} in your latex file. Also, 
-# you might want to use larger fonts, which can be achieved by adding the
-# pointsize= argument, e.g., postscript(file="graph.ps", pointsize=20)
-
-postscript(file="graph.ps")
-plot(bw)
-dev.off()
-
-# The following latex file compiled in the same directory as graph.ps
-# ought to work (remove the #s and place in a file named, e.g., 
-# test.tex).
-# \documentclass[]{article}
-# \usepackage{graphicx}
-# \begin{document}
-# \begin{figure}[!ht]
-# \includegraphics[width=5in, height=5in, angle=270]{graph.ps}
-# \caption{Local linear partial regression surfaces.}
-# \end{figure}
-# \end{document}
-
-
 # EXAMPLE 3: This example demonstrates how to retrieve plotting data from
 # npplot(). When npplot() is called with the arguments
 # `plot.behavior="plot-data"' (or "data"), it returns plotting objects
@@ -960,12 +931,12 @@ lines(age.eval,grad.upper.ci,lty=3)
 
 detach(cps71)
 npRmpi.stop()
-% } % enddontrun
+} % enddontrun
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}
-  \code{\link{np.options}}
+  \code{\link{np.kernels}}, \code{\link{np.options}},
+  \code{\link{npRmpi.start}}
 }
 
 \keyword{nonparametric}

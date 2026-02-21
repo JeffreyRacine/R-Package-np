@@ -171,17 +171,15 @@ running parallel programs.
 \subsection{Parallel Batch Execution}
 
 To run a parallel \pkg{np} job having successfully installed the
-\pkg{npRmpi} program, copy the \code{Rprofile} file in
-\code{npRmpi/inst} to the current directory and name it
-\code{.Rprofile} (or copy it to your home directory and again name it
-\code{.Rprofile}).\footnote{You will need to download the \pkg{npRmpi}
-  source code and unpack it in order to get Rprofile from the
-  npRmpi/inst directory.} Then to run the batch code in the file
-\code{npudensml_npRmpi.R} using two processors on an
+\pkg{npRmpi} program, you can launch the script directly under
+\proglang{MPI} and use \code{npRmpi.start(mode="attach")} inside your
+script. No external bootstrap file is required. To
+run the batch code in the file \code{npudensml_npRmpi.R} using two
+processors on an
 \proglang{MPI} system you will enter something like
 
 \begin{verbatim}
-mpirun -np 2 R CMD BATCH npudensml_npRmpi.R
+mpiexec -n 2 Rscript npudensml_npRmpi.R
 \end{verbatim}
 
 You can compare run times and any other differences by examining the
@@ -207,19 +205,12 @@ clusters.
 You might instead wish to run your code interactively in an
 \proglang{R} terminal/console rather than in batch mode. Doing so
 requires the essential elements in Section \ref{sec example} below
-with two minor differences. For this we do not require that the
-initialization file \code{.Rprofile} reside in the root or current
-directory (if it does it will be benign). To start a session, (i) you
-will load the \pkg{npRmpi} package in the normal manner via
-\code{library("npRmpi")}, then (ii) generate the slave nodes using the
-command \code{mpi.spawn.Rslaves(nslaves=foo)}. For example, on a dual
-core desktop set \code{foo=1} so that
-\code{mpi.spawn.Rslaves(nslaves=1)} will spawn one slave node in
-addition to the master node on which \proglang{R} is running for a
-total of two compute nodes. See the file \code{interactive_Rterm.R} in
-the demo directory for an illustration, but here is some sample code
-illustrating the additional elements required for an interactive
-session.
+with two minor differences. To start an interactive session, load
+\pkg{npRmpi} and call \code{npRmpi.start(mode="spawn", nslaves=foo)}.
+For example, on a dual-core desktop set \code{foo=1} so that one slave
+is spawned in addition to the master node (two compute nodes total).
+See the file \code{interactive_Rterm.R} in the demo directory for an
+illustration.
 
 Note also that in an interactive session the messages displayed during
 execution might be informative so there is no need for the option
@@ -229,17 +220,11 @@ interactively.
 
 \begin{verbatim}
 ## This code can be run interactively inside the R terminal/console
-## It does not require that you have the .Rprofile file from
-## npRmpi/inst/ in your current directory or home directory as we can
-## load the npRmpi package in the standard manner.
 
 library(npRmpi)
 
-## Now we can spawn our slaves from within the R terminal/console manually. 
-## On a two core desktop we need an additional slave on top of the master
-## node to allow both cores to run simultaneously.
-
-mpi.spawn.Rslaves(nslaves=1)
+## Start a spawned interactive session.
+npRmpi.start(mode="spawn", nslaves=1)
 
 ## Then the rest of your program would follow along the lines of that 
 ## in, say, Section \ref{sec example}...
@@ -283,13 +268,11 @@ Below is the same code modified to run in parallel using the
 \pkg{npRmpi} package. The salient differences are as follows:
 
 \begin{enumerate}
-  
-  \item You {\em must} copy the \code{Rprofile} file from the npRmpi/inst
-    directory of the tarball/zip file into either your root directory
-    or current working directory and rename it \code{.Rprofile}. 
     
   \item Start and stop the MPI session using
-    \code{npRmpi.start(nslaves=...)} and \code{npRmpi.stop(force=TRUE)}.
+    \code{npRmpi.start(mode="attach")} and \code{npRmpi.stop(mode="attach")}
+    when running under \code{mpiexec}, or
+    \code{npRmpi.start(mode="spawn", nslaves=...)} in interactive sessions.
 
   \item Enable auto-dispatch with
     \code{options(npRmpi.autodispatch=TRUE, np.messages=FALSE)} so
@@ -315,22 +298,19 @@ Below is the same code modified to run in parallel using the
 
 
 \begin{verbatim}
-## Make sure you have the .Rprofile file from npRmpi/inst/ in your
-## current directory or home directory. It is necessary.
-
-## To run this on systems with an MPI implementation (e.g. MPICH) 
+## To run this on systems with an MPI implementation (e.g. MPICH)
 ## installed and working, try
-## mpirun -np 2 R CMD BATCH npudensml_npRmpi.R. Check the time in the
+## mpiexec -n 2 Rscript npudensml_npRmpi.R. Check the time in the
 ## output file npudensml_npRmpi.Rout (the name of this file with extension
 ## .Rout), then try with, say, 4 processors and compare run time.
 
-## Initialize master and slaves.
-npRmpi.start(nslaves=1)
+## Initialize master/worker session in attach mode.
+npRmpi.start(mode="attach", autodispatch=TRUE, np.messages=FALSE)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
+## (You can still set options() manually if preferred.)
 
 ## Generate some data and broadcast it to all slaves (it will be known
 ## to the master node)
@@ -349,7 +329,7 @@ summary(bw)
 cat("Elapsed time =", t[3], "\n")
 
 ## Clean up properly then quit()
-npRmpi.stop(force=TRUE)
+npRmpi.stop(mode="attach")
 \end{verbatim}
 
 For more examples including regression, conditional density

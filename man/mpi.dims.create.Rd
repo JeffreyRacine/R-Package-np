@@ -34,13 +34,13 @@ Hao Yu
   \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks when toggled to dontrun: this MPI utility example is
 ## intended for manual interactive use.
 #What is the dim numbers of 2 dim Cartersian topology under a grid of 36 nodes
 mpi.dims.create(36,2)	#return c(6,6)
 #Constrained dim numbers
 mpi.dims.create(12,2,c(0,4)) #return c(9,4)
-% } % enddontrun
+} % enddontrun
 } 
 \keyword{interface}

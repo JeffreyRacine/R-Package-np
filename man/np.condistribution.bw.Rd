@@ -417,7 +417,7 @@ npcdistbw(\dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup.
 
   \code{npcdistbw} implements a variety of methods for choosing
   bandwidths for multivariate distributions (\eqn{p+q}-variate) defined

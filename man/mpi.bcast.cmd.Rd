@@ -34,12 +34,14 @@ are, the more CPUs consume.}
 } 
 \details{
   \code{mpi.bcast.cmd} is a collective call. This means all members in a communicator must 
-  execute it at the same time. If slaves are spawned (created) by using slavedaemon.R (Rprofile script), 
-  then they are running \code{mpi.bcast.cmd} in infinite loop (idle state). Hence master can execute 
-  \code{mpi.bcast.cmd} alone to start computation. On the master, \code{cmd} and \code{...} are put together 
-  as a list which is then broadcasted (after serialization) to all slaves (using for loop with mpi.send 
-  and mpi.recv pair). All slaves will return an expression which will be evaluated by either slavedaemon.R, 
-  or by whatever an R script based on slavedaemon.R.
+  execute it at the same time. Under \code{npRmpi.start(mode="spawn")} this is
+  handled by spawned slave daemons. Under \code{npRmpi.start(mode="attach")}
+  (batch \code{mpiexec} workflows), worker ranks enter the same idle-loop
+  coordination internally, so no external bootstrap is needed.
+  On the master, \code{cmd} and \code{...} are put together as a list which is
+  then broadcast (after serialization) to all slaves (using a for-loop with
+  \code{mpi.send}/\code{mpi.recv}). All slaves return an expression that is
+  evaluated by the worker loop.
   
   If nonblock=TRUE, then on receiving side, a nonblock procedure is used to check if 
   there is a message. If not, it will sleep for the specied amount and repeat itself.

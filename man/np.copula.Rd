@@ -77,7 +77,7 @@ npcopula(bws,
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup.
 
 
   \code{npcopula} computes the nonparametric copula or copula density
@@ -134,7 +134,7 @@ npcopula(bws,
 }
 
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## Example 1: Bivariate Mixed Data
 
@@ -315,7 +315,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-% } % enddontrun
+} % enddontrun
 }
 
 \keyword{ nonparametric }

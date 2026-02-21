@@ -31,11 +31,11 @@ uocquantile(x, prob)
 }
 
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 x <- rbinom(n = 100, size = 10, prob = 0.5)
 uocquantile(x, 0.5)
-% } % enddontrun
+} % enddontrun
 }
 
 \keyword{univar}

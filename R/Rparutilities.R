@@ -102,8 +102,8 @@ mpi.spawn.Rslaves <-
          err <-paste("It seems there are some slaves running on comm ", comm)
          stop(err)
     }
-    if (.Platform$OS=="windows"){
-		stop("Spawning is not implemented. Please use mpiexec with Rprofile.")
+	if (.Platform$OS=="windows"){
+		stop("Spawning is not implemented on Windows. Launch with mpiexec and use npRmpi.start(mode=\"attach\").")
         workdrive <- unlist(strsplit(getwd(),":"))[1]
 		workdir <- unlist(strsplit(getwd(),"/"))
 		if (length(workdir) > 1)

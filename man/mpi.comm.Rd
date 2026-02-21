@@ -37,13 +37,13 @@ Hao Yu
   \url{https://www.mpich.org/static/docs/latest/www3/}
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks when toggled to dontrun: communicator examples are
 ## documented for manual MPI sessions.
 mpi.comm.rank(comm=0)
 mpi.comm.size(comm=0)
 mpi.comm.dup(comm=0, newcomm=5)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{interface}
  

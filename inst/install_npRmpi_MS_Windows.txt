@@ -48,25 +48,20 @@ TESTING:
 
    The way to run code in parallel on a windows machine is described
    in steps 1 to 4 below.
+  (i) Download the file 'test.R' and save it locally on your C:\ drive.
 
-   Note that the provided ".Rprofile" file has to be located where
-   'test.R' is for the above command to run properly. In this example,
-   both 'test.R' and '.Rprofile' are located on my 'C Drive'
-
-  (i) Download the files 'test.R' and '.Rprofile' and save them
-      locally on your C:\ drive.
-
- (ii) Open "Command Prompt" as the administrator. At the prompt, type
+  (ii) Ensure your script calls npRmpi.start(mode="attach", autodispatch=TRUE, np.messages=FALSE) near the top and npRmpi.stop(mode="attach") at the end.
+ (iii) Open "Command Prompt" as the administrator. At the prompt, type
 
   cd C:\
 
-(iii) Now type
+(iv) Now type
 
      mpiexec -n 2 R --no-save -q < test.R > test_out.txt
 
      (Change 2 for 3 or 4 if you got a quad-core desktop)
 
-(iv) After execution, type
+(v) After execution, type
 
     test_out.txt
 

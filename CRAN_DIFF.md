@@ -34,7 +34,7 @@ Changed files: 62
 - `configure`: Modernized configure script (MPI detection and flags). (last change: 2026-02-05 | Modernize MPI detection in configure)
 - `configure.ac`: Modernized autoconf definitions (MPI detection paths). (last change: 2026-02-05 | Modernize MPI detection in configure)
 - `configure~`: Added in the current codebase (new file).
-- `demo/.Rprofile`: Added in the current codebase (new file).
+- `demo/legacy-bootstrap-profile`: Added in the current codebase (new file).
 - `demo/Readme`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
 - `demo/compare_rout.py`: Added in the current codebase (new file). (last change: 2026-02-05 | Docs: build notes and demo tooling)
 - `demo/makefile`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
@@ -42,7 +42,7 @@ Changed files: 62
 - `demo/makefile.serial`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
 - `demo/makefile.serial.sharcnet`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
 - `demo/makefile.sharcnet`: Added in the current codebase (new file). (last change: 2026-02-05 | Fix npsigtest eval casting and add demo run/timing helpers)
-- `demo/n_2/.Rprofile`: Added in the current codebase (new file).
+- `demo/n_2/legacy-bootstrap-profile`: Added in the current codebase (new file).
 - `demo/n_2/npcdensls_npRmpi.Rout`: Added in the current codebase (new file).
 - `demo/n_2/npcdensml_npRmpi.Rout`: Added in the current codebase (new file).
 - `demo/n_2/npcdistls_npRmpi.Rout`: Added in the current codebase (new file).
@@ -163,7 +163,7 @@ Changed files: 62
 - `demo/timing_n_4.dat`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
 - `demo/timing_n_4.tex`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
 - `inst/MacR64slaves.sh`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
-- `inst/Rprofile`: MPI runtime profile updated for stable slave startup and shutdown. (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `inst/legacy-bootstrap-profile`: MPI runtime profile updated for stable slave startup and shutdown. (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
 - `inst/Rslaves.sh`: Rmpi slave launcher updated (adds --vanilla and compatibility tweaks). (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
 - `inst/Rslaves32.cmd`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
 - `inst/Rslaves64.cmd`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)

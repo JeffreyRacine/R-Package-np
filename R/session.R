@@ -1,16 +1,103 @@
-npRmpi.start <- function(..., nslaves=1, comm=1){
-  # Ensure a slave pool is available, then initialize npRmpi on all ranks.
-  mpi.spawn.Rslaves(..., nslaves=nslaves, comm=comm)
-  mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE, comm=comm)
+.npRmpi_session_apply_options <- function(autodispatch = NULL,
+                                          np.messages = NULL) {
+  if (!is.null(autodispatch))
+    options(npRmpi.autodispatch = isTRUE(autodispatch))
+  if (!is.null(np.messages))
+    options(np.messages = isTRUE(np.messages))
   invisible(TRUE)
 }
 
-npRmpi.stop <- function(force=FALSE, dellog=TRUE, comm=1){
-  # Idempotent stop: if no slaves are running, return silently.
-  size <- try(mpi.comm.size(comm), silent=TRUE)
-  if (inherits(size, "try-error") || is.na(size) || size < 2)
+.npRmpi_session_ensure_comm <- function(comm = 1L) {
+  size <- try(mpi.comm.size(comm), silent = TRUE)
+  if (!inherits(size, "try-error") && !is.na(size))
+    return(invisible(as.integer(size)))
+  invisible(mpi.comm.dup(0, comm))
+}
+
+.npRmpi_session_attach_worker_loop <- function(comm = 1L,
+                                               nonblock = TRUE,
+                                               sleep = 0.1) {
+  options(echo = FALSE)
+  repeat {
+    msg <- mpi.bcast.cmd(rank = 0, comm = comm, nonblock = nonblock, sleep = sleep)
+    if (is.character(msg) && identical(msg, "kaerb"))
+      break
+    try(eval(msg, envir = .GlobalEnv), silent = TRUE)
+  }
+  try(if (comm != 0L) mpi.comm.free(comm), silent = TRUE)
+  mpi.quit()
+  invisible(FALSE)
+}
+
+npRmpi.start <- function(...,
+                         nslaves = 1,
+                         comm = 1,
+                         mode = c("auto", "spawn", "attach"),
+                         autodispatch = TRUE,
+                         np.messages = FALSE,
+                         nonblock = TRUE,
+                         sleep = 0.1,
+                         quiet = FALSE) {
+  mode <- match.arg(mode)
+  world.size <- try(mpi.comm.size(0), silent = TRUE)
+  world.size <- if (inherits(world.size, "try-error") || is.na(world.size)) 1L else as.integer(world.size)
+
+  if (identical(mode, "auto")) {
+    mode <- if (world.size > 1L) "attach" else "spawn"
+  }
+
+  .npRmpi_session_apply_options(autodispatch = autodispatch, np.messages = np.messages)
+
+  if (identical(mode, "spawn")) {
+    mpi.spawn.Rslaves(..., nslaves = nslaves, comm = comm, quiet = quiet, nonblock = nonblock, sleep = sleep)
+    mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE, comm = comm)
+    return(invisible(TRUE))
+  }
+
+  if (world.size < 2L)
+    stop("attach mode requires a pre-launched MPI world (e.g. mpiexec -n <master+slaves>)")
+
+  .npRmpi_session_ensure_comm(comm = comm)
+  np.mpi.initialize()
+  mpi.barrier(0)
+
+  rank <- try(mpi.comm.rank(comm), silent = TRUE)
+  rank <- if (inherits(rank, "try-error") || is.na(rank)) 0L else as.integer(rank)
+
+  if (rank == 0L) {
+    if (!quiet) slave.hostinfo(comm)
+    return(invisible(TRUE))
+  }
+
+  .npRmpi_session_attach_worker_loop(comm = comm, nonblock = nonblock, sleep = sleep)
+}
+
+npRmpi.stop <- function(force = FALSE,
+                        dellog = TRUE,
+                        comm = 1,
+                        mode = c("auto", "spawn", "attach")) {
+  mode <- match.arg(mode)
+  size.comm <- try(mpi.comm.size(comm), silent = TRUE)
+  size.comm <- if (inherits(size.comm, "try-error") || is.na(size.comm)) 0L else as.integer(size.comm)
+  size.world <- try(mpi.comm.size(0), silent = TRUE)
+  size.world <- if (inherits(size.world, "try-error") || is.na(size.world)) 1L else as.integer(size.world)
+
+  if (identical(mode, "auto")) {
+    mode <- if (size.world > 1L && size.comm > 1L) "attach" else "spawn"
+  }
+
+  if (size.comm < 2L)
     return(invisible(FALSE))
-  mpi.close.Rslaves(dellog=dellog, comm=comm, force=force)
+
+  if (identical(mode, "attach")) {
+    mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm, caller.execute = FALSE)
+    if (comm != 0L) {
+      try(mpi.comm.free(comm), silent = TRUE)
+    }
+    return(invisible(TRUE))
+  }
+
+  mpi.close.Rslaves(dellog = dellog, comm = comm, force = force)
   invisible(TRUE)
 }
 

@@ -98,8 +98,10 @@ R CMD INSTALL –preclean npRmpi_0.50-1.tar.gz
 5. Testing:
 
 From inside your DOS command shell, now navigate where your test R
-code (called it “mytest.R”) is located (along with the .Rprofile
-file). At the command prompt, write
+code (called it “mytest.R”) is located. Ensure your script calls
+npRmpi.start(mode="attach", autodispatch=TRUE, np.messages=FALSE)
+near the top and npRmpi.stop(mode="attach") at the end. At the
+command prompt, write
 
 mpiexec –n 2 R –no-save –q < mytest.R > mytest_OUT.txt
 

@@ -174,7 +174,7 @@ npplregbw(\dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup.
 
   \code{npplregbw} implements a variety of methods for nonparametric
  regression on multivariate (\eqn{q}-variate) explanatory data defined
@@ -311,7 +311,7 @@ npplregbw(\dots)
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -361,6 +361,6 @@ summary(bw)
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-% } % enddontrun     
+} % enddontrun     
 }
 \keyword{nonparametric}

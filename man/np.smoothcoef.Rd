@@ -267,7 +267,7 @@ FALSE, \dots)
   \code{\link{npudensbw}}, \code{\link{npscoefbw}} }
 
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -316,6 +316,6 @@ summary(model)
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-% } % enddontrun     
+} % enddontrun     
 }
 \keyword{nonparametric}

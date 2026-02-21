@@ -93,7 +93,7 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.start}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.start}}.
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
@@ -163,7 +163,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
   and the function \code{\link{npuniden.boundary}}.
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 n <- 100
 set.seed(42)
@@ -290,7 +290,7 @@ lines(X,foo$f.deriv,col=2,lty=2)
 abline(h=0,lty=2)
 rug(X)
 legend("topleft",c("Constrained-log","Unconstrained-log"),lty=1:2,col=1:2,bty="n")
-% } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }
 \keyword{ smooth }

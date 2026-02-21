@@ -1,6 +1,3 @@
-## Make sure you have the .Rprofile file from npRmpi/inst/ in your
-## current directory or home directory. It is necessary.
-
 ## To run this on systems with OPENMPI installed and working, try
 ## mpirun -np 2 R CMD BATCH npplreg_npRmpi. Check the time in the
 ## output file foo.Rout (the name of this file with extension .Rout),

@@ -22,7 +22,8 @@ se(x)
 \seealso{
   \code{\link{fitted}}, \code{\link{residuals}}, \code{\link{coef}},
   and \code{\link{gradients}}, for related methods;
-  \code{\link{npRmpi}} for supported objects. 
+  \code{\link{npRmpi}} for supported objects;
+  \code{\link{npRmpi.start}} for MPI session startup.
 }
 
 \author{
@@ -33,7 +34,7 @@ se(x)
   This method currently only supports objects from the \code{\link{npRmpi}} library.
 }
 \examples{
-% \dontrun{
+\dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
@@ -73,6 +74,6 @@ se(fhat)
 
 npRmpi.stop()               ## soft close (may keep slaves alive)
 ## npRmpi.stop(force=TRUE)  ## hard close
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}

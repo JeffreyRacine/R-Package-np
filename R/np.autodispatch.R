@@ -99,13 +99,13 @@
 .npRmpi_require_active_slave_pool <- function(comm = 1L, where = "this call") {
   if (.npRmpi_has_active_slave_pool(comm = comm))
     return(invisible(TRUE))
-  stop(sprintf("%s requires an active MPI slave pool; call npRmpi.start(nslaves=...) first", where))
+  stop(sprintf("%s requires an active MPI slave pool; call npRmpi.start(...) first", where))
 }
 
 .npRmpi_autodispatch_preflight <- function(comm = 1L) {
   strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
   if (!.npRmpi_has_active_slave_pool(comm = comm)) {
-    msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.start(nslaves=...) first"
+    msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.start(...) first"
     if (strict) stop(msg)
     warning(msg)
     return(FALSE)
