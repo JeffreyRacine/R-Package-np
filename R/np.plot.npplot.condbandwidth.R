@@ -198,15 +198,19 @@ npplot.condbandwidth <-
         else if (cdf) "dist"
         else "dens"
 
-      tobj = eval(parse(text = paste(
-                          switch(tboo,
-                                 "quant" = "npqreg",
-                                 "dist" = "npcdist",
-                                 "dens" = "npcdens"),
-                          "(txdat = xdat, tydat = ydat, exdat =",
-                          ifelse(quantreg, "x.eval, tau = tau",
-                                 "x.eval[,1, drop = FALSE], eydat = x.eval[,2, drop = FALSE]"),
-                          ", bws = bws)", sep="")))
+      method.fun <- switch(tboo,
+                           "quant" = npqreg,
+                           "dist" = npcdist,
+                           "dens" = npcdens)
+      margs <- list(txdat = xdat, tydat = ydat, bws = bws)
+      if (quantreg) {
+        margs$exdat <- x.eval
+        margs$tau <- tau
+      } else {
+        margs$exdat <- x.eval[,1, drop = FALSE]
+        margs$eydat <- x.eval[,2, drop = FALSE]
+      }
+      tobj <- do.call(method.fun, margs)
 
       tcomp = parse(text=paste("tobj$",
                       switch(tboo,
@@ -559,13 +563,19 @@ npplot.condbandwidth <-
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj = eval(parse(text=paste(ifelse(cdf, "npcdist",
-                          ifelse(quantreg, "npqreg", "npcdens")),
-                          "(txdat = xdat, tydat = ydat,",
-                          "exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],",
-                          ifelse(quantreg, "tau = tau,",
-                                 "eydat = eydat[1:xi.neval,, drop = FALSE],"),
-                          "gradients = gradients, bws = bws)",sep="")))
+        method.fun <- if (cdf) npcdist else if (quantreg) npqreg else npcdens
+        margs <- list(
+          txdat = xdat,
+          tydat = ydat,
+          exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+          gradients = gradients,
+          bws = bws
+        )
+        if (quantreg)
+          margs$tau <- tau
+        else
+          margs$eydat <- eydat[1:xi.neval,, drop = FALSE]
+        tobj <- do.call(method.fun, margs)
 
         
         ## if there are gradients then we need to repeat the process for each component
@@ -693,13 +703,19 @@ npplot.condbandwidth <-
             ei[(xi.neval+1):maxneval] = NA
           }
 
-          tobj = eval(parse(text=paste(ifelse(cdf, "npcdist",
-                              ifelse(quantreg, "npqreg", "npcdens")),
-                              "(txdat = xdat, tydat = ydat,",
-                              ifelse(quantreg, "tau = tau,",
-                                     "exdat = exdat[1:xi.neval,, drop = FALSE],"),
-                              "eydat = subcol(eydat,ei,i)[1:xi.neval,, drop = FALSE],",
-                              "gradients = gradients, bws = bws)",sep="")))
+          method.fun <- if (cdf) npcdist else if (quantreg) npqreg else npcdens
+          margs <- list(
+            txdat = xdat,
+            tydat = ydat,
+            eydat = subcol(eydat,ei,i)[1:xi.neval,, drop = FALSE],
+            gradients = gradients,
+            bws = bws
+          )
+          if (quantreg)
+            margs$tau <- tau
+          else
+            margs$exdat <- exdat[1:xi.neval,, drop = FALSE]
+          tobj <- do.call(method.fun, margs)
 
           
           ## if there are gradients then we need to repeat the process for each component
