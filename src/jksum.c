@@ -12518,7 +12518,6 @@ double *SIGN){
     }
 
     MATRIX XTKX = mat_creat( num_reg_continuous + 3, num_obs_train, UNDEFINED );
-    MATRIX XTKXINV = mat_creat( num_reg_continuous + 1, num_reg_continuous + 1, UNDEFINED );
     MATRIX XTKY = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
     MATRIX DELTA = mat_creat( num_reg_continuous + 1, 1, UNDEFINED );
 
@@ -12809,7 +12808,7 @@ double *SIGN){
         }
         
         // we need to do new matrix inversions here for the unordered + ordered data
-        // we can safely taint KWM , XTKXINV, DELTA, and XTKY here
+        // we can safely taint KWM , DELTA, and XTKY here
         for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered); l++){
           const int dl = l - num_reg_continuous;
           const int ojp = j*nrcc33*p_nvar + dl*nrcc33;
@@ -12853,7 +12852,7 @@ double *SIGN){
         }
 
         // we need to do new matrix inversions here for the unordered + ordered data
-        // we can safely taint KWM , XTKXINV, DELTA, and XTKY here
+        // we can safely taint KWM , DELTA, and XTKY here
         for(l = num_reg_continuous + num_reg_unordered; l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++){
 
           const int dl = l - num_reg_continuous;
@@ -12916,7 +12915,6 @@ double *SIGN){
 
     
     mat_free(XTKX);
-    mat_free(XTKXINV);
     mat_free(XTKY);
     mat_free(DELTA);
     mat_free(KWM);
