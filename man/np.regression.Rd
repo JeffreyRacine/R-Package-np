@@ -101,7 +101,7 @@ FALSE, \dots)
   \item{gradients}{
     a logical value indicating that you want gradients computed and
     returned in the resulting \code{npregression} object. Defaults to
-    \code{FALSE}. For \code{regtype="glp"}, derivative components that
+    \code{FALSE}. For \code{regtype="lp"}, derivative components that
     are not defined (requested order exceeds the variable-specific
     polynomial degree) are returned as \code{NA}. Higher-order GLP
     derivatives (order \eqn{>1}) are reserved for future C-level
@@ -109,7 +109,7 @@ FALSE, \dots)
   }
 
   \item{gradient.order}{
-    for \code{regtype="glp"} with \code{gradients=TRUE}, a positive
+    for \code{regtype="lp"} with \code{gradients=TRUE}, a positive
     integer (or integer vector with one entry per continuous predictor)
     specifying derivative order(s). Defaults to \code{1L}. Orders
     exceeding \code{glp.degree} for a variable are returned as
@@ -182,7 +182,7 @@ FALSE, \dots)
   Aitken's (1976) kernel, while ordered data types use a variation of the
   Wang and van Ryzin (1981) kernel.
 
-  When bandwidths are obtained with \code{regtype="glp"}, C-level
+  When bandwidths are obtained with \code{regtype="lp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via
   \code{glp.degree}. The optional flag \code{glp.bernstein} controls
   basis construction: \code{FALSE} (default) uses raw local-polynomial

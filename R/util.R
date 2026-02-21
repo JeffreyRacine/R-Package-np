@@ -100,7 +100,7 @@ NZD_pos <- function(a) {
 npValidateGlpDegree <- function(regtype, glp.degree, ncon, argname = "glp.degree") {
   glp.degree.max <- 12L
 
-  if (!identical(regtype, "glp"))
+  if (!identical(regtype, "lp"))
     return(NULL)
 
   if (is.null(glp.degree))
@@ -130,7 +130,7 @@ npValidateGlpDegree <- function(regtype, glp.degree, ncon, argname = "glp.degree
 }
 
 npValidateGlpBernstein <- function(regtype, glp.bernstein, argname = "glp.bernstein") {
-  if (!identical(regtype, "glp"))
+  if (!identical(regtype, "lp"))
     return(FALSE)
 
   if (is.null(glp.bernstein))
@@ -148,7 +148,7 @@ npValidateGlpGradientOrder <- function(regtype,
                                        argname = "gradient.order") {
   glp.degree.max <- 12L
 
-  if (!identical(regtype, "glp"))
+  if (!identical(regtype, "lp"))
     return(NULL)
 
   if (is.null(gradient.order))
@@ -898,7 +898,7 @@ npFormatRegressionType <- function(x){
     NULL
   }
 
-  if (!identical(regtype, "glp"))
+  if (!identical(regtype, "lp"))
     return(pregtype)
 
   glp.degree <- if (!is.null(x$glp.degree)) {
@@ -910,9 +910,9 @@ npFormatRegressionType <- function(x){
   }
 
   if (is.null(glp.degree) || length(glp.degree) == 0)
-    return("Generalized Local-Polynomial")
+    return("Local-Polynomial")
 
-  sprintf("Generalized Local-Polynomial (degree = %s)",
+  sprintf("Local-Polynomial (degree = %s)",
           paste(glp.degree, collapse = ","))
 }
 

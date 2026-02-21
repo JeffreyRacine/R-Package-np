@@ -401,7 +401,7 @@ npplot(bws = stop("'bws' has not been set"), \dots, random.seed = 42)
   }
 
   \item{gradient.order}{
-    for \code{npplot.rbandwidth} with \code{regtype="glp"} and
+    for \code{npplot.rbandwidth} with \code{regtype="lp"} and
     \code{gradients=TRUE}, a positive integer (or integer vector with
     one entry per continuous predictor) indicating the requested
     derivative order. Orders greater than one are currently returned as

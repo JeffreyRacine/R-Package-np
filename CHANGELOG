@@ -94,7 +94,7 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
 
 * Synchronized C-level generalized local polynomial regression support from
   np master into npRmpi:
-  - `regtype="glp"` in shared regression core
+  - `regtype="lp"` in shared regression core
   - per-continuous-variable degree vectors (`glp.degree`)
   - GLP derivative extraction/plotting control support.
 

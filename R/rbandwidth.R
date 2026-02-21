@@ -1,6 +1,6 @@
 rbandwidth <-
   function(bw = stop("rbandwidth:argument 'bw' missing"),
-           regtype = c("lc","ll","glp"),
+           regtype = c("lc","ll","lp"),
            glp.degree = NULL,
            glp.bernstein = FALSE,
            bwmethod = c("cv.ls","cv.aic"),
@@ -102,7 +102,7 @@ rbandwidth <-
     pregtype = switch(regtype,
       lc = "Local-Constant",
       ll = "Local-Linear",
-      glp = "Generalized-Local-Polynomial"),
+      lp = "Local-Polynomial"),
     glp.degree = glp.degree,
     glp.bernstein = glp.bernstein,
     method = bwmethod,
@@ -211,7 +211,7 @@ print.rbandwidth <- function(x, digits=NULL, ...){
   print(matrix(x$bw,ncol=x$ndim,dimnames=list(paste(x$pscaling,":",sep=""),x$xnames)))
 
   bw.sel.str <- genBwSelStr(x)
-  if (identical(x$regtype, "glp") && x$ncon > 0)
+  if (identical(x$regtype, "lp") && x$ncon > 0)
     bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
                                      degree = x$glp.degree,
                                      bernstein = x$glp.bernstein)
@@ -232,7 +232,7 @@ summary.rbandwidth <- function(object, ...){
 
   cat(genOmitStr(object))
   bw.sel.str <- genBwSelStr(object)
-  if (identical(object$regtype, "glp") && object$ncon > 0)
+  if (identical(object$regtype, "lp") && object$ncon > 0)
     bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
                                      degree = object$glp.degree,
                                      bernstein = object$glp.bernstein)

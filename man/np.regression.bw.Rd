@@ -173,14 +173,14 @@ npregbw(\dots)
   \item{glp.degree}{
     a user-supplied vector of fixed polynomial degrees for the
     continuous predictors (exactly one degree per continuous predictor),
-    relevant only when \code{regtype="glp"}. If omitted, the default is
+    relevant only when \code{regtype="lp"}. If omitted, the default is
     degree one for each continuous predictor. Entries must be
     non-negative integers in \code{[0,12]}. Bandwidth optimization
     treats this vector as fixed input and optimizes only bandwidths.
   }
 
   \item{glp.bernstein}{
-    logical flag relevant only when \code{regtype="glp"}. If
+    logical flag relevant only when \code{regtype="lp"}. If
     \code{FALSE} (default), the GLP basis uses raw local-polynomial
     powers (stable for extrapolation). If \code{TRUE}, a Bernstein
     (B-spline) basis is used for continuous predictors. For
@@ -347,7 +347,7 @@ npregbw(\dots)
     applies an internal transformation that maps the unconstrained
     search to the feasible bandwidth domain. Defaults to
     \code{FALSE}. For true generalized local polynomial optimization
-    (i.e. \code{regtype="glp"} with mixed/higher continuous degrees),
+    (i.e. \code{regtype="lp"} with mixed/higher continuous degrees),
     transformed bounds are enabled internally for stability.}
 
   \item{invalid.penalty}{ a character string specifying the penalty

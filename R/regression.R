@@ -93,7 +93,7 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
     else
       "gradient standard errors are not available: fit the model with gradients=TRUE")
 
-  if (!identical(x$bws$regtype, "glp") || is.null(gradient.order))
+  if (!identical(x$bws$regtype, "lp") || is.null(gradient.order))
     return(gout)
 
   if (!is.matrix(gout))

@@ -130,7 +130,7 @@ npplot.rbandwidth <-
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
-    if (gradients && identical(bws$regtype, "glp")) {
+    if (gradients && identical(bws$regtype, "lp")) {
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
                                        gradient.order = gradient.order,
                                        ncon = bws$ncon)
@@ -485,7 +485,7 @@ npplot.rbandwidth <-
           ei[(xi.neval+1):maxneval] = NA
         }
         
-        tr <- if (gradients && identical(bws$regtype, "glp")) {
+        tr <- if (gradients && identical(bws$regtype, "lp")) {
           suppressWarnings(npreg(txdat = xdat, tydat = ydat,
             exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws,
             gradients = gradients,
