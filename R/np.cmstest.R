@@ -34,9 +34,10 @@ npcmstest <- function(formula,
   else if(all(miss.xy) & miss.f)
     stop("xdat, and ydat, are missing, and no formula is specified.")
   else if(all(miss.xy) & !miss.f){
-    mf <- eval(parse(text=paste("model.frame(formula = formula, data = data,",
-                       ifelse(missing(subset),"","subset = subset,"),
-                           "na.action = na.omit)")))
+    mf.args <- list(formula = formula, data = data, na.action = na.omit)
+    if (!missing(subset))
+      mf.args$subset <- subset
+    mf <- do.call(model.frame, mf.args)
     
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]

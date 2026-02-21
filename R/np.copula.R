@@ -114,7 +114,7 @@ npcopula <- function(bws,
       ## data again to provide a sufficiently fine grid.  We then
       ## concatenate and sort the equally space extended grid and
       ## the equi-quantile grid.
-      x.marginal <- eval(parse(text=paste("data$",bws$xnames[j],sep="")))
+      x.marginal <- data[[bws$xnames[j]]]
       quantile.seq <- seq(0,1,length=round(n.quasi.inv/2))
       if(is.numeric(x.marginal)) {
         x.er <- extendrange(x.marginal,f=er.quasi.inv)

@@ -738,11 +738,13 @@ explodePipe <- function(formula, env = parent.frame()){
     formula <- eval(formula, env)
   tf <- as.character(formula)  
   tf <- tf[length(tf)]
-
-  eval(parse(text=paste("c(",
-               ifelse(length(as.character(formula)) == 3,
-                      'strsplit(as.character(formula)[2]," *[+] *"),',""),
-               'strsplit(strsplit(tf," *[|] *")[[1]]," *[+] *"))')))
+  lhs <- if (length(as.character(formula)) == 3) {
+    strsplit(as.character(formula)[2], " *[+] *")
+  } else {
+    list()
+  }
+  rhs <- strsplit(strsplit(tf, " *[|] *")[[1]], " *[+] *")
+  c(lhs, rhs)
 }
 
 "%~%" <- function(a,b) {
