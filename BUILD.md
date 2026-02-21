@@ -3,19 +3,28 @@
 ## Build Tarball
 
 ```bash
-R CMD build .
+cd /Users/jracine/Development
+R CMD build np-master
 ```
 
-This produces `np_0.60-20.tar.gz` in the same directory.
+This produces `np_0.70-0.tar.gz` in `/Users/jracine/Development`.
 
 ## Install
 
 ```bash
-R CMD INSTALL np_0.60-20.tar.gz
+cd /Users/jracine/Development
+R CMD INSTALL np_0.70-0.tar.gz
 ```
 
 ## Quick Load Check
 
 ```bash
 R -q -e 'library(np); sessionInfo()'
+```
+
+## Check
+
+```bash
+cd /Users/jracine/Development
+R CMD check --as-cran np_0.70-0.tar.gz
 ```
