@@ -2988,7 +2988,7 @@ double *SIGN)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -3020,7 +3020,7 @@ double *SIGN)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -3198,7 +3198,7 @@ double *SIGN)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -3230,7 +3230,7 @@ double *SIGN)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -3410,7 +3410,7 @@ double *SIGN)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -3442,7 +3442,7 @@ double *SIGN)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -3954,7 +3954,7 @@ double *SIGN)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -3986,7 +3986,7 @@ double *SIGN)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -4164,7 +4164,7 @@ double *SIGN)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -4196,7 +4196,7 @@ double *SIGN)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -4376,7 +4376,7 @@ double *SIGN)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -4408,7 +4408,7 @@ double *SIGN)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -4961,7 +4961,7 @@ double *mean)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -4993,7 +4993,7 @@ double *mean)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -5133,7 +5133,7 @@ double *mean)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -5165,7 +5165,7 @@ double *mean)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -5305,7 +5305,7 @@ double *mean)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -5337,7 +5337,7 @@ double *mean)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -5724,7 +5724,7 @@ double *mean)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -5757,7 +5757,7 @@ double *mean)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -5897,7 +5897,7 @@ double *mean)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -5929,7 +5929,7 @@ double *mean)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -6069,7 +6069,7 @@ double *mean)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -6101,7 +6101,7 @@ double *mean)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -6744,7 +6744,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -6776,7 +6776,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -6920,7 +6920,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -6951,7 +6951,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -7096,7 +7096,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -7128,7 +7128,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -7497,7 +7497,7 @@ double **gradient)
 
 					/* Now compute the beast... */
 
-					if(fabs(mat_det(XTKX)) > 0.0 )
+					if(mat_is_nonsingular(XTKX) )
 					{
 
 
@@ -7529,7 +7529,7 @@ double **gradient)
 								XTKX[k][k] += epsilon;
 								nepsilon += epsilon;
 							}
-						} while (fabs(mat_det(XTKX)) == 0.0);
+						} while (!mat_is_nonsingular(XTKX));
 
 
 						/* Add epsilon times local constant estimator to first element of XTKY */
@@ -7861,7 +7861,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -7894,7 +7894,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -8032,7 +8032,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -8064,7 +8064,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -8202,7 +8202,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -8234,7 +8234,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -8406,7 +8406,7 @@ double **gradient)
 
 					/* Now compute the beast... */
 
-					if(fabs(mat_det(XTKX)) > 0.0 )
+					if(mat_is_nonsingular(XTKX) )
 					{
 
 
@@ -8438,7 +8438,7 @@ double **gradient)
 								XTKX[k][k] += epsilon;
 								nepsilon += epsilon;
 							}
-						} while (fabs(mat_det(XTKX)) == 0.0);
+						} while (!mat_is_nonsingular(XTKX));
 
 
 						/* Add epsilon times local constant estimator to first element of XTKY */
@@ -8953,7 +8953,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -8985,7 +8985,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -9127,7 +9127,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -9159,7 +9159,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -9302,7 +9302,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -9334,7 +9334,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -9682,7 +9682,7 @@ double **gradient)
 
 					/* Now compute the beast... */
 
-					if(fabs(mat_det(XTKX)) > 0.0 )
+					if(mat_is_nonsingular(XTKX) )
 					{
 
 
@@ -9714,7 +9714,7 @@ double **gradient)
 								XTKX[k][k] += epsilon;
 								nepsilon += epsilon;
 							}
-						} while (fabs(mat_det(XTKX)) == 0.0);
+						} while (!mat_is_nonsingular(XTKX));
 
 
 						/* Add epsilon times local constant estimator to first element of XTKY */
@@ -10040,7 +10040,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -10072,7 +10072,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -10210,7 +10210,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -10242,7 +10242,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -10380,7 +10380,7 @@ double **gradient)
 
 						/* Now compute the beast... */
 
-						if(fabs(mat_det(XTKX)) > 0.0 )
+						if(mat_is_nonsingular(XTKX) )
 						{
 
 
@@ -10412,7 +10412,7 @@ double **gradient)
 									XTKX[k][k] += epsilon;
 									nepsilon += epsilon;
 								}
-							} while (fabs(mat_det(XTKX)) == 0.0);
+							} while (!mat_is_nonsingular(XTKX));
 
 
 							/* Add epsilon times local constant estimator to first element of XTKY */
@@ -10582,7 +10582,7 @@ double **gradient)
 
 					/* Now compute the beast... */
 
-					if(fabs(mat_det(XTKX)) > 0.0 )
+					if(mat_is_nonsingular(XTKX) )
 					{
 
 
@@ -10614,7 +10614,7 @@ double **gradient)
 								XTKX[k][k] += epsilon;
 								nepsilon += epsilon;
 							}
-						} while (fabs(mat_det(XTKX)) == 0.0);
+						} while (!mat_is_nonsingular(XTKX));
 
 
 						/* Add epsilon times local constant estimator to first element of XTKY */
@@ -18585,7 +18585,7 @@ int *num_categories)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -18617,7 +18617,7 @@ int *num_categories)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -18759,7 +18759,7 @@ int *num_categories)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -18791,7 +18791,7 @@ int *num_categories)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -18933,7 +18933,7 @@ int *num_categories)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -18965,7 +18965,7 @@ int *num_categories)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -19363,7 +19363,7 @@ int *num_categories)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -19395,7 +19395,7 @@ int *num_categories)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -19535,7 +19535,7 @@ int *num_categories)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -19567,7 +19567,7 @@ int *num_categories)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */
@@ -19707,7 +19707,7 @@ int *num_categories)
 
 				/* Now compute the beast... */
 
-				if(fabs(mat_det(XTKX)) > 0.0 )
+				if(mat_is_nonsingular(XTKX) )
 				{
 
 
@@ -19739,7 +19739,7 @@ int *num_categories)
 							XTKX[k][k] += epsilon;
 							nepsilon += epsilon;
 						}
-					} while (fabs(mat_det(XTKX)) == 0.0);
+					} while (!mat_is_nonsingular(XTKX));
 
 
 					/* Add epsilon times local constant estimator to first element of XTKY */

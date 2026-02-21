@@ -7,6 +7,10 @@
 #include <R_ext/BLAS.h>
 #include <R_ext/Lapack.h>
 
+/* Internal legacy helpers still used by mat_det(). */
+int mat_lu( MATRIX A, MATRIX P );
+MATRIX mat_backsubs1( MATRIX A, MATRIX B, MATRIX X, MATRIX P, int xcol );
+
 #ifdef RCSID
 static char rcsid[] = "$Id: matrix.c,v 1.4 2006/11/02 19:50:13 tristen Exp $";
 #endif
@@ -556,9 +560,11 @@ MATRIX mat_mul( MATRIX A, MATRIX B , MATRIX C)
 MATRIX mat_solve( MATRIX A, MATRIX B, MATRIX X)
 {
 	int i, j;
+	int info = 0;
 	const int n = MatRow(A);
 	const int nrhs = MatCol(B);
-	MATRIX A_LU = NULL, P = NULL, Btmp = NULL;
+	double *Ac = NULL, *Bc = NULL;
+	int *ipiv = NULL;
 
 #ifdef CONFORM_CHECK
 	if (MatCol(A) != n)
@@ -569,33 +575,66 @@ MATRIX mat_solve( MATRIX A, MATRIX B, MATRIX X)
 		error("\nUnconformable matrices in routine mat_solve(): X dims mismatch\n");
 #endif
 
-	A_LU = mat_creat(n, n, UNDEFINED);
-	P = mat_creat(n, 1, UNDEFINED);
-	Btmp = mat_creat(n, 1, UNDEFINED);
+	Ac = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
+	Bc = (double *)malloc((size_t)n * (size_t)nrhs * sizeof(double));
+	ipiv = (int *)malloc((size_t)n * sizeof(int));
+	if ((Ac == NULL) || (Bc == NULL) || (ipiv == NULL))
+		error("mat_solve: malloc error\n");
 
-	mat_copy(A, A_LU);
+	/* Copy A,B to LAPACK column-major dense storage. */
+	for (j = 0; j < n; j++)
+		for (i = 0; i < n; i++)
+			Ac[i + j*n] = A[i][j];
+	for (j = 0; j < nrhs; j++)
+		for (i = 0; i < n; i++)
+			Bc[i + j*n] = B[i][j];
 
-	if (mat_lu(A_LU, P) == -1) {
-		mat_free(A_LU);
-		mat_free(P);
-		mat_free(Btmp);
+	F77_CALL(dgesv)(&n, &nrhs, Ac, &n, ipiv, Bc, &n, &info);
+	free(Ac);
+	free(ipiv);
+	if (info != 0) {
+		free(Bc);
 		return NULL;
 	}
 
-	for (j = 0; j < nrhs; j++) {
+	/* Copy solution back from LAPACK column-major dense storage. */
+	for (j = 0; j < nrhs; j++)
 		for (i = 0; i < n; i++)
-			Btmp[i][0] = B[i][j];
-		mat_backsubs1(A_LU, Btmp, X, P, j);
-	}
-
-	mat_free(A_LU);
-	mat_free(P);
-	mat_free(Btmp);
+			X[i][j] = Bc[i + j*n];
+	free(Bc);
 
 	if(!isFiniteMatrix(X))
 		return NULL;
 
 	return X;
+}
+
+int mat_is_nonsingular( MATRIX A )
+{
+	int i, j, info = 0;
+	const int n = MatRow(A);
+	double *Ac = NULL;
+	int *ipiv = NULL;
+
+#ifdef CONFORM_CHECK
+	if (MatCol(A) != n)
+		error("\nUnconformable matrices in routine mat_is_nonsingular(): A must be square\n");
+#endif
+
+	Ac = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
+	ipiv = (int *)malloc((size_t)n * sizeof(int));
+	if ((Ac == NULL) || (ipiv == NULL))
+		error("mat_is_nonsingular: malloc error\n");
+
+	for (j = 0; j < n; j++)
+		for (i = 0; i < n; i++)
+			Ac[i + j*n] = A[i][j];
+
+	F77_CALL(dgetrf)(&n, &n, Ac, &n, ipiv, &info);
+	free(Ac);
+	free(ipiv);
+
+	return (info == 0);
 }
 
 double mat_inv00( MATRIX A, int *ok )
