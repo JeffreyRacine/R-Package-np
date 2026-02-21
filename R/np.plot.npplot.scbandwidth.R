@@ -499,20 +499,25 @@ npplot.scbandwidth <-
           if (plot.errors.method == "asymptotic")
             temp.err[1:xi.neval,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
           else if (plot.errors.method == "bootstrap"){
-            temp.boot.raw <- eval(parse(text = paste("compute.bootstrap.errors(",
-                                      "xdat = xdat, ydat = ydat,",
-                                      ifelse(miss.z, "", "zdat = zdat,"),
-                                      "exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],",
-                                      ifelse(miss.z,"","ezdat = ezdat[1:xi.neval,, drop = FALSE],"),
-                                      "gradients = gradients,",
-                                      "slice.index = plot.index,",
-                                      "plot.errors.boot.method = plot.errors.boot.method,",
-                                      "plot.errors.boot.blocklen = plot.errors.boot.blocklen,",
-                                      "plot.errors.boot.num = plot.errors.boot.num,",
-                                      "plot.errors.center = plot.errors.center,",
-                                      "plot.errors.type = plot.errors.type,",
-                                      "plot.errors.alpha = plot.errors.alpha,",
-                                      "bws = bws)")))
+            boot.args <- list(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+              gradients = gradients,
+              slice.index = plot.index,
+              plot.errors.boot.method = plot.errors.boot.method,
+              plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+              plot.errors.boot.num = plot.errors.boot.num,
+              plot.errors.center = plot.errors.center,
+              plot.errors.type = plot.errors.type,
+              plot.errors.alpha = plot.errors.alpha,
+              bws = bws
+            )
+            if (!miss.z) {
+              boot.args$zdat <- zdat
+              boot.args$ezdat <- ezdat[1:xi.neval,, drop = FALSE]
+            }
+            temp.boot.raw <- do.call(compute.bootstrap.errors, boot.args)
             temp.err[1:xi.neval,] <- temp.boot.raw[["boot.err"]]
             temp.all.err <- temp.boot.raw[["boot.all.err"]]
             temp.boot <- temp.boot.raw[["bxp"]]
