@@ -1010,12 +1010,45 @@ genDenEstStr <- function(x){
 }
 
 genRegEstStr <- function(x){
-  paste(ifelse(is.null(x$pregtype),"",
-               paste("\nKernel Regression Estimator:",x$pregtype)),
+  regtype <- if (!is.null(x$regtype)) x$regtype else if (!is.null(x$bws)) x$bws$regtype else NULL
+  basis <- if (!is.null(x$basis)) x$basis else if (!is.null(x$bws)) x$bws$basis else NULL
+  bern <- if (!is.null(x$bernstein.basis)) x$bernstein.basis else if (!is.null(x$bws)) x$bws$bernstein.basis else NULL
+  est.label <- if (identical(regtype, "lp")) npFormatRegressionType(x) else x$pregtype
+  basis.family <- if (identical(regtype, "lp")) npLpBasisFamilyLabel(basis) else NULL
+  basis.rep <- if (identical(regtype, "lp")) npLpBasisRepresentationLabel(bern) else NULL
+  paste(ifelse(is.null(est.label),"",
+               paste("\nKernel Regression Estimator:",est.label)),
+        ifelse(is.null(basis.family), "",
+               paste("\nLP Basis Family:", basis.family)),
+        ifelse(is.null(basis.rep), "",
+               paste("\nLP Basis Representation:", basis.rep)),
         ifelse(is.null(x$ptype), "",
                paste("\nBandwidth Type:",x$ptype)),
         ifelse(is.null(x$tau), "", paste("\nTau:", x$tau)),
         sep = "")
+}
+
+npLpBasisFamilyLabel <- function(basis){
+  b <- tolower(ifelse(is.null(basis) || !length(basis), "glp", basis))
+  switch(b,
+         glp = "Generalized",
+         additive = "Additive",
+         tensor = "Tensor",
+         tools::toTitleCase(b))
+}
+
+npLpBasisRepresentationLabel <- function(bernstein){
+  if (isTRUE(bernstein)) "Bernstein" else "Raw"
+}
+
+npLpBasisNcol <- function(basis = "glp", degree){
+  if (is.null(degree) || !length(degree))
+    return(NA_real_)
+  d <- dim_basis(basis = basis,
+                 kernel = TRUE,
+                 degree = as.integer(degree),
+                 segments = rep.int(1L, length(degree)))
+  if (identical(tolower(basis), "tensor")) d else d + 1.0
 }
 
 npFormatRegressionType <- function(x){
@@ -1049,8 +1082,17 @@ npFormatRegressionType <- function(x){
   if (is.null(degree) || length(degree) == 0)
     return("Local-Polynomial")
 
-  sprintf("Local-Polynomial (degree = %s)",
-          paste(degree, collapse = ","))
+  basis <- if (!is.null(x$basis)) {
+    x$basis
+  } else if (!is.null(x$bws) && !is.null(x$bws$basis)) {
+    x$bws$basis
+  } else {
+    "glp"
+  }
+  basis.family <- npLpBasisFamilyLabel(basis)
+
+  sprintf("Local-Polynomial (%s basis; degree = %s)",
+          basis.family, paste(degree, collapse = ","))
 }
 
 
