@@ -249,7 +249,7 @@ FALSE, \dots)
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-% \dontrun{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we simulate an
 # example for a partially linear model and compare the coefficient
 # estimates from the partially linear model with those from a correctly
@@ -395,6 +395,6 @@ plot(bw)
 plot(bw,
      plot.errors.boot.num=25, 
      plot.errors.method="bootstrap")
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}

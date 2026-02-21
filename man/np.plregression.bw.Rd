@@ -310,7 +310,7 @@ npplregbw(\dots)
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
-% \dontrun{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we simulate an
 # example for a partially linear model and perform bandwidth selection
 
@@ -418,6 +418,6 @@ bw$bw[[2]] # X[,1] on Z
 bw$bw[[2]]$bw[1] <- 0.00054
 
 summary(bw)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}

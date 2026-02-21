@@ -593,7 +593,7 @@ npcdistbw(\dots)
 }
 
 \examples{
-% \dontrun{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
 # cross-validated bandwidths (default) using a second-order Gaussian
 # kernel (default). Note - this may take a minute or two depending on
@@ -637,6 +637,6 @@ summary(bw)
 # of how to change the kernel function, kernel order, and so forth.
 
 detach(Italy)
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}
