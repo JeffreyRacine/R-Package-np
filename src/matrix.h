@@ -65,25 +65,8 @@ MATRIX _mat_creat( int row, int col );
 MATRIX mat_creat( int row, int col, int type );
 MATRIX mat_fill( MATRIX A, int type );
 int mat_free( MATRIX A );
-MATRIX mat_copy( MATRIX A, MATRIX C );
-
-
-
-MATRIX mat_dumpf( MATRIX, char * );
-
-MATRIX mat_fdumpf( MATRIX A, char *s, FILE *fp );
-
-
-
 MATRIX mat_solve( MATRIX A, MATRIX B, MATRIX X );
 double mat_inv00( MATRIX A, int *ok );
 int mat_is_nonsingular( MATRIX A );
-
-
 MATRIX mat_inv( MATRIX a , MATRIX C );
-
-MATRIX mat_sub_mat( MATRIX A, int il, int iu, MATRIX S, int jl, int ju );
-MATRIX mat_sub_rem_mat( MATRIX A, int il, int iu, MATRIX S );
-
-
 int isFiniteMatrix(MATRIX A);
