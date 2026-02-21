@@ -37,3 +37,6 @@ mknpkg.sh
 ^AGENTS\.md$
 
 ^benchmarks/oneoff
+^benchmarks/perf
+^benchmarks/validation
+^benchmarks/common
