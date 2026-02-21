@@ -743,6 +743,214 @@ SEXP C_np_release_static_buffers(void)
   return R_NilValue;
 }
 
+void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
+                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
+                      double * objective_function_values, double * objective_function_evals,
+                      double * objective_function_invalid, double * timing,
+                      double * objective_function_fast,
+                      double * objective_function_fallback,
+                      int * penalty_mode, double * penalty_mult,
+                      int * glp_degree,
+                      int * glp_bernstein,
+                      int * glp_basis,
+                      double * ckerlb, double * ckerub);
+
+void np_regression(double * tuno, double * tord, double * tcon, double * ty,
+                   double * euno, double * eord, double * econ, double * ey,
+                   double * rbw,
+                   double * mcv, double * padnum,
+                   double * nconfac, double * ncatfac, double * mysd,
+                   int * myopti,
+                   int * glp_degree,
+                   int * glp_bernstein,
+                   int * glp_basis,
+                   double * cm, double * cmerr, double * g, double *gerr,
+                   double * xtra,
+                   double * ckerlb, double * ckerub);
+
+SEXP C_np_regression_bw(SEXP runo,
+                        SEXP rord,
+                        SEXP rcon,
+                        SEXP y,
+                        SEXP mysd,
+                        SEXP myopti,
+                        SEXP myoptd,
+                        SEXP rbw,
+                        SEXP hist_len,
+                        SEXP penalty_mode,
+                        SEXP penalty_mult,
+                        SEXP glp_degree,
+                        SEXP glp_bernstein,
+                        SEXP glp_basis,
+                        SEXP ckerlb,
+                        SEXP ckerub)
+{
+  SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue;
+  SEXP y_r = R_NilValue, mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
+  SEXP rbw_r = R_NilValue, degree_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP out = R_NilValue, out_names = R_NilValue;
+  SEXP out_bw = R_NilValue, out_fval = R_NilValue, out_fval_hist = R_NilValue;
+  SEXP out_eval_hist = R_NilValue, out_invalid_hist = R_NilValue, out_timing = R_NilValue;
+  SEXP out_fast = R_NilValue, out_fallback = R_NilValue;
+  int hlen = asInteger(hist_len);
+  int pmode = asInteger(penalty_mode);
+  double pmult = asReal(penalty_mult);
+  int bern = asInteger(glp_bernstein);
+  int basis = asInteger(glp_basis);
+
+  if (hlen < 1)
+    hlen = 1;
+
+  PROTECT(runo_r = coerceVector(runo, REALSXP));
+  PROTECT(rord_r = coerceVector(rord, REALSXP));
+  PROTECT(rcon_r = coerceVector(rcon, REALSXP));
+  PROTECT(y_r = coerceVector(y, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  PROTECT(out_bw = allocVector(REALSXP, XLENGTH(rbw_r)));
+  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_timing = allocVector(REALSXP, 1));
+  PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_fallback = allocVector(REALSXP, 1));
+
+  memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
+
+  np_regression_bw(REAL(runo_r), REAL(rord_r), REAL(rcon_r), REAL(y_r),
+                   REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
+                   REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                   REAL(out_fast), REAL(out_fallback),
+                   &pmode, &pmult, INTEGER(degree_i), &bern, &basis, REAL(ckerlb_r), REAL(ckerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 8));
+  SET_VECTOR_ELT(out, 0, out_bw);
+  SET_VECTOR_ELT(out, 1, out_fval);
+  SET_VECTOR_ELT(out, 2, out_fval_hist);
+  SET_VECTOR_ELT(out, 3, out_eval_hist);
+  SET_VECTOR_ELT(out, 4, out_invalid_hist);
+  SET_VECTOR_ELT(out, 5, out_timing);
+  SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_fallback);
+
+  PROTECT(out_names = allocVector(STRSXP, 8));
+  SET_STRING_ELT(out_names, 0, mkChar("bw"));
+  SET_STRING_ELT(out_names, 1, mkChar("fval"));
+  SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
+  SET_STRING_ELT(out_names, 3, mkChar("eval.history"));
+  SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
+  SET_STRING_ELT(out_names, 5, mkChar("timing"));
+  SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("fallback.history"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(22);
+  return out;
+}
+
+SEXP C_np_regression(SEXP tuno,
+                     SEXP tord,
+                     SEXP tcon,
+                     SEXP ty,
+                     SEXP euno,
+                     SEXP eord,
+                     SEXP econ,
+                     SEXP ey,
+                     SEXP rbw,
+                     SEXP mcv,
+                     SEXP padnum,
+                     SEXP nconfac,
+                     SEXP ncatfac,
+                     SEXP mysd,
+                     SEXP myopti,
+                     SEXP glp_degree,
+                     SEXP glp_bernstein,
+                     SEXP glp_basis,
+                     SEXP enrow,
+                     SEXP ncol,
+                     SEXP gradients,
+                     SEXP ckerlb,
+                     SEXP ckerub)
+{
+  SEXP tuno_r = R_NilValue, tord_r = R_NilValue, tcon_r = R_NilValue, ty_r = R_NilValue;
+  SEXP euno_r = R_NilValue, eord_r = R_NilValue, econ_r = R_NilValue, ey_r = R_NilValue;
+  SEXP rbw_r = R_NilValue, mcv_r = R_NilValue, padnum_r = R_NilValue;
+  SEXP nconfac_r = R_NilValue, ncatfac_r = R_NilValue, mysd_r = R_NilValue, myopti_i = R_NilValue;
+  SEXP degree_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP out = R_NilValue, out_names = R_NilValue;
+  SEXP out_mean = R_NilValue, out_merr = R_NilValue, out_g = R_NilValue, out_gerr = R_NilValue, out_xtra = R_NilValue;
+  int bern = asInteger(glp_bernstein);
+  int basis = asInteger(glp_basis);
+  int en = asInteger(enrow);
+  int nc = asInteger(ncol);
+  int do_grad = asLogical(gradients);
+  R_xlen_t gsize;
+
+  if (en < 0) en = 0;
+  if (nc < 0) nc = 0;
+  if (do_grad == NA_LOGICAL) do_grad = 0;
+  gsize = (do_grad ? ((R_xlen_t)en * (R_xlen_t)nc) : 0);
+
+  PROTECT(tuno_r = coerceVector(tuno, REALSXP));
+  PROTECT(tord_r = coerceVector(tord, REALSXP));
+  PROTECT(tcon_r = coerceVector(tcon, REALSXP));
+  PROTECT(ty_r = coerceVector(ty, REALSXP));
+  PROTECT(euno_r = coerceVector(euno, REALSXP));
+  PROTECT(eord_r = coerceVector(eord, REALSXP));
+  PROTECT(econ_r = coerceVector(econ, REALSXP));
+  PROTECT(ey_r = coerceVector(ey, REALSXP));
+  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
+  PROTECT(mcv_r = coerceVector(mcv, REALSXP));
+  PROTECT(padnum_r = coerceVector(padnum, REALSXP));
+  PROTECT(nconfac_r = coerceVector(nconfac, REALSXP));
+  PROTECT(ncatfac_r = coerceVector(ncatfac, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  PROTECT(out_mean = allocVector(REALSXP, en));
+  PROTECT(out_merr = allocVector(REALSXP, en));
+  PROTECT(out_g = allocVector(REALSXP, gsize));
+  PROTECT(out_gerr = allocVector(REALSXP, gsize));
+  PROTECT(out_xtra = allocVector(REALSXP, 6));
+
+  np_regression(REAL(tuno_r), REAL(tord_r), REAL(tcon_r), REAL(ty_r),
+                REAL(euno_r), REAL(eord_r), REAL(econ_r), REAL(ey_r),
+                REAL(rbw_r), REAL(mcv_r), REAL(padnum_r),
+                REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+                INTEGER(myopti_i),
+                INTEGER(degree_i), &bern, &basis,
+                REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr), REAL(out_xtra),
+                REAL(ckerlb_r), REAL(ckerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 5));
+  SET_VECTOR_ELT(out, 0, out_mean);
+  SET_VECTOR_ELT(out, 1, out_merr);
+  SET_VECTOR_ELT(out, 2, out_g);
+  SET_VECTOR_ELT(out, 3, out_gerr);
+  SET_VECTOR_ELT(out, 4, out_xtra);
+
+  PROTECT(out_names = allocVector(STRSXP, 5));
+  SET_STRING_ELT(out_names, 0, mkChar("mean"));
+  SET_STRING_ELT(out_names, 1, mkChar("merr"));
+  SET_STRING_ELT(out_names, 2, mkChar("g"));
+  SET_STRING_ELT(out_names, 3, mkChar("gerr"));
+  SET_STRING_ELT(out_names, 4, mkChar("xtra"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(25);
+  return out;
+}
+
 void np_mpi_init(int * mpi_status){
 #ifdef MPI2 
   MPI_Comm_rank(comm[1], &my_rank);
