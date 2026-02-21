@@ -120,6 +120,8 @@ npplreg.plbandwidth <-
            tzdat = stop("training data tzdat missing"),
            exdat, eydat, ezdat, residuals = FALSE, ...){
 
+    fit.start <- proc.time()[3]
+
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)
     
@@ -259,6 +261,14 @@ npplreg.plbandwidth <-
                        "residuals = residuals,",
                        "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN))")))
 
+    fit.elapsed <- proc.time()[3] - fit.start
+    optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+    ev$timing <- bws$timing
+    ev$total.time <- total.time
+    ev$optim.time <- optim.time
+    ev$fit.time <- fit.elapsed
+
     
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
@@ -335,4 +345,3 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
   
   eval(parse(text=paste("npplreg(bws = tbw", tx.str, ty.str, tz.str, ",...)")))
 }
-

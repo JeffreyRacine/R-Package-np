@@ -188,7 +188,17 @@ npInsertGlpSummary <- function(txt, degree, bernstein){
   if (length(reg.idx) != 1L)
     return(txt)
 
-  glp.lines <- paste("GLP Bernstein Basis:", ifelse(isTRUE(bernstein), "TRUE", "FALSE"))
+  basis.dim <- if (is.null(degree) || !length(degree)) {
+    NA_real_
+  } else {
+    prod(as.double(degree) + 1.0)
+  }
+
+  glp.lines <- c(
+    paste("GLP Bernstein Basis:", ifelse(isTRUE(bernstein), "TRUE", "FALSE")),
+    paste("GLP Basis Dimension (including intercept):",
+          format(basis.dim, scientific = FALSE, trim = TRUE))
+  )
 
   lines <- append(lines, glp.lines, after = reg.idx)
   paste(lines, collapse = "\n")

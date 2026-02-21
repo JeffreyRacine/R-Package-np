@@ -1,5 +1,6 @@
 qregression <- 
-    function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, ntrain, trainiseval = FALSE, gradients = FALSE){
+    function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
+             timing = NA, total.time = NA, optim.time = NA, fit.time = NA){
 
         if (missing(bws) | missing(xeval) | missing(tau) | missing(quantile) | missing(ntrain))
             stop("improper invocation of qregression constructor")
@@ -34,7 +35,9 @@ qregression <-
             quantgrad = quantgrad,
             ntrain = ntrain,
             trainiseval = trainiseval,
-            gradients = gradients)
+            gradients = gradients,
+            timing = timing, total.time = total.time,
+            optim.time = optim.time, fit.time = fit.time)
 
         class(d) <- "qregression"
 
@@ -96,6 +99,7 @@ summary.qregression <- function(object, ...) {
 
   cat(genRegEstStr(object))
   cat(genBwKerStrs(object$bws))
+  cat(genTimingStr(object))
   
   cat("\n\n")
 }

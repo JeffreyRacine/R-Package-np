@@ -1,7 +1,9 @@
 plregression = 
   function(bws, xcoef, xcoeferr = 0, xcoefvcov, evalx, evalz, mean, resid = NA,
            ntrain, trainiseval = FALSE, residuals = FALSE,
-           xtra = double(6)){
+           xtra = double(6),
+           timing = NA, total.time = NA,
+           optim.time = NA, fit.time = NA){
 
     if (missing(bws) | missing(evalx) | missing(evalz) | missing(mean) |
         missing(ntrain) | missing(xcoef))
@@ -35,7 +37,11 @@ plregression =
       MAE = xtra[3],
       MAPE = xtra[4],
       CORR = xtra[5],
-      SIGN = xtra[6]
+      SIGN = xtra[6],
+      timing = timing,
+      total.time = total.time,
+      optim.time = optim.time,
+      fit.time = fit.time
       )
 
     names(d$xcoeferr) <- names(d$xcoef) <- d$data.xnames
@@ -140,5 +146,6 @@ summary.plregression <- function(object, ...){
   cat(genGofStr(object))
 
   cat(genBwKerStrs(object$bw))
+  cat(genTimingStr(object))
   cat('\n\n')  
 }  

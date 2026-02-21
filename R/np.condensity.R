@@ -73,6 +73,8 @@ npcdens.conbandwidth <- function(bws,
                                  tydat = stop("invoked without training data 'tydat'"),
                                  exdat, eydat, gradients = FALSE, ...){
 
+  fit.start <- proc.time()[3]
+
   if (xor(missing(exdat),missing(eydat)))
     stop("evaluation data must be supplied for both 'exdat' and 'eydat'")
 
@@ -286,6 +288,10 @@ npcdens.conbandwidth <- function(bws,
   }
 
 
+  fit.elapsed <- proc.time()[3] - fit.start
+  optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+  total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+
   return( condensity(bws = bws,
                      xeval = txeval,
                      yeval = tyeval,
@@ -293,7 +299,9 @@ npcdens.conbandwidth <- function(bws,
                      congrad = myout$congrad, congerr = myout$congerr,
                      ll = myout$log_likelihood,
                      ntrain = tnrow, trainiseval = no.exy, gradients = gradients,
-                     rows.omit = rows.omit) )
+                     rows.omit = rows.omit,
+                     timing = bws$timing, total.time = total.time,
+                     optim.time = optim.time, fit.time = fit.elapsed) )
 
 }
 

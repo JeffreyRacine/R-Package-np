@@ -3,7 +3,9 @@ smoothcoefficient <-
            grad = NA, gerr = NA, resid = NA,
            ntrain, trainiseval = FALSE, residuals = FALSE,
            betas = FALSE,
-           xtra = rep(NA, 6)){
+           xtra = rep(NA, 6),
+           timing = NA, total.time = NA,
+           optim.time = NA, fit.time = NA){
 
     if (missing(bws) | missing(eval) | missing(ntrain))
       stop("improper invocation of smoothcoefficient constructor")
@@ -40,7 +42,11 @@ smoothcoefficient <-
       MAE = xtra[3],
       MAPE = xtra[4],
       CORR = xtra[5],
-      SIGN = xtra[6]
+      SIGN = xtra[6],
+      timing = timing,
+      total.time = total.time,
+      optim.time = optim.time,
+      fit.time = fit.time
       )
 
     class(d) = "smoothcoefficient"
@@ -110,5 +116,6 @@ summary.smoothcoefficient <- function(object, ...){
   cat(genGofStr(object))
 
   cat(genBwKerStrs(object$bws))
+  cat(genTimingStr(object))
   cat('\n\n')  
 }

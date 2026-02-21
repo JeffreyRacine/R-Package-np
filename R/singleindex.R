@@ -6,7 +6,9 @@ singleindex =
            ntrain, trainiseval = FALSE, residuals = FALSE,
            gradients = FALSE, xtra = NA,
            confusion.matrix = NA, CCR.overall = NA,
-           CCR.byoutcome =  NA, fit.mcfadden = NA
+           CCR.byoutcome =  NA, fit.mcfadden = NA,
+           timing = NA, total.time = NA,
+           optim.time = NA, fit.time = NA
            ){
 
     if (missing(bws) | missing(index) | missing(mean) | missing(ntrain))
@@ -48,7 +50,11 @@ singleindex =
       confusion.matrix = confusion.matrix,
       CCR.byoutcome = CCR.byoutcome,
       CCR.overall = CCR.overall,
-      fit.mcfadden = fit.mcfadden)
+      fit.mcfadden = fit.mcfadden,
+      timing = timing,
+      total.time = total.time,
+      optim.time = optim.time,
+      fit.time = fit.time)
 
     class(d) = "singleindex"
 
@@ -126,6 +132,7 @@ summary.singleindex <- function(object, ...){
   cat(genGofStr(object))
   pCatGofStr(object)
   cat(genBwKerStrs(object$bws))
+  cat(genTimingStr(object))
   
   cat("\n\n")
 }

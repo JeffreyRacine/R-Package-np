@@ -83,6 +83,8 @@ npqreg.condbandwidth <-
            lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
            ...){
 
+    fit.start <- proc.time()[3]
+
     no.ex = missing(exdat)
 
     txdat = toFrame(txdat)
@@ -260,6 +262,10 @@ npqreg.condbandwidth <-
     }
 
 
+    fit.elapsed <- proc.time()[3] - fit.start
+    optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+
     qregression(bws = bws,
                 xeval = txeval,
                 tau = tau,
@@ -268,7 +274,9 @@ npqreg.condbandwidth <-
                 quantgrad = myout$yqgrad,
                 ntrain = tnrow,
                 trainiseval = no.ex,
-                gradients = gradients)
+                gradients = gradients,
+                timing = bws$timing, total.time = total.time,
+                optim.time = optim.time, fit.time = fit.elapsed)
   }
 
 
