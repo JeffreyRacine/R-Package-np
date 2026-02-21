@@ -1,6 +1,7 @@
 rbandwidth <-
   function(bw = stop("rbandwidth:argument 'bw' missing"),
            regtype = c("lc","ll","lp"),
+           basis = c("glp","additive","tensor"),
            degree = NULL,
            bernstein.basis = FALSE,
            bwmethod = c("cv.ls","cv.aic"),
@@ -39,6 +40,7 @@ rbandwidth <-
   ndim = length(bw)
   npRejectLegacyLpArgs(names(list(...)), where = "rbandwidth")
   regtype = match.arg(regtype)
+  basis <- npValidateLpBasis(regtype = regtype, basis = basis)
   bwmethod = match.arg(bwmethod)
   bwtype = match.arg(bwtype)
   ckertype = match.arg(ckertype)
@@ -114,6 +116,7 @@ rbandwidth <-
       lc = "Local-Constant",
       ll = "Local-Linear",
       lp = "Local-Polynomial"),
+    basis = basis,
     degree = degree,
     bernstein.basis = bernstein.basis,
     method = bwmethod,
@@ -192,12 +195,14 @@ as.double.rbandwidth <- function(x, ...){
   x$bw
 }
 
-npInsertGlpSummary <- function(txt, degree, bernstein){
+npInsertGlpSummary <- function(txt, basis, degree, bernstein){
   lines <- strsplit(txt, "\n", fixed = TRUE)[[1]]
   reg.idx <- grep("^Regression Type:", lines)
 
   if (length(reg.idx) != 1L)
     return(txt)
+  if (is.null(basis) || !length(basis))
+    basis <- "glp"
 
   basis.dim <- if (is.null(degree) || !length(degree)) {
     NA_real_
@@ -209,6 +214,7 @@ npInsertGlpSummary <- function(txt, degree, bernstein){
   }
 
   glp.lines <- c(
+    paste("LP Basis:", basis),
     paste("GLP Bernstein Basis:", ifelse(isTRUE(bernstein), "TRUE", "FALSE")),
     paste("GLP Basis Dimension (including intercept):",
           format(basis.dim, scientific = FALSE, trim = TRUE))
@@ -227,6 +233,7 @@ print.rbandwidth <- function(x, digits=NULL, ...){
   bw.sel.str <- genBwSelStr(x)
   if (identical(x$regtype, "lp") && x$ncon > 0)
     bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
+                                     basis = x$basis,
                                      degree = x$degree,
                                      bernstein = x$bernstein.basis)
   cat(bw.sel.str)
@@ -248,6 +255,7 @@ summary.rbandwidth <- function(object, ...){
   bw.sel.str <- genBwSelStr(object)
   if (identical(object$regtype, "lp") && object$ncon > 0)
     bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
+                                     basis = object$basis,
                                      degree = object$degree,
                                      bernstein = object$bernstein.basis)
   cat(bw.sel.str)

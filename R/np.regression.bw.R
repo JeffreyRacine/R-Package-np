@@ -152,6 +152,8 @@ npregbw.rbandwidth <-
     rord = xdat[, bws$iord, drop = FALSE]
 
     tbw <- bws
+    tbw$basis <- npValidateLpBasis(regtype = tbw$regtype,
+                                   basis = tbw$basis)
     tbw$degree <- npValidateGlpDegree(regtype = tbw$regtype,
                                           degree = tbw$degree,
                                           ncon = tbw$ncon)
@@ -165,16 +167,16 @@ npregbw.rbandwidth <-
     invalid.penalty <- match.arg(invalid.penalty)
     penalty_mode <- ifelse(invalid.penalty == "baseline", 1L, 0L)
 
-    reg.c <- npRegtypeToC(regtype = bws$regtype,
-                          degree = bws$degree,
-                          ncon = bws$ncon,
+    reg.c <- npRegtypeToC(regtype = tbw$regtype,
+                          degree = tbw$degree,
+                          ncon = tbw$ncon,
                           context = "npregbw")
-    if (identical(bws$regtype, "lp") &&
+    if (identical(tbw$regtype, "lp") &&
         identical(reg.c$code, REGTYPE_GLP) &&
         !isTRUE(transform.bounds))
       transform.bounds <- TRUE
-    degree.c <- if (bws$ncon > 0) {
-      as.integer(if (is.null(reg.c$degree)) rep.int(0L, bws$ncon) else reg.c$degree)
+    degree.c <- if (tbw$ncon > 0) {
+      as.integer(if (is.null(reg.c$degree)) rep.int(0L, tbw$ncon) else reg.c$degree)
     } else {
       integer(1)
     }
@@ -293,6 +295,7 @@ npregbw.rbandwidth <-
 
     tbw <- rbandwidth(bw = tbw$bw,
                       regtype = tbw$regtype,
+                      basis = tbw$basis,
                       degree = tbw$degree,
                       bernstein.basis = tbw$bernstein.basis,
                       bwmethod = tbw$method,
@@ -345,7 +348,7 @@ npregbw.default <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ## dummy arguments for later passing into rbandwidth()
-           regtype, degree, bernstein.basis, bwmethod, bwscaling, bwtype,
+           regtype, basis, degree, bernstein.basis, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
 
@@ -359,7 +362,7 @@ npregbw.default <-
     ## bandwidth() call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("regtype", "degree", "bernstein.basis", "bwmethod", "bwscaling", "bwtype",
+    margs <- c("regtype", "basis", "degree", "bernstein.basis", "bwmethod", "bwscaling", "bwtype",
                "ckertype", "ckerorder", "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)
