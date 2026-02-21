@@ -239,25 +239,21 @@ npregbw.rbandwidth <-
 
         cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
-        system.time(myout <- 
-        .C("np_regression_bw",
-           as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
-           as.double(mysd),
-           as.integer(myopti), as.double(myoptd), 
-           bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
-           fval = double(2),fval.history = double(max(1,nmulti)),
-           eval.history = double(max(1,nmulti)), invalid.history = double(max(1,nmulti)),
-           timing = double(1),
-           fast.history = double(1),
-           fallback.history = double(1),
-           penalty.mode = as.integer(penalty_mode),
-           penalty.multiplier = as.double(penalty.multiplier),
-           degree = degree.c,
-           bernstein.basis = as.integer(isTRUE(tbw$bernstein.basis)),
-           basis = as.integer(npLpBasisCode(tbw$basis)),
-           ckerlb = as.double(cker.bounds.c$lb),
-           ckerub = as.double(cker.bounds.c$ub),
-           PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing","fast.history","fallback.history")])[1]
+        system.time(myout <-
+          .Call("C_np_regression_bw",
+                as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
+                as.double(mysd),
+                as.integer(myopti), as.double(myoptd),
+                as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+                as.integer(max(1, nmulti)),
+                as.integer(penalty_mode),
+                as.double(penalty.multiplier),
+                as.integer(degree.c),
+                as.integer(isTRUE(tbw$bernstein.basis)),
+                as.integer(npLpBasisCode(tbw$basis)),
+                as.double(cker.bounds.c$lb),
+                as.double(cker.bounds.c$ub),
+                PACKAGE = "npRmpi"))[1]
       
 
       rorder = numeric(ncol)

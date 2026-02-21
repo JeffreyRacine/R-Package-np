@@ -358,25 +358,23 @@ npreg.rbandwidth <-
    }
 
 
-    myout=
-      .C("np_regression",
-         asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
-         asDouble(euno),  asDouble(eord),  asDouble(econ), asDouble(eydat),
-         asDouble(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
-         asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
-         asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
-         as.integer(myopti),
-         degree = degree.c,
-         bernstein.basis = as.integer(isTRUE(bws$bernstein.basis)),
-         basis = as.integer(npLpBasisCode(bws$basis)),
-         mean = double(enrow),
-         merr = double(enrow),
-         g = double(ifelse(gradients,enrow*ncol,0)),
-         gerr = double(ifelse(gradients,enrow*ncol,0)),
-         xtra = double(6),
-         ckerlb = as.double(cker.bounds.c$lb),
-         ckerub = as.double(cker.bounds.c$ub),
-         PACKAGE="npRmpi" )[c("mean","merr", "g", "gerr", "xtra")]
+    myout <-
+      .Call("C_np_regression",
+            asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
+            asDouble(euno), asDouble(eord), asDouble(econ), asDouble(eydat),
+            asDouble(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+            asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
+            asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
+            as.integer(myopti),
+            as.integer(degree.c),
+            as.integer(isTRUE(bws$bernstein.basis)),
+            as.integer(npLpBasisCode(bws$basis)),
+            as.integer(enrow),
+            as.integer(ncol),
+            as.logical(gradients),
+            as.double(cker.bounds.c$lb),
+            as.double(cker.bounds.c$ub),
+            PACKAGE = "npRmpi")
 
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 
