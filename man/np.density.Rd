@@ -81,6 +81,11 @@ npudens(bws, \dots)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
+  For S3 plotting help, use \code{methods("plot")} and query
+  class-specific help topics such as \code{?plot.npregression} and
+  \code{?plot.rbandwidth}. You can inspect implementations with
+  \code{getS3method("plot","npregression")}.
+
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)

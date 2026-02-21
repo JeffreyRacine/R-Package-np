@@ -131,6 +131,11 @@ FALSE, \dots)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
+  For S3 plotting help, use \code{methods("plot")} and query
+  class-specific help topics such as \code{?plot.npregression} and
+  \code{?plot.rbandwidth}. You can inspect implementations with
+  \code{getS3method("plot","npregression")}.
+
  \code{npplreg} uses a combination of OLS and nonparametric
  regression to estimate the parameter \eqn{\beta}{B} in the model
  \eqn{Y = X\beta + \Theta (Z) + \epsilon}{Y = XB + theta(Z) + epsilon}.

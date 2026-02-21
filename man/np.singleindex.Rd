@@ -140,6 +140,11 @@ npindex(bws, \dots)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
+  For S3 plotting help, use \code{methods("plot")} and query
+  class-specific help topics such as \code{?plot.npregression} and
+  \code{?plot.rbandwidth}. You can inspect implementations with
+  \code{getS3method("plot","npregression")}.
+
 
   A matrix of gradients along with average derivatives are computed and
   returned if \code{gradients=TRUE} is used.

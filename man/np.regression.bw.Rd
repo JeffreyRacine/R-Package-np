@@ -384,6 +384,11 @@ npregbw(\dots)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
+  For S3 plotting help, use \code{methods("plot")} and query
+  class-specific help topics such as \code{?plot.npregression} and
+  \code{?plot.rbandwidth}. You can inspect implementations with
+  \code{getS3method("plot","npregression")}.
+
   \code{npregbw} implements a variety of methods for choosing
   bandwidths for multivariate (\eqn{p}-variate) regression data defined
   over a set of possibly continuous and/or discrete (unordered, ordered)
