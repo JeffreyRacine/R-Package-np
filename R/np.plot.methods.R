@@ -23,11 +23,34 @@
   )
 }
 
+.np_plot_compat_dispatch <- function(bws, ...) {
+  cls <- class(bws)
+
+  if ("rbandwidth" %in% cls)
+    return(npplot.rbandwidth(bws = bws, ...))
+  if ("conbandwidth" %in% cls)
+    return(npplot.conbandwidth(bws = bws, ...))
+  if ("condbandwidth" %in% cls)
+    return(npplot.condbandwidth(bws = bws, ...))
+  if ("plbandwidth" %in% cls)
+    return(npplot.plbandwidth(bws = bws, ...))
+  if ("sibandwidth" %in% cls)
+    return(npplot.sibandwidth(bws = bws, ...))
+  if ("scbandwidth" %in% cls)
+    return(npplot.scbandwidth(bws = bws, ...))
+  if ("dbandwidth" %in% cls)
+    return(npplot.dbandwidth(bws = bws, ...))
+  if ("bandwidth" %in% cls)
+    return(npplot.bandwidth(bws = bws, ...))
+
+  stop("unsupported bandwidth class for plotting")
+}
+
 .np_plot_from_slot <- function(object, slot = "bws", ...) {
   bws <- object[[slot]]
   if (is.null(bws))
     stop("plot object does not contain expected bandwidth slot")
-  .np_plot_call_method(npplot, bws = bws, .npplot.internal = TRUE, ...,
+  .np_plot_call_method(.np_plot_compat_dispatch, bws = bws, ...,
                        where = "npplot()")
 }
 
