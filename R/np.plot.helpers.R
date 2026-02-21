@@ -167,6 +167,43 @@ plotFactor <- function(f, y, ...){
   if (plot.bootstrap && plot.bxp) bxp else plotFactor
 }
 
+.npplot_resolve_xydat <- function(bws, xdat, ydat, miss.xy) {
+  if (any(miss.xy) && !all(miss.xy))
+    stop("one of, but not both, xdat and ydat was specified")
+
+  if (all(miss.xy) && !is.null(bws$formula)) {
+    tt <- terms(bws)
+    m <- match(c("formula", "data", "subset", "na.action"),
+               names(bws$call), nomatch = 0)
+    tmf <- bws$call[c(1, m)]
+    tmf[[1]] <- as.name("model.frame")
+    tmf[["formula"]] <- tt
+    tmf <- eval(tmf, envir = environment(tt))
+
+    ydat <- model.response(tmf)
+    xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
+    return(list(xdat = xdat, ydat = ydat))
+  }
+
+  if (all(miss.xy) && !is.null(bws$call)) {
+    xdat <- data.frame(eval(bws$call[["xdat"]], environment(bws$call)))
+    ydat <- eval(bws$call[["ydat"]], environment(bws$call))
+  }
+
+  xdat <- toFrame(xdat)
+  goodrows <- seq_len(nrow(xdat))
+  rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
+  if (!is.null(rows.omit))
+    goodrows[rows.omit] <- 0
+
+  if (all(goodrows == 0))
+    stop("Data has no rows without NAs")
+
+  goodrows <- goodrows[goodrows != 0]
+  list(xdat = xdat[goodrows, , drop = FALSE],
+       ydat = ydat[goodrows])
+}
+
 ## Rank-based simultaneous confidence set helper, vendored from
 ## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
 np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {
