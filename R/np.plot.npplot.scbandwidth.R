@@ -446,12 +446,20 @@ npplot.scbandwidth <-
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
 
-      txobjE <-
-        parse(text = paste("npscoef(txdat = xdat, tydat = ydat,",
-                ifelse(miss.z,"","tzdat = zdat,"),
-                "exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],",
-                ifelse(miss.z,"","ezdat = ezdat[1:xi.neval,, drop = FALSE],"),
-                "bws = bws, errors = plot.errors)"))
+      txobj_call <- function(i, ei, xi.neval) {
+        tx.args <- list(
+          txdat = xdat,
+          tydat = ydat,
+          exdat = subcol(exdat, ei, i)[1:xi.neval, , drop = FALSE],
+          bws = bws,
+          errors = plot.errors
+        )
+        if (!miss.z) {
+          tx.args$tzdat <- zdat
+          tx.args$ezdat <- ezdat[1:xi.neval, , drop = FALSE]
+        }
+        do.call(npscoef, tx.args)
+      }
 
 
       ## error plotting expressions
@@ -502,7 +510,7 @@ npplot.scbandwidth <-
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj <- eval(txobjE)
+        tobj <- txobj_call(i, ei, xi.neval)
 
         temp.mean[1:xi.neval] = tobj$mean
 

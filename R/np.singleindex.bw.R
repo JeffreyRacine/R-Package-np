@@ -412,8 +412,17 @@ npindexbw.sibandwidth <-
 
             optim.parm <- if(only.optimize.beta) beta else c(beta,h)
 
-            topt <- parse(text=paste("optim(optim.parm,fn=optim.fn,gr=NULL,method=optim.method,control=optim.control", ifelse(only.optimize.beta, ',h)',')')))
-            suppressWarnings(optim.return <- eval(topt))
+            optim.base.args <- list(
+              par = optim.parm,
+              fn = optim.fn,
+              gr = NULL,
+              method = optim.method,
+              control = optim.control
+            )
+            if (only.optimize.beta) {
+              optim.base.args$h <- h
+            }
+            suppressWarnings(optim.return <- do.call(optim, optim.base.args))
             if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
               num.feval.overall <- num.feval.overall + optim.return$counts[1]
             attempts <- 0
@@ -437,7 +446,15 @@ npindexbw.sibandwidth <-
                   optim.control$abstol <-  10.0*optim.control$abstol
               }
               
-              suppressWarnings(optim.return <- eval(topt))
+              optim.base.args$par <- optim.parm
+              optim.base.args$control <- optim.control
+              if (!only.optimize.beta && ("h" %in% names(optim.base.args))) {
+                optim.base.args$h <- NULL
+              }
+              if (only.optimize.beta) {
+                optim.base.args$h <- h
+              }
+              suppressWarnings(optim.return <- do.call(optim, optim.base.args))
               if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                 num.feval.overall <- num.feval.overall + optim.return$counts[1]
             }
