@@ -661,15 +661,13 @@ npplot.conbandwidth <-
           }
         
           if (plot.behavior != "plot" & plot.errors) {
-            eval(parse(text=paste("plot.out[[plot.index]]$",ifelse(gradients,
-                         paste("gc",j,"err",sep=""),
-                         ifelse(quantreg, "quanterr", "conderr")),
-                         "= na.omit(cbind(-temp.err[,1], temp.err[,2]))", sep="")))
-            eval(parse(text=paste("plot.out[[plot.index]]$",
-                         ifelse(gradients, paste("gc",j,"bias",sep=""), "bias"),
-                         "= na.omit(temp.dens - temp.err[,3])", sep="")))
-            plot.out[[plot.index]]$bxp = temp.boot
-            
+            err.name <- ifelse(gradients,
+                               paste("gc", j, "err", sep = ""),
+                               ifelse(quantreg, "quanterr", "conderr"))
+            bias.name <- ifelse(gradients, paste("gc", j, "bias", sep = ""), "bias")
+            plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
+            plot.out[[plot.index]][[bias.name]] <- na.omit(temp.dens - temp.err[,3])
+            plot.out[[plot.index]]$bxp <- temp.boot
           }
         }
       }
@@ -796,15 +794,13 @@ npplot.conbandwidth <-
             }
               
             if (plot.behavior != "plot" & plot.errors) {
-              eval(parse(text=paste("plot.out[[plot.index]]$",ifelse(gradients,
-                           paste("gc",j,"err",sep=""),
-                           ifelse(quantreg, "quanterr", "conderr")),
-                           "= na.omit(cbind(-temp.err[,1], temp.err[,2]))", sep="")))
-              eval(parse(text=paste("plot.out[[plot.index]]$",
-                           ifelse(gradients, paste("gc",j,"bias",sep=""), "bias"),
-                           "= na.omit(temp.dens - temp.err[,3])", sep="")))
-              plot.out[[plot.index]]$bxp = temp.boot
-                
+              err.name <- ifelse(gradients,
+                                 paste("gc", j, "err", sep = ""),
+                                 ifelse(quantreg, "quanterr", "conderr"))
+              bias.name <- ifelse(gradients, paste("gc", j, "bias", sep = ""), "bias")
+              plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
+              plot.out[[plot.index]][[bias.name]] <- na.omit(temp.dens - temp.err[,3])
+              plot.out[[plot.index]]$bxp <- temp.boot
             }
           }
         }
@@ -899,4 +895,3 @@ npplot.conbandwidth <-
       }
     }
   }
-
