@@ -12,6 +12,9 @@ associated constants.
 
 ## Typical Use
 
+Install/launch Maxima from the official project page:
+<https://maxima.sourceforge.io/>
+
 1. Open Maxima.
 2. Load `kernels.max`.
 3. Run `computeKernels(<base_kernel>, <support>)` for the desired kernel.
