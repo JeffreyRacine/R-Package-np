@@ -235,8 +235,13 @@ npudist.default <- function(bws, tdat, ...){
   tbw <- eval.parent(sc.bw)
 
   ## convention: first argument is always dropped, second, if present, propagated
-  eval(parse(text=paste("npudist(bws = tbw",
-               ifelse(no.tdat, "",
-                      ifelse(tdat.named, ",tdat = tdat",",tdat")),
-               ",...)")))
+  call.args <- list(bws = tbw)
+  if (!no.tdat) {
+    if (tdat.named) {
+      call.args$tdat <- tdat
+    } else {
+      call.args <- c(call.args, list(tdat))
+    }
+  }
+  do.call(npudist, c(call.args, list(...)))
 }

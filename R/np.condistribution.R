@@ -364,5 +364,16 @@ npcdist.default <- function(bws, txdat, tydat, ...){
     }
   }
   
-  eval(parse(text=paste("npcdist(bws = tbw", tx.str, ty.str, ",...)")))
+  call.args <- list(bws = tbw)
+  if (no.bws) {
+    call.args$txdat <- txdat
+    call.args$tydat <- tydat
+  } else {
+    if (txdat.named) call.args$txdat <- txdat
+    if (tydat.named) call.args$tydat <- tydat
+    if ((!bws.named) && (!txdat.named) && (!no.tydat) && (!tydat.named)) {
+      call.args <- c(call.args, list(tydat))
+    }
+  }
+  do.call(npcdist, c(call.args, list(...)))
 }

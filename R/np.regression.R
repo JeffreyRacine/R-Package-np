@@ -481,7 +481,18 @@ npreg.default <- function(bws, txdat, tydat, ...){
     }
   }
   
-  ev <- eval(parse(text=paste("npreg(bws = tbw", tx.str, ty.str, ",...)")))
+  call.args <- list(bws = tbw)
+  if (no.bws) {
+    call.args$txdat <- txdat
+    call.args$tydat <- tydat
+  } else {
+    if (txdat.named) call.args$txdat <- txdat
+    if (tydat.named) call.args$tydat <- tydat
+    if ((!bws.named) && (!txdat.named) && (!no.tydat) && (!tydat.named)) {
+      call.args <- c(call.args, list(tydat))
+    }
+  }
+  ev <- do.call(npreg, c(call.args, list(...)))
 
   ev$call <- match.call(expand.dots = FALSE)
   environment(ev$call) <- parent.frame()
