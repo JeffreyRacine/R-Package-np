@@ -123,6 +123,7 @@ extern double **matrix_X_ordered_quantile_extern;
 extern int int_ll_extern;
 extern int *vector_glp_degree_extern;
 extern int int_glp_bernstein_extern;
+extern int int_glp_basis_extern;
 
 extern int KERNEL_reg_extern;
 extern int KERNEL_reg_unordered_extern;
@@ -6683,6 +6684,7 @@ static int np_glp_store_term(const int ncon,
 
 static int np_glp_enum_terms_rec(const int idx,
                                  const int ncon,
+                                 const int basis_mode,
                                  const int dmax,
                                  const int *deg,
                                  int *cur,
@@ -6692,14 +6694,23 @@ static int np_glp_enum_terms_rec(const int idx,
   int k;
   if(idx == ncon){
     int s = 0;
+    int nz = 0;
     for(k = 0; k < ncon; k++)
       s += cur[k];
-    if((s <= 0) || (s > dmax)) return 1;
+    for(k = 0; k < ncon; k++)
+      if(cur[k] > 0) nz++;
 
-    for(k = 0; k < ncon; k++){
-      const int dk = deg[k];
-      if((dk > 0) && (dk < dmax) && (s > dk) && (cur[k] == dk))
-        return 1;
+    if(basis_mode == 2){ /* tensor */
+      if(s <= 0) return 1;
+    } else if(basis_mode == 0){ /* additive */
+      if((s <= 0) || (nz != 1)) return 1;
+    } else { /* glp */
+      if((s <= 0) || (s > dmax)) return 1;
+      for(k = 0; k < ncon; k++){
+        const int dk = deg[k];
+        if((dk > 0) && (dk < dmax) && (s > dk) && (cur[k] == dk))
+          return 1;
+      }
     }
 
     if(!np_glp_store_term(ncon, terms_ptr, nterms, cap, cur))
@@ -6709,7 +6720,7 @@ static int np_glp_enum_terms_rec(const int idx,
 
   for(k = 0; k <= deg[idx]; k++){
     cur[idx] = k;
-    if(np_glp_enum_terms_rec(idx + 1, ncon, dmax, deg, cur, terms_ptr, nterms, cap) == 0)
+    if(np_glp_enum_terms_rec(idx + 1, ncon, basis_mode, dmax, deg, cur, terms_ptr, nterms, cap) == 0)
       return 0;
   }
   return 1;
@@ -6717,6 +6728,7 @@ static int np_glp_enum_terms_rec(const int idx,
 
 static int np_glp_build_terms(const int ncon,
                               const int *deg,
+                              const int basis_mode,
                               int **terms_out,
                               int *nterms_out){
   int dmax, j;
@@ -6762,7 +6774,7 @@ static int np_glp_build_terms(const int ncon,
   }
 
   if(dmax > 0){
-    if(np_glp_enum_terms_rec(0, ncon, dmax, deg, cur, &terms, &nterms, &cap) == 0){
+    if(np_glp_enum_terms_rec(0, ncon, basis_mode, dmax, deg, cur, &terms, &nterms, &cap) == 0){
       free(cur);
       free(terms);
       return 0;
@@ -6982,6 +6994,7 @@ static void np_glp_fill_basis_eval_deriv(const int which_var,
 typedef struct {
   int ready;
   int use_bernstein;
+  int basis_mode;
   int num_obs;
   int ncon;
   int nterms;
@@ -6991,7 +7004,7 @@ typedef struct {
   double **matrix_X_continuous_train_ptr;
 } NPGLPCVCache;
 
-static NPGLPCVCache np_glp_cv_cache = {0, 0, 0, 0, 0, NULL, NULL, NULL, NULL};
+static NPGLPCVCache np_glp_cv_cache = {0, 0, 1, 0, 0, 0, NULL, NULL, NULL, NULL};
 
 static void np_glp_cv_cache_clear(void){
   int l;
@@ -7005,6 +7018,7 @@ static void np_glp_cv_cache_clear(void){
   free(np_glp_cv_cache.terms);
   np_glp_cv_cache.ready = 0;
   np_glp_cv_cache.use_bernstein = 0;
+  np_glp_cv_cache.basis_mode = 1;
   np_glp_cv_cache.num_obs = 0;
   np_glp_cv_cache.ncon = 0;
   np_glp_cv_cache.nterms = 0;
@@ -7022,6 +7036,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   int *terms = NULL;
   int nterms = 0;
   const int use_bernstein = (int_glp_bernstein_extern != 0);
+  const int basis_mode = int_glp_basis_extern;
   double **basis = NULL;
   NPGLPBasisCtx *basis_ctx = NULL;
 
@@ -7030,7 +7045,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   if(int_ll != LL_GLP) return 1;
   if((vector_glp_degree_extern == NULL) || (ncon <= 0) || (num_obs <= 0))
     return 0;
-  if(!np_glp_build_terms(ncon, vector_glp_degree_extern, &terms, &nterms))
+  if(!np_glp_build_terms(ncon, vector_glp_degree_extern, basis_mode, &terms, &nterms))
     return 0;
   if(nterms <= 0){
     free(terms);
@@ -7073,6 +7088,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
 
   np_glp_cv_cache.ready = 1;
   np_glp_cv_cache.use_bernstein = use_bernstein;
+  np_glp_cv_cache.basis_mode = basis_mode;
   np_glp_cv_cache.num_obs = num_obs;
   np_glp_cv_cache.ncon = ncon;
   np_glp_cv_cache.nterms = nterms;
@@ -7386,6 +7402,7 @@ int gate_override_active = 0;
 
     if(!np_glp_cv_cache.ready ||
        (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+       (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
        (np_glp_cv_cache.num_obs != num_obs) ||
        (np_glp_cv_cache.ncon != num_reg_continuous) ||
        (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous)){
@@ -12259,7 +12276,7 @@ double *SIGN){
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
       error("glp degree vector unavailable");
 
-    if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, &glp_terms, &glp_nterms))
+    if(!np_glp_build_terms(num_reg_continuous, vector_glp_degree_extern, int_glp_basis_extern, &glp_terms, &glp_nterms))
       error("failed to build glp basis terms");
     if(glp_nterms <= 0)
       error("invalid glp basis dimension");

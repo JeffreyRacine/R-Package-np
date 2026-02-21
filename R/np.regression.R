@@ -289,6 +289,7 @@ npreg.rbandwidth <-
 
     npCheckRegressionDesignCondition(reg.code = reg.c$code,
                                      xcon = tcon,
+                                     basis = bws$basis,
                                      degree = bws$degree,
                                      bernstein.basis = bws$bernstein.basis,
                                      where = "npreg")
@@ -360,6 +361,7 @@ npreg.rbandwidth <-
          as.integer(myopti),
          degree = degree.c,
          bernstein.basis = as.integer(isTRUE(bws$bernstein.basis)),
+         basis = as.integer(npLpBasisCode(bws$basis)),
          mean = double(enrow),
          merr = double(enrow),
          g = double(ifelse(gradients,enrow*ncol,0)),

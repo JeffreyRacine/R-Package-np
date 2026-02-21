@@ -18,8 +18,8 @@ extern void np_distribution_conditional_bw(void *, void *, void *, void *, void 
 extern void np_kernelsum(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_mpi_init(void *);
 extern void np_quantile_conditional(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
-extern void np_regression(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
-extern void np_regression_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void np_regression(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
+extern void np_regression_bw(void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *, void *);
 extern void np_release_static_buffers(void *);
 extern void np_set_seed(void *);
 extern void np_set_tgauss2(void *);
@@ -37,8 +37,8 @@ static const R_CMethodDef CEntries[] = {
     {"np_kernelsum",                   (DL_FUNC) &np_kernelsum,                   19},
     {"np_mpi_init",                    (DL_FUNC) &np_mpi_init,                     1},
     {"np_quantile_conditional",        (DL_FUNC) &np_quantile_conditional,        19},
-    {"np_regression",                  (DL_FUNC) &np_regression,                  24},
-    {"np_regression_bw",               (DL_FUNC) &np_regression_bw,               21},
+    {"np_regression",                  (DL_FUNC) &np_regression,                  25},
+    {"np_regression_bw",               (DL_FUNC) &np_regression_bw,               22},
     {"np_release_static_buffers",      (DL_FUNC) &np_release_static_buffers,       1},
     {"np_set_seed",                    (DL_FUNC) &np_set_seed,                     1},
     {"np_set_tgauss2",                 (DL_FUNC) &np_set_tgauss2,                  1},

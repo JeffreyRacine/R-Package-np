@@ -185,8 +185,8 @@ FALSE, \dots)
   When bandwidths are obtained with \code{regtype="lp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via
   \code{degree}. The \code{basis} selector currently supports
-  \code{basis="glp"} (with \code{"additive"} and \code{"tensor"}
-  reserved and guarded). For continuous predictors with degree vector
+  \code{basis="glp"}, \code{"additive"}, and \code{"tensor"}.
+  For continuous predictors with degree vector
   \eqn{d}{d}, additive basis size is
   \eqn{1+\sum_j d_j}{1+sum(d[j])}, tensor basis size is
   \eqn{\prod_j (d_j+1)}{prod(d[j]+1)}, and GLP uses admissible
