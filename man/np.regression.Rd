@@ -186,7 +186,14 @@ FALSE, \dots)
   \code{npreg} supports heterogeneous continuous polynomial degrees via
   \code{degree}. The \code{basis} selector currently supports
   \code{basis="glp"} (with \code{"additive"} and \code{"tensor"}
-  reserved and guarded). The optional flag \code{bernstein.basis}
+  reserved and guarded). For continuous predictors with degree vector
+  \eqn{d}{d}, additive basis size is
+  \eqn{1+\sum_j d_j}{1+sum(d[j])}, tensor basis size is
+  \eqn{\prod_j (d_j+1)}{prod(d[j]+1)}, and GLP uses admissible
+  multi-indices \eqn{\alpha}{alpha} with
+  \eqn{\alpha_j \le d_j}{alpha[j] <= d[j]} and
+  \eqn{0<\sum_j \alpha_j \le \max_j d_j}{0<sum(alpha)<=max(d)} plus
+  an intercept. The optional flag \code{bernstein.basis}
   controls basis construction: \code{FALSE} (default) uses raw
   local-polynomial powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
   homogeneous degree-0 and degree-1 cases remain
@@ -255,6 +262,9 @@ FALSE, \dots)
   shrinkage of local linear curve estimators,} Statistics and Computing,
   7, 11-17.
 
+  Fan, J. and I. Gijbels (1996), \emph{Local Polynomial Modelling and
+  Its Applications,} Chapman and Hall.
+
   Doksum, K. and A. Samarov (1995), \dQuote{Nonparametric estimation of
   global functionals and a measure of the explanatory power of
   covariates in regression,} The Annals of Statistics, 23 1443-1473.  
@@ -262,6 +272,9 @@ FALSE, \dots)
   Hall, P. and Q. Li and J.S. Racine (2007), \dQuote{Nonparametric
   estimation of regression functions in the presence of irrelevant
   regressors,} The Review of Economics and Statistics, 89, 784-789.
+
+  Hall, P. and J.S. Racine (2015), \dQuote{Infinite Order Cross-Validated
+  Local Polynomial Regression,} Journal of Econometrics, 185, 510-525.
 
   Li, Q. and J.S. Racine (2007), \emph{Nonparametric Econometrics: Theory
   and Practice,} Princeton University Press.

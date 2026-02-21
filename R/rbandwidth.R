@@ -78,7 +78,7 @@ rbandwidth <-
   bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
                                           bernstein.basis = bernstein.basis)
   if (identical(regtype, "lp") && ncon > 0L && is.finite(nobs)) {
-    lp.dim <- dim_basis(basis = "glp",
+    lp.dim <- dim_basis(basis = basis,
                         kernel = TRUE,
                         degree = degree,
                         segments = rep.int(1L, ncon))
@@ -204,19 +204,14 @@ npInsertGlpSummary <- function(txt, basis, degree, bernstein){
   if (is.null(basis) || !length(basis))
     basis <- "glp"
 
-  basis.dim <- if (is.null(degree) || !length(degree)) {
-    NA_real_
-  } else {
-    dim_basis(basis = "glp",
-              kernel = TRUE,
-              degree = as.integer(degree),
-              segments = rep.int(1L, length(degree)))
-  }
+  basis.family <- npLpBasisFamilyLabel(basis)
+  basis.rep <- npLpBasisRepresentationLabel(bernstein)
+  basis.dim <- npLpBasisNcol(basis = basis, degree = degree)
 
   glp.lines <- c(
-    paste("LP Basis:", basis),
-    paste("GLP Bernstein Basis:", ifelse(isTRUE(bernstein), "TRUE", "FALSE")),
-    paste("GLP Basis Dimension (including intercept):",
+    paste("LP Basis Family:", basis.family),
+    paste("LP Basis Representation:", basis.rep),
+    paste("LP Basis Dimension (NCOL(B)):",
           format(basis.dim, scientific = FALSE, trim = TRUE))
   )
 

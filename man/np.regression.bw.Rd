@@ -177,6 +177,14 @@ npregbw(\dots)
     \code{"tensor"}. In the current implementation, only
     \code{basis="glp"} is available; \code{"additive"} and
     \code{"tensor"} currently fail fast with an informative error.
+    Let \eqn{d_j}{d[j]} denote the degree for continuous predictor
+    \eqn{j}{j} and \eqn{q}{q} the number of continuous predictors.
+    With one segment per predictor (no internal knots), basis
+    dimensions are:
+    \eqn{1+\sum_{j=1}^q d_j}{1+sum(d[j])} for additive,
+    \eqn{\prod_{j=1}^q (d_j+1)}{prod(d[j]+1)} for tensor, and
+    \eqn{1 + |\{\alpha:\alpha_j \le d_j,\ 0<\sum_j \alpha_j \le \max_j d_j\}|}{1 + number of admissible multi-indices}
+    for generalized local-polynomial (GLP) basis construction.
   }
 
   \item{degree}{
@@ -489,6 +497,12 @@ npregbw(\dots)
   Cheng, M.-Y. and P. Hall and D.M. Titterington (1997), \dQuote{On the
   shrinkage of local linear curve estimators,} Statistics and Computing,
   7, 11-17.
+
+  Fan, J. and I. Gijbels (1996), \emph{Local Polynomial Modelling and
+  Its Applications,} Chapman and Hall.
+
+  Hall, P. and J.S. Racine (2015), \dQuote{Infinite Order Cross-Validated
+  Local Polynomial Regression,} Journal of Econometrics, 185, 510-525.
 
   Hall, P. and Q. Li and J.S. Racine (2007), \dQuote{Nonparametric
   estimation of regression functions in the presence of irrelevant
