@@ -194,7 +194,12 @@ npregbw(\dots)
     powers (stable for extrapolation). If \code{TRUE}, a Bernstein
     (B-spline) basis is used for continuous predictors. For
     \code{bernstein.basis=TRUE}, prediction/evaluation points must lie
-    within the training support of each continuous predictor.
+    within the training support of each continuous predictor. For
+    \code{regtype="ll"} and \code{regtype="lp"}, a pre-optimization
+    design-conditioning check is performed on the training continuous
+    design: rank deficiency triggers an error, and large condition
+    number (\eqn{\kappa(B)}{kappa(B)}) triggers warning/error thresholds
+    to avoid unstable optimization dominated by ridging.
   }
   
   \item{bwmethod}{
