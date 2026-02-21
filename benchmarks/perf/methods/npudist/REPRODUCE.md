@@ -18,18 +18,18 @@ R CMD INSTALL --no-test-load -l /tmp/Rlib_nprmpi_cran20 /Users/jracine/Developme
 
 ```bash
 R_LIBS=/tmp/Rlib_nprmpi_cran20 FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npudist/run_npudist_combos.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npudist/run_npudist_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --nslaves=1 --tag=cran20_t50_n100
 
 R_LIBS=/tmp/Rlib_nprmpi_current FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npudist/run_npudist_combos.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npudist/run_npudist_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --nslaves=1 --tag=current_t50_n100
 ```
 
 ## 3) Build comparison tables
 
 ```bash
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npudist/compare_npudist_versions.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npudist/compare_npudist_versions.R \
   --raw_a=/tmp/RAW_CRAN.csv --label_a=npRmpi_0.60-20 \
   --raw_b=/tmp/RAW_CURRENT.csv --label_b=npRmpi_current \
   --out_timing=/tmp/npudist_nprmpi_combo48_t50_timing_compare.csv \
@@ -41,7 +41,7 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npudist/compare_npudist_
 ## 4) Generate markdown report
 
 ```bash
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npudist/make_npudist_report.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npudist/make_npudist_report.R \
   --timing_csv=/tmp/npudist_nprmpi_combo48_t50_timing_compare.csv \
   --objective_csv=/tmp/npudist_nprmpi_combo48_t50_objective_compare.csv \
   --combo_timing_csv=/tmp/npudist_nprmpi_combo48_t50_combo_timing_compare.csv \

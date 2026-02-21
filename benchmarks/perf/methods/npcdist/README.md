@@ -15,7 +15,7 @@ This folder provides a parameterized benchmark harness for `npcdistbw()` + `npcd
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npcdist/bench_npcdist_param_nprmpi.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npcdist/bench_npcdist_param_nprmpi.R \
   --n=100 --times=50 --base_seed=42 \
   --bwmethod=cv.ls --bwtype=fixed --nmulti=1 \
   --cxkertype=gaussian --cykertype=gaussian \
@@ -28,7 +28,7 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npcdist/bench_npcdist_pa
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npcdist/run_npcdist_combos.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npcdist/run_npcdist_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --rslaves=1 --tag=myrun
 ```
 

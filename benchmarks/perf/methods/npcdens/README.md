@@ -15,7 +15,7 @@ This folder provides a parameterized benchmark harness for `npcdensbw()` + `npcd
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npcdens/bench_npcdens_param_nprmpi.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npcdens/bench_npcdens_param_nprmpi.R \
   --n=100 --times=50 --base_seed=42 \
   --bwmethod=cv.ml --nmulti=1 \
   --cxkertype=gaussian --cykertype=gaussian \
@@ -28,7 +28,7 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npcdens/bench_npcdens_pa
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npcdens/run_npcdens_combos.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npcdens/run_npcdens_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --rslaves=1 --tag=myrun
 ```
 

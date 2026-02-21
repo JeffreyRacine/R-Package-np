@@ -24,7 +24,7 @@ y <- x * exp(z) * (1.0 + rnorm(n, sd = 0.2))
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npscoef/bench_npscoef_param_nprmpi.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npscoef/bench_npscoef_param_nprmpi.R \
   --n=250 --times=50 --base_seed=42 --nmulti=1 --nslaves=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
   --out_raw=/tmp/npscoef_one_mpi_raw.csv --out_summary=/tmp/npscoef_one_mpi_summary.csv
@@ -34,6 +34,6 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npscoef/bench_npscoef_pa
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npscoef/run_npscoef_combos.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npscoef/run_npscoef_combos.R \
   --n=250 --times=50 --base_seed=42 --nmulti=1 --nslaves=1 --tag=myrun
 ```

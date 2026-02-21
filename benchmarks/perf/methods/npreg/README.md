@@ -15,7 +15,7 @@ This folder provides a parameterized benchmark harness for `npregbw()` + `npreg(
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/bench_npreg_param_nprmpi.R \
   --n=100 --times=50 --base_seed=42 \
   --regtype=lc --bwmethod=cv.ls --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
@@ -27,7 +27,7 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/run_npreg_combos.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/run_npreg_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --rslaves=1 --tag=myrun
 ```
 
@@ -81,12 +81,12 @@ R CMD INSTALL --no-test-load -l /tmp/Rlib_nprmpi_cran20 /Users/jracine/Developme
 
 ```bash
 R_LIBS=/tmp/Rlib_nprmpi_cran20 FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/bench_npreg_param_nprmpi.R \
   --n=100 --times=50 --rslaves=1 \
   --out_raw=/tmp/nprmpi_cran20_raw.csv --out_summary=/tmp/nprmpi_cran20_summary.csv
 
 R_LIBS=/tmp/Rlib_nprmpi_current FI_TCP_IFACE=en0 \
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_nprmpi.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/bench_npreg_param_nprmpi.R \
   --n=100 --times=50 --rslaves=1 \
   --out_raw=/tmp/nprmpi_current_raw.csv --out_summary=/tmp/nprmpi_current_summary.csv
 ```
@@ -94,7 +94,7 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/bench_npreg_param_
 3. Compare outputs.
 
 ```bash
-Rscript /Users/jracine/Development/np-npRmpi/benchmarks/npreg/compare_npreg_versions.R \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/compare_npreg_versions.R \
   --raw_a=/tmp/nprmpi_cran20_raw.csv --label_a=npRmpi_0.60-20 \
   --raw_b=/tmp/nprmpi_current_raw.csv --label_b=npRmpi_current \
   --out_timing=/tmp/nprmpi_timing_compare.csv \
