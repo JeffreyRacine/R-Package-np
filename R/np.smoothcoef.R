@@ -71,13 +71,18 @@ npscoef.formula <-
     }
 
 
-    ev <-
-      eval(parse(text=paste("npscoef(txdat = txdat, tydat = tydat,",
-                   ifelse(miss.z, '','tzdat = tzdat,'),
-                   ifelse(has.eval,paste("exdat = exdat,",
-                                         ifelse(y.eval,"eydat = eydat,",""),
-                                         ifelse(miss.z,'', 'ezdat = ezdat,')),""),
-                   "bws = bws, ...)")))
+    sc.args <- list(txdat = txdat, tydat = tydat)
+    if (!miss.z)
+      sc.args$tzdat <- tzdat
+    if (has.eval) {
+      sc.args$exdat <- exdat
+      if (y.eval)
+        sc.args$eydat <- eydat
+      if (!miss.z)
+        sc.args$ezdat <- ezdat
+    }
+    sc.args$bws <- bws
+    ev <- do.call(npscoef, c(sc.args, list(...)))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
@@ -94,10 +99,14 @@ npscoef.formula <-
 
 npscoef.call <-
   function(bws, ...) {
-    eval(parse(text = paste('npscoef(txdat = eval(bws$call[["xdat"]], environment(bws$call)),',
-                 'tydat = eval(bws$call[["ydat"]], environment(bws$call)),',
-                 ifelse(!is.null(bws$zdati), 'tzdat = eval(bws$call[["zdat"]], environment(bws$call)),',''),
-                 'bws = bws, ...)')))
+    call.args <- list(
+      txdat = eval(bws$call[["xdat"]], environment(bws$call)),
+      tydat = eval(bws$call[["ydat"]], environment(bws$call))
+    )
+    if (!is.null(bws$zdati))
+      call.args$tzdat <- eval(bws$call[["zdat"]], environment(bws$call))
+    call.args$bws <- bws
+    do.call(npscoef, c(call.args, list(...)))
   }
 
 npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
@@ -173,7 +182,23 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
     }
   }
 
-  eval(parse(text=paste("npscoef(bws = tbw", tx.str, ty.str, tz.str, ",...)")))
+  call.args <- list(bws = tbw)
+  if (no.bws) {
+    call.args$txdat <- txdat
+    call.args$tydat <- tydat
+    if (!no.tzdat) call.args$tzdat <- tzdat
+  } else {
+    if (txdat.named) call.args$txdat <- txdat
+    if (tydat.named) call.args$tydat <- tydat
+    if (tzdat.named) call.args$tzdat <- tzdat
+    if ((!bws.named) && (!txdat.named) && (!no.tydat) && (!tydat.named)) {
+      call.args <- c(call.args, list(tydat))
+    }
+    if ((!bws.named) && (!txdat.named) && (!no.tzdat) && (!tzdat.named)) {
+      call.args <- c(call.args, list(tzdat))
+    }
+  }
+  do.call(npscoef, c(call.args, list(...)))
 
 }
 
@@ -243,9 +268,10 @@ npscoef.scbandwidth <-
 
     ## catch and destroy NA's
     goodrows = 1:dim(txdat)[1]
-    rows.omit =
-      eval(parse(text = paste("attr(na.omit(data.frame(txdat, tydat",
-                   ifelse(miss.z,'',',tzdat'),')), "na.action")')))
+    train.df <- data.frame(txdat, tydat)
+    if (!miss.z)
+      train.df <- data.frame(train.df, tzdat)
+    rows.omit <- attr(na.omit(train.df), "na.action")
 
     goodrows[rows.omit] = 0
 
@@ -259,10 +285,12 @@ npscoef.scbandwidth <-
 
     if (!miss.ex){
       goodrows = 1:dim(exdat)[1]
-      rows.omit = eval(parse(text=paste('attr(na.omit(data.frame(exdat',
-                               ifelse(miss.ey,"",",eydat"),
-                               ifelse(miss.z, "",",ezdat"),
-                               ')), "na.action")')))
+      eval.df <- data.frame(exdat)
+      if (!miss.ey)
+        eval.df <- data.frame(eval.df, eydat)
+      if (!miss.z)
+        eval.df <- data.frame(eval.df, ezdat)
+      rows.omit <- attr(na.omit(eval.df), "na.action")
 
       goodrows[rows.omit] = 0
 
@@ -342,9 +370,10 @@ npscoef.scbandwidth <-
         ezdat <- exdat
     }
 
-    tww <- eval(parse(text=paste("npksum(txdat = tzdat, tydat = yW, weights = yW,",
-                    ifelse(miss.ex, "", "exdat = ezdat,"),
-                    "bws = bws, leave.one.out = leave.one.out)$ksum")))
+    ksum.args <- list(txdat = tzdat, tydat = yW, weights = yW, bws = bws, leave.one.out = leave.one.out)
+    if (!miss.ex)
+      ksum.args$exdat <- ezdat
+    tww <- do.call(npksum, ksum.args)$ksum
 
     tyw <- tww[-1,1,,drop=FALSE]
     dim(tyw) <- dim(tyw)[-2]
@@ -488,8 +517,10 @@ npscoef.scbandwidth <-
       u2.W <- sapply(1:tnrow, function(i) { W.train[i,, drop=FALSE]*u2.W[i] })
       u2.W <- t(u2.W)
 
-      V.hat <- eval(parse(text = paste("npksum(txdat = tzdat, tydat = W.train, weights = u2.W,",
-                            ifelse(!miss.ex, "exdat = ezdat,", ""), "bws = bws, leave.one.out = leave.one.out)$ksum")))
+      vhat.args <- list(txdat = tzdat, tydat = W.train, weights = u2.W, bws = bws, leave.one.out = leave.one.out)
+      if (!miss.ex)
+        vhat.args$exdat <- ezdat
+      V.hat <- do.call(npksum, vhat.args)$ksum
 
       ## asymptotics rely on positive definite nature of tww (ie. M.eval) and V.hat
       ## so choleski decomposition is used to assure their veracity
@@ -500,15 +531,24 @@ npscoef.scbandwidth <-
 
     }
 
-    ev <- eval(parse(text=paste("smoothcoefficient(bws = bws, eval = teval",
-                 ", mean = mean,",
-                 ifelse(errors & !do.iterate,"merr = merr,",""),
-                 ifelse(betas, "beta = t(coef.mat),",""),
-                 ifelse(residuals, "resid = resid,",""),
-                 "residuals = residuals, betas = betas,",
-                 "ntrain = nrow(txdat), trainiseval = miss.ex,",
-                 ifelse(miss.ey && !miss.ex, "",
-                        "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN)"),")")))
+    sc.obj.args <- list(
+      bws = bws,
+      eval = teval,
+      mean = mean,
+      residuals = residuals,
+      betas = betas,
+      ntrain = nrow(txdat),
+      trainiseval = miss.ex
+    )
+    if (errors && !do.iterate)
+      sc.obj.args$merr <- merr
+    if (betas)
+      sc.obj.args$beta <- t(coef.mat)
+    if (residuals)
+      sc.obj.args$resid <- resid
+    if (!(miss.ey && !miss.ex))
+      sc.obj.args$xtra <- c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
+    ev <- do.call(smoothcoefficient, sc.obj.args)
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
