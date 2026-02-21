@@ -561,14 +561,19 @@ npplot.scbandwidth <-
           plot.out[plot.index] = NA
           if (gradients){
           } else {
-            plot.out[[plot.index]] =
-              eval(parse(text = paste("smoothcoefficient(bws = bws,",
-                           "eval = ", ifelse(miss.z, "subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],",
-                                             "list(exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], ezdat = ezdat[1:xi.neval,, drop = FALSE]),"),
-                           "mean = na.omit(temp.mean),",
-                           "ntrain = dim(xdat)[1],",
-                           "trainiseval = FALSE,",
-                           "xtra = c(0, 0, 0, 0, 0, 0))")))
+            eval.obj <- if (miss.z) {
+              subcol(exdat, ei, i)[1:xi.neval,, drop = FALSE]
+            } else {
+              list(exdat = subcol(exdat, ei, i)[1:xi.neval,, drop = FALSE],
+                   ezdat = ezdat[1:xi.neval,, drop = FALSE])
+            }
+            plot.out[[plot.index]] <-
+              smoothcoefficient(bws = bws,
+                                eval = eval.obj,
+                                mean = na.omit(temp.mean),
+                                ntrain = dim(xdat)[1],
+                                trainiseval = FALSE,
+                                xtra = c(0, 0, 0, 0, 0, 0))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
 
@@ -807,4 +812,3 @@ npplot.scbandwidth <-
 
       
   }
-

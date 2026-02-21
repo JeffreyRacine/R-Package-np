@@ -165,22 +165,15 @@ npplot.sibandwidth <-
           ymin <- yr[1]
           ymax <- yr[2]
         } else {
-          ymin <- eval(parse(text=paste("min(",
-                               ifelse(plot.errors,"na.omit(",""),
-                               "c(temp.mean",
-                               ifelse(plot.errors,"- temp.err[,1]",""),
-                               ", temp.err[,3]",
-                               ifelse(plot.errors,"- temp.err[,1]",""),
-                               "))",
-                               ifelse(plot.errors,")",""))))
-          ymax <- eval(parse(text=paste("max(",
-                               ifelse(plot.errors,"na.omit(",""),
-                               "c(temp.mean",
-                               ifelse(plot.errors,"+ temp.err[,2]",""),
-                               ", temp.err[,3]",
-                               ifelse(plot.errors,"+ temp.err[,2]",""),
-                               "))",
-                               ifelse(plot.errors,")",""))))
+          if (plot.errors){
+            ymin <- min(na.omit(c(temp.mean - temp.err[,1],
+                                  temp.err[,3] - temp.err[,1])))
+            ymax <- max(na.omit(c(temp.mean + temp.err[,2],
+                                  temp.err[,3] + temp.err[,2])))
+          } else {
+            ymin <- min(c(temp.mean, temp.err[,3]))
+            ymax <- max(c(temp.mean, temp.err[,3]))
+          }
         }
       }
 
