@@ -201,8 +201,10 @@ npreg.rbandwidth <-
 
     if (!no.ex){
       goodrows = 1:dim(exdat)[1]
-      rows.omit = eval(parse(text=paste('attr(na.omit(data.frame(exdat',
-                               ifelse(no.ey,"",",eydat"),')), "na.action")')))
+      eval.df <- data.frame(exdat)
+      if (!no.ey)
+        eval.df <- data.frame(eval.df, eydat)
+      rows.omit <- attr(na.omit(eval.df), "na.action")
 
       goodrows[rows.omit] = 0
 
@@ -406,21 +408,31 @@ npreg.rbandwidth <-
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
 
-    ev <- eval(parse(text = paste("npregression(bws = bws,",
-                         "eval = teval,",
-                         "mean = myout$mean, merr = myout$merr,",
-                         ifelse(gradients,
-                                "grad = myout$g, gerr = myout$gerr,",""),
-                         ifelse(residuals, "resid = resid,", ""),
-                         "ntrain = tnrow,",
-                         "trainiseval = no.ex,",
-                         "gradients = gradients,",
-                         ifelse(identical(bws$regtype, "lp"),
-                                "gradient.order = glp.gradient.order,", ""),
-                         "residuals = residuals,",
-                         "xtra = myout$xtra, rows.omit = rows.omit,",
-                         "timing = bws$timing, total.time = total.time,",
-                         "optim.time = optim.time, fit.time = fit.elapsed)")))
+    ev.args <- list(
+      bws = bws,
+      eval = teval,
+      mean = myout$mean,
+      merr = myout$merr,
+      ntrain = tnrow,
+      trainiseval = no.ex,
+      gradients = gradients,
+      residuals = residuals,
+      xtra = myout$xtra,
+      rows.omit = rows.omit,
+      timing = bws$timing,
+      total.time = total.time,
+      optim.time = optim.time,
+      fit.time = fit.elapsed
+    )
+    if (gradients) {
+      ev.args$grad <- myout$g
+      ev.args$gerr <- myout$gerr
+    }
+    if (residuals)
+      ev.args$resid <- resid
+    if (identical(bws$regtype, "lp"))
+      ev.args$gradient.order <- glp.gradient.order
+    ev <- do.call(npregression, ev.args)
 
 
     ev$call <- match.call(expand.dots = FALSE)

@@ -107,8 +107,10 @@ npconmode.conbandwidth <-
 
     if (!no.ex){
       goodrows = 1:dim(exdat)[1]
-      rows.omit = eval(parse(text=paste('attr(na.omit(data.frame(exdat',
-                               ifelse(no.ey,"",",eydat"),')), "na.action")')))
+      eval.df <- data.frame(exdat)
+      if (!no.ey)
+        eval.df <- data.frame(eval.df, eydat)
+      rows.omit <- attr(na.omit(eval.df), "na.action")
 
       goodrows[rows.omit] = 0
 
@@ -142,27 +144,30 @@ npconmode.conbandwidth <-
       efac <- factor(union(bws$ydati$all.lev[[1]], levels(eydat[,1])),
                      levels = union(bws$ydati$all.lev[[1]], levels(eydat[,1])), ordered = is.ordered(tydat[,1]))
 
-    tdensE <- parse(text = paste("npcdens(txdat = txdat, tydat = tydat,",
-                      "exdat = ", ifelse(no.ex, "txdat", "exdat"), ",",
-                      "eydat = rep(efac[i], enrow),",
-                      "bws = bws)$condens"))
-
-
     for(i in 1:nlevels(efac)){
-        tdens <- eval(tdensE)
+        tdens <- npcdens(
+          txdat = txdat,
+          tydat = tydat,
+          exdat = if (no.ex) txdat else exdat,
+          eydat = rep(efac[i], enrow),
+          bws = bws
+        )$condens
         tf = tdens >= mdens
         indices[tf] = i
         mdens[tf] = tdens[tf]
     }
 
-    con.mode <- eval(parse(text = paste("conmode(bws = bws,",
-                             "xeval = ", ifelse(no.ex, "txdat", "exdat"), ",",
-                             ifelse(no.ey & !no.ex, "",
-                                    paste("yeval = ", ifelse(no.ey, "tydat",
-                                                             "eydat"), ",")),
-                             "conmode = efac[indices],",
-                             "condens = mdens, ntrain = nrow(txdat),",
-                             "trainiseval = no.ex)")))
+    cm.args <- list(
+      bws = bws,
+      xeval = if (no.ex) txdat else exdat,
+      conmode = efac[indices],
+      condens = mdens,
+      ntrain = nrow(txdat),
+      trainiseval = no.ex
+    )
+    if (!(no.ey & !no.ex))
+      cm.args$yeval <- if (no.ey) tydat else eydat
+    con.mode <- do.call(conmode, cm.args)
     
     if (!(no.ey & !no.ex)){
       confusion.matrix <- 
