@@ -81,10 +81,14 @@ npindex.formula <-
           exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
         }
 
-        ev <-
-            eval(parse(text=paste("npindex(txdat = txdat, tydat = tydat,",
-                           ifelse(has.eval,paste("exdat = exdat,",ifelse(y.eval,"eydat = eydat,","")),""),
-                           "bws = bws, ...)")))
+        si.args <- list(txdat = txdat, tydat = tydat)
+        if (has.eval) {
+          si.args$exdat <- exdat
+          if (y.eval)
+            si.args$eydat <- eydat
+        }
+        si.args$bws <- bws
+        ev <- do.call(npindex, c(si.args, list(...)))
 
         ev$omit <- attr(umf,"na.action")
         ev$rows.omit <- as.vector(ev$omit)
@@ -174,7 +178,18 @@ npindex.default <- function(bws, txdat, tydat, ...){
     }
   }
 
-  eval(parse(text=paste("npindex(bws = tbw", tx.str, ty.str, ",...)")))
+  call.args <- list(bws = tbw)
+  if (no.bws) {
+    call.args$txdat <- txdat
+    call.args$tydat <- tydat
+  } else {
+    if (txdat.named) call.args$txdat <- txdat
+    if (tydat.named) call.args$tydat <- tydat
+    if ((!bws.named) && (!txdat.named) && (!no.tydat) && (!tydat.named)) {
+      call.args <- c(call.args, list(tydat))
+    }
+  }
+  do.call(npindex, c(call.args, list(...)))
 }
 
 npindex.sibandwidth <-

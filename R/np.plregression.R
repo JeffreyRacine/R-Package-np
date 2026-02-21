@@ -85,11 +85,15 @@ npplreg.formula <-
       ezdat <- emf[, bws$chromoly[[3]], drop = FALSE]
     }
 
-    ev <-
-      eval(parse(text=paste("npplreg(txdat = txdat, tydat = tydat, tzdat = tzdat,",
-                   ifelse(has.eval,paste("exdat = exdat, ezdat = ezdat,",
-                                         ifelse(y.eval,"eydat = eydat,","")),""),
-                   "bws = bws, ...)")))
+    pl.args <- list(txdat = txdat, tydat = tydat, tzdat = tzdat)
+    if (has.eval) {
+      pl.args$exdat <- exdat
+      pl.args$ezdat <- ezdat
+      if (y.eval)
+        pl.args$eydat <- eydat
+    }
+    pl.args$bws <- bws
+    ev <- do.call(npplreg, c(pl.args, list(...)))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
@@ -350,5 +354,18 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
     }
   }
   
-  eval(parse(text=paste("npplreg(bws = tbw", tx.str, ty.str, tz.str, ",...)")))
+  call.args <- list(bws = tbw)
+  if (no.bws) {
+    call.args$txdat <- txdat
+    call.args$tydat <- tydat
+    call.args$tzdat <- tzdat
+  } else {
+    if (txdat.named) call.args$txdat <- txdat
+    if (tydat.named) call.args$tydat <- tydat
+    if (tzdat.named) call.args$tzdat <- tzdat
+    if ((!bws.named) && (!txdat.named) && (!no.tzdat) && (!tzdat.named)) {
+      call.args <- c(call.args, list(tzdat))
+    }
+  }
+  do.call(npplreg, c(call.args, list(...)))
 }
