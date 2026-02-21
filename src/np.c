@@ -5,6 +5,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 
 #include <R.h>
@@ -185,6 +186,210 @@ static int np_has_finite_cker_bounds(const double *lb, const double *ub, const i
       return 1;
   }
   return 0;
+}
+
+static int np_cmp_desc_int(const void *a, const void *b)
+{
+  const int ia = *((const int *)a);
+  const int ib = *((const int *)b);
+  return (ib > ia) - (ib < ia);
+}
+
+static void np_dim_basis_two_dimen(const int d1, const int d2, double *nd1, double *pd12)
+{
+  int i, j, low;
+  double d12 = *pd12;
+  double s;
+  double *nd2 = NULL;
+
+  if ((d1 <= 0) || (d2 <= 0))
+    return;
+
+  if (d2 == 1){
+    *pd12 = d12;
+    return;
+  }
+
+  d12 = (double)d2;
+  if (d1 > d2){
+    for (i = 1; i <= (d1 - d2); i++)
+      d12 += ((double)d2) * nd1[i];
+  }
+
+  for (i = 2; i <= d2; i++)
+    d12 += ((double)i) * nd1[d1 - i + 1];
+
+  d12 += nd1[d1];
+
+  nd2 = (double *)malloc((size_t)(d1 + 1) * sizeof(double));
+  if (nd2 == NULL)
+    error("np_dim_basis_two_dimen: memory allocation failed");
+
+  for (i = 0; i <= d1; i++)
+    nd2[i] = nd1[i];
+
+  if (d1 > 1){
+    for (j = 1; j <= (d1 - 1); j++){
+      s = 0.0;
+      low = MAX(0, j - d2 + 1);
+      for (i = j; i >= low; i--)
+        s += (i > 0) ? nd1[i] : 1.0;
+      nd2[j] = s;
+    }
+  }
+
+  nd2[d1] = nd1[d1];
+  for (i = MAX(1, d1 - d2 + 1); i <= (d1 - 1); i++)
+    nd2[d1] += nd1[i];
+
+  for (i = 0; i <= d1; i++)
+    nd1[i] = nd2[i];
+
+  free(nd2);
+  *pd12 = d12;
+}
+
+void np_dim_basis(int *basis_code,
+                  int *kernel,
+                  int *degree,
+                  int *segments,
+                  int *k,
+                  int *include,
+                  int *categories,
+                  int *ninclude,
+                  double *result)
+{
+  int i, m, dsum, rcount = 0;
+  int basis;
+  int use_kernel;
+  int ndeg;
+  int ninc;
+  int *rows = NULL;
+  int *dims = NULL;
+  double ncol_bs = 0.0;
+
+  if ((basis_code == NULL) || (kernel == NULL) || (k == NULL) || (result == NULL)){
+    if (result != NULL) *result = NA_REAL;
+    return;
+  }
+
+  basis = *basis_code;      /* 0=additive, 1=glp, 2=tensor */
+  use_kernel = *kernel;
+  ndeg = MAX(0, *k);
+  ninc = MAX(0, (ninclude == NULL) ? 0 : *ninclude);
+
+  if ((basis < 0) || (basis > 2)){
+    *result = NA_REAL;
+    return;
+  }
+
+  if (ndeg > 0){
+    rows = (int *)malloc((size_t)ndeg * sizeof(int));
+    if (rows == NULL)
+      error("np_dim_basis: memory allocation failed");
+    for (i = 0; i < ndeg; i++)
+      rows[i] = degree[i] + segments[i];
+  }
+
+  if (use_kernel){
+    if (basis == 0){ /* additive */
+      for (i = 0; i < ndeg; i++)
+        if (degree[i] > 0)
+          ncol_bs += (double)(rows[i] - 1);
+    } else if (basis == 2){ /* tensor */
+      ncol_bs = 1.0;
+      m = 0;
+      for (i = 0; i < ndeg; i++){
+        if (degree[i] > 0){
+          ncol_bs *= (double)rows[i];
+          m++;
+        }
+      }
+      if (m == 0)
+        ncol_bs = 0.0;
+    } else { /* glp */
+      if (ndeg > 0){
+        dims = (int *)malloc((size_t)ndeg * sizeof(int));
+        if (dims == NULL)
+          error("np_dim_basis: memory allocation failed");
+      }
+      for (i = 0; i < ndeg; i++){
+        if (degree[i] > 0){
+          dsum = rows[i] - 1;
+          if (dsum > 0)
+            dims[rcount++] = dsum;
+        }
+      }
+    }
+  } else {
+    if (basis == 0){ /* additive */
+      for (i = 0; i < ndeg; i++)
+        if (degree[i] > 0)
+          ncol_bs += (double)(rows[i] - 1);
+      for (i = 0; i < ninc; i++)
+        ncol_bs += (double)(include[i] * categories[i] - 1);
+    } else if (basis == 2){ /* tensor */
+      ncol_bs = 1.0;
+      m = 0;
+      for (i = 0; i < ndeg; i++){
+        if (degree[i] > 0){
+          ncol_bs *= (double)rows[i];
+          m++;
+        }
+      }
+      for (i = 0; i < ninc; i++){
+        ncol_bs *= (double)(include[i] * categories[i] - 1);
+        m++;
+      }
+      if (m == 0)
+        ncol_bs = 0.0;
+    } else { /* glp */
+      if ((ndeg + ninc) > 0){
+        dims = (int *)malloc((size_t)(ndeg + ninc) * sizeof(int));
+        if (dims == NULL)
+          error("np_dim_basis: memory allocation failed");
+      }
+      for (i = 0; i < ndeg; i++){
+        if (degree[i] > 0){
+          dsum = rows[i] - 1;
+          if (dsum > 0)
+            dims[rcount++] = dsum;
+        }
+      }
+      for (i = 0; i < ninc; i++){
+        dsum = include[i] * categories[i] - 1;
+        if (dsum > 0)
+          dims[rcount++] = dsum;
+      }
+    }
+  }
+
+  if (basis == 1){ /* glp recurrence */
+    if (rcount == 0){
+      ncol_bs = 0.0;
+    } else {
+      int dmax, idx;
+      double *nd1 = NULL;
+      qsort(dims, (size_t)rcount, sizeof(int), np_cmp_desc_int);
+      dmax = dims[0];
+      nd1 = (double *)malloc((size_t)(dmax + 1) * sizeof(double));
+      if (nd1 == NULL)
+        error("np_dim_basis: memory allocation failed");
+      for (idx = 0; idx <= dmax; idx++)
+        nd1[idx] = (idx == dmax) ? 0.0 : 1.0;
+      ncol_bs = (double)dmax;
+      if (rcount > 1){
+        for (idx = 1; idx < rcount; idx++)
+          np_dim_basis_two_dimen(dmax, dims[idx], nd1, &ncol_bs);
+        ncol_bs += (double)(rcount - 1);
+      }
+      free(nd1);
+    }
+  }
+
+  if (rows != NULL) free(rows);
+  if (dims != NULL) free(dims);
+  *result = ncol_bs;
 }
 
 static void bwm_reset_counters(void)
