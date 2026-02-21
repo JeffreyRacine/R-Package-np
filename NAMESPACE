@@ -1,7 +1,7 @@
 useDynLib(npRmpi)
 import(stats, boot, cubature)
 importFrom("grDevices", "boxplot.stats", "extendrange", "grey", "n2mfrow", "rgb")
-importFrom("graphics", "axis", "legend", "lines", "mtext", "par", "persp", "plot", "plot.new", "plot.window", "points", "polygon")
+importFrom("graphics", "axis", "legend", "lines", "mtext", "par", "persp", "plot", "plot.new", "plot.window", "points", "polygon", "bxp")
 importFrom("utils", "combn", "flush.console")
 importFrom("methods", "is")
 importFrom("parallel", "nextRNGStream", "detectCores")
