@@ -15,7 +15,7 @@ test_that("nptgauss basic functionality works", {
   expect_silent(nptgauss(3.0))
 })
 
-test_that("npplot basic functionality works", {
+test_that("plot basic functionality works", {
   # skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
@@ -26,7 +26,7 @@ test_that("npplot basic functionality works", {
   pdf(NULL)
   on.exit(dev.off())
   
-  npplot(bws=bw)
+  plot(bw)
 })
 
 test_that("se and gradients methods work", {

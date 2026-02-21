@@ -7,7 +7,7 @@
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
-  \code{\link{npplot}} for plotting options.
+  \code{\link{plot}} for plotting options.
 }
 \usage{
 np.mpi.initialize()
@@ -24,5 +24,5 @@ np.mpi.initialize()
 
 \seealso{
   \code{\link{np.kernels}}, \code{\link{np.options}},
-  \code{\link{npplot}}, \code{\link{npRmpi.init}}.
+  \code{\link{plot}}, \code{\link{npRmpi.init}}.
 }

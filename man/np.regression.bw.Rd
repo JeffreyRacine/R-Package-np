@@ -382,7 +382,7 @@ npregbw(\dots)
 
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
   \code{npregbw} implements a variety of methods for choosing
   bandwidths for multivariate (\eqn{p}-variate) regression data defined
@@ -563,7 +563,7 @@ npregbw(\dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{npreg}}
 }
 \examples{

@@ -41,7 +41,7 @@ npRmpi.session.info(comm = 1)
   \item{dellog}{Logical; when \code{TRUE}, remove slave log files (if applicable).}
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
 \code{npRmpi.init()} now supports two robust execution models:
 \enumerate{

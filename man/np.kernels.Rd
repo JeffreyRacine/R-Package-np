@@ -8,7 +8,7 @@
 }
 \details{
   Documentation guide: see \code{\link{np.options}} for global options For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
-  and \code{\link{npplot}} for plotting options.
+  and \code{\link{plot}} for plotting options.
 
   Kernel option names used in \pkg{npRmpi}:
 
@@ -118,7 +118,7 @@
   \emph{Journal of the American Statistical Association}, \bold{99}, 1015--1026.
 }
 \seealso{
-  \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{npregbw}},
   \code{\link{npudensbw}},
   \code{\link{npudistbw}},

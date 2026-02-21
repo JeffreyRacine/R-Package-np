@@ -110,7 +110,7 @@
                     "\nProceeding without bootstrapping."))
     }
     
-    normalized.opts <- .npplot_normalize_common_options(
+    normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
@@ -1063,4 +1063,3 @@
     }
   }
 
-npplot.condbandwidth <- function(...) .np_plot_condbandwidth_engine(...)

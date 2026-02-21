@@ -1,7 +1,7 @@
 Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
 
 * Completed migration to modular S3 plot methods coordinated with
-  autodispatch-aware wrappers, while preserving legacy `npplot*` internals for
+  autodispatch-aware wrappers, while preserving legacy `plot*` internals for
   numerical/visual parity.
 
 * Added compatibility normalization for legacy S3 plot aliases prior to
@@ -43,7 +43,7 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
   one-time per-session warning to preserve backward compatibility while
   removing a stale legacy selector path.
 
-* Synchronized `npplot()` bootstrap error-band enhancements/fixes from
+* Synchronized `plot()` bootstrap error-band enhancements/fixes from
   np master:
   - replaced fixed quantiles with scalar `plot.errors.alpha` and added
     bootstrap quantile band types `pointwise`, `bonferroni`,
@@ -114,7 +114,7 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
   - reduced all-large branch overhead, including tree-list bypass where the
     all-large regime is already known.
 
-* Updated `npplot()` error-type semantics/documentation in sync with master:
+* Updated `plot()` error-type semantics/documentation in sync with master:
   - renamed bootstrap error type `standard` to `pmzsd`
   - `pmzsd` now uses plus/minus the `1-alpha/2` normal quantile
     (`qnorm(alpha/2, lower.tail=FALSE)` semantics).
@@ -340,7 +340,7 @@ Changes from Version 0.60-9 to 0.60-10 [5-Feb-2020]
 
 Changes from Version 0.60-8 to 0.60-9 [24-Oct-2018]
 
-* Added support for character expansion to npplot() (which is invoked
+* Added support for character expansion to plot() (which is invoked
   by calling plot() on an np object) - will take defaults from the
   environment par() or can be set directly, e.g.,
   plot(foo,cex.main=0.8)
@@ -391,11 +391,11 @@ Changes from Version 0.60-3 to 0.60-4 [03-Dec-2017]
 * Using wrapLines(strwrap(...)) for summary output for model specification
   test to automatically wrap long formula lines
 
-* plot() calls npplot() and npplot() behaves better when most passable
+* plot() calls plot() and plot() behaves better when most passable
   parameters are fed (col =, lty =, xlab =, etc.) but there may still
   be room for improvement
 
-* Added option plot.par.mfrow=TRUE/FALSE to npplot() so that the
+* Added option plot.par.mfrow=TRUE/FALSE to plot() so that the
   automated setting of par(mfrow=c(,)) in plot is disabled and the
   user can do this manually if desired
 
@@ -635,10 +635,10 @@ Changes from Version 0.40-8 to 0.40-9 [30-July-2011]
 
 Changes from Version 0.40-7 to 0.40-8 [29-July-2011]
 
-* Fixed issue where calling npplot resets system seed
+* Fixed issue where calling plot resets system seed
 
 * Updated examples in docs so that plot is recommended throughout (and
-  not npplot that is invoked by plot)
+  not plot that is invoked by plot)
 
 * Fixed regression in npindex when gradients=TRUE and errors=TRUE
 
@@ -725,7 +725,7 @@ Changes from Version 0.30-8 to 0.30-9 [17-May-2010]
 
 * Fixed regression (dating to version 0.30-4) where random.seed=42 was
   not initialized in functions npcmstest, npdeneqtest, npindexbw,
-  npsdeptest, npqcmstest, npsigtest, npsymtest, npunitest, and npplot
+  npsdeptest, npqcmstest, npsigtest, npsymtest, npunitest, and plot
 
 * Fixed issue with saving and restoring random seed in npdeptest
 
@@ -915,7 +915,7 @@ Changes from Version 0.14-3 to 0.20-0 [28-Jul-2008]
 
 * Fixed some quietness issues
 
-* npplot() now returns data upon request for conditional densities
+* plot() now returns data upon request for conditional densities
 
 * npreg() and npcdens() now take the appropriate limits in some
   pathological cases
@@ -965,7 +965,7 @@ Changes from Version 0.13-1 to 0.14-1 [18-Dec-2007]
 * Fixed error when plotting asymptotic errors with conditional
   densities
 
-* Fixed a bug in npplot() with partially linear regressions and
+* Fixed a bug in plot() with partially linear regressions and
   plot.behavior='data' or 'plot-data'
 
 * Maximum default number of multistarts is 5
@@ -1016,7 +1016,7 @@ Changes from Version 0.12-1 to 0.13-1 [03-May-2007]
 * Predict now accepts the argument 'se.fit', like predict.lm
 
 * Fixed bug where incorrect asymptotic standard errors of gradients
-  for regression objects were being displayed in npplot()
+  for regression objects were being displayed in plot()
 
 * Fixed bug where errors of gradients of regression objects were not
   being returned in matrix form

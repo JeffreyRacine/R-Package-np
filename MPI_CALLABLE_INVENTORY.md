@@ -34,7 +34,7 @@ From `NAMESPACE` export block (lines 130-175), the core `np*` user-facing surfac
 - `np.pairs`, `np.pairs.plot`, `uocquantile`
 
 4. Shared helpers exposed to users:
-- `npplot`
+- `plot`
 - `se`
 - `gradients`
 
@@ -48,7 +48,7 @@ Generic coverage counts:
 - `predict`: 17
 - `fitted`: 10
 - `se`: 8
-- `npplot`: 8
+- `plot`: 8
 - `gradients`: 5
 - `compute.bootstrap.errors`: 5
 - `npqreg`, `npsigtest`: 5 each
@@ -57,7 +57,7 @@ Generic coverage counts:
 ## 3) Critical Transitive Paths (Must Be Included)
 These are the highest-risk pathways for hangs when users do not manually broadcast:
 
-1. `plot.<class>()` methods that delegate to `npplot(...)`:
+1. `plot.<class>()` methods that delegate to `plot(...)`:
 - e.g. `plot.npregression`, `plot.condensity`, `plot.condistribution`, `plot.plregression`, `plot.qregression`, `plot.singleindex`, `plot.smoothcoefficient`, and bandwidth plot methods.
 
 2. `predict.<class>()` methods that call back into `np*` constructors via `eval(...)`:
@@ -118,7 +118,7 @@ Strong candidates to use inside helper/preflight:
 Use this checklist when wiring the helper:
 
 1. Intercept all top-level `np*` constructors listed in Section 1.
-2. Intercept `npplot` and all `plot.*` methods that route to `npplot`.
+2. Intercept `plot` and all `plot.*` methods that route to `plot`.
 3. Intercept all `predict.*` methods that route through `eval(np*(...))`.
 4. Intercept bandwidth `predict.*` methods that call estimators.
 5. Add nested-broadcast sentinel handling.
@@ -127,7 +127,7 @@ Use this checklist when wiring the helper:
 
 ## 7) Recommendation on Scope
 For first implementation pass, prioritize:
-1. `npregbw`, `npreg`, `npplot`, `predict.npregression`, `predict.rbandwidth`
+1. `npregbw`, `npreg`, `plot`, `predict.npregression`, `predict.rbandwidth`
 2. `npcdensbw`, `npcdens`, `predict.condensity`, `predict.conbandwidth`
 3. `npcdistbw`, `npcdist`, `predict.condistribution`, `predict.condbandwidth`
 4. then remaining estimator families.
@@ -219,7 +219,7 @@ Implication:
 1. Static check: enumerate every `predict.*` and `plot.*` method body and classify as:
 - accessor-only
 - re-evaluates estimator (`eval(np*...)`)
-- calls `npplot`.
+- calls `plot`.
 2. Runtime check harness:
 - for each top-level `np*` constructor + one method chain, run:
   - no manual broadcast (expected success),
@@ -245,7 +245,7 @@ This section maps key production chains from user entry to native/MPI layers.
 - `npreg(...)` in `/Users/jracine/Development/np-npRmpi/R/np.regression.R` -> `.C("np_regression", ...)`
 7. Transitive re-entry:
 - `predict.npregression()` in `/Users/jracine/Development/np-npRmpi/R/regression.R` calls `eval(npreg(...), envir=parent.frame())`
-- `plot.npregression()` calls `npplot(...)`
+- `plot.npregression()` calls `plot(...)`
 
 ### 11.2 Conditional density bandwidth/fit chain
 1. User call:
@@ -260,7 +260,7 @@ This section maps key production chains from user entry to native/MPI layers.
 - `npcdens(...)` in `/Users/jracine/Development/np-npRmpi/R/np.condensity.R` -> `.C("np_density_conditional", ...)`
 6. Transitive re-entry:
 - `predict.condensity()` in `/Users/jracine/Development/np-npRmpi/R/condensity.R` calls `eval(npcdens(...))`
-- `plot.condensity()` calls `npplot(...)`
+- `plot.condensity()` calls `plot(...)`
 
 ### 11.3 Conditional distribution bandwidth/fit chain
 1. User call:
@@ -275,7 +275,7 @@ This section maps key production chains from user entry to native/MPI layers.
 - `npcdist(...)` in `/Users/jracine/Development/np-npRmpi/R/np.condistribution.R` uses `.C("np_density_conditional", ..., densOrDist=NP_DO_DIST, ...)`
 6. Transitive re-entry:
 - `predict.condistribution()` in `/Users/jracine/Development/np-npRmpi/R/condistribution.R` calls `eval(npcdist(...))`
-- `plot.condistribution()` calls `npplot(...)`
+- `plot.condistribution()` calls `plot(...)`
 
 ### 11.4 Slave execution loop chain
 1. Startup/init:
@@ -297,8 +297,8 @@ This section maps key production chains from user entry to native/MPI layers.
 3. `predict.*` and bandwidth `predict.*` are mandatory interception points:
 - They are common hidden re-entry points (`eval(np*...)`) and will bypass a constructor-only dispatcher.
 
-4. `plot.* -> npplot -> np*` needs one-shot dispatch semantics:
-- `npplot` can loop across slices and call `np*` repeatedly; helper must avoid rebroadcasting each nested step.
+4. `plot.* -> plot -> np*` needs one-shot dispatch semantics:
+- `plot` can loop across slices and call `np*` repeatedly; helper must avoid rebroadcasting each nested step.
 
 5. Option synchronization must be explicit and whitelisted:
 - `np.messages`, `np.tree`, `np.largeh.rel.tol`, `np.disc.upper.rel.tol`, `np.groupcv.fast` affect kernel/CV branches and must be synchronized before estimator entry.
@@ -335,7 +335,7 @@ Notes:
 
 Implication for helper/guardrail scope:
 1. Add `npregiv` and `npregivderiv` constructor chains to explicit coverage tests (already exported and example-used).
-2. Even if their `plot.*` methods are base-plot only (not `npplot`), include them in callable inventory so user-exposed behavior is not omitted.
+2. Even if their `plot.*` methods are base-plot only (not `plot`), include them in callable inventory so user-exposed behavior is not omitted.
 3. Track the S3-registration drift as a separate namespace-consistency issue.
 
 ### 13.3 Example-surface cross-check
@@ -362,7 +362,7 @@ Implemented constructor/method interception currently includes:
 11. `npcopula`
 12. `npquantile`
 13. `np.pairs`, `np.pairs.plot`
-14. `npplot`
+14. `plot`
 15. `npregiv`, `npregivderiv`
 16. `npqreg`
 17. `npcmstest`, `npqcmstest`, `npdeneqtest`
@@ -382,5 +382,5 @@ Static audit status:
 1. All `predict.*` and bandwidth `predict.*` methods that re-enter estimators (`eval(np*...)`) now route through constructor entry points with both:
 - `.npRmpi_require_active_slave_pool(...)`
 - `.npRmpi_autodispatch_call(...)` (when active)
-2. All `plot.*` methods that delegate to `npplot(...)` are covered by `npplot()` guard + autodispatch.
+2. All `plot.*` methods that delegate to `plot(...)` are covered by `plot()` guard + autodispatch.
 3. No remaining autodispatch call sites were found without a nearby active-pool guard (excluding helper internals in `R/np.autodispatch.R` by design).

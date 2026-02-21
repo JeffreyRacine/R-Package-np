@@ -1,4 +1,4 @@
-.np_plot_call_method <- function(method, bws, ..., where = "npplot()") {
+.np_plot_call_method <- function(method, bws, ..., where = "plot()") {
   dots <- list(...)
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
@@ -51,7 +51,7 @@
   if (is.null(bws))
     stop("plot object does not contain expected bandwidth slot")
   .np_plot_call_method(.np_plot_compat_dispatch, bws = bws, ...,
-                       where = "npplot()")
+                       where = "plot()")
 }
 
 .np_plot_npregression <- function(object, ...) .np_plot_from_slot(object, "bws", ...)

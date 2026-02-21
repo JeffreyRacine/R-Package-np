@@ -32,7 +32,7 @@ np.pairs.plot(pair_list)
   \code{np.pairs.plot} returns \code{NULL} (invisibly).
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
 On the diagonal, \code{npudens} is used to compute kernel density
 estimates. Off-diagonal panels use \code{npreg} with residuals to draw
@@ -84,5 +84,5 @@ npRmpi.quit()               ## soft close (may keep slaves alive)
 } % enddontrun
 }
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}\code{\link{npudens}}, \code{\link{npreg}}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}\code{\link{npudens}}, \code{\link{npreg}}}
 \keyword{hplot}

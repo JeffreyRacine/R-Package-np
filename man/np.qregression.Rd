@@ -153,7 +153,7 @@ npqreg(bws, \dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
 
   The optimizer invoked for search is Powell's conjugate direction
@@ -243,7 +243,7 @@ npqreg(bws, \dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}} \pkg{quantreg} }
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}} \pkg{quantreg} }
 
 \examples{
 \dontrun{

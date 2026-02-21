@@ -38,7 +38,7 @@
     on.exit(par(oldpar), add = TRUE)
 
     miss.xy = c(missing(xdat),missing(ydat))
-    xy <- .npplot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)
+    xy <- .np_plot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)
     xdat <- xy$xdat
     ydat <- xy$ydat
 
@@ -53,7 +53,7 @@
                     "\nProceeding without bootstrapping."))
     }
 
-    normalized.opts <- .npplot_normalize_common_options(
+    normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
@@ -372,4 +372,3 @@
     
   }
 
-npplot.sibandwidth <- function(...) .np_plot_sibandwidth_engine(...)

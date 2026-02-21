@@ -72,7 +72,7 @@ npdeneqtest(x = NULL,
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
   
   \code{npdeneqtest} computes the integrated squared density difference
@@ -95,7 +95,7 @@ npdeneqtest(x = NULL,
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{npdeptest},\link{npsdeptest},\link{npsymtest},\link{npunitest}}
 }
 

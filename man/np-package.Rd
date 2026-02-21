@@ -128,7 +128,7 @@
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{npplot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
  The kernel methods in \code{npRmpi} employ the so-called
 	\sQuote{generalized product kernels} found in Hall, Racine,
 	and Li (2004), Li, Lin, and Racine (2013), Li, Ouyang, and
@@ -353,7 +353,7 @@
 
 }
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{np.options}}
 }
 \keyword{package}

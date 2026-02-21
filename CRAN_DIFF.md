@@ -317,7 +317,7 @@ Changed files: 62
 - `R/np.distribution.R`: Updated relative to CRAN (see file for details). (last change: 2014-05-05 | Merge branch 'master' into npRmpi)
 - `R/np.distribution.bw.R`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
 - `R/np.kernel.R`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
-- `R/np.plot.R`: Plotting updates to align with revised outputs and defaults (includes plreg categorical plot fix). (last change: 2026-02-05 | Fix npplot for plreg with categorical predictor)
+- `R/np.plot.R`: Plotting updates to align with revised outputs and defaults (includes plreg categorical plot fix). (last change: 2026-02-05 | Fix plot for plreg with categorical predictor)
 - `R/np.qregression.R`: Quantile regression path adjusted for consistency with updated bandwidth/fit handling. (last change: 2026-02-04 | Merge master updates into npRmpi)
 - `R/np.regression.R`: Updated relative to CRAN (see file for details). (last change: 2026-02-04 | Merge master updates into npRmpi)
 - `R/np.regression.bw.R`: Updated relative to CRAN (see file for details). (last change: 2014-06-24 | Merge branch 'master' into npRmpi)
