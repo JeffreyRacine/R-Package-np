@@ -55,3 +55,6 @@ npver
 ^REVISION_SUMMARY_.*\.md$
 
 ^benchmarks/oneoff
+^benchmarks/perf
+^benchmarks/validation
+^benchmarks/common
