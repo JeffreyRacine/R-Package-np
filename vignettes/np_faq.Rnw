@@ -715,7 +715,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
   Use the \texttt{class()} function. For example, define \texttt{x <-
     factor(c("male","female"))}, then type \texttt{class(x)}.
 
-\subsection{When I use \texttt{plot()} \texttt{(npplot())} existing graphics
+\subsection{When I use \texttt{plot()} existing graphics
     windows are overwritten. How can I display multiple graphics plots
     in separate graphics windows so that I can see results from
     previous runs and compare that to my new run?}
@@ -756,7 +756,7 @@ f <- npudens(tdat=x,edat=xeval,bws=bw.SJ(x))
     \texttt{Error in eval(expr, envir, enclos) : object ``variable'' not
       found\dots}
 
-  This arises because \texttt{plot()} (\texttt{npplot()}) tries to retrieve
+  This arises because the \texttt{plot()} method tries to retrieve
   the variable from the environment but you have changed the
   definition when you called the bandwidth selection routine (e.g.,
   \texttt{npregbw(y\textasciitilde x,data=dataframe)}).
@@ -862,7 +862,7 @@ legend(20,15,
     plot a model with the \texttt{gradients=TRUE} option, they are. The
     \texttt{gradients()} function must be broken\dots}
 
-  The function \texttt{plot()} (\texttt{npplot()}) plots 'partial'
+  The \texttt{plot()} methods plot 'partial'
   means and gradients. In other words, it plots $x_1$ versus $\hat
   g(x_1,\bar x_2)$ for the partial mean, where $\bar x_2$ is, say, the
   median/modal value of $x_2$. It also plots $x_1$ versus
@@ -876,7 +876,7 @@ legend(20,15,
 
   The example below shows how you could manually generate the partial
   gradients (and means) for your data where the sample realizations
-  form the evaluation data for $x_1$ (unlike \texttt{npplot()} which
+  form the evaluation data for $x_1$ (unlike the default \texttt{plot()} behavior which
   uses an evenly spaced grid). Note we use the function
   \texttt{uocquantile()} to generate a vector that holds $x_2$
   constant at is median/modal value (i.e., the 0.5 quantile) in the
@@ -924,7 +924,7 @@ data.eval <-  data.frame(x1 = seq(min(x1),max(x1),length=50),
 \end{verbatim}
 \end{singlespacing}
 
-\subsection{I use \texttt{plot()} \texttt{(npplot())} to plot, say, a density
+\subsection{I use \texttt{plot()} to plot, say, a density
     and the resulting plot looks like an inverted density rather than
     a density\dots}
 
@@ -932,7 +932,7 @@ data.eval <-  data.frame(x1 = seq(min(x1),max(x1),length=50),
   undersmoothed. Data-driven (i.e., automatic) bandwidth selection
   procedures are not guaranteed always to produce good results due to
   perhaps the presence of outliers or the rounding/discretization of
-  continuous data, among others. By default, \texttt{npplot()} takes
+  continuous data, among others. By default, \texttt{plot()} takes
   the two extremes of the data (minimum, maximum i.e., actual data
   points) then creates an equally spaced grid of evaluation data
   (i.e., not actual data points in general) and computes the density
@@ -2074,7 +2074,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \begin{itemize}
 
-\item Added support for character expansion to \texttt{npplot()} (which is invoked by calling \texttt{plot()} on an np object) - will take defaults from the environment \texttt{par()} or can be set directly, e.g., \texttt{plot(foo,cex.main=0.8)}
+\item Added support for character expansion in plotting methods used by \texttt{plot()} on \texttt{np} objects; defaults are taken from \texttt{par()} and can be set directly (e.g., \texttt{plot(foo,cex.main=0.8)}).
 
 \end{itemize}
 
@@ -2143,7 +2143,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 \item Using \texttt{wrapLines(strwrap(...))} for summary output for
   model specification test to automatically wrap long formula lines
 
-\item \texttt{plot()} calls \texttt{npplot()} and \texttt{npplot()}
+\item \texttt{plot()} uses class-specific S3 plotting methods and plotting
   behaves better when most passable parameters are fed (\texttt{col
     =}, \texttt{lty =}, \texttt{xlab =}, etc.) but there may still be
   room for improvement

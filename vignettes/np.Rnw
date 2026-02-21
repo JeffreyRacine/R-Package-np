@@ -310,7 +310,7 @@ Work flow therefore typically proceeds as follows:
 \end{enumerate}
 
 In order to streamline the creation of a set of complicated graphics
-objects, \code{plot} (which calls \code{npplot}) is dynamic; i.e., you
+objects, \code{plot} (via class-specific S3 methods) is dynamic; i.e., you
 can specify, say, bootstrapped error bounds and the appropriate
 routines will be called in real time. Be aware, however, that
 bootstrap methods can be computationally demanding hence some plots
@@ -709,8 +709,7 @@ $i=1,\dots,n$, as the model is quadratic in age.
 
 Of course, it might be preferable to also plot error bars for the
 estimates, either asymptotic or resampled. We have automated this in
-the function \code{npplot} which is automatically called by
-\code{plot}. The lower left and lower right plots in Figure~\ref{age
+the class-specific S3 \code{plot} methods. The lower left and lower right plots in Figure~\ref{age
   profile} present pointwise error bars using asymptotic standard
 error formulas for the regression function and gradient, respectively.
 
