@@ -176,6 +176,11 @@ npplregbw(\dots)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
+  For S3 plotting help, use \code{methods("plot")} and query
+  class-specific help topics such as \code{?plot.npregression} and
+  \code{?plot.rbandwidth}. You can inspect implementations with
+  \code{getS3method("plot","npregression")}.
+
   \code{npplregbw} implements a variety of methods for nonparametric
  regression on multivariate (\eqn{q}-variate) explanatory data defined
  over a set of possibly continuous and/or discrete (unordered, ordered)

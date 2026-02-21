@@ -209,6 +209,11 @@ npindexbw(\dots)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
+  For S3 plotting help, use \code{methods("plot")} and query
+  class-specific help topics such as \code{?plot.npregression} and
+  \code{?plot.rbandwidth}. You can inspect implementations with
+  \code{getS3method("plot","npregression")}.
+
   We implement Ichimura's (1993) method via
   joint estimation of the bandwidth and coefficient vector using
   leave-one-out nonlinear least squares. We implement Klein and Spady's
