@@ -97,56 +97,56 @@ NZD_pos <- function(a) {
   a
 }
 
-npValidateGlpDegree <- function(regtype, glp.degree, ncon, argname = "glp.degree") {
-  glp.degree.max <- 12L
+npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
+  degree.max <- 12L
 
   if (!identical(regtype, "lp"))
     return(NULL)
 
-  if (is.null(glp.degree))
-    glp.degree <- rep.int(1L, ncon)
+  if (is.null(degree))
+    degree <- rep.int(1L, ncon)
 
-  if (!length(glp.degree) && ncon == 0L)
+  if (!length(degree) && ncon == 0L)
     return(integer(0))
 
-  if (length(glp.degree) != ncon)
+  if (length(degree) != ncon)
     stop(sprintf("%s must have one entry per continuous predictor (%d expected, got %d)",
-                 argname, ncon, length(glp.degree)))
+                 argname, ncon, length(degree)))
 
-  if (any(!is.finite(glp.degree)))
+  if (any(!is.finite(degree)))
     stop(sprintf("%s must contain finite non-negative integers", argname))
 
-  if (any(glp.degree < 0))
+  if (any(degree < 0))
     stop(sprintf("%s must contain finite non-negative integers", argname))
 
-  if (any(glp.degree != floor(glp.degree)))
+  if (any(degree != floor(degree)))
     stop(sprintf("%s must contain finite non-negative integers", argname))
 
-  if (any(glp.degree > glp.degree.max))
+  if (any(degree > degree.max))
     stop(sprintf("%s must contain finite non-negative integers in [0,%d]",
-                 argname, glp.degree.max))
+                 argname, degree.max))
 
-  as.integer(glp.degree)
+  as.integer(degree)
 }
 
-npValidateGlpBernstein <- function(regtype, glp.bernstein, argname = "glp.bernstein") {
+npValidateGlpBernstein <- function(regtype, bernstein.basis, argname = "bernstein.basis") {
   if (!identical(regtype, "lp"))
     return(FALSE)
 
-  if (is.null(glp.bernstein))
-    glp.bernstein <- FALSE
+  if (is.null(bernstein.basis))
+    bernstein.basis <- FALSE
 
-  if (!is.logical(glp.bernstein) || length(glp.bernstein) != 1L || is.na(glp.bernstein))
+  if (!is.logical(bernstein.basis) || length(bernstein.basis) != 1L || is.na(bernstein.basis))
     stop(sprintf("%s must be TRUE or FALSE", argname))
 
-  isTRUE(glp.bernstein)
+  isTRUE(bernstein.basis)
 }
 
 npValidateGlpGradientOrder <- function(regtype,
                                        gradient.order,
                                        ncon,
                                        argname = "gradient.order") {
-  glp.degree.max <- 12L
+  degree.max <- 12L
 
   if (!identical(regtype, "lp"))
     return(NULL)
@@ -173,28 +173,38 @@ npValidateGlpGradientOrder <- function(regtype,
   if (any(gradient.order != floor(gradient.order)))
     stop(sprintf("%s must contain finite positive integers", argname))
 
-  if (any(gradient.order > glp.degree.max))
-    stop(sprintf("%s must contain integers in [1,%d]", argname, glp.degree.max))
+  if (any(gradient.order > degree.max))
+    stop(sprintf("%s must contain integers in [1,%d]", argname, degree.max))
 
   as.integer(gradient.order)
 }
 
-npRegtypeToC <- function(regtype, glp.degree, ncon, context = "npreg") {
+npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
   if (identical(regtype, "lc"))
-    return(list(code = REGTYPE_LC, glp.degree = NULL))
+    return(list(code = REGTYPE_LC, degree = NULL))
 
   if (identical(regtype, "ll"))
-    return(list(code = REGTYPE_LL, glp.degree = NULL))
+    return(list(code = REGTYPE_LL, degree = NULL))
 
-  glp.degree <- npValidateGlpDegree(regtype, glp.degree, ncon)
+  degree <- npValidateGlpDegree(regtype, degree, ncon)
 
-  if ((ncon == 0L) || all(glp.degree == 0L))
-    return(list(code = REGTYPE_LC, glp.degree = glp.degree))
+  if ((ncon == 0L) || all(degree == 0L))
+    return(list(code = REGTYPE_LC, degree = degree))
 
-  if (all(glp.degree == 1L))
-    return(list(code = REGTYPE_LL, glp.degree = glp.degree))
+  if (all(degree == 1L))
+    return(list(code = REGTYPE_LL, degree = degree))
 
-  list(code = REGTYPE_GLP, glp.degree = glp.degree)
+  list(code = REGTYPE_GLP, degree = degree)
+}
+
+npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
+  if (is.null(dotnames) || !length(dotnames))
+    return(invisible(NULL))
+  bad <- intersect(dotnames, c("glp.degree", "glp.bernstein"))
+  if (length(bad))
+    stop(sprintf("%s: legacy arguments %s are no longer supported; use degree and bernstein.basis",
+                 where, paste(sprintf("'%s'", bad), collapse = ", ")))
+  invisible(NULL)
 }
 
 ## Function to test for monotone increasing vector
@@ -901,19 +911,19 @@ npFormatRegressionType <- function(x){
   if (!identical(regtype, "lp"))
     return(pregtype)
 
-  glp.degree <- if (!is.null(x$glp.degree)) {
-    x$glp.degree
-  } else if (!is.null(x$bws) && !is.null(x$bws$glp.degree)) {
-    x$bws$glp.degree
+  degree <- if (!is.null(x$degree)) {
+    x$degree
+  } else if (!is.null(x$bws) && !is.null(x$bws$degree)) {
+    x$bws$degree
   } else {
     NULL
   }
 
-  if (is.null(glp.degree) || length(glp.degree) == 0)
+  if (is.null(degree) || length(degree) == 0)
     return("Local-Polynomial")
 
   sprintf("Local-Polynomial (degree = %s)",
-          paste(glp.degree, collapse = ","))
+          paste(degree, collapse = ","))
 }
 
 

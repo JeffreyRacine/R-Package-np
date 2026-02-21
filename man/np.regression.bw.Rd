@@ -55,8 +55,8 @@ npregbw(\dots)
         invalid.penalty = c("baseline","dbmax"),
         penalty.multiplier = 10,
         regtype,
-        glp.degree,
-        glp.bernstein,
+        degree,
+        bernstein.basis,
         bwmethod,
         bwscaling,
         bwtype,
@@ -166,11 +166,11 @@ npregbw(\dots)
     estimator to use. \code{lc} specifies a local-constant estimator
     (Nadaraya-Watson) and \code{ll} specifies a local-linear
     estimator. \code{glp} specifies a generalized local polynomial
-    estimator with polynomial degree(s) given by \code{glp.degree} for
+    estimator with polynomial degree(s) given by \code{degree} for
     continuous predictors. Defaults to \code{lc}.
   }
 
-  \item{glp.degree}{
+  \item{degree}{
     a user-supplied vector of fixed polynomial degrees for the
     continuous predictors (exactly one degree per continuous predictor),
     relevant only when \code{regtype="lp"}. If omitted, the default is
@@ -179,12 +179,12 @@ npregbw(\dots)
     treats this vector as fixed input and optimizes only bandwidths.
   }
 
-  \item{glp.bernstein}{
+  \item{bernstein.basis}{
     logical flag relevant only when \code{regtype="lp"}. If
     \code{FALSE} (default), the GLP basis uses raw local-polynomial
     powers (stable for extrapolation). If \code{TRUE}, a Bernstein
     (B-spline) basis is used for continuous predictors. For
-    \code{glp.bernstein=TRUE}, prediction/evaluation points must lie
+    \code{bernstein.basis=TRUE}, prediction/evaluation points must lie
     within the training support of each continuous predictor.
   }
   

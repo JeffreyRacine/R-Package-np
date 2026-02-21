@@ -1,8 +1,8 @@
 rbandwidth <-
   function(bw = stop("rbandwidth:argument 'bw' missing"),
            regtype = c("lc","ll","lp"),
-           glp.degree = NULL,
-           glp.bernstein = FALSE,
+           degree = NULL,
+           bernstein.basis = FALSE,
            bwmethod = c("cv.ls","cv.aic"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
@@ -37,6 +37,7 @@ rbandwidth <-
            ...){
 
   ndim = length(bw)
+  npRejectLegacyLpArgs(names(list(...)), where = "rbandwidth")
   regtype = match.arg(regtype)
   bwmethod = match.arg(bwmethod)
   bwtype = match.arg(bwtype)
@@ -69,11 +70,11 @@ rbandwidth <-
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
 
   ncon <- sum(xdati$icon)
-  glp.degree <- npValidateGlpDegree(regtype = regtype,
-                                    glp.degree = glp.degree,
+  degree <- npValidateGlpDegree(regtype = regtype,
+                                    degree = degree,
                                     ncon = ncon)
-  glp.bernstein <- npValidateGlpBernstein(regtype = regtype,
-                                          glp.bernstein = glp.bernstein)
+  bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
+                                          bernstein.basis = bernstein.basis)
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
   ## calculate some info to be pretty-printed
@@ -103,8 +104,8 @@ rbandwidth <-
       lc = "Local-Constant",
       ll = "Local-Linear",
       lp = "Local-Polynomial"),
-    glp.degree = glp.degree,
-    glp.bernstein = glp.bernstein,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
     method = bwmethod,
     pmethod = bwmToPrint(bwmethod),
     fval = fval,
@@ -213,8 +214,8 @@ print.rbandwidth <- function(x, digits=NULL, ...){
   bw.sel.str <- genBwSelStr(x)
   if (identical(x$regtype, "lp") && x$ncon > 0)
     bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
-                                     degree = x$glp.degree,
-                                     bernstein = x$glp.bernstein)
+                                     degree = x$degree,
+                                     bernstein = x$bernstein.basis)
   cat(bw.sel.str)
   cat(genBwKerStrs(x))
 
@@ -234,8 +235,8 @@ summary.rbandwidth <- function(object, ...){
   bw.sel.str <- genBwSelStr(object)
   if (identical(object$regtype, "lp") && object$ncon > 0)
     bw.sel.str <- npInsertGlpSummary(txt = bw.sel.str,
-                                     degree = object$glp.degree,
-                                     bernstein = object$glp.bernstein)
+                                     degree = object$degree,
+                                     bernstein = object$bernstein.basis)
   cat(bw.sel.str)
 
   cat('\n')

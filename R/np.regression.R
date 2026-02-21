@@ -111,6 +111,7 @@ npreg.rbandwidth <-
     no.ex = missing(exdat)
     no.ey = missing(eydat)
     dots <- list(...)
+    npRejectLegacyLpArgs(names(dots), where = "npreg")
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
     txdat = toFrame(txdat)
@@ -149,21 +150,21 @@ npreg.rbandwidth <-
     if (length(bws$bw) != length(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
 
-    bws$glp.degree <- npValidateGlpDegree(regtype = bws$regtype,
-                                          glp.degree = bws$glp.degree,
+    bws$degree <- npValidateGlpDegree(regtype = bws$regtype,
+                                          degree = bws$degree,
                                           ncon = bws$ncon)
-    bws$glp.bernstein <- npValidateGlpBernstein(regtype = bws$regtype,
-                                                glp.bernstein = bws$glp.bernstein)
+    bws$bernstein.basis <- npValidateGlpBernstein(regtype = bws$regtype,
+                                                bernstein.basis = bws$bernstein.basis)
     glp.gradient.order <- npValidateGlpGradientOrder(regtype = bws$regtype,
                                                      gradient.order = gradient.order,
                                                      ncon = bws$ncon)
 
     reg.c <- npRegtypeToC(regtype = bws$regtype,
-                          glp.degree = bws$glp.degree,
+                          degree = bws$degree,
                           ncon = bws$ncon,
                           context = "npreg")
-    glp.degree.c <- if (bws$ncon > 0) {
-      as.integer(if (is.null(reg.c$glp.degree)) rep.int(0L, bws$ncon) else reg.c$glp.degree)
+    degree.c <- if (bws$ncon > 0) {
+      as.integer(if (is.null(reg.c$degree)) rep.int(0L, bws$ncon) else reg.c$degree)
     } else {
       integer(1)
     }
@@ -207,14 +208,14 @@ npreg.rbandwidth <-
     }
 
     if (identical(bws$regtype, "lp") &&
-        isTRUE(bws$glp.bernstein) &&
+        isTRUE(bws$bernstein.basis) &&
         !no.ex &&
         any(bws$icon)) {
       for (ii in which(bws$icon)) {
         tr <- range(as.numeric(txdat[[ii]]))
         ex <- as.numeric(exdat[[ii]])
         if (any(ex < tr[1] | ex > tr[2])) {
-          stop("glp.bernstein=TRUE requires evaluation continuous predictors to lie within training support; use glp.bernstein=FALSE for extrapolation")
+          stop("bernstein.basis=TRUE requires evaluation continuous predictors to lie within training support; use bernstein.basis=FALSE for extrapolation")
         }
       }
     }
@@ -343,8 +344,8 @@ npreg.rbandwidth <-
          asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
          asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
          as.integer(myopti),
-         glp.degree = glp.degree.c,
-         glp.bernstein = as.integer(isTRUE(bws$glp.bernstein)),
+         degree = degree.c,
+         bernstein.basis = as.integer(isTRUE(bws$bernstein.basis)),
          mean = double(enrow),
          merr = double(enrow),
          g = double(ifelse(gradients,enrow*ncol,0)),
@@ -371,13 +372,13 @@ npreg.rbandwidth <-
         cont.idx <- which(bws$icon)
 
         if (length(cont.idx)) {
-          keep.cont <- (glp.gradient.order == 1L) & (bws$glp.degree >= 1L)
+          keep.cont <- (glp.gradient.order == 1L) & (bws$degree >= 1L)
           if (any(keep.cont)) {
             keep.idx <- cont.idx[keep.cont]
             myout$g[, keep.idx] <- raw.g[, keep.idx, drop = FALSE]
             myout$gerr[, keep.idx] <- raw.gerr[, keep.idx, drop = FALSE]
           }
-          if (warn.glp.gradient && any(glp.gradient.order > bws$glp.degree))
+          if (warn.glp.gradient && any(glp.gradient.order > bws$degree))
             warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
           if (warn.glp.gradient && any(glp.gradient.order > 1L))
             warning("higher-order glp derivatives are not yet available at C level; returning NA for requested orders > 1")
