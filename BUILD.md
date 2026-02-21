@@ -14,15 +14,17 @@ export CXX=mpicxx
 ## Build Tarball
 
 ```bash
-R CMD build .
+cd /Users/jracine/Development
+R CMD build np-npRmpi
 ```
 
-This produces `npRmpi_0.60-20.tar.gz` in the same directory.
+This produces `npRmpi_0.70-0.tar.gz` in `/Users/jracine/Development`.
 
 ## Install
 
 ```bash
-R CMD INSTALL npRmpi_0.60-20.tar.gz
+cd /Users/jracine/Development
+R CMD INSTALL npRmpi_0.70-0.tar.gz
 ```
 
 ## Quick Load Check
@@ -30,3 +32,18 @@ R CMD INSTALL npRmpi_0.60-20.tar.gz
 ```bash
 R -q -e 'library(npRmpi); sessionInfo()'
 ```
+
+## Check
+
+```bash
+cd /Users/jracine/Development
+R CMD check --as-cran npRmpi_0.70-0.tar.gz
+```
+
+## Runtime Modes
+
+- Interactive R session:
+  - `npRmpi.start(mode="spawn", nslaves=...)`
+- Cluster/batch under `mpiexec`:
+  - start script with `npRmpi.start(mode="attach", autodispatch=TRUE, np.messages=FALSE)`
+  - end script with `npRmpi.stop(mode="attach")`

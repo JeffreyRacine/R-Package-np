@@ -38,9 +38,37 @@ Then build/install from the repo:
 
 ```bash
 R CMD build .
-R CMD INSTALL npRmpi_0.60-20.tar.gz
+R CMD INSTALL npRmpi_0.70-0.tar.gz
 ```
 
 See `BUILD.md` and `WORKTREES.md` in this repo for local build details.
+
+## Quick Start
+
+Interactive session:
+
+```r
+library(npRmpi)
+npRmpi.start(mode = "spawn", nslaves = 1)
+options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+
+set.seed(1)
+x <- runif(200)
+y <- sin(2*pi*x) + rnorm(200, sd = 0.2)
+bw <- npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls")
+fit <- npreg(bws = bw)
+summary(fit)
+
+npRmpi.stop()
+```
+
+Batch/cluster (`mpiexec`) session:
+
+```r
+library(npRmpi)
+npRmpi.start(mode = "attach", autodispatch = TRUE, np.messages = FALSE)
+# ... np* calls ...
+npRmpi.stop(mode = "attach")
+```
 
 For more information on this project please visit the maintainer's website (https://experts.mcmaster.ca/people/racinej).
