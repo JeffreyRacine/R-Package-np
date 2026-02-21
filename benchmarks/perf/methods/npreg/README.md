@@ -5,7 +5,7 @@ This folder provides a parameterized benchmark harness for `npregbw()` + `npreg(
 ## Files
 
 - `bench_npreg_param_nprmpi.R`: run one benchmark configuration with `microbenchmark` repetitions.
-- `run_npreg_combos.R`: run all 32 option combinations (`2x2x2x2x2`) with a shared setup.
+- `run_npreg_combos.R`: run a default full option grid (now including `regtype="lp"` with `basis` and `bernstein.basis`), 128 combinations by default.
 - `compare_npreg_versions.R`: compare two raw outputs and emit overall and combo-specific comparison tables.
 - `make_npreg_report.R`: generate a markdown report from comparison CSV outputs.
 - `make_npreg_combined_report.R`: generate a single markdown report combining `np` and `npRmpi` comparison CSV outputs.
@@ -23,13 +23,20 @@ Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/bench
   --out_raw=/tmp/npreg_one_mpi_raw.csv --out_summary=/tmp/npreg_one_mpi_summary.csv
 ```
 
-## Full Combination Run (32 combos)
+## Full Combination Run (default: 128 combos)
 
 ```bash
 R_LIBS=/tmp/Rlib_npRmpi_post FI_TCP_IFACE=en0 \
 Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/run_npreg_combos.R \
   --n=100 --times=50 --base_seed=42 --nmulti=1 --rslaves=1 --tag=myrun
 ```
+
+Optional LP grid controls:
+
+- `--lp_bases=glp,additive,tensor`
+- `--lp_degree=2,2`
+- `--lp_bernstein.basis=TRUE,FALSE`
+- `--max_combos=8` (optional smoke-run limiter)
 
 Outputs are written to `/tmp` with run IDs in filenames:
 
@@ -46,6 +53,9 @@ Outputs are written to `/tmp` with run IDs in filenames:
 - `nmulti=1`
 - `nslaves=1` (`--rslaves` alias supported)
 - `regtype=lc`
+- `basis=glp` (used when `regtype=lp`)
+- `degree=2,2` (used when `regtype=lp`)
+- `bernstein.basis=FALSE` (used when `regtype=lp`)
 - `bwmethod=cv.ls`
 - `ckertype=gaussian`
 - `np_tree=FALSE`
@@ -107,5 +117,5 @@ Comparison outputs:
 
 - Timing by function (`npregbw`, `npreg`, `npreg_total`) with mean/median and percent change.
 - Objective diagnostics (`fval`, `ifval`, `num_fval`, bandwidth match rate, `ok` match rate).
-- Combo timing table by (`regtype`, `bwmethod`, `ckertype`, `np_tree`, `seed_policy`, `nmulti`) with mean/median percent change.
+- Combo timing table by (`regtype`, `basis`, `degree`, `bernstein.basis`, `bwmethod`, `ckertype`, `np_tree`, `seed_policy`, `nmulti`) with mean/median percent change.
 - Combo objective diagnostics by the same combination keys.

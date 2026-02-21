@@ -1,6 +1,6 @@
 # Reproduce: npreg Current-vs-CRAN (npRmpi)
 
-This document reproduces the 32-combo comparison for `npRmpi` with `n=100`, `times=50`, `nslaves=1`.
+This document reproduces the default full-grid comparison for `npRmpi` with `n=100`, `times=50`, `nslaves=1` (128 combos).
 
 ## 1) Build isolated libraries
 
@@ -14,7 +14,7 @@ R CMD INSTALL -l /tmp/Rlib_nprmpi_cran20 /Users/jracine/Development/CRAN/np_0.60
 R CMD INSTALL --no-test-load -l /tmp/Rlib_nprmpi_cran20 /Users/jracine/Development/CRAN/npRmpi_0.60-20.tar.gz
 ```
 
-## 2) Run 32 combos on CRAN and current
+## 2) Run default combo grid on CRAN and current
 
 ```bash
 R_LIBS=/tmp/Rlib_nprmpi_cran20 FI_TCP_IFACE=en0 \

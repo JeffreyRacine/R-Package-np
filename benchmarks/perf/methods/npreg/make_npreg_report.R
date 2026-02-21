@@ -47,8 +47,11 @@ main <- function() {
   combo_objective <- read.csv(cfg$combo_objective_csv, stringsAsFactors = FALSE)
 
   ord <- order(combo_timing$pct_faster_mean_total_b_vs_a, decreasing = TRUE)
-  top_gain <- combo_timing[ord, c("regtype","bwmethod","ckertype","np_tree","seed_policy","pct_faster_mean_total_b_vs_a","pct_faster_median_total_b_vs_a")]
-  top_loss <- combo_timing[rev(ord), c("regtype","bwmethod","ckertype","np_tree","seed_policy","pct_faster_mean_total_b_vs_a","pct_faster_median_total_b_vs_a")]
+  top_cols <- c("regtype","basis","degree","bernstein.basis","bwmethod","ckertype","np_tree","seed_policy",
+                "pct_faster_mean_total_b_vs_a","pct_faster_median_total_b_vs_a")
+  top_cols <- top_cols[top_cols %in% names(combo_timing)]
+  top_gain <- combo_timing[ord, top_cols, drop = FALSE]
+  top_loss <- combo_timing[rev(ord), top_cols, drop = FALSE]
   top_gain <- head(top_gain, 5)
   top_loss <- head(top_loss, 5)
 
