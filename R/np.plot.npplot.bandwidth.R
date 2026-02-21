@@ -511,9 +511,39 @@ npplot.bandwidth <-
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
-          eval(parse(text = paste(eval(pfunE), "(", eval(pxE), eval(pyE),
-                       eval(pylimE), eval(pxlabE), eval(pylabE), eval(prestE),
-                       eval(pmainE), ")")))
+          plot.fun <- if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) bxp else plotFactor
+          } else {
+            plot
+          }
+          plot.args <- list()
+          if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
+          } else {
+            plot.args$x <- ei
+          }
+          if (!(xi.factor && plot.bootstrap && plot.bxp))
+            plot.args$y <- temp.dens
+          if (plot.errors)
+            plot.args$ylim <- if (plot.errors.type == "all")
+              compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err)
+            else
+              compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err)
+          plot.args$xlab <- ifelse(!is.null(xlab), xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
+          plot.args$ylab <- ifelse(!is.null(ylab), ylab, "Density")
+          if (!xi.factor) {
+            plot.args$type <- ifelse(!is.null(type), type, "l")
+            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
+            plot.args$col <- ifelse(!is.null(col), col, par()$col)
+            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
+            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
+            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
+            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
+            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+          }
+          plot.args$main <- ifelse(!is.null(main), main, "")
+          plot.args$sub <- ifelse(!is.null(sub), sub, "")
+          do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
@@ -531,8 +561,16 @@ npplot.bandwidth <-
                 lty = 2,
                 add.legend = TRUE)
             } else {
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+              draw.args <- list(
+                ex = as.numeric(na.omit(ei)),
+                ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
+                ehy = if (plotOnEstimate) na.omit(temp.dens + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = ifelse(!is.null(lty), lty, ifelse(xi.factor, 1, 2))
+              )
+              do.call(draw.errors, draw.args)
             }
           }
         }
@@ -594,9 +632,35 @@ npplot.bandwidth <-
           xi.factor = is.factor(xdat[,i])
 
           ## plot evaluation
-          eval(parse(text = paste(eval(pfunE), "(", eval(pxE), eval(pyE),
-                       eval(pylimE), eval(pxlabE), eval(pylabE), eval(prestE),
-                       eval(pmainE), ")")))
+          plot.fun <- if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) bxp else plotFactor
+          } else {
+            plot
+          }
+          plot.args <- list()
+          if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[i]] else plot.args$f <- allei[,i]
+          } else {
+            plot.args$x <- allei[,i]
+          }
+          if (!(xi.factor && plot.bootstrap && plot.bxp))
+            plot.args$y <- data.eval[,i]
+          plot.args$ylim <- c(y.min, y.max)
+          plot.args$xlab <- ifelse(!is.null(xlab), xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
+          plot.args$ylab <- ifelse(!is.null(ylab), ylab, "Density")
+          if (!xi.factor) {
+            plot.args$type <- ifelse(!is.null(type), type, "l")
+            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
+            plot.args$col <- ifelse(!is.null(col), col, par()$col)
+            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
+            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
+            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
+            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
+            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+          }
+          plot.args$main <- ifelse(!is.null(main), main, "")
+          plot.args$sub <- ifelse(!is.null(sub), sub, "")
+          do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
@@ -614,8 +678,16 @@ npplot.bandwidth <-
                 lty = 2,
                 add.legend = TRUE)
             } else {
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+              draw.args <- list(
+                ex = as.numeric(na.omit(allei[,i])),
+                ely = if (plotOnEstimate) na.omit(data.eval[,i] - data.err[,3*i-2]) else na.omit(data.err[,3*i] - data.err[,3*i-2]),
+                ehy = if (plotOnEstimate) na.omit(data.eval[,i] + data.err[,3*i-1]) else na.omit(data.err[,3*i] + data.err[,3*i-1]),
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = ifelse(!is.null(lty), lty, ifelse(xi.factor, 1, 2))
+              )
+              do.call(draw.errors, draw.args)
             }
           }
         }
@@ -630,4 +702,3 @@ npplot.bandwidth <-
       }
     }
   }
-
