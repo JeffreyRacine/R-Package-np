@@ -186,19 +186,18 @@ npudensbw.bandwidth <-
 
       if (bws$method != "normal-reference"){
         total.time <-
-          system.time(myout <- 
-                      .C("np_density_bw", as.double(duno), as.double(dord), as.double(dcon),
-                         as.double(mysd),
-                         as.integer(myopti), as.double(myoptd), 
-                         bw = c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord]),
-                         fval = double(2), fval.history = double(max(1,nmulti)),
-                         eval.history = double(max(1,nmulti)), invalid.history = double(max(1,nmulti)),
-                         timing = double(1),
-                         penalty.mode = as.integer(penalty_mode),
-                         penalty.multiplier = as.double(penalty.multiplier),
-                         ckerlb = as.double(cker.bounds.c$lb),
-                         ckerub = as.double(cker.bounds.c$ub),
-                         PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing")])[1]
+          system.time(myout <-
+                        .Call("C_np_density_bw",
+                              as.double(duno), as.double(dord), as.double(dcon),
+                              as.double(mysd),
+                              as.integer(myopti), as.double(myoptd),
+                              as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+                              as.integer(max(1, nmulti)),
+                              as.integer(penalty_mode),
+                              as.double(penalty.multiplier),
+                              as.double(cker.bounds.c$lb),
+                              as.double(cker.bounds.c$ub),
+                              PACKAGE="npRmpi"))[1]
       } else {
         nbw = double(ncol)
         if (bws$ncon > 0){

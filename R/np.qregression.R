@@ -238,23 +238,23 @@ npqreg.condbandwidth <-
       lbc.dir = lbc.dir, cfac.dir = cfac.dir,initc.dir = initc.dir, 
       lbd.dir = lbd.dir, hbd.dir = hbd.dir, dfac.dir = dfac.dir, initd.dir = initd.dir)
     
-    myout=
-      .C("np_quantile_conditional",
-         as.double(tydat),
-         as.double(txuno), as.double(txord), as.double(txcon),
-         as.double(exuno), as.double(exord), as.double(excon),
-         as.double(tau),
-         as.double(c(bws$xbw[bws$ixcon],bws$ybw[bws$iycon],
-                     bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
-                     bws$xbw[bws$ixuno],bws$xbw[bws$ixord])),
-         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-         as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-         as.integer(myopti),
-         as.double(myoptd),
-         yq = double(enrow),
-         yqerr = double(enrow),
-         yqgrad = double(enrow*bws$xndim*gradients),
-         PACKAGE="npRmpi" )[c("yq","yqerr", "yqgrad")]
+    myout <-
+      .Call("C_np_quantile_conditional",
+            as.double(tydat),
+            as.double(txuno), as.double(txord), as.double(txcon),
+            as.double(exuno), as.double(exord), as.double(excon),
+            as.double(tau),
+            as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                        bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                        bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+            as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+            as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+            as.integer(myopti),
+            as.double(myoptd),
+            as.integer(enrow),
+            as.integer(bws$xndim),
+            as.logical(gradients),
+            PACKAGE="npRmpi")[c("yq", "yqerr", "yqgrad")]
 
     ##need to untangle yqgrad
 

@@ -234,36 +234,23 @@ npcdensbw.conbandwidth <-
 
       if (bws$method != "normal-reference"){
         total.time <-
-          system.time(myout.raw <- 
-          .C("np_density_conditional_bw", as.double(yuno), as.double(yord), as.double(ycon),
-             as.double(xuno), as.double(xord), as.double(xcon),
-             as.double(mysd),
-             as.integer(myopti), as.double(myoptd), 
-             bw = c(bws$xbw[bws$ixcon],bws$ybw[bws$iycon],
-               bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
-               bws$xbw[bws$ixuno],bws$xbw[bws$ixord]),
-             fval = double(2), fval.history = double(max(1,nmulti)),
-             eval.history = double(max(1,nmulti)), invalid.history = double(max(1,nmulti)),
-             timing = double(1),
-             fast.history = double(1),
-             fallback.history = double(1),
-             penalty.mode = as.integer(penalty_mode),
-             penalty.multiplier = as.double(penalty.multiplier),
-             cxkerlb = as.double(cxker.bounds.c$lb),
-             cxkerub = as.double(cxker.bounds.c$ub),
-             cykerlb = as.double(cyker.bounds.c$lb),
-             cykerub = as.double(cyker.bounds.c$ub),
-             PACKAGE="npRmpi" ))[1]
-        myout <- list(
-          bw = myout.raw$bw,
-          fval = myout.raw$fval,
-          fval.history = myout.raw$fval.history,
-          eval.history = myout.raw$eval.history,
-          invalid.history = myout.raw$invalid.history,
-          timing = myout.raw$timing,
-          fast.history = if(!is.null(myout.raw$fast.history)) myout.raw$fast.history else myout.raw[[16]],
-          fallback.history = if(!is.null(myout.raw$fallback.history)) myout.raw$fallback.history else myout.raw[[17]]
-        )
+          system.time(myout <-
+                        .Call("C_np_density_conditional_bw",
+                              as.double(yuno), as.double(yord), as.double(ycon),
+                              as.double(xuno), as.double(xord), as.double(xcon),
+                              as.double(mysd),
+                              as.integer(myopti), as.double(myoptd),
+                              as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                                          bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                                          bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+                              as.integer(max(1, nmulti)),
+                              as.integer(penalty_mode),
+                              as.double(penalty.multiplier),
+                              as.double(cxker.bounds.c$lb),
+                              as.double(cxker.bounds.c$ub),
+                              as.double(cyker.bounds.c$lb),
+                              as.double(cyker.bounds.c$ub),
+                              PACKAGE="npRmpi"))[1]
       } else {
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
