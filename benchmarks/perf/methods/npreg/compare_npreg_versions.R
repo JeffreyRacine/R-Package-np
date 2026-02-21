@@ -37,18 +37,22 @@ prep_raw <- function(df) {
   if (!("ok" %in% names(df))) df$ok <- NA
   if (!("bw" %in% names(df))) df$bw <- ""
   if (!("np_tree" %in% names(df))) df$np_tree <- NA
+  if (!("basis" %in% names(df))) df$basis <- NA_character_
+  if (!("degree" %in% names(df))) df$degree <- ""
+  if (!("bernstein.basis" %in% names(df))) df$bernstein.basis <- NA
   df$np_tree <- normalize_bool(df$np_tree)
+  df$bernstein.basis <- normalize_bool(df$bernstein.basis)
   df$ok <- normalize_bool(df$ok)
   df
 }
 
 combo_keys <- function(df) {
-  keep <- c("n", "regtype", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy")
+  keep <- c("n", "regtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy")
   keep[keep %in% names(df)]
 }
 
 match_keys <- function(a, b) {
-  keep <- c("n", "regtype", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy", "seed", "iter")
+  keep <- c("n", "regtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy", "seed", "iter")
   keep[keep %in% names(a) & keep %in% names(b)]
 }
 
@@ -74,6 +78,9 @@ summ_timing_by_combo <- function(df, label) {
     data.frame(
       n = g$n[1],
       regtype = g$regtype[1],
+      basis = if ("basis" %in% names(g)) g$basis[1] else NA_character_,
+      degree = if ("degree" %in% names(g)) g$degree[1] else "",
+      bernstein.basis = if ("bernstein.basis" %in% names(g)) g$bernstein.basis[1] else NA,
       bwmethod = g$bwmethod[1],
       nmulti = if ("nmulti" %in% names(g)) g$nmulti[1] else NA_integer_,
       ckertype = g$ckertype[1],
@@ -137,13 +144,16 @@ main <- function() {
   combo_a <- summ_timing_by_combo(a, cfg$label_a)
   combo_b <- summ_timing_by_combo(b, cfg$label_b)
   combo_keys_common <- intersect(
-    c("n", "regtype", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy"),
+    c("n", "regtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy"),
     intersect(names(combo_a), names(combo_b))
   )
   combo_m <- merge(combo_a, combo_b, by = combo_keys_common, suffixes = c("_a", "_b"), all = TRUE)
   combo_timing <- data.frame(
     n = getcol(combo_m, "n"),
     regtype = getcol(combo_m, "regtype"),
+    basis = getcol(combo_m, "basis", NA_character_),
+    degree = getcol(combo_m, "degree", ""),
+    bernstein.basis = getcol(combo_m, "bernstein.basis"),
     bwmethod = getcol(combo_m, "bwmethod"),
     nmulti = getcol(combo_m, "nmulti"),
     ckertype = getcol(combo_m, "ckertype"),
@@ -200,7 +210,7 @@ main <- function() {
 
   cks <- combo_keys(m)
   if (length(cks) == 0L) {
-    cks <- intersect(c("n", "regtype", "bwmethod", "ckertype", "np_tree", "seed_policy"), names(m))
+    cks <- intersect(c("n", "regtype", "basis", "degree", "bernstein.basis", "bwmethod", "ckertype", "np_tree", "seed_policy"), names(m))
   }
   split_ix <- interaction(m[cks], drop = TRUE, lex.order = TRUE)
   grp <- split(m, split_ix)
@@ -208,6 +218,9 @@ main <- function() {
     data.frame(
       n = if ("n" %in% names(g)) g$n[1] else NA_integer_,
       regtype = if ("regtype" %in% names(g)) g$regtype[1] else "",
+      basis = if ("basis" %in% names(g)) g$basis[1] else NA_character_,
+      degree = if ("degree" %in% names(g)) g$degree[1] else "",
+      bernstein.basis = if ("bernstein.basis" %in% names(g)) g$bernstein.basis[1] else NA,
       bwmethod = if ("bwmethod" %in% names(g)) g$bwmethod[1] else "",
       nmulti = if ("nmulti" %in% names(g)) g$nmulti[1] else NA_integer_,
       ckertype = if ("ckertype" %in% names(g)) g$ckertype[1] else "",

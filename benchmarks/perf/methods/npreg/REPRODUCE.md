@@ -1,6 +1,6 @@
 # Reproduce: npreg Current-vs-CRAN (np)
 
-This document reproduces the 32-combo comparison for `np` with `n=100`, `times=50`.
+This document reproduces the default full-grid comparison for `np` with `n=100`, `times=50` (128 combos).
 
 ## 1) Build isolated libraries
 
@@ -10,7 +10,7 @@ R CMD INSTALL -l /tmp/Rlib_np_current /Users/jracine/Development/np-master
 R CMD INSTALL -l /tmp/Rlib_np_cran20 /Users/jracine/Development/CRAN/np_0.60-20.tar.gz
 ```
 
-## 2) Run 32 combos on CRAN and current
+## 2) Run default combo grid on CRAN and current
 
 ```bash
 R_LIBS=/tmp/Rlib_np_cran20 \

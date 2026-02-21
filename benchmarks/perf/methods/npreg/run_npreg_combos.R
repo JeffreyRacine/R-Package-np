@@ -1,11 +1,23 @@
 #!/usr/bin/env Rscript
 
 parse_args <- function(args) {
+  parse_csv <- function(val) {
+    trimws(strsplit(val, ",", fixed = TRUE)[[1]])
+  }
+  parse_csv_bool <- function(val) {
+    v <- tolower(parse_csv(val))
+    if (!all(v %in% c("true", "false"))) stop("boolean CSV fields must use TRUE/FALSE")
+    v == "true"
+  }
   out <- list(
     n = 100L,
     times = 50L,
     base_seed = 42L,
     nmulti = 1L,
+    lp_bases = c("glp", "additive", "tensor"),
+    lp_degree = "2,2",
+    lp_bernstein.basis = c(FALSE, TRUE),
+    max_combos = NA_integer_,
     out_dir = "/tmp",
     tag = "",
     show_progress = TRUE
@@ -23,6 +35,10 @@ parse_args <- function(args) {
     else if (key == "times") out$times <- as.integer(val)
     else if (key == "base_seed") out$base_seed <- as.integer(val)
     else if (key == "nmulti") out$nmulti <- as.integer(val)
+    else if (key == "lp_bases") out$lp_bases <- parse_csv(val)
+    else if (key == "lp_degree") out$lp_degree <- val
+    else if (key == "lp_bernstein.basis" || key == "lp_bernstein" || key == "lp_bernstein_basis") out$lp_bernstein.basis <- parse_csv_bool(val)
+    else if (key == "max_combos") out$max_combos <- as.integer(val)
     else if (key == "out_dir") out$out_dir <- val
     else if (key == "tag") out$tag <- val
     else if (key == "show_progress") out$show_progress <- as.logical(val)
@@ -66,8 +82,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
   out_summary <- file.path(cfg$out_dir, paste0("npreg_combo_summary_", run_id, ".csv"))
   out_manifest <- file.path(cfg$out_dir, paste0("npreg_combo_manifest_", run_id, ".csv"))
 
-  combos <- expand.grid(
-    regtype = c("lc", "ll"),
+  base_grid <- expand.grid(
     bwmethod = c("cv.ls", "cv.aic"),
     ckertype = c("gaussian", "epanechnikov"),
     np_tree = c(FALSE, TRUE),
@@ -75,14 +90,44 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
     stringsAsFactors = FALSE
   )
 
-  status <- vector("list", nrow(combos))
+  combos_base <- cbind(
+    regtype = rep(c("lc", "ll"), each = nrow(base_grid)),
+    base_grid[rep(seq_len(nrow(base_grid)), times = 2L), , drop = FALSE],
+    basis = NA_character_,
+    degree = "",
+    bernstein.basis = NA
+  )
 
-  for (i in seq_len(nrow(combos))) {
+  combos_lp <- expand.grid(
+    regtype = "lp",
+    basis = cfg$lp_bases,
+    degree = cfg$lp_degree,
+    bernstein.basis = cfg$lp_bernstein.basis,
+    bwmethod = c("cv.ls", "cv.aic"),
+    ckertype = c("gaussian", "epanechnikov"),
+    np_tree = c(FALSE, TRUE),
+    seed_policy = c("fixed", "varying"),
+    stringsAsFactors = FALSE
+  )
+
+  combos <- rbind(
+    combos_base[, c("regtype", "basis", "degree", "bernstein.basis", "bwmethod", "ckertype", "np_tree", "seed_policy")],
+    combos_lp[, c("regtype", "basis", "degree", "bernstein.basis", "bwmethod", "ckertype", "np_tree", "seed_policy")]
+  )
+
+  status <- vector("list", nrow(combos))
+  combo_n <- if (is.na(cfg$max_combos)) nrow(combos) else min(nrow(combos), cfg$max_combos)
+
+  for (i in seq_len(combo_n)) {
     row <- combos[i, ]
 
     if (cfg$show_progress) {
-      cat(sprintf("[%02d/%02d] regtype=%s bw=%s cker=%s tree=%s seed_policy=%s\n",
-                  i, nrow(combos), row$regtype, row$bwmethod, row$ckertype,
+      cat(sprintf("[%02d/%02d] regtype=%s basis=%s degree=%s bern=%s bw=%s cker=%s tree=%s seed_policy=%s\n",
+                  i, nrow(combos), row$regtype,
+                  ifelse(is.na(row$basis), "", row$basis),
+                  ifelse(nchar(row$degree) == 0L, "", row$degree),
+                  ifelse(is.na(row$bernstein.basis), "", toupper(as.character(row$bernstein.basis))),
+                  row$bwmethod, row$ckertype,
                   as.character(row$np_tree), row$seed_policy))
     }
 
@@ -93,6 +138,9 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
       sprintf("--base_seed=%d", cfg$base_seed),
       sprintf("--nmulti=%d", cfg$nmulti),
       sprintf("--regtype=%s", row$regtype),
+      sprintf("--basis=%s", ifelse(is.na(row$basis), "glp", row$basis)),
+      sprintf("--degree=%s", ifelse(nchar(row$degree) == 0L, "2,2", row$degree)),
+      sprintf("--bernstein.basis=%s", ifelse(is.na(row$bernstein.basis), "FALSE", toupper(as.character(row$bernstein.basis)))),
       sprintf("--bwmethod=%s", row$bwmethod),
       sprintf("--ckertype=%s", row$ckertype),
       sprintf("--np_tree=%s", toupper(as.character(row$np_tree))),
@@ -107,6 +155,9 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
     status[[i]] <- data.frame(
       combo_id = i,
       regtype = row$regtype,
+      basis = row$basis,
+      degree = row$degree,
+      bernstein.basis = row$bernstein.basis,
       bwmethod = row$bwmethod,
       ckertype = row$ckertype,
       np_tree = row$np_tree,
