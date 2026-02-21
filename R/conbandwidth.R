@@ -301,4 +301,4 @@ summary.conbandwidth <- function(object, ...) {
   cat("\n\n")
 }
 
-predict.conbandwidth <- function(...) { eval(npcdens(...), envir = parent.frame()) }
+predict.conbandwidth <- function(...) { do.call(npcdens, list(...), envir = parent.frame()) }

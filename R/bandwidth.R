@@ -193,4 +193,4 @@ summary.bandwidth <- function(object, ...) {
 }
 
 
-predict.bandwidth <- function(...) { eval(npudens(...), envir =parent.frame()) }
+predict.bandwidth <- function(...) { do.call(npudens, list(...), envir = parent.frame()) }

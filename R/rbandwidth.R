@@ -241,7 +241,7 @@ print.rbandwidth <- function(x, digits=NULL, ...){
 }
 
 
-predict.rbandwidth <- function(...) { eval(npreg(...), envir = parent.frame()) }
+predict.rbandwidth <- function(...) { do.call(npreg, list(...), envir = parent.frame()) }
 
 summary.rbandwidth <- function(object, ...){
   cat("\nRegression Data (",object$nobs," observations, ",object$ndim," variable(s)):\n",sep="")
