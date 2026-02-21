@@ -78,19 +78,13 @@ MATRIX mat_fdumpf( MATRIX A, char *s, FILE *fp );
 MATRIX mat_mul( MATRIX A, MATRIX B , MATRIX C );
 MATRIX mat_solve( MATRIX A, MATRIX B, MATRIX X );
 double mat_inv00( MATRIX A, int *ok );
+int mat_is_nonsingular( MATRIX A );
 
 
 MATRIX mat_inv( MATRIX a , MATRIX C );
 
-int mat_lu( MATRIX A, MATRIX P );
-MATRIX mat_backsubs1( MATRIX A, MATRIX B, MATRIX X, MATRIX P, int xcol );
-
-
-
 MATRIX mat_sub_mat( MATRIX A, int il, int iu, MATRIX S, int jl, int ju );
 MATRIX mat_sub_rem_mat( MATRIX A, int il, int iu, MATRIX S );
-
-double mat_det( MATRIX a );
 
 
 int isFiniteMatrix(MATRIX A);
