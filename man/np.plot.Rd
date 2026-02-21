@@ -16,7 +16,9 @@
   nonparametric statistical objects such as regressions, quantile
   regressions, partially linear regressions, single-index models,
   densities and distributions, given training data and a bandwidth
-  object.
+  object. Direct calls to \code{npplot()} are supported for backward
+  compatibility and emit a once-per-session advisory; \code{plot(...)}
+  is the preferred public interface.
 }
 
 \usage{
