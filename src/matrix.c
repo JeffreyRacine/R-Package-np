@@ -420,51 +420,6 @@ MATRIX mat_inv( MATRIX a , MATRIX C)
  */
 
 
-
-/*
- *-----------------------------------------------------------------------------
- * funct:  mat_mul
- * desct:  multiplication of two matrices
- * given:  A, B = compatible matrices to be multiplied
- * retrn:  NULL if malloc() fails
- *   else allocated matrix of A * B
- * comen:
- *-----------------------------------------------------------------------------
- */
-MATRIX mat_mul( MATRIX A, MATRIX B , MATRIX C)
-{
-	int  i, j, k;
-
-#ifdef CONFORM_CHECK
-
-	if(MatCol(A)!=MatRow(B))
-	{
-		error("\nUnconformable matrices in routine mat_mul(): Col(A)!=Row(B) (%d/%d)\n", MatCol(A),MatRow(B));
-	}
-	if(MatRow(A)!=MatRow(C))
-	{
-		error("\nUnconformable matrices in routine mat_mul(): Row(A)!=Row(C) (%d/%d)\n", MatRow(A), MatRow(C));
-	}
-	if(MatCol(B)!=MatCol(C))
-	{
-		error("\nUnconformable matrices in routine mat_mul(): Col(B)!=Col(C) (%d/%d)\n", MatCol(B), MatCol(C));
-	}
-#endif
-
-	for (i=0; i<MatRow(A); i++)
-	{
-		for (j=0; j<MatCol(B); j++)
-		{
-			for (k=0, C[i][j]=0.0; k<MatCol(A); k++)
-			{
-				C[i][j] += A[i][k] * B[k][j];
-			}
-		}
-	}
-
-	return (C);
-}
-
 /*
  *-----------------------------------------------------------------------------
  * funct:  mat_solve
