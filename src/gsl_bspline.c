@@ -12,6 +12,7 @@
 #include <math.h>
 #include "gsl_bspline.h"
 #include <R.h>
+#include <Rinternals.h>
 
 /* Code to replicate bs() in splines package. Note that feeding in
    x_min and x_max is necessary if you want to replicate predict.bs()
@@ -134,3 +135,112 @@ int gsl_bspline_deriv(double *x,
 	return(0);
 
 } /* main() */
+
+SEXP C_gsl_bspline(SEXP x,
+                   SEXP degree,
+                   SEXP nbreak,
+                   SEXP x_min,
+                   SEXP x_max,
+                   SEXP knots,
+                   SEXP knots_int)
+{
+  SEXP x_r = R_NilValue;
+  SEXP knots_r = R_NilValue;
+  SEXP bx = R_NilValue;
+  int n;
+  int degree_i;
+  int nbreak_i;
+  int knots_int_i;
+  double x_min_d;
+  double x_max_d;
+  int ncol;
+
+  PROTECT(x_r = coerceVector(x, REALSXP));
+  PROTECT(knots_r = coerceVector(knots, REALSXP));
+
+  n = (int) XLENGTH(x_r);
+  degree_i = asInteger(degree);
+  nbreak_i = asInteger(nbreak);
+  knots_int_i = asInteger(knots_int);
+  x_min_d = asReal(x_min);
+  x_max_d = asReal(x_max);
+
+  ncol = nbreak_i + degree_i - 1;
+  PROTECT(bx = allocMatrix(REALSXP, n, ncol));
+
+  gsl_bspline(REAL(x_r),
+              &n,
+              &degree_i,
+              &nbreak_i,
+              &x_min_d,
+              &x_max_d,
+              REAL(knots_r),
+              &knots_int_i,
+              REAL(bx));
+
+  UNPROTECT(3);
+  return bx;
+}
+
+SEXP C_gsl_bspline_deriv(SEXP x,
+                         SEXP degree,
+                         SEXP nbreak,
+                         SEXP deriv,
+                         SEXP x_min,
+                         SEXP x_max,
+                         SEXP knots,
+                         SEXP knots_int)
+{
+  SEXP x_r = R_NilValue;
+  SEXP deriv_i = R_NilValue;
+  SEXP knots_r = R_NilValue;
+  SEXP bx = R_NilValue;
+  int n;
+  int degree_i;
+  int nbreak_i;
+  int knots_int_i;
+  int order_max;
+  double x_min_d;
+  double x_max_d;
+  int ncol;
+
+  PROTECT(x_r = coerceVector(x, REALSXP));
+  PROTECT(deriv_i = coerceVector(deriv, INTSXP));
+  PROTECT(knots_r = coerceVector(knots, REALSXP));
+
+  n = (int) XLENGTH(x_r);
+  degree_i = asInteger(degree);
+  nbreak_i = asInteger(nbreak);
+  knots_int_i = asInteger(knots_int);
+  x_min_d = asReal(x_min);
+  x_max_d = asReal(x_max);
+
+  if ((int)XLENGTH(deriv_i) != n)
+    error("C_gsl_bspline_deriv: deriv length must match x length");
+
+  order_max = 0;
+  if (n > 0) {
+    int i;
+    for (i = 0; i < n; i++)
+      if (INTEGER(deriv_i)[i] > order_max)
+        order_max = INTEGER(deriv_i)[i];
+  }
+
+  ncol = nbreak_i + degree_i - 1;
+  PROTECT(bx = allocMatrix(REALSXP, n, ncol));
+
+  gsl_bspline_deriv(REAL(x_r),
+                    &n,
+                    &degree_i,
+                    &nbreak_i,
+                    INTEGER(deriv_i),
+                    &order_max,
+                    &x_min_d,
+                    &x_max_d,
+                    REAL(knots_r),
+                    &knots_int_i,
+                    REAL(bx));
+
+  UNPROTECT(4);
+  return bx;
+}

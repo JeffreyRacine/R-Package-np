@@ -25,14 +25,14 @@ extern void np_set_seed(void *);
 extern void np_set_tgauss2(void *);
 
 /* .Call calls */
+extern SEXP C_gsl_bspline(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_gsl_bspline_deriv(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_dim_basis(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_set_tgauss2(SEXP);
 extern SEXP C_np_release_static_buffers(void);
 
 static const R_CMethodDef CEntries[] = {
-    {"gsl_bspline",                    (DL_FUNC) &gsl_bspline,                     9},
-    {"gsl_bspline_deriv",              (DL_FUNC) &gsl_bspline_deriv,              11},
     {"np_density",                     (DL_FUNC) &np_density,                     18},
     {"np_density_bw",                  (DL_FUNC) &np_density_bw,                  16},
     {"np_density_conditional",         (DL_FUNC) &np_density_conditional,         30},
@@ -47,6 +47,8 @@ static const R_CMethodDef CEntries[] = {
 };
 
 static const R_CallMethodDef CallEntries[] = {
+    {"C_gsl_bspline",                  (DL_FUNC) &C_gsl_bspline,                   7},
+    {"C_gsl_bspline_deriv",            (DL_FUNC) &C_gsl_bspline_deriv,             8},
     {"C_np_dim_basis",                 (DL_FUNC) &C_np_dim_basis,                  6},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
     {"C_np_set_tgauss2",               (DL_FUNC) &C_np_set_tgauss2,                1},
