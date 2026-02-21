@@ -17,17 +17,10 @@
   .npRmpi_require_active_slave_pool(where = where)
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = where)
 
-  if (exists(".Random.seed", .GlobalEnv)) {
-    save.seed <- get(".Random.seed", .GlobalEnv)
-    exists.seed <- TRUE
-  } else {
-    exists.seed <- FALSE
-  }
-
-  set.seed(random.seed)
-  on.exit(if (exists.seed) assign(".Random.seed", save.seed, .GlobalEnv), add = TRUE)
-
-  do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))
+  .np_with_seed(
+    random.seed,
+    do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))
+  )
 }
 
 .np_plot_from_slot <- function(object, slot = "bws", ...) {

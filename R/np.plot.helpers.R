@@ -2,6 +2,20 @@
 ## you just need to supply training data and the bandwidth
 ## this tool will help you visualize the result
 
+.np_with_seed <- function(random.seed = 42L, code) {
+  if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    exists.seed <- TRUE
+  } else {
+    exists.seed <- FALSE
+  }
+
+  set.seed(random.seed)
+  on.exit(if (exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv), add = TRUE)
+
+  force(code)
+}
+
 gen.label = function(label, altlabel){
   paste(ifelse(is.null(label), altlabel, label))
 }
@@ -1507,6 +1521,5 @@ trim.quantiles <- function(dat, trim){
   }
   tq
 }
-
 
 
