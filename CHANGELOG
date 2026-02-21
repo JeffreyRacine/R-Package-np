@@ -1,4 +1,12 @@
-Changes from Version 0.60-20 to 0.70-0 [19-Feb-2026]
+Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
+
+* Completed migration from monolithic plotting entry points to modular S3
+  plot methods and helper dispatch, while preserving backward-compatible
+  `npplot*` internals for parity.
+
+* Fixed S3 plot argument compatibility regression by normalizing legacy alias
+  arguments prior to dispatch (`gradient` -> `gradients`, `persp` ->
+  `perspective`) to avoid ambiguous matching in run-mode examples.
 
 * Added bounded continuous-kernel support across the package with a unified
   interface for Gaussian-family kernels using per-variable bounds:

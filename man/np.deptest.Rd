@@ -137,7 +137,7 @@ npdeptest(data.x = NULL,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 set.seed(1234)
 
 ## Test/measure lack of fit between y and its fitted value from a
@@ -189,7 +189,7 @@ model <- lm(y~x)
 y.fit <- fitted(model)
 
 npdeptest(y,y.fit,boot.num=99)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{ univar }
 \keyword{ nonparametric }

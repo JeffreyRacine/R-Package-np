@@ -160,7 +160,7 @@ npquantile(x = NULL,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 ## Simulate data from a chi-square distribution
 df <- 50
 x <- rchisq(100,df=df)
@@ -176,7 +176,7 @@ quantile(x,tau)
 
 ## True quantiles based on known distribution
 qchisq(tau,df=df)
-} % enddontrun
+% } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
 

@@ -223,7 +223,7 @@ npsigtest(bws, \dots)
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we simulate 100 draws
 # from a DGP in which z, the first column of X, is an irrelevant
 # discrete variable
@@ -291,6 +291,6 @@ npsigtest(bws=bw)
 # only, as in
 
 npsigtest(bws=bw,index=c(1,3))
-} % enddontrun
+% } % enddontrun
 }
 \keyword{ nonparametric }
