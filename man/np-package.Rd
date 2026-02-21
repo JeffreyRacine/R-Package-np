@@ -26,8 +26,8 @@
   bandwidth objects to other functions, and those functions can grab the
   specifics from the bandwidth object thereby removing potential
   inconsistencies and unnecessary repetition. Furthermore, many
-  functions such as \code{\link{plot}} (which automatically calls
-  \code{npplot}) can work with the bandwidth object directly without
+  functions such as \code{\link{plot}} (via class-specific S3 methods)
+  can work with the bandwidth object directly without
   having to do the subsequent companion function evaluation.
 
   As of \code{npRmpi} version 0.20-0, we allow the user to combine these
@@ -106,11 +106,10 @@
 	implemented, while the user can specify their own bandwidths should
 	they so choose (either a raw bandwidth or scaling factor).
 
-	A flexible plotting utility, \code{\link{npplot}} (which is
-	automatically invoked by \code{\link{plot}}) , facilitates graphing of
-	multivariate objects. An example for creating postscript graphs using
-	the \code{\link{npplot}} utility and pulling this into a LaTeX
-	document is provided.
+	A flexible plotting utility, via class-specific S3
+	\code{\link{plot}} methods, facilitates graphing of multivariate
+	objects. An example for creating postscript graphs and pulling this
+	into a LaTeX document is provided.
 
 	The function \code{\link{npksum}} allows users to create or implement
 	their own kernel estimators or tests should they so desire.
