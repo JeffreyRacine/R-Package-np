@@ -56,9 +56,10 @@ npudistbw.formula <-
 
     }
 
-    tbw <- eval(parse(text=paste("npudistbw(dat = dat,",
-                        ifelse(has.gval,"gdat = gdat,",""),
-                        "...)")))
+    bw.args <- list(dat = dat)
+    if (has.gval)
+      bw.args$gdat <- gdat
+    tbw <- do.call(npudistbw, c(bw.args, list(...)))
     tbw$call <- match.call(expand.dots = FALSE)
     environment(tbw$call) <- parent.frame()
     tbw$formula <- formula
@@ -378,12 +379,17 @@ npudistbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("dbandwidth(bws",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ", nobs = dim(dat)[1], xdati = untangle(dat),",
-                        "xnames = names(dat),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    bw.args <- list(
+      bw = bws,
+      nobs = dim(dat)[1],
+      xdati = untangle(dat),
+      xnames = names(dat),
+      bandwidth.compute = bandwidth.compute
+    )
+    if (any.m) {
+      for (nm in mc.names[m]) bw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(dbandwidth, bw.args)
 
 
     ## next grab dummies for actual bandwidth selection and perform call
@@ -402,10 +408,11 @@ npudistbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("npudistbw.dbandwidth(dat=dat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    bwsel.args <- list(dat = dat, bws = tbw)
+    if (any.m) {
+      for (nm in mc.names[m]) bwsel.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(npudistbw.dbandwidth, bwsel.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

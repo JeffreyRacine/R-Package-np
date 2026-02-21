@@ -375,15 +375,19 @@ npregbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("rbandwidth(bws",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ", nobs = dim(xdat)[1],",
-                        "xdati = untangle(xdat),",
-                        "ydati = untangle(data.frame(ydat)),",
-                        "xnames = names(xdat),",
-                        "ynames = deparse(substitute(ydat)),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    bw.args <- list(
+      bw = bws,
+      nobs = dim(xdat)[1],
+      xdati = untangle(xdat),
+      ydati = untangle(data.frame(ydat)),
+      xnames = names(xdat),
+      ynames = deparse(substitute(ydat)),
+      bandwidth.compute = bandwidth.compute
+    )
+    if (any.m) {
+      for (nm in mc.names[m]) bw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(rbandwidth, bw.args)
 
     mc.names <- names(match.call(expand.dots = FALSE))
     margs <- c("bandwidth.compute", "nmulti", "remin", "itmax", "ftol", "tol",
@@ -399,10 +403,11 @@ npregbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("npregbw.rbandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (any.m) {
+      for (nm in mc.names[m]) bwsel.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(npregbw.rbandwidth, bwsel.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

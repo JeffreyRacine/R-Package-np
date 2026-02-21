@@ -460,17 +460,20 @@ npcdensbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("conbandwidth(",
-                        "xbw = bws[length(ydat)+1:length(xdat)],",
-                        "ybw = bws[1:length(ydat)],",
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ifelse(any.m, ",",""),
-                        "nobs = nrow(xdat),",
-                        "xdati = untangle(xdat),",
-                        "ydati = untangle(ydat),",
-                        "xnames = names(xdat),",
-                        "ynames = names(ydat),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    bw.args <- list(
+      xbw = bws[length(ydat) + 1:length(xdat)],
+      ybw = bws[1:length(ydat)],
+      nobs = nrow(xdat),
+      xdati = untangle(xdat),
+      ydati = untangle(ydat),
+      xnames = names(xdat),
+      ynames = names(ydat),
+      bandwidth.compute = bandwidth.compute
+    )
+    if (any.m) {
+      for (nm in mc.names[m]) bw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(conbandwidth, bw.args)
                         
     ## next grab dummies for actual bandwidth selection and perform call
 
@@ -488,10 +491,11 @@ npcdensbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("npcdensbw.conbandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (any.m) {
+      for (nm in mc.names[m]) bwsel.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(npcdensbw.conbandwidth, bwsel.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

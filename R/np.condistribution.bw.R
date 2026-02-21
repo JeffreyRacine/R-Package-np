@@ -82,8 +82,10 @@ npcdistbw.formula <-
       gydat <- gmf[, variableNames[[1]], drop = FALSE]
     }
     
-    tbw = eval(parse(text=paste("npcdistbw(xdat = xdat, ydat = ydat,",
-                       ifelse(has.gval, "gydat = gydat",""), "...)")))
+    bw.args <- list(xdat = xdat, ydat = ydat)
+    if (has.gval)
+      bw.args$gydat <- gydat
+    tbw <- do.call(npcdistbw, c(bw.args, list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)
@@ -526,18 +528,21 @@ npcdistbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("condbandwidth(",
-                        "xbw = bws[length(ydat)+1:length(xdat)],",
-                        "ybw = bws[1:length(ydat)],",
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ifelse(any.m, ",",""),
-                        "uykertype = 'aitchisonaitken',",
-                        "nobs = nrow(xdat),",
-                        "xdati = untangle(xdat),",
-                        "ydati = untangle(ydat),",
-                        "xnames = names(xdat),",
-                        "ynames = names(ydat),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    bw.args <- list(
+      xbw = bws[length(ydat) + 1:length(xdat)],
+      ybw = bws[1:length(ydat)],
+      uykertype = "aitchisonaitken",
+      nobs = nrow(xdat),
+      xdati = untangle(xdat),
+      ydati = untangle(ydat),
+      xnames = names(xdat),
+      ynames = names(ydat),
+      bandwidth.compute = bandwidth.compute
+    )
+    if (any.m) {
+      for (nm in mc.names[m]) bw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(condbandwidth, bw.args)
                         
     ## next grab dummies for actual bandwidth selection and perform call
 
@@ -555,10 +560,11 @@ npcdistbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("npcdistbw.condbandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (any.m) {
+      for (nm in mc.names[m]) bwsel.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(npcdistbw.condbandwidth, bwsel.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()

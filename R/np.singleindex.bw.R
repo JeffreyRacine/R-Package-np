@@ -132,11 +132,13 @@ npindexbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    if (bandwidth.compute)
-      tbw <- eval(parse(text=paste("npindexbw.sibandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                          ifelse(any.m, ",",""),
-                          paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                          ")")))
+    if (bandwidth.compute) {
+      bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+      if (any.m) {
+        for (nm in mc.names[m]) bwsel.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+      }
+      tbw <- do.call(npindexbw.sibandwidth, bwsel.args)
+    }
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
