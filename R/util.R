@@ -142,6 +142,22 @@ npValidateGlpBernstein <- function(regtype, bernstein.basis, argname = "bernstei
   isTRUE(bernstein.basis)
 }
 
+npValidateLpBasis <- function(regtype, basis, argname = "basis") {
+  if (!identical(regtype, "lp"))
+    return("glp")
+
+  if (is.null(basis))
+    basis <- "glp"
+
+  basis <- match.arg(as.character(basis), c("glp", "additive", "tensor"))
+
+  if (!identical(basis, "glp"))
+    stop(sprintf("%s='%s' is not yet implemented; currently only basis='glp' is supported",
+                 argname, basis))
+
+  basis
+}
+
 npValidateGlpGradientOrder <- function(regtype,
                                        gradient.order,
                                        ncon,
@@ -200,9 +216,9 @@ npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
 npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
   if (is.null(dotnames) || !length(dotnames))
     return(invisible(NULL))
-  bad <- intersect(dotnames, c("glp.degree", "glp.bernstein"))
+  bad <- intersect(dotnames, c("glp.degree", "glp.bernstein", "glp.basis"))
   if (length(bad))
-    stop(sprintf("%s: legacy arguments %s are no longer supported; use degree and bernstein.basis",
+    stop(sprintf("%s: legacy arguments %s are no longer supported; use basis, degree and bernstein.basis",
                  where, paste(sprintf("'%s'", bad), collapse = ", ")))
   invisible(NULL)
 }
