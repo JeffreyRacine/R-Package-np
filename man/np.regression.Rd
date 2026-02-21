@@ -112,7 +112,7 @@ FALSE, \dots)
     for \code{regtype="lp"} with \code{gradients=TRUE}, a positive
     integer (or integer vector with one entry per continuous predictor)
     specifying derivative order(s). Defaults to \code{1L}. Orders
-    exceeding \code{glp.degree} for a variable are returned as
+    exceeding \code{degree} for a variable are returned as
     \code{NA}; orders greater than one are currently reserved for
     future extension and return \code{NA}.
   }
@@ -184,7 +184,7 @@ FALSE, \dots)
 
   When bandwidths are obtained with \code{regtype="lp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via
-  \code{glp.degree}. The optional flag \code{glp.bernstein} controls
+  \code{degree}. The optional flag \code{bernstein.basis} controls
   basis construction: \code{FALSE} (default) uses raw local-polynomial
   powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
   homogeneous degree-0 and degree-1 cases remain
@@ -196,8 +196,8 @@ FALSE, \dots)
   The degree vector is fixed user input (one entry per continuous
   predictor, non-negative integers in \code{[0,12]}), while
   optimization remains over bandwidths only. For
-  \code{glp.bernstein=TRUE}, evaluation points for continuous predictors
-  must lie within training support; use \code{glp.bernstein=FALSE} for
+  \code{bernstein.basis=TRUE}, evaluation points for continuous predictors
+  must lie within training support; use \code{bernstein.basis=FALSE} for
   extrapolation.
 
   The use of compactly supported kernels or the occurrence of small

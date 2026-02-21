@@ -159,11 +159,11 @@ npregbw.rbandwidth <-
     rord = xdat[, bws$iord, drop = FALSE]
 
     tbw <- bws
-    tbw$glp.degree <- npValidateGlpDegree(regtype = tbw$regtype,
-                                          glp.degree = tbw$glp.degree,
+    tbw$degree <- npValidateGlpDegree(regtype = tbw$regtype,
+                                          degree = tbw$degree,
                                           ncon = tbw$ncon)
-    tbw$glp.bernstein <- npValidateGlpBernstein(regtype = tbw$regtype,
-                                                glp.bernstein = tbw$glp.bernstein)
+    tbw$bernstein.basis <- npValidateGlpBernstein(regtype = tbw$regtype,
+                                                bernstein.basis = tbw$bernstein.basis)
 
     mysd <- EssDee(rcon)
     nconfac <- nrow^(-1.0/(2.0*bws$ckerorder+bws$ncon))
@@ -173,15 +173,15 @@ npregbw.rbandwidth <-
     penalty_mode <- ifelse(invalid.penalty == "baseline", 1L, 0L)
 
     reg.c <- npRegtypeToC(regtype = bws$regtype,
-                          glp.degree = bws$glp.degree,
+                          degree = bws$degree,
                           ncon = bws$ncon,
                           context = "npregbw")
     if (identical(bws$regtype, "lp") &&
         identical(reg.c$code, REGTYPE_GLP) &&
         !isTRUE(transform.bounds))
       transform.bounds <- TRUE
-    glp.degree.c <- if (bws$ncon > 0) {
-      as.integer(if (is.null(reg.c$glp.degree)) rep.int(0L, bws$ncon) else reg.c$glp.degree)
+    degree.c <- if (bws$ncon > 0) {
+      as.integer(if (is.null(reg.c$degree)) rep.int(0L, bws$ncon) else reg.c$degree)
     } else {
       integer(1)
     }
@@ -244,8 +244,8 @@ npregbw.rbandwidth <-
            fallback.history = double(1),
            penalty.mode = as.integer(penalty_mode),
            penalty.multiplier = as.double(penalty.multiplier),
-           glp.degree = glp.degree.c,
-           glp.bernstein = as.integer(isTRUE(tbw$glp.bernstein)),
+           degree = degree.c,
+           bernstein.basis = as.integer(isTRUE(tbw$bernstein.basis)),
            ckerlb = as.double(cker.bounds.c$lb),
            ckerub = as.double(cker.bounds.c$ub),
            PACKAGE="npRmpi" )[c("bw","fval","fval.history","eval.history","invalid.history","timing","fast.history","fallback.history")])[1]
@@ -300,8 +300,8 @@ npregbw.rbandwidth <-
 
     tbw <- rbandwidth(bw = tbw$bw,
                       regtype = tbw$regtype,
-                      glp.degree = tbw$glp.degree,
-                      glp.bernstein = tbw$glp.bernstein,
+                      degree = tbw$degree,
+                      bernstein.basis = tbw$bernstein.basis,
                       bwmethod = tbw$method,
                       bwscaling = tbw$scaling,
                       bwtype = tbw$type,
@@ -352,12 +352,13 @@ npregbw.default <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ## dummy arguments for later passing into rbandwidth()
-           regtype, glp.degree, glp.bernstein, bwmethod, bwscaling, bwtype,
+           regtype, degree, bernstein.basis, bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ckerbound, ckerlb, ckerub, ukertype, okertype,
            ...){
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    npRejectLegacyLpArgs(names(list(...)), where = "npregbw")
 
     xdat <- toFrame(xdat)
 
@@ -378,8 +379,8 @@ npregbw.default <-
     )
 
     if (!missing(regtype)) rb.args$regtype <- regtype
-    if (!missing(glp.degree)) rb.args$glp.degree <- glp.degree
-    if (!missing(glp.bernstein)) rb.args$glp.bernstein <- glp.bernstein
+    if (!missing(degree)) rb.args$degree <- degree
+    if (!missing(bernstein.basis)) rb.args$bernstein.basis <- bernstein.basis
     if (!missing(bwmethod)) rb.args$bwmethod <- bwmethod
     if (!missing(bwscaling)) rb.args$bwscaling <- bwscaling
     if (!missing(bwtype)) rb.args$bwtype <- bwtype

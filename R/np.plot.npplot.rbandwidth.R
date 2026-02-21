@@ -136,7 +136,7 @@ npplot.rbandwidth <-
                                        ncon = bws$ncon)
       if (length(go))
         plot.gradient.order.label[which(bws$icon)] <- go
-      if (any(go > bws$glp.degree))
+      if (any(go > bws$degree))
         warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
       if (any(go > 1L))
         warning("higher-order glp derivatives are not yet available at C level; plotting NA for requested orders > 1")
