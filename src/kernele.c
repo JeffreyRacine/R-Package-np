@@ -3035,12 +3035,6 @@ double *SIGN)
 					gradient[k][j] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
-
-				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
-				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
-				flawed. Now using local constant.*/
-
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
 
 				if(temp_var <= 0.0)
@@ -3244,12 +3238,6 @@ double *SIGN)
 				{
 					gradient[k][j] = - DELTA[k+1][0];
 				}
-
-				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
-
-				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
-				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
-				flawed. Now using local constant.*/
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
 
@@ -3456,12 +3444,6 @@ double *SIGN)
 				{
 					gradient[k][j] = - DELTA[k+1][0];
 				}
-
-				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
-
-				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
-				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
-				flawed. Now using local constant.*/
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
 
@@ -3999,12 +3981,6 @@ double *SIGN)
 					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
-
-				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
-				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
-				flawed. Now using local constant.*/
-
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
 
 				if(temp_var <= 0.0)
@@ -4208,12 +4184,6 @@ double *SIGN)
 				{
 					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
 				}
-
-				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
-
-				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
-				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
-				flawed. Now using local constant.*/
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
 
@@ -4420,12 +4390,6 @@ double *SIGN)
 				{
 					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
 				}
-
-				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
-
-				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
-				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
-				flawed. Now using local constant.*/
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
 
