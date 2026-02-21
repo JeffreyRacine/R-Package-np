@@ -1,4 +1,4 @@
-test_that("npplot contract: regression and conditional estimators return data payloads", {
+test_that("plot contract: regression and conditional estimators return data payloads", {
   skip_if_not_installed("np")
 
   set.seed(101)
@@ -27,7 +27,7 @@ test_that("npplot contract: regression and conditional estimators return data pa
   expect_true(all(vapply(rout, function(xi) !is.null(xi$merr), logical(1))))
 })
 
-test_that("npplot contract: npcdens/npcdist support bootstrap all in data mode", {
+test_that("plot contract: npcdens/npcdist support bootstrap all in data mode", {
   skip_if_not_installed("np")
 
   set.seed(102)
@@ -74,7 +74,7 @@ test_that("npplot contract: npcdens/npcdist support bootstrap all in data mode",
   expect_true(all(vapply(dout, function(xi) !is.null(xi$conderr), logical(1))))
 })
 
-test_that("npplot contract: plot.errors.alpha is enforced in (0,0.5)", {
+test_that("plot contract: plot.errors.alpha is enforced in (0,0.5)", {
   skip_if_not_installed("np")
 
   set.seed(103)

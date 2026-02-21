@@ -129,7 +129,7 @@ FALSE, \dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
  \code{npplreg} uses a combination of OLS and nonparametric
  regression to estimate the parameter \eqn{\beta}{B} in the model
@@ -246,7 +246,7 @@ FALSE, \dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
 \dontrun{

@@ -173,7 +173,7 @@ npplregbw(\dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   \code{npplregbw} implements a variety of methods for nonparametric
  regression on multivariate (\eqn{q}-variate) explanatory data defined
@@ -307,7 +307,7 @@ npplregbw(\dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{npregbw}}, \code{\link{npreg}} }
 \examples{
 \dontrun{

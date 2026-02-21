@@ -93,7 +93,7 @@ an optional upper bound on the support of \code{X} or \code{Y} (defaults to 1)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
@@ -158,7 +158,7 @@ Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   The \pkg{logcondens}, \pkg{LogConDEAD}, and \pkg{scdensity} packages,
   and the function \code{\link{npuniden.boundary}}.
 }

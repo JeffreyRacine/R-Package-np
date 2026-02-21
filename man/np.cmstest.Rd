@@ -10,7 +10,7 @@
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
-  \code{\link{npplot}} for plotting options.
+  \code{\link{plot}} for plotting options.
 }
 \usage{
 npcmstest(formula,
@@ -182,7 +182,7 @@ npcmstest(formula,
 
 \seealso{
   \code{\link{np.kernels}}, \code{\link{np.options}},
-  \code{\link{npplot}}, \code{\link{npregbw}}.
+  \code{\link{plot}}, \code{\link{npregbw}}.
 }
 
 \examples{

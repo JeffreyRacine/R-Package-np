@@ -7,7 +7,7 @@
 }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels and
-  \code{\link{npplot}} for plotting options.
+  \code{\link{plot}} for plotting options.
 
   The following options are recognized by \pkg{np}.
 
@@ -43,7 +43,7 @@
     floating-point differences relative to the legacy accumulation order.
     Default is \code{TRUE}.
 
-    \item \code{plot.par.mfrow} (logical): used by \code{\link{npplot}} to
+    \item \code{plot.par.mfrow} (logical): used by \code{\link{plot}} to
     determine whether plotting layout is automatically managed via
     \code{par(mfrow=...)}. If \code{NULL} (default behavior), \pkg{np} uses
     its internal plotting defaults.
@@ -56,8 +56,8 @@
   Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{npplot}}
-  \code{\link{np}}, \code{\link{npplot}}, \code{\link{options}}
+  \code{\link{np.kernels}}, \code{\link{plot}}
+  \code{\link{np}}, \code{\link{plot}}, \code{\link{options}}
 }
 \examples{
 \dontrun{

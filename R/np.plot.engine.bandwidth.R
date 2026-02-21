@@ -1,4 +1,4 @@
-.np_plot_dbandwidth_engine <-
+.np_plot_bandwidth_engine <-
   function(bws,
            xdat,
            data = NULL,
@@ -48,8 +48,8 @@
     on.exit(par(oldpar), add = TRUE)
 
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
-        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
-
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
+      
     miss.x <- missing(xdat)
 
     if(miss.x && !is.null(bws$formula)){
@@ -79,7 +79,7 @@
       warning(paste("plot.errors.method must be set to 'bootstrap' to use bootstrapping.",
                     "\nProceeding without bootstrapping."))
     }
-    normalized.opts <- .npplot_normalize_common_options(
+    normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
@@ -142,9 +142,9 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      tobj =  npudist(tdat = xdat, edat = x.eval, bws = bws)
+      tobj =  npudens(tdat = xdat, edat = x.eval, bws = bws)
 
-      tdens = matrix(data = tobj$dist,
+      tdens = matrix(data = tobj$dens,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       terr = matrix(data = tobj$derr, nrow = nrow(x.eval), ncol = 3)
@@ -156,6 +156,7 @@
       if (plot.errors.method == "bootstrap"){
         terr.obj <- compute.bootstrap.errors(xdat = xdat, 
           exdat = x.eval,
+          cdf = FALSE,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -168,7 +169,7 @@
         terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
-        center.val <- if (pc) terr[,3] else tobj$dist
+        center.val <- if (pc) terr[,3] else tobj$dens
 
         lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
@@ -184,10 +185,10 @@
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tobj$dist - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
+        lerr = matrix(data = tobj$dens - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tobj$dist + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
+        herr = matrix(data = tobj$dens + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -198,18 +199,17 @@
                   if (plot.errors.type == "all" && !is.null(lerr.all))
                   c(min(c(unlist(lerr.all), lerr)), max(c(unlist(herr.all), herr)))
                   else
-                      c(min(lerr),max(herr))
+                      c(min(lerr), max(herr))
               } else
-                  c(min(tobj$dist),max(tobj$dist))
+                  c(min(tobj$dens),max(tobj$dens))
       }
 
       if (plot.behavior != "plot"){
-        d1 <- npdistribution(bws = bws, eval = x.eval,
-                             dist = tobj$dist, derr = terr[,1:2], ntrain = nrow(xdat))
+        d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens, derr = terr[,1:2], ntrain = nrow(xdat))
         d1$bias = NA
 
         if (plot.errors.center == "bias-corrected")
-          d1$bias = terr[,3] - tobj$dist
+          d1$bias = terr[,3] - tobj$dens
         
         if (plot.behavior == "data")
           return ( list(d1 = d1) )
@@ -282,7 +282,7 @@
                 cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
                 xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
                 ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "X2")),
-                zlab = ifelse(!is.null(zlab),zlab,"Joint Distribution"),
+                zlab = ifelse(!is.null(zlab),zlab,"Joint Density"),
                 theta = i,
                 phi = phi,
                 main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
@@ -337,7 +337,7 @@
 
           Sys.sleep(0.5)
       }
-
+      
 
       if (plot.behavior == "plot-data")
         return ( list(d1 = d1) )        
@@ -391,12 +391,12 @@
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
         ifelse(plot.errors,
-               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2])))),",
+               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err),",
                ""))
 
       pxlabE = "xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[i], paste('X', i, sep = ''))),"
 
-      pylabE = "ylab = ifelse(!is.null(ylab),ylab,'Distribution'),"
+      pylabE = paste("ylab = ", "ifelse(!is.null(ylab),ylab,'Density')", ",")
 
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,par()$lty), col = ifelse(!is.null(col),col,par()$col), lwd = ifelse(!is.null(lwd),lwd,par()$lwd), cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis), cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab), cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main), cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),"))
 
@@ -422,7 +422,7 @@
       erestE = "plot.errors.style = ifelse(xi.factor,'bar',plot.errors.style),
                 plot.errors.bar = ifelse(xi.factor,'I',plot.errors.bar),
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor,1,2)"
+                lty = ifelse(!is.null(lty),lty,ifelse(xi.factor,1,2))"
 
       ## density / distribution expressions
 
@@ -449,8 +449,8 @@
         }
 
         eval.slice <- subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE]
-        tobj <- npudist(tdat = xdat, edat = eval.slice, bws = bws)
-        temp.dens[1:xi.neval] <- tobj$dist
+        tobj <- npudens(tdat = xdat, edat = eval.slice, bws = bws)
+        temp.dens[1:xi.neval] <- tobj$dens
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
@@ -459,6 +459,7 @@
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+                      cdf = FALSE,
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
@@ -506,10 +507,9 @@
             plot.args$ylim <- if (plot.errors.type == "all")
               compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err)
             else
-              c(min(na.omit(c(temp.dens - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-                max(na.omit(c(temp.dens + temp.err[,2], temp.err[,3] + temp.err[,2]))))
+              compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err)
           plot.args$xlab <- ifelse(!is.null(xlab), xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
-          plot.args$ylab <- ifelse(!is.null(ylab), ylab, "Distribution")
+          plot.args$ylab <- ifelse(!is.null(ylab), ylab, "Density")
           if (!xi.factor) {
             plot.args$type <- ifelse(!is.null(type), type, "l")
             plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
@@ -547,7 +547,7 @@
                 plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
                 plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
+                lty = ifelse(!is.null(lty), lty, ifelse(xi.factor, 1, 2))
               )
               do.call(draw.errors, draw.args)
             }
@@ -556,10 +556,10 @@
 
         if (plot.behavior != "plot") {
           plot.out[i] = NA
-          plot.out[[i]] <- npdistribution(
+          plot.out[[i]] <- npdensity(
             bws = bws,
             eval = eval.slice,
-            dist = na.omit(temp.dens),
+            dens = na.omit(temp.dens),
             derr = na.omit(cbind(-temp.err[,1], temp.err[,2])),
             ntrain = bws$nobs
           )
@@ -632,7 +632,7 @@
             plot.args$y <- data.eval[,i]
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- ifelse(!is.null(xlab), xlab, gen.label(bws$xnames[i], paste("X", i, sep = "")))
-          plot.args$ylab <- ifelse(!is.null(ylab), ylab, "Distribution")
+          plot.args$ylab <- ifelse(!is.null(ylab), ylab, "Density")
           if (!xi.factor) {
             plot.args$type <- ifelse(!is.null(type), type, "l")
             plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
@@ -670,7 +670,7 @@
                 plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
                 plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
+                lty = ifelse(!is.null(lty), lty, ifelse(xi.factor, 1, 2))
               )
               do.call(draw.errors, draw.args)
             }
@@ -688,4 +688,3 @@
     }
   }
 
-npplot.dbandwidth <- function(...) .np_plot_dbandwidth_engine(...)

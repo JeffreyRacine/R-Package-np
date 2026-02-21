@@ -77,7 +77,7 @@ npcopula(bws,
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
 
   \code{npcopula} computes the nonparametric copula or copula density
@@ -129,7 +129,7 @@ npcopula(bws,
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \link{npudensbw},\link{npudens},\link{npudist}
 }
 

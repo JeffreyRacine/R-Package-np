@@ -2149,7 +2149,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
   room for improvement
 
 \item Added option \texttt{plot.par.mfrow=TRUE/FALSE} to
-  \texttt{npplot()} so that the automated setting of
+  \texttt{plot()} so that the automated setting of
   \texttt{par(mfrow=c(,))} in plot is disabled and the user can do
   this manually if desired
 
@@ -2443,10 +2443,10 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \begin{itemize}
 
-\item Fixed issue where calling \texttt{npplot} resets system seed
+\item Fixed issue where calling \texttt{plot} resets system seed
 
 \item Updated examples in docs so that plot is recommended throughout
-  (and not \texttt{npplot} that is invoked by \texttt{plot})
+  (and not \texttt{plot} that is invoked by \texttt{plot})
 
 \item Fixed regression in \texttt{npindex} when \texttt{gradients=TRUE} and
   \texttt{errors=TRUE}
@@ -2577,7 +2577,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
   \texttt{random.seed=42} was not initialized in functions
   \texttt{npcmstest}, \texttt{npdeneqtest}, \texttt{npindexbw},
   \texttt{npsdeptest}, \texttt{npqcmstest}, \texttt{npsigtest},
-  \texttt{npsymtest}, \texttt{npunitest}, and \texttt{npplot}
+  \texttt{npsymtest}, \texttt{npunitest}, and \texttt{plot}
 
 \item Fixed issue with saving and restoring random seed in \texttt{npdeptest}
 
@@ -2831,7 +2831,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 
 \item Fixed some quietness issues
 
-\item \texttt{npplot()} now returns data upon request for conditional
+\item \texttt{plot()} now returns data upon request for conditional
   densities
 
 \item \texttt{npreg()} and \texttt{npcdens()} now take the appropriate
@@ -2894,7 +2894,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 \item Fixed error when plotting asymptotic errors with conditional
   densities
 
-\item Fixed a bug in \texttt{npplot()} with partially linear regressions
+\item Fixed a bug in \texttt{plot()} with partially linear regressions
   and \texttt{plot.behavior="data"} or \texttt{"plot-data"}
 
 \item Maximum default number of multistarts is 5
@@ -2951,7 +2951,7 @@ legend("topleft",c("beta2","ci.l","ci.u"),col=c(1,2,2),pch=c(1,1,1),bty="n")
 \item Predict now accepts the argument 'se.fit', like predict.lm
 
 \item Fixed bug where incorrect asymptotic standard errors of
-  gradients for regression objects were being displayed in \texttt{npplot()}
+  gradients for regression objects were being displayed in \texttt{plot()}
 
 \item Fixed bug where errors of gradients of regression objects were
   not being returned in matrix form

@@ -15,7 +15,7 @@ test_that("nptgauss basic functionality works", {
   expect_silent(nptgauss(3.0))
 })
 
-test_that("npplot basic functionality works", {
+test_that("plot basic functionality works", {
   data("faithful")
   bw <- npudensbw(dat=faithful, bws=c(0.5, 5), bandwidth.compute=FALSE)
   
@@ -23,7 +23,7 @@ test_that("npplot basic functionality works", {
   pdf(NULL)
   on.exit(dev.off())
   
-  expect_silent(npplot(bws=bw))
+  expect_silent(plot(bw))
 })
 
 test_that("se and gradients methods work", {

@@ -128,7 +128,7 @@
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
  The kernel methods in \code{np} employ the so-called
 	\sQuote{generalized product kernels} found in Hall, Racine,
 	and Li (2004), Li, Lin, and Racine (2013), Li, Ouyang, and
@@ -274,7 +274,7 @@
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{np.options}}
 }
 

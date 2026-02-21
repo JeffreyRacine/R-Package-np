@@ -90,7 +90,7 @@ npunitest(data.x = NULL,
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
 
   \code{npunitest} computes the nonparametric metric entropy (normalized
@@ -128,7 +128,7 @@ npunitest(data.x = NULL,
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{npdeneqtest},\link{npdeptest},\link{npsdeptest},\link{npsymtest}}
 }
 

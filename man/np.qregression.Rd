@@ -153,7 +153,7 @@ npqreg(bws, \dots)
 }
 
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
 
   The optimizer invoked for search is Powell's conjugate direction
@@ -243,7 +243,7 @@ npqreg(bws, \dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}} \pkg{quantreg} }
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}} \pkg{quantreg} }
 
 \examples{
 \dontrun{

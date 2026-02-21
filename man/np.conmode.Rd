@@ -17,7 +17,7 @@
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
-  \code{\link{npplot}} for plotting options.
+  \code{\link{plot}} for plotting options.
 }
 
 \usage{
@@ -165,7 +165,7 @@ npconmode(bws, \dots)
 
 \seealso{
   \code{\link{np.kernels}}, \code{\link{np.options}},
-  \code{\link{npplot}}, \code{\link{npcdensbw}}.
+  \code{\link{plot}}, \code{\link{npcdensbw}}.
 }
 
 \examples{

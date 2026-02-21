@@ -1,8 +1,8 @@
-.np_plot_plbandwidth_engine <-
+.np_plot_scbandwidth_engine <-
   function(bws,
            xdat,
            ydat,
-           zdat,
+           zdat = NULL,
            data = NULL,
            xq = 0.5,
            zq = 0.5,
@@ -34,9 +34,9 @@
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
+           plot.errors.boot.num = 399,
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
-           plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
@@ -53,72 +53,72 @@
     on.exit(par(oldpar), add = TRUE)
 
     if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
-        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow
-      
-    if(!missing(gradients))
-      stop("gradients not supported with partially linear models. Coefficients may be extracted with coef()")
+        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
 
-    miss.xyz = c(missing(xdat), missing(ydat), missing(zdat))
+    if(!missing(gradients))
+      stop("gradients not supported with smooth coefficient models.")
+
+    miss.xy = c(missing(xdat),missing(ydat))
+    miss.z = missing(zdat) & is.null(bws$zdati)
     
-    if (any(miss.xyz) && !all(miss.xyz))
+    if (any(miss.xy) && !all(miss.xy))
       stop("one of, but not both, xdat and ydat was specified")
-    else if(all(miss.xyz) && !is.null(bws$formula)){
+    else if(all(miss.xy) && !is.null(bws$formula)){
       tt <- terms(bws)
       m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-
-      tmf.xf <- tmf.x <- tmf <- bws$call[c(1,m)]
-      tmf.xf[[1]] <- tmf[[1]] <- as.name("model.frame")
+                 names(bws$call), nomatch = 0)
+      tmf <- bws$call[c(1,m)]
+      tmf[[1]] <- as.name("model.frame")
       tmf[["formula"]] <- tt
       umf <- tmf <- eval(tmf, envir = environment(tt))
-
-      bronze <- lapply(bws$chromoly, paste, collapse = " + ")
-
-      tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
-                                      env = environment(formula))
-      tmf.xf <- eval(tmf.xf, envir = environment(tt))
       
       ydat <- model.response(tmf)
-      xdat <- tmf.xf
-
-      zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
+      xdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
+      if (!miss.z)
+        zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
     } else {
-      if(all(miss.xyz) && !is.null(bws$call)){
+      if(all(miss.xy) && !is.null(bws$call)){
         xdat <- data.frame(eval(bws$call[["xdat"]], environment(bws$call)))
-        ydat = eval(bws$call[["ydat"]], environment(bws$call))
-        zdat <- data.frame(eval(bws$call[["zdat"]], environment(bws$call)))
+        ydat <- eval(bws$call[["ydat"]], environment(bws$call))
+        if (!miss.z)
+          zdat <- data.frame(eval(bws$call[["zdat"]], environment(bws$call)))
       }
-      xdat = toFrame(xdat)
-      zdat = toFrame(zdat)
-      
+          
       ## catch and destroy NA's
+      xdat = toFrame(xdat)
+      if(!miss.z)
+        zdat <- toFrame(zdat)
+
       goodrows = 1:dim(xdat)[1]
-      rows.omit = attr(na.omit(data.frame(xdat,ydat,zdat)), "na.action")
+      train.df <- data.frame(xdat, ydat)
+      if (!miss.z)
+        train.df <- data.frame(train.df, zdat)
+      rows.omit <- attr(na.omit(train.df), "na.action")
+      
+      attr(na.omit(data.frame(xdat,ydat,zdat)), "na.action")
       goodrows[rows.omit] = 0
 
       if (all(goodrows==0))
-        stop("Training data has no rows without NAs")
+        stop("Data has no rows without NAs")
 
       xdat = xdat[goodrows,,drop = FALSE]
+
+      if(!miss.z)
+        zdat <- zdat[goodrows,,drop = FALSE]
+      
       ydat = ydat[goodrows]
-      zdat = zdat[goodrows,,drop = FALSE]
     }
 
+    ## ydat = as.double(ydat)
 
-    nxcon = sum(bws$xdati$icon)
-    nxuno = sum(bws$xdati$iuno)
-    nxord = sum(bws$xdati$iord)
+    xq = double(ncol(xdat))+xq
+    xtrim = double(ncol(xdat))+xtrim
 
-    nzcon = sum(bws$zdati$icon)
-    nzuno = sum(bws$zdati$iuno)
-    nzord = sum(bws$zdati$iord)
-
-    xq = double(bws$xndim)+xq
-    zq = double(bws$zndim)+zq
+    if (!miss.z){
+      zq = double(ncol(zdat))+zq
+      ztrim = double(ncol(zdat))+ztrim
+    }
     
-    xtrim = double(bws$xndim)+xtrim
-    ztrim = double(bws$zndim)+ztrim
-
 
     if (missing(plot.errors.method) &
         any(!missing(plot.errors.boot.num), !missing(plot.errors.boot.method),
@@ -126,8 +126,7 @@
       warning(paste("plot.errors.method must be set to 'bootstrap' to use bootstrapping.",
                     "\nProceeding without bootstrapping."))
     }
-    
-    normalized.opts <- .npplot_normalize_common_options(
+    normalized.opts <- .np_plot_normalize_common_options(
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
@@ -139,8 +138,7 @@
       plot.errors.bar = plot.errors.bar,
       xdat = xdat,
       common.scale = common.scale,
-      ylim = ylim,
-      allow_asymptotic_quantile = FALSE
+      ylim = ylim
     )
 
     plot.behavior <- normalized.opts$plot.behavior
@@ -153,21 +151,14 @@
     plot.errors.style <- normalized.opts$plot.errors.style
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
+    plot.errors <- normalized.opts$plot.errors
 
-    if (plot.errors.method == "asymptotic") {
-      warning(paste("asymptotic errors are not supported with partially linear regression.\n",
-                    "Proceeding without calculating errors"))
-      plot.errors.method = "none"
-    }
-
-    plot.errors = (plot.errors.method != "none")
-
-    if ((nxcon + nxord == 1) & (nzcon + nzord == 1) & (nxuno + nzuno == 0) &
-        perspective & !gradients & !any(xor(bws$xdati$iord, bws$xdati$inumord)) &
-        !any(xor(bws$zdati$iord, bws$zdati$inumord))){
+    if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) & (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) & perspective & !gradients &
+        !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
 
       view = match.arg(view)
       rotate = (view == "rotate")
+
       
       if (is.ordered(xdat[,1])){
         x1.eval = bws$xdati$all.ulev[[1]]
@@ -178,35 +169,58 @@
         x1.eval = seq(qi[1], qi[2], length.out = x1.neval)
       }
 
-      if (is.ordered(zdat[,1])){
-        z1.eval = bws$zdati$all.ulev[[1]]
-        z1.neval = length(z1.eval)
+      if(!miss.z){
+        tdat <- zdat[,1]
+        ti <- 1
+        tdati <-  bws$zdati
+        ttrim <- ztrim
+        x2.names <- bws$znames
       } else {
-        z1.neval = neval
-        qi = trim.quantiles(zdat[,1], ztrim[1])
-        z1.eval = seq(qi[1], qi[2], length.out = z1.neval)
+        tdat <- xdat[,2]
+        ti <- 2
+        tdati <- bws$xdati
+        ttrim <- xtrim
+        x2.names <- bws$xnames
+      }
+        
+      if (is.ordered(tdat)){
+        x2.eval = tdati$all.ulev[[ti]]
+        x2.neval = length(x2.eval)
+      } else {
+        x2.neval = neval
+        qi = trim.quantiles(tdat, ttrim[ti])
+        x2.eval = seq(qi[1], qi[2], length.out = x2.neval)
       }
 
-      x.eval <- expand.grid(x1.eval, z1.eval)
-
-      if (bws$xdati$iord[1])
+      x.eval <- expand.grid(x1.eval, x2.eval)
+      
+      if (is.ordered(xdat[,1]))
         x1.eval <- (bws$xdati$all.dlev[[1]])[as.integer(x1.eval)]
       
-      if (bws$zdati$iord[1])
-        z1.eval <- (bws$zdati$all.dlev[[1]])[as.integer(z1.eval)]
+      if (is.ordered(tdat))
+        x2.eval <- (tdati$all.dlev[[ti]])[as.integer(x2.eval)]
 
-      tobj = npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-        exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE], bws = bws)
+      scoef.args <- list(txdat = xdat, tydat = ydat, bws = bws, iterate = FALSE, errors = plot.errors)
+      if (!miss.z)
+        scoef.args$tzdat <- zdat
+      if (miss.z) {
+        scoef.args$exdat <- x.eval
+      } else {
+        scoef.args$exdat <- x.eval[,1, drop = FALSE]
+        scoef.args$ezdat <- x.eval[,2, drop = FALSE]
+      }
+      tobj <- do.call(npscoef, scoef.args)
 
-      terr = matrix(data = NA, nrow = nrow(x.eval), ncol = 3)
+      terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
+      terr[,3] = NA
       
       treg = matrix(data = tobj$mean,
-        nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
+        nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       if (plot.errors.method == "bootstrap"){
-        terr <- compute.bootstrap.errors(
-          xdat = xdat, ydat = ydat, zdat = zdat,
-          exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],
+        boot.args <- list(
+          xdat = xdat,
+          ydat = ydat,
           gradients = FALSE,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
@@ -215,20 +229,37 @@
           plot.errors.center = plot.errors.center,
           plot.errors.type = plot.errors.type,
           plot.errors.alpha = plot.errors.alpha,
-          bws = bws)[["boot.err"]]
+          bws = bws
+        )
+        if (!miss.z)
+          boot.args$zdat <- zdat
+        if (miss.z) {
+          boot.args$exdat <- x.eval
+        } else {
+          boot.args$exdat <- x.eval[,1, drop = FALSE]
+          boot.args$ezdat <- x.eval[,1, drop = FALSE]
+        }
+        terr <- do.call(compute.bootstrap.errors, boot.args)[["boot.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
 
         lerr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
           -terr[,1],
-          nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
         herr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
           +terr[,2],
-          nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+      } else if (plot.errors.method == "asymptotic") {
+        lerr = matrix(data = tobj$mean - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
+
+        herr = matrix(data = tobj$mean + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
+          nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
-      
+
       if(is.null(zlim)) {
           zlim =
               if (plot.errors)
@@ -238,22 +269,15 @@
       }
         
       if (plot.behavior != "plot"){
-        r1 = plregression(bws = bws, xcoef = tobj$xcoef,
-          xcoefvcov = vcov(tobj),
-          xcoeferr = tobj$xcoeferr,
-          evalx =  x.eval[,1],
-          evalz =  x.eval[,2],
-          mean = tobj$mean,
-          ntrain = dim(xdat)[1],
-          trainiseval = FALSE,
-          xtra=c(tobj$RSQ,tobj$MSE,0,0,0,0))
-
-        r1$merr = NA
+        r1 <- do.call(smoothcoefficient, list(
+          bws = bws,
+          eval = if (miss.z) x.eval else list(exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE]),
+          mean = as.double(treg),
+          merr = terr[,1:2],
+          ntrain = dim(xdat)[1]
+        ))
         r1$bias = NA
 
-        if (plot.errors)
-          r1$merr = terr[,1:2]
-        
         if (plot.errors.center == "bias-corrected")
           r1$bias = terr[,3] - treg
 
@@ -271,7 +295,7 @@
         for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
           if (plot.errors){
             persp(x1.eval,
-                  z1.eval,
+                  x2.eval,
                   lerr,
                   zlim = zlim,
                   cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
@@ -291,7 +315,7 @@
           }
 
           persp(x1.eval,
-                z1.eval,
+                x2.eval,
                 treg,
                 zlim = zlim,
                 col = persp.col,
@@ -301,9 +325,9 @@
                 cex.lab =  ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
                 cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
                 cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                xlab = ifelse(!is.null(xlab),xlab,gen.label(names(xdat)[1], "X1")),
-                ylab = ifelse(!is.null(ylab),ylab,gen.label(names(xdat)[2], "Z1")),
-                zlab = ifelse(!is.null(zlab),zlab,gen.label(names(ydat),"Conditional Mean")),
+                xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[1], "X1")),
+                ylab = ifelse(!is.null(ylab),ylab,gen.label(x2.names[1], "X2")),
+                zlab = ifelse(!is.null(zlab),zlab,gen.label(bws$ynames,"Conditional Mean")),
                 theta = i,
                 phi = phi,
                 main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
@@ -311,7 +335,7 @@
           if (plot.errors){
             par(new = TRUE)
             persp(x1.eval,
-                  z1.eval,
+                  x2.eval,
                   herr,
                   zlim = zlim,
                   cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
@@ -337,48 +361,51 @@
         return ( list(r1 = r1) )
 
     } else {
-##      stop("not yet supported!")
-      
-      if (plot.behavior != "data" && plot.par.mfrow)
-        par(mfrow=n2mfrow(bws$xndim + bws$zndim),cex=par()$cex)
 
+      tot.dim <- (bws$xndim <- length(bws$xdati$icon)) + (bws$zndim <- length(bws$zdati$icon))
+
+      if (plot.behavior != "data" && plot.par.mfrow)
+        par(mfrow=n2mfrow(tot.dim),cex=par()$cex)
+
+      maxneval = max(c(sapply(xdat,nlevels), unlist(sapply(zdat,nlevels)), neval))
+      all.isFactor = c(sapply(xdat, is.factor), unlist(sapply(zdat, is.factor)))
+      
       x.ev = xdat[1,,drop = FALSE]
-      z.ev = zdat[1,,drop = FALSE]
 
       for (i in 1:bws$xndim)
         x.ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
 
-      for (i in 1:bws$zndim)
-        z.ev[1,i] = uocquantile(zdat[,i], prob=zq[i])
-
-
-      maxneval = max(c(sapply(xdat,nlevels), sapply(zdat,nlevels), neval))
-
-      ## Preserve original data types (e.g., factors) for evaluation data
       exdat = xdat[rep(1, maxneval), , drop = FALSE]
-      ezdat = zdat[rep(1, maxneval), , drop = FALSE]
 
       for (i in 1:bws$xndim)
         exdat[,i] = x.ev[1,i]
 
-      for (i in 1:bws$zndim)
-        ezdat[,i] = z.ev[1,i]
+      if (!miss.z){
+        z.ev = zdat[1,,drop = FALSE]
+        
+        for (i in 1:bws$zndim)
+          z.ev[1,i] = uocquantile(zdat[,i], prob=zq[i])
+
+        ezdat = zdat[rep(1, maxneval), , drop = FALSE]
+
+        for (i in 1:bws$zndim)
+          ezdat[,i] = z.ev[1,i]
+
+      }
 
       if (common.scale){
         data.eval = matrix(data = NA, nrow = maxneval,
-          ncol = (bws$xndim + bws$zndim))
+          ncol = tot.dim)
         
         data.err = matrix(data = NA, nrow = maxneval,
-          ncol = 3*(bws$xndim + bws$zndim))
-        data.err.all = vector("list", bws$xndim + bws$zndim)
+          ncol = 3*tot.dim)
+        data.err.all = vector("list", tot.dim)
 
         allei = as.data.frame(matrix(data = NA, nrow = maxneval,
-          ncol = bws$xndim + bws$zndim))
+          ncol = tot.dim))
 
         all.bxp = list()
       }
-
-      all.isFactor = c(sapply(xdat, is.factor), sapply(zdat, is.factor))
 
       plot.out = list()
 
@@ -404,7 +431,9 @@
           ifelse(common.scale,"y = data.eval[,plot.index],", "y = temp.mean,")))
 
       pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors, "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),", ""))
+        ifelse(plot.errors,
+               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err) else c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))), max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2])))),",
+               ""))
 
       pxlabE = expression(paste("xlab = gen.label(bws$",
           xOrZ, "names[i], paste('", toupper(xOrZ),"', i, sep = '')),",sep=''))
@@ -416,6 +445,22 @@
       prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,par()$lty), col = ifelse(!is.null(col),col,par()$col), lwd = ifelse(!is.null(lwd),lwd,par()$lwd), cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis), cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab), cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main), cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),"))
 
       pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
+
+      txobj_call <- function(i, ei, xi.neval) {
+        tx.args <- list(
+          txdat = xdat,
+          tydat = ydat,
+          exdat = subcol(exdat, ei, i)[1:xi.neval, , drop = FALSE],
+          bws = bws,
+          errors = plot.errors
+        )
+        if (!miss.z) {
+          tx.args$tzdat <- zdat
+          tx.args$ezdat <- ezdat[1:xi.neval, , drop = FALSE]
+        }
+        do.call(npscoef, tx.args)
+      }
+
 
       ## error plotting expressions
       plotOnEstimate = (plot.errors.center == "estimate")
@@ -465,34 +510,36 @@
           ei[(xi.neval+1):maxneval] = NA
         }
 
-
-        tobj <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-          exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-          ezdat = ezdat[1:xi.neval,, drop = FALSE],
-          bws = bws)
+        tobj <- txobj_call(i, ei, xi.neval)
 
         temp.mean[1:xi.neval] = tobj$mean
 
         if (plot.errors){
-          if (plot.errors.method == "bootstrap"){
-            temp.boot <- compute.bootstrap.errors(
-                      xdat = xdat,
-                      ydat = ydat,
-                      zdat = zdat,
-                      exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-                      ezdat = ezdat[1:xi.neval,, drop = FALSE],
-                      gradients = gradients,
-                      slice.index = plot.index,
-                      plot.errors.boot.method = plot.errors.boot.method,
-                      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
-                      plot.errors.boot.num = plot.errors.boot.num,
-                      plot.errors.center = plot.errors.center,
-                      plot.errors.type = plot.errors.type,
-                      plot.errors.alpha = plot.errors.alpha,
-                      bws = bws)
-            temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
-            temp.all.err <- temp.boot[["boot.all.err"]]
-            temp.boot <- temp.boot[["bxp"]]
+          if (plot.errors.method == "asymptotic")
+            temp.err[1:xi.neval,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
+          else if (plot.errors.method == "bootstrap"){
+            boot.args <- list(
+              xdat = xdat,
+              ydat = ydat,
+              exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+              gradients = gradients,
+              slice.index = plot.index,
+              plot.errors.boot.method = plot.errors.boot.method,
+              plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+              plot.errors.boot.num = plot.errors.boot.num,
+              plot.errors.center = plot.errors.center,
+              plot.errors.type = plot.errors.type,
+              plot.errors.alpha = plot.errors.alpha,
+              bws = bws
+            )
+            if (!miss.z) {
+              boot.args$zdat <- zdat
+              boot.args$ezdat <- ezdat[1:xi.neval,, drop = FALSE]
+            }
+            temp.boot.raw <- do.call(compute.bootstrap.errors, boot.args)
+            temp.err[1:xi.neval,] <- temp.boot.raw[["boot.err"]]
+            temp.all.err <- temp.boot.raw[["boot.all.err"]]
+            temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){
               temp.boot$out <- numeric()
               temp.boot$group <- integer()
@@ -533,8 +580,7 @@
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
-                                  gen.label(bws$ynames, "Conditional Mean"))
+          plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
           if (!xi.factor) {
             plot.args$type <- ifelse(!is.null(type), type, "l")
             plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
@@ -557,9 +603,13 @@
             if (plot.errors.type == "all") {
               draw.all.error.types(
                 ex = as.numeric(na.omit(ei)),
-                center = na.omit(if (plotOnEstimate) temp.mean else temp.err[,3]),
+                center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
                 all.err = temp.all.err,
-                xi.factor = xi.factor)
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
             } else {
               draw.args <- list(
                 ex = as.numeric(na.omit(ei)),
@@ -568,7 +618,7 @@
                 plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
                 plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
+                lty = 2
               )
               do.call(draw.errors, draw.args)
             }
@@ -580,15 +630,19 @@
           plot.out[plot.index] = NA
           if (gradients){
           } else {
-            plot.out[[plot.index]] =
-              plregression(bws = bws, xcoef = tobj$xcoef, xcoefvcov = vcov(tobj),
-                           xcoeferr = tobj$xcoeferr,
-                           evalx = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-                           evalz = ezdat[1:xi.neval,, drop = FALSE],
-                           mean = na.omit(temp.mean),
-                           ntrain = dim(xdat)[1],
-                           trainiseval = FALSE,
-                           xtra = c(tobj$RSQ, tobj$MSE, 0, 0, 0, 0))
+            eval.obj <- if (miss.z) {
+              subcol(exdat, ei, i)[1:xi.neval,, drop = FALSE]
+            } else {
+              list(exdat = subcol(exdat, ei, i)[1:xi.neval,, drop = FALSE],
+                   ezdat = ezdat[1:xi.neval,, drop = FALSE])
+            }
+            plot.out[[plot.index]] <-
+              smoothcoefficient(bws = bws,
+                                eval = eval.obj,
+                                mean = na.omit(temp.mean),
+                                ntrain = dim(xdat)[1],
+                                trainiseval = FALSE,
+                                xtra = c(0, 0, 0, 0, 0, 0))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
 
@@ -602,201 +656,209 @@
         }
       }
 
-      xOrZ = "z"
-      for (i in 1:bws$zndim){
-        plot.index = plot.index + 1
-        temp.err[,] = NA
-        temp.mean[] =  NA
-        temp.boot = list()
-        temp.all.err <- NULL
+      if (!miss.z){
+        xOrZ = "z"
+        for (i in 1:bws$zndim){
+          plot.index = plot.index + 1
+          temp.err[,] = NA
+          temp.mean[] =  NA
+          temp.boot = list()
+          temp.all.err <- NULL
 
-        xi.factor = all.isFactor[plot.index]
-        
-        if (xi.factor){
-          ei = levels(zdat[,i])
+          xi.factor = all.isFactor[plot.index]
+          
+          if (xi.factor){
+            ei = levels(zdat[,i])
           ei = factor(ei, levels = ei)
-          xi.neval = length(ei)
-        } else {
-          xi.neval = neval
-          qi = trim.quantiles(zdat[,i], ztrim[i])
-          ei = seq(qi[1], qi[2], length.out = neval)
-        }
-
-        if (xi.neval < maxneval){
-          ei[(xi.neval+1):maxneval] = NA
-        }
-
-        tobj <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-          exdat = exdat[1:xi.neval,, drop = FALSE],
-          ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
-          bws = bws)
-
-        temp.mean[1:xi.neval] = tobj$mean
-
-        if (plot.errors){
-          if (plot.errors.method == "bootstrap"){
-            temp.boot <- compute.bootstrap.errors(
-                      xdat = xdat,
-                      ydat = ydat,
-                      zdat = zdat,
-                      exdat = exdat[1:xi.neval,, drop = FALSE],
-                      ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
-                      gradients = gradients,
-                      slice.index = plot.index,
-                      plot.errors.boot.method = plot.errors.boot.method,
-                      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
-                      plot.errors.boot.num = plot.errors.boot.num,
-                      plot.errors.center = plot.errors.center,
-                      plot.errors.type = plot.errors.type,
-                      plot.errors.alpha = plot.errors.alpha,
-                      bws = bws)
-            temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
-            temp.all.err <- temp.boot[["boot.all.err"]]
-            temp.boot <- temp.boot[["bxp"]]
-            if (!plot.bxp.out){
-              temp.boot$out <- numeric()
-              temp.boot$group <- integer()
-            }
+            xi.neval = length(ei)
+          } else {
+            xi.neval = neval
+            qi = trim.quantiles(zdat[,i], ztrim[i])
+            ei = seq(qi[1], qi[2], length.out = neval)
           }
-        }
 
-        if (common.scale){
-          allei[,plot.index] = ei
-          data.eval[, plot.index] = temp.mean
+          if (xi.neval < maxneval){
+            ei[(xi.neval+1):maxneval] = NA
+          }
+
+          tobj <- npscoef(txdat = xdat, tydat = ydat, tzdat = zdat,
+                          exdat = exdat[1:xi.neval,, drop = FALSE],
+                          ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
+                          bws = bws)
+
+          temp.mean[1:xi.neval] = tobj$mean
+
           if (plot.errors){
-            all.bxp[plot.index] = NA
-            all.bxp[[plot.index]] = temp.boot
-
-            data.err[, c(3*plot.index-2,3*plot.index-1,3*plot.index)] = temp.err
-            data.err.all[[plot.index]] = temp.all.err
-          }
-        } else if (plot.behavior != "data") {
-          ## plot evaluation
-          plot.fun <- if (xi.factor) {
-            .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
-          } else {
-            plot
-          }
-          plot.args <- list()
-          if (xi.factor) {
-            if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
-          } else {
-            plot.args$x <- ei
-          }
-          if (!(xi.factor && plot.bootstrap && plot.bxp))
-            plot.args$y <- temp.mean
-          if (plot.errors)
-            plot.args$ylim <- if (plot.errors.type == "all")
-              compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
-            else
-              c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
-                max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
-          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
-                                      paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
-                                  gen.label(bws$ynames, "Conditional Mean"))
-          if (!xi.factor) {
-            plot.args$type <- ifelse(!is.null(type), type, "l")
-            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
-            plot.args$col <- ifelse(!is.null(col), col, par()$col)
-            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
-            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
-            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
-            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
-            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
-          }
-          plot.args$main <- ifelse(!is.null(main), main, "")
-          plot.args$sub <- ifelse(!is.null(sub), sub, "")
-          do.call(plot.fun, plot.args)
-
-          ## error plotting evaluation
-          if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
-            if (!xi.factor && !plotOnEstimate)
-              lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
-
-            if (plot.errors.type == "all") {
-              draw.all.error.types(
-                ex = as.numeric(na.omit(ei)),
-                center = na.omit(if (plotOnEstimate) temp.mean else temp.err[,3]),
-                all.err = temp.all.err,
-                xi.factor = xi.factor)
-            } else {
-              draw.args <- list(
-                ex = as.numeric(na.omit(ei)),
-                ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
-                ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
-                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
-                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
-                plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
-              )
-              do.call(draw.errors, draw.args)
+            if (plot.errors.method == "asymptotic")
+              temp.err[1:xi.neval,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
+          else if (plot.errors.method == "bootstrap"){
+              temp.boot.raw <- compute.bootstrap.errors(
+                                                    xdat = xdat,
+                                                    ydat = ydat,
+                                                    zdat = zdat,
+                                                    exdat = exdat[1:xi.neval,, drop = FALSE],
+                                                    ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
+                                                    gradients = gradients,
+                                                    slice.index = plot.index,
+                                                    plot.errors.boot.method = plot.errors.boot.method,
+                                                    plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+                                                    plot.errors.boot.num = plot.errors.boot.num,
+                                                    plot.errors.center = plot.errors.center,
+                                                    plot.errors.type = plot.errors.type,
+                                                    plot.errors.alpha = plot.errors.alpha,
+                                                    bws = bws)
+              temp.err[1:xi.neval,] <- temp.boot.raw[["boot.err"]]
+              temp.all.err <- temp.boot.raw[["boot.all.err"]]
+              temp.boot <- temp.boot.raw[["bxp"]]
+              if (!plot.bxp.out){
+                temp.boot$out <- numeric()
+                temp.boot$group <- integer()
+              }
             }
-
           }
-        }
 
-        
-        if (plot.behavior != "plot") {
-          plot.out[plot.index] = NA
-          if (gradients){
-          } else {
-            plot.out[[plot.index]] =
-              plregression(bws = bws, xcoef = tobj$xcoef,
-                           xcoeferr = tobj$xcoeferr,
-                           xcoefvcov = vcov(tobj),
-                           evalx = exdat[1:xi.neval,, drop = FALSE],
-                           evalz = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
-                           mean = na.omit(temp.mean),
-                           ntrain = dim(zdat)[1],
-                           trainiseval = FALSE,
-                           xtra = c(tobj$RSQ, tobj$MSE, 0, 0, 0, 0))
-            plot.out[[plot.index]]$merr = NA
-            plot.out[[plot.index]]$bias = NA
+          if (common.scale){
+            allei[,plot.index] = ei
+            data.eval[, plot.index] = temp.mean
+            if (plot.errors){
+              all.bxp[plot.index] = NA
+              all.bxp[[plot.index]] = temp.boot
 
+              data.err[, c(3*plot.index-2,3*plot.index-1,3*plot.index)] = temp.err
+              data.err.all[[plot.index]] = temp.all.err
+            }
+          } else if (plot.behavior != "data") {
+            ## plot evaluation
+            plot.fun <- if (xi.factor) {
+              .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
+            } else {
+              plot
+            }
+            plot.args <- list()
+            if (xi.factor) {
+              if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
+            } else {
+              plot.args$x <- ei
+            }
+            if (!(xi.factor && plot.bootstrap && plot.bxp))
+              plot.args$y <- temp.mean
             if (plot.errors)
-              plot.out[[plot.index]]$merr = temp.err[,1:2]
+              plot.args$ylim <- if (plot.errors.type == "all")
+                compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
+              else
+                c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
+                  max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
+            plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                        paste(toupper(xOrZ), i, sep = ""))
+            plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
+            if (!xi.factor) {
+              plot.args$type <- ifelse(!is.null(type), type, "l")
+              plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
+              plot.args$col <- ifelse(!is.null(col), col, par()$col)
+              plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
+              plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
+              plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
+              plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
+              plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+            }
+            plot.args$main <- ifelse(!is.null(main), main, "")
+            plot.args$sub <- ifelse(!is.null(sub), sub, "")
+            do.call(plot.fun, plot.args)
 
-            if (plot.errors.center == "bias-corrected")
-              plot.out[[plot.index]]$bias = temp.err[,3] - temp.mean
-            plot.out[[plot.index]]$bxp = temp.boot
+            ## error plotting evaluation
+            if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+              if (!xi.factor && !plotOnEstimate)
+                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+
+              if (plot.errors.type == "all") {
+                draw.all.error.types(
+                  ex = as.numeric(na.omit(ei)),
+                  center = as.numeric(na.omit(if (plotOnEstimate) temp.mean else temp.err[,3])),
+                  all.err = temp.all.err,
+                  plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                  plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                  plot.errors.bar.num = plot.errors.bar.num,
+                  lty = 2,
+                  add.legend = TRUE)
+              } else {
+                draw.args <- list(
+                  ex = as.numeric(na.omit(ei)),
+                  ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
+                  ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                  plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                  plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                  plot.errors.bar.num = plot.errors.bar.num,
+                  lty = 2
+                )
+                do.call(draw.errors, draw.args)
+              }
+
+            }
+          }
+
+          
+          if (plot.behavior != "plot") {
+            plot.out[plot.index] = NA
+            if (gradients){
+            } else {
+              plot.out[[plot.index]] =
+                smoothcoefficient(bws = bws, 
+                                  eval = list(exdat = exdat[1:xi.neval,, drop = FALSE],
+                                    ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE]),
+                                  mean = na.omit(temp.mean),
+                                  ntrain = dim(zdat)[1],
+                                  trainiseval = FALSE)
+
+              plot.out[[plot.index]]$merr = NA
+              plot.out[[plot.index]]$bias = NA
+
+              if (plot.errors)
+                plot.out[[plot.index]]$merr = temp.err[,1:2]
+
+              if (plot.errors.center == "bias-corrected")
+                plot.out[[plot.index]]$bias = temp.err[,3] - temp.mean
+              plot.out[[plot.index]]$bxp = temp.boot
+            }
           }
         }
       }
-
+      
       if (common.scale & (plot.behavior != "data")){
+        jj = 1:(bws$xndim + bws$zndim)*3
+        
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
           for (k in 1:(bws$xndim + bws$zndim)) {
             if (is.null(data.err.all[[k]])) next
             nkeep.k <- nrow(data.err.all[[k]]$pointwise)
-            if (nkeep.k == 0) next
             center.k <- if (plot.errors.center == "estimate")
-              na.omit(data.eval[seq_len(nkeep.k), k])
+              data.eval[1:nkeep.k,k]
             else
-              na.omit(data.err[seq_len(nkeep.k), 3*k])
+              data.err[1:nkeep.k,3*k]
             range.k <- compute.all.error.range(center.k, data.err.all[[k]])
             y.min <- min(y.min, range.k[1], na.rm = TRUE)
             y.max <- max(y.max, range.k[2], na.rm = TRUE)
           }
           if (!is.finite(y.min) || !is.finite(y.max)) {
-            y.min <- min(na.omit(as.double(data.eval)))
-            y.max <- max(na.omit(as.double(data.eval)))
+            if (plot.errors.center == "estimate") {
+              y.max = max(na.omit(as.double(data.eval)) + na.omit(as.double(data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.eval)) - na.omit(as.double(data.err[,jj-2])))
+            } else {
+              y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+              y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
+            }
           }
-        } else {
-          jj = 1:(bws$xndim + bws$zndim)*3
-          if (plot.errors.center == "estimate" | !plot.errors) {
-            y.max = max(na.omit(as.double(data.eval)) +
-              if (plot.errors) na.omit(as.double(data.err[,jj-1]))
-              else 0)
-            y.min = min(na.omit(as.double(data.eval)) -
-              if (plot.errors) na.omit(as.double(data.err[,jj-2]))
-              else 0)
-          } else if (plot.errors.center == "bias-corrected") {
-            y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
-            y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
-          }
+        } else if (plot.errors.center == "estimate" | !plot.errors) {
+          y.max = max(na.omit(as.double(data.eval)) +
+            if (plot.errors) na.omit(as.double(data.err[,jj-1]))
+            else 0)
+          y.min = min(na.omit(as.double(data.eval)) -
+            if (plot.errors) na.omit(as.double(data.err[,jj-2]))
+            else 0)
+        } else if (plot.errors.center == "bias-corrected") {
+          y.max = max(na.omit(as.double(data.err[,jj] + data.err[,jj-1])))
+          y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
         }
 
         if(!is.null(ylim)){
@@ -831,8 +893,7 @@
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
-                                  gen.label(bws$ynames, "Conditional Mean"))
+          plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
           if (!xi.factor) {
             plot.args$type <- ifelse(!is.null(type), type, "l")
             plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
@@ -849,19 +910,20 @@
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+            if (!xi.factor && !plotOnEstimate)
+              lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
+
             if (plot.errors.type == "all") {
               draw.all.error.types(
                 ex = as.numeric(na.omit(allei[,plot.index])),
-                center = if (plotOnEstimate)
-                  na.omit(data.eval[,plot.index])
-                else
-                  na.omit(data.err[,3*plot.index]),
+                center = as.numeric(na.omit(if (plotOnEstimate) data.eval[,plot.index] else data.err[,3*plot.index])),
                 all.err = data.err.all[[plot.index]],
-                xi.factor = xi.factor)
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = 2,
+                add.legend = TRUE)
             } else {
-              if (!xi.factor && !plotOnEstimate)
-                lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
-
               draw.args <- list(
                 ex = as.numeric(na.omit(allei[,plot.index])),
                 ely = if (plotOnEstimate) na.omit(data.eval[,plot.index] - data.err[,3*plot.index-2]) else na.omit(data.err[,3*plot.index] - data.err[,3*plot.index-2]),
@@ -869,7 +931,7 @@
                 plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
                 plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
+                lty = 2
               )
               do.call(draw.errors, draw.args)
             }
@@ -886,11 +948,12 @@
         names(plot.out) =
           if (gradients){ }
           else
-            paste("plr",1:(bws$xndim+bws$zndim),sep="")
+            paste("sc",1:(bws$xndim+bws$zndim),sep="")
         
         return (plot.out)
       }
     }
+
+      
   }
 
-npplot.plbandwidth <- function(...) .np_plot_plbandwidth_engine(...)

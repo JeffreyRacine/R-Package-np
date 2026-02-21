@@ -44,7 +44,7 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
 }
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   Typical usages are (see below for a complete list of options and also
   the examples at the end of this help file)
@@ -91,7 +91,7 @@ optional arguments passed to \code{npudensbw} and \code{npudens}
 Jeffrey S. Racine \email{racinej@mcmaster.ca}
 }
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
 The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link{npuniden.boundary}}.
 }
 \examples{

@@ -200,7 +200,7 @@ described in Table~\ref{np function table}.
 \code{npindex} & Semiparametric Single Index Model & \citet{ICHIMURA:1993}, \citet{KLEIN_SPADY:1993}\\
 \code{npindexbw} & Semiparametric Single Index Model Parameter and Bandwidth Selection& \citet{ICHIMURA:1993}, \citet{KLEIN_SPADY:1993}\\
 \code{npksum} &  Nonparametric Kernel Sums & \\
-\code{npplot} & General Purpose Plotting of Nonparametric Objects& \\
+\code{plot} & General Purpose Plotting of Nonparametric Objects& \\
 \code{npplreg} & Semiparametric Partially Linear  Regression &
 \citet{ROBINSON:1988}, \citet{GAO_LIU_RACINE:2012} \\
 \code{npplregbw} & Semiparametric Partially Linear  Regression Bandwidth Selection & \citet{ROBINSON:1988}, \citet{GAO_LIU_RACINE:2012} \\

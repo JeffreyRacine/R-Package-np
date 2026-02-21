@@ -167,7 +167,7 @@ plotFactor <- function(f, y, ...){
   if (plot.bootstrap && plot.bxp) bxp else plotFactor
 }
 
-.npplot_resolve_xydat <- function(bws, xdat, ydat, miss.xy) {
+.np_plot_resolve_xydat <- function(bws, xdat, ydat, miss.xy) {
   if (any(miss.xy) && !all(miss.xy))
     stop("one of, but not both, xdat and ydat was specified")
 
@@ -309,7 +309,7 @@ compute.default.error.range <- function(center, err) {
   c(min(lower, na.rm = TRUE), max(upper, na.rm = TRUE))
 }
 
-.npplot_normalize_common_options <- function(plot.behavior,
+.np_plot_normalize_common_options <- function(plot.behavior,
                                              plot.errors.method,
                                              plot.errors.boot.method,
                                              plot.errors.boot.blocklen,

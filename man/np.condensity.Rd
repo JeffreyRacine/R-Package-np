@@ -108,7 +108,7 @@ npcdens(bws, \dots)
 
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{npplot}} for plotting options.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, and \code{\link{plot}} for plotting options.
 
   \code{npcdens} implements a variety of methods for estimating
   multivariate conditional distributions (\eqn{p+q}-variate) defined
@@ -207,7 +207,7 @@ npcdens(bws, \dots)
 }
 
 \seealso{
-  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{npplot}}
+  \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{npudens}}
 }
 \examples{
