@@ -40,9 +40,11 @@ npqreg.formula <-
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
     }
 
-    tbw <-
-    eval(parse(text=paste("npqreg(txdat = txdat, tydat = tydat,",
-                 ifelse(has.eval,"exdat = exdat,",""), "bws = bws, ...)")))
+    q.args <- list(txdat = txdat, tydat = tydat)
+    if (has.eval)
+      q.args$exdat <- exdat
+    q.args$bws <- bws
+    tbw <- do.call(npqreg, c(q.args, list(...)))
 
     tbw$omit <- attr(umf,"na.action")
     tbw$rows.omit <- as.vector(tbw$omit)
@@ -336,5 +338,16 @@ npqreg.default <- function(bws, txdat, tydat, ...){
     }
   }
   
-  eval(parse(text=paste("npqreg(bws = tbw", tx.str, ty.str, ",...)")))
+  call.args <- list(bws = tbw)
+  if (no.bws) {
+    call.args$txdat <- txdat
+    call.args$tydat <- tydat
+  } else {
+    if (txdat.named) call.args$txdat <- txdat
+    if (tydat.named) call.args$tydat <- tydat
+    if ((!bws.named) && (!txdat.named) && (!no.tydat) && (!tydat.named)) {
+      call.args <- c(call.args, list(tydat))
+    }
+  }
+  do.call(npqreg, c(call.args, list(...)))
 }

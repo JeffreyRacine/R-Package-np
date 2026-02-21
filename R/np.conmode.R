@@ -47,10 +47,14 @@ npconmode.formula <-
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
     }
     
-    ev <-
-      eval(parse(text=paste("npconmode(txdat = txdat, tydat = tydat,",
-                   ifelse(has.eval,paste("exdat = exdat,",ifelse(has.ey,"eydat = eydat,","")),""),
-                   "bws = bws, ...)")))
+    cm.args <- list(txdat = txdat, tydat = tydat)
+    if (has.eval) {
+      cm.args$exdat <- exdat
+      if (has.ey)
+        cm.args$eydat <- eydat
+    }
+    cm.args$bws <- bws
+    ev <- do.call(npconmode, c(cm.args, list(...)))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
@@ -246,5 +250,16 @@ npconmode.default <- function(bws, txdat, tydat, ...){
     }
   }
   
-  eval(parse(text=paste("npconmode(bws = tbw", tx.str, ty.str, ",...)")))
+  call.args <- list(bws = tbw)
+  if (no.bws) {
+    call.args$txdat <- txdat
+    call.args$tydat <- tydat
+  } else {
+    if (txdat.named) call.args$txdat <- txdat
+    if (tydat.named) call.args$tydat <- tydat
+    if ((!bws.named) && (!txdat.named) && (!no.tydat) && (!tydat.named)) {
+      call.args <- c(call.args, list(tydat))
+    }
+  }
+  do.call(npconmode, c(call.args, list(...)))
 }
