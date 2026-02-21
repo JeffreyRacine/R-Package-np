@@ -34,7 +34,7 @@
 }
 
 .npRmpi_bcast_robj_by_name <- function(name, caller_env = parent.frame()) {
-  expr <- parse(text = sprintf("mpi.bcast.Robj2slave(%s)", name))[[1L]]
+  expr <- substitute(mpi.bcast.Robj2slave(NM), list(NM = as.name(name)))
   eval(expr, envir = caller_env)
 }
 
