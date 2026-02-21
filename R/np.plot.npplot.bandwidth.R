@@ -491,7 +491,7 @@ npplot.bandwidth <-
         } else if (plot.behavior != "data") {
           ## plot evaluation
           plot.fun <- if (xi.factor) {
-            if (plot.bootstrap && plot.bxp) bxp else plotFactor
+            .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
           } else {
             plot
           }
@@ -618,7 +618,7 @@ npplot.bandwidth <-
 
           ## plot evaluation
           plot.fun <- if (xi.factor) {
-            if (plot.bootstrap && plot.bxp) bxp else plotFactor
+            .np_plot_panel_fun(plot.bootstrap = plot.bootstrap, plot.bxp = plot.bxp)
           } else {
             plot
           }

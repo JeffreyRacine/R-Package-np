@@ -2,7 +2,7 @@
 ## you just need to supply training data and the bandwidth
 ## this tool will help you visualize the result
 
-.np_with_seed <- function(random.seed = 42L, code) {
+.np_seed_enter <- function(random.seed = 42L) {
   if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
     save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
     exists.seed <- TRUE
@@ -11,8 +11,19 @@
   }
 
   set.seed(random.seed)
-  on.exit(if (exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv), add = TRUE)
+  list(exists.seed = exists.seed, save.seed = save.seed)
+}
 
+.np_seed_exit <- function(state) {
+  if (isTRUE(state$exists.seed)) {
+    assign(".Random.seed", state$save.seed, envir = .GlobalEnv)
+  }
+  invisible(NULL)
+}
+
+.np_with_seed <- function(random.seed = 42L, code) {
+  seed.state <- .np_seed_enter(random.seed)
+  on.exit(.np_seed_exit(seed.state), add = TRUE)
   force(code)
 }
 
@@ -150,6 +161,10 @@ plotFactor <- function(f, y, ...){
 
   lines(x = l.f, y = l.y, lty = 2)
   points(x = f, y = y)
+}
+
+.np_plot_panel_fun <- function(plot.bootstrap, plot.bxp) {
+  if (plot.bootstrap && plot.bxp) bxp else plotFactor
 }
 
 ## Rank-based simultaneous confidence set helper, vendored from
