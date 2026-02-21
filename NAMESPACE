@@ -263,15 +263,6 @@ S3method(npcdistbw, formula)
 S3method(npcdistbw, default)
 S3method(npcdistbw, condbandwidth)
 
-S3method(npplot, rbandwidth)
-S3method(npplot, bandwidth)
-S3method(npplot, dbandwidth)
-S3method(npplot, plbandwidth)
-S3method(npplot, conbandwidth)
-S3method(npplot, condbandwidth)
-S3method(npplot, sibandwidth)
-S3method(npplot, scbandwidth)
-
 S3method(compute.bootstrap.errors, rbandwidth)
 S3method(compute.bootstrap.errors, bandwidth)
 S3method(compute.bootstrap.errors, dbandwidth)
@@ -316,4 +307,3 @@ S3method(npscoef, scbandwidth)
 
 S3method(gsl.bs, default)
 S3method(predict, gsl.bs)
-
