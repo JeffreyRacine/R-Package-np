@@ -2443,7 +2443,6 @@ double *SIGN)
 	double temp1 = DBL_MAX;
 
 	MATRIX  XTKX;
-	MATRIX  XTKXINV;
 	MATRIX  XTKY;
 	MATRIX  XTKYSQ;
 	MATRIX  DELTA;
@@ -2854,7 +2853,6 @@ double *SIGN)
 
 
 		XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-		XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 		XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		XTKYSQ = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
@@ -3037,7 +3035,7 @@ double *SIGN)
 					gradient[k][j] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKXINV, XTKYSQ, DELTA);
+				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
 
 				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
 				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
@@ -3247,7 +3245,7 @@ double *SIGN)
 					gradient[k][j] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKXINV, XTKYSQ, DELTA);
+				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
 
 				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
 				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
@@ -3459,7 +3457,7 @@ double *SIGN)
 					gradient[k][j] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKXINV, XTKYSQ, DELTA);
+				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
 
 				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
 				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
@@ -3495,7 +3493,6 @@ double *SIGN)
 		}
 
 		mat_free( XTKX );
-		mat_free( XTKXINV );
 		mat_free( XTKY );
 		mat_free( XTKYSQ );
 		mat_free( DELTA );
@@ -3821,7 +3818,6 @@ double *SIGN)
 
 
 		XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-		XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 		XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		XTKYSQ = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
@@ -4003,7 +3999,7 @@ double *SIGN)
 					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKXINV, XTKYSQ, DELTA);
+				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
 
 				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
 				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
@@ -4213,7 +4209,7 @@ double *SIGN)
 					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKXINV, XTKYSQ, DELTA);
+				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
 
 				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
 				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
@@ -4425,7 +4421,7 @@ double *SIGN)
 					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
 				}
 
-				/*				DELTA =  mat_mul( XTKXINV, XTKYSQ, DELTA);
+				/*				DELTA =  mat_mul( XTKYSQ, DELTA);
 
 				temp_var = DELTA[0][0] - mean[j]*mean[j]; 12/9/03 - local
 				linear E[Y^2|]-(E[Y|X])^2 for conditional variance is
@@ -4461,7 +4457,6 @@ double *SIGN)
 		}
 
 		mat_free( XTKX );
-		mat_free( XTKXINV );
 		mat_free( XTKY );
 		mat_free( XTKYSQ );
 		mat_free( DELTA );
@@ -4566,7 +4561,6 @@ double *mean)
 	double temp1 = DBL_MAX;
 
 	MATRIX  XTKX;
-	MATRIX  XTKXINV;
 	MATRIX  XTKY;
 	MATRIX  DELTA;
 
@@ -4793,7 +4787,6 @@ double *mean)
 		/* Local Linear */
 
 		XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-		XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 		XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -4822,7 +4815,6 @@ double *mean)
 		{
 
 			mat_free( XTKX );
-			mat_free( XTKXINV );
 			mat_free( XTKY );
 			mat_free( DELTA );
 
@@ -5353,7 +5345,6 @@ double *mean)
 		}
 
 		mat_free( XTKX );
-		mat_free( XTKXINV );
 		mat_free( XTKY );
 		mat_free( DELTA );
 
@@ -5554,7 +5545,6 @@ double *mean)
 		/* Local Linear */
 
 		XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-		XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 		XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -5586,7 +5576,6 @@ double *mean)
 		{
 
 			mat_free( XTKX );
-			mat_free( XTKXINV );
 			mat_free( XTKY );
 			mat_free( DELTA );
 
@@ -6118,7 +6107,6 @@ double *mean)
 		}
 
 		mat_free( XTKX );
-		mat_free( XTKXINV );
 		mat_free( XTKY );
 		mat_free( DELTA );
 
@@ -6222,7 +6210,6 @@ double **gradient)
 	double *pointer_matrix_bandwidth;
 
 	MATRIX  XTKX;
-	MATRIX  XTKXINV;
 	MATRIX  XTKY;
 	MATRIX  DELTA;
 
@@ -6613,7 +6600,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -7150,7 +7136,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -7390,7 +7375,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -7549,7 +7533,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -7732,7 +7715,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -8251,7 +8233,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -8297,7 +8278,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -8453,7 +8433,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -8824,7 +8803,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -9356,7 +9334,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -9575,7 +9552,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -9734,7 +9710,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -9911,7 +9886,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -10429,7 +10403,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -10473,7 +10446,6 @@ double **gradient)
 
 
 				XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-				XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 				XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 				DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -10629,7 +10601,6 @@ double **gradient)
 				}
 
 				mat_free( XTKX );
-				mat_free( XTKXINV );
 				mat_free( XTKY );
 				mat_free( DELTA );
 
@@ -18170,7 +18141,6 @@ int *num_categories)
 	double temp1 = DBL_MAX;
 
 	MATRIX  XTKX;
-	MATRIX  XTKXINV;
 	MATRIX  XTKY;
 	MATRIX  DELTA;
 
@@ -18416,7 +18386,6 @@ int *num_categories)
 		/* Local Linear */
 
 		XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-		XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 		XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -18445,7 +18414,6 @@ int *num_categories)
 		{
 
 			mat_free( XTKX );
-			mat_free( XTKXINV );
 			mat_free( XTKY );
 			mat_free( DELTA );
 
@@ -18982,7 +18950,6 @@ int *num_categories)
 		}
 
 		mat_free( XTKX );
-		mat_free( XTKXINV );
 		mat_free( XTKY );
 		mat_free( DELTA );
 
@@ -19193,7 +19160,6 @@ int *num_categories)
 		/* Local Linear */
 
 		XTKX = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
-		XTKXINV = mat_creat( num_reg_cat_cont + 1, num_reg_cat_cont + 1, UNDEFINED );
 		XTKY = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 		DELTA = mat_creat( num_reg_cat_cont + 1, 1, UNDEFINED );
 
@@ -19225,7 +19191,6 @@ int *num_categories)
 		{
 
 			mat_free( XTKX );
-			mat_free( XTKXINV );
 			mat_free( XTKY );
 			mat_free( DELTA );
 
@@ -19756,7 +19721,6 @@ int *num_categories)
 		}
 
 		mat_free( XTKX );
-		mat_free( XTKXINV );
 		mat_free( XTKY );
 		mat_free( DELTA );
 
