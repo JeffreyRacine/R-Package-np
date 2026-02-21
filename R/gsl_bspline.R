@@ -135,37 +135,30 @@ bs.des     <- function(x,
 
 		if(all(deriv==0)) {
 
-				myout <- .C("gsl_bspline",
-										as.double(x),
-										as.integer(n),
-										as.integer(degree),
-										as.integer(nbreak),
-										as.double(x.min),
-										as.double(x.max),
-										as.double(knots),
-										as.integer(knots.int),
-										Bx = double(n*ncol),
-										PACKAGE="npRmpi" )
+				B <- .Call("C_gsl_bspline",
+									 as.double(x),
+									 as.integer(degree),
+									 as.integer(nbreak),
+									 as.double(x.min),
+									 as.double(x.max),
+									 as.double(knots),
+									 as.integer(knots.int),
+									 PACKAGE="npRmpi" )
 
 		} else {
 
-				myout <- .C("gsl_bspline_deriv",
-										as.double(x),
-										as.integer(n),
-										as.integer(degree),
-										as.integer(nbreak),
-										as.integer(deriv),
-										as.integer(max(deriv)), #for setting the size of memory
-										as.double(x.min),
-										as.double(x.max),
-										as.double(knots),                
-										as.integer(knots.int),
-										Bx = double(n*ncol),
-										PACKAGE="npRmpi" )
+				B <- .Call("C_gsl_bspline_deriv",
+									 as.double(x),
+									 as.integer(degree),
+									 as.integer(nbreak),
+									 as.integer(deriv),
+									 as.double(x.min),
+									 as.double(x.max),
+									 as.double(knots),
+									 as.integer(knots.int),
+									 PACKAGE="npRmpi" )
 
 		}
-
-		B <- matrix(data=myout$Bx, nrow = n, ncol = ncol, byrow = TRUE)
 
 		return(B)
 
