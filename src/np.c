@@ -10,6 +10,7 @@
 
 #include <R.h>
 #include <R_ext/Arith.h>
+#include <Rinternals.h>
 #include <stdint.h>
 
 #ifdef MPI2
@@ -675,6 +676,73 @@ void np_set_seed(int * num){
   iff = 0;
 }
 
+SEXP C_np_dim_basis(SEXP basis_code,
+                    SEXP kernel,
+                    SEXP degree,
+                    SEXP segments,
+                    SEXP include,
+                    SEXP categories)
+{
+  SEXP degree_i = R_NilValue;
+  SEXP segments_i = R_NilValue;
+  SEXP include_i = R_NilValue;
+  SEXP categories_i = R_NilValue;
+  int basis_code_i = asInteger(basis_code);
+  int kernel_i = asInteger(kernel);
+  int k;
+  int ninclude;
+  double result = NA_REAL;
+
+  PROTECT(degree_i = coerceVector(degree, INTSXP));
+  PROTECT(segments_i = coerceVector(segments, INTSXP));
+  PROTECT(include_i = coerceVector(include, INTSXP));
+  PROTECT(categories_i = coerceVector(categories, INTSXP));
+
+  k = (int) XLENGTH(degree_i);
+  ninclude = (int) XLENGTH(include_i);
+
+  np_dim_basis(&basis_code_i,
+               &kernel_i,
+               INTEGER(degree_i),
+               INTEGER(segments_i),
+               &k,
+               INTEGER(include_i),
+               INTEGER(categories_i),
+               &ninclude,
+               &result);
+
+  UNPROTECT(4);
+  return ScalarReal(result);
+}
+
+SEXP C_np_set_seed(SEXP seed)
+{
+  int num = asInteger(seed);
+  np_set_seed(&num);
+  return R_NilValue;
+}
+
+SEXP C_np_set_tgauss2(SEXP coefficients)
+{
+  SEXP coef_r = R_NilValue;
+
+  PROTECT(coef_r = coerceVector(coefficients, REALSXP));
+  if (XLENGTH(coef_r) != 10)
+    error("C_np_set_tgauss2: coefficients must have length 10");
+
+  np_set_tgauss2(REAL(coef_r));
+
+  UNPROTECT(1);
+  return R_NilValue;
+}
+
+SEXP C_np_release_static_buffers(void)
+{
+  int unused = 0;
+  np_release_static_buffers(&unused);
+  return R_NilValue;
+}
+
 void np_mpi_init(int * mpi_status){
 #ifdef MPI2 
   MPI_Comm_rank(comm[1], &my_rank);
@@ -685,6 +753,14 @@ void np_mpi_init(int * mpi_status){
   mpi_status[MPI_RANKI] = -1;
   mpi_status[MPI_NUMPI] = -1;
 #endif
+}
+
+SEXP C_np_mpi_init(void)
+{
+  SEXP ans = PROTECT(allocVector(INTSXP, 2));
+  np_mpi_init(INTEGER(ans));
+  UNPROTECT(1);
+  return ans;
 }
 
 

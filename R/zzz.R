@@ -15,7 +15,7 @@
 }
 
 .onUnload <- function (lpath){
-  try(.C("np_release_static_buffers", as.integer(0), PACKAGE = "npRmpi"), silent = TRUE)
+  try(.Call("C_np_release_static_buffers", PACKAGE = "npRmpi"), silent = TRUE)
   mpi.finalize()
   library.dynam.unload("npRmpi", libpath=lpath) 
 }

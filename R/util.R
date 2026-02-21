@@ -326,17 +326,14 @@ dim_basis <- function(basis = c("additive", "glp", "tensor"),
 
   basis.code <- switch(basis, additive = 0L, glp = 1L, tensor = 2L)
 
-  .C("np_dim_basis",
-     basis_code = as.integer(basis.code),
-     kernel = as.integer(isTRUE(kernel)),
-     degree = degree,
-     segments = segments,
-     k = as.integer(length(degree)),
-     include = include,
-     categories = categories,
-     ninclude = as.integer(length(include)),
-     result = double(1L),
-     PACKAGE = "npRmpi")$result
+  .Call("C_np_dim_basis",
+        as.integer(basis.code),
+        as.integer(isTRUE(kernel)),
+        degree,
+        segments,
+        include,
+        categories,
+        PACKAGE = "npRmpi")
 }
 
 ## Function to test for monotone increasing vector
@@ -359,7 +356,7 @@ matrix.sd <- function(x, na.rm=FALSE) {
 }
 
 npseed <- function(seed){
-  .C("np_set_seed",as.integer(abs(seed)), PACKAGE = "npRmpi")
+  .Call("C_np_set_seed", as.integer(abs(seed))[1L], PACKAGE = "npRmpi")
   invisible()
 }
 
@@ -392,7 +389,9 @@ nptgauss <- function(b){
 
   int.kernels[CKER_TGAUSS + 1] <- k
   
-  invisible(.C("np_set_tgauss2",as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)), PACKAGE = "npRmpi"))
+  invisible(.Call("C_np_set_tgauss2",
+                  as.double(c(b, alpha, c0, a0, a1, a2, k, k2, k22, km)),
+                  PACKAGE = "npRmpi"))
 
 }
 
