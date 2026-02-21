@@ -38,6 +38,14 @@ npRmpi.init <- function(...,
                          nonblock = TRUE,
                          sleep = 0.1,
                          quiet = FALSE) {
+  if ("package:Rmpi" %in% search() &&
+      !isTRUE(getOption("npRmpi.allow.attached.Rmpi", FALSE))) {
+    stop(
+      "package 'Rmpi' is attached. Detach it and use npRmpi APIs directly, ",
+      "or set options(npRmpi.allow.attached.Rmpi=TRUE) to bypass this guard."
+    )
+  }
+
   mode <- match.arg(mode)
   world.size <- try(mpi.comm.size(0), silent = TRUE)
   world.size <- if (inherits(world.size, "try-error") || is.na(world.size)) 1L else as.integer(world.size)
