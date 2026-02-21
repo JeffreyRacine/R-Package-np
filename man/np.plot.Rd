@@ -11,14 +11,13 @@
 \title{General Purpose Plotting of Nonparametric Objects}
 
 \description{
-  \code{npplot} is a compatibility entry point invoked by
-  \code{\link{plot}} S3 methods and generates plots of
+  Plotting is provided via \code{\link{plot}} S3 methods, which generate
+  plots of
   nonparametric statistical objects such as regressions, quantile
   regressions, partially linear regressions, single-index models,
   densities and distributions, given training data and a bandwidth
-  object. Direct calls to \code{npplot()} are supported for backward
-  compatibility and emit a once-per-session advisory; \code{plot(...)}
-  is the preferred public interface.
+  object. \code{npplot()} is retained as an internal compatibility helper;
+  \code{plot(...)} is the supported public interface.
 }
 
 \usage{

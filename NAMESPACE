@@ -148,7 +148,6 @@ export(b.star
        ,npcopula
        ,npdeptest       
        ,npsdeptest
-       ,npplot
        ,npksum
        ,npqreg
        ,npquantile
