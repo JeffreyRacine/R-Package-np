@@ -40,8 +40,11 @@ npudist.formula <-
       edat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
     }
     
-    ev <- eval(parse(text=paste("npudist(tdat = tdat,",
-                 ifelse(has.eval,"edat = edat,",""), "bws = bws, ...)")))
+    ud.args <- list(tdat = tdat)
+    if (has.eval)
+      ud.args$edat <- edat
+    ud.args$bws <- bws
+    ev <- do.call(npudist, c(ud.args, list(...)))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)

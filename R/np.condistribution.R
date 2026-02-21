@@ -40,9 +40,13 @@ npcdist.formula <-
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
     }
 
-    ev <-
-    eval(parse(text=paste("npcdist(txdat = txdat, tydat = tydat,",
-                 ifelse(has.eval,"exdat = exdat, eydat = eydat,",""), "bws = bws, ...)")))
+    cd.args <- list(txdat = txdat, tydat = tydat)
+    if (has.eval) {
+      cd.args$exdat <- exdat
+      cd.args$eydat <- eydat
+    }
+    cd.args$bws <- bws
+    ev <- do.call(npcdist, c(cd.args, list(...)))
 
     ev$omit <- attr(umf,"na.action")
     ev$rows.omit <- as.vector(ev$omit)
