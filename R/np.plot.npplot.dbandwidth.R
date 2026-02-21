@@ -430,12 +430,6 @@ npplot.dbandwidth <-
 
       ## density / distribution expressions
 
-      devalE = parse(text="npudist(tdat = xdat, edat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws)")
-      
-      dcompE = parse(text="tobj$dist")
-
-      doutE = parse(text="npdistribution(bws = bws, eval = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], dist = na.omit(temp.dens), derr = na.omit(cbind(-temp.err[,1], temp.err[,2])), ntrain = bws$nobs)")
-
       for (i in 1:bws$ndim){
         temp.err[,] = NA
         temp.dens[] =  NA
@@ -458,9 +452,9 @@ npplot.dbandwidth <-
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj = eval(devalE)
-
-        temp.dens[1:xi.neval] = eval(dcompE)
+        eval.slice <- subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE]
+        tobj <- npudist(tdat = xdat, edat = eval.slice, bws = bws)
+        temp.dens[1:xi.neval] <- tobj$dist
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
@@ -566,7 +560,13 @@ npplot.dbandwidth <-
 
         if (plot.behavior != "plot") {
           plot.out[i] = NA
-          plot.out[[i]] = eval(doutE)
+          plot.out[[i]] <- npdistribution(
+            bws = bws,
+            eval = eval.slice,
+            dist = na.omit(temp.dens),
+            derr = na.omit(cbind(-temp.err[,1], temp.err[,2])),
+            ntrain = bws$nobs
+          )
           plot.out[[i]]$bias = na.omit(temp.dens - temp.err[,3])
           plot.out[[i]]$bxp = temp.boot
         }
@@ -691,4 +691,3 @@ npplot.dbandwidth <-
       }
     }
   }
-

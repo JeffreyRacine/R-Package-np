@@ -148,9 +148,7 @@ npplot.bandwidth <-
 
       tobj =  npudens(tdat = xdat, edat = x.eval, bws = bws)
 
-      tcomp = parse(text="tobj$dens")
-
-      tdens = matrix(data = eval(tcomp),
+      tdens = matrix(data = tobj$dens,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       terr = matrix(data = tobj$derr, nrow = nrow(x.eval), ncol = 3)
@@ -175,7 +173,7 @@ npplot.bandwidth <-
         terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
-        center.val <- if (pc) terr[,3] else eval(tcomp)
+        center.val <- if (pc) terr[,3] else tobj$dens
 
         lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
@@ -191,10 +189,10 @@ npplot.bandwidth <-
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = eval(tcomp) - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
+        lerr = matrix(data = tobj$dens - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = eval(tcomp) + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
+        herr = matrix(data = tobj$dens + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -207,21 +205,15 @@ npplot.bandwidth <-
                   else
                       c(min(lerr), max(herr))
               } else
-                  c(min(eval(tcomp)),max(eval(tcomp)))
+                  c(min(tobj$dens),max(tobj$dens))
       }
-          
-      tret = parse(text=paste(
-                     "npdensity",
-                     "(bws = bws, eval = x.eval,",
-                     "dens",
-                     " = eval(tcomp), derr = terr[,1:2], ntrain = nrow(xdat))", sep=""))
 
       if (plot.behavior != "plot"){
-        d1 = eval(tret)
+        d1 <- npdensity(bws = bws, eval = x.eval, dens = tobj$dens, derr = terr[,1:2], ntrain = nrow(xdat))
         d1$bias = NA
 
         if (plot.errors.center == "bias-corrected")
-          d1$bias = terr[,3] - eval(tcomp)
+          d1$bias = terr[,3] - tobj$dens
         
         if (plot.behavior == "data")
           return ( list(d1 = d1) )
@@ -438,19 +430,6 @@ npplot.bandwidth <-
 
       ## density / distribution expressions
 
-      devalE = parse(text=paste("npudens",
-                       "(tdat = xdat, edat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws)",
-                       sep=""))
-      
-      dcompE = parse(text="tobj$dens")
-
-
-      doutE = parse(text=paste("npdensity",
-                      "(bws = bws, eval = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],",
-                      "dens",
-                      "= na.omit(temp.dens), derr = na.omit(cbind(-temp.err[,1], temp.err[,2])), ntrain = bws$nobs)",
-                      sep=""))
-
       for (i in 1:bws$ndim){
         temp.err[,] = NA
         temp.dens[] =  NA
@@ -473,9 +452,9 @@ npplot.bandwidth <-
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj = eval(devalE)
-
-        temp.dens[1:xi.neval] = eval(dcompE)
+        eval.slice <- subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE]
+        tobj <- npudens(tdat = xdat, edat = eval.slice, bws = bws)
+        temp.dens[1:xi.neval] <- tobj$dens
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
@@ -581,7 +560,13 @@ npplot.bandwidth <-
 
         if (plot.behavior != "plot") {
           plot.out[i] = NA
-          plot.out[[i]] = eval(doutE)
+          plot.out[[i]] <- npdensity(
+            bws = bws,
+            eval = eval.slice,
+            dens = na.omit(temp.dens),
+            derr = na.omit(cbind(-temp.err[,1], temp.err[,2])),
+            ntrain = bws$nobs
+          )
           plot.out[[i]]$bias = na.omit(temp.dens - temp.err[,3])
           plot.out[[i]]$bxp = temp.boot
         }

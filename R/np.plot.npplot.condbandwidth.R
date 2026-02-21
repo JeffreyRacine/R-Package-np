@@ -214,29 +214,25 @@ npplot.condbandwidth <-
         margs$eydat <- x.eval[,2, drop = FALSE]
       }
       tobj <- do.call(method.fun, margs)
+      tcomp <- switch(tboo,
+                      "quant" = tobj$quantile,
+                      "dist" = tobj$condist,
+                      "dens" = tobj$condens)
+      tcerr <- if (quantreg) tobj$quanterr else tobj$conderr
+      tex <- if (quantreg) x.eval else x.eval[,1]
+      tey <- if (quantreg) NA else x.eval[,2]
 
-      tcomp = parse(text=paste("tobj$",
-                      switch(tboo,
-                             "quant" = "quantile",
-                             "dist" = "condist",
-                             "dens" = "condens"), sep=""))
-
-      tcerr = parse(text=paste(ifelse(quantreg, "tobj$quanterr", "tobj$conderr")))
-
-      tex = parse(text=paste(ifelse(quantreg, "x.eval", "x.eval[,1]")))
-      tey = parse(text=paste(ifelse(quantreg, "NA", "x.eval[,2]")))
-
-      tdens = matrix(data = eval(tcomp),
+      tdens = matrix(data = tcomp,
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-      terr = matrix(data = eval(tcerr), nrow = length(eval(tcomp)), ncol = 3)
+      terr = matrix(data = tcerr, nrow = length(tcomp), ncol = 3)
       terr[,3] = NA
       lerr.all <- NULL
       herr.all <- NULL
       
       if (plot.errors.method == "bootstrap"){
         terr.obj <- compute.bootstrap.errors(xdat = xdat, ydat = ydat,
-          exdat = eval(tex), eydat = eval(tey),
+          exdat = tex, eydat = tey,
           cdf = cdf,
           quantreg = quantreg,
           tau = tau,
@@ -254,7 +250,7 @@ npplot.condbandwidth <-
         terr.all <- terr.obj[["boot.all.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
-        center.val <- if(pc) terr[,3] else eval(tcomp)
+        center.val <- if(pc) terr[,3] else tcomp
 
         lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
@@ -270,10 +266,10 @@ npplot.condbandwidth <-
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = eval(tcomp) - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
+        lerr = matrix(data = tcomp - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tcerr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = eval(tcomp) + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(tcerr),
+        herr = matrix(data = tcomp + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tcerr,
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -286,27 +282,29 @@ npplot.condbandwidth <-
             else
               c(min(lerr),max(herr))
           } else
-            c(min(eval(tcomp)),max(eval(tcomp)))
+                c(min(tcomp),max(tcomp))
       }
 
-      ## I am sorry it had to come to this ...
-      tret = parse(text=paste(
-                     switch(tboo,
-                            "quant" = "qregression",
-                            "dist" = "condistribution",
-                            "dens" = "condensity"),
-                     "(bws = bws, xeval = eval(tex),",
-                     ifelse(quantreg, "tau = tau, quantile = eval(tcomp), quanterr = terr[,1:2]",
-                            paste("yeval = eval(tey),", ifelse(cdf, "condist = ", "condens = "),
-                                  "eval(tcomp), conderr = terr[,1:2]")),
-                     ", ntrain = dim(xdat)[1])", sep=""))
-
       if (plot.behavior != "plot"){
-        cd1 = eval(tret)
+        ret.fun <- switch(tboo,
+                          "quant" = qregression,
+                          "dist" = condistribution,
+                          "dens" = condensity)
+        ret.args <- list(bws = bws, xeval = tex, ntrain = dim(xdat)[1])
+        if (quantreg) {
+          ret.args$tau <- tau
+          ret.args$quantile <- tcomp
+          ret.args$quanterr <- terr[,1:2]
+        } else {
+          ret.args$yeval <- tey
+          if (cdf) ret.args$condist <- tcomp else ret.args$condens <- tcomp
+          ret.args$conderr <- terr[,1:2]
+        }
+        cd1 <- do.call(ret.fun, ret.args)
         cd1$bias = NA
 
         if (plot.errors.center == "bias-corrected")
-          cd1$bias = terr[,3] - eval(tcomp)
+          cd1$bias = terr[,3] - tcomp
         
         if (plot.behavior == "data")
           return ( list(cd1 = cd1) )
@@ -583,16 +581,26 @@ npplot.condbandwidth <-
         
         ## if there are gradients then we need to repeat the process for each component
 
-        tevalexpr = parse(text=paste("tobj$",ifelse(gradients,
-                            ifelse(quantreg, "quantgrad[,j]","congrad[,j]"),
-                            ifelse(cdf, "condist", ifelse(quantreg, "quantile",
-                                                          "condens"))), sep=""))
-        terrexpr = parse(text=paste("tobj$",ifelse(gradients,
-                           "congerr[,j]", ifelse(quantreg,"quanterr",
-                                                 "conderr")), sep=""))
-
-        if (gradients & quantreg)
-          terrexpr = parse(text="NA")
+        eval.extract <- function(obj, jj){
+          if (gradients) {
+            if (quantreg) obj$quantgrad[,jj] else obj$congrad[,jj]
+          } else if (cdf) {
+            obj$condist
+          } else if (quantreg) {
+            obj$quantile
+          } else {
+            obj$condens
+          }
+        }
+        err.extract <- function(obj, jj){
+          if (gradients) {
+            if (quantreg) rep(NA_real_, length(eval.extract(obj, jj))) else obj$congerr[,jj]
+          } else if (quantreg) {
+            obj$quanterr
+          } else {
+            obj$conderr
+          }
+        }
 
         if (plot.behavior != "plot"){
           plot.out[plot.index] = NA
@@ -602,11 +610,17 @@ npplot.condbandwidth <-
         for (j in 1:dsf){
           temp.boot = list()
           temp.all.err <- NULL
-          temp.dens[1:xi.neval] = eval(tevalexpr) 
+          temp.dens[1:xi.neval] <- eval.extract(tobj, j)
           
           if (plot.errors){
-            if (plot.errors.method == "asymptotic")
-              temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(terrexpr))
+            if (plot.errors.method == "asymptotic") {
+              terr.j <- err.extract(tobj, j)
+              temp.err[1:xi.neval,1:2] <- if (all(is.na(terr.j))) {
+                matrix(NA_real_, nrow = xi.neval, ncol = 2)
+              } else {
+                replicate(2, qnorm(plot.errors.alpha/2, lower.tail = FALSE) * terr.j)
+              }
+            }
             else if (plot.errors.method == "bootstrap"){
               temp.boot <- compute.bootstrap.errors(
                         xdat = xdat,
@@ -764,16 +778,26 @@ npplot.condbandwidth <-
           
           ## if there are gradients then we need to repeat the process for each component
 
-          tevalexpr = parse(text=paste("tobj$",ifelse(gradients,
-                              ifelse(quantreg, "quantgrad[,j]","congrad[,j]"),
-                              ifelse(cdf, "condist", ifelse(quantreg, "quantile",
-                                                            "condens"))), sep=""))
-          terrexpr = parse(text=paste("tobj$",ifelse(gradients,
-                             "congerr[,j]", ifelse(quantreg,"quanterr",
-                                                   "conderr")), sep=""))
-
-          if (gradients & quantreg)
-            terrexpr = parse(text="NA")
+          eval.extract <- function(obj, jj){
+            if (gradients) {
+              if (quantreg) obj$quantgrad[,jj] else obj$congrad[,jj]
+            } else if (cdf) {
+              obj$condist
+            } else if (quantreg) {
+              obj$quantile
+            } else {
+              obj$condens
+            }
+          }
+          err.extract <- function(obj, jj){
+            if (gradients) {
+              if (quantreg) rep(NA_real_, length(eval.extract(obj, jj))) else obj$congerr[,jj]
+            } else if (quantreg) {
+              obj$quanterr
+            } else {
+              obj$conderr
+            }
+          }
 
           if (plot.behavior != "plot"){
             plot.out[plot.index] = NA
@@ -783,11 +807,17 @@ npplot.condbandwidth <-
           for (j in 1:dsf){
             temp.boot = list()
             temp.all.err <- NULL
-            temp.dens[1:xi.neval] = eval(tevalexpr) 
+            temp.dens[1:xi.neval] <- eval.extract(tobj, j)
             
             if (plot.errors){
-              if (plot.errors.method == "asymptotic")
-                temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*eval(terrexpr))
+              if (plot.errors.method == "asymptotic") {
+                terr.j <- err.extract(tobj, j)
+                temp.err[1:xi.neval,1:2] <- if (all(is.na(terr.j))) {
+                  matrix(NA_real_, nrow = xi.neval, ncol = 2)
+                } else {
+                  replicate(2, qnorm(plot.errors.alpha/2, lower.tail = FALSE) * terr.j)
+                }
+              }
               else if (plot.errors.method == "bootstrap"){
                 temp.boot <- compute.bootstrap.errors(
                           xdat = xdat,
