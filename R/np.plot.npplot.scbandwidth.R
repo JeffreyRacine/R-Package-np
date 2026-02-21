@@ -90,9 +90,10 @@ npplot.scbandwidth <-
         zdat <- toFrame(zdat)
 
       goodrows = 1:dim(xdat)[1]
-      rows.omit =
-        eval(parse(text = paste("attr(na.omit(data.frame(xdat, ydat",
-                     ifelse(miss.z,'',',zdat'),')), "na.action")')))
+      train.df <- data.frame(xdat, ydat)
+      if (!miss.z)
+        train.df <- data.frame(train.df, zdat)
+      rows.omit <- attr(na.omit(train.df), "na.action")
       
       attr(na.omit(data.frame(xdat,ydat,zdat)), "na.action")
       goodrows[rows.omit] = 0
@@ -199,10 +200,16 @@ npplot.scbandwidth <-
       if (is.ordered(tdat))
         x2.eval <- (tdati$all.dlev[[ti]])[as.integer(x2.eval)]
 
-      tobj <- eval(parse(text = paste('npscoef(txdat = xdat, tydat = ydat,',
-                           ifelse(miss.z,'','tzdat = zdat,'),
-                           ifelse(miss.z,'exdat = x.eval,','exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE],'),
-                           'bws = bws, iterate = FALSE, errors = plot.errors)')))
+      scoef.args <- list(txdat = xdat, tydat = ydat, bws = bws, iterate = FALSE, errors = plot.errors)
+      if (!miss.z)
+        scoef.args$tzdat <- zdat
+      if (miss.z) {
+        scoef.args$exdat <- x.eval
+      } else {
+        scoef.args$exdat <- x.eval[,1, drop = FALSE]
+        scoef.args$ezdat <- x.eval[,2, drop = FALSE]
+      }
+      tobj <- do.call(npscoef, scoef.args)
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
@@ -211,20 +218,28 @@ npplot.scbandwidth <-
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       if (plot.errors.method == "bootstrap"){
-        terr <-
-          eval(parse(text = paste(
-                       'compute.bootstrap.errors(xdat = xdat, ydat = ydat,',
-                       ifelse(miss.z,'','zdat = zdat,'),
-                       ifelse(miss.z, 'exdat = x.eval,',
-                              'exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,1, drop = FALSE],'),
-                       ' gradients = FALSE, slice.index = 0,',
-                       'plot.errors.boot.method = plot.errors.boot.method,',
-                       'plot.errors.boot.blocklen = plot.errors.boot.blocklen,',
-                       'plot.errors.boot.num = plot.errors.boot.num,',
-                       'plot.errors.center = plot.errors.center,',
-                       'plot.errors.type = plot.errors.type,',
-                       'plot.errors.alpha = plot.errors.alpha,',
-                       'bws = bws)[["boot.err"]]')))
+        boot.args <- list(
+          xdat = xdat,
+          ydat = ydat,
+          gradients = FALSE,
+          slice.index = 0,
+          plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+          plot.errors.boot.num = plot.errors.boot.num,
+          plot.errors.center = plot.errors.center,
+          plot.errors.type = plot.errors.type,
+          plot.errors.alpha = plot.errors.alpha,
+          bws = bws
+        )
+        if (!miss.z)
+          boot.args$zdat <- zdat
+        if (miss.z) {
+          boot.args$exdat <- x.eval
+        } else {
+          boot.args$exdat <- x.eval[,1, drop = FALSE]
+          boot.args$ezdat <- x.eval[,1, drop = FALSE]
+        }
+        terr <- do.call(compute.bootstrap.errors, boot.args)[["boot.err"]]
 
         pc = (plot.errors.center == "bias-corrected")
 
@@ -254,12 +269,13 @@ npplot.scbandwidth <-
       }
         
       if (plot.behavior != "plot"){
-        r1 <-
-          eval(parse(text = paste("smoothcoefficient(bws = bws,",
-                       ifelse(miss.z, "eval = x.eval,", "eval = list(exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE])"),
-                       "mean = as.double(treg),",
-                       "merr = terr[,1:2],",
-                       "ntrain = dim(xdat)[1])")))
+        r1 <- do.call(smoothcoefficient, list(
+          bws = bws,
+          eval = if (miss.z) x.eval else list(exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE]),
+          mean = as.double(treg),
+          merr = terr[,1:2],
+          ntrain = dim(xdat)[1]
+        ))
         r1$bias = NA
 
         if (plot.errors.center == "bias-corrected")
