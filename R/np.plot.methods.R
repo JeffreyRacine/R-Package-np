@@ -3,6 +3,17 @@
   random.seed <- if (!is.null(dots$random.seed)) dots$random.seed else 42L
   dots$random.seed <- NULL
 
+  # Keep backward compatibility with legacy plot argument aliases.
+  if (!is.null(dots$gradient) && is.null(dots$gradients)) {
+    dots$gradients <- dots$gradient
+  }
+  dots$gradient <- NULL
+
+  if (!is.null(dots$persp) && is.null(dots$perspective)) {
+    dots$perspective <- dots$persp
+  }
+  dots$persp <- NULL
+
   .npRmpi_require_active_slave_pool(where = where)
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = where)
 
