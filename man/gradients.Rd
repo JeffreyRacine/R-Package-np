@@ -27,7 +27,7 @@ gradients(x, \dots)
   \item{errors}{ a logical value specifying whether or not standard
     errors of gradients are desired. Defaults to \code{FALSE}.}
   \item{gradient.order}{
-    for \code{npregression} objects fitted with \code{regtype="glp"},
+    for \code{npregression} objects fitted with \code{regtype="lp"},
     optional derivative order request (scalar or one entry per
     continuous predictor). Orders exceeding the fitted polynomial degree
     (or greater than one, pending future C-level support) are returned

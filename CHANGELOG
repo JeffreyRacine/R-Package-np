@@ -86,7 +86,7 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
   np-package and np.plot man pages; set default option values at package load.
 
 * Added C-level generalized local polynomial regression support in `npreg`:
-  - new `regtype="glp"` path in shared core code
+  - new `regtype="lp"` path in shared core code
   - per-continuous-variable degree vectors (`glp.degree`)
   - GLP derivative extraction/plotting controls synchronized with
     regression/gradient interfaces.

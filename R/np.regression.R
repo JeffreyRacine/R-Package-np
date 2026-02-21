@@ -206,7 +206,7 @@ npreg.rbandwidth <-
         stop("Evaluation data has no rows without NAs")
     }
 
-    if (identical(bws$regtype, "glp") &&
+    if (identical(bws$regtype, "lp") &&
         isTRUE(bws$glp.bernstein) &&
         !no.ex &&
         any(bws$icon)) {
@@ -363,7 +363,7 @@ npreg.rbandwidth <-
       myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
       myout$gerr = as.matrix(myout$gerr[,rorder])
 
-      if (identical(bws$regtype, "glp")) {
+      if (identical(bws$regtype, "lp")) {
         raw.g <- myout$g
         raw.gerr <- myout$gerr
         myout$g[,] <- NA_real_
@@ -399,7 +399,7 @@ npreg.rbandwidth <-
                          "ntrain = tnrow,",
                          "trainiseval = no.ex,",
                          "gradients = gradients,",
-                         ifelse(identical(bws$regtype, "glp"),
+                         ifelse(identical(bws$regtype, "lp"),
                                 "gradient.order = glp.gradient.order,", ""),
                          "residuals = residuals,",
                          "xtra = myout$xtra, rows.omit = rows.omit,",

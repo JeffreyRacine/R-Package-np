@@ -169,7 +169,7 @@ npregbw.rbandwidth <-
                           glp.degree = bws$glp.degree,
                           ncon = bws$ncon,
                           context = "npregbw")
-    if (identical(bws$regtype, "glp") &&
+    if (identical(bws$regtype, "lp") &&
         identical(reg.c$code, REGTYPE_GLP) &&
         !isTRUE(transform.bounds))
       transform.bounds <- TRUE

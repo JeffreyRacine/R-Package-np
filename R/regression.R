@@ -88,7 +88,7 @@ se.npregression <- function(x) { x$merr }
 gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...) {
   gout <- if (!errors) x$grad else x$gerr
 
-  if (!identical(x$bws$regtype, "glp") || is.null(gradient.order))
+  if (!identical(x$bws$regtype, "lp") || is.null(gradient.order))
     return(gout)
 
   if (!is.matrix(gout))
