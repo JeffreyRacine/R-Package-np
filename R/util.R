@@ -207,6 +207,59 @@ npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
   invisible(NULL)
 }
 
+dim_basis <- function(basis = c("additive", "glp", "tensor"),
+                      kernel = TRUE,
+                      degree = NULL,
+                      segments = NULL,
+                      include = NULL,
+                      categories = NULL) {
+  basis <- match.arg(basis)
+
+  if (is.null(degree))
+    degree <- integer(0)
+  if (is.null(segments))
+    segments <- rep.int(1L, length(degree))
+
+  degree <- as.integer(degree)
+  segments <- as.integer(segments)
+
+  if (length(degree) != length(segments))
+    stop("degree and segments must have the same length")
+  if (any(!is.finite(degree)) || any(degree < 0L))
+    stop("degree must contain finite non-negative integers")
+  if (any(!is.finite(segments)) || any(segments <= 0L))
+    stop("segments must contain finite positive integers")
+
+  if (is.null(include))
+    include <- integer(0)
+  if (is.null(categories))
+    categories <- integer(0)
+
+  include <- as.integer(include)
+  categories <- as.integer(categories)
+
+  if (length(include) != length(categories))
+    stop("include and categories must have the same length")
+  if (any(!is.finite(include)) || any(include < 0L))
+    stop("include must contain finite non-negative integers")
+  if (any(!is.finite(categories)) || any(categories < 0L))
+    stop("categories must contain finite non-negative integers")
+
+  basis.code <- switch(basis, additive = 0L, glp = 1L, tensor = 2L)
+
+  .C("np_dim_basis",
+     basis_code = as.integer(basis.code),
+     kernel = as.integer(isTRUE(kernel)),
+     degree = degree,
+     segments = segments,
+     k = as.integer(length(degree)),
+     include = include,
+     categories = categories,
+     ninclude = as.integer(length(include)),
+     result = double(1L),
+     PACKAGE = "np")$result
+}
+
 ## Function to test for monotone increasing vector
 
 is.monotone.increasing <- function(x) {

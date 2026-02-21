@@ -192,7 +192,10 @@ npInsertGlpSummary <- function(txt, degree, bernstein){
   basis.dim <- if (is.null(degree) || !length(degree)) {
     NA_real_
   } else {
-    prod(as.double(degree) + 1.0)
+    dim_basis(basis = "glp",
+              kernel = TRUE,
+              degree = as.integer(degree),
+              segments = rep.int(1L, length(degree)))
   }
 
   glp.lines <- c(
