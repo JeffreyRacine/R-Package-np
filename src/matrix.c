@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
 #include "matrix.h"
@@ -178,82 +177,7 @@ int mat_free( MATRIX A )
 }
 
 
-/*
- *-----------------------------------------------------------------------------
- *       funct:  mat_copy
- *       desct:  duplicate a matrix
- *       given:  A = matrix to duplicated
- *       retrn:  C = A
- *       comen:
- *-----------------------------------------------------------------------------
- */
-MATRIX mat_copy( MATRIX A, MATRIX C )
-{
-	int i, j;
 
-	for (i=0; i<MatRow(A); i++)
-	{
-		for (j=0; j<MatCol(A); j++)
-		{
-			C[i][j] = A[i][j];
-		}
-	}
-	return (C);
-}
-
-
-
-
-
-/*
- *-----------------------------------------------------------------------------
- * file: matdump.c
- * desc: matrix mathematics - object dump
- * by: ko shu pui, Patrick
- * date: 24 nov 91 v0.1
- * revi: 14 may 92 v0.2
- * ref:
- *       [1] Mary L.Boas, "Mathematical Methods in the Physical Science,"
- * John Wiley & Sons, 2nd Ed., 1983. Chap 3.
- *
- * [2] Kendall E.Atkinson, "An Introduction to Numerical Analysis,"
- * John Wiley & Sons, 1978.
- *
- *-----------------------------------------------------------------------------
- */
-
-
-
-/*
- *-----------------------------------------------------------------------------
- * funct:  mat_dumpf
- *   desct:  dump a matrix with format string to standard output
- * given:  A = matrix to dumped
- * retrn:  nothing
- * comen:  matrix a dumped to standard output
- *-----------------------------------------------------------------------------
- */
-/*MATRIX mat_dumpf(MATRIX A, char *s)
-{
-	return (mat_fdumpf(A, s, stdout));
-  }*/
-
-
-MATRIX mat_fdumpf( MATRIX A, char *s, FILE *fp )
-{
-	int  i, j;
-
-	for (i=0; i<MatRow(A); i++)
-	{
-		for (j=0; j<MatCol(A); j++)
-		{
-			fprintf( fp, s, A[i][j] );
-		}
-		fprintf( fp, "\n" );
-	}
-
-	return (A);
-}
 
 
 /*
