@@ -178,6 +178,11 @@ npregbw.rbandwidth <-
                           degree = tbw$degree,
                           ncon = tbw$ncon,
                           context = "npregbw")
+    npCheckRegressionDesignCondition(reg.code = reg.c$code,
+                                     xcon = rcon,
+                                     degree = tbw$degree,
+                                     bernstein.basis = tbw$bernstein.basis,
+                                     where = "npregbw")
     if (identical(tbw$regtype, "lp") &&
         identical(reg.c$code, REGTYPE_GLP) &&
         !isTRUE(transform.bounds))

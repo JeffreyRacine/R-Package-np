@@ -200,7 +200,9 @@ FALSE, \dots)
   optimization remains over bandwidths only. For
   \code{bernstein.basis=TRUE}, evaluation points for continuous predictors
   must lie within training support; use \code{bernstein.basis=FALSE} for
-  extrapolation.
+  extrapolation. For \code{regtype="ll"} and \code{regtype="lp"}, the
+  training continuous design is checked for rank deficiency and extreme
+  condition number before estimation proceeds.
 
   The use of compactly supported kernels or the occurrence of small
   bandwidths can lead to numerical problems for the local linear

@@ -195,6 +195,64 @@ npValidateGlpGradientOrder <- function(regtype,
   as.integer(gradient.order)
 }
 
+npCheckRegressionDesignCondition <- function(reg.code,
+                                             xcon,
+                                             degree = NULL,
+                                             bernstein.basis = FALSE,
+                                             where = "npregbw") {
+  kappa.warn <- 1e8
+  kappa.stop <- 1e12
+
+  if (!(reg.code %in% c(REGTYPE_LL, REGTYPE_GLP)))
+    return(invisible(NULL))
+
+  xcon <- as.data.frame(xcon)
+  n <- nrow(xcon)
+  if (is.null(n) || n <= 0L)
+    return(invisible(NULL))
+
+  B <- if (identical(reg.code, REGTYPE_GLP)) {
+    if (is.null(degree))
+      stop(sprintf("%s: LP degree vector missing for design-conditioning check", where))
+    W.glp(xdat = xcon,
+          degree = degree,
+          Bernstein = isTRUE(bernstein.basis))
+  } else {
+    cbind(1, as.matrix(xcon))
+  }
+
+  p <- ncol(B)
+  if (is.null(p) || p <= 0L)
+    return(invisible(NULL))
+
+  sv <- suppressWarnings(tryCatch(svd(B, nu = 0L, nv = 0L)$d, error = function(e) NULL))
+  if (is.null(sv) || !length(sv))
+    stop(sprintf("%s: unable to compute singular values for design-conditioning check", where))
+  tol.rank <- max(dim(B)) * max(sv) * .Machine$double.eps
+  r <- sum(sv > tol.rank)
+  if (r < p) {
+    stop(sprintf("%s: regression design matrix is rank deficient (rank=%d < p=%d). Reduce polynomial degree or remove collinear continuous predictors.",
+                 where, r, p))
+  }
+
+  kB <- suppressWarnings(tryCatch(kappa(B), error = function(e) Inf))
+  if (!is.finite(kB))
+    kB <- Inf
+
+  if (kB > kappa.stop) {
+    stop(sprintf("%s: regression design matrix is severely ill-conditioned (kappa(B)=%.3e > %.1e). Reduce polynomial degree or remove collinear continuous predictors.",
+                 where, kB, kappa.stop))
+  }
+
+  if (kB > kappa.warn) {
+    warning(sprintf("%s: regression design matrix is ill-conditioned (kappa(B)=%.3e > %.1e). Estimation may rely heavily on ridging; consider lower degree or less collinear predictors.",
+                    where, kB, kappa.warn),
+            call. = FALSE, immediate. = TRUE)
+  }
+
+  invisible(NULL)
+}
+
 npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
   if (identical(regtype, "lc"))
     return(list(code = REGTYPE_LC, degree = NULL))

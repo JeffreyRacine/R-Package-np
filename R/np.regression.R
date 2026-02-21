@@ -287,6 +287,12 @@ npreg.rbandwidth <-
     tcon = txdat[, bws$icon, drop = FALSE]
     tord = txdat[, bws$iord, drop = FALSE]
 
+    npCheckRegressionDesignCondition(reg.code = reg.c$code,
+                                     xcon = tcon,
+                                     degree = bws$degree,
+                                     bernstein.basis = bws$bernstein.basis,
+                                     where = "npreg")
+
     if (!no.ex){
       exdat = toMatrix(exdat)
 
