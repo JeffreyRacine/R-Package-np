@@ -55,6 +55,7 @@ npregbw(\dots)
         invalid.penalty = c("baseline","dbmax"),
         penalty.multiplier = 10,
         regtype,
+        basis,
         degree,
         bernstein.basis,
         bwmethod,
@@ -165,9 +166,17 @@ npregbw(\dots)
     a character string specifying which type of kernel regression
     estimator to use. \code{lc} specifies a local-constant estimator
     (Nadaraya-Watson) and \code{ll} specifies a local-linear
-    estimator. \code{glp} specifies a generalized local polynomial
+    estimator. \code{lp} specifies a local polynomial
     estimator with polynomial degree(s) given by \code{degree} for
     continuous predictors. Defaults to \code{lc}.
+  }
+
+  \item{basis}{
+    basis selector relevant only when \code{regtype="lp"}.
+    Supported values are \code{"glp"}, \code{"additive"}, and
+    \code{"tensor"}. In the current implementation, only
+    \code{basis="glp"} is available; \code{"additive"} and
+    \code{"tensor"} currently fail fast with an informative error.
   }
 
   \item{degree}{
