@@ -605,6 +605,10 @@ npscoefbw.default <-
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
+    if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
+        missing(bws))
+      stop("bwmethod='manual' requires argument 'bws'")
+
 
     miss.z <- missing(zdat)
     xdat <- toFrame(xdat)
