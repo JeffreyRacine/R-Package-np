@@ -1647,19 +1647,6 @@ W.lp <- function(xdat = NULL,
 
 }
 
-W.glp <- function(xdat = NULL,
-                  exdat = NULL,
-                  degree = NULL,
-                  gradient.vec = NULL,
-                  Bernstein = TRUE) {
-  W.lp(xdat = xdat,
-       exdat = exdat,
-       degree = degree,
-       gradient.vec = gradient.vec,
-       basis = "glp",
-       bernstein.basis = Bernstein)
-}
-
 ### internal constants used in the c backend
 
 SF_NORMAL = 0
