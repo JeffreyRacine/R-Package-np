@@ -234,6 +234,14 @@
     .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
 
     out[[i]] <- as.name(tmp)
+    # Preserve formula-method dispatch semantics for generics that use
+    # formal name `bws` in the generic but `formula` in the method.
+    if (identical(nm, "bws") && inherits(val, "formula")) {
+      out.nms <- names(out)
+      if (!is.null(out.nms) && length(out.nms) >= i)
+        out.nms[i] <- ""
+      names(out) <- out.nms
+    }
     tmpnames <- c(tmpnames, tmp)
     tmpvals[[tmp]] <- val
   }
