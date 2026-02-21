@@ -515,9 +515,42 @@ npplot.plbandwidth <-
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
-          eval(parse(text = paste(eval(pfunE), "(", eval(pxE), eval(pyE),
-                       eval(pylimE), eval(pxlabE), eval(pylabE), eval(prestE),
-                       eval(pmainE), ")")))
+          plot.fun <- if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) bxp else plotFactor
+          } else {
+            plot
+          }
+          plot.args <- list()
+          if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
+          } else {
+            plot.args$x <- ei
+          }
+          if (!(xi.factor && plot.bootstrap && plot.bxp))
+            plot.args$y <- temp.mean
+          if (plot.errors)
+            plot.args$ylim <- if (plot.errors.type == "all")
+              compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
+            else
+              c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
+                max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
+          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
+                                  gen.label(bws$ynames, "Conditional Mean"))
+          if (!xi.factor) {
+            plot.args$type <- ifelse(!is.null(type), type, "l")
+            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
+            plot.args$col <- ifelse(!is.null(col), col, par()$col)
+            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
+            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
+            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
+            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
+            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+          }
+          plot.args$main <- ifelse(!is.null(main), main, "")
+          plot.args$sub <- ifelse(!is.null(sub), sub, "")
+          do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
@@ -531,8 +564,16 @@ npplot.plbandwidth <-
                 all.err = temp.all.err,
                 xi.factor = xi.factor)
             } else {
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+              draw.args <- list(
+                ex = as.numeric(na.omit(ei)),
+                ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
+                ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = ifelse(xi.factor, 1, 2)
+              )
+              do.call(draw.errors, draw.args)
             }
 
           }
@@ -634,9 +675,42 @@ npplot.plbandwidth <-
           }
         } else if (plot.behavior != "data") {
           ## plot evaluation
-          eval(parse(text = paste(eval(pfunE), "(", eval(pxE), eval(pyE),
-                       eval(pylimE), eval(pxlabE), eval(pylabE), eval(prestE),
-                       eval(pmainE), ")")))
+          plot.fun <- if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) bxp else plotFactor
+          } else {
+            plot
+          }
+          plot.args <- list()
+          if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) plot.args$z <- temp.boot else plot.args$f <- ei
+          } else {
+            plot.args$x <- ei
+          }
+          if (!(xi.factor && plot.bootstrap && plot.bxp))
+            plot.args$y <- temp.mean
+          if (plot.errors)
+            plot.args$ylim <- if (plot.errors.type == "all")
+              compute.all.error.range(if (plotOnEstimate) temp.mean else temp.err[,3], temp.all.err)
+            else
+              c(min(na.omit(c(temp.mean - temp.err[,1], temp.err[,3] - temp.err[,1]))),
+                max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
+          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
+                                  gen.label(bws$ynames, "Conditional Mean"))
+          if (!xi.factor) {
+            plot.args$type <- ifelse(!is.null(type), type, "l")
+            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
+            plot.args$col <- ifelse(!is.null(col), col, par()$col)
+            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
+            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
+            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
+            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
+            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+          }
+          plot.args$main <- ifelse(!is.null(main), main, "")
+          plot.args$sub <- ifelse(!is.null(sub), sub, "")
+          do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
@@ -650,8 +724,16 @@ npplot.plbandwidth <-
                 all.err = temp.all.err,
                 xi.factor = xi.factor)
             } else {
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+              draw.args <- list(
+                ex = as.numeric(na.omit(ei)),
+                ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
+                ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = ifelse(xi.factor, 1, 2)
+              )
+              do.call(draw.errors, draw.args)
             }
 
           }
@@ -736,9 +818,37 @@ npplot.plbandwidth <-
           xi.factor = all.isFactor[plot.index]
 
           ## plot evaluation
-          eval(parse(text = paste(eval(pfunE), "(", eval(pxE), eval(pyE),
-                       eval(pylimE), eval(pxlabE), eval(pylabE), eval(prestE),
-                       eval(pmainE), ")")))
+          plot.fun <- if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) bxp else plotFactor
+          } else {
+            plot
+          }
+          plot.args <- list()
+          if (xi.factor) {
+            if (plot.bootstrap && plot.bxp) plot.args$z <- all.bxp[[plot.index]] else plot.args$f <- allei[,plot.index]
+          } else {
+            plot.args$x <- allei[,plot.index]
+          }
+          if (!(xi.factor && plot.bootstrap && plot.bxp))
+            plot.args$y <- data.eval[,plot.index]
+          plot.args$ylim <- c(y.min, y.max)
+          plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
+                                      paste(toupper(xOrZ), i, sep = ""))
+          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
+                                  gen.label(bws$ynames, "Conditional Mean"))
+          if (!xi.factor) {
+            plot.args$type <- ifelse(!is.null(type), type, "l")
+            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
+            plot.args$col <- ifelse(!is.null(col), col, par()$col)
+            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
+            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
+            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
+            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
+            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+          }
+          plot.args$main <- ifelse(!is.null(main), main, "")
+          plot.args$sub <- ifelse(!is.null(sub), sub, "")
+          do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
           if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
@@ -755,8 +865,16 @@ npplot.plbandwidth <-
               if (!xi.factor && !plotOnEstimate)
                 lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
-              eval(parse(text = paste(eval(efunE), "(", eval(eexE), eval(eelyE),
-                           eval(eehyE), eval(erestE), ")")))
+              draw.args <- list(
+                ex = as.numeric(na.omit(allei[,plot.index])),
+                ely = if (plotOnEstimate) na.omit(data.eval[,plot.index] - data.err[,3*plot.index-2]) else na.omit(data.err[,3*plot.index] - data.err[,3*plot.index-2]),
+                ehy = if (plotOnEstimate) na.omit(data.eval[,plot.index] + data.err[,3*plot.index-1]) else na.omit(data.err[,3*plot.index] + data.err[,3*plot.index-1]),
+                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
+                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.bar.num = plot.errors.bar.num,
+                lty = ifelse(xi.factor, 1, 2)
+              )
+              do.call(draw.errors, draw.args)
             }
             
 
@@ -777,5 +895,4 @@ npplot.plbandwidth <-
       }
     }
   }
-
 
