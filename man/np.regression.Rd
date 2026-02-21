@@ -184,9 +184,11 @@ FALSE, \dots)
 
   When bandwidths are obtained with \code{regtype="lp"}, C-level
   \code{npreg} supports heterogeneous continuous polynomial degrees via
-  \code{degree}. The optional flag \code{bernstein.basis} controls
-  basis construction: \code{FALSE} (default) uses raw local-polynomial
-  powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
+  \code{degree}. The \code{basis} selector currently supports
+  \code{basis="glp"} (with \code{"additive"} and \code{"tensor"}
+  reserved and guarded). The optional flag \code{bernstein.basis}
+  controls basis construction: \code{FALSE} (default) uses raw
+  local-polynomial powers, while \code{TRUE} uses a Bernstein/B-spline basis. The
   homogeneous degree-0 and degree-1 cases remain
   equivalent to \code{lc} and \code{ll}, respectively. Current GLP
   derivative output is first-order for continuous predictors; higher
