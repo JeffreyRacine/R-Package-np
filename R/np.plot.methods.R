@@ -27,7 +27,8 @@
   bws <- object[[slot]]
   if (is.null(bws))
     stop("plot object does not contain expected bandwidth slot")
-  .np_plot_call_method(npplot, bws = bws, ..., where = "npplot()")
+  .np_plot_call_method(npplot, bws = bws, .npplot.internal = TRUE, ...,
+                       where = "npplot()")
 }
 
 .np_plot_npregression <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
