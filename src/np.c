@@ -36,7 +36,6 @@ extern MPI_Comm	*comm;
 /* headers.h has all definitions of routines used by main() and related modules */
 
 #include "headers.h"
-#include "matrix.h"
 #include "tree.h"
 
 // categorical hashing

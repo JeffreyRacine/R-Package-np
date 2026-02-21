@@ -6,7 +6,6 @@
 #include <R.h>
 
 #include "headers.h"
-#include "matrix.h"
 
 #ifdef MPI2
 
