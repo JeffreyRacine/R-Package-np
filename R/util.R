@@ -834,8 +834,15 @@ genGofStr <- function(x){
 }
 
 genTimingStr <- function(x){
-  ifelse(is.na(x$total.time),"",
-         paste("\nEstimation Time: ",format(x$total.time)," seconds",sep = ""))
+  if (is.null(x$total.time) || is.na(x$total.time))
+    return("")
+
+  if (!is.null(x$optim.time) && !is.na(x$optim.time) &&
+      !is.null(x$fit.time) && !is.na(x$fit.time))
+    return(paste("\nEstimation Time: ", format(x$total.time), " seconds (optim ",
+                 format(x$optim.time), "s, fit ", format(x$fit.time), "s)", sep = ""))
+
+  paste("\nEstimation Time: ",format(x$total.time)," seconds",sep = "")
 }
   
 pCatGofStr <- function(x){

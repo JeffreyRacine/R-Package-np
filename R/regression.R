@@ -4,7 +4,11 @@ npregression <-
              ntrain, trainiseval = FALSE, gradients = FALSE, residuals = FALSE,
              gradient.order = NULL,
              xtra = rep(NA, 6),
-             rows.omit = NA){
+             rows.omit = NA,
+             timing = NA,
+             total.time = NA,
+             optim.time = NA,
+             fit.time = NA){
 
         if (missing(bws) | missing(eval) | missing(ntrain))
             stop("improper invocation of npregression constructor")
@@ -46,7 +50,11 @@ npregression <-
             CORR = xtra[5],
             SIGN = xtra[6],
             rows.omit = rows.omit,
-            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+            timing = timing,
+            total.time = total.time,
+            optim.time = optim.time,
+            fit.time = fit.time)
 
         class(d) <- "npregression"
 
@@ -133,5 +141,6 @@ summary.npregression <- function(object, ...) {
   cat(genGofStr(object))
 
   cat(genBwKerStrs(object$bws))
+  cat(genTimingStr(object))
   cat('\n\n')  
 }

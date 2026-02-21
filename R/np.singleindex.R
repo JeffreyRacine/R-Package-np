@@ -187,6 +187,8 @@ npindex.sibandwidth <-
            residuals = FALSE,
            errors = FALSE,
            boot.num = 399, ...) {
+
+    fit.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npindex()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -573,7 +575,7 @@ npindex.sibandwidth <-
       strres = ""
     }
 
-    eval(parse(text=paste(
+    ev <- eval(parse(text=paste(
                  "singleindex(bws = bws, index = index.eval, mean = index.mean,",
                  ifelse(errors,"merr = index.merr,",""),
                  ifelse(gradients,"grad = index.grad, mean.grad = colMeans(index.grad), betavcov = Bvcov,",""),
@@ -581,5 +583,12 @@ npindex.sibandwidth <-
                  strres,
                  "ntrain = nrow(txdat),", strgof,
                  "trainiseval = no.ex, residuals = residuals, gradients = gradients)")))
-
+    fit.elapsed <- proc.time()[3] - fit.start
+    optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+    ev$timing <- bws$timing
+    ev$total.time <- total.time
+    ev$optim.time <- optim.time
+    ev$fit.time <- fit.elapsed
+    ev
   }

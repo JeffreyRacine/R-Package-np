@@ -63,6 +63,8 @@ npudist.dbandwidth <-
   function(bws,
            tdat = stop("invoked without training data 'tdat'"),
            edat, ...){
+
+    fit.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npudist()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -182,9 +184,15 @@ npudist.dbandwidth <-
          ckerub = as.double(cker.bounds.c$ub),
          PACKAGE="npRmpi" )[c("dist","derr", "log_likelihood")]
 
+    fit.elapsed <- proc.time()[3] - fit.start
+    optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+
     ev <- npdistribution(bws=bws, eval=teval, dist = myout$dist,
                          derr = myout$derr, ntrain = tnrow, trainiseval = no.e,
-                         rows.omit = rows.omit)
+                         rows.omit = rows.omit,
+                         timing = bws$timing, total.time = total.time,
+                         optim.time = optim.time, fit.time = fit.elapsed)
     return(ev)
   }
 

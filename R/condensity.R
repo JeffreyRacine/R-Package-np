@@ -3,7 +3,9 @@ condensity <-
              condens, conderr = NA,
              congrad = NA, congerr = NA,
              ll = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
-             rows.omit = NA){
+             rows.omit = NA,
+             timing = NA, total.time = NA,
+             optim.time = NA, fit.time = NA){
 
         if (missing(bws) | missing(xeval) | missing(yeval) | missing(condens) | missing(ntrain))
             stop("improper invocation of condensity constructor")
@@ -45,7 +47,9 @@ condensity <-
             trainiseval = trainiseval,
             gradients = gradients,
             rows.omit = rows.omit,
-            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)))
+            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+            timing = timing, total.time = total.time,
+            optim.time = optim.time, fit.time = fit.time)
         
         class(d) <- "condensity"
 
@@ -111,5 +115,6 @@ summary.condensity <- function(object, ...){
   cat(genDenEstStr(object))
 
   cat(genBwKerStrs(object$bws))
+  cat(genTimingStr(object))
   cat('\n\n')  
 }

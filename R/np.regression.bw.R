@@ -101,9 +101,10 @@ npregbw.rbandwidth <-
            lbd.init = 0.1, hbd.init = 0.9, dfac.init = 0.375, 
           scale.init.categorical.sample = FALSE,
           transform.bounds = FALSE,
-           invalid.penalty = c("baseline","dbmax"),
-           penalty.multiplier = 10,
-           ...){
+          invalid.penalty = c("baseline","dbmax"),
+          penalty.multiplier = 10,
+          ...){
+    elapsed.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -230,8 +231,7 @@ npregbw.rbandwidth <-
 
         cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
-        total.time <-
-          system.time(myout <- 
+        system.time(myout <- 
         .C("np_regression_bw",
            as.double(runo), as.double(rord), as.double(rcon), as.double(ydat),
            as.double(mysd),
@@ -264,8 +264,9 @@ npregbw.rbandwidth <-
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
       tbw$timing <- myout$timing
-      tbw$total.time <- total.time
     }
+
+    tbw$total.time <- proc.time()[3] - elapsed.start
 
     tbw$sfactor <- tbw$bandwidth <- tbw$bw
 

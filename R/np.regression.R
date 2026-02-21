@@ -108,6 +108,7 @@ npreg.rbandwidth <-
            exdat, eydat, gradients = FALSE, gradient.order = 1L,
            residuals = FALSE,
            ...){
+    fit.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npreg()")
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
     if (.npRmpi_autodispatch_active())
@@ -391,6 +392,10 @@ npreg.rbandwidth <-
     }
 
 
+    fit.elapsed <- proc.time()[3] - fit.start
+    optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+
     ev <- eval(parse(text = paste("npregression(bws = bws,",
                          "eval = teval,",
                          "mean = myout$mean, merr = myout$merr,",
@@ -403,7 +408,9 @@ npreg.rbandwidth <-
                          ifelse(identical(bws$regtype, "glp"),
                                 "gradient.order = glp.gradient.order,", ""),
                          "residuals = residuals,",
-                         "xtra = myout$xtra, rows.omit = rows.omit)")))
+                         "xtra = myout$xtra, rows.omit = rows.omit,",
+                         "timing = bws$timing, total.time = total.time,",
+                         "optim.time = optim.time, fit.time = fit.elapsed)")))
 
 
     ev$call <- match.call(expand.dots = FALSE)

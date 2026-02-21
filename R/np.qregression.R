@@ -82,6 +82,8 @@ npqreg.condbandwidth <-
            lbc.dir = 0.5, dfc.dir = 3, cfac.dir = 2.5*(3.0-sqrt(5)),initc.dir = 1.0, 
            lbd.dir = 0.1, hbd.dir = 1, dfac.dir = 0.25*(3.0-sqrt(5)), initd.dir = 1.0, 
            ...){
+
+    fit.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npqreg()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -265,6 +267,10 @@ npqreg.condbandwidth <-
     }
 
 
+    fit.elapsed <- proc.time()[3] - fit.start
+    optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+
     qregression(bws = bws,
                 xeval = txeval,
                 tau = tau,
@@ -273,7 +279,9 @@ npqreg.condbandwidth <-
                 quantgrad = myout$yqgrad,
                 ntrain = tnrow,
                 trainiseval = no.ex,
-                gradients = gradients)
+                gradients = gradients,
+                timing = bws$timing, total.time = total.time,
+                optim.time = optim.time, fit.time = fit.elapsed)
   }
 
 

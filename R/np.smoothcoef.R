@@ -192,6 +192,8 @@ npscoef.scbandwidth <-
            tol = .Machine$double.eps,
            leave.one.out = FALSE,
            betas = FALSE, ...){
+
+    fit.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npscoef()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -498,7 +500,7 @@ npscoef.scbandwidth <-
 
     }
 
-    eval(parse(text=paste("smoothcoefficient(bws = bws, eval = teval",
+    ev <- eval(parse(text=paste("smoothcoefficient(bws = bws, eval = teval",
                  ", mean = mean,",
                  ifelse(errors & !do.iterate,"merr = merr,",""),
                  ifelse(betas, "beta = t(coef.mat),",""),
@@ -507,5 +509,13 @@ npscoef.scbandwidth <-
                  "ntrain = nrow(txdat), trainiseval = miss.ex,",
                  ifelse(miss.ey && !miss.ex, "",
                         "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN)"),")")))
+    fit.elapsed <- proc.time()[3] - fit.start
+    optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+    ev$timing <- bws$timing
+    ev$total.time <- total.time
+    ev$optim.time <- optim.time
+    ev$fit.time <- fit.elapsed
+    ev
 
   }
