@@ -789,6 +789,60 @@ void np_density_conditional(double * tyuno, double * tyord, double * tycon,
                             double * gradients, double * gradients_stderr, double * ll,
                             double * cxkerlb, double * cxkerub,
                             double * cykerlb, double * cykerub);
+void np_density_bw(double * myuno, double * myord, double * mycon,
+                   double * mysd, int * myopti, double * myoptd, double * myans, double * fval,
+                   double * objective_function_values, double * objective_function_evals,
+                   double * objective_function_invalid, double * timing,
+                   int * penalty_mode, double * penalty_mult,
+                   double * ckerlb, double * ckerub);
+void np_distribution_bw(double * myuno, double * myord, double * mycon,
+                        double * myeuno, double * myeord, double * myecon, double * mysd,
+                        int * myopti, double * myoptd, double * myans, double * fval,
+                        double * objective_function_values, double * objective_function_evals,
+                        double * objective_function_invalid, double * timing,
+                        int * penalty_mode, double * penalty_mult,
+                        double * ckerlb, double * ckerub);
+void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
+                               double * u_uno, double * u_ord, double * u_con,
+                               double * mysd,
+                               int * myopti, double * myoptd, double * myans, double * fval,
+                               double * objective_function_values, double * objective_function_evals,
+                               double * objective_function_invalid, double * timing,
+                               double * objective_function_fast,
+                               double * objective_function_fallback,
+                               int * penalty_mode, double * penalty_mult,
+                               double * cxkerlb, double * cxkerub,
+                               double * cykerlb, double * cykerub);
+void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con,
+                                    double * u_uno, double * u_ord, double * u_con,
+                                    double * cg_uno, double * cg_ord, double * cg_con, double * mysd,
+                                    int * myopti, double * myoptd, double * myans, double * fval,
+                                    double * objective_function_values, double * objective_function_evals,
+                                    double * objective_function_invalid, double * timing,
+                                    double * objective_function_fast,
+                                    double * objective_function_fallback,
+                                    int * penalty_mode, double * penalty_mult,
+                                    double * cxkerlb, double * cxkerub,
+                                    double * cykerlb, double * cykerub);
+void np_kernelsum(double * tuno, double * tord, double * tcon,
+                  double * ty, double * weights,
+                  double * euno, double * eord, double * econ,
+                  double * bw,
+                  double * mcv, double * padnum,
+                  int * operator,
+                  int * myopti, double * kpow,
+                  double * weighted_sum, double * weighted_p_sum,
+                  double * kernel_weights,
+                  double * ckerlb, double * ckerub);
+void np_quantile_conditional(double * tc_con,
+                             double * tu_uno, double * tu_ord, double * tu_con,
+                             double * eu_uno, double * eu_ord, double * eu_con,
+                             double * quantile,
+                             double * mybw,
+                             double * mcv, double *padnum,
+                             double * nconfac, double * ncatfac, double * mysd,
+                             int * myopti, double * myoptd,
+                             double * yq, double * yqerr, double *yg);
 
 SEXP C_np_regression_bw(SEXP runo,
                         SEXP rord,
@@ -1148,6 +1202,489 @@ SEXP C_np_density_conditional(SEXP tyuno,
   setAttrib(out, R_NamesSymbol, out_names);
 
   UNPROTECT(37);
+  return out;
+}
+
+SEXP C_np_density_bw(SEXP myuno,
+                     SEXP myord,
+                     SEXP mycon,
+                     SEXP mysd,
+                     SEXP myopti,
+                     SEXP myoptd,
+                     SEXP bw,
+                     SEXP hist_len,
+                     SEXP penalty_mode,
+                     SEXP penalty_mult,
+                     SEXP ckerlb,
+                     SEXP ckerub)
+{
+  SEXP myuno_r=R_NilValue, myord_r=R_NilValue, mycon_r=R_NilValue, mysd_r=R_NilValue;
+  SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue;
+  SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue;
+  int hlen = asInteger(hist_len);
+  int pmode = asInteger(penalty_mode);
+  double pmult = asReal(penalty_mult);
+
+  if(hlen < 1) hlen = 1;
+
+  PROTECT(myuno_r = coerceVector(myuno, REALSXP));
+  PROTECT(myord_r = coerceVector(myord, REALSXP));
+  PROTECT(mycon_r = coerceVector(mycon, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+  PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
+  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_timing = allocVector(REALSXP, 1));
+
+  memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
+  np_density_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
+                REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
+                REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                &pmode, &pmult, REAL(ckerlb_r), REAL(ckerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 6));
+  SET_VECTOR_ELT(out, 0, out_bw);
+  SET_VECTOR_ELT(out, 1, out_fval);
+  SET_VECTOR_ELT(out, 2, out_fval_hist);
+  SET_VECTOR_ELT(out, 3, out_eval_hist);
+  SET_VECTOR_ELT(out, 4, out_invalid_hist);
+  SET_VECTOR_ELT(out, 5, out_timing);
+
+  PROTECT(out_names = allocVector(STRSXP, 6));
+  SET_STRING_ELT(out_names, 0, mkChar("bw"));
+  SET_STRING_ELT(out_names, 1, mkChar("fval"));
+  SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
+  SET_STRING_ELT(out_names, 3, mkChar("eval.history"));
+  SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
+  SET_STRING_ELT(out_names, 5, mkChar("timing"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(17);
+  return out;
+}
+
+SEXP C_np_distribution_bw(SEXP myuno,
+                          SEXP myord,
+                          SEXP mycon,
+                          SEXP myeuno,
+                          SEXP myeord,
+                          SEXP myecon,
+                          SEXP mysd,
+                          SEXP myopti,
+                          SEXP myoptd,
+                          SEXP bw,
+                          SEXP hist_len,
+                          SEXP penalty_mode,
+                          SEXP penalty_mult,
+                          SEXP ckerlb,
+                          SEXP ckerub)
+{
+  SEXP myuno_r=R_NilValue, myord_r=R_NilValue, mycon_r=R_NilValue;
+  SEXP myeuno_r=R_NilValue, myeord_r=R_NilValue, myecon_r=R_NilValue, mysd_r=R_NilValue;
+  SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue;
+  SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue;
+  int hlen = asInteger(hist_len);
+  int pmode = asInteger(penalty_mode);
+  double pmult = asReal(penalty_mult);
+
+  if(hlen < 1) hlen = 1;
+
+  PROTECT(myuno_r = coerceVector(myuno, REALSXP));
+  PROTECT(myord_r = coerceVector(myord, REALSXP));
+  PROTECT(mycon_r = coerceVector(mycon, REALSXP));
+  PROTECT(myeuno_r = coerceVector(myeuno, REALSXP));
+  PROTECT(myeord_r = coerceVector(myeord, REALSXP));
+  PROTECT(myecon_r = coerceVector(myecon, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+  PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
+  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_timing = allocVector(REALSXP, 1));
+
+  memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
+  np_distribution_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
+                     REAL(myeuno_r), REAL(myeord_r), REAL(myecon_r), REAL(mysd_r),
+                     INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
+                     REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                     &pmode, &pmult, REAL(ckerlb_r), REAL(ckerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 6));
+  SET_VECTOR_ELT(out, 0, out_bw);
+  SET_VECTOR_ELT(out, 1, out_fval);
+  SET_VECTOR_ELT(out, 2, out_fval_hist);
+  SET_VECTOR_ELT(out, 3, out_eval_hist);
+  SET_VECTOR_ELT(out, 4, out_invalid_hist);
+  SET_VECTOR_ELT(out, 5, out_timing);
+
+  PROTECT(out_names = allocVector(STRSXP, 6));
+  SET_STRING_ELT(out_names, 0, mkChar("bw"));
+  SET_STRING_ELT(out_names, 1, mkChar("fval"));
+  SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
+  SET_STRING_ELT(out_names, 3, mkChar("eval.history"));
+  SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
+  SET_STRING_ELT(out_names, 5, mkChar("timing"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(20);
+  return out;
+}
+
+SEXP C_np_density_conditional_bw(SEXP c_uno,
+                                 SEXP c_ord,
+                                 SEXP c_con,
+                                 SEXP u_uno,
+                                 SEXP u_ord,
+                                 SEXP u_con,
+                                 SEXP mysd,
+                                 SEXP myopti,
+                                 SEXP myoptd,
+                                 SEXP bw,
+                                 SEXP hist_len,
+                                 SEXP penalty_mode,
+                                 SEXP penalty_mult,
+                                 SEXP cxkerlb,
+                                 SEXP cxkerub,
+                                 SEXP cykerlb,
+                                 SEXP cykerub)
+{
+  SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
+  SEXP mysd_r=R_NilValue, myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue;
+  SEXP cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue;
+  SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_fallback=R_NilValue;
+  int hlen = asInteger(hist_len);
+  int pmode = asInteger(penalty_mode);
+  double pmult = asReal(penalty_mult);
+
+  if(hlen < 1) hlen = 1;
+
+  PROTECT(c_uno_r = coerceVector(c_uno, REALSXP));
+  PROTECT(c_ord_r = coerceVector(c_ord, REALSXP));
+  PROTECT(c_con_r = coerceVector(c_con, REALSXP));
+  PROTECT(u_uno_r = coerceVector(u_uno, REALSXP));
+  PROTECT(u_ord_r = coerceVector(u_ord, REALSXP));
+  PROTECT(u_con_r = coerceVector(u_con, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+  PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(cxkerlb_r = coerceVector(cxkerlb, REALSXP));
+  PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
+  PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
+  PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
+
+  PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
+  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_timing = allocVector(REALSXP, 1));
+  PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_fallback = allocVector(REALSXP, 1));
+
+  memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
+  np_density_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
+                            REAL(u_uno_r), REAL(u_ord_r), REAL(u_con_r), REAL(mysd_r),
+                            INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
+                            REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                            REAL(out_fast), REAL(out_fallback), &pmode, &pmult,
+                            REAL(cxkerlb_r), REAL(cxkerub_r), REAL(cykerlb_r), REAL(cykerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 8));
+  SET_VECTOR_ELT(out, 0, out_bw);
+  SET_VECTOR_ELT(out, 1, out_fval);
+  SET_VECTOR_ELT(out, 2, out_fval_hist);
+  SET_VECTOR_ELT(out, 3, out_eval_hist);
+  SET_VECTOR_ELT(out, 4, out_invalid_hist);
+  SET_VECTOR_ELT(out, 5, out_timing);
+  SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_fallback);
+
+  PROTECT(out_names = allocVector(STRSXP, 8));
+  SET_STRING_ELT(out_names, 0, mkChar("bw"));
+  SET_STRING_ELT(out_names, 1, mkChar("fval"));
+  SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
+  SET_STRING_ELT(out_names, 3, mkChar("eval.history"));
+  SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
+  SET_STRING_ELT(out_names, 5, mkChar("timing"));
+  SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("fallback.history"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(24);
+  return out;
+}
+
+SEXP C_np_distribution_conditional_bw(SEXP c_uno,
+                                      SEXP c_ord,
+                                      SEXP c_con,
+                                      SEXP u_uno,
+                                      SEXP u_ord,
+                                      SEXP u_con,
+                                      SEXP cg_uno,
+                                      SEXP cg_ord,
+                                      SEXP cg_con,
+                                      SEXP mysd,
+                                      SEXP myopti,
+                                      SEXP myoptd,
+                                      SEXP bw,
+                                      SEXP hist_len,
+                                      SEXP penalty_mode,
+                                      SEXP penalty_mult,
+                                      SEXP cxkerlb,
+                                      SEXP cxkerub,
+                                      SEXP cykerlb,
+                                      SEXP cykerub)
+{
+  SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
+  SEXP cg_uno_r=R_NilValue, cg_ord_r=R_NilValue, cg_con_r=R_NilValue, mysd_r=R_NilValue;
+  SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue;
+  SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_fallback=R_NilValue;
+  int hlen = asInteger(hist_len);
+  int pmode = asInteger(penalty_mode);
+  double pmult = asReal(penalty_mult);
+
+  if(hlen < 1) hlen = 1;
+
+  PROTECT(c_uno_r = coerceVector(c_uno, REALSXP));
+  PROTECT(c_ord_r = coerceVector(c_ord, REALSXP));
+  PROTECT(c_con_r = coerceVector(c_con, REALSXP));
+  PROTECT(u_uno_r = coerceVector(u_uno, REALSXP));
+  PROTECT(u_ord_r = coerceVector(u_ord, REALSXP));
+  PROTECT(u_con_r = coerceVector(u_con, REALSXP));
+  PROTECT(cg_uno_r = coerceVector(cg_uno, REALSXP));
+  PROTECT(cg_ord_r = coerceVector(cg_ord, REALSXP));
+  PROTECT(cg_con_r = coerceVector(cg_con, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+  PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(cxkerlb_r = coerceVector(cxkerlb, REALSXP));
+  PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
+  PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
+  PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
+
+  PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
+  PROTECT(out_fval = allocVector(REALSXP, 2));
+  PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_eval_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
+  PROTECT(out_timing = allocVector(REALSXP, 1));
+  PROTECT(out_fast = allocVector(REALSXP, 1));
+  PROTECT(out_fallback = allocVector(REALSXP, 1));
+
+  memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
+  np_distribution_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
+                                 REAL(u_uno_r), REAL(u_ord_r), REAL(u_con_r),
+                                 REAL(cg_uno_r), REAL(cg_ord_r), REAL(cg_con_r), REAL(mysd_r),
+                                 INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
+                                 REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                                 REAL(out_fast), REAL(out_fallback), &pmode, &pmult,
+                                 REAL(cxkerlb_r), REAL(cxkerub_r), REAL(cykerlb_r), REAL(cykerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 8));
+  SET_VECTOR_ELT(out, 0, out_bw);
+  SET_VECTOR_ELT(out, 1, out_fval);
+  SET_VECTOR_ELT(out, 2, out_fval_hist);
+  SET_VECTOR_ELT(out, 3, out_eval_hist);
+  SET_VECTOR_ELT(out, 4, out_invalid_hist);
+  SET_VECTOR_ELT(out, 5, out_timing);
+  SET_VECTOR_ELT(out, 6, out_fast);
+  SET_VECTOR_ELT(out, 7, out_fallback);
+
+  PROTECT(out_names = allocVector(STRSXP, 8));
+  SET_STRING_ELT(out_names, 0, mkChar("bw"));
+  SET_STRING_ELT(out_names, 1, mkChar("fval"));
+  SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
+  SET_STRING_ELT(out_names, 3, mkChar("eval.history"));
+  SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
+  SET_STRING_ELT(out_names, 5, mkChar("timing"));
+  SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
+  SET_STRING_ELT(out_names, 7, mkChar("fallback.history"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(27);
+  return out;
+}
+
+SEXP C_np_kernelsum(SEXP tuno,
+                    SEXP tord,
+                    SEXP tcon,
+                    SEXP ty,
+                    SEXP weights,
+                    SEXP euno,
+                    SEXP eord,
+                    SEXP econ,
+                    SEXP bw,
+                    SEXP mcv,
+                    SEXP padnum,
+                    SEXP op,
+                    SEXP myopti,
+                    SEXP kpow,
+                    SEXP ksum_len,
+                    SEXP pksum_len,
+                    SEXP kw_len,
+                    SEXP ckerlb,
+                    SEXP ckerub)
+{
+  SEXP tuno_r=R_NilValue, tord_r=R_NilValue, tcon_r=R_NilValue, ty_r=R_NilValue, weights_r=R_NilValue;
+  SEXP euno_r=R_NilValue, eord_r=R_NilValue, econ_r=R_NilValue, bw_r=R_NilValue, mcv_r=R_NilValue;
+  SEXP padnum_r=R_NilValue, op_i=R_NilValue, myopti_i=R_NilValue, kpow_r=R_NilValue, ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_ksum=R_NilValue, out_pksum=R_NilValue, out_kw=R_NilValue;
+  int n_ksum = asInteger(ksum_len);
+  int n_pksum = asInteger(pksum_len);
+  int n_kw = asInteger(kw_len);
+
+  if(n_ksum < 0) n_ksum = 0;
+  if(n_pksum < 0) n_pksum = 0;
+  if(n_kw < 0) n_kw = 0;
+
+  PROTECT(tuno_r = coerceVector(tuno, REALSXP));
+  PROTECT(tord_r = coerceVector(tord, REALSXP));
+  PROTECT(tcon_r = coerceVector(tcon, REALSXP));
+  PROTECT(ty_r = coerceVector(ty, REALSXP));
+  PROTECT(weights_r = coerceVector(weights, REALSXP));
+  PROTECT(euno_r = coerceVector(euno, REALSXP));
+  PROTECT(eord_r = coerceVector(eord, REALSXP));
+  PROTECT(econ_r = coerceVector(econ, REALSXP));
+  PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(mcv_r = coerceVector(mcv, REALSXP));
+  PROTECT(padnum_r = coerceVector(padnum, REALSXP));
+  PROTECT(op_i = coerceVector(op, INTSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(kpow_r = coerceVector(kpow, REALSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  PROTECT(out_ksum = allocVector(REALSXP, n_ksum));
+  PROTECT(out_pksum = allocVector(REALSXP, n_pksum));
+  PROTECT(out_kw = allocVector(REALSXP, n_kw));
+
+  np_kernelsum(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+               REAL(ty_r), REAL(weights_r),
+               REAL(euno_r), REAL(eord_r), REAL(econ_r),
+               REAL(bw_r),
+               REAL(mcv_r), REAL(padnum_r),
+               INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
+               REAL(out_ksum), REAL(out_pksum), REAL(out_kw),
+               REAL(ckerlb_r), REAL(ckerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 3));
+  SET_VECTOR_ELT(out, 0, out_ksum);
+  SET_VECTOR_ELT(out, 1, out_pksum);
+  SET_VECTOR_ELT(out, 2, out_kw);
+
+  PROTECT(out_names = allocVector(STRSXP, 3));
+  SET_STRING_ELT(out_names, 0, mkChar("ksum"));
+  SET_STRING_ELT(out_names, 1, mkChar("p.ksum"));
+  SET_STRING_ELT(out_names, 2, mkChar("kernel.weights"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(21);
+  return out;
+}
+
+SEXP C_np_quantile_conditional(SEXP tc_con,
+                               SEXP tu_uno,
+                               SEXP tu_ord,
+                               SEXP tu_con,
+                               SEXP eu_uno,
+                               SEXP eu_ord,
+                               SEXP eu_con,
+                               SEXP quantile,
+                               SEXP mybw,
+                               SEXP mcv,
+                               SEXP padnum,
+                               SEXP nconfac,
+                               SEXP ncatfac,
+                               SEXP mysd,
+                               SEXP myopti,
+                               SEXP myoptd,
+                               SEXP enrow,
+                               SEXP xndim,
+                               SEXP gradients)
+{
+  SEXP tc_con_r=R_NilValue, tu_uno_r=R_NilValue, tu_ord_r=R_NilValue, tu_con_r=R_NilValue;
+  SEXP eu_uno_r=R_NilValue, eu_ord_r=R_NilValue, eu_con_r=R_NilValue, quantile_r=R_NilValue;
+  SEXP mybw_r=R_NilValue, mcv_r=R_NilValue, padnum_r=R_NilValue, nconfac_r=R_NilValue, ncatfac_r=R_NilValue, mysd_r=R_NilValue;
+  SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_yq=R_NilValue, out_yqerr=R_NilValue, out_yg=R_NilValue;
+  int en = asInteger(enrow);
+  int xd = asInteger(xndim);
+  int do_grad = asLogical(gradients);
+  R_xlen_t gsize;
+
+  if(en < 0) en = 0;
+  if(xd < 0) xd = 0;
+  if(do_grad == NA_LOGICAL) do_grad = 0;
+  gsize = (R_xlen_t)en * (R_xlen_t)xd * (do_grad ? 1 : 0);
+
+  PROTECT(tc_con_r = coerceVector(tc_con, REALSXP));
+  PROTECT(tu_uno_r = coerceVector(tu_uno, REALSXP));
+  PROTECT(tu_ord_r = coerceVector(tu_ord, REALSXP));
+  PROTECT(tu_con_r = coerceVector(tu_con, REALSXP));
+  PROTECT(eu_uno_r = coerceVector(eu_uno, REALSXP));
+  PROTECT(eu_ord_r = coerceVector(eu_ord, REALSXP));
+  PROTECT(eu_con_r = coerceVector(eu_con, REALSXP));
+  PROTECT(quantile_r = coerceVector(quantile, REALSXP));
+  PROTECT(mybw_r = coerceVector(mybw, REALSXP));
+  PROTECT(mcv_r = coerceVector(mcv, REALSXP));
+  PROTECT(padnum_r = coerceVector(padnum, REALSXP));
+  PROTECT(nconfac_r = coerceVector(nconfac, REALSXP));
+  PROTECT(ncatfac_r = coerceVector(ncatfac, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
+
+  PROTECT(out_yq = allocVector(REALSXP, en));
+  PROTECT(out_yqerr = allocVector(REALSXP, en));
+  PROTECT(out_yg = allocVector(REALSXP, gsize));
+
+  np_quantile_conditional(REAL(tc_con_r),
+                          REAL(tu_uno_r), REAL(tu_ord_r), REAL(tu_con_r),
+                          REAL(eu_uno_r), REAL(eu_ord_r), REAL(eu_con_r),
+                          REAL(quantile_r),
+                          REAL(mybw_r),
+                          REAL(mcv_r), REAL(padnum_r),
+                          REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+                          INTEGER(myopti_i), REAL(myoptd_r),
+                          REAL(out_yq), REAL(out_yqerr), REAL(out_yg));
+
+  PROTECT(out = allocVector(VECSXP, 3));
+  SET_VECTOR_ELT(out, 0, out_yq);
+  SET_VECTOR_ELT(out, 1, out_yqerr);
+  SET_VECTOR_ELT(out, 2, out_yg);
+
+  PROTECT(out_names = allocVector(STRSXP, 3));
+  SET_STRING_ELT(out_names, 0, mkChar("yq"));
+  SET_STRING_ELT(out_names, 1, mkChar("yqerr"));
+  SET_STRING_ELT(out_names, 2, mkChar("yqgrad"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(21);
   return out;
 }
 

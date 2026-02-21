@@ -334,21 +334,21 @@ npksum.default <-
 	   return(result)
    }
 
-    myout <- 
-      .C("np_kernelsum",
-         asDouble(tuno), asDouble(tord), asDouble(tcon),
-         asDouble(tydat), asDouble(weights),
-         asDouble(euno),  asDouble(eord),  asDouble(econ), 
-         as.double(c(bws$bw[bws$icon],bws$bw[bws$iuno],bws$bw[bws$iord])),
-	         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-	         as.integer(c(operator.num[bws$icon],operator.num[bws$iuno],operator.num[bws$iord])),
-	         as.integer(myopti), as.double(kernel.pow),
-	         ksum = double(length.out),
-	         p.ksum = double(p.length.out),
-	         kernel.weights = double(nkw),
-	         ckerlb = as.double(cker.bounds.c$lb),
-	         ckerub = as.double(cker.bounds.c$ub),
-	         PACKAGE="np" )[return.names]
+    myout <-
+      .Call("C_np_kernelsum",
+            asDouble(tuno), asDouble(tord), asDouble(tcon),
+            asDouble(tydat), asDouble(weights),
+            asDouble(euno), asDouble(eord), asDouble(econ),
+            as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+            as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+            as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
+            as.integer(myopti), as.double(kernel.pow),
+            as.integer(length.out),
+            as.integer(p.length.out),
+            as.integer(nkw),
+            as.double(cker.bounds.c$lb),
+            as.double(cker.bounds.c$ub),
+            PACKAGE="np")[return.names]
 
     if (dim.out[1] > 1){
       dim(myout[["ksum"]]) <- dim.out
