@@ -1,4 +1,4 @@
-npplot.sibandwidth <-
+.np_plot_sibandwidth_engine <-
   function(bws,
            xdat,
            ydat,
@@ -368,3 +368,5 @@ npplot.sibandwidth <-
 
     
   }
+
+npplot.sibandwidth <- function(...) .np_plot_sibandwidth_engine(...)

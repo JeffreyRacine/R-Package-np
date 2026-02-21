@@ -1,4 +1,4 @@
-npplot.conbandwidth <-
+.np_plot_conbandwidth_engine <-
   function(bws,
            xdat,
            ydat,
@@ -1056,3 +1056,5 @@ npplot.conbandwidth <-
       }
     }
   }
+
+npplot.conbandwidth <- function(...) .np_plot_conbandwidth_engine(...)

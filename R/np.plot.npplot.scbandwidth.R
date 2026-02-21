@@ -1,4 +1,4 @@
-npplot.scbandwidth <-
+.np_plot_scbandwidth_engine <-
   function(bws,
            xdat,
            ydat,
@@ -956,3 +956,5 @@ npplot.scbandwidth <-
 
       
   }
+
+npplot.scbandwidth <- function(...) .np_plot_scbandwidth_engine(...)
