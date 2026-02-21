@@ -555,8 +555,11 @@ int mat_is_nonsingular( MATRIX A )
 
 double mat_inv00( MATRIX A, int *ok )
 {
+	int i, j, info = 0;
+	int nrhs = 1;
 	const int n = MatRow(A);
-	MATRIX B = NULL, X = NULL;
+	double *Ac = NULL, *bc = NULL;
+	int *ipiv = NULL;
 	double v = 0.0;
 
 #ifdef CONFORM_CHECK
@@ -564,22 +567,32 @@ double mat_inv00( MATRIX A, int *ok )
 		error("\nUnconformable matrices in routine mat_inv00(): A must be square\n");
 #endif
 
-	B = mat_creat(n, 1, ZERO_MATRIX);
-	X = mat_creat(n, 1, ZERO_MATRIX);
-	B[0][0] = 1.0;
+	Ac = (double *)malloc((size_t)n * (size_t)n * sizeof(double));
+	bc = (double *)calloc((size_t)n, sizeof(double));
+	ipiv = (int *)malloc((size_t)n * sizeof(int));
+	if ((Ac == NULL) || (bc == NULL) || (ipiv == NULL))
+		error("mat_inv00: malloc error\n");
 
-	if (mat_solve(A, B, X) == NULL) {
+	for (j = 0; j < n; j++)
+		for (i = 0; i < n; i++)
+			Ac[i + j*n] = A[i][j];
+	bc[0] = 1.0;
+
+	F77_CALL(dgesv)(&n, &nrhs, Ac, &n, ipiv, bc, &n, &info);
+	if (info != 0) {
 		*ok = 0;
-		mat_free(B);
-		mat_free(X);
+		free(Ac);
+		free(bc);
+		free(ipiv);
 		return 0.0;
 	}
 
-	v = X[0][0];
+	v = bc[0];
 	*ok = isfinite(v) ? 1 : 0;
 
-	mat_free(B);
-	mat_free(X);
+	free(Ac);
+	free(bc);
+	free(ipiv);
 
 	return v;
 }
