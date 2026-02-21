@@ -75,10 +75,8 @@ npseed(712)
 
 x <- runif(10)
 y <- x + rnorm(10, sd = 0.1)
-mydat <- data.frame(x,y)
-rm(x,y)
 
-bw <- npregbw(y~x, data=mydat)
+bw <- npregbw(y~x)
 
 summary(bw)
 

@@ -568,13 +568,11 @@ z2 <- rbinom(n,1,.5)
 y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
 z1 <- factor(z1)
 z2 <- factor(z2)
-mydat <- data.frame(y,x,z1,z2)
-rm(x,y,z1,z2)
 
 bw <- npregbw(y~x+z1+z2,
               regtype="lc",
               bwmethod="cv.ls",
-              data=mydat)
+              nmulti=1)
 
 summary(bw)
 

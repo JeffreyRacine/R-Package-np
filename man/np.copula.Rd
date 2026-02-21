@@ -164,11 +164,12 @@ n.eval <- 100
 rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
-mydat <- mvrnorm(n=n, mu, Sigma)
-mydat <- data.frame(x=mydat[,1],
-                    y=ordered(as.integer(cut(mydat[,2],
-                      quantile(mydat[,2],seq(0,1,by=.1)),
-                      include.lowest=TRUE))-1))
+xy <- mvrnorm(n=n, mu, Sigma)
+x <- xy[,1]
+y <- ordered(as.integer(cut(xy[,2],
+                      quantile(xy[,2],seq(0,1,by=.1)),
+                      include.lowest=TRUE))-1)
+mydat <- data.frame(x=x, y=y)
 q.min <- 0.0
 q.max <- 1.0
 grid.seq <- seq(q.min,q.max,length=n.eval)
@@ -176,8 +177,8 @@ grid.dat <- cbind(grid.seq,grid.seq)
 
 ## Estimate the copula (bw object obtained from npudistbw())
 
-bw.cdf <- npudistbw(~x+y,data=mydat)
-copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat)
+bw.cdf <- npudistbw(~x+y, data=mydat)
+copula <- npcopula(bws=bw.cdf, data=mydat, u=grid.dat)
 
 ## Plot the copula
 
@@ -195,13 +196,13 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
 
 ## Plot the empirical copula
 
-copula.emp <- npcopula(bws=bw.cdf,data=mydat)
+copula.emp <- npcopula(bws=bw.cdf, data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
-bw.pdf <- npudensbw(~x+y,data=mydat)
-copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat)
+bw.pdf <- npudensbw(~x+y, data=mydat)
+copula <- npcopula(bws=bw.pdf, data=mydat, u=grid.dat)
 
 ## Plot the copula density
 
@@ -255,8 +256,10 @@ n.eval <- 100
 rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
-mydat <- mvrnorm(n=n, mu, Sigma)
-mydat <- data.frame(x=mydat[,1],y=mydat[,2])
+xy <- mvrnorm(n=n, mu, Sigma)
+x <- xy[,1]
+y <- xy[,2]
+mydat <- data.frame(x=x, y=y)
 
 q.min <- 0.0
 q.max <- 1.0
@@ -265,8 +268,8 @@ grid.dat <- cbind(grid.seq,grid.seq)
 
 ## Estimate the copula (bw object obtained from npudistbw())
 
-bw.cdf <- npudistbw(~x+y,data=mydat)
-copula <- npcopula(bws=bw.cdf,data=mydat,u=grid.dat)
+bw.cdf <- npudistbw(~x+y, data=mydat)
+copula <- npcopula(bws=bw.cdf, data=mydat, u=grid.dat)
 
 ## Plot the copula
 
@@ -284,13 +287,13 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
 
 ## Plot the empirical copula
 
-copula.emp <- npcopula(bws=bw.cdf,data=mydat)
+copula.emp <- npcopula(bws=bw.cdf, data=mydat)
 plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
-bw.pdf <- npudensbw(~x+y,data=mydat)
-copula <- npcopula(bws=bw.pdf,data=mydat,u=grid.dat)
+bw.pdf <- npudensbw(~x+y, data=mydat)
+copula <- npcopula(bws=bw.pdf, data=mydat, u=grid.dat)
 
 ## Plot the copula density
 

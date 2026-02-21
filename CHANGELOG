@@ -1,4 +1,24 @@
-Changes from Version 0.60-20 to 0.70-0 [19-Feb-2026]
+Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
+
+* Completed migration to modular S3 plot methods coordinated with
+  autodispatch-aware wrappers, while preserving legacy `npplot*` internals for
+  numerical/visual parity.
+
+* Added compatibility normalization for legacy S3 plot aliases prior to
+  dispatch (`gradient` -> `gradients`, `persp` -> `perspective`) to avoid
+  ambiguous argument matching during run-mode examples.
+
+* Hardened autodispatch/manual-mode interactions and mixed-mode guardrails:
+  - synchronized options/preflight checks before distributed calls
+  - stabilized automatic object/data broadcasting for high-level `np*`
+    entry points
+  - improved diagnostics for nested/unsupported mixed dispatch contexts.
+
+* Expanded run-mode documentation modernization:
+  - converted core `np*` examples to the simplified `npRmpi.start()` +
+    `options(npRmpi.autodispatch=TRUE)` style where supported
+  - updated helper examples (`gradients`, `se`, etc.) to the same model
+  - refreshed run/dontrun script workflow for check cycles.
 
 * Ported bounded continuous-kernel support from np master across npRmpi
   interfaces and C pathways with unified bound controls:

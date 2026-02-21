@@ -258,13 +258,10 @@ n <- 500
 x1 <- runif(n, min=-1, max=1)
 x2 <- runif(n, min=-1, max=1)
 y <- x1 - x2 + rnorm(n)
-mydat <- data.frame(x1,x2,y)
-rm(y,x1,x2)
 
 ## Ichimura, continuous y
 
-bw <- npindexbw(formula=y~x1+x2,
-                data=mydat)
+bw <- npindexbw(formula=y~x1+x2)
 
 summary(bw)
 

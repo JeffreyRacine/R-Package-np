@@ -290,12 +290,10 @@ n <- 500
 x <- runif(n)
 z <- runif(n, min=-2, max=2)
 y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
-mydat <- data.frame(x,y,z)
-rm(x,y,z)
 
 ## A smooth coefficient model example
 
-bw <- npscoefbw(y~x|z,data=mydat)
+bw <- npscoefbw(y~x|z)
 
 summary(bw)
 
