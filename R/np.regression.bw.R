@@ -69,7 +69,9 @@ npregbw.NULL <-
            bws, ...){
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
+        parent.frame()))
 
     xdat <- toFrame(xdat)
 
@@ -107,7 +109,9 @@ npregbw.rbandwidth <-
     elapsed.start <- proc.time()[3]
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
+        parent.frame()))
 
     xdat <- toFrame(xdat)
 
@@ -363,7 +367,9 @@ npregbw.default <-
            ...){
     .npRmpi_require_active_slave_pool(where = "npregbw()")
     if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
+        parent.frame()))
     npRejectLegacyLpArgs(names(list(...)), where = "npregbw")
 
     xdat <- toFrame(xdat)

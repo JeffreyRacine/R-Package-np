@@ -38,6 +38,11 @@
   eval(expr, envir = caller_env)
 }
 
+.npRmpi_autodispatch_as_generic_call <- function(generic, mc) {
+  args <- as.list(mc)[-1L]
+  as.call(c(list(as.name(generic)), args))
+}
+
 .npRmpi_autodispatch_active <- function() {
   isTRUE(getOption("npRmpi.autodispatch", FALSE)) &&
     !isTRUE(getOption("npRmpi.autodispatch.disable", FALSE))
@@ -392,7 +397,7 @@
     options(npRmpi.autodispatch.disable = TRUE)
     on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
     on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-    eval(CALL, envir = .GlobalEnv)
+    CALL
   }, list(CALL = prepared$call))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
