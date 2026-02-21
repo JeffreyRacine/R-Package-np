@@ -27,21 +27,21 @@
   cls <- class(bws)
 
   if ("rbandwidth" %in% cls)
-    return(npplot.rbandwidth(bws = bws, ...))
+    return(.np_plot_rbandwidth_engine(bws = bws, ...))
   if ("conbandwidth" %in% cls)
-    return(npplot.conbandwidth(bws = bws, ...))
+    return(.np_plot_conbandwidth_engine(bws = bws, ...))
   if ("condbandwidth" %in% cls)
-    return(npplot.condbandwidth(bws = bws, ...))
+    return(.np_plot_condbandwidth_engine(bws = bws, ...))
   if ("plbandwidth" %in% cls)
-    return(npplot.plbandwidth(bws = bws, ...))
+    return(.np_plot_plbandwidth_engine(bws = bws, ...))
   if ("sibandwidth" %in% cls)
-    return(npplot.sibandwidth(bws = bws, ...))
+    return(.np_plot_sibandwidth_engine(bws = bws, ...))
   if ("scbandwidth" %in% cls)
-    return(npplot.scbandwidth(bws = bws, ...))
+    return(.np_plot_scbandwidth_engine(bws = bws, ...))
   if ("dbandwidth" %in% cls)
-    return(npplot.dbandwidth(bws = bws, ...))
+    return(.np_plot_dbandwidth_engine(bws = bws, ...))
   if ("bandwidth" %in% cls)
-    return(npplot.bandwidth(bws = bws, ...))
+    return(.np_plot_bandwidth_engine(bws = bws, ...))
 
   stop("unsupported bandwidth class for plotting")
 }
@@ -99,28 +99,28 @@
 .np_plot_plregression <- function(object, ...) .np_plot_from_slot(object, "bw", ...)
 
 .np_plot_bandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.bandwidth, bws = bws, ..., where = "plot.bandwidth()")
+  .np_plot_call_method(.np_plot_bandwidth_engine, bws = bws, ..., where = "plot.bandwidth()")
 }
 .np_plot_rbandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.rbandwidth, bws = bws, ..., where = "plot.rbandwidth()")
+  .np_plot_call_method(.np_plot_rbandwidth_engine, bws = bws, ..., where = "plot.rbandwidth()")
 }
 .np_plot_dbandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.dbandwidth, bws = bws, ..., where = "plot.dbandwidth()")
+  .np_plot_call_method(.np_plot_dbandwidth_engine, bws = bws, ..., where = "plot.dbandwidth()")
 }
 .np_plot_conbandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.conbandwidth, bws = bws, ..., where = "plot.conbandwidth()")
+  .np_plot_call_method(.np_plot_conbandwidth_engine, bws = bws, ..., where = "plot.conbandwidth()")
 }
 .np_plot_condbandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.condbandwidth, bws = bws, ..., where = "plot.condbandwidth()")
+  .np_plot_call_method(.np_plot_condbandwidth_engine, bws = bws, ..., where = "plot.condbandwidth()")
 }
 .np_plot_plbandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.plbandwidth, bws = bws, ..., where = "plot.plbandwidth()")
+  .np_plot_call_method(.np_plot_plbandwidth_engine, bws = bws, ..., where = "plot.plbandwidth()")
 }
 .np_plot_sibandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.sibandwidth, bws = bws, ..., where = "plot.sibandwidth()")
+  .np_plot_call_method(.np_plot_sibandwidth_engine, bws = bws, ..., where = "plot.sibandwidth()")
 }
 .np_plot_scbandwidth <- function(bws, ...) {
-  .np_plot_call_method(npplot.scbandwidth, bws = bws, ..., where = "plot.scbandwidth()")
+  .np_plot_call_method(.np_plot_scbandwidth_engine, bws = bws, ..., where = "plot.scbandwidth()")
 }
 
 plot.bandwidth <- function(x, ...) .np_plot_bandwidth(x, ...)

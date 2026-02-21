@@ -1,4 +1,4 @@
-npplot.bandwidth <-
+.np_plot_bandwidth_engine <-
   function(bws,
            xdat,
            data = NULL,
@@ -691,3 +691,5 @@ npplot.bandwidth <-
       }
     }
   }
+
+npplot.bandwidth <- function(...) .np_plot_bandwidth_engine(...)
