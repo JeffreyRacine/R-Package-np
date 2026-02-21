@@ -76,7 +76,7 @@ npplot.plbandwidth <-
 
       tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
                                       env = environment(formula))
-      tmf.xf <- eval(tmf.xf,parent.frame())
+      tmf.xf <- eval(tmf.xf, envir = environment(tt))
       
       ydat <- model.response(tmf)
       xdat <- tmf.xf
@@ -895,4 +895,3 @@ npplot.plbandwidth <-
       }
     }
   }
-

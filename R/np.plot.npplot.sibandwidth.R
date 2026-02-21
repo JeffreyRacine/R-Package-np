@@ -38,38 +38,9 @@ npplot.sibandwidth <-
     on.exit(par(oldpar), add = TRUE)
 
     miss.xy = c(missing(xdat),missing(ydat))
-    
-    if (any(miss.xy) && !all(miss.xy))
-      stop("one of, but not both, xdat and ydat was specified")
-    else if(all(miss.xy) && !is.null(bws$formula)){
-      tt <- terms(bws)
-    m <- match(c("formula", "data", "subset", "na.action"),
-               names(bws$call), nomatch = 0)
-    tmf <- bws$call[c(1,m)]
-    tmf[[1]] <- as.name("model.frame")
-    tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf, envir = environment(tt))
-
-      ydat <- model.response(tmf)
-      xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
-    } else {
-      if(all(miss.xy) && !is.null(bws$call)){
-        xdat <- data.frame(eval(bws$call[["xdat"]], environment(bws$call)))
-        ydat = eval(bws$call[["ydat"]], environment(bws$call))
-      }
-          
-      ## catch and destroy NA's
-      xdat = toFrame(xdat)
-      goodrows = 1:dim(xdat)[1]
-      rows.omit = attr(na.omit(data.frame(xdat,ydat)), "na.action")
-      goodrows[rows.omit] = 0
-
-      if (all(goodrows==0))
-        stop("Data has no rows without NAs")
-
-      xdat = xdat[goodrows,,drop = FALSE]
-      ydat = ydat[goodrows]
-    }
+    xy <- .npplot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)
+    xdat <- xy$xdat
+    ydat <- xy$ydat
 
 
     if (is.null(plot.errors.bar.num))
