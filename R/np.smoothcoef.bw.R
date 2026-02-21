@@ -596,6 +596,9 @@ npscoefbw.default <-
            optim.reltol, optim.abstol, optim.maxit,
            ...){
 
+    if (!missing(bwmethod) && identical(match.arg(bwmethod, c("cv.ls", "manual")), "manual") &&
+        missing(bws))
+      stop("bwmethod='manual' requires argument 'bws'")
 
     miss.z <- missing(zdat)
     xdat <- toFrame(xdat)
