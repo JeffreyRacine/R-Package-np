@@ -1,4 +1,4 @@
-citHeader("To cite np in publications use:")
+citHeader("To cite npRmpi in publications use:")
 
 bibentry(bibtype = "Article",
          title = "Nonparametric Econometrics: The np Package",

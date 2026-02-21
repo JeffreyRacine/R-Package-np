@@ -104,28 +104,7 @@ mpi.spawn.Rslaves <-
     }
 	if (.Platform$OS=="windows"){
 		stop("Spawning is not implemented on Windows. Launch with mpiexec and use npRmpi.start(mode=\"attach\").")
-        workdrive <- unlist(strsplit(getwd(),":"))[1]
-		workdir <- unlist(strsplit(getwd(),"/"))
-		if (length(workdir) > 1)
-			workdir <-paste(workdir, collapse="\\")
-		else
-        	workdir <- paste(workdir,"\\")
-        localhost <- Sys.getenv("COMPUTERNAME")
-        networkdrive <- NULL #.Call("RegQuery", as.integer(2),paste("NETWORK\\",workdrive,sep=""), 
-                        #PACKAGE = "npRmpi")
-        remotepath <-networkdrive[which(networkdrive=="RemotePath")+1]
-        mapdrive <- as.logical(mapdrive && !is.null(remotepath))
-        arg <- c(Rscript, R.home(), workdrive, workdir, localhost, mapdrive, remotepath)
-		if (.Platform$r_arch == "i386") 
-            realns <- mpi.comm.spawn(slave = system.file("Rslaves32.cmd", 
-				package = "npRmpi"), slavearg = arg, nslaves = nslaves, 
-				info = 0, root = root, intercomm = intercomm, quiet = quiet)
-		else 
-			realns <- mpi.comm.spawn(slave = system.file("Rslaves64.cmd", 
-			            package = "npRmpi"), slavearg = arg, nslaves = nslaves, 
-				info = 0, root = root, intercomm = intercomm, quiet = quiet)
-    }
-    else{
+    } else {
         tmp <- paste(Sys.getpid(), "+", comm, sep="")   
         if (needlog)
             arg <- c(Rscript, tmp, "needlog", R.home())
