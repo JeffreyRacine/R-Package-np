@@ -15,7 +15,7 @@
 #include <Rinternals.h>
 
 #include "headers.h"
-#include "matrix.h"
+#include "linalg.h"
 #include "gsl_bspline.h"
 
 #include "hash.h"

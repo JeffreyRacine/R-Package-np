@@ -10,7 +10,7 @@
 #include <R_ext/Utils.h>
 
 #include "headers.h"
-#include "matrix.h"
+#include "linalg.h"
 
 #ifdef MPI2
 

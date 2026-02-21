@@ -1,13 +1,13 @@
 #include <stdlib.h>
 #include <math.h>
-#include "matrix.h"
+#include "linalg.h"
 
 #include <R.h>
 #include <R_ext/BLAS.h>
 #include <R_ext/Lapack.h>
 
 #ifdef RCSID
-static char rcsid[] = "$Id: matrix.c,v 1.4 2006/11/02 19:50:13 tristen Exp $";
+static char rcsid[] = "$Id: linalg.c,v 1.4 2006/11/02 19:50:13 tristen Exp $";
 #endif
 
 
