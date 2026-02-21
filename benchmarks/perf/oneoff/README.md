@@ -2,6 +2,8 @@
 
 MPI work-alike benchmark entry-point for one-off `npRmpi` methods where we do not vary kernel/method options.
 
+This `benchmarks/perf/oneoff` location is canonical. The top-level `benchmarks/oneoff` directory is legacy and retained for compatibility.
+
 ## Covered Functions
 
 - `npcmstest`
