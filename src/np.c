@@ -768,6 +768,28 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * xtra,
                    double * ckerlb, double * ckerub);
 
+void np_density(double * tuno, double * tord, double * tcon,
+                double * euno, double * eord, double * econ,
+                double * rbw,
+                double * mcv, double * padnum,
+                double * nconfac, double * ncatfac, double * mysd,
+                int * myopti,
+                double * mydens, double * myderr, double * ll,
+                double * ckerlb, double * ckerub);
+
+void np_density_conditional(double * tyuno, double * tyord, double * tycon,
+                            double * txuno, double * txord, double * txcon,
+                            double * eyuno, double * eyord, double * eycon,
+                            double * exuno, double * exord, double * excon,
+                            double * rbw,
+                            double * ymcv, double * ypadnum, double * xmcv, double * xpadnum,
+                            double * nconfac, double * ncatfac, double * mysd,
+                            int * myopti,
+                            double * cmean, double * cmean_stderr,
+                            double * gradients, double * gradients_stderr, double * ll,
+                            double * cxkerlb, double * cxkerub,
+                            double * cykerlb, double * cykerub);
+
 SEXP C_np_regression_bw(SEXP runo,
                         SEXP rord,
                         SEXP rcon,
@@ -948,6 +970,184 @@ SEXP C_np_regression(SEXP tuno,
   setAttrib(out, R_NamesSymbol, out_names);
 
   UNPROTECT(25);
+  return out;
+}
+
+SEXP C_np_density(SEXP tuno,
+                  SEXP tord,
+                  SEXP tcon,
+                  SEXP euno,
+                  SEXP eord,
+                  SEXP econ,
+                  SEXP rbw,
+                  SEXP mcv,
+                  SEXP padnum,
+                  SEXP nconfac,
+                  SEXP ncatfac,
+                  SEXP mysd,
+                  SEXP myopti,
+                  SEXP enrow,
+                  SEXP ckerlb,
+                  SEXP ckerub)
+{
+  SEXP tuno_r=R_NilValue, tord_r=R_NilValue, tcon_r=R_NilValue;
+  SEXP euno_r=R_NilValue, eord_r=R_NilValue, econ_r=R_NilValue;
+  SEXP rbw_r=R_NilValue, mcv_r=R_NilValue, padnum_r=R_NilValue;
+  SEXP nconfac_r=R_NilValue, ncatfac_r=R_NilValue, mysd_r=R_NilValue, myopti_i=R_NilValue;
+  SEXP ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_dens=R_NilValue, out_derr=R_NilValue, out_ll=R_NilValue;
+  int en = asInteger(enrow);
+
+  if (en < 0) en = 0;
+
+  PROTECT(tuno_r = coerceVector(tuno, REALSXP));
+  PROTECT(tord_r = coerceVector(tord, REALSXP));
+  PROTECT(tcon_r = coerceVector(tcon, REALSXP));
+  PROTECT(euno_r = coerceVector(euno, REALSXP));
+  PROTECT(eord_r = coerceVector(eord, REALSXP));
+  PROTECT(econ_r = coerceVector(econ, REALSXP));
+  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
+  PROTECT(mcv_r = coerceVector(mcv, REALSXP));
+  PROTECT(padnum_r = coerceVector(padnum, REALSXP));
+  PROTECT(nconfac_r = coerceVector(nconfac, REALSXP));
+  PROTECT(ncatfac_r = coerceVector(ncatfac, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
+  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+
+  PROTECT(out_dens = allocVector(REALSXP, en));
+  PROTECT(out_derr = allocVector(REALSXP, en));
+  PROTECT(out_ll = allocVector(REALSXP, 1));
+
+  np_density(REAL(tuno_r), REAL(tord_r), REAL(tcon_r),
+             REAL(euno_r), REAL(eord_r), REAL(econ_r),
+             REAL(rbw_r),
+             REAL(mcv_r), REAL(padnum_r),
+             REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+             INTEGER(myopti_i),
+             REAL(out_dens), REAL(out_derr), REAL(out_ll),
+             REAL(ckerlb_r), REAL(ckerub_r));
+
+  PROTECT(out = allocVector(VECSXP, 3));
+  SET_VECTOR_ELT(out, 0, out_dens);
+  SET_VECTOR_ELT(out, 1, out_derr);
+  SET_VECTOR_ELT(out, 2, out_ll);
+
+  PROTECT(out_names = allocVector(STRSXP, 3));
+  SET_STRING_ELT(out_names, 0, mkChar("dens"));
+  SET_STRING_ELT(out_names, 1, mkChar("derr"));
+  SET_STRING_ELT(out_names, 2, mkChar("log_likelihood"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(20);
+  return out;
+}
+
+SEXP C_np_density_conditional(SEXP tyuno,
+                              SEXP tyord,
+                              SEXP tycon,
+                              SEXP txuno,
+                              SEXP txord,
+                              SEXP txcon,
+                              SEXP eyuno,
+                              SEXP eyord,
+                              SEXP eycon,
+                              SEXP exuno,
+                              SEXP exord,
+                              SEXP excon,
+                              SEXP rbw,
+                              SEXP ymcv,
+                              SEXP ypadnum,
+                              SEXP xmcv,
+                              SEXP xpadnum,
+                              SEXP nconfac,
+                              SEXP ncatfac,
+                              SEXP mysd,
+                              SEXP myopti,
+                              SEXP enrow,
+                              SEXP xndim,
+                              SEXP ckerlbx,
+                              SEXP ckerubx,
+                              SEXP ckerlby,
+                              SEXP ckeruby)
+{
+  SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
+  SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
+  SEXP eyuno_r=R_NilValue, eyord_r=R_NilValue, eycon_r=R_NilValue;
+  SEXP exuno_r=R_NilValue, exord_r=R_NilValue, excon_r=R_NilValue;
+  SEXP rbw_r=R_NilValue, ymcv_r=R_NilValue, ypadnum_r=R_NilValue, xmcv_r=R_NilValue, xpadnum_r=R_NilValue;
+  SEXP nconfac_r=R_NilValue, ncatfac_r=R_NilValue, mysd_r=R_NilValue, myopti_i=R_NilValue;
+  SEXP ckerlbx_r=R_NilValue, ckerubx_r=R_NilValue, ckerlby_r=R_NilValue, ckeruby_r=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue;
+  SEXP out_cond=R_NilValue, out_cderr=R_NilValue, out_grad=R_NilValue, out_gerr=R_NilValue, out_ll=R_NilValue;
+  int en = asInteger(enrow);
+  int xd = asInteger(xndim);
+  R_xlen_t gsize;
+
+  if (en < 0) en = 0;
+  if (xd < 0) xd = 0;
+  gsize = (R_xlen_t)en * (R_xlen_t)xd;
+
+  PROTECT(tyuno_r = coerceVector(tyuno, REALSXP));
+  PROTECT(tyord_r = coerceVector(tyord, REALSXP));
+  PROTECT(tycon_r = coerceVector(tycon, REALSXP));
+  PROTECT(txuno_r = coerceVector(txuno, REALSXP));
+  PROTECT(txord_r = coerceVector(txord, REALSXP));
+  PROTECT(txcon_r = coerceVector(txcon, REALSXP));
+  PROTECT(eyuno_r = coerceVector(eyuno, REALSXP));
+  PROTECT(eyord_r = coerceVector(eyord, REALSXP));
+  PROTECT(eycon_r = coerceVector(eycon, REALSXP));
+  PROTECT(exuno_r = coerceVector(exuno, REALSXP));
+  PROTECT(exord_r = coerceVector(exord, REALSXP));
+  PROTECT(excon_r = coerceVector(excon, REALSXP));
+  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
+  PROTECT(ymcv_r = coerceVector(ymcv, REALSXP));
+  PROTECT(ypadnum_r = coerceVector(ypadnum, REALSXP));
+  PROTECT(xmcv_r = coerceVector(xmcv, REALSXP));
+  PROTECT(xpadnum_r = coerceVector(xpadnum, REALSXP));
+  PROTECT(nconfac_r = coerceVector(nconfac, REALSXP));
+  PROTECT(ncatfac_r = coerceVector(ncatfac, REALSXP));
+  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
+  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
+  PROTECT(ckerlbx_r = coerceVector(ckerlbx, REALSXP));
+  PROTECT(ckerubx_r = coerceVector(ckerubx, REALSXP));
+  PROTECT(ckerlby_r = coerceVector(ckerlby, REALSXP));
+  PROTECT(ckeruby_r = coerceVector(ckeruby, REALSXP));
+
+  PROTECT(out_cond = allocVector(REALSXP, en));
+  PROTECT(out_cderr = allocVector(REALSXP, en));
+  PROTECT(out_grad = allocVector(REALSXP, gsize));
+  PROTECT(out_gerr = allocVector(REALSXP, gsize));
+  PROTECT(out_ll = allocVector(REALSXP, 1));
+
+  np_density_conditional(REAL(tyuno_r), REAL(tyord_r), REAL(tycon_r),
+                         REAL(txuno_r), REAL(txord_r), REAL(txcon_r),
+                         REAL(eyuno_r), REAL(eyord_r), REAL(eycon_r),
+                         REAL(exuno_r), REAL(exord_r), REAL(excon_r),
+                         REAL(rbw_r),
+                         REAL(ymcv_r), REAL(ypadnum_r), REAL(xmcv_r), REAL(xpadnum_r),
+                         REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
+                         INTEGER(myopti_i),
+                         REAL(out_cond), REAL(out_cderr), REAL(out_grad), REAL(out_gerr), REAL(out_ll),
+                         REAL(ckerlbx_r), REAL(ckerubx_r), REAL(ckerlby_r), REAL(ckeruby_r));
+
+  PROTECT(out = allocVector(VECSXP, 5));
+  SET_VECTOR_ELT(out, 0, out_cond);
+  SET_VECTOR_ELT(out, 1, out_cderr);
+  SET_VECTOR_ELT(out, 2, out_grad);
+  SET_VECTOR_ELT(out, 3, out_gerr);
+  SET_VECTOR_ELT(out, 4, out_ll);
+
+  PROTECT(out_names = allocVector(STRSXP, 5));
+  SET_STRING_ELT(out_names, 0, mkChar("condens"));
+  SET_STRING_ELT(out_names, 1, mkChar("conderr"));
+  SET_STRING_ELT(out_names, 2, mkChar("congrad"));
+  SET_STRING_ELT(out_names, 3, mkChar("congerr"));
+  SET_STRING_ELT(out_names, 4, mkChar("log_likelihood"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  UNPROTECT(37);
   return out;
 }
 

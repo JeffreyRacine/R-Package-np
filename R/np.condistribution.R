@@ -258,29 +258,27 @@ npcdist.condbandwidth <-
     cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
     cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])
     
-    myout=
-      .C("np_density_conditional",
-         as.double(tyuno), as.double(tyord), as.double(tycon),
-         as.double(txuno), as.double(txord), as.double(txcon),
-         as.double(eyuno), as.double(eyord), as.double(eycon),
-         as.double(exuno), as.double(exord), as.double(excon),
-         as.double(c(bws$xbw[bws$ixcon],bws$ybw[bws$iycon],
-                     bws$ybw[bws$iyuno],bws$ybw[bws$iyord],
-                     bws$xbw[bws$ixuno],bws$xbw[bws$ixord])),
-         as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
-         as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-         as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
-         as.integer(myopti),
-         condist = double(enrow),
-         conderr = double(enrow),
-         congrad = double(enrow*bws$xndim),
-         congerr = double(enrow*bws$xndim),
-         log_likelihood = double(1),
-         cxkerlb = as.double(cxker.bounds.c$lb),
-         cxkerub = as.double(cxker.bounds.c$ub),
-         cykerlb = as.double(cyker.bounds.c$lb),
-         cykerub = as.double(cyker.bounds.c$ub),
-         PACKAGE="npRmpi" )[c("condist", "conderr", "congrad", "congerr", "log_likelihood")]
+    myout <-
+      .Call("C_np_density_conditional",
+            as.double(tyuno), as.double(tyord), as.double(tycon),
+            as.double(txuno), as.double(txord), as.double(txcon),
+            as.double(eyuno), as.double(eyord), as.double(eycon),
+            as.double(exuno), as.double(exord), as.double(excon),
+            as.double(c(bws$xbw[bws$ixcon], bws$ybw[bws$iycon],
+                        bws$ybw[bws$iyuno], bws$ybw[bws$iyord],
+                        bws$xbw[bws$ixuno], bws$xbw[bws$ixord])),
+            as.double(bws$ymcv), as.double(attr(bws$ymcv, "pad.num")),
+            as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+            as.double(bws$nconfac), as.double(bws$ncatfac), as.double(bws$sdev),
+            as.integer(myopti),
+            as.integer(enrow),
+            as.integer(bws$xndim),
+            as.double(cxker.bounds.c$lb),
+            as.double(cxker.bounds.c$ub),
+            as.double(cyker.bounds.c$lb),
+            as.double(cyker.bounds.c$ub),
+            PACKAGE = "npRmpi")
+    names(myout)[1] <- "condist"
 
     if(gradients){
       myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
