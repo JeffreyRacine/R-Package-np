@@ -75,7 +75,6 @@ MATRIX mat_fdumpf( MATRIX A, char *s, FILE *fp );
 
 
 
-MATRIX mat_mul( MATRIX A, MATRIX B , MATRIX C );
 MATRIX mat_solve( MATRIX A, MATRIX B, MATRIX X );
 double mat_inv00( MATRIX A, int *ok );
 int mat_is_nonsingular( MATRIX A );
