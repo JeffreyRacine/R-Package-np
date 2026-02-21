@@ -62,8 +62,10 @@ npscoefbw.formula <-
     if (!(miss.z <- !(length(chromoly) == 3)))
       zdat <- mf[, chromoly[[3]], drop = FALSE]
     
-    tbw <- eval(parse(text = paste('npscoefbw(xdat = xdat, ydat = ydat,',
-                        ifelse(miss.z,'','zdat = zdat,'), '...)')))
+    bw.args <- list(xdat = xdat, ydat = ydat)
+    if (!miss.z)
+      bw.args$zdat <- zdat
+    tbw <- do.call(npscoefbw, c(bw.args, list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     tbw$call <- match.call(expand.dots = FALSE)
@@ -98,8 +100,10 @@ npscoefbw.NULL <-
 
     bws <- double(ifelse(miss.z, ncol(xdat), ncol(zdat)))
 
-    tbw <- eval(parse(text = paste("npscoefbw.default(xdat = xdat, ydat = ydat, bws = bws,",
-                        ifelse(miss.z,"", "zdat = zdat,"), "...)")))
+    bw.args <- list(xdat = xdat, ydat = ydat, bws = bws)
+    if (!miss.z)
+      bw.args$zdat <- zdat
+    tbw <- do.call(npscoefbw.default, c(bw.args, list(...)))
 
     ## clean up (possible) inconsistencies due to recursion ...
     mc <- match.call(expand.dots = FALSE)
@@ -158,8 +162,11 @@ npscoefbw.scbandwidth <-
     if (!(is.vector(ydat) | is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
 
-    eval(parse(text = paste("bwMatch(",
-                 ifelse(miss.z, "xdat, bws$xdati", "zdat, bws$zdati"),")")))
+    if (miss.z) {
+      bwMatch(xdat, bws$xdati)
+    } else {
+      bwMatch(zdat, bws$zdati)
+    }
     
     if (dim(xdat)[1] != length(ydat))
       stop("number of regression data and response data do not match")
@@ -178,9 +185,10 @@ npscoefbw.scbandwidth <-
       
     ## catch and destroy NA's
     goodrows = 1:dim(xdat)[1]
-    rows.omit =
-      eval(parse(text = paste("attr(na.omit(data.frame(xdat,ydat",
-                   ifelse(miss.z,'',',zdat'),')), "na.action")')))
+    train.df <- data.frame(xdat, ydat)
+    if (!miss.z)
+      train.df <- data.frame(train.df, zdat)
+    rows.omit <- attr(na.omit(train.df), "na.action")
     
     goodrows[rows.omit] = 0
 
@@ -303,11 +311,14 @@ npscoefbw.scbandwidth <-
 
           }
 
-          scoef.looE <- parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                                ifelse(miss.z,'','tzdat = zdat,'),
-                                'leave.one.out = TRUE, iterate = TRUE,',
-                                'maxiter = backfit.maxiter, tol = backfit.tol,',
-                                'betas = TRUE)'))
+          scoef.loo.args <- list(
+            bws = bws, txdat = xdat, tydat = ydat,
+            leave.one.out = TRUE, iterate = TRUE,
+            maxiter = backfit.maxiter, tol = backfit.tol,
+            betas = TRUE
+          )
+          if (!miss.z)
+            scoef.loo.args$tzdat <- zdat
           
           partial.cv.ls <- function(param, partial.index) {
             sbw <- bws
@@ -319,7 +330,7 @@ npscoefbw.scbandwidth <-
             
             if (backfit.iterate){
               bws$bw.fitted[,partial.index] <- param
-              scoef.loo <- eval(scoef.looE)
+              scoef.loo <- do.call(npscoef, scoef.loo.args)
               partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
             } else {
               bws$bw <- param
@@ -435,9 +446,10 @@ npscoefbw.scbandwidth <-
             bws$bw.fitted <- matrix(data = bws$bw, nrow = length(bws$bw), ncol = n.part)
             ## obtain matrix of alpha.hat | h0 and beta.hat | h0
 
-            scoef <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                                  ifelse(miss.z, '', 'tzdat = zdat,'),
-                                  'iterate = FALSE, betas = TRUE)')))
+            scoef.args <- list(bws = bws, txdat = xdat, tydat = ydat, iterate = FALSE, betas = TRUE)
+            if (!miss.z)
+              scoef.args$tzdat <- zdat
+            scoef <- do.call(npscoef, scoef.args)
             
             resid.full <- ydat - scoef$mean
 
@@ -467,10 +479,14 @@ npscoefbw.scbandwidth <-
 
                 if (backfit.iterate){
                   ## re-estimate all betas
-                  scoef <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                                        ifelse(miss.z, '', 'tzdat = zdat,'),
-                                        'iterate = TRUE, maxiter = backfit.maxiter,',
-                                        'tol = backfit.tol, betas = TRUE)')))
+                  scoef.args <- list(
+                    bws = bws, txdat = xdat, tydat = ydat,
+                    iterate = TRUE, maxiter = backfit.maxiter,
+                    tol = backfit.tol, betas = TRUE
+                  )
+                  if (!miss.z)
+                    scoef.args$tzdat <- zdat
+                  scoef <- do.call(npscoef, scoef.args)
                   resid.full <- ydat - scoef$mean
                 } else {
                   bws$bw <- bws$bw.fitted[,j]
@@ -500,10 +516,14 @@ npscoefbw.scbandwidth <-
               else
                 console <- printClear(console)
             }
-            scoef.loo <- eval(parse(text = paste('npscoef(bws = bws, txdat = xdat, tydat = ydat,',
-                                      ifelse(miss.z,'', 'tzdat = zdat,'),
-                                      'iterate = TRUE, maxiter = backfit.maxiter,',
-                                      'tol = backfit.tol, leave.one.out = TRUE)$mean')))
+            scoef.loo.args <- list(
+              bws = bws, txdat = xdat, tydat = ydat,
+              iterate = TRUE, maxiter = backfit.maxiter,
+              tol = backfit.tol, leave.one.out = TRUE
+            )
+            if (!miss.z)
+              scoef.loo.args$tzdat <- zdat
+            scoef.loo <- do.call(npscoef, scoef.loo.args)$mean
             bws$fval.fitted <- sum((ydat - scoef.loo)^2)/n
           }
 
@@ -619,17 +639,21 @@ npscoefbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
-    tbw <- eval(parse(text=paste("scbandwidth(bw = bws",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ", nobs = dim(xdat)[1],",
-                        "xdati = untangle(xdat),",
-                        "ydati = untangle(data.frame(ydat)),",
-                        "zdati = untangle(zdat),",
-                        "xnames = names(xdat),",
-                        "ynames = deparse(substitute(ydat)),",
-                        "znames = names(zdat),",
-                        "bandwidth.compute = bandwidth.compute)")))
+    sbw.args <- list(
+      bw = bws,
+      nobs = dim(xdat)[1],
+      xdati = untangle(xdat),
+      ydati = untangle(data.frame(ydat)),
+      zdati = untangle(zdat),
+      xnames = names(xdat),
+      ynames = deparse(substitute(ydat)),
+      znames = names(zdat),
+      bandwidth.compute = bandwidth.compute
+    )
+    if (any.m) {
+      for (nm in mc.names[m]) sbw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(scbandwidth, sbw.args)
 
     ## next grab dummies for actual bandwidth selection and perform call
     mc.names <- names(match.call(expand.dots = FALSE))
@@ -647,10 +671,11 @@ npscoefbw.default <-
     any.m <- any(m != 0)
 
 
-    tbw <- eval(parse(text=paste("npscoefbw.scbandwidth(xdat=xdat, ydat=ydat, bws=tbw",
-                        ifelse(any.m, ",",""),
-                        paste(mc.names[m], ifelse(any.m,"=",""), mc.names[m], collapse=", "),
-                        ")")))
+    scbw.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (any.m) {
+      for (nm in mc.names[m]) scbw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(npscoefbw.scbandwidth, scbw.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
