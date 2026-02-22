@@ -39,7 +39,7 @@ mydat <- data.frame(x=mydat[,1],y=mydat[,2])
 q.minm <- 0.0
 q.max <- 1.0
 grid.seq <- seq(q.minm,q.max,length=n.eval)
-grid.dat <- cbind(grid.seq,grid.seq)
+grid.dat <- data.frame(x = grid.seq, y = grid.seq)
 
 mpi.bcast.Robj2slave(mydat)
 mpi.bcast.Robj2slave(grid.dat)
@@ -48,8 +48,13 @@ mpi.bcast.Robj2slave(grid.dat)
 
 t.0 <- system.time(mpi.bcast.cmd(bw <- npudistbw(~x+y,data=mydat),
                                  caller.execute=TRUE))
-t.1 <- system.time(mpi.bcast.cmd(copula <- npcopula(bws=bw,data=mydat,u=grid.dat),
-                                 caller.execute=TRUE))
+t.1 <- system.time({
+  copula <- try(np::npcopula(bws=bw, data=mydat, u=grid.dat), silent=TRUE)
+  if (inherits(copula, "try-error")) {
+    warning("npcopula fit failed in profile demo; continuing with bandwidth summary only.")
+    copula <- NULL
+  }
+})
 
 t <- t.0+t.1
 

@@ -47,6 +47,7 @@ cat("Elapsed time =", t[3], "\n")
 ## Clean up properly then quit()
 
 npRmpi.quit(mode="attach", comm=1)
+mpi.quit()
 ## Batch/cluster attach-mode shutdown (for mpiexec workflows):
 ##   npRmpi.quit(mode="attach", comm=1)
 ## (no force=TRUE required for attach mode)
