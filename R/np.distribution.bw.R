@@ -1,11 +1,27 @@
 npudistbw <- function(...){
-  args = list(...)
-  if (is(args[[1]],"formula"))
-    UseMethod("npudistbw",args[[1]])
-  else if (!is.null(args$formula))
-    UseMethod("npudistbw",args$formula)
-  else
-    UseMethod("npudistbw",args[[which(names(args)=="bws")[1]]])
+  mc <- match.call(expand.dots = FALSE)
+  dots <- mc$...
+
+  if (length(dots) == 0L)
+    stop("invoked without arguments")
+
+  dot.names <- names(dots)
+
+  first.val <- eval(dots[[1L]], envir = parent.frame())
+  if (inherits(first.val, "formula"))
+    return(UseMethod("npudistbw", first.val))
+
+  if (!is.null(dot.names) && any(dot.names == "formula")) {
+    formula.val <- eval(dots[[which(dot.names == "formula")[1L]]], envir = parent.frame())
+    return(UseMethod("npudistbw", formula.val))
+  }
+
+  if (!is.null(dot.names) && any(dot.names == "bws")) {
+    bws.val <- eval(dots[[which(dot.names == "bws")[1L]]], envir = parent.frame())
+    return(UseMethod("npudistbw", bws.val))
+  }
+
+  UseMethod("npudistbw", first.val)
 }
 
 npudistbw.formula <-
