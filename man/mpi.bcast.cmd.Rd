@@ -46,7 +46,7 @@ are, the more CPUs consume.}
   If nonblock=TRUE, then on receiving side, a nonblock procedure is used to check if 
   there is a message. If not, it will sleep for the specied amount and repeat itself.
   
-  Please use \code{\link{mpi.remote.exec}} if you want the executed results returned from R 
+  Please use \code{mpi.remote.exec} if you want the executed results returned from R 
   slaves.
  }
 \section{Warning}{
@@ -58,9 +58,6 @@ are, the more CPUs consume.}
 
 \author{
 Hao Yu (minor modifications by  Jeffrey S. Racine \email{racinej@mcmaster.ca})
-}
-\seealso{
-  \code{\link{mpi.remote.exec}}
 }
 %\examples{
 %}
