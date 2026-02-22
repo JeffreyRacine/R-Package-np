@@ -1743,16 +1743,5 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (is.null(expr))
     stop(sprintf("bandwidth call does not contain '%s'", arg))
 
-  call.env <- environment(bws$call)
-  val <- try(eval(expr, envir = call.env), silent = TRUE)
-  if (!inherits(val, "try-error"))
-    return(val)
-
-  # Auto-dispatch can rewrite call arguments into temporary symbols that
-  # live outside bws$call's lexical environment.
-  if (exists(".npRmpi_autodispatch_eval_arg", mode = "function")) {
-    return(.npRmpi_autodispatch_eval_arg(expr, caller_env = parent.frame()))
-  }
-
-  stop(attr(val, "condition")$message)
+  eval(expr, envir = environment(bws$call))
 }
