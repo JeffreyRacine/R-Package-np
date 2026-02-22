@@ -184,8 +184,14 @@
   out <- mc
   if (is.call(out) && length(out) >= 1L && is.symbol(out[[1L]])) {
     fname <- as.character(out[[1L]])
-    if (exists(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)) {
-      out[[1L]] <- get(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
+    if (grepl(".", fname, fixed = TRUE)) {
+      # For non-exported S3 methods (e.g., npcdens.conbandwidth), broadcast
+      # the generic symbol to avoid serializing closure heads in MPI commands.
+      generic <- strsplit(fname, ".", fixed = TRUE)[[1L]][1L]
+      if (nzchar(generic) &&
+          exists(generic, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)) {
+        out[[1L]] <- as.name(generic)
+      }
     }
   }
   tmpnames <- character(0)
