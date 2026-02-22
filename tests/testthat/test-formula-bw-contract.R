@@ -6,7 +6,6 @@ test_that("formula npudensbw matches default interface with subset/na.action", {
   )
   dat$x2[c(4, 17)] <- NA_real_
   keep <- dat$x1 > 0.2
-
   bw_formula <- np::npudensbw(
     ~ x1 + x2,
     data = dat,
@@ -34,7 +33,6 @@ test_that("formula npudistbw matches default interface with subset/na.action", {
   )
   dat$x1[c(2, 11)] <- NA_real_
   keep <- dat$x2 > -0.5
-
   bw_formula <- np::npudistbw(
     ~ x1 + x2,
     data = dat,
@@ -63,7 +61,6 @@ test_that("formula npregbw matches default interface with subset/na.action", {
   )
   dat$y[c(3, 9)] <- NA_real_
   keep <- dat$x1 < 0.85
-
   bw_formula <- np::npregbw(
     y ~ x1 + x2,
     data = dat,
