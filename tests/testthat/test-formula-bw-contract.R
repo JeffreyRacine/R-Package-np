@@ -110,3 +110,35 @@ test_that("formula npregbw matches default interface with subset/na.action", {
 
   expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
 })
+
+test_that("formula npcdistbw gdata path matches default interface", {
+  set.seed(20260222)
+  dat <- data.frame(
+    y = rnorm(36),
+    x = runif(36)
+  )
+  gdat <- data.frame(
+    y = rnorm(18),
+    x = runif(18)
+  )
+
+  bw_formula <- np::npcdistbw(
+    y ~ x,
+    data = dat,
+    gdata = gdat,
+    bws = c(0.35, 0.45),
+    bandwidth.compute = FALSE
+  )
+
+  mf <- model.frame(y ~ x, data = dat)
+  gmf <- model.frame(y ~ x, data = gdat)
+  bw_default <- np::npcdistbw(
+    xdat = mf[, "x", drop = FALSE],
+    ydat = mf[, "y", drop = FALSE],
+    gydat = gmf[, "y", drop = FALSE],
+    bws = c(0.35, 0.45),
+    bandwidth.compute = FALSE
+  )
+
+  expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
+})
