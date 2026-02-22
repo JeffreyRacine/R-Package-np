@@ -381,7 +381,8 @@ npregbw.default <-
       bandwidth.compute = bandwidth.compute
     )
     if (any.m) {
-      for (nm in mc.names[m]) bw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+      nms <- mc.names[m]
+      bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     tbw <- do.call(rbandwidth, bw.args)
 
@@ -401,7 +402,8 @@ npregbw.default <-
 
     bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
     if (any.m) {
-      for (nm in mc.names[m]) bwsel.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+      nms <- mc.names[m]
+      bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     tbw <- do.call(npregbw.rbandwidth, bwsel.args)
 

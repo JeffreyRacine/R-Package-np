@@ -267,7 +267,8 @@ npplregbw.default =
     if (bandwidth.compute) {
       bwsel.args <- list(xdat = xdat, ydat = ydat, zdat = zdat, bws = tbw)
       if (any.m) {
-        for (nm in mc.names[m]) bwsel.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+        nms <- mc.names[m]
+        bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
       }
       tbw <- do.call(npplregbw.plbandwidth, bwsel.args)
     }

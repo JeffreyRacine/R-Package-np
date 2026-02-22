@@ -651,7 +651,8 @@ npscoefbw.default <-
       bandwidth.compute = bandwidth.compute
     )
     if (any.m) {
-      for (nm in mc.names[m]) sbw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+      nms <- mc.names[m]
+      sbw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     tbw <- do.call(scbandwidth, sbw.args)
 
@@ -673,7 +674,8 @@ npscoefbw.default <-
 
     scbw.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
     if (any.m) {
-      for (nm in mc.names[m]) scbw.args[[nm]] <- get(nm, envir = environment(), inherits = FALSE)
+      nms <- mc.names[m]
+      scbw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     tbw <- do.call(npscoefbw.scbandwidth, scbw.args)
 
