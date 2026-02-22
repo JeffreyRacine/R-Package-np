@@ -10,8 +10,7 @@ options(np.messages=FALSE)
 
 set.seed(42)
 
-n <- 5000
-
+n <- as.integer(Sys.getenv("NP_DEMO_N", "5000"))
 x <- rchisq(n, df=3)
 x1 <- (ifelse(x < 6, x, 6) - 2.348)/1.511
 x <- rnorm(n)

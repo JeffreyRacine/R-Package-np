@@ -10,8 +10,7 @@ options(np.messages=FALSE)
 
 set.seed(42)
 
-n <- 1000
-
+n <- as.integer(Sys.getenv("NP_DEMO_N", "1000"))
 x1 <- rnorm(n)
 x2 <- rbinom(n, 5, .3)
 

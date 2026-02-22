@@ -10,8 +10,7 @@ options(np.messages=FALSE)
 
 set.seed(42)
 
-n <- 5000
-
+n <- as.integer(Sys.getenv("NP_DEMO_N", "5000"))
 x1 <- runif(n, min=-1, max=1)
 x2 <- runif(n, min=-1, max=1)
 y <- x1 - x2 + rnorm(n)

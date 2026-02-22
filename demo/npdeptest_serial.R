@@ -10,8 +10,7 @@ options(np.messages=FALSE)
 
 set.seed(42)
 
-n <- 2500
-
+n <- as.integer(Sys.getenv("NP_DEMO_N", "2500"))
 x <- rnorm(n)
 y <- 1 + x + rnorm(n)
 model <- lm(y~x)

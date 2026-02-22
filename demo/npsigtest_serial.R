@@ -10,8 +10,7 @@ set.seed(42)
 
 ## Significance testing with z irrelevant
 
-n <- 1000
-
+n <- as.integer(Sys.getenv("NP_DEMO_N", "1000"))
 z <- factor(rbinom(n,1,.5))
 x1 <- rnorm(n)
 x2 <- runif(n,-2,2)

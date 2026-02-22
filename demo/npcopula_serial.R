@@ -15,8 +15,7 @@ require(MASS)
 
 set.seed(42)
 
-n <- 5000
-n.eval <- 25
+n <- as.integer(Sys.getenv("NP_DEMO_N", "5000"))n.eval <- 25
 rho <- 0.95
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)

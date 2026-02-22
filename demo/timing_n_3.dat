@@ -6,7 +6,6 @@ npconmode (n=0): np=1: 8.3, np=2: 4.2, ratio=0.51
 npcopula (n=5000): np=1: 5.3, np=2: 1.9, ratio=0.36
 npdeneqtest (n=2500): np=1: 33.0, np=2: 11.9, ratio=0.36
 npdeptest (n=2500): np=1: 42.0, np=2: 14.8, ratio=0.35
-npglpreg (n=1000): np=1: 290.9, np=2: 296.0, ratio=1.02
 npindexich (n=5000): np=1: 18.9, np=2: 6.8, ratio=0.36
 npindexks (n=5000): np=1: 25.1, np=2: 8.8, ratio=0.35
 npplreg (n=1000): np=1: 10.3, np=2: 4.2, ratio=0.41

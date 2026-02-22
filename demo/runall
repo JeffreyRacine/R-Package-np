@@ -1,23 +1,26 @@
 #!/bin/bash
+set -euo pipefail
 
 mkdir -p serial
-cd serial
-make -f ../makefile.serial
-cd ../
+(
+  cd serial
+  make -f ../makefile.serial
+)
 
-mkdir -p n_2
-cd n_2
-make -f ../makefile.mpi np=2
-cd ../
+for np in 2 3 4; do
+  mkdir -p "n_${np}_attach"
+  (
+    cd "n_${np}_attach"
+    make -f ../makefile.attach np=${np}
+  )
 
-mkdir -p n_3
-cd n_3
-make -f ../makefile.mpi np=3
-cd ../
+  mkdir -p "n_${np}_profile"
+  (
+    cd "n_${np}_profile"
+    make -f ../makefile.profile np=${np}
+  )
+done
 
-mkdir -p n_4
-cd n_4
-make -f ../makefile.mpi np=4
-cd ../
-
-./timing
+if [ -x ./timing ]; then
+  ./timing
+fi

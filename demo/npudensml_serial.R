@@ -10,8 +10,7 @@ options(np.messages=FALSE)
 
 set.seed(42)
 
-n <- 10000
-
+n <- as.integer(Sys.getenv("NP_DEMO_N", "10000"))
 mydat <- data.frame(x=rnorm(n))
 
 ## A simple example with likelihood cross-validation

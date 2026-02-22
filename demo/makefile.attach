@@ -1,0 +1,7 @@
+DEMOS = npcdensls npcdensml npcdistls npcmstest npconmode npcopula npdeneqtest npdeptest npindexich npindexks npplreg npqreg npregiv npreglcaic npreglcls npregllaic npregllls npscoef npsdeptest npsigtest npsymtest npudensls npudensml npudistcdf npunitest
+
+all:
+	@for d in $(DEMOS); do \
+		echo "[attach][np=$(np)] $$d"; \
+		mpiexec -n $(np) Rscript ../$${d}_npRmpi_attach.R; \
+	done

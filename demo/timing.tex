@@ -49,7 +49,6 @@ show expected scaling benefits.
   speedup (in fact overhead from message passing will slow it down as
   the number of cores increases)
 
-\item Note that currently the function npscoef and npglpreg are not
   fully MPI aware as the ridging occurs outside of a call to npksum()
   hence is processed serially and not in parallel
 

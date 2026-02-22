@@ -22,8 +22,7 @@ ar.series <- function(phi,epsilon) {
   return(series)
 }
 
-n <- 2500
-
+n <- as.integer(Sys.getenv("NP_DEMO_N", "2500"))
 ## Stationary persistent symmetric time-series
 
 yt <- ar.series(0.5,rnorm(n))
