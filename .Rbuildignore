@@ -27,6 +27,7 @@ mknpkg.sh
 ^issue_notes
 ^benchmarks
 ^AGENTS\.md$
+^MODERNIZATION_DOD\.md$
 
 ^benchmarks/oneoff
 ^benchmarks/perf
