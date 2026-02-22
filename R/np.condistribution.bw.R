@@ -26,15 +26,10 @@ npcdistbw.formula <-
     mf <- mf[c(1,m)]
     gmf <- gmf[c(1,gm)]
 
-    if(!missing(call) && is.call(call)){
-      ## rummage about in the call for the original formula
-      for(i in 1:length(call)){
-        if(tryCatch(inherits(eval(call[[i]], envir = parent.frame()), "formula"),
-                    error = function(e) FALSE))
-          break;
-      }
-      mf[[2]] <- call[[i]]
-      gmf[[2]] <- call[[i]]
+    formula.call <- .np_bw_formula_from_call(call_obj = call, eval_env = parent.frame())
+    if (!is.null(formula.call)) {
+      mf[[2]] <- formula.call
+      gmf[[2]] <- formula.call
     }
                      
 

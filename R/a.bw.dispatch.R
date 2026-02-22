@@ -21,3 +21,16 @@
 
   first.val
 }
+
+.np_bw_formula_from_call <- function(call_obj, eval_env = parent.frame()) {
+  if (missing(call_obj) || !is.call(call_obj))
+    return(NULL)
+
+  for (i in seq_along(call_obj)) {
+    val <- tryCatch(eval(call_obj[[i]], envir = eval_env), error = function(e) NULL)
+    if (inherits(val, "formula"))
+      return(call_obj[[i]])
+  }
+
+  NULL
+}
