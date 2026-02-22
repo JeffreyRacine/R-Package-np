@@ -59,7 +59,7 @@ npudist.formula <-
 
 npudist.call <-
   function(bws, ...) {
-    npudist(tdat = eval(bws$call[["dat"]], environment(bws$call)),
+    npudist(tdat = .np_eval_bws_call_arg(bws, "dat"),
           bws = bws, ...)
   }
 

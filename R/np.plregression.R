@@ -112,9 +112,9 @@ npplreg.formula <-
 
 npplreg.call <-
   function(bws, ...) {
-    npplreg(txdat = eval(bws$call[["xdat"]], environment(bws$call)),
-            tydat = eval(bws$call[["ydat"]], environment(bws$call)),
-            tzdat = eval(bws$call[["zdat"]], environment(bws$call)),
+    npplreg(txdat = .np_eval_bws_call_arg(bws, "xdat"),
+            tydat = .np_eval_bws_call_arg(bws, "ydat"),
+            tzdat = .np_eval_bws_call_arg(bws, "zdat"),
             bws = bws, ...)
   }
 

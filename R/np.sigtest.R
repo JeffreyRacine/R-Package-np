@@ -84,8 +84,8 @@ npsigtest.formula <-
 
 npsigtest.call <-
   function(bws, ...) {
-    ev <- npsigtest(xdat = eval(bws$call[["xdat"]], environment(bws$call)),
-                    ydat = eval(bws$call[["ydat"]], environment(bws$call)),
+    ev <- npsigtest(xdat = .np_eval_bws_call_arg(bws, "xdat"),
+                    ydat = .np_eval_bws_call_arg(bws, "ydat"),
                     bws = bws, ...)
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()

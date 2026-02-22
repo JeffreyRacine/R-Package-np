@@ -1734,3 +1734,25 @@ int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.6239694368826
                  0.5, 2.90113075268188e-01)
 
 QFAC <- qnorm(.25,lower.tail=F)*2
+
+.np_eval_bws_call_arg <- function(bws, arg) {
+  if (is.null(bws$call))
+    stop("bandwidth object does not contain a call component")
+
+  expr <- bws$call[[arg]]
+  if (is.null(expr))
+    stop(sprintf("bandwidth call does not contain '%s'", arg))
+
+  call.env <- environment(bws$call)
+  val <- try(eval(expr, envir = call.env), silent = TRUE)
+  if (!inherits(val, "try-error"))
+    return(val)
+
+  # Auto-dispatch can rewrite call arguments into temporary symbols that
+  # live outside bws$call's lexical environment.
+  if (exists(".npRmpi_autodispatch_eval_arg", mode = "function")) {
+    return(.npRmpi_autodispatch_eval_arg(expr, caller_env = parent.frame()))
+  }
+
+  stop(attr(val, "condition")$message)
+}

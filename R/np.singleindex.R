@@ -111,8 +111,8 @@ npindex.formula <-
 
 npindex.call <-
   function(bws, ...) {
-    npindex(txdat = eval(bws$call[["xdat"]], environment(bws$call)),
-            tydat = eval(bws$call[["ydat"]], environment(bws$call)),
+    npindex(txdat = .np_eval_bws_call_arg(bws, "xdat"),
+            tydat = .np_eval_bws_call_arg(bws, "ydat"),
             bws = bws, ...)
   }
 

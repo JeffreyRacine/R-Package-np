@@ -71,8 +71,8 @@
       xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
     } else {
       if(all(miss.xy) && !is.null(bws$call)){
-        xdat <- data.frame(eval(bws$call[["xdat"]], environment(bws$call)))
-        ydat = eval(bws$call[["ydat"]], environment(bws$call))
+        xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"))
+        ydat = .np_eval_bws_call_arg(bws, "ydat")
       }
           
       ## catch and destroy NA's
