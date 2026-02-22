@@ -241,8 +241,6 @@
     val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
     idx <- idx + 1L
     tmp <- sprintf(".__npRmpi_autod_%s_%d", nm, idx)
-    .GlobalEnv[[tmp]] <- val
-    .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
 
     out[[i]] <- as.name(tmp)
     # Preserve formula-method dispatch semantics for generics that use
@@ -327,6 +325,22 @@
   x
 }
 
+.npRmpi_autodispatch_publish_tmps <- function(tmpvals, comm = 1L) {
+  if (!length(tmpvals))
+    return(invisible(TRUE))
+
+  # Publish all temporary call materials in one broadcast command instead of
+  # per-object broadcasts, which add substantial fixed MPI overhead.
+  cmd <- substitute({
+    vals <- VALS
+    for (nm in names(vals))
+      assign(nm, vals[[nm]], envir = .GlobalEnv)
+  }, list(VALS = tmpvals))
+
+  .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
+  invisible(TRUE)
+}
+
 .npRmpi_autodispatch_tag_result <- function(x, mode = "auto") {
   if (is.list(x) || is.environment(x)) {
     attr(x, "npRmpi.dispatch.mode") <- mode
@@ -383,28 +397,49 @@
   if (!.npRmpi_autodispatch_preflight(comm = comm))
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
-  .npRmpi_autodispatch_sync_options(comm = comm)
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
-  on.exit(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm), add = TRUE)
+  if (length(prepared$tmpnames))
+    for (nm in prepared$tmpnames)
+      prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
 
-  if (length(prepared$tmpnames)) {
-    for (nm in prepared$tmpnames) {
-      val <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
-      prepared$tmpvals[[nm]] <- val
-      .GlobalEnv[[nm]] <- val
-      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
-    }
-  }
+  opt.keys <- .npRmpi_autodispatch_option_keys()
+  opt.vals <- lapply(opt.keys, getOption)
+  opt.strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
 
   cmd <- substitute({
+    for (i in seq_along(OPT_KEYS))
+      options(structure(list(OPT_VALS[[i]]), names = OPT_KEYS[[i]]))
+
+    if (OPT_STRICT) {
+      for (i in seq_along(OPT_KEYS)) {
+        lval <- getOption(OPT_KEYS[[i]])
+        if (!identical(lval, OPT_VALS[[i]]))
+          stop(sprintf("failed to synchronize option '%s' across MPI ranks", OPT_KEYS[[i]]))
+      }
+    }
+
+    tmpvals <- TMPVALS
+    if (length(tmpvals)) {
+      for (nm in names(tmpvals))
+        assign(nm, tmpvals[[nm]], envir = .GlobalEnv)
+    }
+
     old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
     old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
     options(npRmpi.autodispatch.context = TRUE)
     options(npRmpi.autodispatch.disable = TRUE)
     on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
     on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+    if (length(TMP_NAMES))
+      on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
+
     CALL
-  }, list(CALL = prepared$call))
+  }, list(CALL = prepared$call,
+          TMPVALS = prepared$tmpvals,
+          TMP_NAMES = prepared$tmpnames,
+          OPT_KEYS = opt.keys,
+          OPT_VALS = opt.vals,
+          OPT_STRICT = opt.strict))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 
@@ -436,28 +471,49 @@
   if (!.npRmpi_autodispatch_preflight(comm = comm))
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
-  .npRmpi_autodispatch_sync_options(comm = comm)
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
-  on.exit(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm), add = TRUE)
+  if (length(prepared$tmpnames))
+    for (nm in prepared$tmpnames)
+      prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
 
-  if (length(prepared$tmpnames)) {
-    for (nm in prepared$tmpnames) {
-      val <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
-      prepared$tmpvals[[nm]] <- val
-      .GlobalEnv[[nm]] <- val
-      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
-    }
-  }
+  opt.keys <- .npRmpi_autodispatch_option_keys()
+  opt.vals <- lapply(opt.keys, getOption)
+  opt.strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
 
   cmd <- substitute({
+    for (i in seq_along(OPT_KEYS))
+      options(structure(list(OPT_VALS[[i]]), names = OPT_KEYS[[i]]))
+
+    if (OPT_STRICT) {
+      for (i in seq_along(OPT_KEYS)) {
+        lval <- getOption(OPT_KEYS[[i]])
+        if (!identical(lval, OPT_VALS[[i]]))
+          stop(sprintf("failed to synchronize option '%s' across MPI ranks", OPT_KEYS[[i]]))
+      }
+    }
+
+    tmpvals <- TMPVALS
+    if (length(tmpvals)) {
+      for (nm in names(tmpvals))
+        assign(nm, tmpvals[[nm]], envir = .GlobalEnv)
+    }
+
     old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
     old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
     options(npRmpi.autodispatch.context = TRUE)
     options(npRmpi.autodispatch.disable = TRUE)
     on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
     on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+    if (length(TMP_NAMES))
+      on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
+
     CALL
-  }, list(CALL = prepared$call))
+  }, list(CALL = prepared$call,
+          TMPVALS = prepared$tmpvals,
+          TMP_NAMES = prepared$tmpnames,
+          OPT_KEYS = opt.keys,
+          OPT_VALS = opt.vals,
+          OPT_STRICT = opt.strict))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 
