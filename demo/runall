@@ -4,20 +4,20 @@ set -euo pipefail
 mkdir -p serial
 (
   cd serial
-  make -f ../makefile.serial
+  make -f ../makefile MODE=serial
 )
 
 for np in 2 3 4; do
   mkdir -p "n_${np}_attach"
   (
     cd "n_${np}_attach"
-    make -f ../makefile.attach np=${np}
+    make -f ../makefile MODE=attach NP=${np}
   )
 
   mkdir -p "n_${np}_profile"
   (
     cd "n_${np}_profile"
-    make -f ../makefile.profile np=${np}
+    make -f ../makefile MODE=profile NP=${np}
   )
 done
 

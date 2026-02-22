@@ -78,7 +78,7 @@ startup/teardown behavior:
 }
 
 Template startup profile for manual-broadcast attach workflows is provided at
-\code{inst/.Rprofile}. Copy it to the job working directory (or set
+\code{inst/Rprofile}. Copy it to the job working directory (or set
 \code{R_PROFILE} to that file) when using \code{mpiexec -n ... R CMD BATCH ...}
 with explicit \code{mpi.bcast.cmd()} and \code{mpi.bcast.Robj2slave()} calls.
 
@@ -111,7 +111,7 @@ if (is.master) {
 
 ## CASE 3: performance-oriented attach mode with manual broadcast (.Rprofile)
 ## run: mpiexec -n 6 R CMD BATCH --no-save script_attach_manual.R
-## requires: .Rprofile from inst/.Rprofile in working dir (or R_PROFILE set)
+## requires: .Rprofile from inst/Rprofile in working dir (or R_PROFILE set)
 mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
 mpi.bcast.cmd(library(MASS), caller.execute=TRUE)
 mpi.bcast.cmd(set.seed(42), caller.execute=TRUE)

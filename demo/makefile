@@ -1,2 +1,27 @@
-all:
-	$(MAKE) -f ../makefile.attach np=$(np)
+DEMOS = npcdensls npcdensml npcdistls npcmstest npconmode npcopula npdeneqtest npdeptest npindexich npindexks npplreg npqreg npregiv npreglcaic npreglcls npregllaic npregllls npscoef npsdeptest npsigtest npsymtest npudensls npudensml npudistcdf npunitest
+
+MODE ?= attach
+NP ?= 2
+RPROFILE ?= $(shell Rscript -e 'cat(system.file("Rprofile", package="npRmpi"))')
+
+all: run
+
+run: run-$(MODE)
+
+run-serial:
+	@for d in $(DEMOS); do \
+		echo "[serial] $$d"; \
+		R CMD BATCH --vanilla ../$${d}_serial.R; \
+	done
+
+run-attach:
+	@for d in $(DEMOS); do \
+		echo "[attach][np=$(NP)] $$d"; \
+		mpiexec -n $(NP) Rscript ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout; \
+	done
+
+run-profile:
+	@for d in $(DEMOS); do \
+		echo "[profile][np=$(NP)] $$d"; \
+		R_PROFILE_USER=$(RPROFILE) mpiexec -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R; \
+	done

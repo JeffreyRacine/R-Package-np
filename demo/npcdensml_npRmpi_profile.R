@@ -1,4 +1,4 @@
-## Make sure you have the .Rprofile file from npRmpi/inst/ in your
+## Make sure you have the Rprofile file from npRmpi/inst/ in your
 ## current directory or home directory. It is necessary.
 
 ## To run this on systems with OPENMPI installed and working, try

@@ -617,7 +617,7 @@
 }
 
 \details{
-  For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/.Rprofile}.
+  For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/Rprofile}.
   Documentation guide: see \code{\link{np.kernels}} for kernels and
   \code{\link{np.options}} for global options.
 
