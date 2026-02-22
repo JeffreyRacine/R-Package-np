@@ -29,7 +29,8 @@ npscoef.formula <-
     tmf <- bws$call[c(1,m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    umf <- tmf <- eval(tmf, envir = environment(tt))
+    mf.args <- as.list(tmf)[-1L]
+    umf <- tmf <- do.call("model.frame", mf.args, envir = environment(tt))
 
     tydat <- model.response(tmf)
     txdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
