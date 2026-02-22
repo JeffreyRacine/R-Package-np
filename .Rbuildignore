@@ -43,6 +43,7 @@
 mknpkg.sh
 npver
 ^AGENTS\.md$
+^MODERNIZATION_DOD\.md$
 ^MPI_CALLABLE_INVENTORY\.md$
 ^REVISION_SUMMARY_.*\.md$
 
@@ -50,3 +51,4 @@ npver
 ^benchmarks/perf
 ^benchmarks/validation
 ^benchmarks/common
+^benchmarks$
