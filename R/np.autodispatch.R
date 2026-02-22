@@ -38,6 +38,27 @@
   eval(expr, envir = caller_env)
 }
 
+.npRmpi_autodispatch_next_remote_name <- function() {
+  id <- getOption("npRmpi.autodispatch.remote.counter", 0L)
+  id <- as.integer(id) + 1L
+  options(npRmpi.autodispatch.remote.counter = id)
+  sprintf(".__npRmpi_autod_ret_%d", id)
+}
+
+.npRmpi_autodispatch_remote_ref <- function(x) {
+  ref <- try(attr(x, "npRmpi.autodispatch.remote", exact = TRUE), silent = TRUE)
+  if (inherits(ref, "try-error") || !is.character(ref) || length(ref) != 1L || !nzchar(ref))
+    return(NULL)
+  ref
+}
+
+.npRmpi_autodispatch_large_arg_threshold <- function() {
+  thr <- getOption("npRmpi.autodispatch.arg.broadcast.threshold", 4096L)
+  if (!is.numeric(thr) || length(thr) != 1L || is.na(thr) || thr < 0)
+    return(4096L)
+  as.integer(thr)
+}
+
 .npRmpi_autodispatch_as_generic_call <- function(generic, mc) {
   args <- as.list(mc)[-1L]
   as.call(c(list(as.name(generic)), args))
@@ -196,6 +217,7 @@
   }
   tmpnames <- character(0)
   tmpvals <- list()
+  prepublish <- list()
   idx <- 0L
 
   has_data_inputs <- !is.null(nms) && any(nms %in% c("data", "xdat", "ydat", "txdat", "tydat", "zdat"))
@@ -239,6 +261,11 @@
     if (!nm %in% targets) next
 
     val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
+    ref <- .npRmpi_autodispatch_remote_ref(val)
+    if (!is.null(ref)) {
+      out[[i]] <- as.name(ref)
+      next
+    }
     idx <- idx + 1L
     tmp <- sprintf(".__npRmpi_autod_%s_%d", nm, idx)
 
@@ -252,10 +279,14 @@
       names(out) <- out.nms
     }
     tmpnames <- c(tmpnames, tmp)
-    tmpvals[[tmp]] <- val
+    if (as.numeric(object.size(val)) >= .npRmpi_autodispatch_large_arg_threshold()) {
+      prepublish[[tmp]] <- val
+    } else {
+      tmpvals[[tmp]] <- val
+    }
   }
 
-  list(call = out, tmpnames = unique(tmpnames), tmpvals = tmpvals)
+  list(call = out, tmpnames = unique(tmpnames), tmpvals = tmpvals, prepublish = prepublish)
 }
 
 .npRmpi_autodispatch_cleanup <- function(tmpnames, comm = 1L) {
@@ -341,9 +372,11 @@
   invisible(TRUE)
 }
 
-.npRmpi_autodispatch_tag_result <- function(x, mode = "auto") {
-  if (is.list(x) || is.environment(x)) {
+.npRmpi_autodispatch_tag_result <- function(x, mode = "auto", remote = NULL) {
+  if (!is.null(x)) {
     attr(x, "npRmpi.dispatch.mode") <- mode
+    if (is.character(remote) && length(remote) == 1L && nzchar(remote))
+      attr(x, "npRmpi.autodispatch.remote") <- remote
   }
   x
 }
@@ -357,6 +390,7 @@
     }
   }
   attr(x, "npRmpi.dispatch.mode") <- NULL
+  attr(x, "npRmpi.autodispatch.remote") <- NULL
   x
 }
 
@@ -400,11 +434,22 @@
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
   if (length(prepared$tmpnames))
     for (nm in prepared$tmpnames)
-      prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
+      if (!is.null(prepared$tmpvals[[nm]]))
+        prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
+      else if (!is.null(prepared$prepublish[[nm]]))
+        prepared$prepublish[[nm]] <- .npRmpi_autodispatch_untag(prepared$prepublish[[nm]])
+
+  if (length(prepared$prepublish)) {
+    for (nm in names(prepared$prepublish)) {
+      .GlobalEnv[[nm]] <- prepared$prepublish[[nm]]
+      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
+    }
+  }
 
   opt.keys <- .npRmpi_autodispatch_option_keys()
   opt.vals <- lapply(opt.keys, getOption)
   opt.strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
+  remote.name <- .npRmpi_autodispatch_next_remote_name()
 
   cmd <- substitute({
     for (i in seq_along(OPT_KEYS))
@@ -433,23 +478,26 @@
     if (length(TMP_NAMES))
       on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
 
-    CALL
+    res <- CALL
+    assign(REMOTE_NAME, res, envir = .GlobalEnv)
+    res
   }, list(CALL = prepared$call,
           TMPVALS = prepared$tmpvals,
           TMP_NAMES = prepared$tmpnames,
           OPT_KEYS = opt.keys,
           OPT_VALS = opt.vals,
-          OPT_STRICT = opt.strict))
+          OPT_STRICT = opt.strict,
+          REMOTE_NAME = remote.name))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 
   if (is.list(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto"))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
 
   if (is.call(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto"))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
 
-  .npRmpi_autodispatch_tag_result(result, mode = "auto")
+  .npRmpi_autodispatch_tag_result(result, mode = "auto", remote = remote.name)
 }
 
 .npRmpi_manual_distributed_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
@@ -474,11 +522,22 @@
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
   if (length(prepared$tmpnames))
     for (nm in prepared$tmpnames)
-      prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
+      if (!is.null(prepared$tmpvals[[nm]]))
+        prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
+      else if (!is.null(prepared$prepublish[[nm]]))
+        prepared$prepublish[[nm]] <- .npRmpi_autodispatch_untag(prepared$prepublish[[nm]])
+
+  if (length(prepared$prepublish)) {
+    for (nm in names(prepared$prepublish)) {
+      .GlobalEnv[[nm]] <- prepared$prepublish[[nm]]
+      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
+    }
+  }
 
   opt.keys <- .npRmpi_autodispatch_option_keys()
   opt.vals <- lapply(opt.keys, getOption)
   opt.strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
+  remote.name <- .npRmpi_autodispatch_next_remote_name()
 
   cmd <- substitute({
     for (i in seq_along(OPT_KEYS))
@@ -507,23 +566,26 @@
     if (length(TMP_NAMES))
       on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
 
-    CALL
+    res <- CALL
+    assign(REMOTE_NAME, res, envir = .GlobalEnv)
+    res
   }, list(CALL = prepared$call,
           TMPVALS = prepared$tmpvals,
           TMP_NAMES = prepared$tmpnames,
           OPT_KEYS = opt.keys,
           OPT_VALS = opt.vals,
-          OPT_STRICT = opt.strict))
+          OPT_STRICT = opt.strict,
+          REMOTE_NAME = remote.name))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
 
   if (is.list(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto"))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
 
   if (is.call(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto"))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
 
-  .npRmpi_autodispatch_tag_result(result, mode = "auto")
+  .npRmpi_autodispatch_tag_result(result, mode = "auto", remote = remote.name)
 }
 
 .npRmpi_bootstrap_make_indices <- function(n,
