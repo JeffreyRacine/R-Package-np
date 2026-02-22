@@ -108,10 +108,6 @@ npplregbw.formula <-
       mf.args$data <- eval(mf.args$data, envir = parent.frame())
       mf.xf.args$data <- mf.args$data
     }
-    if (!is.null(mf.args$na.action))
-      mf.args$na.action <- eval(mf.args$na.action, envir = parent.frame())
-    if (!is.null(mf.xf.args$na.action))
-      mf.xf.args$na.action <- eval(mf.xf.args$na.action, envir = parent.frame())
     if (!is.null(mf.args$subset)) {
       subset.expr <- if (has.data)
         eval(mf.args$subset, envir = mf.args$data, enclos = parent.frame())
