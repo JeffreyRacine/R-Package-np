@@ -948,7 +948,7 @@ SEXP C_np_regression_bw(SEXP runo,
   SET_STRING_ELT(out_names, 7, mkChar("fallback.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(22);
+  UNPROTECT(21);
   return out;
 }
 
@@ -1245,7 +1245,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   SET_STRING_ELT(out_names, 4, mkChar("log_likelihood"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(37);
+  UNPROTECT(32);
   return out;
 }
 
