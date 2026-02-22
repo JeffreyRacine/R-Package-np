@@ -1,30 +1,9 @@
 npudensbw <- function(...){
   mc <- match.call(expand.dots = FALSE)
-  dots <- mc$...
-
-  if (length(dots) == 0L)
-    stop("invoked without arguments")
-
-  dot.names <- names(dots)
-
-  if (!is.null(dot.names) && any(dot.names == "formula")) {
-    formula.val <- eval(dots[[which(dot.names == "formula")[1L]]], envir = parent.frame())
-    return(UseMethod("npudensbw", formula.val))
-  }
-
-  first.val <- eval(dots[[1L]], envir = parent.frame())
-  if (inherits(first.val, "formula"))
-    return(UseMethod("npudensbw", first.val))
-
-  if (!is.null(dot.names) && any(dot.names == "bws")) {
-    bws.val <- eval(dots[[which(dot.names == "bws")[1L]]], envir = parent.frame())
-    return(UseMethod("npudensbw", bws.val))
-  }
-
-  if (!is.null(dot.names) && any(dot.names == "dat"))
-    return(UseMethod("npudensbw", NULL))
-
-  UseMethod("npudensbw", first.val)
+  target <- .np_bw_dispatch_target(dots = mc$...,
+                                   data_arg_names = "dat",
+                                   eval_env = parent.frame())
+  UseMethod("npudensbw", target)
 }
 
 npudensbw.formula <-
