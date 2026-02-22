@@ -31,3 +31,19 @@ test_that("npksum preserves 1D exdat column naming", {
   expect_identical(colnames(k$eval), "exdat")
 })
 
+test_that("npksum positional bws dispatch matches named bws", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  set.seed(42)
+  n <- 20
+  x <- runif(n)
+  y <- rnorm(n)
+
+  {
+    k_named <- npksum(txdat = x, tydat = y, bws = 0.4)
+    k_pos <- npksum(0.4, txdat = x, tydat = y)
+  }
+
+  expect_s3_class(k_pos, "npkernelsum")
+  expect_identical(k_named$ksum, k_pos$ksum)
+})
