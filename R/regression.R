@@ -114,7 +114,7 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   gout.masked
 }
 predict.npregression <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npreg(bws = object$bws, ...), envir = parent.frame())
+  tr <- do.call(npreg, c(list(bws = object$bws), list(...)))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

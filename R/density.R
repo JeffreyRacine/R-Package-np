@@ -68,7 +68,7 @@ fitted.npdensity <- function(object, ...){
 se.npdensity <- function(x){ x$derr }
 
 predict.npdensity <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npudens(bws = object$bws, ...), envir = parent.frame())
+  tr <- do.call(npudens, c(list(bws = object$bws), list(...)))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, log.likelihood = tr$ll))

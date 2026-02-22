@@ -193,4 +193,4 @@ summary.dbandwidth <- function(object, ...) {
 }
 
 
-predict.dbandwidth <- function(...) { do.call(npudist, list(...), envir = parent.frame()) }
+predict.dbandwidth <- function(...) { do.call(npudist, list(...)) }
