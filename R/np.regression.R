@@ -65,14 +65,9 @@ npreg.formula <-
       exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
     }
 
-    reg.args <- list(txdat = txdat, tydat = tydat)
-    if (has.eval) {
-      reg.args$exdat <- exdat
-      if (y.eval)
-        reg.args$eydat <- eydat
-    }
-    reg.args$bws <- bws
-    ev <- do.call(npreg, c(reg.args, list(...)))
+    ev <- eval(parse(text=paste("npreg(txdat = txdat, tydat = tydat,",
+                       ifelse(has.eval,paste("exdat = exdat,",ifelse(y.eval,"eydat = eydat,","")),""),
+                       "bws = bws, ...)")))
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()
 

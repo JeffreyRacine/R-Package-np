@@ -873,6 +873,9 @@ SEXP C_np_regression_bw(SEXP runo,
   double pmult = asReal(penalty_mult);
   int bern = asInteger(glp_bernstein);
   int basis = asInteger(glp_basis);
+  int ncon = 0;
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
 
   if (hlen < 1)
     hlen = 1;
@@ -889,6 +892,19 @@ SEXP C_np_regression_bw(SEXP runo,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  ncon = (int)INTEGER(myopti_i)[REG_NCONI];
+  ckerlb_p = REAL(ckerlb_r);
+  ckerub_p = REAL(ckerub_r);
+  if ((XLENGTH(ckerlb_r) == 0 || XLENGTH(ckerub_r) == 0) && ncon > 0) {
+    int i;
+    ckerlb_p = (double *) R_alloc((size_t)ncon, sizeof(double));
+    ckerub_p = (double *) R_alloc((size_t)ncon, sizeof(double));
+    for (i = 0; i < ncon; i++) {
+      ckerlb_p[i] = -INFINITY;
+      ckerub_p[i] = INFINITY;
+    }
+  }
+
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(rbw_r)));
   PROTECT(out_fval = allocVector(REALSXP, 2));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
@@ -904,7 +920,7 @@ SEXP C_np_regression_bw(SEXP runo,
                    REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                    REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                    REAL(out_fast), REAL(out_fallback),
-                   &pmode, &pmult, INTEGER(degree_i), &bern, &basis, REAL(ckerlb_r), REAL(ckerub_r));
+                   &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p);
 
   PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -967,31 +983,49 @@ SEXP C_np_regression(SEXP tuno,
   int en = asInteger(enrow);
   int nc = asInteger(ncol);
   int do_grad = asLogical(gradients);
+  int ncon = 0;
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
   R_xlen_t gsize;
 
   if (en < 0) en = 0;
   if (nc < 0) nc = 0;
   if (do_grad == NA_LOGICAL) do_grad = 0;
-  gsize = (do_grad ? ((R_xlen_t)en * (R_xlen_t)nc) : 0);
+  /* Keep non-zero storage for g/gerr when gradients are disabled to avoid
+   * passing potentially invalid zero-length REAL pointers into legacy C code. */
+  gsize = (do_grad ? ((R_xlen_t)en * (R_xlen_t)nc) : 1);
 
-  PROTECT(tuno_r = coerceVector(tuno, REALSXP));
-  PROTECT(tord_r = coerceVector(tord, REALSXP));
-  PROTECT(tcon_r = coerceVector(tcon, REALSXP));
-  PROTECT(ty_r = coerceVector(ty, REALSXP));
-  PROTECT(euno_r = coerceVector(euno, REALSXP));
-  PROTECT(eord_r = coerceVector(eord, REALSXP));
-  PROTECT(econ_r = coerceVector(econ, REALSXP));
-  PROTECT(ey_r = coerceVector(ey, REALSXP));
-  PROTECT(rbw_r = coerceVector(rbw, REALSXP));
-  PROTECT(mcv_r = coerceVector(mcv, REALSXP));
-  PROTECT(padnum_r = coerceVector(padnum, REALSXP));
-  PROTECT(nconfac_r = coerceVector(nconfac, REALSXP));
-  PROTECT(ncatfac_r = coerceVector(ncatfac, REALSXP));
-  PROTECT(mysd_r = coerceVector(mysd, REALSXP));
-  PROTECT(myopti_i = coerceVector(myopti, INTSXP));
-  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
-  PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
-  PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
+  PROTECT(tuno_r = duplicate(coerceVector(tuno, REALSXP)));
+  PROTECT(tord_r = duplicate(coerceVector(tord, REALSXP)));
+  PROTECT(tcon_r = duplicate(coerceVector(tcon, REALSXP)));
+  PROTECT(ty_r = duplicate(coerceVector(ty, REALSXP)));
+  PROTECT(euno_r = duplicate(coerceVector(euno, REALSXP)));
+  PROTECT(eord_r = duplicate(coerceVector(eord, REALSXP)));
+  PROTECT(econ_r = duplicate(coerceVector(econ, REALSXP)));
+  PROTECT(ey_r = duplicate(coerceVector(ey, REALSXP)));
+  PROTECT(rbw_r = duplicate(coerceVector(rbw, REALSXP)));
+  PROTECT(mcv_r = duplicate(coerceVector(mcv, REALSXP)));
+  PROTECT(padnum_r = duplicate(coerceVector(padnum, REALSXP)));
+  PROTECT(nconfac_r = duplicate(coerceVector(nconfac, REALSXP)));
+  PROTECT(ncatfac_r = duplicate(coerceVector(ncatfac, REALSXP)));
+  PROTECT(mysd_r = duplicate(coerceVector(mysd, REALSXP)));
+  PROTECT(myopti_i = duplicate(coerceVector(myopti, INTSXP)));
+  PROTECT(degree_i = duplicate(coerceVector(glp_degree, INTSXP)));
+  PROTECT(ckerlb_r = duplicate(coerceVector(ckerlb, REALSXP)));
+  PROTECT(ckerub_r = duplicate(coerceVector(ckerub, REALSXP)));
+
+  ncon = (int)INTEGER(myopti_i)[REG_NCONI];
+  ckerlb_p = REAL(ckerlb_r);
+  ckerub_p = REAL(ckerub_r);
+  if ((XLENGTH(ckerlb_r) == 0 || XLENGTH(ckerub_r) == 0) && ncon > 0) {
+    int i;
+    ckerlb_p = (double *) R_alloc((size_t)ncon, sizeof(double));
+    ckerub_p = (double *) R_alloc((size_t)ncon, sizeof(double));
+    for (i = 0; i < ncon; i++) {
+      ckerlb_p[i] = -INFINITY;
+      ckerub_p[i] = INFINITY;
+    }
+  }
 
   PROTECT(out_mean = allocVector(REALSXP, en));
   PROTECT(out_merr = allocVector(REALSXP, en));
@@ -1006,7 +1040,7 @@ SEXP C_np_regression(SEXP tuno,
                 INTEGER(myopti_i),
                 INTEGER(degree_i), &bern, &basis,
                 REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr), REAL(out_xtra),
-                REAL(ckerlb_r), REAL(ckerub_r));
+                ckerlb_p, ckerub_p);
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_mean);
