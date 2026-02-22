@@ -2,7 +2,8 @@ DEMOS = npcdensls npcdensml npcdistls npcmstest npconmode npcopula npdeneqtest n
 
 MODE ?= attach
 NP ?= 2
-RPROFILE ?= $(shell Rscript -e 'cat(system.file("Rprofile", package="npRmpi"))')
+RPROFILE ?= $(if $(wildcard ../.Rprofile),../.Rprofile,$(shell Rscript -e 'cat(system.file("Rprofile", package="npRmpi"))'))
+MPI_ENV_NP_DEMO_N = $(if $(NP_DEMO_N),-env NP_DEMO_N $(NP_DEMO_N),)
 
 all: run
 
@@ -17,11 +18,11 @@ run-serial:
 run-attach:
 	@for d in $(DEMOS); do \
 		echo "[attach][np=$(NP)] $$d"; \
-		mpiexec -n $(NP) Rscript ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout; \
+		mpiexec $(MPI_ENV_NP_DEMO_N) -n $(NP) Rscript ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout; \
 	done
 
 run-profile:
 	@for d in $(DEMOS); do \
 		echo "[profile][np=$(NP)] $$d"; \
-		R_PROFILE_USER=$(RPROFILE) mpiexec -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R; \
+		R_PROFILE_USER=$(RPROFILE) mpiexec $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R; \
 	done
