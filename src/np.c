@@ -138,6 +138,21 @@ static double bwm_eval_count = 0.0;
 static double bwm_invalid_count = 0.0;
 static double bwm_fast_eval_count = 0.0;
 static double bwm_fallback_eval_count = 0.0;
+
+static void resolve_bounds_or_default(SEXP lb_r, SEXP ub_r, int ncon, double ** lb_p, double ** ub_p)
+{
+  int i;
+  *lb_p = REAL(lb_r);
+  *ub_p = REAL(ub_r);
+  if ((XLENGTH(lb_r) == 0 || XLENGTH(ub_r) == 0) && ncon > 0) {
+    *lb_p = (double *)R_alloc((size_t)ncon, sizeof(double));
+    *ub_p = (double *)R_alloc((size_t)ncon, sizeof(double));
+    for (i = 0; i < ncon; i++) {
+      (*lb_p)[i] = -INFINITY;
+      (*ub_p)[i] = INFINITY;
+    }
+  }
+}
 static int bwm_use_transform = 0;
 static int bwm_num_reg_continuous = 0;
 static int bwm_num_reg_unordered = 0;
@@ -1085,6 +1100,9 @@ SEXP C_np_density(SEXP tuno,
   SEXP ckerlb_r=R_NilValue, ckerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue, out_dens=R_NilValue, out_derr=R_NilValue, out_ll=R_NilValue;
   int en = asInteger(enrow);
+  int ncon = 0;
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
 
   if (en < 0) en = 0;
 
@@ -1104,6 +1122,9 @@ SEXP C_np_density(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  ncon = (int)INTEGER(myopti_i)[DEN_NCONI];
+  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
+
   PROTECT(out_dens = allocVector(REALSXP, en));
   PROTECT(out_derr = allocVector(REALSXP, en));
   PROTECT(out_ll = allocVector(REALSXP, 1));
@@ -1115,7 +1136,7 @@ SEXP C_np_density(SEXP tuno,
              REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
              INTEGER(myopti_i),
              REAL(out_dens), REAL(out_derr), REAL(out_ll),
-             REAL(ckerlb_r), REAL(ckerub_r));
+             ckerlb_p, ckerub_p);
 
   PROTECT(out = allocVector(VECSXP, 3));
   SET_VECTOR_ELT(out, 0, out_dens);
@@ -1171,6 +1192,12 @@ SEXP C_np_density_conditional(SEXP tyuno,
   SEXP out_cond=R_NilValue, out_cderr=R_NilValue, out_grad=R_NilValue, out_gerr=R_NilValue, out_ll=R_NilValue;
   int en = asInteger(enrow);
   int xd = asInteger(xndim);
+  int ncon_x = 0;
+  int ncon_y = 0;
+  double * cxkerlb_p = NULL;
+  double * cxkerub_p = NULL;
+  double * cykerlb_p = NULL;
+  double * cykerub_p = NULL;
   R_xlen_t gsize;
 
   if (en < 0) en = 0;
@@ -1203,6 +1230,11 @@ SEXP C_np_density_conditional(SEXP tyuno,
   PROTECT(ckerlby_r = coerceVector(ckerlby, REALSXP));
   PROTECT(ckeruby_r = coerceVector(ckeruby, REALSXP));
 
+  ncon_x = (int)INTEGER(myopti_i)[CD_UNCONI];
+  ncon_y = (int)INTEGER(myopti_i)[CD_CNCONI];
+  resolve_bounds_or_default(ckerlbx_r, ckerubx_r, ncon_x, &cxkerlb_p, &cxkerub_p);
+  resolve_bounds_or_default(ckerlby_r, ckeruby_r, ncon_y, &cykerlb_p, &cykerub_p);
+
   PROTECT(out_cond = allocVector(REALSXP, en));
   PROTECT(out_cderr = allocVector(REALSXP, en));
   PROTECT(out_grad = allocVector(REALSXP, gsize));
@@ -1218,7 +1250,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
                          REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
                          INTEGER(myopti_i),
                          REAL(out_cond), REAL(out_cderr), REAL(out_grad), REAL(out_gerr), REAL(out_ll),
-                         REAL(ckerlbx_r), REAL(ckerubx_r), REAL(ckerlby_r), REAL(ckeruby_r));
+                         cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
 
   PROTECT(out = allocVector(VECSXP, 5));
   SET_VECTOR_ELT(out, 0, out_cond);
@@ -1260,6 +1292,9 @@ SEXP C_np_density_bw(SEXP myuno,
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
+  int ncon = 0;
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
 
   if(hlen < 1) hlen = 1;
 
@@ -1273,6 +1308,9 @@ SEXP C_np_density_bw(SEXP myuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  ncon = (int)INTEGER(myopti_i)[BW_NCONI];
+  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
+
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
   PROTECT(out_fval = allocVector(REALSXP, 2));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
@@ -1284,7 +1322,7 @@ SEXP C_np_density_bw(SEXP myuno,
   np_density_bw(REAL(myuno_r), REAL(myord_r), REAL(mycon_r),
                 REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                 REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                &pmode, &pmult, REAL(ckerlb_r), REAL(ckerub_r));
+                &pmode, &pmult, ckerlb_p, ckerub_p);
 
   PROTECT(out = allocVector(VECSXP, 6));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -1332,6 +1370,9 @@ SEXP C_np_distribution_bw(SEXP myuno,
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
+  int ncon = 0;
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
 
   if(hlen < 1) hlen = 1;
 
@@ -1348,6 +1389,9 @@ SEXP C_np_distribution_bw(SEXP myuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  ncon = (int)INTEGER(myopti_i)[DBW_NCONI];
+  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
+
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
   PROTECT(out_fval = allocVector(REALSXP, 2));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
@@ -1360,7 +1404,7 @@ SEXP C_np_distribution_bw(SEXP myuno,
                      REAL(myeuno_r), REAL(myeord_r), REAL(myecon_r), REAL(mysd_r),
                      INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                      REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                     &pmode, &pmult, REAL(ckerlb_r), REAL(ckerub_r));
+                     &pmode, &pmult, ckerlb_p, ckerub_p);
 
   PROTECT(out = allocVector(VECSXP, 6));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -1410,6 +1454,12 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
+  int ncon_x = 0;
+  int ncon_y = 0;
+  double * cxkerlb_p = NULL;
+  double * cxkerub_p = NULL;
+  double * cykerlb_p = NULL;
+  double * cykerub_p = NULL;
 
   if(hlen < 1) hlen = 1;
 
@@ -1428,6 +1478,11 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
+  ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
+  ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
+  resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
+  resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
+
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
   PROTECT(out_fval = allocVector(REALSXP, 2));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
@@ -1443,7 +1498,7 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                             INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                             REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                             REAL(out_fast), REAL(out_fallback), &pmode, &pmult,
-                            REAL(cxkerlb_r), REAL(cxkerub_r), REAL(cykerlb_r), REAL(cykerub_r));
+                            cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
 
   PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -1500,6 +1555,12 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
+  int ncon_x = 0;
+  int ncon_y = 0;
+  double * cxkerlb_p = NULL;
+  double * cxkerub_p = NULL;
+  double * cykerlb_p = NULL;
+  double * cykerub_p = NULL;
 
   if(hlen < 1) hlen = 1;
 
@@ -1521,6 +1582,11 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
 
+  ncon_x = (int)INTEGER(myopti_i)[CBW_UNCONI];
+  ncon_y = (int)INTEGER(myopti_i)[CBW_CNCONI];
+  resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
+  resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
+
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
   PROTECT(out_fval = allocVector(REALSXP, 2));
   PROTECT(out_fval_hist = allocVector(REALSXP, hlen));
@@ -1537,7 +1603,7 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                  INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                                  REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                                  REAL(out_fast), REAL(out_fallback), &pmode, &pmult,
-                                 REAL(cxkerlb_r), REAL(cxkerub_r), REAL(cykerlb_r), REAL(cykerub_r));
+                                 cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
 
   PROTECT(out = allocVector(VECSXP, 8));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -1591,6 +1657,9 @@ SEXP C_np_kernelsum(SEXP tuno,
   int n_ksum = asInteger(ksum_len);
   int n_pksum = asInteger(pksum_len);
   int n_kw = asInteger(kw_len);
+  int ncon = 0;
+  double * ckerlb_p = NULL;
+  double * ckerub_p = NULL;
 
   if(n_ksum < 0) n_ksum = 0;
   if(n_pksum < 0) n_pksum = 0;
@@ -1613,6 +1682,9 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerlb_r = coerceVector(ckerlb, REALSXP));
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
+  ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
+  resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
+
   PROTECT(out_ksum = allocVector(REALSXP, n_ksum));
   PROTECT(out_pksum = allocVector(REALSXP, n_pksum));
   PROTECT(out_kw = allocVector(REALSXP, n_kw));
@@ -1624,7 +1696,7 @@ SEXP C_np_kernelsum(SEXP tuno,
                REAL(mcv_r), REAL(padnum_r),
                INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
                REAL(out_ksum), REAL(out_pksum), REAL(out_kw),
-               REAL(ckerlb_r), REAL(ckerub_r));
+               ckerlb_p, ckerub_p);
 
   PROTECT(out = allocVector(VECSXP, 3));
   SET_VECTOR_ELT(out, 0, out_ksum);
