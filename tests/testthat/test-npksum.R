@@ -35,3 +35,17 @@ test_that("npksum positional bws dispatch matches named bws", {
   expect_s3_class(k_pos, "npkernelsum")
   expect_identical(k_named$ksum, k_pos$ksum)
 })
+
+test_that("npksum formula subset and na.action match explicit data path", {
+  set.seed(7)
+  n <- 24
+  dat <- data.frame(x = runif(n), y = rnorm(n))
+  dat$y[c(3, 12)] <- NA_real_
+
+  k_formula <- npksum(y ~ x, data = dat, subset = x > 0.2, na.action = na.omit, bws = 0.45)
+
+  dat2 <- na.omit(subset(dat, x > 0.2))
+  k_explicit <- npksum(txdat = dat2$x, tydat = dat2$y, bws = 0.45)
+
+  expect_identical(k_formula$ksum, k_explicit$ksum)
+})
