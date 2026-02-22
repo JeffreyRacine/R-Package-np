@@ -177,7 +177,8 @@ plotFactor <- function(f, y, ...){
     tmf <- bws$call[c(1, m)]
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
-    tmf <- eval(tmf, envir = environment(tt))
+    mf.args <- as.list(tmf)[-1L]
+    tmf <- do.call("model.frame", mf.args, envir = environment(tt))
 
     ydat <- model.response(tmf)
     xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
