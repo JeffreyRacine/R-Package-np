@@ -3,6 +3,33 @@
     "np.disc.upper.rel.tol", "np.groupcv.fast")
 }
 
+.npRmpi_autodispatch_option_snapshot <- function(keys = .npRmpi_autodispatch_option_keys()) {
+  setNames(lapply(keys, getOption), keys)
+}
+
+.npRmpi_autodispatch_should_sync_options <- function(snapshot) {
+  mode <- getOption("npRmpi.autodispatch.option.sync", "onchange")
+  if (!is.character(mode) || length(mode) != 1L || is.na(mode))
+    mode <- "onchange"
+  mode <- match.arg(mode, choices = c("onchange", "always", "never"))
+
+  if (identical(mode, "never"))
+    return(FALSE)
+
+  if (identical(mode, "always")) {
+    options(npRmpi.autodispatch.option.snapshot = snapshot)
+    return(TRUE)
+  }
+
+  cached <- getOption("npRmpi.autodispatch.option.snapshot", NULL)
+  if (!identical(cached, snapshot)) {
+    options(npRmpi.autodispatch.option.snapshot = snapshot)
+    return(TRUE)
+  }
+
+  FALSE
+}
+
 .npRmpi_warn_pkg_conflict_once <- function() {
   if (!isTRUE(getOption("npRmpi.conflicts.warn", TRUE)))
     return(invisible(FALSE))
@@ -150,7 +177,7 @@
   }, list(KEYS = keys, VALS = vals))
   .npRmpi_bcast_cmd_expr(cmd.sync, comm = comm, caller.execute = TRUE)
 
-  if (isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))) {
+  if (isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))) {
     cmd.verify <- substitute({
       for (i in seq_along(KEYS)) {
         lval <- getOption(KEYS[[i]])
@@ -447,15 +474,23 @@
   }
 
   opt.keys <- .npRmpi_autodispatch_option_keys()
-  opt.vals <- lapply(opt.keys, getOption)
-  opt.strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
+  opt.snapshot <- .npRmpi_autodispatch_option_snapshot(opt.keys)
+  opt.sync <- .npRmpi_autodispatch_should_sync_options(opt.snapshot)
+  if (opt.sync) {
+    opt.keys <- names(opt.snapshot)
+    opt.vals <- unname(opt.snapshot)
+  } else {
+    opt.keys <- character(0)
+    opt.vals <- list()
+  }
+  opt.verify <- opt.sync && isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))
   remote.name <- .npRmpi_autodispatch_next_remote_name()
 
   cmd <- substitute({
     for (i in seq_along(OPT_KEYS))
       options(structure(list(OPT_VALS[[i]]), names = OPT_KEYS[[i]]))
 
-    if (OPT_STRICT) {
+    if (OPT_VERIFY) {
       for (i in seq_along(OPT_KEYS)) {
         lval <- getOption(OPT_KEYS[[i]])
         if (!identical(lval, OPT_VALS[[i]]))
@@ -486,7 +521,7 @@
           TMP_NAMES = prepared$tmpnames,
           OPT_KEYS = opt.keys,
           OPT_VALS = opt.vals,
-          OPT_STRICT = opt.strict,
+          OPT_VERIFY = opt.verify,
           REMOTE_NAME = remote.name))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
@@ -535,15 +570,23 @@
   }
 
   opt.keys <- .npRmpi_autodispatch_option_keys()
-  opt.vals <- lapply(opt.keys, getOption)
-  opt.strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
+  opt.snapshot <- .npRmpi_autodispatch_option_snapshot(opt.keys)
+  opt.sync <- .npRmpi_autodispatch_should_sync_options(opt.snapshot)
+  if (opt.sync) {
+    opt.keys <- names(opt.snapshot)
+    opt.vals <- unname(opt.snapshot)
+  } else {
+    opt.keys <- character(0)
+    opt.vals <- list()
+  }
+  opt.verify <- opt.sync && isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))
   remote.name <- .npRmpi_autodispatch_next_remote_name()
 
   cmd <- substitute({
     for (i in seq_along(OPT_KEYS))
       options(structure(list(OPT_VALS[[i]]), names = OPT_KEYS[[i]]))
 
-    if (OPT_STRICT) {
+    if (OPT_VERIFY) {
       for (i in seq_along(OPT_KEYS)) {
         lval <- getOption(OPT_KEYS[[i]])
         if (!identical(lval, OPT_VALS[[i]]))
@@ -574,7 +617,7 @@
           TMP_NAMES = prepared$tmpnames,
           OPT_KEYS = opt.keys,
           OPT_VALS = opt.vals,
-          OPT_STRICT = opt.strict,
+          OPT_VERIFY = opt.verify,
           REMOTE_NAME = remote.name))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)

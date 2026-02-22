@@ -1,9 +1,15 @@
 .npRmpi_session_apply_options <- function(autodispatch = NULL,
-                                          np.messages = NULL) {
+                                          np.messages = NULL,
+                                          autodispatch.verify.options = NULL,
+                                          autodispatch.option.sync = NULL) {
   if (!is.null(autodispatch))
     options(npRmpi.autodispatch = isTRUE(autodispatch))
   if (!is.null(np.messages))
     options(np.messages = isTRUE(np.messages))
+  if (!is.null(autodispatch.verify.options))
+    options(npRmpi.autodispatch.verify.options = isTRUE(autodispatch.verify.options))
+  if (!is.null(autodispatch.option.sync))
+    options(npRmpi.autodispatch.option.sync = as.character(autodispatch.option.sync)[1L])
   invisible(TRUE)
 }
 
@@ -43,6 +49,8 @@ npRmpi.init <- function(...,
                          comm = 1,
                          mode = c("auto", "spawn", "attach"),
                          autodispatch = TRUE,
+                         autodispatch.verify.options = FALSE,
+                         autodispatch.option.sync = c("onchange", "always", "never"),
                          np.messages = FALSE,
                          nonblock = TRUE,
                          sleep = 0.1,
@@ -56,6 +64,7 @@ npRmpi.init <- function(...,
   }
 
   mode <- match.arg(mode)
+  autodispatch.option.sync <- match.arg(autodispatch.option.sync)
   world.size <- try(mpi.comm.size(0), silent = TRUE)
   world.size <- if (inherits(world.size, "try-error") || is.na(world.size)) 1L else as.integer(world.size)
 
@@ -63,7 +72,12 @@ npRmpi.init <- function(...,
     mode <- if (world.size > 1L) "attach" else "spawn"
   }
 
-  .npRmpi_session_apply_options(autodispatch = autodispatch, np.messages = np.messages)
+  .npRmpi_session_apply_options(
+    autodispatch = autodispatch,
+    np.messages = np.messages,
+    autodispatch.verify.options = autodispatch.verify.options,
+    autodispatch.option.sync = autodispatch.option.sync
+  )
 
   if (identical(mode, "spawn")) {
     if (.npRmpi_session_has_active_pool(comm = comm)) {
