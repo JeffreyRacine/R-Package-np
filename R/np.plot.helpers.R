@@ -143,13 +143,12 @@ draw.all.error.types <- function(ex, center, all.err,
 }
 
 plotFactor <- function(f, y, ...){
-  dot.expr <- as.list(substitute(list(...)))[-1L]
-  dot.names <- names(dot.expr)
+  dot.args <- list(...)
+  dot.names <- names(dot.args)
   has.user.lty <- !is.null(dot.names) && any(dot.names == "lty")
 
   if (has.user.lty) {
-    plot.call <- as.call(c(list(quote(plot), x = quote(f), y = quote(y)), dot.expr))
-    eval(plot.call, parent.frame())
+    do.call(plot, c(list(x = f, y = y), dot.args))
   } else {
     plot(x = f, y = y, lty = "blank", ...)
   }
