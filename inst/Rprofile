@@ -18,6 +18,14 @@ if (!invisible(library(npRmpi, logical.return = TRUE))) {
   q(save = "no")
 }
 
+# Ensure core base/recommended packages are attached for worker-side eval
+# when launched via Rscript + .Rprofile.
+for (pkg in c("utils", "stats", "datasets", "grDevices", "graphics", "methods")) {
+  if (!(paste0("package:", pkg) %in% search())) {
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE))
+  }
+}
+
 options(error = quote(assign(".mpi.err", FALSE, envir = .GlobalEnv)))
 
 if (mpi.comm.size(0) > 1)
@@ -32,7 +40,17 @@ if (mpi.comm.rank(0) > 0) {
                                  nonblock = .nonblock, sleep = .sleep)
     if (is.character(tmp.message) && identical(tmp.message, "kaerb"))
       break
-    try(eval(tmp.message, envir = .GlobalEnv), TRUE)
+    res <- try(eval(tmp.message, envir = .GlobalEnv), silent = TRUE)
+    if (inherits(res, "try-error")) {
+      cmd <- paste(utils::capture.output(print(tmp.message)), collapse = " ")
+      msg <- as.character(res)
+      base::cat(sprintf("\n[slave rank %d] CMD: %s\n[slave rank %d] ERROR: %s\n",
+                        mpi.comm.rank(0), cmd, mpi.comm.rank(0),
+                        paste(msg, collapse = " ")),
+                file = stderr())
+      flush(stderr())
+      base::stop(msg)
+    }
   }
   mpi.comm.free(.comm)
   mpi.quit()
