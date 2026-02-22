@@ -170,3 +170,36 @@ test_that("formula npcdensbw matches default interface with subset/na.action", {
 
   expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
 })
+
+test_that("formula npindexbw matches default interface with subset/na.action", {
+  set.seed(20260222)
+  dat <- data.frame(
+    y = rnorm(42),
+    x1 = runif(42),
+    x2 = rnorm(42)
+  )
+  dat$y[c(4, 21)] <- NA_real_
+
+  bw_formula <- np::npindexbw(
+    y ~ x1 + x2,
+    data = dat,
+    subset = x1 < 0.9,
+    na.action = na.omit,
+    bws = c(0.2, 0.3, 0.4),
+    bandwidth.compute = FALSE,
+    method = "ichimura",
+    nmulti = 1
+  )
+
+  mf <- model.frame(y ~ x1 + x2, data = dat, subset = x1 < 0.9, na.action = na.omit)
+  bw_default <- np::npindexbw(
+    xdat = mf[, c("x1", "x2"), drop = FALSE],
+    ydat = model.response(mf),
+    bws = c(0.2, 0.3, 0.4),
+    bandwidth.compute = FALSE,
+    method = "ichimura",
+    nmulti = 1
+  )
+
+  expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
+})
