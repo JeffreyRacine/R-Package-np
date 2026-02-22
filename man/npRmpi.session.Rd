@@ -12,7 +12,10 @@ reuse it across multiple examples within the same R session.
 \usage{
 npRmpi.init(..., nslaves = 1, comm = 1,
             mode = c("auto", "spawn", "attach"),
-            autodispatch = TRUE, np.messages = FALSE,
+            autodispatch = TRUE,
+            autodispatch.verify.options = FALSE,
+            autodispatch.option.sync = c("onchange", "always", "never"),
+            np.messages = FALSE,
             nonblock = TRUE, sleep = 0.1, quiet = FALSE)
 
 npRmpi.quit(force = FALSE, dellog = TRUE, comm = 1,
@@ -30,6 +33,11 @@ npRmpi.session.info(comm = 1)
     \code{"attach"} when \code{mpi.comm.size(0) > 1}, otherwise \code{"spawn"}.}
   \item{autodispatch}{Logical; if non-\code{NULL}, sets
     \code{options(npRmpi.autodispatch=...)} inside \code{npRmpi.init()}.}
+  \item{autodispatch.verify.options}{Logical; when \code{TRUE}, verify selected
+    synchronized options across ranks on each dispatch sync event.}
+  \item{autodispatch.option.sync}{Option synchronization policy for
+    auto-dispatch: \code{"onchange"} (default), \code{"always"}, or
+    \code{"never"}.}
   \item{np.messages}{Logical; if non-\code{NULL}, sets
     \code{options(np.messages=...)} inside \code{npRmpi.init()}.}
   \item{nonblock}{Logical passed to the internal attach-mode worker loop
@@ -55,6 +63,71 @@ npRmpi.session.info(comm = 1)
 For cluster/batch jobs, run scripts directly under MPI, e.g.
 \code{mpiexec -n 128 Rscript foo.R}, and call
 \code{npRmpi.init(mode="attach")} inside \code{foo.R}.
+
+\strong{Performance note.} Wall-clock can differ across workflows even for
+identical statistical output. The main drivers are MPI message passing and
+startup/teardown behavior:
+\enumerate{
+  \item \code{mpiexec + attach + manual mpi.bcast.*} often has the lowest
+  messaging overhead for small/moderate jobs.
+  \item \code{R CMD BATCH + npRmpi.init(mode="spawn")} is simpler to use but
+  may pay additional broadcast/setup overhead, especially when many slaves are
+  used on small \code{n}.
+  \item As \code{n} grows, compute usually dominates fixed messaging costs and
+  relative penalties commonly shrink.
+}
+
+Template startup profile for manual-broadcast attach workflows is provided at
+\code{inst/.Rprofile}. Copy it to the job working directory (or set
+\code{R_PROFILE} to that file) when using \code{mpiexec -n ... R CMD BATCH ...}
+with explicit \code{mpi.bcast.cmd()} and \code{mpi.bcast.Robj2slave()} calls.
+
+Minimal comparison script (three patterns) follows:
+\preformatted{
+## CASE 1: user-friendly (single R process; spawn mode)
+## run: R CMD BATCH --no-save script_spawn.R
+library(npRmpi); library(MASS)
+npRmpi.init(nslaves=5)  # autodispatch=TRUE by default
+options(np.messages=FALSE)
+set.seed(42); n <- 5000
+rho <- 0.25; mu <- c(0,0); Sigma <- matrix(c(1,rho,rho,1),2,2)
+dat <- mvrnorm(n=n, mu, Sigma); mydat <- data.frame(x=dat[,2], y=dat[,1])
+bw <- npcdensbw(y~x, bwmethod="cv.ml", data=mydat)
+fit <- npcdens(bws=bw)
+npRmpi.quit()
+
+## CASE 2: user-friendly under mpiexec (attach mode; no manual bcast calls)
+## run: mpiexec -n 6 R CMD BATCH --no-save script_attach_auto.R
+library(npRmpi); library(MASS)
+is.master <- isTRUE(npRmpi.init(mode="attach"))
+if (is.master) {
+  options(np.messages=FALSE)
+  set.seed(42); n <- 5000
+  rho <- 0.25; mu <- c(0,0); Sigma <- matrix(c(1,rho,rho,1),2,2)
+  dat <- mvrnorm(n=n, mu, Sigma); mydat <- data.frame(x=dat[,2], y=dat[,1])
+  bw <- npcdensbw(y~x, bwmethod="cv.ml", data=mydat)
+  fit <- npcdens(bws=bw)
+  npRmpi.quit(mode="attach")
+  mpi.quit()  # explicit master finalize for clean mpiexec exit
+}
+
+## CASE 3: performance-oriented attach mode with manual broadcast (.Rprofile)
+## run: mpiexec -n 6 R CMD BATCH --no-save script_attach_manual.R
+## requires: .Rprofile from inst/.Rprofile in working dir (or R_PROFILE set)
+mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
+mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)
+mpi.bcast.cmd(library(MASS), caller.execute=TRUE)
+mpi.bcast.cmd(set.seed(42), caller.execute=TRUE)
+n <- 5000
+rho <- 0.25; mu <- c(0,0); Sigma <- matrix(c(1,rho,rho,1),2,2)
+dat <- mvrnorm(n=n, mu, Sigma); mydat <- data.frame(x=dat[,2], y=dat[,1])
+mpi.bcast.Robj2slave(mydat)
+t <- system.time(mpi.bcast.cmd(bw <- npcdensbw(y~x, bwmethod="cv.ml", data=mydat),
+                               caller.execute=TRUE))
+t <- t + system.time(mpi.bcast.cmd(fit <- npcdens(bws=bw), caller.execute=TRUE))
+cat("Elapsed time =", t[3], "\n")
+mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)
+}
 
 \code{npRmpi.quit()} is idempotent: if no slaves are running it returns
 silently. When \code{options(npRmpi.reuse.slaves=TRUE)} (default on some
@@ -94,6 +167,7 @@ npRmpi.quit()
 ## npRmpi.init(mode="attach", autodispatch=TRUE, np.messages=FALSE)
 ## ... np* calls ...
 ## npRmpi.quit(mode="attach")
+## mpi.quit()
 }
 }
 \keyword{nonparametric}
