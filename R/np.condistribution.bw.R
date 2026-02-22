@@ -91,15 +91,6 @@ npcdistbw.formula <-
     }
     
     mf.args <- as.list(mf[-1L])
-    has.data <- !is.null(mf.args$data)
-    mf.args$formula <- eval(mf.args$formula, envir = parent.frame())
-    if (has.data)
-      mf.args$data <- eval(mf.args$data, envir = parent.frame())
-    if (!is.null(mf.args$subset))
-      mf.args$subset <- if (has.data)
-        eval(mf.args$subset, envir = mf.args$data, enclos = parent.frame())
-      else
-        eval(mf.args$subset, envir = parent.frame())
     mf <- do.call("model.frame", mf.args, envir = parent.frame())
     
     ydat <- mf[, variableNames[[1]], drop = FALSE]
@@ -108,8 +99,6 @@ npcdistbw.formula <-
     if (has.gval) {
       gmf.args <- as.list(gmf[-1L])
       names(gmf.args)[names(gmf.args) == "gdata"] <- "data"
-      gmf.args$formula <- eval(gmf.args$formula, envir = parent.frame())
-      gmf.args$data <- eval(gmf.args$data, envir = parent.frame())
       gmf <- do.call("model.frame", gmf.args, envir = parent.frame())
       gydat <- gmf[, variableNames[[1]], drop = FALSE]
     }
