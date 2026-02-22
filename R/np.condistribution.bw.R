@@ -95,8 +95,6 @@ npcdistbw.formula <-
     mf.args$formula <- eval(mf.args$formula, envir = parent.frame())
     if (has.data)
       mf.args$data <- eval(mf.args$data, envir = parent.frame())
-    if (!is.null(mf.args$na.action))
-      mf.args$na.action <- eval(mf.args$na.action, envir = parent.frame())
     if (!is.null(mf.args$subset))
       mf.args$subset <- if (has.data)
         eval(mf.args$subset, envir = mf.args$data, enclos = parent.frame())
