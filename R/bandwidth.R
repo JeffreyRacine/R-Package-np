@@ -38,7 +38,7 @@ bandwidth <-
     else if (ckertype == "uniform")
       warning("ignoring kernel order specified with uniform kernel type")
     else {
-      kord = eval(formals()$ckerorder) 
+      kord = c(2,4,6,8) 
       if (!any(kord == ckerorder))
         stop("ckerorder must be one of ", paste(kord,collapse=" "))
     }
