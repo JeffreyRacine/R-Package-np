@@ -7,19 +7,22 @@ npudistbw <- function(...){
 
   dot.names <- names(dots)
 
-  first.val <- eval(dots[[1L]], envir = parent.frame())
-  if (inherits(first.val, "formula"))
-    return(UseMethod("npudistbw", first.val))
-
   if (!is.null(dot.names) && any(dot.names == "formula")) {
     formula.val <- eval(dots[[which(dot.names == "formula")[1L]]], envir = parent.frame())
     return(UseMethod("npudistbw", formula.val))
   }
 
+  first.val <- eval(dots[[1L]], envir = parent.frame())
+  if (inherits(first.val, "formula"))
+    return(UseMethod("npudistbw", first.val))
+
   if (!is.null(dot.names) && any(dot.names == "bws")) {
     bws.val <- eval(dots[[which(dot.names == "bws")[1L]]], envir = parent.frame())
     return(UseMethod("npudistbw", bws.val))
   }
+
+  if (!is.null(dot.names) && any(dot.names %in% c("dat", "gdat")))
+    return(UseMethod("npudistbw", NULL))
 
   UseMethod("npudistbw", first.val)
 }
