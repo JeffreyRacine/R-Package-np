@@ -12,6 +12,19 @@
 
 ## Findings
 
+### Completed (2026-02-22)
+- `predict.*` wrapper modernization checkpoint completed and committed (`2e0ca24`):
+  - Replaced legacy `eval(np*(...), envir = parent.frame())` forwarding in:
+    - `regression.R`, `density.R`, `distribution.R`, `condensity.R`, `condistribution.R`,
+      `smoothcoefficient.R`, `qregression.R`, `singleindex.R`, `plregression.R`.
+  - Replaced bandwidth `predict.*` wrappers using `do.call(..., envir = parent.frame())` with direct `do.call(...)` in:
+    - `bandwidth.R`, `rbandwidth.R`, `dbandwidth.R`, `conbandwidth.R`,
+      `condbandwidth.R`, `plbandwidth.R`, `sibandwidth.R`, `smoothbandwidth.R`.
+  - Smoke logs:
+    - `/tmp/smoke_bw_predict_wrappers_nprmpi.log`
+    - `/tmp/smoke_bw_predict_wrappers_nprmpi_part2.log`
+  - Outcome: completed and closed as a TODO item.
+
 ### A. GlobalEnv temp-object dependency in autodispatch (investigated; not yet removable)
 - Previous behavior relied on assigning transient objects into `.GlobalEnv` before broadcasting.
 - This created side effects and was fragile under nested/manual dispatch boundaries.
@@ -56,6 +69,6 @@
    - `npsigtest`
    - `plot(..., plot.errors.method="bootstrap")` for `npreg`, `npcdens`, `npcdist`
 3. Run `man/run` then `R CMD build` + `R CMD check --as-cran` for `npRmpi`.
-4. Start staged `eval(parse())` retirement in plotting internals:
+4. Continue staged `eval(parse())` retirement in plotting internals:
    - first target `R/np.plot.plot.bandwidth.R` and `R/np.plot.plot.rbandwidth.R`.
 5. After parity confirmation, mirror compatible plot modularization cleanups into `np-master`.
