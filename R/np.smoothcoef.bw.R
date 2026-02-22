@@ -145,8 +145,8 @@ npscoefbw.scbandwidth <-
     
     ## Save seed prior to setting
 
-    if(exists(".Random.seed", .GlobalEnv)) {
-      save.seed <- get(".Random.seed", .GlobalEnv)
+    if(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+      save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
       exists.seed = TRUE
     } else {
       exists.seed = FALSE
@@ -566,7 +566,7 @@ npscoefbw.scbandwidth <-
 
     ## Restore seed
 
-    if(exists.seed) assign(".Random.seed", save.seed, .GlobalEnv)
+    if(exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv)
     
     bws <- scbandwidth(bw = bws$bw,
                        bwmethod = bws$method,
