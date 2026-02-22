@@ -9,6 +9,7 @@ with Mixed Data Types }
   Zheng (1998).
 }
 \details{
+  For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/.Rprofile}.
   Documentation guide: see \code{\link{np.kernels}} for kernels,
   \code{\link{np.options}} for global options, and
   \code{\link{plot}} for plotting options.
@@ -187,7 +188,7 @@ npqcmstest(formula,
   type.
 }
 
-\seealso{
+\seealso{\code{\link{npRmpi.init}}. 
   \code{\link{np.kernels}}, \code{\link{np.options}},
   \code{\link{plot}}, \code{\link{npregbw}}.
 }

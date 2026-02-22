@@ -32,7 +32,7 @@ np.pairs.plot(pair_list)
   \code{np.pairs.plot} returns \code{NULL} (invisibly).
 }
 \details{
-  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
+  Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/.Rprofile} manual-broadcast template.
 
 On the diagonal, \code{npudens} is used to compute kernel density
 estimates. Off-diagonal panels use \code{npreg} with residuals to draw

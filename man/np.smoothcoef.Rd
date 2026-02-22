@@ -260,7 +260,7 @@ FALSE, \dots)
   or out of sample estimates with backfitting.
 }
 
-\seealso{
+\seealso{\code{\link{npRmpi.init}}. 
   \code{\link{np.kernels}}, \code{\link{np.options}}, \code{\link{plot}}
   \code{\link{bw.nrd}}, \code{\link{bw.SJ}}, \code{\link{hist}},
   \code{\link{npudens}}, \code{\link{npudist}},

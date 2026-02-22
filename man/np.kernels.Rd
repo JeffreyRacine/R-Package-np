@@ -7,6 +7,7 @@
   compact-support variants used in C-level code paths).
 }
 \details{
+  For MPI startup/performance guidance (including message-passing tradeoffs and the manual-broadcast template), see \code{\link{npRmpi.init}} details and \code{inst/.Rprofile}.
   Documentation guide: see \code{\link{np.options}} for global options For interactive and cluster batch workflows, see \code{\link{npRmpi.init}}.
   and \code{\link{plot}} for plotting options.
 
