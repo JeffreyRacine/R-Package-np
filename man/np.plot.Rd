@@ -20,7 +20,7 @@
 }
 
 \usage{
-\method{plot}{bandwidth}(bws,
+\method{plot}{bandwidth}(x,
        xdat,
        data = NULL,
        xq = 0.5,
@@ -65,7 +65,7 @@
        \dots,
        random.seed)
 
-\method{plot}{conbandwidth}(bws,
+\method{plot}{conbandwidth}(x,
        xdat,
        ydat,
        data = NULL,
@@ -115,7 +115,7 @@
        \dots,
        random.seed)
 
-\method{plot}{plbandwidth}(bws,
+\method{plot}{plbandwidth}(x,
        xdat,
        ydat,
        zdat,
@@ -165,7 +165,7 @@
        \dots,
        random.seed)
 
-\method{plot}{rbandwidth}(bws,
+\method{plot}{rbandwidth}(x,
        xdat,
        ydat,
        data = NULL,
@@ -213,7 +213,7 @@
        \dots,
        random.seed)
 
-\method{plot}{scbandwidth}(bws,
+\method{plot}{scbandwidth}(x,
        xdat,
        ydat,
        zdat = NULL,
@@ -263,7 +263,7 @@
        \dots,
        random.seed)
 
-\method{plot}{sibandwidth}(bws,
+\method{plot}{sibandwidth}(x,
        xdat,
        ydat,
        data = NULL,
@@ -301,7 +301,7 @@
 }
 \arguments{
 
-  \item{bws}{
+  \item{x}{
     a bandwidth specification. This should be a bandwidth object
     returned from an invocation of \code{\link{npudensbw}}, \link{npcdensbw},
     \code{\link{npregbw}}, \link{npplregbw}, \link{npindexbw}, or
@@ -318,7 +318,7 @@
     an optional data frame, list or environment (or object
     coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
     in the model. If not found in data, the variables are taken from
-    \code{environment(bws)}, typically the environment where the
+    \code{environment(x)}, typically the environment where the
     bandwidth object was generated.
   }
 
