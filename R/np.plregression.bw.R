@@ -99,8 +99,29 @@ npplregbw.formula <-
       attr(mf.xf[["formula"]], "predvars") <- bquote((.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])[,.(match(arguments.mfx,arguments)),drop = FALSE])
     }
     
-    mf <- eval(mf, parent.frame())
-    mf.xf <- eval(mf.xf,parent.frame())
+    mf.args <- as.list(mf[-1L])
+    mf.xf.args <- as.list(mf.xf[-1L])
+    has.data <- !is.null(mf.args$data)
+    mf.args$formula <- eval(mf.args$formula, envir = parent.frame())
+    mf.xf.args$formula <- eval(mf.xf.args$formula, envir = parent.frame())
+    if (has.data) {
+      mf.args$data <- eval(mf.args$data, envir = parent.frame())
+      mf.xf.args$data <- mf.args$data
+    }
+    if (!is.null(mf.args$na.action))
+      mf.args$na.action <- eval(mf.args$na.action, envir = parent.frame())
+    if (!is.null(mf.xf.args$na.action))
+      mf.xf.args$na.action <- eval(mf.xf.args$na.action, envir = parent.frame())
+    if (!is.null(mf.args$subset)) {
+      subset.expr <- if (has.data)
+        eval(mf.args$subset, envir = mf.args$data, enclos = parent.frame())
+      else
+        eval(mf.args$subset, envir = parent.frame())
+      mf.args$subset <- subset.expr
+      mf.xf.args$subset <- subset.expr
+    }
+    mf <- do.call("model.frame", mf.args, envir = parent.frame())
+    mf.xf <- do.call("model.frame", mf.xf.args, envir = parent.frame())
 
     ydat <- model.response(mf)
     xdat <- mf.xf

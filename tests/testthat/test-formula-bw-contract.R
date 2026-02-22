@@ -203,3 +203,65 @@ test_that("formula npindexbw matches default interface with subset/na.action", {
 
   expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
 })
+
+test_that("formula npplregbw matches default interface with subset/na.action", {
+  set.seed(20260222)
+  dat <- data.frame(
+    y = rnorm(44),
+    x = runif(44),
+    z = rnorm(44)
+  )
+  bws_mat <- matrix(c(0.25, 0.35), nrow = 2, ncol = 1)
+
+  bw_formula <- np::npplregbw(
+    y ~ z | x,
+    data = dat,
+    subset = x < 0.92,
+    na.action = na.omit,
+    bws = bws_mat,
+    bandwidth.compute = FALSE
+  )
+
+  mf <- model.frame(y ~ x + z, data = dat, subset = x < 0.92, na.action = na.omit)
+  bw_default <- np::npplregbw(
+    xdat = mf[, "z", drop = FALSE],
+    ydat = model.response(mf),
+    zdat = mf[, "x", drop = FALSE],
+    bws = bws_mat,
+    bandwidth.compute = FALSE
+  )
+
+  bw_formula_vec <- vapply(bw_formula$bw, function(bwi) as.numeric(bwi$bw)[1L], numeric(1))
+  bw_default_vec <- vapply(bw_default$bw, function(bwi) as.numeric(bwi$bw)[1L], numeric(1))
+  expect_equal(bw_formula_vec, bw_default_vec)
+})
+
+test_that("formula npscoefbw matches default interface with subset/na.action", {
+  set.seed(20260222)
+  dat <- data.frame(
+    y = rnorm(44),
+    x = runif(44),
+    z = rnorm(44)
+  )
+  dat$y[c(8, 29)] <- NA_real_
+
+  bw_formula <- np::npscoefbw(
+    y ~ x | z,
+    data = dat,
+    subset = x > 0.08,
+    na.action = na.omit,
+    bws = 0.4,
+    bandwidth.compute = FALSE
+  )
+
+  mf <- model.frame(y ~ x + z, data = dat, subset = x > 0.08, na.action = na.omit)
+  bw_default <- np::npscoefbw(
+    xdat = mf[, "x", drop = FALSE],
+    ydat = model.response(mf),
+    zdat = mf[, "z", drop = FALSE],
+    bws = 0.4,
+    bandwidth.compute = FALSE
+  )
+
+  expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
+})
