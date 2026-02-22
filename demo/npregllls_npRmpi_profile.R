@@ -1,4 +1,4 @@
-## Make sure you have the Rprofile file from npRmpi/inst/ in your
+## Make sure you have the .Rprofile file from npRmpi/inst/ in your
 ## current directory or home directory. It is necessary.
 
 ## To run this on systems with OPENMPI installed and working, try
@@ -11,18 +11,13 @@
 mpi.bcast.cmd(np.mpi.initialize(),
               caller.execute=TRUE)
 
-## Turn off progress i/o as this clutters the output file (if you want
-## to see search progress you can comment out this command)
-
-mpi.bcast.cmd(options(np.messages=FALSE),
-              caller.execute=TRUE)
-
 ## Generate data and broadcast it to all slave nodes in the form of a
 ## data frame
 
 set.seed(42)
 
 n <- as.integer(Sys.getenv("NP_DEMO_N", "5000"))
+
 x <- runif(n)
 z1 <- rbinom(n,1,.5)
 z2 <- rbinom(n,1,.5)
