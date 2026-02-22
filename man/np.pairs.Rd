@@ -54,7 +54,6 @@ scatterplots and smoothers.
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
 npRmpi.init(nslaves=1)
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("USArrests")
 y_vars <- c("Murder", "UrbanPop")

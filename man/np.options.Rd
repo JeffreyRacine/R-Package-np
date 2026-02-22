@@ -70,7 +70,6 @@
 \examples{
 \dontrun{
 npRmpi.init(nslaves=1)
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 old <- options(
   np.tree = TRUE,

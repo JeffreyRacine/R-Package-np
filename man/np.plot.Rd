@@ -752,7 +752,6 @@
 \examples{
 \dontrun{
 npRmpi.init(nslaves=1)
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 # EXAMPLE 1: For this example, we load Giovanni Baiocchi's Italian GDP
 # panel (see Italy for details), then create a data frame in which year

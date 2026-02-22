@@ -110,7 +110,6 @@ The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
 npRmpi.init(nslaves=1)
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 ## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
 ## unadjusted density, and DGP

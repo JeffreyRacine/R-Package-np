@@ -380,7 +380,6 @@ npudistbw(\dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
     npRmpi.init(nslaves=1)
-    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     bw <- npudistbw(formula = ~y, data = mydat)
     npRmpi.quit()
     
@@ -392,7 +391,6 @@ npudistbw(\dots)
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
     npRmpi.init(nslaves=1)
-    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     Fhat <- npudistbw(tdat = y, ckertype="epanechnikov", ckerorder=4)
     npRmpi.quit()
     
@@ -582,7 +580,6 @@ npudistbw(\dots)
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
 npRmpi.init(nslaves=1)
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data("Italy")
 

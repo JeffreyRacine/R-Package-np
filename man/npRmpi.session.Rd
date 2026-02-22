@@ -88,7 +88,6 @@ Minimal comparison script (three patterns) follows:
 ## run: R CMD BATCH --no-save script_spawn.R
 library(npRmpi); library(MASS)
 npRmpi.init(nslaves=5)  # autodispatch=TRUE by default
-options(np.messages=FALSE)
 set.seed(42); n <- 5000
 rho <- 0.25; mu <- c(0,0); Sigma <- matrix(c(1,rho,rho,1),2,2)
 dat <- mvrnorm(n=n, mu, Sigma); mydat <- data.frame(x=dat[,2], y=dat[,1])
@@ -101,7 +100,6 @@ npRmpi.quit()
 library(npRmpi); library(MASS)
 is.master <- isTRUE(npRmpi.init(mode="attach"))
 if (is.master) {
-  options(np.messages=FALSE)
   set.seed(42); n <- 5000
   rho <- 0.25; mu <- c(0,0); Sigma <- matrix(c(1,rho,rho,1),2,2)
   dat <- mvrnorm(n=n, mu, Sigma); mydat <- data.frame(x=dat[,2], y=dat[,1])
@@ -115,7 +113,6 @@ if (is.master) {
 ## run: mpiexec -n 6 R CMD BATCH --no-save script_attach_manual.R
 ## requires: .Rprofile from inst/.Rprofile in working dir (or R_PROFILE set)
 mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
-mpi.bcast.cmd(options(np.messages=FALSE), caller.execute=TRUE)
 mpi.bcast.cmd(library(MASS), caller.execute=TRUE)
 mpi.bcast.cmd(set.seed(42), caller.execute=TRUE)
 n <- 5000

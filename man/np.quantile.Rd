@@ -65,7 +65,6 @@ npquantile(x = NULL,
     ## reuse the existing pool instead of respawning. To change the number of
     ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
     npRmpi.init(nslaves=1)
-    options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
     set.seed(42)
     x <- rchisq(100,df=10)
     npquantile(x)
@@ -183,7 +182,6 @@ npquantile(x = NULL,
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
 npRmpi.init(nslaves=1)
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 set.seed(42)
 

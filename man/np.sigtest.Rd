@@ -161,7 +161,7 @@ npsigtest(bws, \dots)
   distortions that may arise in certain cases.
 
   For \code{npRmpi}, \code{npsigtest} supports direct execution when
-  \code{options(npRmpi.autodispatch=TRUE)} is enabled. In that mode,
+  autodispatch is enabled (default via \code{npRmpi.init()}). In that mode,
   users can call \code{npregbw}, \code{npreg}, and \code{npsigtest}
   directly without wrapping calls in \code{mpi.bcast.cmd(...)}.
   
@@ -245,7 +245,6 @@ npsigtest(bws, \dots)
 ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
 npRmpi.init(nslaves=1)
 
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 set.seed(42)
 
 ## Significance testing with z irrelevant

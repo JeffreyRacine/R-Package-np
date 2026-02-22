@@ -68,7 +68,6 @@ gradients(x, \dots)
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 \dontrun{
 npRmpi.init(nslaves=1)
-options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 x <- runif(10)
 y <- x + rnorm(10, sd = 0.1)
