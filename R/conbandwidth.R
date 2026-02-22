@@ -67,7 +67,7 @@ conbandwidth <-
   else if (cxkertype == "uniform")
     warning("ignoring kernel order specified with uniform kernel type")
   else {
-    kord = eval(formals()$cxkerorder) 
+    kord = c(2,4,6,8) 
     if (!any(kord == cxkerorder))
       stop("cxkerorder must be one of ", paste(kord,collapse=" "))
   }
@@ -86,7 +86,7 @@ conbandwidth <-
   else if (cykertype == "uniform")
     warning("ignoring kernel order specified with uniform kernel type")
   else {
-    kord = eval(formals()$cykerorder) 
+    kord = c(2,4,6,8) 
     if (!any(kord == cykerorder))
       stop("cykerorder must be one of ", paste(kord,collapse=" "))
   }
