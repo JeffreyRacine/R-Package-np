@@ -293,4 +293,4 @@ summary.condbandwidth <- function(object, ...) {
   cat("\n\n")
 }
 
-predict.condbandwidth <- function(...) { do.call(npcdist, list(...), envir = parent.frame()) }
+predict.condbandwidth <- function(...) { do.call(npcdist, list(...)) }

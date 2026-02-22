@@ -90,7 +90,7 @@ gradients.condensity <- function(x, errors = FALSE, ...) {
 }
 
 predict.condensity <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npcdens(bws = object$bws, ...), envir = parent.frame())
+  tr <- do.call(npcdens, c(list(bws = object$bws), list(...)))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, log.likelihood = tr$ll))

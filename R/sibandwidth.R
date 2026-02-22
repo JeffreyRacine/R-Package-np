@@ -155,7 +155,7 @@ coef.sibandwidth <- function(object, ...) {
  names(tc) <- object$xnames
  return(tc)
 }
-predict.sibandwidth <- function(...) { do.call(npindex, list(...), envir = parent.frame()) }
+predict.sibandwidth <- function(...) { do.call(npindex, list(...)) }
 
 summary.sibandwidth <- function(object, ...){
   cat("\nSingle Index Model",

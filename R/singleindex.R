@@ -100,8 +100,7 @@ residuals.singleindex <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npindex(bws = object$bws, residuals =TRUE)$resid) } 
 }
 predict.singleindex <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npindex(bws = object$bws, errors = se.fit, boot.num = 99, ...),
-             envir = parent.frame())
+  tr <- do.call(npindex, c(list(bws = object$bws, errors = se.fit, boot.num = 99), list(...)))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

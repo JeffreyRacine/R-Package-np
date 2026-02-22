@@ -90,7 +90,7 @@ gradients.condistribution <- function(x, errors = FALSE, ...) {
 }
 
 predict.condistribution <- function(object, se.fit = FALSE, ...) {
-  tr <- eval(npcdist(bws = object$bws, ...), envir = parent.frame())
+  tr <- do.call(npcdist, c(list(bws = object$bws), list(...)))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs))
