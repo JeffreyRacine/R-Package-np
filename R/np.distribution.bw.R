@@ -81,7 +81,10 @@ npudistbw.formula <-
                      
       gmf[[1]] <- as.name("model.frame")
       names(gmf)[3] <- "data"
-      gmf <- eval(gmf, envir = parent.frame())
+      gmf.args <- as.list(gmf[-1L])
+      gmf.args$formula <- eval(gmf.args$formula, envir = parent.frame())
+      gmf.args$data <- eval(gmf.args$data, envir = parent.frame())
+      gmf <- do.call("model.frame", gmf.args, envir = parent.frame())
 
       gdat <- gmf[, attr(attr(gmf, "terms"),"term.labels"), drop = FALSE]
 
