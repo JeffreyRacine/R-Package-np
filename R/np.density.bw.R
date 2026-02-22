@@ -52,7 +52,19 @@ npudensbw.formula <-
     }
     
     mf[[1]] <- as.name("model.frame")
-    mf <- eval(mf, envir = parent.frame())
+    mf.args <- as.list(mf[-1L])
+    has.data <- !is.null(mf.args$data)
+    mf.args$formula <- eval(mf.args$formula, envir = parent.frame())
+    if (has.data)
+      mf.args$data <- eval(mf.args$data, envir = parent.frame())
+    if (!is.null(mf.args$na.action))
+      mf.args$na.action <- eval(mf.args$na.action, envir = parent.frame())
+    if (!is.null(mf.args$subset))
+      mf.args$subset <- if (has.data)
+        eval(mf.args$subset, envir = mf.args$data, enclos = parent.frame())
+      else
+        eval(mf.args$subset, envir = parent.frame())
+    mf <- do.call("model.frame", mf.args, envir = parent.frame())
 
     if (attr(attr(mf, "terms"), "response") != 0)
       stop("invalid density formula")
