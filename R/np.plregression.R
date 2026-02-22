@@ -36,8 +36,10 @@ npplreg.formula <-
     tmf.xf[["formula"]] <- tt.xf
     tmf[["formula"]] <- tt
 
-    umf <- tmf <- eval(tmf, envir = environment(tt))
-    tmf.xf <- eval(tmf.xf, envir = environment(tt.xf))
+    mf.args <- as.list(tmf)[-1L]
+    mf.xf.args <- as.list(tmf.xf)[-1L]
+    umf <- tmf <- do.call("model.frame", mf.args, envir = environment(tt))
+    tmf.xf <- do.call("model.frame", mf.xf.args, envir = environment(tt.xf))
     
     tydat <- model.response(tmf)
     txdat <- tmf.xf
