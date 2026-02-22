@@ -1,12 +1,31 @@
 npplregbw <-
   function(...){
-    args = list(...)
-    if (is(args[[1]],"formula"))
-      UseMethod("npplregbw",args[[1]])
-    else if (!is.null(args$formula) && is(args$formula,"formula"))
-      UseMethod("npplregbw",args$formula)
-    else
-      UseMethod("npplregbw",args[[which(names(args)=="bws")[1]]])
+    mc <- match.call(expand.dots = FALSE)
+    dots <- mc$...
+
+    if (length(dots) == 0L)
+      stop("invoked without arguments")
+
+    dot.names <- names(dots)
+
+    if (!is.null(dot.names) && any(dot.names == "formula")) {
+      formula.val <- eval(dots[[which(dot.names == "formula")[1L]]], envir = parent.frame())
+      return(UseMethod("npplregbw", formula.val))
+    }
+
+    first.val <- eval(dots[[1L]], envir = parent.frame())
+    if (inherits(first.val, "formula"))
+      return(UseMethod("npplregbw", first.val))
+
+    if (!is.null(dot.names) && any(dot.names == "bws")) {
+      bws.val <- eval(dots[[which(dot.names == "bws")[1L]]], envir = parent.frame())
+      return(UseMethod("npplregbw", bws.val))
+    }
+
+    if (!is.null(dot.names) && any(dot.names %in% c("xdat", "ydat", "zdat")))
+      return(UseMethod("npplregbw", NULL))
+
+    UseMethod("npplregbw", first.val)
   }
 
 npplregbw.formula <-

@@ -1,12 +1,31 @@
 npcdistbw <-
   function(...){
-    args = list(...)
-    if (is(args[[1]],"formula"))
-      UseMethod("npcdistbw",args[[1]])
-    else if (!is.null(args$formula) && is(args$formula,"formula"))
-      UseMethod("npcdistbw",args$formula)
-    else
-      UseMethod("npcdistbw",args[[which(names(args)=="bws")[1]]])
+    mc <- match.call(expand.dots = FALSE)
+    dots <- mc$...
+
+    if (length(dots) == 0L)
+      stop("invoked without arguments")
+
+    dot.names <- names(dots)
+
+    if (!is.null(dot.names) && any(dot.names == "formula")) {
+      formula.val <- eval(dots[[which(dot.names == "formula")[1L]]], envir = parent.frame())
+      return(UseMethod("npcdistbw", formula.val))
+    }
+
+    first.val <- eval(dots[[1L]], envir = parent.frame())
+    if (inherits(first.val, "formula"))
+      return(UseMethod("npcdistbw", first.val))
+
+    if (!is.null(dot.names) && any(dot.names == "bws")) {
+      bws.val <- eval(dots[[which(dot.names == "bws")[1L]]], envir = parent.frame())
+      return(UseMethod("npcdistbw", bws.val))
+    }
+
+    if (!is.null(dot.names) && any(dot.names %in% c("xdat", "ydat", "gydat")))
+      return(UseMethod("npcdistbw", NULL))
+
+    UseMethod("npcdistbw", first.val)
   }
 
 npcdistbw.formula <-
