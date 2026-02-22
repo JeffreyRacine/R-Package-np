@@ -14,6 +14,15 @@
   invisible(mpi.comm.dup(0, comm))
 }
 
+.npRmpi_session_has_active_pool <- function(comm = 1L) {
+  size <- try(mpi.comm.size(comm), silent = TRUE)
+  rank <- try(mpi.comm.rank(comm), silent = TRUE)
+  if (inherits(size, "try-error") || inherits(rank, "try-error") ||
+      is.na(size) || is.na(rank))
+    return(FALSE)
+  as.integer(size) >= 2L
+}
+
 .npRmpi_session_attach_worker_loop <- function(comm = 1L,
                                                nonblock = TRUE,
                                                sleep = 0.1) {
@@ -57,6 +66,11 @@ npRmpi.init <- function(...,
   .npRmpi_session_apply_options(autodispatch = autodispatch, np.messages = np.messages)
 
   if (identical(mode, "spawn")) {
+    if (.npRmpi_session_has_active_pool(comm = comm)) {
+      if (!quiet)
+        slave.hostinfo(comm)
+      return(invisible(TRUE))
+    }
     mpi.spawn.Rslaves(..., nslaves = nslaves, comm = comm, quiet = quiet, nonblock = nonblock, sleep = sleep)
     mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE, comm = comm)
     return(invisible(TRUE))
@@ -65,6 +79,11 @@ npRmpi.init <- function(...,
   if (world.size < 2L)
     stop("attach mode requires a pre-launched MPI world (e.g. mpiexec -n <master+slaves>)")
 
+  # Attach mode standardizes on communicator 1 used by the C core.
+  # Ensure it exists under mpiexec-launched sessions without requiring
+  # user-side mpi.comm.dup(...) boilerplate in scripts.
+  comm <- 1L
+  try(mpi.comm.dup(0, comm), silent = TRUE)
   .npRmpi_session_ensure_comm(comm = comm)
   np.mpi.initialize()
   mpi.barrier(0)
@@ -98,6 +117,7 @@ npRmpi.quit <- function(force = FALSE,
     return(invisible(FALSE))
 
   if (identical(mode, "attach")) {
+    comm <- 1L
     mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm, caller.execute = FALSE)
     if (comm != 0L) {
       try(mpi.comm.free(comm), silent = TRUE)
