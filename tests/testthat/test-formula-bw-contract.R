@@ -157,3 +157,34 @@ test_that("formula npcdistbw gdata path matches default interface", {
 
   expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
 })
+
+test_that("formula npcdensbw matches default interface with subset/na.action", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260222)
+  dat <- data.frame(
+    y = rnorm(36),
+    x = runif(36)
+  )
+  dat$y[c(5, 19)] <- NA_real_
+
+  bw_formula <- npRmpi::npcdensbw(
+    y ~ x,
+    data = dat,
+    subset = x > 0.25,
+    na.action = na.omit,
+    bws = c(0.35, 0.45),
+    bandwidth.compute = FALSE
+  )
+
+  mf <- model.frame(y ~ x, data = dat, subset = x > 0.25, na.action = na.omit)
+  bw_default <- npRmpi::npcdensbw(
+    xdat = mf[, "x", drop = FALSE],
+    ydat = mf[, "y", drop = FALSE],
+    bws = c(0.35, 0.45),
+    bandwidth.compute = FALSE
+  )
+
+  expect_equal(as.numeric(bw_formula$bw), as.numeric(bw_default$bw))
+})
