@@ -42,7 +42,7 @@ npscoefbw.formula <-
     if(!missing(call) && is.call(call)){
       ## rummage about in the call for the original formula
       for(i in 1:length(call)){
-        if(tryCatch(inherits(eval(call[[i]]), "formula"),
+        if(tryCatch(inherits(eval(call[[i]], envir = parent.frame()), "formula"),
                     error = function(e) FALSE))
           break;
       }
