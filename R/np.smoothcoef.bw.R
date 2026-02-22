@@ -74,7 +74,19 @@ npscoefbw.formula <-
       attr(mf[["formula"]], "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
     }
     
-    mf <- eval(mf, parent.frame())
+    mf.args <- as.list(mf[-1L])
+    has.data <- !is.null(mf.args$data)
+    mf.args$formula <- eval(mf.args$formula, envir = parent.frame())
+    if (has.data)
+      mf.args$data <- eval(mf.args$data, envir = parent.frame())
+    if (!is.null(mf.args$na.action))
+      mf.args$na.action <- eval(mf.args$na.action, envir = parent.frame())
+    if (!is.null(mf.args$subset))
+      mf.args$subset <- if (has.data)
+        eval(mf.args$subset, envir = mf.args$data, enclos = parent.frame())
+      else
+        eval(mf.args$subset, envir = parent.frame())
+    mf <- do.call("model.frame", mf.args, envir = parent.frame())
     
     ydat <- model.response(mf)
     xdat <- mf[, chromoly[[2]], drop = FALSE]
