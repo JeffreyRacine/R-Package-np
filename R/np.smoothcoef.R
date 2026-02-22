@@ -101,11 +101,11 @@ npscoef.formula <-
 npscoef.call <-
   function(bws, ...) {
     call.args <- list(
-      txdat = eval(bws$call[["xdat"]], environment(bws$call)),
-      tydat = eval(bws$call[["ydat"]], environment(bws$call))
+      txdat = .np_eval_bws_call_arg(bws, "xdat"),
+      tydat = .np_eval_bws_call_arg(bws, "ydat")
     )
     if (!is.null(bws$zdati))
-      call.args$tzdat <- eval(bws$call[["zdat"]], environment(bws$call))
+      call.args$tzdat <- .np_eval_bws_call_arg(bws, "zdat")
     call.args$bws <- bws
     do.call(npscoef, c(call.args, list(...)))
   }

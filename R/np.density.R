@@ -60,7 +60,7 @@ npudens.formula <-
 
 npudens.call <-
   function(bws, ...) {
-    npudens(bws, tdat = eval(bws$call[["dat"]], environment(bws$call)),
+    npudens(bws, tdat = .np_eval_bws_call_arg(bws, "dat"),
             ...)
   }
 

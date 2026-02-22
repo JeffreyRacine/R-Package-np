@@ -96,8 +96,8 @@ npreg.formula <-
 
 npreg.call <-
   function(bws, ...) {
-    ev <- npreg(txdat = eval(bws$call[["xdat"]], environment(bws$call)),
-                tydat = eval(bws$call[["ydat"]], environment(bws$call)),
+    ev <- npreg(txdat = .np_eval_bws_call_arg(bws, "xdat"),
+                tydat = .np_eval_bws_call_arg(bws, "ydat"),
                 bws = bws, ...)
     ev$call <- match.call(expand.dots = FALSE)
     environment(ev$call) <- parent.frame()

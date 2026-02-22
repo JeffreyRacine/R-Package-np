@@ -66,8 +66,8 @@ npcdist.formula <-
 
 npcdist.call <-
   function(bws, ...) {
-    npcdist(txdat = eval(bws$call[["xdat"]], environment(bws$call)),
-            tydat = eval(bws$call[["ydat"]], environment(bws$call)),
+    npcdist(txdat = .np_eval_bws_call_arg(bws, "xdat"),
+            tydat = .np_eval_bws_call_arg(bws, "ydat"),
             bws = bws, ...)
   }
 

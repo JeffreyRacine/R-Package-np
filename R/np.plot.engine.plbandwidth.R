@@ -86,9 +86,9 @@
       zdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
     } else {
       if(all(miss.xyz) && !is.null(bws$call)){
-        xdat <- data.frame(eval(bws$call[["xdat"]], environment(bws$call)))
-        ydat = eval(bws$call[["ydat"]], environment(bws$call))
-        zdat <- data.frame(eval(bws$call[["zdat"]], environment(bws$call)))
+        xdat <- data.frame(.np_eval_bws_call_arg(bws, "xdat"))
+        ydat = .np_eval_bws_call_arg(bws, "ydat")
+        zdat <- data.frame(.np_eval_bws_call_arg(bws, "zdat"))
       }
       xdat = toFrame(xdat)
       zdat = toFrame(zdat)

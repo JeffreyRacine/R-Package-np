@@ -63,8 +63,8 @@ npqreg.formula <-
 
 npqreg.call <-
   function(bws, ...) {
-    npqreg(txdat = eval(bws$call[["xdat"]], environment(bws$call)),
-           tydat = eval(bws$call[["ydat"]], environment(bws$call)),
+    npqreg(txdat = .np_eval_bws_call_arg(bws, "xdat"),
+           tydat = .np_eval_bws_call_arg(bws, "ydat"),
            bws = bws, ...)
   }
 

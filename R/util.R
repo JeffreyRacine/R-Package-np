@@ -1734,3 +1734,14 @@ int.kernels <- c(0.28209479177387814348, 0.47603496111841936711, 0.6239694368826
                  0.5, 2.90113075268188e-01)
 
 QFAC <- qnorm(.25,lower.tail=F)*2
+
+.np_eval_bws_call_arg <- function(bws, arg) {
+  if (is.null(bws$call))
+    stop("bandwidth object does not contain a call component")
+
+  expr <- bws$call[[arg]]
+  if (is.null(expr))
+    stop(sprintf("bandwidth call does not contain '%s'", arg))
+
+  eval(expr, envir = environment(bws$call))
+}
