@@ -94,7 +94,7 @@ npudensbw.NULL <-
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
-      t.names <- deparse(substitute(dat))
+      t.names <- paste(deparse(substitute(dat)), collapse = "")
 
     dat = toFrame(dat)
     
@@ -340,7 +340,7 @@ npudensbw.default <-
 
     t.names <- NULL
     if(!is.data.frame(dat) && !is.matrix(dat))
-      t.names <- deparse(substitute(dat))
+      t.names <- paste(deparse(substitute(dat)), collapse = "")
 
     dat <- toFrame(dat)
     
