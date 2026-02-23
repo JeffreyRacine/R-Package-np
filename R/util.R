@@ -734,7 +734,13 @@ explodeFormula <- function(formula, data=NULL){
 
 explodePipe <- function(formula, env = parent.frame()){
   if (!inherits(formula, "formula")) {
+    if (is.symbol(formula) &&
+        is.environment(env) &&
+        exists(as.character(formula), envir = env, inherits = TRUE)) {
+      formula <- get(as.character(formula), envir = env, inherits = TRUE)
+    } else {
     formula <- tryCatch(eval(formula, envir = env), error = function(e) e)
+    }
     if (inherits(formula, "error"))
       stop(conditionMessage(formula), call. = FALSE)
   }
