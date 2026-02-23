@@ -618,7 +618,7 @@ npsigtest.default <- function(bws, xdat, ydat, ...){
     sc.bw$bandwidth.compute <- FALSE
   }
 
-  tbw <- eval.parent(sc.bw)
+  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   
   call.args <- list(bws = tbw)
   if(!no.xdat)

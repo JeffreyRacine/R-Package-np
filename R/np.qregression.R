@@ -324,7 +324,7 @@ npqreg.default <- function(bws, txdat, tydat, ...){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
-  tbw <- eval.parent(sc.bw)
+  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
 
   ## convention: drop 'bws' and up to two unnamed arguments (including bws)
   if(no.bws){
