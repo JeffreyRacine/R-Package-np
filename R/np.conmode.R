@@ -35,7 +35,8 @@ npconmode.formula <-
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
 
-    if ((has.eval <- !is.null(newdata))) {
+    has.eval <- !is.null(newdata)
+    if (has.eval) {
       has.ey <- succeedWithResponse(tt, newdata)
 
       if (has.ey){

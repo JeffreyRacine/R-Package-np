@@ -58,7 +58,8 @@ npscoefbw.formula <-
     
     ydat <- model.response(mf)
     xdat <- mf[, chromoly[[2]], drop = FALSE]
-    if (!(miss.z <- !(length(chromoly) == 3)))
+    miss.z <- !(length(chromoly) == 3)
+    if (!miss.z)
       zdat <- mf[, chromoly[[3]], drop = FALSE]
     
     bw.args <- list(xdat = xdat, ydat = ydat)

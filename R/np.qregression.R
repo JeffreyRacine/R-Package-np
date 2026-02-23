@@ -35,7 +35,8 @@ npqreg.formula <-
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
 
-    if ((has.eval <- !is.null(newdata))) {
+    has.eval <- !is.null(newdata)
+    if (has.eval) {
       tt <- drop.terms(tt, match(bws$variableNames$response, attr(tt, 'term.labels')))
       umf <- emf <- model.frame(tt, data = newdata)
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]

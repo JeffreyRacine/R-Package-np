@@ -19,7 +19,8 @@ npksum.formula <-
     tydat <- model.response(mf)
     txdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
 
-    if (!(miss.new <- missing(newdata))){
+    miss.new <- missing(newdata)
+    if (!miss.new){
       tt <- delete.response(attr(mf,"terms"))
       umf <- emf <- model.frame(tt, data = newdata)
       exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]

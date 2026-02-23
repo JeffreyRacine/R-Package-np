@@ -34,7 +34,8 @@ npcdist.formula <-
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]
 
-    if ((has.eval <- !is.null(newdata))) {
+    has.eval <- !is.null(newdata)
+    if (has.eval) {
       umf <- emf <- model.frame(tt, data = newdata)
       
       eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]

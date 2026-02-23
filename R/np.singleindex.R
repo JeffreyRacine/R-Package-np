@@ -49,8 +49,8 @@ npindex.formula <-
 
         tydat <- model.response(tmf)
         txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
-
-        if ((has.eval <- !is.null(newdata))) {
+        has.eval <- !is.null(newdata)
+        if (has.eval) {
           if (!y.eval){
             tt <- delete.response(tt)
 

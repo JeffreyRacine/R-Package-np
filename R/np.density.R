@@ -36,7 +36,8 @@ npudens.formula <-
 
     tdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
 
-    if ((has.eval <- !is.null(newdata))) {
+    has.eval <- !is.null(newdata)
+    if (has.eval) {
       umf <- emf <- model.frame(tt, data = newdata)
 
       edat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]

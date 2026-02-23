@@ -45,7 +45,8 @@ npplreg.formula <-
     txdat <- tmf.xf
     tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
 
-    if ((has.eval <- !is.null(newdata))) {
+    has.eval <- !is.null(newdata)
+    if (has.eval) {
       if (!y.eval){
         tt <- delete.response(tt)
         
