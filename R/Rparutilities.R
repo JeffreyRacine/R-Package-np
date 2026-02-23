@@ -404,7 +404,11 @@ mpi.apply <- function(X, FUN, ...,  comm=1){
     dotarg <- tmpfunarg$dot.arg
     tmpdata.arg <- list(mpi.scatter.Robj(root=0,comm=.comm))
     if (mpi.comm.rank(.comm) <= n){
-        out <- try(do.call(".tmpfun", c(tmpdata.arg, dotarg)),TRUE)
+        out <- tryCatch(do.call(".tmpfun", c(tmpdata.arg, dotarg)),
+                        error = function(e)
+                          structure(conditionMessage(e),
+                                    class = "try-error",
+                                    condition = e))
         mpi.send.Robj(out,0,tag,.comm)
     }
 }
@@ -642,7 +646,11 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
         tag <- mpi.get.sourcetag()[2]
         if (tag > n)
             break
-        out <- try(do.call(".tmpfun", c(tmpdata.arg, dotarg)),TRUE)
+        out <- tryCatch(do.call(".tmpfun", c(tmpdata.arg, dotarg)),
+                        error = function(e)
+                          structure(conditionMessage(e),
+                                    class = "try-error",
+                                    condition = e))
         #if (.mpi.err)
         #    print(geterrmessage())
         mpi.send.Robj(out,0,tag,.comm)
