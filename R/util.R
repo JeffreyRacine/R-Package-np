@@ -764,7 +764,7 @@ explodeFormula <- function(formula, data=NULL){
 explodePipe <- function(formula, env = parent.frame()){
   if (!inherits(formula, "formula")) {
     if (is.symbol(formula) && is.environment(env)) {
-      not_found <- new.env(parent = emptyenv())
+      not_found <- .np_missing_binding_sentinel
       sym_val <- get0(as.character(formula), envir = env, inherits = TRUE, ifnotfound = not_found)
       if (!identical(sym_val, not_found)) {
         formula <- sym_val
@@ -1840,7 +1840,7 @@ QFAC <- qnorm(.25,lower.tail=F)*2
       return(val$value)
 
     if (is.environment(caller_env)) {
-      not_found <- new.env(parent = emptyenv())
+      not_found <- .np_missing_binding_sentinel
       sym_val <- get0(as.character(expr), envir = caller_env, inherits = TRUE, ifnotfound = not_found)
       if (!identical(sym_val, not_found))
         return(sym_val)
