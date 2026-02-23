@@ -36,6 +36,7 @@ test_that(".np_try_eval_in_frames returns an error object when resolution fails"
   out <- .np_try_eval_in_frames(quote(np_missing_symbol_contract), eval_env = new.env(parent = emptyenv()))
   expect_false(out$ok)
   expect_true(inherits(out$error, "error"))
+  expect_match(conditionMessage(out$error), "np_missing_symbol_contract")
 })
 
 test_that(".np_eval_bw_call reports underlying evaluation errors", {
