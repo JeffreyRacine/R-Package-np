@@ -304,3 +304,30 @@ Completed in `np-npRmpi`:
    - tarball-first:
      - `/tmp/nprmpi_build_scoef_ndim_20260223.log` (`BUILD_RC:0`)
      - `/tmp/nprmpi_check_scoef_ndim_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
+
+## Sigtest Index/Bootstrap Hygiene Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Fixed duplicate-index validation bug in `npsigtest` and modernized related bootstrap indexing patterns.
+2. Scope:
+   - `R/np.sigtest.R`
+   - `tests/testthat/test-npsigtest.R`
+3. Changes:
+   - fixed repeated-index guard typo:
+     - `if(length(unique(index)) < length(unique))` -> `if(length(unique(index)) < length(index))`
+   - `index` default now uses `seq_len(ncol(xdat))`
+   - `goodrows` initialization uses `seq_len(nrow(xdat))`
+   - bootstrap loops use `seq_len(boot.num)`
+   - pairwise bootstrap resampling uses `sample.int(num.obs, replace = TRUE)`
+   - indicator means use logical means directly (`mean(In.vec > In)`).
+4. Commit:
+   - `np-npRmpi`: `08bf9fa`
+5. Validation:
+   - parse:
+     - `/tmp/nprmpi_sigtest_parse_20260223.log` (`RC:0`)
+   - focused tests:
+     - `/tmp/nprmpi_sigtest_tests_20260223.log` (`PASS 7, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_sigtest_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_sigtest_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_sigtest_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
