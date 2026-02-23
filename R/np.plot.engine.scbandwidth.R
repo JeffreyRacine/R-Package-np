@@ -52,6 +52,10 @@
     oldpar <- par(no.readonly = TRUE)
     on.exit(par(oldpar), add = TRUE)
 
+    scalar_default <- function(value, default) {
+      if (is.null(value)) default else value
+    }
+
     opt.plot.par.mfrow <- getOption("plot.par.mfrow")
     if (!is.null(opt.plot.par.mfrow))
         plot.par.mfrow <- opt.plot.par.mfrow
@@ -290,7 +294,7 @@
       dtheta = 5.0
       dphi = 10.0
 
-      persp.col = ifelse(plot.errors, FALSE, ifelse(!is.null(col),col,"lightblue"))
+      persp.col = if (plot.errors) FALSE else scalar_default(col, "lightblue")
       
       ##for (j in 0:((50 %/% dphi - 1)*rotate)*dphi+phi){
         for (i in 0:((360 %/% dtheta - 1)*rotate)*dtheta+theta){
@@ -299,19 +303,19 @@
                   x2.eval,
                   lerr,
                   zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                  cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                  cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                  cex.main = scalar_default(cex.main, par()$cex.main),
+                  cex.sub = scalar_default(cex.sub, par()$cex.sub),
                   col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
+                  border = scalar_default(border, "grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
                   phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                  lwd = scalar_default(lwd, par()$lwd))
             par(new = TRUE)
           }
 
@@ -320,15 +324,15 @@
                 treg,
                 zlim = zlim,
                 col = persp.col,
-                border = ifelse(!is.null(border),border,"black"),
+                border = scalar_default(border, "black"),
                 ticktype = "detailed",
-                cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                cex.lab =  ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[1], "X1")),
-                ylab = ifelse(!is.null(ylab),ylab,gen.label(x2.names[1], "X2")),
-                zlab = ifelse(!is.null(zlab),zlab,gen.label(bws$ynames,"Conditional Mean")),
+                cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                cex.main = scalar_default(cex.main, par()$cex.main),
+                cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                xlab = scalar_default(xlab, gen.label(bws$xnames[1], "X1")),
+                ylab = scalar_default(ylab, gen.label(x2.names[1], "X2")),
+                zlab = scalar_default(zlab, gen.label(bws$ynames,"Conditional Mean")),
                 theta = i,
                 phi = phi,
                 main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
@@ -339,19 +343,19 @@
                   x2.eval,
                   herr,
                   zlim = zlim,
-                  cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                  cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                  cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                  cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
+                  cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                  cex.lab = scalar_default(cex.lab, par()$cex.lab),
+                  cex.main = scalar_default(cex.main, par()$cex.main),
+                  cex.sub = scalar_default(cex.sub, par()$cex.sub),
                   col = persp.col,
-                  border = ifelse(!is.null(border),border,"grey"),
+                  border = scalar_default(border, "grey"),
                   ticktype = "detailed",
                   xlab = "",
                   ylab = "",
                   zlab = "",
                   theta = i,
                   phi = phi,
-                  lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                  lwd = scalar_default(lwd, par()$lwd))
           }
 
           Sys.sleep(0.5)
@@ -583,17 +587,17 @@
                                       paste(toupper(xOrZ), i, sep = ""))
           plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
           if (!xi.factor) {
-            plot.args$type <- ifelse(!is.null(type), type, "l")
-            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
-            plot.args$col <- ifelse(!is.null(col), col, par()$col)
-            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
-            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
-            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
-            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
-            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+            plot.args$type <- scalar_default(type, "l")
+            plot.args$lty <- scalar_default(lty, par()$lty)
+            plot.args$col <- scalar_default(col, par()$col)
+            plot.args$lwd <- scalar_default(lwd, par()$lwd)
+            plot.args$cex.axis <- scalar_default(cex.axis, par()$cex.axis)
+            plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
+            plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
+            plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
           }
-          plot.args$main <- ifelse(!is.null(main), main, "")
-          plot.args$sub <- ifelse(!is.null(sub), sub, "")
+          plot.args$main <- scalar_default(main, "")
+          plot.args$sub <- scalar_default(sub, "")
           do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
@@ -753,17 +757,17 @@
                                         paste(toupper(xOrZ), i, sep = ""))
             plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
             if (!xi.factor) {
-              plot.args$type <- ifelse(!is.null(type), type, "l")
-              plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
-              plot.args$col <- ifelse(!is.null(col), col, par()$col)
-              plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
-              plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
-              plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
-              plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
-              plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+              plot.args$type <- scalar_default(type, "l")
+              plot.args$lty <- scalar_default(lty, par()$lty)
+              plot.args$col <- scalar_default(col, par()$col)
+              plot.args$lwd <- scalar_default(lwd, par()$lwd)
+              plot.args$cex.axis <- scalar_default(cex.axis, par()$cex.axis)
+              plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
+              plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
+              plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
             }
-            plot.args$main <- ifelse(!is.null(main), main, "")
-            plot.args$sub <- ifelse(!is.null(sub), sub, "")
+            plot.args$main <- scalar_default(main, "")
+            plot.args$sub <- scalar_default(sub, "")
             do.call(plot.fun, plot.args)
 
             ## error plotting evaluation
@@ -896,17 +900,17 @@
                                       paste(toupper(xOrZ), i, sep = ""))
           plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
           if (!xi.factor) {
-            plot.args$type <- ifelse(!is.null(type), type, "l")
-            plot.args$lty <- ifelse(!is.null(lty), lty, par()$lty)
-            plot.args$col <- ifelse(!is.null(col), col, par()$col)
-            plot.args$lwd <- ifelse(!is.null(lwd), lwd, par()$lwd)
-            plot.args$cex.axis <- ifelse(!is.null(cex.axis), cex.axis, par()$cex.axis)
-            plot.args$cex.lab <- ifelse(!is.null(cex.lab), cex.lab, par()$cex.lab)
-            plot.args$cex.main <- ifelse(!is.null(cex.main), cex.main, par()$cex.main)
-            plot.args$cex.sub <- ifelse(!is.null(cex.sub), cex.sub, par()$cex.sub)
+            plot.args$type <- scalar_default(type, "l")
+            plot.args$lty <- scalar_default(lty, par()$lty)
+            plot.args$col <- scalar_default(col, par()$col)
+            plot.args$lwd <- scalar_default(lwd, par()$lwd)
+            plot.args$cex.axis <- scalar_default(cex.axis, par()$cex.axis)
+            plot.args$cex.lab <- scalar_default(cex.lab, par()$cex.lab)
+            plot.args$cex.main <- scalar_default(cex.main, par()$cex.main)
+            plot.args$cex.sub <- scalar_default(cex.sub, par()$cex.sub)
           }
-          plot.args$main <- ifelse(!is.null(main), main, "")
-          plot.args$sub <- ifelse(!is.null(sub), sub, "")
+          plot.args$main <- scalar_default(main, "")
+          plot.args$sub <- scalar_default(sub, "")
           do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
