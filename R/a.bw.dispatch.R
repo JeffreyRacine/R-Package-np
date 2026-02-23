@@ -1,4 +1,4 @@
-.np_try_eval_in_frames <- function(expr, eval_env = parent.frame(), enclos = NULL) {
+.np_try_eval_in_frames <- function(expr, eval_env = parent.frame(), enclos = NULL, search_frames = TRUE) {
   if (is.symbol(expr) &&
       is.environment(eval_env) &&
       exists(as.character(expr), envir = eval_env, inherits = TRUE)) {
@@ -13,6 +13,8 @@
     return(list(ok = TRUE, value = val, error = NULL))
 
   first_error <- val
+  if (!isTRUE(search_frames))
+    return(list(ok = FALSE, value = NULL, error = first_error))
 
   frames <- sys.frames()
   for (i in rev(seq_along(frames))) {

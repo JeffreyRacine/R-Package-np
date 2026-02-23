@@ -15,6 +15,15 @@ test_that(".np_try_eval_in_frames resolves symbols from caller frames", {
   expect_identical(val$value, 17L)
 })
 
+test_that(".np_try_eval_in_frames can disable caller frame fallback", {
+  out <- local({
+    x <- 19L
+    .np_try_eval_in_frames(quote(x), eval_env = new.env(parent = emptyenv()), search_frames = FALSE)
+  })
+  expect_false(out$ok)
+  expect_true(inherits(out$error, "error"))
+})
+
 test_that(".np_try_eval_in_frames returns an error object when resolution fails", {
   out <- .np_try_eval_in_frames(quote(np_missing_symbol_contract), eval_env = new.env(parent = emptyenv()))
   expect_false(out$ok)
