@@ -178,8 +178,8 @@ npunitest <- function(data.x = NULL,
       
       ## Conduct simple iid bootstrap resamples
       
-      data.null.x <- data.null[sample(1:length(data.null),length(data.x),replace=TRUE)]
-      data.null.y <- data.null[sample(1:length(data.null),length(data.y),replace=TRUE)]
+      data.null.x <- data.null[sample.int(length(data.null), size = length(data.x), replace = TRUE)]
+      data.null.y <- data.null[sample.int(length(data.null), size = length(data.y), replace = TRUE)]
 
       resampled.stat[b] <- Srho.univar(data.null.x,data.null.y,bw.x,bw.y,method=method)
       
