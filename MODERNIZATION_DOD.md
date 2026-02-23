@@ -199,3 +199,30 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_scoef_ndim_20260223.log` (`BUILD_RC:0`)
      - `/tmp/np_master_check_scoef_ndim_20260223.log` (`CHECK_RC:0`)
+
+## Sigtest Index/Bootstrap Hygiene Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Fixed duplicate-index validation bug in `npsigtest` and modernized related bootstrap indexing patterns.
+2. Scope:
+   - `R/np.sigtest.R`
+   - `tests/testthat/test-npsigtest.R`
+3. Changes:
+   - fixed repeated-index guard typo:
+     - `if(length(unique(index)) < length(unique))` -> `if(length(unique(index)) < length(index))`
+   - `index` default now uses `seq_len(ncol(xdat))`
+   - `goodrows` initialization uses `seq_len(nrow(xdat))`
+   - bootstrap loops use `seq_len(boot.num)`
+   - pairwise bootstrap resampling uses `sample.int(num.obs, replace = TRUE)`
+   - indicator means use logical means directly (`mean(In.vec > In)`).
+4. Commit:
+   - `np-master`: `6198c04`
+5. Validation:
+   - parse:
+     - `/tmp/np_master_sigtest_parse_20260223.log` (`RC:0`)
+   - focused tests:
+     - `/tmp/np_master_sigtest_tests_20260223.log` (`PASS 5, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_sigtest_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_sigtest_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/np_master_check_sigtest_20260223.log` (`CHECK_RC:0`)
