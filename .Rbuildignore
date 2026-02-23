@@ -28,6 +28,7 @@ mknpkg.sh
 ^benchmarks
 ^AGENTS\.md$
 ^MODERNIZATION_DOD\.md$
+^AS_CRAN_WARNING_LEDGER\.md$
 
 ^benchmarks/oneoff
 ^benchmarks/perf
