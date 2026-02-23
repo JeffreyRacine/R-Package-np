@@ -382,7 +382,7 @@ npscoefbw.scbandwidth <-
           value.overall <- numeric(nmulti)
           num.feval.overall <- 0
 
-          x.scale <- sapply(1:bws$ndim, function(i){
+          x.scale <- sapply(seq_len(bws$ndim), function(i){
             if (dati$icon[i]){
               return(1.059224*((if (bws$scaling) 1.0 else mysd[sum(dati$icon[1:i])]*nconfac)))
             }
