@@ -249,6 +249,15 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
             as.integer(-1)
 }
 
+.npRmpi_eval_scmd <- function(scmd, arg = list(), envir = parent.frame()) {
+    if (length(arg) > 0)
+        return(do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = envir))
+    if (is.symbol(scmd) &&
+        exists(as.character(scmd), envir = envir, inherits = TRUE))
+        return(get(as.character(scmd), envir = envir, inherits = TRUE))
+    eval(scmd, envir = envir)
+}
+
 .mpi.worker.exec <- function(tag, ret, simplify){
     #assign(".mpi.err", FALSE,  envir = .GlobalEnv)
     assign(".mpi.err", FALSE)
@@ -262,12 +271,8 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     if (ret){
     size <- mpi.comm.size(.comm)
     myerrcode <- as.integer(0)
-    if (length(scmd.arg$arg)>0)
-        out <- tryCatch(do.call(.npRmpi_bcast_cmd_funref(scmd.arg$scmd), scmd.arg$arg, envir=.GlobalEnv),
-                        error = function(e) e)
-    else
-        out <- tryCatch(eval(scmd.arg$scmd, envir=sys.parent()),
-                        error = function(e) e)
+    out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = sys.parent()),
+                    error = function(e) e)
     
     if (get(".mpi.err")){
         print(geterrmessage())
@@ -306,12 +311,8 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     }       
     }
     else {
-    if (length(scmd.arg$arg)>0)
-            out <- tryCatch(do.call(.npRmpi_bcast_cmd_funref(scmd.arg$scmd), scmd.arg$arg),
-                            error = function(e) e)
-        else
-            out <- tryCatch(eval(scmd.arg$scmd),
-                            error = function(e) e)
+        out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = parent.frame()),
+                        error = function(e) e)
     }
 }
 

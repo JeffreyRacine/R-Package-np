@@ -44,7 +44,7 @@
     msg <- mpi.bcast.cmd(rank = 0, comm = comm, nonblock = nonblock, sleep = sleep)
     if (is.character(msg) && identical(msg, "kaerb"))
       break
-    tryCatch(eval(msg, envir = .GlobalEnv), error = function(e) invisible(e))
+    tryCatch(.npRmpi_eval_scmd(msg, envir = .GlobalEnv), error = function(e) invisible(e))
   }
   .npRmpi_safe(if (comm != 0L) mpi.comm.free(comm), fallback = NULL)
   mpi.quit()
