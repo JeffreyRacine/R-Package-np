@@ -58,6 +58,73 @@ test_that("session routing smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npcdens user-style example completes with quiet=FALSE", {
+  skip_on_cran()
+  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
+  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
+
+  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=FALSE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "set.seed(42)",
+      "n <- 1000",
+      "x <- rnorm(n)",
+      "y <- rnorm(n)",
+      "F <- npcdens(y~x)",
+      "summary(F$bws)",
+      "png(tempfile(fileext='.png'))",
+      "plot(F)",
+      "dev.off()",
+      "stopifnot(inherits(F, 'condensity'))",
+      "cat('SESSION_NPCDENS_EXAMPLE_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPCDENS_EXAMPLE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("session npreg factor example completes with quiet=FALSE", {
+  skip_on_cran()
+  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
+  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
+
+  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=FALSE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "set.seed(42)",
+      "n <- 250",
+      "x <- runif(n)",
+      "z1 <- rbinom(n,1,.5)",
+      "z2 <- rbinom(n,1,.5)",
+      "y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)",
+      "z1 <- factor(z1)",
+      "z2 <- factor(z2)",
+      "bw <- npregbw(y~x+z1+z2, regtype='lc', bwmethod='cv.ls', nmulti=1)",
+      "summary(bw)",
+      "fit <- npreg(bws=bw, gradients=FALSE)",
+      "summary(fit)",
+      "stopifnot(inherits(bw, 'rbandwidth'), inherits(fit, 'npregression'))",
+      "cat('SESSION_NPREG_FACTORS_EXAMPLE_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPREG_FACTORS_EXAMPLE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("skip-init mode fails fast without MPI pool crash", {
   skip_on_cran()
   pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
