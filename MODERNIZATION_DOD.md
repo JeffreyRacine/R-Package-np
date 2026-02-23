@@ -119,3 +119,22 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_user_npcdens_smoke_20260223.out` (`NPRMPI_USER_NPCDENS_SMOKE_OK`)
    - tarball check (MPI env pinned):
      - `/tmp/nprmpi_check_seqcols_20260223.log` (`Status: OK`)
+
+## BW Guarded-Slice `seq_len` Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced guarded `1:gbw` fallback slices with explicit `seq_len(gbw)` indices in bw constructors.
+2. Scope:
+   - `R/np.condensity.bw.R`
+   - `R/np.distribution.bw.R`
+3. Commit:
+   - `np-npRmpi`: `6ed24a6`
+4. Validation:
+   - parse gates: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/nprmpi_gbwidx_tests_20260223.log` (`includes pre-existing npudist test failure outside touched constructors`)
+   - focused fresh-install surface smoke:
+     - `/tmp/nprmpi_gbwidx_surface_smoke3_20260223.out` (`NPRMPI_GBWIDX_SURFACE_SMOKE_OK`)
+   - issue-note verified repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_gbwidx_20260223.log`
+   - tarball check (MPI env pinned):
+     - `/tmp/nprmpi_check_gbwidx_20260223.log` (`Status: OK`)
