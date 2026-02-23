@@ -1,20 +1,16 @@
 # `R CMD check --as-cran` Warning/Note Ledger (`np-npRmpi`)
 
-Last refresh: 2026-02-23  
+Last refresh: 2026-02-23 (post-scalar refactors)  
 Tarball: `npRmpi_0.70-0.tar.gz`  
-Check log: `/tmp/nprmpi_check_ascran_20260223.log`
+Check log: `/tmp/nprmpi_check_ascran_postledgerfix_20260223.log`
 
 ## Current Status
-- `Status: 1 WARNING, 2 NOTEs`
+- `Status: 1 WARNING, 1 NOTE`
 
 ## Notes
 1. `CRAN incoming feasibility` NOTE
 - Detail: version jump (`submitted: 0.70.0`, `existing: 0.60.20`).
 - Disposition: accepted for modernization release line.
-
-2. `future file timestamps` NOTE
-- Detail: local environment time-verification limitation (`unable to verify current time`).
-- Disposition: accepted for local runs; re-check on release host/CI.
 
 ## Warning
 1. `top-level files` WARNING (`checkbashisms` script unavailable)
