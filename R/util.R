@@ -1747,11 +1747,53 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (is.null(eval.env))
     eval.env <- parent.frame()
 
-  if (is.symbol(expr))
-    return(get(as.character(expr), envir = eval.env, inherits = TRUE))
+  if (!is.language(expr))
+    return(expr)
+
+  val <- tryCatch(eval(expr, envir = eval.env), error = function(e) e)
+  if (!inherits(val, "error"))
+    return(val)
+
+  fallback <- bws[[arg]]
+  if (!is.null(fallback))
+    return(fallback)
+
+  stop(conditionMessage(val), call. = FALSE)
+}
+
+.np_eval_call_arg <- function(call_obj, arg, caller_env = parent.frame()) {
+  if (is.null(call_obj))
+    stop("object does not contain a call component")
+
+  expr <- call_obj[[arg]]
+  if (is.null(expr))
+    stop(sprintf("call does not contain '%s'", arg))
+
+  eval.env <- environment(call_obj)
+  if (is.null(eval.env))
+    eval.env <- caller_env
 
   if (!is.language(expr))
     return(expr)
 
-  eval(expr, envir = eval.env)
+  val <- tryCatch(eval(expr, envir = eval.env), error = function(e) e)
+  if (!inherits(val, "error"))
+    return(val)
+
+  if (is.symbol(expr) &&
+      is.environment(caller_env) &&
+      exists(as.character(expr), envir = caller_env, inherits = TRUE))
+    return(get(as.character(expr), envir = caller_env, inherits = TRUE))
+
+  frames <- sys.frames()
+  for (i in rev(seq_along(frames))) {
+    env_i <- frames[[i]]
+    if (identical(env_i, eval.env))
+      next
+    val_i <- tryCatch(eval(expr, envir = env_i), error = function(e) e)
+    if (!inherits(val_i, "error"))
+      return(val_i)
+  }
+
+  stop(conditionMessage(val), call. = FALSE)
 }
