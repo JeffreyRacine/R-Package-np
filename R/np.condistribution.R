@@ -128,26 +128,28 @@ npcdist.condbandwidth <-
       stop("supplied bandwidths do not match 'tydat' in type")
     
     ## catch and destroy NA's
-    goodrows = 1:dim(txdat)[1]
-    rows.omit = attr(na.omit(data.frame(txdat,tydat)), "na.action")
-    goodrows[rows.omit] = 0
+    keep.rows <- rep_len(TRUE, nrow(txdat))
+    rows.omit <- attr(na.omit(data.frame(txdat, tydat)), "na.action")
+    if (length(rows.omit) > 0L)
+      keep.rows[as.integer(rows.omit)] <- FALSE
 
-    if (all(goodrows==0))
+    if (!any(keep.rows))
       stop("Data has no rows without NAs")
 
-    txdat = txdat[goodrows,,drop = FALSE]
-    tydat = tydat[goodrows,,drop = FALSE]
+    txdat <- txdat[keep.rows,,drop = FALSE]
+    tydat <- tydat[keep.rows,,drop = FALSE]
 
     if (!no.exy){
-      goodrows = 1:dim(exdat)[1]
-      rows.omit = attr(na.omit(data.frame(exdat,eydat)), "na.action")
-      goodrows[rows.omit] = 0
+      keep.eval <- rep_len(TRUE, nrow(exdat))
+      rows.omit <- attr(na.omit(data.frame(exdat, eydat)), "na.action")
+      if (length(rows.omit) > 0L)
+        keep.eval[as.integer(rows.omit)] <- FALSE
 
-      if (all(goodrows==0))
+      if (!any(keep.eval))
         stop("Data has no rows without NAs")
 
-      exdat = exdat[goodrows,,drop = FALSE]
-      eydat = eydat[goodrows,,drop = FALSE]
+      exdat <- exdat[keep.eval,,drop = FALSE]
+      eydat <- eydat[keep.eval,,drop = FALSE]
     }
 
 
