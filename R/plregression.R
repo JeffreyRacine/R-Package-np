@@ -55,8 +55,8 @@ plregression =
 print.plregression <- function(x, digits=NULL, ...){
   cat("\nPartially Linear Model",
       "\nRegression data: ", x$ntrain, " training points,",
-      ifelse(x$trainiseval, "", paste(" and ", x$nobs, " evaluation points,",
-                                      sep = "")),
+      if (x$trainiseval) "" else paste(" and ", x$nobs, " evaluation points,",
+                                      sep = ""),
       " in ",(x$zndim+x$xndim)," variable(s)",
       "\nWith ", x$xndim, " linear parametric regressor(s), ",
       x$zndim, " nonparametric regressor(s)\n\n", sep="")
@@ -115,8 +115,8 @@ predict.plregression <- function(object, se.fit = FALSE, ...) {
 summary.plregression <- function(object, ...){
   cat("\nPartially Linear Model",
       "\nRegression data: ", object$ntrain, " training points,",
-      ifelse(object$trainiseval, "", paste(" and ", object$nobs, " evaluation points,",
-                                      sep = "")),
+      if (object$trainiseval) "" else paste(" and ", object$nobs, " evaluation points,",
+                                      sep = ""),
       " in ",(object$zndim+object$xndim)," variable(s)",
       "\nWith ", object$xndim, " linear parametric regressor(s), ",
       object$zndim, " nonparametric regressor(s)\n", sep="")

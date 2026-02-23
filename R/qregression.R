@@ -46,7 +46,7 @@ qregression <-
 
 print.qregression <- function(x, digits=NULL, ...){
   cat("\nQuantile regression data: ", x$ntrain, " training points,",
-      ifelse(x$trainiseval, "", paste(" and ", x$nobs, " evaluation points,\n", sep="")),
+      if (x$trainiseval) "" else paste(" and ", x$nobs, " evaluation points,\n", sep=""),
       " in ", x$xndim + x$yndim, " variable(s)",
       "\n(", x$yndim, " dependent variable(s), and ", x$xndim, " explanatory variable(s))\n\n",
       sep="")
@@ -86,7 +86,7 @@ gradients.qregression <- function(x, errors = FALSE, ...) {
 
 summary.qregression <- function(object, ...) {
   cat("\nQuantile Regression Data: ", object$ntrain, " training points,",
-      ifelse(object$trainiseval, "", paste(" and ", object$nobs, " evaluation points,\n", sep="")),
+      if (object$trainiseval) "" else paste(" and ", object$nobs, " evaluation points,\n", sep=""),
       " in ", object$xndim + object$yndim, " variable(s)",
       "\n(", object$yndim, " dependent variable(s), and ", object$xndim, " explanatory variable(s))\n\n",
       sep="")

@@ -57,7 +57,7 @@ condistribution <-
 
 print.condistribution <- function(x, digits=NULL, ...){
   cat("\nConditional distribution data: ", x$ntrain, " training points,",
-      ifelse(x$trainiseval, "", paste(" and ", x$nobs, " evaluation points,\n", sep="")),
+      if (x$trainiseval) "" else paste(" and ", x$nobs, " evaluation points,\n", sep=""),
       " in ", x$xndim + x$yndim, " variable(s)",
       "\n(", x$yndim, " dependent variable(s), and ", x$xndim, " explanatory variable(s))\n\n",
       sep="")
@@ -98,7 +98,7 @@ predict.condistribution <- function(object, se.fit = FALSE, ...) {
 
 summary.condistribution <- function(object, ...){
   cat("\nConditional Distribution Data: ", object$ntrain, " training points,",
-      ifelse(object$trainiseval, "", paste(" and ", object$nobs, " evaluation points,\n", sep="")),
+      if (object$trainiseval) "" else paste(" and ", object$nobs, " evaluation points,\n", sep=""),
       " in ", object$xndim + object$yndim, " variable(s)",
       "\n(", object$yndim, " dependent variable(s), and ", object$xndim, " explanatory variable(s))\n\n",
       sep="")
