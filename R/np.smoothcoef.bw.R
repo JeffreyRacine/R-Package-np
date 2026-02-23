@@ -251,6 +251,8 @@ npscoefbw.scbandwidth <-
       system.time({
         if (bandwidth.compute){
           maxPenalty <- sqrt(.Machine$double.xmax)
+          cv_state <- new.env(parent = emptyenv())
+          cv_state$console <- NULL
           overall.cv.ls <- function(param) {
             sbw <- bws
             sbw$bw <- param
@@ -295,16 +297,16 @@ npscoefbw.scbandwidth <-
               }
             }
 
-            cv.console <<- printClear(cv.console)
-            ##cv.console <<- printPush(msg = paste("param:", param), console = cv.console)
+            cv_state$console <- printClear(cv_state$console)
+            ##cv_state$console <- printPush(msg = paste("param:", param), console = cv_state$console)
 
             stopifnot(all(is.finite(mean.loo)))
 
             if(!any(mean.loo == maxPenalty)){
               fv <- sum((ydat-mean.loo)^2)/n
-              cv.console <<- printPush(msg = paste("fval:", signif(fv, digits = options('digits')$digits)), console = cv.console)
+              cv_state$console <- printPush(msg = paste("fval:", signif(fv, digits = options('digits')$digits)), console = cv_state$console)
             } else {
-              cv.console <<- printPush(msg = "near-singular system encountered, ridging", console = cv.console)
+              cv_state$console <- printPush(msg = "near-singular system encountered, ridging", console = cv_state$console)
               fv <- maxPenalty
             }
 
@@ -354,10 +356,10 @@ npscoefbw.scbandwidth <-
 
             fv <- sum((partial.orig - partial.loo)^2)/n
             
-            cv.console <<- printClear(cv.console)
-            cv.console <<- printPush(msg = paste("fval:",
+            cv_state$console <- printClear(cv_state$console)
+            cv_state$console <- printPush(msg = paste("fval:",
                                        signif(fv, digits = options('digits')$digits)),
-                                     console = cv.console)
+                                     console = cv_state$console)
             return(ifelse(is.finite(fv),fv,maxPenalty))
           }
 
@@ -390,7 +392,7 @@ npscoefbw.scbandwidth <-
           for (i in 1:nmulti) {
 
             console <- printPush(msg = paste(sep="", "Multistart ", i, " of ", nmulti, "... "), console)
-            cv.console <- newLineConsole(console)
+            cv_state$console <- newLineConsole(console)
             
             if (i == 1) {
               tbw <- x.scale
@@ -418,7 +420,7 @@ npscoefbw.scbandwidth <-
 
             }
 
-            cv.console <- printClear(cv.console)
+            cv_state$console <- printClear(cv_state$console)
 
             value.overall[i] <- optim.return$value
 
@@ -460,7 +462,7 @@ npscoefbw.scbandwidth <-
 
               for(j in 1:n.part){
                 console <- printPush(msg = paste(sep="", "partial residual ", j, " of ", n.part, "... "), console)
-                cv.console <- newLineConsole(console)
+                cv_state$console <- newLineConsole(console)
 
                 ## estimate partial residuals
                 partial.orig <- W[,j] * scoef$beta[,j] + resid.full
@@ -473,7 +475,7 @@ npscoefbw.scbandwidth <-
                 if(!is.null(optim.return$counts) && length(optim.return$counts) > 0)
                   num.feval.overall <- num.feval.overall + optim.return$counts[1]
                 
-                cv.console <- printClear(cv.console)
+                cv_state$console <- printClear(cv_state$console)
                 
                 ## grab parameter
                 bws$bw.fitted[,j] <- optim.return$par
