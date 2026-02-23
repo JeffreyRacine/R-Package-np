@@ -245,7 +245,7 @@ npreg.rbandwidth <-
 
 
     tnrow = dim(txdat)[1]
-    enrow = ifelse(no.ex,tnrow,dim(exdat)[1])
+    enrow = (if (no.ex) tnrow else dim(exdat)[1])
     ncol = dim(txdat)[2]
 
     ## convert tydat, eydat to numeric, from a factor with levels from the y-data
@@ -321,7 +321,7 @@ npreg.rbandwidth <-
       num_obs_eval = enrow,
       num_uno = bws$nuno, num_ord = bws$nord,
       num_con = bws$ncon,
-      int_LARGE_SF = ifelse(bws$scaling, SF_NORMAL, SF_ARB),
+      int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
       BANDWIDTH_reg_extern = switch(bws$type,
         fixed = BW_FIXED,
         generalized_nn = BW_GEN_NN,

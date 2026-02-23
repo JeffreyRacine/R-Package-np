@@ -564,7 +564,7 @@ npindex.sibandwidth <-
         SIGN = SIGNfunc(tydat,index.tmean)
       }
       strgof = "xtra=c(RSQ,MSE,MAE,MAPE,CORR,SIGN),"
-      strres = ifelse(residuals, "resid = tydat - index.tmean,","")
+      strres = (if (residuals) "resid = tydat - index.tmean," else "")
     } else if(bws$method == "kleinspady") {
       index.pred =
         if (!no.ey) round(index.mean)

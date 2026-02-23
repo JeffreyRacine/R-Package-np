@@ -202,7 +202,7 @@ npplreg.plbandwidth <-
     
     ## x on z
     nrow = nrow(txdat)
-    nrow.eval = ifelse(no.exz,0,nrow(exdat))
+    nrow.eval = (if (no.exz) 0 else nrow(exdat))
     ncol = ncol(txdat)
     B = double(ncol)
     resx = matrix(data = 0, nrow = nrow, ncol = ncol)
