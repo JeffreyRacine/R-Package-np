@@ -35,3 +35,8 @@ test_that("explodePipe resolves formula symbols from provided env", {
   expect_identical(explodePipe(quote(fml), env = env),
                    explodePipe(env$fml, env = env))
 })
+
+test_that("explodePipe evaluates non-symbol formulas through strict frame helper", {
+  fn.body <- paste(deparse(body(explodePipe), width.cutoff = 500L), collapse = " ")
+  expect_match(fn.body, "\\.np_try_eval_in_frames\\(formula, eval_env = env, search_frames = FALSE\\)")
+})

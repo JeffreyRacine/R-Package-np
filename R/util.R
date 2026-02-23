@@ -739,7 +739,11 @@ explodePipe <- function(formula, env = parent.frame()){
         exists(as.character(formula), envir = env, inherits = TRUE)) {
       formula <- get(as.character(formula), envir = env, inherits = TRUE)
     } else {
-    formula <- tryCatch(eval(formula, envir = env), error = function(e) e)
+    out <- .np_try_eval_in_frames(formula, eval_env = env, search_frames = FALSE)
+    if (isTRUE(out$ok))
+      formula <- out$value
+    else
+      formula <- out$error
     }
     if (inherits(formula, "error"))
       stop(conditionMessage(formula), call. = FALSE)
