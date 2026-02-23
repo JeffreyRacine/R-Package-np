@@ -208,7 +208,7 @@ npplreg.plbandwidth <-
     resx = matrix(data = 0, nrow = nrow, ncol = ncol)
     resx.eval = matrix(data = 0, nrow = nrow.eval, ncol = ncol)
 
-    for (i in 1:ncol){
+    for (i in seq_len(ncol)) {
       mm = npreg(txdat=tzdat, tydat=txdat[,i], bws = bws$bw[[i+1]])
 
       if (is.factor(txdat[1,i])){

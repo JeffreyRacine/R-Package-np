@@ -291,7 +291,7 @@ npscoefbw.scbandwidth <-
             nc <- ncol(tww[-1,-1,1])
 
             while(any(doridge)){
-              iloo <- (1:n)[doridge]
+              iloo <- seq_len(n)[doridge]
               for (ii in iloo) {
                 doridge[ii] <- FALSE
                 ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
@@ -401,7 +401,7 @@ npscoefbw.scbandwidth <-
                                 reltol = optim.reltol,
                                 maxit = optim.maxit)
 
-          for (i in 1:nmulti) {
+          for (i in seq_len(nmulti)) {
 
             console <- printPush(msg = paste(sep="", "Multistart ", i, " of ", nmulti, "... "), console)
             cv_state$console <- newLineConsole(console)
@@ -469,10 +469,10 @@ npscoefbw.scbandwidth <-
             resid.full <- ydat - scoef$mean
 
             
-            for(i in 1:cv.num.iterations){
+            for (i in seq_len(cv.num.iterations)) {
               console <- printPush(msg = paste(sep="", "backfitting iteration ", i, " of ", cv.num.iterations, "... "), console)
 
-              for(j in 1:n.part){
+              for (j in seq_len(n.part)) {
                 console <- printPush(msg = paste(sep="", "partial residual ", j, " of ", n.part, "... "), console)
                 cv_state$console <- newLineConsole(console)
 

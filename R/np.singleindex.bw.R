@@ -383,7 +383,7 @@ npindexbw.sibandwidth <-
             optim.control <- list(reltol=optim.reltol,maxit=optim.maxit)
           }
 
-          for(i in 1:nmulti) {
+          for (i in seq_len(nmulti)) {
 
             console <- printPush(paste(sep="", "Multistart ", i, " of ", nmulti, "..."), console)
             ##cv.console <- newLineConsole(console)
