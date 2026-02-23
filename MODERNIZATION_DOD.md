@@ -19,6 +19,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Session-mode regression (`npRmpi.init(nslaves=1)` startup hang path) fixed in spawn-report route (`7b5ba36`).
 - [x] Session API scalar controls validated early (`npRmpi.init/quit`) to fail before MPI internals on invalid inputs (`3cf92e7`).
 - [x] Subprocess timeout routing contracts added for session smoke and skip-init fast-fail (`e6581f3`).
+- [x] Subprocess timeout routing contract added for manual-broadcast mode smoke (`0db36a8`).
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks in working MPI env.
 - [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
 - [ ] Full `--as-cran` warning/note closure and accepted-warning ledger still required.
@@ -34,7 +35,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 ### 2) MPI Execution Model Integrity
 - [ ] Attach mode (`mpiexec` + `.Rprofile`) works for core workflows.
 - [x] Session mode (`npRmpi.init/quit`) works for core workflows.
-- [ ] Manual broadcast high-performance path remains functional.
+- [x] Manual broadcast high-performance path remains functional.
 - [ ] Any new MPI helper path has explicit cleanup guarantees (`npRmpi.stop(force=TRUE)` or `mpi.quit()` route).
 
 ### 3) Evaluation and Call Construction
