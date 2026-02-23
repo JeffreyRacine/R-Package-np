@@ -324,6 +324,12 @@
   invisible(TRUE)
 }
 
+.npRmpi_is_missing_call_arg <- function(arg) {
+  if (missing(arg))
+    return(TRUE)
+  is.symbol(arg) && identical(as.character(arg), "")
+}
+
 .npRmpi_autodispatch_replace_tmps <- function(x, tmpvals) {
   if (!length(tmpvals))
     return(x)
@@ -336,21 +342,25 @@
   }
 
   if (is.call(x)) {
-    for (i in seq_len(length(x))) {
-      xi <- tryCatch(x[[i]], error = function(e) NULL)
-      if (!is.null(xi))
-        x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
+    xlist <- as.list(x)
+    for (i in seq_along(xlist)) {
+      xi <- xlist[[i]]
+      if (.npRmpi_is_missing_call_arg(xi))
+        next
+      xlist[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
     }
-    return(x)
+    return(as.call(xlist))
   }
 
   if (is.pairlist(x)) {
-    for (i in seq_len(length(x))) {
-      xi <- tryCatch(x[[i]], error = function(e) NULL)
-      if (!is.null(xi))
-        x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
+    xlist <- as.list(x)
+    for (i in seq_along(xlist)) {
+      xi <- xlist[[i]]
+      if (.npRmpi_is_missing_call_arg(xi))
+        next
+      xlist[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
     }
-    return(x)
+    return(as.pairlist(xlist))
   }
 
   if (inherits(x, "formula"))

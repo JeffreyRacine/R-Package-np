@@ -10,6 +10,8 @@
 .npRmpi_rm_existing <- getFromNamespace(".npRmpi_rm_existing", "npRmpi")
 .np_eval_bws_call_arg <- getFromNamespace(".np_eval_bws_call_arg", "npRmpi")
 .npRmpi_autodispatch_target_args <- getFromNamespace(".npRmpi_autodispatch_target_args", "npRmpi")
+.npRmpi_autodispatch_replace_tmps <- getFromNamespace(".npRmpi_autodispatch_replace_tmps", "npRmpi")
+.npRmpi_is_missing_call_arg <- getFromNamespace(".npRmpi_is_missing_call_arg", "npRmpi")
 
 test_that(".npRmpi_bcast_cmd_expr forwards command expression structurally", {
   env <- new.env(parent = environment())
@@ -84,6 +86,20 @@ test_that("autodispatch target argument set covers gdat alias", {
   expect_true(is.character(args))
   expect_true("gdata" %in% args)
   expect_true("gdat" %in% args)
+})
+
+test_that("autodispatch tmp replacement handles calls with missing arguments", {
+  call_in <- quote(npplregbw(formula = y ~ x, data = , bws = .__npRmpi_autod_bws_1))
+  call_out <- .npRmpi_autodispatch_replace_tmps(
+    call_in,
+    tmpvals = list(".__npRmpi_autod_bws_1" = 7L)
+  )
+
+  out_list <- as.list(call_out)
+  expect_true(is.call(call_out))
+  expect_identical(out_list[[1L]], as.name("npplregbw"))
+  expect_true(.npRmpi_is_missing_call_arg(out_list[[3L]]))
+  expect_identical(out_list[[4L]], 7L)
 })
 
 test_that("npudist(bws=...) resolves large autodispatch temporary call arguments", {
