@@ -138,3 +138,28 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_issue_notes_repros_gbwidx_20260223.log`
    - tarball check (MPI env pinned):
      - `/tmp/nprmpi_check_gbwidx_20260223.log` (`Status: OK`)
+
+## Autodispatch Tmp-Call Replacement Fix (2026-02-23)
+Completed in `np-npRmpi`:
+1. Fixed large-argument autodispatch return rewriting so bandwidth `call` objects no longer retain unresolved temporary symbols (e.g. `.__npRmpi_autod_dat_1`).
+2. Root cause:
+   - return-path replacement only used `prepared$tmpvals`; large arguments are staged in `prepared$prepublish`.
+3. Change:
+   - in `.npRmpi_distributed_call_impl`, use combined replacement map `c(prepared$tmpvals, prepared$prepublish)` for list/call return rewriting.
+4. Scope:
+   - `R/np.autodispatch.R`
+5. Commit:
+   - `np-npRmpi`: `d6f5b6e`
+6. Validation:
+   - targeted unit file:
+     - `/tmp/nprmpi_test_npudist_20260223.log` (`TEST_RC:0`)
+   - direct repro (fresh install):
+     - `/tmp/nprmpi_npudist_call_repro_20260223.out` (`NPRMPI_NPUDIST_CALL_REPRO_OK`)
+   - broader targeted filter:
+     - `/tmp/nprmpi_gbwidx_tests_postfix_20260223.log` (`TEST_RC:0`)
+   - issue-note verified repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_autodtmpfix_20260223.log`
+   - session-mode npcdens smoke:
+     - `/tmp/nprmpi_user_npcdens_smoke_fix_20260223.out` (`NPRMPI_USER_NPCDENS_SMOKE_OK`)
+   - tarball check:
+     - `/tmp/nprmpi_check_autodtmpfix_20260223.log` (`Status: OK`)
