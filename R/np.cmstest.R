@@ -62,9 +62,12 @@ npcmstest <- function(formula,
 
   ## Save seed prior to setting
 
-  .np_seed_missing <- new.env(parent = emptyenv())
-  save.seed <- get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE, ifnotfound = .np_seed_missing)
-  exists.seed <- !identical(save.seed, .np_seed_missing)
+  if(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    exists.seed = TRUE
+  } else {
+    exists.seed = FALSE
+  }
 
   set.seed(random.seed)
 
