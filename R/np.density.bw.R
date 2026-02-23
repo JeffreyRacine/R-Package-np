@@ -99,6 +99,18 @@ npudensbw.bandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ...){
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    remin <- npValidateScalarLogical(remin, "remin")
+    scale.init.categorical.sample <-
+      npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
+    transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
+    itmax <- npValidatePositiveInteger(itmax, "itmax")
+    ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
+    tol <- npValidatePositiveFiniteNumeric(tol, "tol")
+    small <- npValidatePositiveFiniteNumeric(small, "small")
+    penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
+    if (!missing(nmulti))
+      nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     .npRmpi_require_active_slave_pool(where = "npudensbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -108,6 +120,7 @@ npudensbw.bandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,dim(dat)[2])
     }
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
 
     if (length(bws$bw) != dim(dat)[2])
       stop(paste("length of bandwidth vector does not match number of columns of",

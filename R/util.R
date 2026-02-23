@@ -149,6 +149,27 @@ npValidateScalarLogical <- function(value, argname) {
   value
 }
 
+npValidateNonNegativeInteger <- function(value, argname) {
+  if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
+      !is.finite(value) || value < 0 || value != floor(value))
+    stop(sprintf("'%s' must be a non-negative integer", argname))
+  as.integer(value)
+}
+
+npValidatePositiveInteger <- function(value, argname) {
+  if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
+      !is.finite(value) || value < 1 || value != floor(value))
+    stop(sprintf("'%s' must be a positive integer", argname))
+  as.integer(value)
+}
+
+npValidatePositiveFiniteNumeric <- function(value, argname) {
+  if (!is.numeric(value) || length(value) != 1L || is.na(value) ||
+      !is.finite(value) || value <= 0)
+    stop(sprintf("'%s' must be a positive finite numeric scalar", argname))
+  as.double(value)
+}
+
 npValidateLpBasis <- function(regtype, basis, argname = "basis") {
   if (!identical(regtype, "lp"))
     return("glp")
