@@ -392,7 +392,7 @@
   cmd <- substitute({
     vals <- VALS
     for (nm in names(vals))
-      assign(nm, vals[[nm]], envir = .GlobalEnv)
+      .GlobalEnv[[nm]] <- vals[[nm]]
   }, list(VALS = tmpvals))
 
   .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
@@ -501,7 +501,7 @@
     tmpvals <- TMPVALS
     if (length(tmpvals)) {
       for (nm in names(tmpvals))
-        assign(nm, tmpvals[[nm]], envir = .GlobalEnv)
+        .GlobalEnv[[nm]] <- tmpvals[[nm]]
     }
 
     old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
@@ -514,7 +514,7 @@
       on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
 
     res <- CALL
-    assign(REMOTE_NAME, res, envir = .GlobalEnv)
+    .GlobalEnv[[REMOTE_NAME]] <- res
     res
   }, list(CALL = prepared$call,
           TMPVALS = prepared$tmpvals,
@@ -597,7 +597,7 @@
     tmpvals <- TMPVALS
     if (length(tmpvals)) {
       for (nm in names(tmpvals))
-        assign(nm, tmpvals[[nm]], envir = .GlobalEnv)
+        .GlobalEnv[[nm]] <- tmpvals[[nm]]
     }
 
     old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
@@ -610,7 +610,7 @@
       on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
 
     res <- CALL
-    assign(REMOTE_NAME, res, envir = .GlobalEnv)
+    .GlobalEnv[[REMOTE_NAME]] <- res
     res
   }, list(CALL = prepared$call,
           TMPVALS = prepared$tmpvals,
