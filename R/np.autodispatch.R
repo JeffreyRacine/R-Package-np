@@ -55,7 +55,11 @@
 }
 
 .npRmpi_bcast_cmd_expr <- function(expr, comm = 1L, caller.execute = TRUE) {
-  do.call("mpi.bcast.cmd",
+  target <- get("mpi.bcast.cmd",
+                envir = parent.frame(),
+                mode = "function",
+                inherits = TRUE)
+  do.call(target,
           list(cmd = expr, comm = comm, caller.execute = caller.execute),
           envir = parent.frame())
 }
