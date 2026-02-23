@@ -89,7 +89,7 @@ npRmpi.init <- function(...,
   if (identical(mode, "spawn")) {
     if (.npRmpi_session_has_active_pool(comm = comm)) {
       if (!quiet)
-        slave.hostinfo(comm)
+        mpi.hostinfo(comm)
       return(invisible(TRUE))
     }
     mpi.spawn.Rslaves(..., nslaves = nslaves, comm = comm, quiet = quiet, nonblock = nonblock, sleep = sleep)

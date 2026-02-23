@@ -96,7 +96,7 @@ mpi.spawn.Rslaves <-
                      ), call. = FALSE)
                  }
              }
-             if (!quiet) slave.hostinfo(comm)
+             if (!quiet) mpi.hostinfo(comm)
              return(invisible(existing))
          }
          err <-paste("It seems there are some slaves running on comm ", comm)
@@ -147,7 +147,7 @@ mpi.spawn.Rslaves <-
         mpi.comm.disconnect(intercomm)
 		mpi.bcast(nonblock,type=1, rank=0, comm=comm)
 		mpi.bcast(sleep,type=2, rank=0, comm=comm)
-        if (!quiet) slave.hostinfo(comm)
+        if (!quiet) mpi.hostinfo(comm)
     }
     else
         stop("Fail to merge the comm for master and slaves.")
