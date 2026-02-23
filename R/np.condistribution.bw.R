@@ -35,14 +35,9 @@ npcdistbw.formula <-
 
     mf[[1]] <- as.name("model.frame")
     gmf[[1]] <- as.name("model.frame")
+    formula.obj <- if (!is.null(formula.call)) eval(formula.call, envir = parent.frame()) else formula
 
-    if (m[2] > 0) { # use data as environment
-        mf[["formula"]] = eval(mf[[m[1]]], environment(mf[[m[2]]]))
-    } else { # use parent frame
-        mf[["formula"]] = eval(mf[[m[1]]], parent.frame())
-    }
-    
-    variableNames <- if(m[2] > 0) explodeFormula(mf[["formula"]], data = data) else explodeFormula(mf[["formula"]])
+    variableNames <- if(m[2] > 0) explodeFormula(formula.obj, data = data) else explodeFormula(formula.obj)
     
     ## make formula evaluable, then eval
     varsPlus <- lapply(variableNames, paste, collapse=" + ")
