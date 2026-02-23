@@ -3,13 +3,13 @@ mpi.finalize <- function(){
     if (!isTRUE(getOption("npRmpi.mpi.initialized", TRUE)))
         return(invisible(FALSE))
 
-    is.master <- try(mpi.is.master(), silent = TRUE)
-    if (!inherits(is.master, "try-error") && isTRUE(is.master))
+    is.master <- tryCatch(mpi.is.master(), error = function(e) NA)
+    if (!is.na(is.master) && isTRUE(is.master))
         print("Exiting Rmpi. Rmpi cannot be used unless relaunching R.")
 
-    out <- try(.Call("mpi_finalize",PACKAGE = "npRmpi"), silent = TRUE)
+    out <- tryCatch(.Call("mpi_finalize",PACKAGE = "npRmpi"), error = function(e) NULL)
     options(npRmpi.mpi.initialized = FALSE)
-    if (inherits(out, "try-error"))
+    if (is.null(out))
         return(invisible(FALSE))
     out
 }

@@ -13,18 +13,25 @@
   invisible(TRUE)
 }
 
+.npRmpi_safe_int <- function(expr) {
+  tryCatch(as.integer(expr), error = function(e) NA_integer_)
+}
+
+.npRmpi_safe <- function(expr, fallback = NULL) {
+  tryCatch(expr, error = function(e) fallback)
+}
+
 .npRmpi_session_ensure_comm <- function(comm = 1L) {
-  size <- try(mpi.comm.size(comm), silent = TRUE)
-  if (!inherits(size, "try-error") && !is.na(size))
+  size <- .npRmpi_safe_int(mpi.comm.size(comm))
+  if (!is.na(size))
     return(invisible(as.integer(size)))
   invisible(mpi.comm.dup(0, comm))
 }
 
 .npRmpi_session_has_active_pool <- function(comm = 1L) {
-  size <- try(mpi.comm.size(comm), silent = TRUE)
-  rank <- try(mpi.comm.rank(comm), silent = TRUE)
-  if (inherits(size, "try-error") || inherits(rank, "try-error") ||
-      is.na(size) || is.na(rank))
+  size <- .npRmpi_safe_int(mpi.comm.size(comm))
+  rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
+  if (is.na(size) || is.na(rank))
     return(FALSE)
   as.integer(size) >= 2L
 }
@@ -39,7 +46,7 @@
       break
     tryCatch(eval(msg, envir = .GlobalEnv), error = function(e) invisible(e))
   }
-  try(if (comm != 0L) mpi.comm.free(comm), silent = TRUE)
+  .npRmpi_safe(if (comm != 0L) mpi.comm.free(comm), fallback = NULL)
   mpi.quit()
   invisible(FALSE)
 }
@@ -65,8 +72,8 @@ npRmpi.init <- function(...,
 
   mode <- match.arg(mode)
   autodispatch.option.sync <- match.arg(autodispatch.option.sync)
-  world.size <- try(mpi.comm.size(0), silent = TRUE)
-  world.size <- if (inherits(world.size, "try-error") || is.na(world.size)) 1L else as.integer(world.size)
+  world.size <- .npRmpi_safe_int(mpi.comm.size(0))
+  world.size <- if (is.na(world.size)) 1L else as.integer(world.size)
 
   if (identical(mode, "auto")) {
     mode <- if (world.size > 1L) "attach" else "spawn"
@@ -97,13 +104,13 @@ npRmpi.init <- function(...,
   # Ensure it exists under mpiexec-launched sessions without requiring
   # user-side mpi.comm.dup(...) boilerplate in scripts.
   comm <- 1L
-  try(mpi.comm.dup(0, comm), silent = TRUE)
+  .npRmpi_safe(mpi.comm.dup(0, comm), fallback = NULL)
   .npRmpi_session_ensure_comm(comm = comm)
   np.mpi.initialize()
   mpi.barrier(0)
 
-  rank <- try(mpi.comm.rank(comm), silent = TRUE)
-  rank <- if (inherits(rank, "try-error") || is.na(rank)) 0L else as.integer(rank)
+  rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
+  rank <- if (is.na(rank)) 0L else as.integer(rank)
 
   if (rank == 0L) {
     if (!quiet) slave.hostinfo(comm)
@@ -118,10 +125,10 @@ npRmpi.quit <- function(force = FALSE,
                         comm = 1,
                         mode = c("auto", "spawn", "attach")) {
   mode <- match.arg(mode)
-  size.comm <- try(mpi.comm.size(comm), silent = TRUE)
-  size.comm <- if (inherits(size.comm, "try-error") || is.na(size.comm)) 0L else as.integer(size.comm)
-  size.world <- try(mpi.comm.size(0), silent = TRUE)
-  size.world <- if (inherits(size.world, "try-error") || is.na(size.world)) 1L else as.integer(size.world)
+  size.comm <- .npRmpi_safe_int(mpi.comm.size(comm))
+  size.comm <- if (is.na(size.comm)) 0L else as.integer(size.comm)
+  size.world <- .npRmpi_safe_int(mpi.comm.size(0))
+  size.world <- if (is.na(size.world)) 1L else as.integer(size.world)
 
   if (identical(mode, "auto")) {
     mode <- if (size.world > 1L && size.comm > 1L) "attach" else "spawn"
@@ -134,7 +141,7 @@ npRmpi.quit <- function(force = FALSE,
     comm <- 1L
     mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm, caller.execute = FALSE)
     if (comm != 0L) {
-      try(mpi.comm.free(comm), silent = TRUE)
+      .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
     }
     return(invisible(TRUE))
   }
@@ -144,40 +151,37 @@ npRmpi.quit <- function(force = FALSE,
 }
 
 npRmpi.session.info <- function(comm=1){
-  np_ver <- try(utils::packageVersion("npRmpi"), silent=TRUE)
-  rmpi_ver <- try(utils::packageVersion("Rmpi"), silent=TRUE)
+  np_ver <- .npRmpi_safe(utils::packageVersion("npRmpi"), fallback = NA)
+  rmpi_ver <- .npRmpi_safe(utils::packageVersion("Rmpi"), fallback = NA)
   reuse <- isTRUE(getOption("npRmpi.reuse.slaves", FALSE))
   env_no_reuse <- Sys.getenv("NP_RMPI_NO_REUSE_SLAVES", unset="")
 
-  mpi_ver <- try({
+  mpi_ver <- .npRmpi_safe({
     if (requireNamespace("Rmpi", quietly = TRUE) &&
         exists("mpi.get.version", envir = asNamespace("Rmpi"), inherits = FALSE)) {
       get("mpi.get.version", envir = asNamespace("Rmpi"))()
     } else {
       NA
     }
-  }, silent = TRUE)
-  comm_size <- try(mpi.comm.size(comm), silent=TRUE)
-  comm_rank <- try(mpi.comm.rank(comm), silent=TRUE)
-  proc <- try(mpi.get.processor.name(), silent=TRUE)
-
-  if (inherits(comm_size, "try-error")) comm_size <- NA_integer_
-  if (inherits(comm_rank, "try-error")) comm_rank <- NA_integer_
+  }, fallback = NA)
+  comm_size <- .npRmpi_safe_int(mpi.comm.size(comm))
+  comm_rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
+  proc <- .npRmpi_safe(mpi.get.processor.name(), fallback = NA_character_)
 
   info <- list(
-    npRmpi = if (inherits(np_ver, "try-error")) NA_character_ else as.character(np_ver),
-    Rmpi = if (inherits(rmpi_ver, "try-error")) NA_character_ else as.character(rmpi_ver),
+    npRmpi = if (is.na(np_ver)[1L]) NA_character_ else as.character(np_ver),
+    Rmpi = if (is.na(rmpi_ver)[1L]) NA_character_ else as.character(rmpi_ver),
     platform = R.version$platform,
     sysname = Sys.info()[["sysname"]],
     release = Sys.info()[["release"]],
     reuse_slaves = reuse,
     NP_RMPI_NO_REUSE_SLAVES = env_no_reuse,
-    mpi_version = if (inherits(mpi_ver, "try-error")) NA else mpi_ver,
+    mpi_version = if (is.na(mpi_ver)[1L]) NA else mpi_ver,
     comm = comm,
     comm_rank = comm_rank,
     comm_size = comm_size,
     nslaves = if (is.na(comm_size)) NA_integer_ else max(as.integer(comm_size) - 1L, 0L),
-    processor = if (inherits(proc, "try-error")) NA_character_ else proc
+    processor = proc
   )
 
   cat("npRmpi session info\n")

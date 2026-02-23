@@ -214,8 +214,8 @@ plotFactor <- function(f, y, ...){
   if (!.npRmpi_autodispatch_called_from_bcast())
     return(plot.behavior)
 
-  rank <- try(mpi.comm.rank(), silent = TRUE)
-  if (inherits(rank, "try-error") || is.na(rank) || rank == 0L)
+  rank <- tryCatch(mpi.comm.rank(), error = function(e) NA_integer_)
+  if (is.na(rank) || rank == 0L)
     return(plot.behavior)
 
   "data"
