@@ -24,8 +24,8 @@ npplregbw.formula <-
     mf.xf[[1]] <- as.name("model.frame")
     
     ## mangle formula ...
-    formula_to_explode <- eval(mf[["formula"]], parent.frame())
-    chromoly <- explodePipe(formula_to_explode, env = environment(formula))
+    formula.obj <- if (!is.null(formula.call)) eval(formula.call, envir = parent.frame()) else formula
+    chromoly <- explodePipe(formula.obj, env = environment(formula))
 
     if (length(chromoly) != 3) ## stop if malformed formula
       stop("invoked with improper formula, please see npplregbw documentation for proper use")
