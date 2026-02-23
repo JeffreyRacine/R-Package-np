@@ -589,7 +589,7 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
     if (slave.num < 1)
         stop("There are no slaves running")
     if (n <= slave.num) {
-        if (exists(".mpi.applyLB")) 
+        if (!is.null(get0(".mpi.applyLB", envir = .GlobalEnv, inherits = FALSE)))
 			rm(".mpi.applyLB",  envir=.GlobalEnv)
         return (mpi.apply(X,FUN,...,comm=comm))
     }    
@@ -673,7 +673,7 @@ mpi.iapplyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1, sleep=0.01){
     if (slave.num < 1)
         stop("There are no slaves running")
     if (n <= slave.num) {
-        if (exists(".mpi.applyLB"))
+        if (!is.null(get0(".mpi.applyLB", envir = .GlobalEnv, inherits = FALSE)))
             rm(".mpi.applyLB",  envir =.GlobalEnv)
         return (mpi.iapply(X,FUN,...,comm=comm,sleep=sleep))
     }
