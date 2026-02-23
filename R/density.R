@@ -6,7 +6,7 @@ npdensity <-
              timing = NA, total.time = NA,
              optim.time = NA, fit.time = NA){
 
-        if (missing(bws) | missing(eval) | missing(dens) | missing(ntrain))
+        if (missing(bws) || missing(eval) || missing(dens) || missing(ntrain))
             stop("improper invocation of density constructor")
 
         if (length(rows.omit) == 0)

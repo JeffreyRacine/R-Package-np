@@ -2,7 +2,7 @@ qregression <-
     function(bws, xeval, tau, quantile, quanterr = NA, quantgrad = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
              timing = NA, total.time = NA, optim.time = NA, fit.time = NA){
 
-        if (missing(bws) | missing(xeval) | missing(tau) | missing(quantile) | missing(ntrain))
+        if (missing(bws) || missing(xeval) || missing(tau) || missing(quantile) || missing(ntrain))
             stop("improper invocation of qregression constructor")
 
         d <- list(

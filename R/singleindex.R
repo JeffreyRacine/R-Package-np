@@ -11,7 +11,7 @@ singleindex =
            optim.time = NA, fit.time = NA
            ){
 
-    if (missing(bws) | missing(index) | missing(mean) | missing(ntrain))
+    if (missing(bws) || missing(index) || missing(mean) || missing(ntrain))
       stop("improper invocation of singleindex constructor")
 
     d = list(

@@ -2,7 +2,7 @@ npkernelsum =
   function(bws, eval, ksum, kw, p.ksum,
            ntrain, trainiseval = FALSE){
 
-    if (missing(bws) | missing(eval) | missing(ksum) | missing(ntrain))
+    if (missing(bws) || missing(eval) || missing(ksum) || missing(ntrain))
       stop("improper invocation of npkernelsum constructor")
 
     d = list(

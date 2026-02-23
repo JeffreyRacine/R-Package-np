@@ -7,7 +7,7 @@ smoothcoefficient <-
            timing = NA, total.time = NA,
            optim.time = NA, fit.time = NA){
 
-    if (missing(bws) | missing(eval) | missing(ntrain))
+    if (missing(bws) || missing(eval) || missing(ntrain))
       stop("improper invocation of smoothcoefficient constructor")
 
     d = list(
