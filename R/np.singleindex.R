@@ -449,7 +449,7 @@ npindex.sibandwidth <-
 
       ## xmex = X_i-\hat E(X_i|X_i'\beta), dimension k\times n.
 
-      xmex <- sapply(1:length(tydat),function(i){W[i,]-tyindex[,i]/tindex[i]})
+      xmex <- sapply(seq_along(tydat),function(i){W[i,]-tyindex[,i]/tindex[i]})
 
       ## Need to trap case where k-1=1..., sapply will return a
       ## vector, need a 1 x n matrix
@@ -533,13 +533,13 @@ npindex.sibandwidth <-
       boot.out = suppressWarnings(boot(data.frame(txdat,tydat), boofun, R = boot.num))
 
       index.merr = matrix(data = 0, ncol = 1, nrow = length(index.eval))
-      index.merr[,] = sqrt(diag(cov(boot.out$t[,1:length(index.eval)])))
+      index.merr[,] = sqrt(diag(cov(boot.out$t[,seq_len(length(index.eval))])))
 
       if (gradients) {
         index.gerr = matrix(data = 0, ncol = ncol(txdat), nrow = length(index.eval))
         index.gerr[,] = sqrt(diag(cov(boot.out$t[,(length(index.eval)+1):(2*length(index.eval))])))
 
-        for (i in 1:ncol(txdat))
+        for (i in seq_len(ncol(txdat)))
           index.gerr[,i] = abs(bws$beta[i])*index.gerr[,i]
 
         index.mgerr = sd(boot.out$t[,2*length(index.eval)+1])

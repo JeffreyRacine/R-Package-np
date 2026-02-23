@@ -186,7 +186,7 @@ npplregbw.plbandwidth =
         
         ## x on z
 
-        for (i in 1:ncol(xdat)){
+        for (i in seq_len(ncol(xdat))) {
           bws$bw[[i+1]] <- npregbw(xdat=zdat, ydat=xdat[,i],
                   bws = bws$bw[[i+1]], nmulti = nmulti, ...)
         }
@@ -247,7 +247,7 @@ npplregbw.default =
     plband$yzbw = npregbw(xdat = zdat, ydat = ydat,
       bws = bws[1,], ..., bandwidth.compute = FALSE)
 
-    for (i in 1:dim(xdat)[2])
+    for (i in seq_len(dim(xdat)[2]))
       plband[[i+1]] = npregbw(xdat = zdat, ydat = xdat[,i],
               bws = bws[i+1,], ..., bandwidth.compute = FALSE)
 

@@ -55,9 +55,9 @@ plbandwidth <-
     porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order",
       "Eighth-Order" )
     ## chug chug
-    sfactor <- lapply(1:length(bws), function(i) { unlist(bws[[i]]$sfactor) })
-    bandwidth <- lapply(1:length(bws), function(i) { unlist(bws[[i]]$bandwidth) })
-    sumNum <- lapply(1:length(bws), function(i) { unlist(bws[[i]]$sumNum) })
+    sfactor <- lapply(seq_along(bws), function(i) { unlist(bws[[i]]$sfactor) })
+    bandwidth <- lapply(seq_along(bws), function(i) { unlist(bws[[i]]$bandwidth) })
+    sumNum <- lapply(seq_along(bws), function(i) { unlist(bws[[i]]$sumNum) })
 
     names(sfactor) <- names(bandwidth) <- names(sumNum) <- rep("z", length(bws))
 
@@ -137,7 +137,7 @@ print.plbandwidth <- function(x, digits=NULL, ...){
 
   bwmat = matrix(data = 0, nrow = x$xndim+1, ncol = x$bw$yzbw$ndim)
   
-  for (i in 1:length(x$bw))
+  for (i in seq_along(x$bw))
     bwmat[i,] = x$bw[[i]]$bw
   
   ## perhaps add a column for objective function value?
