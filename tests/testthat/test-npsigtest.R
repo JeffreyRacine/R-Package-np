@@ -66,3 +66,24 @@ test_that("npsigtest npregression path works under autodispatch", {
   expect_s3_class(sig, "sigtest")
   expect_true(is.numeric(sig$P))
 })
+
+test_that("npsigtest rejects duplicate index entries under autodispatch", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  options(npRmpi.autodispatch = TRUE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+
+  set.seed(11)
+  n <- 30
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- x1 + rnorm(n, sd = 0.1)
+  mydat <- data.frame(y, x1, x2)
+
+  bw <- npregbw(y ~ x1 + x2, data = mydat, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
+
+  expect_error(
+    npsigtest(bws = bw, boot.num = 9, index = c(1, 1)),
+    "repeated values"
+  )
+})

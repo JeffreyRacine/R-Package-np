@@ -108,7 +108,7 @@ npsigtest.rbandwidth <- function(bws,
                                  boot.type = c("I","II"),
                                  pivot = TRUE,
                                  joint = FALSE,
-                                 index = seq(1,ncol(xdat)),
+                                 index = seq_len(ncol(xdat)),
                                  random.seed = 42,
                                  ...) {
   .npRmpi_require_active_slave_pool(where = "npsigtest()")
@@ -118,7 +118,7 @@ npsigtest.rbandwidth <- function(bws,
   if(boot.num < 9) stop("number of bootstrap replications must be >= 9")
 
   ## catch and destroy NA's
-  goodrows <- 1:dim(xdat)[1]
+  goodrows <- seq_len(nrow(xdat))
   rows.omit <- attr(na.omit(data.frame(xdat,ydat)), "na.action")
   goodrows[rows.omit] <- 0
 
@@ -150,7 +150,7 @@ npsigtest.rbandwidth <- function(bws,
   ## Test for valid entries in index
 
   if(any(index < 1 | index > NCOL(xdat))) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
-  if(length(unique(index))<length(unique)) stop("index contains repeated values (must be unique)")
+  if(length(unique(index)) < length(index)) stop("index contains repeated values (must be unique)")
 
   if(!joint) {
 
@@ -254,7 +254,7 @@ npsigtest.rbandwidth <- function(bws,
       
     }
     
-    for(i.star in 1:boot.num) {
+    for (i.star in seq_len(boot.num)) {
       
       if(boot.type=="I") {
         msg <- paste("Bootstrap replication ",
@@ -299,7 +299,7 @@ npsigtest.rbandwidth <- function(bws,
         ## Leave variable being tested untouched, resample remaining
         ## pairs of y,X thereby breaking any systematic relationship
         ## between variable being tested in y
-        boot.index <- sample(1:num.obs,replace=TRUE)
+        boot.index <- sample.int(num.obs, replace = TRUE)
         ydat.star <- ydat[boot.index]
         xdat.star <- xdat[boot.index,]
         for(i in index) xdat.star[,i] <- xdat[,i]
@@ -370,7 +370,7 @@ npsigtest.rbandwidth <- function(bws,
 
     ## Compute the P-value
 
-    P <- mean(ifelse(In.vec>In,1,0))
+    P <- mean(In.vec > In)
 
     In.mat[,1] = In.vec
 
@@ -465,7 +465,7 @@ npsigtest.rbandwidth <- function(bws,
         
       }
       
-      for(i.star in 1:boot.num) {
+      for (i.star in seq_len(boot.num)) {
         
         if(boot.type=="I") {
           msg <- paste("Bootstrap replication ",
@@ -520,7 +520,7 @@ npsigtest.rbandwidth <- function(bws,
           ## Leave variable being tested untouched, resample remaining
           ## pairs of y,X thereby breaking any systematic relationship
           ## between variable being tested in y
-          boot.index <- sample(1:num.obs,replace=TRUE)
+          boot.index <- sample.int(num.obs, replace = TRUE)
           ydat.star <- ydat[boot.index]
           xdat.star <- xdat
           xdat.star[,-i] <- xdat[boot.index,-i]
@@ -592,7 +592,7 @@ npsigtest.rbandwidth <- function(bws,
       
       ## Compute the P-value
       
-      P[ii] <- mean(ifelse(In.vec>In[ii],1,0))
+      P[ii] <- mean(In.vec > In[ii])
       
       In.mat[,ii] = In.vec
       
