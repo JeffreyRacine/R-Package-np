@@ -214,7 +214,7 @@ npindex.sibandwidth <-
 
     txdat = toFrame(txdat)
 
-    if (!(is.vector(tydat) | is.factor(tydat)))
+    if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")
 
     tydat =

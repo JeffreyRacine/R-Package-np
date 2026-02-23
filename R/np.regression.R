@@ -129,7 +129,7 @@ npreg.rbandwidth <-
 
     txdat = toFrame(txdat)
 
-    if (!(is.vector(tydat) | is.factor(tydat)))
+    if (!(is.vector(tydat) || is.factor(tydat)))
       stop("'tydat' must be a vector or a factor")
 
 
@@ -147,7 +147,7 @@ npreg.rbandwidth <-
         stop("'txdat' and 'exdat' are not similar data frames!")
 
       if (!no.ey){
-        if (!(is.vector(eydat) | is.factor(eydat)))
+        if (!(is.vector(eydat) || is.factor(eydat)))
           stop("'eydat' must be a vector or a factor")
         if (dim(exdat)[1] != length(eydat))
           stop("number of evaluation data 'exdat' and dependent data 'eydat' do not match")
