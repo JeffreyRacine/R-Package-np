@@ -498,19 +498,6 @@ npreg.default <- function(bws, txdat, tydat, ...){
     
   tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   
-  ## convention: drop 'bws' and up to two unnamed arguments (including bws)
-  if(no.bws){
-    tx.str <- ",txdat = txdat"
-    ty.str <- ",tydat = tydat"
-  } else {
-    tx.str <- ifelse(txdat.named, ",txdat = txdat","")
-    ty.str <- ifelse(tydat.named, ",tydat = tydat","")    
-    if((!bws.named) && (!txdat.named)){
-      ty.str <- ifelse(tydat.named, ",tydat = tydat",
-                       ifelse(no.tydat,"",",tydat"))
-    }
-  }
-  
   call.args <- list(bws = tbw)
   if (no.bws) {
     call.args$txdat <- txdat

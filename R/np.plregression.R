@@ -352,25 +352,6 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
     
   tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   
-  ## convention: drop 'bws' and up to three unnamed arguments (including bws)
-  ## for simplicity, we don't allow for inconsistent
-  ## mixes of named/unnamed arguments
-  ## so bws is named or unnamed, and t[xyz]dat collectively either
-  ## named or unnamed
-  
-  if(no.bws){
-    tx.str <- ",txdat = txdat"
-    ty.str <- ",tydat = tydat"
-    tz.str <- ",tzdat = tzdat"
-  } else {
-    tx.str <- ifelse(txdat.named, ",txdat = txdat","")
-    ty.str <- ifelse(tydat.named, ",tydat = tydat","")
-    tz.str <- ifelse(tzdat.named, ",tzdat = tzdat","")
-    if((!bws.named) && (!txdat.named)){
-      tz.str <- ifelse(no.tzdat,"",",tzdat")
-    }
-  }
-  
   call.args <- list(bws = tbw)
   if (no.bws) {
     call.args$txdat <- txdat

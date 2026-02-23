@@ -174,21 +174,6 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
   ## for inconsistent mixes of named/unnamed arguments so bws is named
   ## or unnamed, and t[xyz]dat collectively either named or unnamed
 
-  tz.str <- ifelse(tzdat.named, ",tzdat = tzdat",
-                   ifelse(no.tzdat, "", "tzdat"))
-
-  if(no.bws){
-    tx.str <- ",txdat = txdat"
-    ty.str <- ",tydat = tydat"
-  } else {
-    tx.str <- ifelse(txdat.named, ",txdat = txdat","")
-    ty.str <- ifelse(tydat.named, ",tydat = tydat","")
-    if((!bws.named) && (!txdat.named)){
-      ty.str <- ifelse(tydat.named, ",tydat = tydat",
-                       ifelse(no.tydat, "", "tydat"))
-    }
-  }
-
   call.args <- list(bws = tbw)
   if (no.bws) {
     call.args$txdat <- txdat
