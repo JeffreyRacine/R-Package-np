@@ -372,3 +372,41 @@ Completed in `np-npRmpi`:
    - tarball-first:
      - `/tmp/nprmpi_build_unitest2_20260223.log` (`BUILD_RC:0`)
      - `/tmp/nprmpi_check_unitest2_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
+
+## Np*test Bootstrap Loop/Index Hygiene Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Modernized bootstrap loop/index idioms in `np.*test` paths and fixed `npsdeptest` bootstrap lag routing semantics for `lag.num > 1`.
+2. Scope:
+   - `R/np.cmstest.R`
+   - `R/np.qcmstest.R`
+   - `R/np.deneqtest.R`
+   - `R/np.deptest.R`
+   - `R/np.sdeptest.R`
+3. Changes:
+   - `1:boot.num`/`1:lag.num` loops -> `seq_len(...)`
+   - indicator p-value means use logical means directly
+   - `npsdeptest` bootstrap now computes lagged pairs inside the per-lag loop from a single resampled series (`resampled.ts`), removing stale-`k` behavior.
+4. Commit:
+   - `np-npRmpi`: `91cae32`
+5. Validation:
+   - parse gate: `PARSE_OK`
+   - focused tests:
+     - `/tmp/nprmpi_nptests_fix_20260223.log` (`PASS 13, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_nptestsfix_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_nptestsfix_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_nptestsfix_20260223.log` (`Status: 1 WARNING` pre-fix codoc)
+
+## Sigtest Rd Signature Alignment Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Aligned `npsigtest.rbandwidth` Rd default for `index` with code (`seq_len(ncol(xdat))`).
+2. Scope:
+   - `man/np.sigtest.Rd`
+3. Commit:
+   - `np-npRmpi`: `6a0f08d`
+4. Validation:
+   - tarball-first:
+     - `/tmp/nprmpi_check_sigdoc_20260223.log` (`Status: OK`)
+   - `--as-cran` refresh:
+     - `/tmp/nprmpi_check_ascran_refresh_20260223.log` (`Status: 1 WARNING, 1 NOTE`; no codoc warning).
