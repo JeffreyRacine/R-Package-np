@@ -8,11 +8,12 @@ npudensbw <- function(...){
 
 npudensbw.formula <-
   function(formula, data, subset, na.action, call, ...){
+    formula.terms <- terms(formula)
     orig.ts <- if (missing(data))
-      .np_terms_ts_mask(terms_obj = terms(formula),
+      .np_terms_ts_mask(terms_obj = formula.terms,
                         data = environment(formula),
                         eval_env = environment(formula))
-    else .np_terms_ts_mask(terms_obj = terms(formula),
+    else .np_terms_ts_mask(terms_obj = formula.terms,
                            data = data,
                            eval_env = environment(formula))
    
@@ -22,17 +23,17 @@ npudensbw.formula <-
     mf <- mf[c(1,m)]
 
     if(all(orig.ts)){
-      args <- (as.list(attr(terms(formula), "variables"))[-1])
-      formula <- terms(formula)
+      args <- (as.list(attr(formula.terms, "variables"))[-1])
+      formula <- formula.terms
       attr(formula, "predvars") <- as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), args))))
       mf[["formula"]] <- formula
     }else if(any(orig.ts)){
-      arguments <- (as.list(attr(terms(formula), "variables"))[-1])
+      arguments <- (as.list(attr(formula.terms, "variables"))[-1])
       arguments.normal <- arguments[which(!orig.ts)]
       arguments.timeseries <- arguments[which(orig.ts)]
 
       ix <- sort(c(which(orig.ts),which(!orig.ts)),index.return = TRUE)$ix
-      formula <- terms(formula)
+      formula <- formula.terms
       attr(formula, "predvars") <- bquote(.(as.call(c(quote(cbind),as.call(c(quote(as.data.frame),as.call(c(quote(ts.intersect), arguments.timeseries)))),arguments.normal,check.rows = TRUE)))[,.(ix)])
       mf[["formula"]] <- formula
     }
