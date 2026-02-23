@@ -178,7 +178,7 @@ npksum.default <-
     if(!integer.pow)
       stop("'kernel.pow' is not an integer")
 
-    if (!miss.ex & leave.one.out)
+    if (!miss.ex && leave.one.out)
       stop("you may not specify 'leave.one.out = TRUE' and provide evaluation data")
 
     if (!miss.weights && !(is.matrix(weights) && nrow(weights) == nrow(txdat)))
@@ -229,7 +229,7 @@ npksum.default <-
     length.out = prod(dim.out[which(dim.out > 0)])
 
     if((permutation.operator != "none") || compute.ocg){
-      npvar <- (if ((permutation.operator != "none")) bws$ncon else 0) + (if (compute.score | compute.ocg) bws$nuno + bws$nord else 0)
+      npvar <- (if ((permutation.operator != "none")) bws$ncon else 0) + (if (compute.score || compute.ocg) bws$nuno + bws$nord else 0)
       p.length.out <- npvar*length.out
       p.dim.out <- c(dim.out, max(npvar, 0))      
     }

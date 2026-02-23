@@ -128,10 +128,10 @@ npconmode.conbandwidth <-
     tnrow = dim(txdat)[1]
     enrow = ifelse(no.ex, tnrow, dim(exdat)[1])
 
-    if (!no.ey & no.ex)
+    if (!no.ey && no.ex)
       stop("npconmode: invalid invocation: 'eydat' provided but not 'exdat'")
 
-    if (bws$yndim != 1 | bws$yncon > 0)
+    if (bws$yndim != 1 || bws$yncon > 0)
       stop("'tydat' must consist of one (1) discrete variable")
 
     mdens = double(enrow)
@@ -166,11 +166,11 @@ npconmode.conbandwidth <-
       ntrain = nrow(txdat),
       trainiseval = no.ex
     )
-    if (!(no.ey & !no.ex))
+    if (!(no.ey && !no.ex))
       cm.args$yeval <- if (no.ey) tydat else eydat
     con.mode <- do.call(conmode, cm.args)
     
-    if (!(no.ey & !no.ex)){
+    if (!(no.ey && !no.ex)){
       confusion.matrix <- 
         table(factor(if (no.ex) tydat[,1] else eydat[,1], exclude = NULL),
               factor(con.mode$conmode,exclude = NULL), dnn=c("Actual", "Predicted"))
