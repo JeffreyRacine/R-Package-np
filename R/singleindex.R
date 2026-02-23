@@ -64,8 +64,8 @@ singleindex =
 print.singleindex <- function(x, digits=NULL, ...){
   cat("\nSingle Index Model",
       "\nRegression data: ", x$ntrain, " training points,",
-      ifelse(x$trainiseval, "", paste(" and ", x$nobs,
-                                      " evaluation points,", sep="")),
+      if (x$trainiseval) "" else paste(" and ", x$nobs,
+                                      " evaluation points,", sep=""),
       " in ",x$ndim," variable(s)\n",sep="")
 
   print(matrix(x$beta,ncol=x$ndim,dimnames=list(paste("Beta",":",sep=""),x$xnames)))
@@ -121,8 +121,8 @@ gradients.singleindex <- function(x, errors = FALSE, ...) {
 summary.singleindex <- function(object, ...){
   cat("\nSingle Index Model",
       "\nRegression Data: ", object$ntrain, " training points,",
-      ifelse(object$trainiseval, "", paste(" and ", object$nobs,
-                                      " evaluation points,", sep="")),
+      if (object$trainiseval) "" else paste(" and ", object$nobs,
+                                      " evaluation points,", sep=""),
       " in ",object$ndim," variable(s)\n\n",sep="")
 
   cat(genOmitStr(object))
