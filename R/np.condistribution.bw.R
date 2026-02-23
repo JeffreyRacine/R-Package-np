@@ -335,17 +335,23 @@ npcdistbw.condbandwidth <-
         nbw = double(yncol+xncol)
         gbw = bws$yncon+bws$xncon
         if (gbw > 0){
-          nbw[1:bws$xncon] <- 1.06
-          nbw[(bws$xncon+1):gbw] <- 1.587
-          if(!bws$scaling)
-            nbw[1:gbw]=nbw[1:gbw]*mysd*nconfac
+          xcon_idx <- seq_len(bws$xncon)
+          ycon_idx <- seq.int(from = bws$xncon + 1L, length.out = bws$yncon)
+          if (length(xcon_idx) > 0L)
+            nbw[xcon_idx] <- 1.06
+          if (length(ycon_idx) > 0L)
+            nbw[ycon_idx] <- 1.587
+          if(!bws$scaling){
+            gbw_idx <- seq_len(gbw)
+            nbw[gbw_idx]=nbw[gbw_idx]*mysd*nconfac
+          }
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
         total.time <- NA
       }
 
-      yr = 1:yncol
-      xr = 1:xncol
+      yr = seq_len(yncol)
+      xr = seq_len(xncol)
       rorder = numeric(yncol + xncol)
 
       ## bandwidths are passed back from the C routine in an unusual order
@@ -364,7 +370,7 @@ npcdistbw.condbandwidth <-
 
       tbw <- bws
       tbw$ybw[c(rycon,ryuno,ryord)] <- myout$bw[yr+bws$xncon]
-      tbw$xbw[c(rxcon,rxuno,rxord)] <- myout$bw[setdiff(1:(yncol+xncol),yr+bws$xncon)]
+      tbw$xbw[c(rxcon,rxuno,rxord)] <- myout$bw[setdiff(seq_len(yncol + xncol), yr + bws$xncon)]
 
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
