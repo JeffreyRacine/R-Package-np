@@ -56,6 +56,8 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [ ] Tarball-first validation is cleanly run:
   - `R CMD build np-master`
   - `R CMD check --as-cran np_<ver>.tar.gz`
+- [ ] Issue-note regression sweep is run periodically and after core modernization touches:
+  - `./issue_notes/run_verified_issue_repros.sh`
 - [ ] New warnings/notes are treated as regressions unless explicitly accepted and documented.
 - [ ] Windows validation completed via win-builder prior to release candidate.
 

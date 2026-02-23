@@ -34,3 +34,17 @@ Concluded not feasible in general; guidance only.
 #18 now fixed (see above).
 #44 open (needs deeper theoretical check).
 #3 open (behavior likely inherent to higher‑order kernel LL).
+
+Periodic regression sweep
+
+Run this periodically (and after any modernization touch in core estimator paths):
+
+./issue_notes/run_verified_issue_repros.sh
+
+Optional explicit log path:
+
+./issue_notes/run_verified_issue_repros.sh /tmp/np_issue_notes_repros_manual.log
+
+Pass/fail rule:
+
+- any `FAIL:` line in the run log is a regression candidate and blocks merge until triaged.
