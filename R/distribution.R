@@ -31,7 +31,7 @@ npdistribution <-
             ntrain = ntrain,
             trainiseval = trainiseval,
             rows.omit = rows.omit,
-            nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+            nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
             timing = timing, total.time = total.time,
             optim.time = optim.time, fit.time = fit.time)
 

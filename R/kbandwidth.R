@@ -78,7 +78,7 @@ kbandwidth.numeric <-
     mybw = list(
       bw=bw,
       scaling = bwscaling,
-      pscaling = ifelse(bwscaling, "Scale Factor(s)", "Bandwidth(s)"),
+      pscaling = if (bwscaling) "Scale Factor(s)" else "Bandwidth(s)",
       type = bwtype,
       ptype = bwtToPrint(bwtype),
       ckertype = ckertype,    
