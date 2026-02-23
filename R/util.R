@@ -733,8 +733,11 @@ explodeFormula <- function(formula, data=NULL){
 
 
 explodePipe <- function(formula, env = parent.frame()){
-  if (!inherits(formula, "formula"))
-    formula <- eval(formula, env)
+  if (!inherits(formula, "formula")) {
+    formula <- tryCatch(eval(formula, envir = env), error = function(e) e)
+    if (inherits(formula, "error"))
+      stop(conditionMessage(formula), call. = FALSE)
+  }
   tf <- as.character(formula)  
   tf <- tf[length(tf)]
   lhs <- if (length(as.character(formula)) == 3) {
@@ -888,8 +891,11 @@ toMatrix <- function(data) {
 ## could fail without the response too, but then the calling routine is about
 ## to die a noisy death anyhow ...
 succeedWithResponse <- function(tt, frame){
-  !inherits(try(eval(expr = attr(tt, "variables"),
-                     envir = frame, enclos = NULL), silent = TRUE), "try-error")
+  vars <- attr(tt, "variables")
+  if (is.null(vars))
+    return(FALSE)
+  out <- tryCatch(eval(expr = vars, envir = frame, enclos = NULL), error = function(e) e)
+  !inherits(out, "error")
 }
 
 ## determine whether a bandwidth
