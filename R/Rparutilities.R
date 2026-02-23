@@ -816,7 +816,7 @@ mpi.iparSapply <- function (X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.se
 }
 
 .mpi_make_replicate_fun <- function(expr, env = parent.frame()) {
-    eval(substitute(function(...) EXPR, list(EXPR = expr)), envir = env)
+    as.function(c(alist(... = ), expr), envir = env)
 }
 
 mpi.parReplicate <- function(n,  expr, job.num=mpi.comm.size(comm)-1, apply.seq=NULL,
