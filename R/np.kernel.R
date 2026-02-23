@@ -164,10 +164,12 @@ npksum.default <-
     operator.num <- ALL_OPERATORS[operator]
     poperator.num <- PERMUTATION_OPERATORS[permutation.operator]
     
-    ccon = unlist(lapply(txdat[,bws$icon,drop=FALSE],class))
-    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
-        (any(bws$iord) && !all(sapply(txdat[,bws$iord, drop = FALSE],inherits, "ordered"))) ||
-        (any(bws$iuno) && !all(sapply(txdat[,bws$iuno, drop = FALSE],inherits, "factor"))))
+    if ((any(bws$icon) &&
+         !all(vapply(txdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$iord) &&
+         !all(vapply(txdat[, bws$iord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+        (any(bws$iuno) &&
+         !all(vapply(txdat[, bws$iuno, drop = FALSE], inherits, logical(1), "factor"))))
       stop("supplied bandwidths do not match 'txdat' in type")
 
     if (!miss.ty && (nrow(txdat) != nrow(tydat)))
@@ -185,28 +187,29 @@ npksum.default <-
       stop("improperly specified weight matrix")
     ## catch and destroy NA's
 
-    goodrows = 1:dim(txdat)[1]
-    rows.omit = attr(na.omit(txdat), "na.action")
+    keep.rows <- rep_len(TRUE, nrow(txdat))
+    rows.omit <- attr(na.omit(txdat), "na.action")
 
     if (!miss.ty)
-      rows.omit = union(rows.omit, attr(na.omit(tydat), "na.action"))
+      rows.omit <- union(rows.omit, attr(na.omit(tydat), "na.action"))
 
     if (!miss.weights)
-      rows.omit = union(rows.omit, attr(na.omit(weights), "na.action"))
+      rows.omit <- union(rows.omit, attr(na.omit(weights), "na.action"))
 
     
-    goodrows[rows.omit] = 0
+    if (length(rows.omit) > 0L)
+      keep.rows[as.integer(rows.omit)] <- FALSE
 
-    if (all(goodrows==0))
+    if (!any(keep.rows))
       stop("Data has no rows without NAs")
 
-    txdat = txdat[goodrows,,drop = FALSE]
+    txdat <- txdat[keep.rows,,drop = FALSE]
 
     if (!miss.ty)
-      tydat = tydat[goodrows,, drop = FALSE]
+      tydat <- tydat[keep.rows,, drop = FALSE]
 
     if (!miss.weights)
-      weights = weights[goodrows,, drop = FALSE]
+      weights <- weights[keep.rows,, drop = FALSE]
 
     if (!miss.ex){
       exdat = na.omit(exdat)
@@ -224,12 +227,16 @@ npksum.default <-
 
     dim.in = c(twncol, tyncol, enrow)
 
-    dim.out = c(max(ncol(weights),0), max(ncol(tydat),0), enrow)
+    dim.out = c(twncol, tyncol, enrow)
     
     length.out = prod(dim.out[which(dim.out > 0)])
 
-    if((permutation.operator != "none") || compute.ocg){
-      npvar <- (if ((permutation.operator != "none")) bws$ncon else 0) + (if (compute.score || compute.ocg) bws$nuno + bws$nord else 0)
+    has.permutation <- permutation.operator != "none"
+    has.pksum <- has.permutation || compute.ocg
+
+    if (has.pksum){
+      npvar <- (if (has.permutation) bws$ncon else 0L) +
+        (if (compute.score || compute.ocg) bws$nuno + bws$nord else 0L)
       p.length.out <- npvar*length.out
       p.dim.out <- c(dim.out, max(npvar, 0))      
     }
@@ -363,7 +370,7 @@ npksum.default <-
       kw <- NULL
     }
 
-    if(((permutation.operator != "none") || compute.ocg) && (p.length.out > 0)) {
+    if(has.pksum && (p.length.out > 0)) {
       dim.p <- p.dim.out[which(p.dim.out > 1)]
       if(length(dim.p) == 0) dim.p <- 1
 
@@ -371,7 +378,7 @@ npksum.default <-
 
       ip <- integer(0)
 
-      if((permutation.operator != "none") && (bws$ncon > 0))
+      if(has.permutation && (bws$ncon > 0))
         ip <- which(bws$icon)
 
       if(compute.ocg || compute.score){
