@@ -1,8 +1,8 @@
 # `R CMD check --as-cran` Warning/Note Ledger (`np-master`)
 
-Last refresh: 2026-02-23 (post load-hook/routing checkpoint)  
+Last refresh: 2026-02-23 (post `np.*test` + `np.sigtest.Rd` alignment checkpoint)  
 Tarball: `np_0.70-0.tar.gz`  
-Check log: `/tmp/np_master_check_ascran_postloadhook_20260223.log`
+Check log: `/tmp/np_master_check_ascran_refresh_20260223.log`
 
 ## Current Status
 - `Status: 2 WARNINGs, 1 NOTE`
@@ -20,6 +20,9 @@ Check log: `/tmp/np_master_check_ascran_postloadhook_20260223.log`
 2. `inst/doc` PDF size WARNING
 - Detail: `gs+qpdf` suggests compaction opportunities for generated vignette PDFs.
 - Disposition: accepted for now; optional packaging optimization before final CRAN submission (`tools::compactPDF` or `--compact-vignettes`).
+
+## Cleared In This Refresh
+1. Prior `npsigtest.rbandwidth` code/documentation mismatch warning is cleared after `man/np.sigtest.Rd` default alignment.
 
 ## Gate Policy
 - Any *new* warning/note not listed here is treated as a regression.

@@ -267,3 +267,41 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_unitest2_20260223.log` (`BUILD_RC:0`)
      - `/tmp/np_master_check_unitest2_20260223.log` (`CHECK_RC:0`)
+
+## Np*test Bootstrap Loop/Index Hygiene Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Modernized bootstrap loop/index idioms in `np.*test` paths and fixed `npsdeptest` bootstrap lag routing semantics for `lag.num > 1`.
+2. Scope:
+   - `R/np.cmstest.R`
+   - `R/np.qcmstest.R`
+   - `R/np.deneqtest.R`
+   - `R/np.deptest.R`
+   - `R/np.sdeptest.R`
+3. Changes:
+   - `1:boot.num`/`1:lag.num` loops -> `seq_len(...)`
+   - indicator p-value means use logical means directly
+   - `npsdeptest` bootstrap now computes lagged pairs inside the per-lag loop from a single resampled series (`resampled.ts`), removing stale-`k` behavior.
+4. Commit:
+   - `np-master`: `ee2b478`
+5. Validation:
+   - parse gate: `PARSE_OK`
+   - focused tests:
+     - `/tmp/np_master_nptests_fix_20260223.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_nptestsfix_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_nptestsfix_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/np_master_check_nptestsfix_20260223.log` (`Status: 1 WARNING` pre-fix codoc)
+
+## Sigtest Rd Signature Alignment Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Aligned `npsigtest.rbandwidth` Rd default for `index` with code (`seq_len(ncol(xdat))`).
+2. Scope:
+   - `man/np.sigtest.Rd`
+3. Commit:
+   - `np-master`: `da2e4a8`
+4. Validation:
+   - tarball-first:
+     - `/tmp/np_master_check_sigdoc_20260223.log` (`Status: OK`)
+   - `--as-cran` refresh:
+     - `/tmp/np_master_check_ascran_refresh_20260223.log` (`Status: 2 WARNINGs, 1 NOTE`; no codoc warning).
