@@ -266,6 +266,12 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     stop("unable to evaluate MPI command expression", call. = FALSE)
 }
 
+.npRmpi_clear_applylb_cache <- function() {
+    if (!is.null(get0(".mpi.applyLB", envir = .GlobalEnv, inherits = FALSE)))
+        rm(".mpi.applyLB", envir = .GlobalEnv)
+    invisible(NULL)
+}
+
 .mpi.worker.exec <- function(tag, ret, simplify){
 	.comm <- 1
     #tag.ret <- mpi.bcast(integer(3), type=1, comm=.comm)
@@ -274,9 +280,8 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     #simplify <- as.logical(tag.ret[3])
     scmd.arg <- mpi.bcast.Robj(comm=.comm)
 
-    if (ret){
+	    if (ret){
 	    size <- mpi.comm.size(.comm)
-	    myerrcode <- as.integer(0)
 	    out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = sys.parent()),
 	                    error = function(e) e)
 
@@ -587,8 +592,7 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
     if (slave.num < 1)
         stop("There are no slaves running")
     if (n <= slave.num) {
-        if (!is.null(get0(".mpi.applyLB", envir = .GlobalEnv, inherits = FALSE)))
-			rm(".mpi.applyLB",  envir=.GlobalEnv)
+        .npRmpi_clear_applylb_cache()
         return (mpi.apply(X,FUN,...,comm=comm))
     }    
     if (!is.function(FUN))
@@ -671,8 +675,7 @@ mpi.iapplyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1, sleep=0.01){
     if (slave.num < 1)
         stop("There are no slaves running")
     if (n <= slave.num) {
-        if (!is.null(get0(".mpi.applyLB", envir = .GlobalEnv, inherits = FALSE)))
-            rm(".mpi.applyLB",  envir =.GlobalEnv)
+        .npRmpi_clear_applylb_cache()
         return (mpi.iapply(X,FUN,...,comm=comm,sleep=sleep))
     }
     if (!is.function(FUN))

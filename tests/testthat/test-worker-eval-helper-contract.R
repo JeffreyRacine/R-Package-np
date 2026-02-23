@@ -32,5 +32,14 @@ test_that("mpi.bcast.cmd caller path executes no-arg commands through helper", {
 test_that(".mpi.worker.exec no longer uses .mpi.err side-channel", {
   fn.body <- paste(deparse(body(.mpi.worker.exec), width.cutoff = 500L), collapse = " ")
   expect_no_match(fn.body, "\\.mpi\\.err")
+  expect_no_match(fn.body, "myerrcode")
   expect_match(fn.body, "type <- \\.typeindex\\(out\\)")
+})
+
+test_that("applyLB short-circuit paths use shared cache-clear helper", {
+  body.lb <- paste(deparse(body(mpi.applyLB), width.cutoff = 500L), collapse = " ")
+  body.ilb <- paste(deparse(body(mpi.iapplyLB), width.cutoff = 500L), collapse = " ")
+
+  expect_match(body.lb, "\\.npRmpi_clear_applylb_cache\\(\\)")
+  expect_match(body.ilb, "\\.npRmpi_clear_applylb_cache\\(\\)")
 })
