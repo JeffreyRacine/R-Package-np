@@ -43,7 +43,7 @@ npregbw.formula <-
       
     mf[[1]] <- as.name("model.frame")
     mf.args <- as.list(mf[-1L])
-    mf <- do.call("model.frame", mf.args, envir = parent.frame())
+    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
 
     ydat <- model.response(mf)
     xdat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]

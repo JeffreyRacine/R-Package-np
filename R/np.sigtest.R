@@ -16,7 +16,7 @@
   tmf[[1]] <- as.name("model.frame")
   tmf[["formula"]] <- tt
   mf.args <- as.list(tmf)[-1L]
-  tmf <- do.call("model.frame", mf.args, envir = environment(tt))
+  tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
   ydat <- model.response(tmf)
   xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
@@ -69,7 +69,7 @@ npsigtest.formula <-
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call("model.frame", mf.args, envir = environment(tt))
+    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
     ydat <- model.response(tmf)
     xdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]

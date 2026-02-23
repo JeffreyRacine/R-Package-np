@@ -30,7 +30,7 @@ npconmode.formula <-
     tmf[[1]] <- as.name("model.frame")
     tmf[["formula"]] <- tt
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call("model.frame", mf.args, envir = environment(tt))
+    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
     tydat <- tmf[, bws$variableNames[["response"]], drop = FALSE]
     txdat <- tmf[, bws$variableNames[["terms"]], drop = FALSE]

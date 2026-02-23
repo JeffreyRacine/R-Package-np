@@ -79,8 +79,8 @@ npplregbw.formula <-
     
     mf.args <- as.list(mf[-1L])
     mf.xf.args <- as.list(mf.xf[-1L])
-    mf <- do.call("model.frame", mf.args, envir = parent.frame())
-    mf.xf <- do.call("model.frame", mf.xf.args, envir = parent.frame())
+    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
+    mf.xf <- do.call(stats::model.frame, mf.xf.args, envir = parent.frame())
 
     ydat <- model.response(mf)
     xdat <- mf.xf

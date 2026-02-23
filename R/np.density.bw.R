@@ -40,7 +40,7 @@ npudensbw.formula <-
     
     mf[[1]] <- as.name("model.frame")
     mf.args <- as.list(mf[-1L])
-    mf <- do.call("model.frame", mf.args, envir = parent.frame())
+    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
 
     if (attr(attr(mf, "terms"), "response") != 0)
       stop("invalid density formula")

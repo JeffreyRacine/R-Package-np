@@ -32,7 +32,7 @@ npreg.formula <-
     if (!missing(data) && !is.null(data))
       tmf[["data"]] <- substitute(data)
     mf.args <- as.list(tmf)[-1L]
-    umf <- tmf <- do.call("model.frame", mf.args, envir = environment(tt))
+    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
     tydat <- model.response(tmf)
     txdat <- tmf[, attr(attr(tmf, "terms"),"term.labels"), drop = FALSE]
