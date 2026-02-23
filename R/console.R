@@ -33,15 +33,17 @@ toMsg <- function(msg, console = stop("no console provided")){
 
   if(length(tMsg) > 1){
     tmpPos <- console$lineLen + console$startCol
+    fills <- character(length(tMsg))
   
     ## do tabbing
-    msg <- paste(tMsg, sapply(tMsg, function(x) {
-      tmpPos <<- tmpPos + nchar(x)
-      tmpPos <<- tmpPos +
-        nchar(tFill <- paste(charRep(' ', console$tabLen-(tmpPos %% console$tabLen)),
-                             collapse = ''))
-      tFill
-    }), sep='', collapse='')
+    for(i in seq_along(tMsg)) {
+      tmpPos <- tmpPos + nchar(tMsg[[i]])
+      tFill <- paste(charRep(' ', console$tabLen-(tmpPos %% console$tabLen)),
+                     collapse = '')
+      fills[[i]] <- tFill
+      tmpPos <- tmpPos + nchar(tFill)
+    }
+    msg <- paste(tMsg, fills, sep='', collapse='')
   }
   list(msg = msg,
        len = nchar(msg))
@@ -85,4 +87,3 @@ printClear <- function(console = stop("no console provided")){
   }
   return(console)
 }
-
