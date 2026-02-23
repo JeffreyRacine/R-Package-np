@@ -26,6 +26,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`91ec5dc`).
 - [x] Verified issue-note repro harness includes session `npreg` factor-routing guard (`b5b597a`).
 - [x] Load hook now supports source-tree/dev loading without installed-package lookup dependence (`61b4783`).
+- [x] Native bridge stress harness added and passing for touched `.Call` surfaces in session mode (`issue_notes/native_bridge_stress.R`).
 - [x] `--as-cran` reports no code/documentation mismatches (`/tmp/nprmpi_check_ascran_postloadhook_20260223.log`).
 - [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
@@ -50,9 +51,9 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 
 ### 4) Native Interface Safety
 - [x] `.C` callsites in R layer are `0`.
-- [ ] `.Call` interface paths have stress tests for touched entry points.
-- [ ] PROTECT/UNPROTECT accounting validated for modified C entry points.
-- [ ] No new stack-imbalance warnings in targeted serial + MPI runs.
+- [x] `.Call` interface paths have stress tests for touched entry points.
+- [x] PROTECT/UNPROTECT accounting validated for modified C entry points.
+- [x] No new stack-imbalance warnings in targeted serial + MPI runs.
 
 ### 5) Performance Governance
 - [ ] Every performance patch includes pre/post comparison with identical script/args.
