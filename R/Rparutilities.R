@@ -263,7 +263,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     size <- mpi.comm.size(.comm)
     myerrcode <- as.integer(0)
     if (length(scmd.arg$arg)>0)
-        out <- tryCatch(do.call(as.character(scmd.arg$scmd), scmd.arg$arg, envir=.GlobalEnv),
+        out <- tryCatch(do.call(.npRmpi_bcast_cmd_funref(scmd.arg$scmd), scmd.arg$arg, envir=.GlobalEnv),
                         error = function(e) e)
     else
         out <- tryCatch(eval(scmd.arg$scmd, envir=sys.parent()),
@@ -307,7 +307,7 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     }
     else {
     if (length(scmd.arg$arg)>0)
-            out <- tryCatch(do.call(as.character(scmd.arg$scmd), scmd.arg$arg),
+            out <- tryCatch(do.call(.npRmpi_bcast_cmd_funref(scmd.arg$scmd), scmd.arg$arg),
                             error = function(e) e)
         else
             out <- tryCatch(eval(scmd.arg$scmd),
