@@ -15,9 +15,9 @@
 }
 
 .onUnload <- function (lpath){
-  try(.Call("C_np_release_static_buffers", PACKAGE = "npRmpi"), silent = TRUE)
+  tryCatch(.Call("C_np_release_static_buffers", PACKAGE = "npRmpi"), error = function(e) NULL)
   if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
-    try(mpi.finalize(), silent = TRUE)
+    tryCatch(mpi.finalize(), error = function(e) NULL)
   library.dynam.unload("npRmpi", libpath=lpath) 
 }
 
@@ -68,18 +68,18 @@
       options(npRmpi.conflicts.warned.rmpi = FALSE)
 
     setHook(packageEvent("np", "attach"),
-            function(...) try(get(".npRmpi_warn_pkg_conflict_once",
-                                  envir = asNamespace("npRmpi"),
-                                  mode = "function",
-                                  inherits = FALSE)(),
-                              silent = TRUE),
+            function(...) tryCatch(get(".npRmpi_warn_pkg_conflict_once",
+                                       envir = asNamespace("npRmpi"),
+                                       mode = "function",
+                                       inherits = FALSE)(),
+                                   error = function(e) invisible(e)),
             action = "append")
     setHook(packageEvent("Rmpi", "attach"),
-            function(...) try(get(".npRmpi_warn_rmpi_conflict_once",
-                                  envir = asNamespace("npRmpi"),
-                                  mode = "function",
-                                  inherits = FALSE)(),
-                              silent = TRUE),
+            function(...) tryCatch(get(".npRmpi_warn_rmpi_conflict_once",
+                                       envir = asNamespace("npRmpi"),
+                                       mode = "function",
+                                       inherits = FALSE)(),
+                                   error = function(e) invisible(e)),
             action = "append")
 
     return(invisible())
@@ -88,7 +88,9 @@
   if(.Call("mpidist",PACKAGE="npRmpi") == 2){
     auto.lamboot <- isTRUE(getOption("npRmpi.auto.lamboot", FALSE)) ||
       nzchar(Sys.getenv("NP_RMPI_AUTO_LAMBOOT"))
-    if (auto.lamboot && (length(try(system("lamnodes",TRUE,ignore.stderr = TRUE))) == 0)){
+    lamnodes <- tryCatch(system("lamnodes", TRUE, ignore.stderr = TRUE),
+                         error = function(e) character(0))
+    if (auto.lamboot && length(lamnodes) == 0){
 	    system("lamboot -H",ignore.stderr = TRUE)
     }
   }
@@ -126,17 +128,17 @@
     options(npRmpi.conflicts.warned.rmpi = FALSE)
 
   setHook(packageEvent("np", "attach"),
-          function(...) try(get(".npRmpi_warn_pkg_conflict_once",
-                                envir = asNamespace("npRmpi"),
-                                mode = "function",
-                                inherits = FALSE)(),
-                            silent = TRUE),
+          function(...) tryCatch(get(".npRmpi_warn_pkg_conflict_once",
+                                     envir = asNamespace("npRmpi"),
+                                     mode = "function",
+                                     inherits = FALSE)(),
+                                 error = function(e) invisible(e)),
           action = "append")
   setHook(packageEvent("Rmpi", "attach"),
-          function(...) try(get(".npRmpi_warn_rmpi_conflict_once",
-                                envir = asNamespace("npRmpi"),
-                                mode = "function",
-                                inherits = FALSE)(),
-                            silent = TRUE),
+          function(...) tryCatch(get(".npRmpi_warn_rmpi_conflict_once",
+                                     envir = asNamespace("npRmpi"),
+                                     mode = "function",
+                                     inherits = FALSE)(),
+                                 error = function(e) invisible(e)),
           action = "append")
 }
