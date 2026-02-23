@@ -55,9 +55,11 @@
 }
 
 .npRmpi_bcast_cmd_expr <- function(expr, comm = 1L, caller.execute = TRUE) {
-  eval(substitute(mpi.bcast.cmd(cmd = EXPR, comm = COMM, caller.execute = CE),
-                  list(EXPR = expr, COMM = comm, CE = caller.execute)),
-       envir = parent.frame())
+  call <- as.call(list(as.name("mpi.bcast.cmd"),
+                       cmd = expr,
+                       comm = comm,
+                       caller.execute = caller.execute))
+  eval(call, envir = parent.frame())
 }
 
 .npRmpi_bcast_robj_by_name <- function(name, caller_env = parent.frame()) {
@@ -65,8 +67,8 @@
             envir = asNamespace("npRmpi"),
             mode = "function",
             inherits = FALSE)
-  expr <- substitute(FN(NM), list(FN = fn, NM = as.name(name)))
-  eval(expr, envir = caller_env)
+  call <- as.call(list(fn, as.name(name)))
+  eval(call, envir = caller_env)
 }
 
 .npRmpi_autodispatch_next_remote_name <- function() {
