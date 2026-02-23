@@ -216,7 +216,7 @@ npcdens(bws, \dots)
   \code{\link{npudens}}
 }
 \examples{
-\dontrun{
+% % % % % % \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
 # likelihood cross-validated bandwidths (default) using a second-order
@@ -244,7 +244,7 @@ summary(fhat)
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(Italy)
 
@@ -282,7 +282,7 @@ summary(fhat)
 # Call the plot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(Italy)
 
@@ -304,7 +304,7 @@ summary(bw)
 # Plot the density function (<ctrl>-C will interrupt on *NIX systems,
 # <esc> will interrupt on MS Windows systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(faithful)
 
@@ -334,7 +334,7 @@ summary(bw)
 # Plot the density function (<ctrl>-C will interrupt on *NIX systems, 
 # <esc> will interrupt on MS Windows systems)
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(faithful)
 
@@ -344,7 +344,7 @@ detach(faithful)
 
 set.seed(123)
 
-n <- 1000
+n <- 300
 
 # x1 is chi-squared having 3 df truncated at 6 standardized by
 # subtracting 2.348 and dividing by 1.511
@@ -364,13 +364,13 @@ y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
 # Generate data-driven bandwidths (likelihood cross-validation). Note -
 # this may take a few minutes depending on the speed of your computer...
 
-bw <- npcdensbw(formula=factor(y)~x1+x2)
+bw <- npcdensbw(formula=factor(y)~x1+x2, nmulti=1)
 
 # Next, create the evaluation data in order to generate a perspective
 # plot
 
-x1.seq <- seq(min(x1), max(x1), length=50)
-x2.seq <- seq(min(x2), max(x2), length=50)
+x1.seq <- seq(min(x1), max(x1), length=30)
+x2.seq <- seq(min(x2), max(x2), length=30)
 X.eval <- expand.grid(x1=x1.seq,x2=x2.seq)
 
 data.eval <- data.frame(y=factor(rep(1, nrow(X.eval))),x1=X.eval[,1],x2=X.eval[,2])
@@ -382,7 +382,7 @@ fit <- fitted(npcdens(bws=bw,newdata=data.eval))
 
 # Finally, coerce the data into a matrix for plotting with persp()
 
-fit.mat <- matrix(fit, 50, 50)
+fit.mat <- matrix(fit, 30, 30)
 
 # Generate a perspective plot similar to Figure 2 b of Klein and Spady
 # (1993)
@@ -405,7 +405,7 @@ persp(x1.seq,
 
 set.seed(123)
 
-n <- 1000
+n <- 300
 
 # x1 is chi-squared having 3 df truncated at 6 standardized by
 # subtracting 2.348 and dividing by 1.511
@@ -429,13 +429,13 @@ X <- cbind(x1, x2)
 # Generate data-driven bandwidths (likelihood cross-validation). Note -
 # this may take a few minutes depending on the speed of your computer...
 
-bw <- npcdensbw(xdat=X, ydat=factor(y))
+bw <- npcdensbw(xdat=X, ydat=factor(y), nmulti=1)
 
 # Next, create the evaluation data in order to generate a perspective
 # plot
 
-x1.seq <- seq(min(x1), max(x1), length=50)
-x2.seq <- seq(min(x2), max(x2), length=50)
+x1.seq <- seq(min(x1), max(x1), length=30)
+x2.seq <- seq(min(x2), max(x2), length=30)
 X.eval <- expand.grid(x1=x1.seq,x2=x2.seq)
 
 # Now evaluate the conditional probability for y=1 and for the
@@ -447,7 +447,7 @@ fit <- fitted(npcdens(exdat=X.eval,
 
 # Finally, coerce the data into a matrix for plotting with persp()
 
-fit.mat <- matrix(fit, 50, 50)
+fit.mat <- matrix(fit, 30, 30)
 
 # Generate a perspective plot similar to Figure 2 b of Klein and Spady
 # (1993)
@@ -463,7 +463,6 @@ persp(x1.seq,
       main="Estimated Nonparametric Probability Perspective", 
       theta=310, 
       phi=25)
-} % enddontrun
+% % % % % % } % enddontrun
 }
 \keyword{nonparametric}
-

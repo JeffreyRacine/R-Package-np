@@ -134,7 +134,7 @@ npcopula(bws,
 }
 
 \examples{
-\dontrun{
+% % % % % % \dontrun{
 ## Example 1: Bivariate Mixed Data
 
 require(MASS)
@@ -143,8 +143,8 @@ set.seed(42)
 
 ## Simulate correlated Gaussian data (rho(x,y)=0.99)
 
-n <- 1000
-n.eval <- 100
+n <- 300
+n.eval <- 30
 rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
@@ -208,8 +208,8 @@ set.seed(42)
 
 ## Simulate correlated Gaussian data (rho(x,y)=0.99)
 
-n <- 1000
-n.eval <- 100
+n <- 300
+n.eval <- 30
 rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
@@ -262,7 +262,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
       xlab="u1",
       ylab="u2",
       zlab="Copula Density")
-} % enddontrun
+% % % % % % } % enddontrun
 }
 
 \keyword{ nonparametric }
