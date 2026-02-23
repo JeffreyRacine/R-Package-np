@@ -1806,13 +1806,6 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (!is.language(expr))
     return(expr)
 
-  if (is.symbol(expr) && is.environment(eval.env)) {
-    not_found <- new.env(parent = emptyenv())
-    sym_val <- get0(as.character(expr), envir = eval.env, inherits = TRUE, ifnotfound = not_found)
-    if (!identical(sym_val, not_found))
-      return(sym_val)
-  }
-
   val <- .np_try_eval_in_frames(expr, eval_env = eval.env, search_frames = FALSE)
   if (isTRUE(val$ok))
     return(val$value)
@@ -1841,18 +1834,17 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (!is.language(expr))
     return(expr)
 
-  if (is.symbol(expr) && is.environment(eval.env)) {
-    not_found <- new.env(parent = emptyenv())
-    sym_val <- get0(as.character(expr), envir = eval.env, inherits = TRUE, ifnotfound = not_found)
-    if (!identical(sym_val, not_found))
-      return(sym_val)
-  }
+  if (is.symbol(expr)) {
+    val <- .np_try_eval_in_frames(expr, eval_env = eval.env, search_frames = FALSE)
+    if (isTRUE(val$ok))
+      return(val$value)
 
-  if (is.symbol(expr) && is.environment(caller_env)) {
-    not_found <- new.env(parent = emptyenv())
-    sym_val <- get0(as.character(expr), envir = caller_env, inherits = TRUE, ifnotfound = not_found)
-    if (!identical(sym_val, not_found))
-      return(sym_val)
+    if (is.environment(caller_env)) {
+      not_found <- new.env(parent = emptyenv())
+      sym_val <- get0(as.character(expr), envir = caller_env, inherits = TRUE, ifnotfound = not_found)
+      if (!identical(sym_val, not_found))
+        return(sym_val)
+    }
   }
 
   val <- .np_try_eval_in_frames(expr, eval_env = eval.env)

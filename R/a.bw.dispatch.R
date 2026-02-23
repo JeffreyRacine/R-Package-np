@@ -1,4 +1,7 @@
 .np_try_eval_in_frames <- function(expr, eval_env = parent.frame(), enclos = NULL, search_frames = TRUE) {
+  if (!is.language(expr))
+    return(list(ok = TRUE, value = expr, error = NULL))
+
   sym <- NULL
   not_found <- NULL
   if (is.symbol(expr)) {
