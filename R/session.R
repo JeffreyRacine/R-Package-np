@@ -157,12 +157,11 @@ npRmpi.session.info <- function(comm=1){
   env_no_reuse <- Sys.getenv("NP_RMPI_NO_REUSE_SLAVES", unset="")
 
   mpi_ver <- .npRmpi_safe({
-    if (requireNamespace("Rmpi", quietly = TRUE) &&
-        exists("mpi.get.version", envir = asNamespace("Rmpi"), inherits = FALSE)) {
-      get("mpi.get.version", envir = asNamespace("Rmpi"))()
-    } else {
-      NA
-    }
+    if (!requireNamespace("Rmpi", quietly = TRUE))
+      return(NA)
+    rmpi_ns <- asNamespace("Rmpi")
+    mpi_get_version <- get0("mpi.get.version", envir = rmpi_ns, mode = "function", inherits = FALSE)
+    if (is.function(mpi_get_version)) mpi_get_version() else NA
   }, fallback = NA)
   comm_size <- .npRmpi_safe_int(mpi.comm.size(comm))
   comm_rank <- .npRmpi_safe_int(mpi.comm.rank(comm))

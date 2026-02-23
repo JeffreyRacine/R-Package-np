@@ -244,8 +244,8 @@
       # For non-exported S3 methods (e.g., npcdens.conbandwidth), broadcast
       # the generic symbol to avoid serializing closure heads in MPI commands.
       generic <- strsplit(fname, ".", fixed = TRUE)[[1L]][1L]
-      if (nzchar(generic) &&
-          exists(generic, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)) {
+      generic_fun <- get0(generic, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
+      if (nzchar(generic) && is.function(generic_fun)) {
         out[[1L]] <- as.name(generic)
       }
     }
