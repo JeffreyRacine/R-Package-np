@@ -851,12 +851,9 @@ npregiv <- function(y,
 
     ## Save seed prior to setting
 
-    if(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
-      save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-      exists.seed = TRUE
-    } else {
-      exists.seed = FALSE
-    }
+    .np_seed_missing <- new.env(parent = emptyenv())
+  save.seed <- get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE, ifnotfound = .np_seed_missing)
+  exists.seed <- !identical(save.seed, .np_seed_missing)
 
     set.seed(random.seed)
     on.exit({
