@@ -483,7 +483,7 @@ npscoef.scbandwidth <-
       nc <- ncol(tm[,,1])
 
       while(any(doridge)){
-        ii <- (1:nrow(txdat))[doridge]
+        ii <- seq_len(nrow(txdat))[doridge]
         for (jj in ii) {
           doridge[jj] <- FALSE
           ridge.val <- ridge.tm[jj]*tyw[,jj][1]/NZD(tm[,,jj][1,1])

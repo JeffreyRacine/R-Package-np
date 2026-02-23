@@ -140,8 +140,8 @@ condbandwidth <-
     }
 
     sumNum <- list(x = NA, y = NA)
-    sumNum[] <- lapply(1:length(dati), function(i) {
-      sapply(1:length(dati[[i]]$icon), scaleOrMax, j = i)
+    sumNum[] <- lapply(seq_along(dati), function(i) {
+      sapply(seq_along(dati[[i]]$icon), scaleOrMax, j = i)
     })
   } else {
     sumNum <- NA
