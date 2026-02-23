@@ -138,6 +138,23 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
         as.integer(comm), as.integer(buffunit), PACKAGE = "npRmpi")
 }
 
+.npRmpi_bcast_cmd_funref <- function(scmd) {
+    if (is.function(scmd))
+        return(scmd)
+    if (is.symbol(scmd))
+        return(as.character(scmd))
+    if (is.character(scmd) && length(scmd) >= 1L)
+        return(scmd[[1L]])
+    if (is.call(scmd) && length(scmd) >= 1L) {
+        hd <- scmd[[1L]]
+        if (is.symbol(hd))
+            return(as.character(hd))
+        if (is.character(hd) && length(hd) >= 1L)
+            return(hd[[1L]])
+    }
+    as.character(scmd)[1L]
+}
+
 #bin.nchar <- function(x){
 #    if (!is.character(x))
 #        stop("Must be a (binary) character")
@@ -196,7 +213,7 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 		}
 		#parse(text=out)
 		if (length(scmd.arg$arg)>0)
-			enquote(do.call(as.character(scmd.arg$scmd), scmd.arg$arg, envir=.GlobalEnv))
+			enquote(do.call(.npRmpi_bcast_cmd_funref(scmd.arg$scmd), scmd.arg$arg, envir=.GlobalEnv))
 		else 
 			scmd.arg$scmd
 	}
