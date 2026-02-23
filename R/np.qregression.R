@@ -88,6 +88,22 @@ npqreg.condbandwidth <-
 
     fit.start <- proc.time()[3]
     gradients <- npValidateScalarLogical(gradients, "gradients")
+    if (!is.numeric(itmax) || length(itmax) != 1L || is.na(itmax) ||
+        !is.finite(itmax) || itmax < 1 || itmax != floor(itmax))
+      stop("'itmax' must be a positive integer")
+    if (!is.numeric(ftol) || length(ftol) != 1L || is.na(ftol) ||
+        !is.finite(ftol) || ftol <= 0)
+      stop("'ftol' must be a positive finite numeric scalar")
+    if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
+        !is.finite(tol) || tol <= 0)
+      stop("'tol' must be a positive finite numeric scalar")
+    if (!is.numeric(small) || length(small) != 1L || is.na(small) ||
+        !is.finite(small) || small <= 0)
+      stop("'small' must be a positive finite numeric scalar")
+    itmax <- as.integer(itmax)
+    ftol <- as.double(ftol)
+    tol <- as.double(tol)
+    small <- as.double(small)
 
     no.ex = missing(exdat)
 

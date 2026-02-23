@@ -206,6 +206,14 @@ npscoef.scbandwidth <-
     iterate <- npValidateScalarLogical(iterate, "iterate")
     leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
     betas <- npValidateScalarLogical(betas, "betas")
+    if (!is.numeric(maxiter) || length(maxiter) != 1L || is.na(maxiter) ||
+        !is.finite(maxiter) || maxiter < 1 || maxiter != floor(maxiter))
+      stop("'maxiter' must be a positive integer")
+    if (!is.numeric(tol) || length(tol) != 1L || is.na(tol) ||
+        !is.finite(tol) || tol < 0)
+      stop("'tol' must be a finite numeric scalar >= 0")
+    maxiter <- as.integer(maxiter)
+    tol <- as.double(tol)
 
     miss.z <- missing(tzdat)
 
