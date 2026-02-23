@@ -645,7 +645,7 @@ npregiv <- function(y,
           fv <- maxPenalty
         }
 
-        return(ifelse(is.finite(fv),fv,maxPenalty))
+        return(if (is.finite(fv)) fv else maxPenalty)
 
       } else {
 
@@ -697,7 +697,7 @@ npregiv <- function(y,
           fv <- maxPenalty
         }
 
-        return(ifelse(is.finite(fv),fv,maxPenalty))
+        return(if (is.finite(fv)) fv else maxPenalty)
 
       }
 
@@ -768,7 +768,7 @@ npregiv <- function(y,
           fv <- maxPenalty
         }
 
-        return(ifelse(is.finite(fv),fv,maxPenalty))
+        return(if (is.finite(fv)) fv else maxPenalty)
 
       } else {
 
@@ -825,7 +825,7 @@ npregiv <- function(y,
           fv <- maxPenalty
         }
 
-        return(ifelse(is.finite(fv),fv,maxPenalty))
+        return(if (is.finite(fv)) fv else maxPenalty)
 
       }
 
@@ -2138,7 +2138,7 @@ npregiv <- function(y,
 
       }
 
-      norm.stop[j] <- ifelse(penalize.iteration,j*sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)),sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)))
+      norm.stop[j] <- if (penalize.iteration) j*sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2)) else sum(resid.fitted^2)/NZD_pos(sum(E.y.w^2))
 
       console <- printClear(console)
       console <- printPop(console)
