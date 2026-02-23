@@ -122,3 +122,19 @@ Completed in `np-master`:
      - `/tmp/np_issue_notes_repros_gbwidx_20260223.log`
    - tarball check:
      - `/tmp/np_master_check_gbwidx_20260223.log` (`Status: OK`)
+
+## DBandwidth `rorder` seq_len Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Replaced fragile `rorder` reconstruction using `(1:ncol)[...]` with zero-length-safe `seq_len(ncol)` indexing.
+2. Scope:
+   - `R/np.distribution.bw.R`
+3. Commit:
+   - `np-master`: `4854b5f`
+4. Validation:
+   - parse gate: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/np_master_dist_rorder_tests_20260223.log` (`TEST_RC:0`)
+   - issue-note verified repro sweep:
+     - `/tmp/np_issue_notes_repros_dist_rorder_20260223.log`
+   - tarball check:
+     - `/tmp/np_master_check_dist_rorder_20260223.log` (`Status: OK`)
