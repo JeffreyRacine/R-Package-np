@@ -142,10 +142,12 @@ npudistbw.dbandwidth <-
       stop(paste("length of bandwidth vector does not match number of columns of",
            "'dat'"))
 
-    ccon = unlist(lapply(as.data.frame(dat[,bws$icon]),class))
-    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
-        (any(bws$iord) && !all(sapply(as.data.frame(dat[,bws$iord]),inherits, "ordered"))) ||
-        (any(bws$iuno) && !all(sapply(as.data.frame(dat[,bws$iuno]),inherits, "factor"))))
+    if ((any(bws$icon) &&
+         !all(vapply(as.data.frame(dat[, bws$icon]), inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$iord) &&
+         !all(vapply(as.data.frame(dat[, bws$iord]), inherits, logical(1), "ordered"))) ||
+        (any(bws$iuno) &&
+         !all(vapply(as.data.frame(dat[, bws$iuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'dat'", "in type"))
 
     if(any(bws$iuno))
