@@ -33,8 +33,8 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 
 ### 2) Evaluation and Call Construction
 - [x] No `eval(parse(...))` in R layer.
-- [ ] High-risk `eval(...)` call construction paths are replaced with structured calls (`do.call`, explicit call objects) where appropriate.
-- [ ] Any remaining `eval(...)` has a documented reason and a regression test.
+- [x] High-risk `eval(...)` call construction paths are replaced with structured calls (`do.call`, explicit call objects) where appropriate.
+- [x] Any remaining `eval(...)` has a documented reason and a regression test.
 
 ### 3) Native Interface Safety
 - [x] `.C` callsites in R layer are `0`.
