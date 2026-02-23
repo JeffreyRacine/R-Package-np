@@ -190,7 +190,7 @@ npudist.dbandwidth <-
 
     fit.elapsed <- proc.time()[3] - fit.start
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
-    total.time <- fit.elapsed + ifelse(is.na(optim.time), 0.0, optim.time)
+    total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
 
     ev <- npdistribution(bws=bws, eval=teval, dist = myout$dist,
                          derr = myout$derr, ntrain = tnrow, trainiseval = no.e,
