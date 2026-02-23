@@ -94,6 +94,10 @@
 
     plot.out = list()
 
+    scalar_default <- function(value, default) {
+      if (is.null(value)) default else value
+    }
+
     neval = maxneval = length(ydat)
     
     tobj = npindex(txdat = xdat, tydat = ydat,
@@ -154,18 +158,18 @@
           plot(tobj$index[i.sort], temp.mean[i.sort],
                ylim = if (!is.null(ylim)) ylim else c(ymin,ymax),
                xlim = xlim,
-               cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-               cex.lab =  ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-               cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-               cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-               xlab = ifelse(!is.null(xlab),xlab,"index"),
-               ylab = ifelse(!is.null(ylab),ylab,gen.label(bws$ynames, 'Conditional Mean')),
-               type = ifelse(!is.null(type),type,'l'),
-               lty = ifelse(!is.null(lty),lty,par()$lty),
-               col = ifelse(!is.null(col),col,par()$col),
+               cex.axis = scalar_default(cex.axis, par()$cex.axis),
+               cex.lab =  scalar_default(cex.lab, par()$cex.lab),
+               cex.main = scalar_default(cex.main, par()$cex.main),
+               cex.sub = scalar_default(cex.sub, par()$cex.sub),
+               xlab = scalar_default(xlab, "index"),
+               ylab = scalar_default(ylab, gen.label(bws$ynames, 'Conditional Mean')),
+               type = scalar_default(type, 'l'),
+               lty = scalar_default(lty, par()$lty),
+               col = scalar_default(col, par()$col),
                main = main,
                sub = sub,
-               lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+               lwd = scalar_default(lwd, par()$lwd))
           if (plot.errors.type == "all") {
             sorted.all.err <- lapply(temp.all.err, function(err) {
               if (is.null(err)) return(NULL)
@@ -199,20 +203,20 @@
           }
         } else {
           plot(tobj$index[i.sort], temp.mean[i.sort],
-               cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-               cex.lab =  ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-               cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-               cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-               xlab = ifelse(!is.null(xlab),xlab,"Index"),
-               ylab = ifelse(!is.null(ylab),ylab,gen.label(bws$ynames, 'Conditional Mean')),
-               type = ifelse(!is.null(type),type,'l'),
-               lty = ifelse(!is.null(lty),lty,par()$lty),
-               col = ifelse(!is.null(col),col,par()$col),
+               cex.axis = scalar_default(cex.axis, par()$cex.axis),
+               cex.lab =  scalar_default(cex.lab, par()$cex.lab),
+               cex.main = scalar_default(cex.main, par()$cex.main),
+               cex.sub = scalar_default(cex.sub, par()$cex.sub),
+               xlab = scalar_default(xlab, "Index"),
+               ylab = scalar_default(ylab, gen.label(bws$ynames, 'Conditional Mean')),
+               type = scalar_default(type, 'l'),
+               lty = scalar_default(lty, par()$lty),
+               col = scalar_default(col, par()$col),
                main = main,
                sub = sub,
                xlim = xlim,
                ylim = ylim,
-               lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+               lwd = scalar_default(lwd, par()$lwd))
         }
       }
 
@@ -291,18 +295,18 @@
             
             plot(tobj$index[i.sort], temp.mean[i.sort]*bws$beta[i],
                  ylim = panel.ylim,
-                 cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis),
-                 cex.lab =  ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab),
-                 cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main),
-                 cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),
-                 xlab = ifelse(!is.null(xlab),xlab,"index"),
+                 cex.axis = scalar_default(cex.axis, par()$cex.axis),
+                 cex.lab =  scalar_default(cex.lab, par()$cex.lab),
+                 cex.main = scalar_default(cex.main, par()$cex.main),
+                 cex.sub = scalar_default(cex.sub, par()$cex.sub),
+                 xlab = scalar_default(xlab, "index"),
                  ylab = paste("Gradient Component",i, "of", gen.label(bws$ynames, 'Conditional Mean')),
-                 lty = ifelse(!is.null(lty),lty,par()$lty),
-                 col = ifelse(!is.null(col),col,par()$col),
-                 type = ifelse(!is.null(type),type,'l'),
+                 lty = scalar_default(lty, par()$lty),
+                 col = scalar_default(col, par()$col),
+                 type = scalar_default(type, 'l'),
                  main = main,
                  sub = sub,
-                 lwd = ifelse(!is.null(lwd),lwd,par()$lwd))
+                 lwd = scalar_default(lwd, par()$lwd))
             
             if (plot.errors){
               if (plot.errors.type == "all") {
@@ -368,4 +372,3 @@
 
     
   }
-
