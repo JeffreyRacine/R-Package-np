@@ -80,4 +80,15 @@ test_that("bandwidth wrappers reject invalid scalar control flags", {
     npscoefbw.scbandwidth(xdat = dat, ydat = dat$x, bws = bws, backfit.tol = 0),
     "'backfit.tol' must be a positive finite numeric scalar"
   )
+
+  expect_error(
+    npplregbw.default(xdat = dat, ydat = dat$x, zdat = dat,
+                      bws = matrix(0, nrow = 2, ncol = 1),
+                      bandwidth.compute = c(TRUE, FALSE)),
+    "'bandwidth.compute' must be TRUE or FALSE"
+  )
+  expect_error(
+    npplregbw.plbandwidth(xdat = dat, ydat = dat$x, zdat = dat, bws = bws, nmulti = -1),
+    "'nmulti' must be a non-negative integer"
+  )
 })

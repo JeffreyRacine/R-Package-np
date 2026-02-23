@@ -154,6 +154,7 @@ npplregbw.plbandwidth =
     if (missing(nmulti)){
       nmulti <- min(5,dim(zdat)[2])
     }
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
@@ -224,6 +225,7 @@ npplregbw.default =
            bandwidth.compute = TRUE,
            nmulti, remin, itmax,
            ftol, tol, small){
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -264,6 +266,12 @@ npplregbw.default =
     any.m <- any(m != 0)
 
     if (bandwidth.compute) {
+      if (!missing(nmulti)) nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+      if (!missing(remin)) remin <- npValidateScalarLogical(remin, "remin")
+      if (!missing(itmax)) itmax <- npValidatePositiveInteger(itmax, "itmax")
+      if (!missing(ftol)) ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
+      if (!missing(tol)) tol <- npValidatePositiveFiniteNumeric(tol, "tol")
+      if (!missing(small)) small <- npValidatePositiveFiniteNumeric(small, "small")
       bwsel.args <- list(xdat = xdat, ydat = ydat, zdat = zdat, bws = tbw)
       if (any.m) {
         nms <- mc.names[m]
