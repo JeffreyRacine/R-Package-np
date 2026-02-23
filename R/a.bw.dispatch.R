@@ -1,12 +1,13 @@
+.np_missing_binding_sentinel <- new.env(parent = emptyenv())
+
 .np_try_eval_in_frames <- function(expr, eval_env = parent.frame(), enclos = NULL, search_frames = TRUE) {
   if (!is.language(expr))
     return(list(ok = TRUE, value = expr, error = NULL))
 
   sym <- NULL
-  not_found <- NULL
+  not_found <- .np_missing_binding_sentinel
   if (is.symbol(expr)) {
     sym <- as.character(expr)
-    not_found <- new.env(parent = emptyenv())
   }
 
   if (!is.null(sym) && is.environment(eval_env)) {
