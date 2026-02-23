@@ -1,4 +1,10 @@
 .np_try_eval_in_frames <- function(expr, eval_env = parent.frame(), enclos = NULL) {
+  if (is.symbol(expr) &&
+      is.environment(eval_env) &&
+      exists(as.character(expr), envir = eval_env, inherits = TRUE)) {
+    return(list(ok = TRUE, value = get(as.character(expr), envir = eval_env, inherits = TRUE)))
+  }
+
   val <- tryCatch(
     if (is.null(enclos)) eval(expr, envir = eval_env) else eval(expr, envir = eval_env, enclos = enclos),
     error = function(e) e
@@ -11,6 +17,11 @@
     env_i <- frames[[i]]
     if (identical(env_i, eval_env))
       next
+    if (is.symbol(expr) &&
+        is.environment(env_i) &&
+        exists(as.character(expr), envir = env_i, inherits = TRUE)) {
+      return(list(ok = TRUE, value = get(as.character(expr), envir = env_i, inherits = TRUE)))
+    }
     val_i <- tryCatch(
       if (is.null(enclos)) eval(expr, envir = env_i) else eval(expr, envir = env_i, enclos = enclos),
       error = function(e) e
