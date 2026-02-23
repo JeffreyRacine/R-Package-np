@@ -10,6 +10,24 @@
     sym_val <- get0(sym, envir = eval_env, inherits = TRUE, ifnotfound = not_found)
     if (!identical(sym_val, not_found))
       return(list(ok = TRUE, value = sym_val, error = NULL))
+
+    first_error <- simpleError(sprintf("object '%s' not found", sym))
+    if (!isTRUE(search_frames))
+      return(list(ok = FALSE, value = NULL, error = first_error))
+
+    frames <- sys.frames()
+    for (i in rev(seq_along(frames))) {
+      env_i <- frames[[i]]
+      if (identical(env_i, eval_env))
+        next
+      if (is.environment(env_i)) {
+        sym_val <- get0(sym, envir = env_i, inherits = TRUE, ifnotfound = not_found)
+        if (!identical(sym_val, not_found))
+          return(list(ok = TRUE, value = sym_val, error = NULL))
+      }
+    }
+
+    return(list(ok = FALSE, value = NULL, error = first_error))
   }
 
   val <- tryCatch(
@@ -28,11 +46,6 @@
     env_i <- frames[[i]]
     if (identical(env_i, eval_env))
       next
-    if (!is.null(sym) && is.environment(env_i)) {
-      sym_val <- get0(sym, envir = env_i, inherits = TRUE, ifnotfound = not_found)
-      if (!identical(sym_val, not_found))
-        return(list(ok = TRUE, value = sym_val, error = NULL))
-    }
     val_i <- tryCatch(
       if (is.null(enclos)) eval(expr, envir = env_i) else eval(expr, envir = env_i, enclos = enclos),
       error = function(e) e
