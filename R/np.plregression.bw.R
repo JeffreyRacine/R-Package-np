@@ -50,8 +50,12 @@ npplregbw.formula <-
     }
 
     orig.ts <- if (missing(data))
-      sapply(eval(attr(formula.all, "variables"), environment(formula.all)), inherits, "ts")
-    else sapply(eval(attr(formula.all, "variables"), data, environment(formula.all)), inherits, "ts")
+      .np_terms_ts_mask(terms_obj = formula.all,
+                        data = environment(formula.all),
+                        eval_env = environment(formula.all))
+    else .np_terms_ts_mask(terms_obj = formula.all,
+                           data = data,
+                           eval_env = environment(formula.all))
 
     arguments.mfx <- chromoly[[2]]
     arguments.mf <- c(chromoly[[1]],chromoly[[3]])
