@@ -21,6 +21,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`51e9232`).
 - [x] Core bw selector indexing is zero-length-safe (`seq_len`) in distribution/conditional/index bw paths (`0716cd6`).
 - [x] Residual `1:n` index patterns retired in core estimator bw/index/smoothcoef/plreg paths (`37a157c`).
+- [x] Conditional bw `goodrows` row-indexing now uses `seq_len(nrow(...))` in density/distribution selectors (`6d602bb`), with pre/post perf + parity artifacts recorded.
 - [x] Verified issue-note repro harness includes `npreg` factor-dispatch guard (`4802530`).
 - [x] Native bridge stress harness added and passing for touched `.Call` surfaces (`issue_notes/native_bridge_stress.R`).
 - [x] `--as-cran` reports no code/documentation mismatches (`/tmp/np_master_check_ascran_postloadhook_20260223.log`).
