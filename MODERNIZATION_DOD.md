@@ -38,6 +38,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 
 ### 5) Documentation and Examples
 - [ ] Examples are runnable/minimal; heavy workflows in `\dontrun{}`.
+- [ ] CRAN gate assumes `\dontrun{}` policy; full `\dontrun{}` execution is optional and used only for intentional behavior validation.
 - [ ] Canonical references are linked from core docs (`np.kernels`, `np.options`, `np.plot`).
 - [ ] Any user-facing mode changes have migration notes in NEWS/CHANGELOG.
 
