@@ -116,6 +116,19 @@ npudistbw.dbandwidth <-
            ...){
 
     dat = toFrame(dat)
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    remin <- npValidateScalarLogical(remin, "remin")
+    do.full.integral <- npValidateScalarLogical(do.full.integral, "do.full.integral")
+    scale.init.categorical.sample <-
+      npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
+    transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
+    itmax <- npValidatePositiveInteger(itmax, "itmax")
+    ngrid <- npValidatePositiveInteger(ngrid, "ngrid")
+    ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
+    tol <- npValidatePositiveFiniteNumeric(tol, "tol")
+    small <- npValidatePositiveFiniteNumeric(small, "small")
+    memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
+    penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
 
     nofi <- missing(do.full.integral)
     nogi <- missing(ngrid)
@@ -123,6 +136,7 @@ npudistbw.dbandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,dim(dat)[2])
     }
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
 
     if (length(bws$bw) != dim(dat)[2])
       stop(paste("length of bandwidth vector does not match number of columns of",
