@@ -398,7 +398,7 @@ npreg.rbandwidth <-
         cont.idx <- which(bws$icon)
 
         if (length(cont.idx)) {
-          keep.cont <- (glp.gradient.order == 1L) & (bws$degree >= 1L)
+          keep.cont <- (glp.gradient.order == 1L) && (bws$degree >= 1L)
           if (any(keep.cont)) {
             keep.idx <- cont.idx[keep.cont]
             myout$g[, keep.idx] <- raw.g[, keep.idx, drop = FALSE]

@@ -106,7 +106,7 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   gout.masked[,] <- NA_real_
   cont.idx <- which(x$bws$icon)
   if (length(cont.idx)) {
-    keep.cont <- (gorder == 1L) & (x$bws$degree >= 1L)
+    keep.cont <- (gorder == 1L) && (x$bws$degree >= 1L)
     if (any(keep.cont)) {
       keep.idx <- cont.idx[keep.cont]
       gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]
