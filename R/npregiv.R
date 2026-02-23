@@ -850,16 +850,16 @@ npregiv <- function(y,
 
     if(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
       save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-      exists.seed = TRUE
+      exists.seed <- TRUE
     } else {
-      exists.seed = FALSE
+      exists.seed <- FALSE
     }
 
     set.seed(random.seed)
     on.exit({
       if(exists.seed) {
         assign(".Random.seed", save.seed, envir = .GlobalEnv)
-      } else if(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+      } else {
         rm(".Random.seed", envir = .GlobalEnv)
       }
     }, add = TRUE)
