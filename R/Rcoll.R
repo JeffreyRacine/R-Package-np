@@ -138,7 +138,7 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
         as.integer(comm), as.integer(buffunit), PACKAGE = "npRmpi")
 }
 
-.npRmpi_bcast_cmd_funref <- function(scmd) {
+.npRmpi_bcast_cmd_funref <- function(scmd, eval_env = parent.frame()) {
     if (is.function(scmd))
         return(scmd)
     if (is.symbol(scmd))
@@ -147,11 +147,21 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
         return(scmd[[1L]])
     if (is.call(scmd) && length(scmd) >= 1L) {
         hd <- scmd[[1L]]
+        if (is.symbol(hd) && as.character(hd) %in% c("::", ":::") && length(scmd) >= 3L) {
+            fn <- tryCatch(eval(scmd, envir = eval_env), error = function(e) NULL)
+            if (is.function(fn))
+                return(fn)
+        }
+        if (is.function(hd))
+            return(hd)
         if (is.symbol(hd))
             return(as.character(hd))
         if (is.character(hd) && length(hd) >= 1L)
             return(hd[[1L]])
     }
+    fn <- tryCatch(eval(scmd, envir = eval_env), error = function(e) NULL)
+    if (is.function(fn))
+        return(fn)
     as.character(scmd)[1L]
 }
 
