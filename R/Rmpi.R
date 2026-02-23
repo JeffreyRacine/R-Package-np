@@ -1,19 +1,30 @@
 ### Copyright (C) 2002 Hao Yu 
 mpi.finalize <- function(){
-    if(mpi.is.master())
+    if (!isTRUE(getOption("npRmpi.mpi.initialized", TRUE)))
+        return(invisible(FALSE))
+
+    is.master <- try(mpi.is.master(), silent = TRUE)
+    if (!inherits(is.master, "try-error") && isTRUE(is.master))
         print("Exiting Rmpi. Rmpi cannot be used unless relaunching R.")
-    .Call("mpi_finalize",PACKAGE = "npRmpi")
+
+    out <- try(.Call("mpi_finalize",PACKAGE = "npRmpi"), silent = TRUE)
+    options(npRmpi.mpi.initialized = FALSE)
+    if (inherits(out, "try-error"))
+        return(invisible(FALSE))
+    out
 }
 
 mpi.exit <- function(){
     if (mpi.is.master())
     	print("Detaching Rmpi. Rmpi cannot be used unless relaunching R.")
     .Call("mpi_finalize",PACKAGE = "npRmpi")
+    options(npRmpi.mpi.initialized = FALSE)
     detach(package:npRmpi)
 }
 
 mpi.quit <- function(save="no"){
     .Call("mpi_finalize",PACKAGE = "npRmpi")
+    options(npRmpi.mpi.initialized = FALSE)
     q(save=save,runLast=FALSE)
 }
 

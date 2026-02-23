@@ -16,7 +16,8 @@
 
 .onUnload <- function (lpath){
   try(.Call("C_np_release_static_buffers", PACKAGE = "npRmpi"), silent = TRUE)
-  mpi.finalize()
+  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+    try(mpi.finalize(), silent = TRUE)
   library.dynam.unload("npRmpi", libpath=lpath) 
 }
 
@@ -37,6 +38,7 @@
   }
 
   if (nzchar(Sys.getenv("NP_RMPI_SKIP_INIT"))) {
+    options(npRmpi.mpi.initialized = FALSE)
     if(is.null(options('np.messages')$np.messages))
       options(np.messages = TRUE)
 
@@ -93,6 +95,7 @@
 	
   if(!.Call("mpi_initialize",PACKAGE="npRmpi"))
     stop("Cannot start MPI_Init(). Exit")
+  options(npRmpi.mpi.initialized = TRUE)
   
   if(is.null(options('np.messages')$np.messages))
     options(np.messages = TRUE)
