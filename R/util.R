@@ -1743,5 +1743,15 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (is.null(expr))
     stop(sprintf("bandwidth call does not contain '%s'", arg))
 
-  eval(expr, envir = environment(bws$call))
+  eval.env <- environment(bws$call)
+  if (is.null(eval.env))
+    eval.env <- parent.frame()
+
+  if (is.symbol(expr))
+    return(get(as.character(expr), envir = eval.env, inherits = TRUE))
+
+  if (!is.language(expr))
+    return(expr)
+
+  eval(expr, envir = eval.env)
 }
