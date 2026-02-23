@@ -54,7 +54,7 @@ npindex.formula <-
           if (!y.eval){
             tt <- delete.response(tt)
 
-            orig.ts <- sapply(eval(attr(tt, "variables"), newdata, environment(tt)), inherits, "ts")
+            orig.ts <- .np_terms_ts_mask(terms_obj = tt, data = newdata)
             
             ## delete.response clobbers predvars, which is used for timeseries objects
             ## so we need to reconstruct it

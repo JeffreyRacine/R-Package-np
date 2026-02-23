@@ -53,7 +53,7 @@ npplreg.formula <-
         formula.xz <- terms(as.formula(paste(" ~ ",bronze[[2]], " + ",bronze[[3]]),
                                        env = environment(bws$formula)))
 
-        orig.ts <- sapply(eval(attr(formula.xz, "variables"), newdata, environment(formula.xz)), inherits, "ts")
+        orig.ts <- .np_terms_ts_mask(terms_obj = formula.xz, data = newdata)
 
         arguments.mfx <- bws$chromoly[[2]]
         arguments.mf <- bws$chromoly[[3]]
