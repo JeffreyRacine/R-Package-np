@@ -126,7 +126,7 @@ npconmode.conbandwidth <-
 
 
     tnrow = dim(txdat)[1]
-    enrow = ifelse(no.ex, tnrow, dim(exdat)[1])
+    enrow = if (no.ex) tnrow else dim(exdat)[1]
 
     if (!no.ey && no.ex)
       stop("npconmode: invalid invocation: 'eydat' provided but not 'exdat'")
