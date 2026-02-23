@@ -1,3 +1,24 @@
+.npRmpi_try_dynload <- function(lib, pkg) {
+  dll <- paste0(pkg, .Platform$dynlib.ext)
+  candidates <- unique(c(
+    file.path(lib, pkg, "libs", dll),
+    file.path(lib, "libs", dll),
+    file.path(lib, "src", dll)
+  ))
+
+  for (path in candidates) {
+    if (file.exists(path)) {
+      dyn.load(path)
+      return(TRUE)
+    }
+  }
+
+  isTRUE(tryCatch({
+    library.dynam(pkg, pkg, lib)
+    TRUE
+  }, error = function(e) FALSE))
+}
+
 .onAttach <- function (lib, pkg) {
 		packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-0) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
     if (isTRUE(getOption("npRmpi.conflicts.warn", TRUE)) &&
@@ -22,8 +43,7 @@
 }
 
 .onLoad <- function (lib, pkg) {
-  library.dynam("npRmpi", pkg, lib)
-  if (!TRUE)
+  if (!is.loaded("mpi_initialize") && !.npRmpi_try_dynload(lib = lib, pkg = pkg))
     stop("Fail to load npRmpi dynamic library.")
   if (!is.loaded("mpi_initialize"))
     stop("Probably npRmpi has been detached. Please quit R.")
