@@ -76,3 +76,9 @@ export NP_RMPI_SKIP_INIT=1
 ```bash
 FI_TCP_IFACE=en0
 ```
+
+- If `R CMD check` still fails in sandbox with OFI/NIC initialization errors, use the loopback + tcp provider fallback:
+
+```bash
+FI_TCP_IFACE=lo0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=lo0 R CMD check --no-manual npRmpi_0.60-21.tar.gz
+```
