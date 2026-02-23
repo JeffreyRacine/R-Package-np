@@ -26,16 +26,16 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`91ec5dc`).
 - [x] Verified issue-note repro harness includes session `npreg` factor-routing guard (`b5b597a`).
 - [x] Load hook now supports source-tree/dev loading without installed-package lookup dependence (`61b4783`).
-- [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
+- [x] `--as-cran` reports no code/documentation mismatches (`/tmp/nprmpi_check_ascran_postloadhook_20260223.log`).
 - [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
 
 ## Mandatory Release Gates
 
 ### 1) Interface and Semantics
-- [ ] Public APIs for core estimators are stable (signature + return-structure contracts).
-- [ ] Formula/default method pairs have parity tests (including `subset`/`na.action` behavior).
-- [ ] S3 docs and method signatures match exactly (no codoc mismatches).
+- [x] Public APIs for core estimators are stable (signature + return-structure contracts).
+- [x] Formula/default method pairs have parity tests (including `subset`/`na.action` behavior).
+- [x] S3 docs and method signatures match exactly (no codoc mismatches).
 
 ### 2) MPI Execution Model Integrity
 - [x] Attach mode (`mpiexec` + `.Rprofile`) works for core workflows.
@@ -44,12 +44,12 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [ ] Any new MPI helper path has explicit cleanup guarantees (`npRmpi.stop(force=TRUE)` or `mpi.quit()` route).
 
 ### 3) Evaluation and Call Construction
-- [ ] No `eval(parse(...))` in R layer.
+- [x] No `eval(parse(...))` in R layer.
 - [ ] High-risk `eval(...)` paths replaced where appropriate with structured calls.
 - [ ] Any remaining `eval(...)` is documented and covered by tests.
 
 ### 4) Native Interface Safety
-- [ ] `.C` callsites in R layer are `0`.
+- [x] `.C` callsites in R layer are `0`.
 - [ ] `.Call` interface paths have stress tests for touched entry points.
 - [ ] PROTECT/UNPROTECT accounting validated for modified C entry points.
 - [ ] No new stack-imbalance warnings in targeted serial + MPI runs.
@@ -72,12 +72,12 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [ ] CRAN gate assumes `\dontrun{}` policy; full `\dontrun{}` execution is optional and used only for intentional behavior validation.
 
 ### 7) Check and Packaging Hygiene
-- [ ] Tarball-first validation is cleanly run:
+- [x] Tarball-first validation is cleanly run:
   - `R CMD build np-npRmpi`
   - `R CMD check --as-cran npRmpi_<ver>.tar.gz`
-- [ ] Issue-note regression sweep is run periodically and after core modernization touches:
+- [x] Issue-note regression sweep is run periodically and after core modernization touches:
   - `./issue_notes/run_verified_issue_repros.sh`
-- [ ] New warnings/notes are treated as regressions unless explicitly accepted and documented.
+- [x] New warnings/notes are treated as regressions unless explicitly accepted and documented.
 - [ ] Windows validation completed via win-builder prior to release candidate.
 
 ## Required Benchmark/Validation Record per Checkpoint
