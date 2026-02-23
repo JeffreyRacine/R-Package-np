@@ -331,3 +331,23 @@ Completed in `np-npRmpi`:
    - tarball-first:
      - `/tmp/nprmpi_build_sigtest_20260223.log` (`BUILD_RC:0`)
      - `/tmp/nprmpi_check_sigtest_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
+
+## Unitest Bootstrap Sampling Hygiene Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Modernized null-draw bootstrap sampling in `npunitest` to use `sample.int(...)` instead of index-vector sampling via `sample(1:length(...), ...)`.
+2. Scope:
+   - `R/np.unitest.R`
+3. Commit:
+   - `np-npRmpi`: `a918d1c`
+4. Validation:
+   - parse:
+     - `/tmp/nprmpi_unitest_parse_20260223.log` (`RC:0`)
+   - focused tests:
+     - `/tmp/nprmpi_unitest_tests_20260223.log` (`PASS 9, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_unitest_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_unitest_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_unitest_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
+5. Note:
+   - check warning count in this run reflects pre-existing non-target tree state (top-level/codoc drift), not this `np.unitest.R` change.
