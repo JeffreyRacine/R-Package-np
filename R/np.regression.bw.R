@@ -124,7 +124,7 @@ npregbw.rbandwidth <-
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
 
-    if(!(is.vector(ydat) | is.factor(ydat)))
+    if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
 
     if (length(bws$bw) != dim(xdat)[2])
@@ -374,7 +374,7 @@ npregbw.default <-
     xdat <- toFrame(xdat)
     npRejectLegacyLpArgs(names(list(...)), where = "npregbw")
 
-    if(!(is.vector(ydat) | is.factor(ydat)))
+    if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
 
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
