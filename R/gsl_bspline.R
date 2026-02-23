@@ -87,7 +87,8 @@ gsl.bs.default <- function(x,
 					tt <- bs.des(rep(k.pivot, ord-deriv), degree, nbreak,deriv= derivs, x.min, x.max, knots)
 					B[or, ] <- xr %*% (tt/scalef)
 			}
-			if(any(inside <- !outside))
+			inside <- !outside
+			if(any(inside))
 					B[inside, ] <- bs.des(x[inside], degree, nbreak, rep(deriv, length(x[inside])), x.min, x.max, knots)
 	}
 	else {
