@@ -163,7 +163,7 @@ npcdistbw.condbandwidth <-
     ##stop("only fixed bandwidths currently supported with ccdf bandwidth selection")
 
     ## catch and destroy NA's
-    goodrows <- 1:dim(xdat)[1]
+    goodrows <- seq_len(nrow(xdat))
     rows.omit <- unclass(na.action(na.omit(data.frame(xdat,ydat))))
     goodrows[rows.omit] <- 0
 
