@@ -269,7 +269,8 @@ npregbw.rbandwidth <-
       
 
       rorder = numeric(ncol)
-      rorder[c((1:ncol)[bws$icon], (1:ncol)[bws$iuno], (1:ncol)[bws$iord])]=1:ncol
+      ord_idx <- seq_len(ncol)
+      rorder[c(ord_idx[bws$icon], ord_idx[bws$iuno], ord_idx[bws$iord])] <- ord_idx
 
       tbw$bw <- myout$bw[rorder]
       tbw$fval <- myout$fval[1]
