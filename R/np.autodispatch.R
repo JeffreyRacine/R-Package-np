@@ -277,7 +277,10 @@
 
     val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
     ref <- .npRmpi_autodispatch_remote_ref(val)
-    if (!is.null(ref)) {
+    # `bws` objects can be post-processed locally (e.g. formula methods
+    # rewriting call/formula metadata). Reusing a stale remote reference can
+    # reintroduce unresolved temporary symbols during downstream plotting.
+    if (!is.null(ref) && !identical(nm, "bws")) {
       out[[i]] <- as.name(ref)
       next
     }
