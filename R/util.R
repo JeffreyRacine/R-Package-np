@@ -1066,11 +1066,11 @@ pCatGofStr <- function(x){
 }
 
 genDenEstStr <- function(x){
-  paste("\nBandwidth Type: ",x$ptype,
-        ifelse(is.null(x$log_likelihood) || identical(x$log_likelihood, NA),"",
-               paste("\nLog Likelihood:",
-                     format(x$log_likelihood))),
-        sep="")
+  loglik.str <- ""
+  if (!(is.null(x$log_likelihood) || identical(x$log_likelihood, NA))) {
+    loglik.str <- paste("\nLog Likelihood:", format(x$log_likelihood))
+  }
+  paste("\nBandwidth Type: ", x$ptype, loglik.str, sep = "")
 }
 
 genRegEstStr <- function(x){
@@ -1080,16 +1080,12 @@ genRegEstStr <- function(x){
   est.label <- if (identical(regtype, "lp")) npFormatRegressionType(x) else x$pregtype
   basis.family <- if (identical(regtype, "lp")) npLpBasisFamilyLabel(basis) else NULL
   basis.rep <- if (identical(regtype, "lp")) npLpBasisRepresentationLabel(bern) else NULL
-  paste(ifelse(is.null(est.label),"",
-               paste("\nKernel Regression Estimator:",est.label)),
-        ifelse(is.null(basis.family), "",
-               paste("\nLP Basis Family:", basis.family)),
-        ifelse(is.null(basis.rep), "",
-               paste("\nLP Basis Representation:", basis.rep)),
-        ifelse(is.null(x$ptype), "",
-               paste("\nBandwidth Type:",x$ptype)),
-        ifelse(is.null(x$tau), "", paste("\nTau:", x$tau)),
-        sep = "")
+  est.label.str <- if (is.null(est.label)) "" else paste("\nKernel Regression Estimator:", est.label)
+  basis.family.str <- if (is.null(basis.family)) "" else paste("\nLP Basis Family:", basis.family)
+  basis.rep.str <- if (is.null(basis.rep)) "" else paste("\nLP Basis Representation:", basis.rep)
+  ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type:", x$ptype)
+  tau.str <- if (is.null(x$tau)) "" else paste("\nTau:", x$tau)
+  paste(est.label.str, basis.family.str, basis.rep.str, ptype.str, tau.str, sep = "")
 }
 
 npLpBasisFamilyLabel <- function(basis){
@@ -1191,16 +1187,18 @@ genBwSelStr <- function(x){
 
   pregtype <- npFormatRegressionType(x)
 
-  paste(ifelse(is.null(pregtype),"",paste("\nRegression Type:", pregtype)),
-        ifelse(is.null(x$pmethod),"",paste("\nBandwidth Selection Method:",
-                                           x$pmethod)),
-        if (!identical(x$formula,NULL)) paste("\nFormula:",
-                                              paste(deparse(x$formula), collapse="\n")),
-        ifelse(is.null(x$ptype), "",
-               paste("\nBandwidth Type: ",x$ptype, sep="")),
+  pregtype.str <- if (is.null(pregtype)) "" else paste("\nRegression Type:", pregtype)
+  pmethod.str <- if (is.null(x$pmethod)) "" else paste("\nBandwidth Selection Method:", x$pmethod)
+  formula.str <- if (!identical(x$formula, NULL)) paste("\nFormula:", paste(deparse(x$formula), collapse = "\n")) else ""
+  ptype.str <- if (is.null(x$ptype)) "" else paste("\nBandwidth Type: ", x$ptype, sep = "")
+
+  paste(pregtype.str,
+        pmethod.str,
+        formula.str,
+        ptype.str,
         fval.str,
         nfe.str,
-        sep="")
+        sep = "")
 }
 
 genBwScaleStrs <- function(x){
