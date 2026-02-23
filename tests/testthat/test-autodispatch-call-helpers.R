@@ -19,3 +19,13 @@ test_that(".npRmpi_bcast_cmd_expr forwards command expression structurally", {
   expect_identical(env$seen$comm, 3L)
   expect_identical(env$seen$caller.execute, FALSE)
 })
+
+test_that(".npRmpi_autodispatch_call delegates to shared distributed-call helper", {
+  fn.body <- paste(deparse(body(.npRmpi_autodispatch_call), width.cutoff = 500L), collapse = " ")
+  expect_match(fn.body, "\\.npRmpi_distributed_call_impl\\(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE\\)")
+})
+
+test_that(".npRmpi_manual_distributed_call delegates to shared distributed-call helper", {
+  fn.body <- paste(deparse(body(.npRmpi_manual_distributed_call), width.cutoff = 500L), collapse = " ")
+  expect_match(fn.body, "\\.npRmpi_distributed_call_impl\\(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE\\)")
+})

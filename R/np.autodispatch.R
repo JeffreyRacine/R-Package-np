@@ -441,11 +441,15 @@
   invisible(FALSE)
 }
 
-.npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
-  .npRmpi_warn_pkg_conflict_once()
-  .npRmpi_warn_rmpi_conflict_once()
-  if (!.npRmpi_autodispatch_active())
+.npRmpi_distributed_call_impl <- function(mc,
+                                          caller_env = parent.frame(),
+                                          comm = 1L,
+                                          warn_nested = FALSE) {
+  if (.npRmpi_autodispatch_called_from_bcast()) {
+    if (warn_nested)
+      .npRmpi_autodispatch_warn_nested()
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
+  }
 
   if (.npRmpi_autodispatch_in_context())
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
@@ -453,11 +457,6 @@
   rank <- tryCatch(mpi.comm.rank(comm), error = function(e) NA_integer_)
   if (!is.na(rank) && rank != 0L)
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
-
-  if (.npRmpi_autodispatch_called_from_bcast()) {
-    .npRmpi_autodispatch_warn_nested()
-    return(.npRmpi_eval_without_dispatch(mc, caller_env))
-  }
 
   .npRmpi_autodispatch_failfast_formula_data(mc, caller_env = caller_env)
 
@@ -541,100 +540,19 @@
   .npRmpi_autodispatch_tag_result(result, mode = "auto", remote = remote.name)
 }
 
+.npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
+  .npRmpi_warn_pkg_conflict_once()
+  .npRmpi_warn_rmpi_conflict_once()
+  if (!.npRmpi_autodispatch_active())
+    return(.npRmpi_eval_without_dispatch(mc, caller_env))
+
+  .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = TRUE)
+}
+
 .npRmpi_manual_distributed_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
-
-  if (.npRmpi_autodispatch_in_context())
-    return(.npRmpi_eval_without_dispatch(mc, caller_env))
-
-  rank <- tryCatch(mpi.comm.rank(comm), error = function(e) NA_integer_)
-  if (!is.na(rank) && rank != 0L)
-    return(.npRmpi_eval_without_dispatch(mc, caller_env))
-
-  if (.npRmpi_autodispatch_called_from_bcast())
-    return(.npRmpi_eval_without_dispatch(mc, caller_env))
-
-  .npRmpi_autodispatch_failfast_formula_data(mc, caller_env = caller_env)
-
-  if (!.npRmpi_autodispatch_preflight(comm = comm))
-    return(.npRmpi_eval_without_dispatch(mc, caller_env))
-
-  prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
-  if (length(prepared$tmpnames))
-    for (nm in prepared$tmpnames)
-      if (!is.null(prepared$tmpvals[[nm]]))
-        prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
-      else if (!is.null(prepared$prepublish[[nm]]))
-        prepared$prepublish[[nm]] <- .npRmpi_autodispatch_untag(prepared$prepublish[[nm]])
-
-  if (length(prepared$prepublish)) {
-    for (nm in names(prepared$prepublish)) {
-      .GlobalEnv[[nm]] <- prepared$prepublish[[nm]]
-      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
-    }
-  }
-
-  opt.keys <- .npRmpi_autodispatch_option_keys()
-  opt.snapshot <- .npRmpi_autodispatch_option_snapshot(opt.keys)
-  opt.sync <- .npRmpi_autodispatch_should_sync_options(opt.snapshot)
-  if (opt.sync) {
-    opt.keys <- names(opt.snapshot)
-    opt.vals <- unname(opt.snapshot)
-  } else {
-    opt.keys <- character(0)
-    opt.vals <- list()
-  }
-  opt.verify <- opt.sync && isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))
-  remote.name <- .npRmpi_autodispatch_next_remote_name()
-
-  cmd <- substitute({
-    for (i in seq_along(OPT_KEYS))
-      options(structure(list(OPT_VALS[[i]]), names = OPT_KEYS[[i]]))
-
-    if (OPT_VERIFY) {
-      for (i in seq_along(OPT_KEYS)) {
-        lval <- getOption(OPT_KEYS[[i]])
-        if (!identical(lval, OPT_VALS[[i]]))
-          stop(sprintf("failed to synchronize option '%s' across MPI ranks", OPT_KEYS[[i]]))
-      }
-    }
-
-    tmpvals <- TMPVALS
-    if (length(tmpvals)) {
-      for (nm in names(tmpvals))
-        .GlobalEnv[[nm]] <- tmpvals[[nm]]
-    }
-
-    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
-    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
-    options(npRmpi.autodispatch.context = TRUE)
-    options(npRmpi.autodispatch.disable = TRUE)
-    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
-    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-    if (length(TMP_NAMES))
-      on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
-
-    res <- CALL
-    .GlobalEnv[[REMOTE_NAME]] <- res
-    res
-  }, list(CALL = prepared$call,
-          TMPVALS = prepared$tmpvals,
-          TMP_NAMES = prepared$tmpnames,
-          OPT_KEYS = opt.keys,
-          OPT_VALS = opt.vals,
-          OPT_VERIFY = opt.verify,
-          REMOTE_NAME = remote.name))
-
-  result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
-
-  if (is.list(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
-
-  if (is.call(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
-
-  .npRmpi_autodispatch_tag_result(result, mode = "auto", remote = remote.name)
+  .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE)
 }
 
 .npRmpi_bootstrap_make_indices <- function(n,
