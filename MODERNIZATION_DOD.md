@@ -27,6 +27,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Core bw selector indexing is zero-length-safe (`seq_len`) in distribution/conditional/index bw paths (`57222c8`).
 - [x] Residual `1:n` index patterns retired in core estimator bw/index/smoothcoef/plreg paths (`531216c`).
 - [x] Conditional bw `goodrows` row-indexing now uses `seq_len(nrow(...))` in density/distribution selectors (`29aed7c`), with pre/post perf + parity artifacts recorded.
+- [x] Conditional bw column/index reconstruction now uses `seq_len(...)`/safe ranges (`45dc5cc`) including hardened `gbw` split indexing for `xncon==0` edge paths.
 - [x] Verified issue-note repro harness includes session `npreg` factor-routing guard (`b5b597a`).
 - [x] Load hook now supports source-tree/dev loading without installed-package lookup dependence (`61b4783`).
 - [x] Native bridge stress harness added and passing for touched `.Call` surfaces in session mode (`issue_notes/native_bridge_stress.R`).
@@ -96,3 +97,25 @@ Include in commit body or companion note:
 ## Current Residual Risks (Known)
 - Attach/session mode behavior may differ by environment and MPI interface settings (`FI_TCP_IFACE`), so smoke gates must run in both modes before release.
 - Remaining non-target doc warnings and duplicated alias/cross-reference warnings should be triaged and either fixed or explicitly accepted.
+
+## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:n` column reconstruction and `setdiff(1:(...))` forms with `seq_len(...)` in conditional bw selectors.
+2. Hardened `gbw` split initialization in `npcdistbw.condbandwidth` to avoid `1:0`/descending range hazards when `xncon==0`.
+3. Scope:
+   - `R/np.condensity.bw.R`
+   - `R/np.condistribution.bw.R`
+4. Commit:
+   - `np-npRmpi`: `45dc5cc`
+5. Validation:
+   - parse gates for touched files: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/nprmpi_condbw_seqcols_targeted_tests_20260223.log` (`TEST_RC:0`)
+   - edge smoke (`xncon==0` path) on fresh install:
+     - `/tmp/nprmpi_condbw_xncon0_smoke_installed_20260223.out` (`NPRMPI_CONDBW_XNCON0_SMOKE_OK`)
+   - issue-note verified repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_seqcols_en0_20260223.log`
+   - session-mode regression smoke (`npRmpi.init` + `npcdens`):
+     - `/tmp/nprmpi_user_npcdens_smoke_20260223.out` (`NPRMPI_USER_NPCDENS_SMOKE_OK`)
+   - tarball check (MPI env pinned):
+     - `/tmp/nprmpi_check_seqcols_20260223.log` (`Status: OK`)
