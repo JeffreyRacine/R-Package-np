@@ -24,6 +24,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Opt-in `mpiexec` attach-mode smoke contract added (`c719107`, enabled by `NP_RMPI_ENABLE_ATTACH_TEST=1`).
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks in working MPI env.
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`91ec5dc`).
+- [x] Core bw selector indexing is zero-length-safe (`seq_len`) in distribution/conditional/index bw paths (`57222c8`).
 - [x] Verified issue-note repro harness includes session `npreg` factor-routing guard (`b5b597a`).
 - [x] Load hook now supports source-tree/dev loading without installed-package lookup dependence (`61b4783`).
 - [x] Native bridge stress harness added and passing for touched `.Call` surfaces in session mode (`issue_notes/native_bridge_stress.R`).
