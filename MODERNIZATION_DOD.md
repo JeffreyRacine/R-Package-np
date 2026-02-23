@@ -71,6 +71,8 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [ ] Tarball-first validation is cleanly run:
   - `R CMD build np-npRmpi`
   - `R CMD check --as-cran npRmpi_<ver>.tar.gz`
+- [ ] Issue-note regression sweep is run periodically and after core modernization touches:
+  - `./issue_notes/run_verified_issue_repros.sh`
 - [ ] New warnings/notes are treated as regressions unless explicitly accepted and documented.
 - [ ] Windows validation completed via win-builder prior to release candidate.
 

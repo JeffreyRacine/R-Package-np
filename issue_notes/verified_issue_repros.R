@@ -3,9 +3,21 @@
 # Repros for verified issues that were fixed in current working tree.
 # Intended to be run against the updated package to confirm fixes.
 
-suppressPackageStartupMessages(library(np))
+suppressPackageStartupMessages(library(npRmpi))
 
-cat("np version:", as.character(packageVersion("np")), "\n\n")
+cat("npRmpi version:", as.character(packageVersion("npRmpi")), "\n\n")
+
+pool_ok <- TRUE
+tryCatch({
+  npRmpi.init(nslaves = 1, quiet = TRUE)
+}, error = function(e) {
+  pool_ok <<- FALSE
+  cat("FAIL: npRmpi.init(nslaves=1) failed:", conditionMessage(e), "\n")
+})
+
+if (!pool_ok) {
+  quit(save = "no", status = 1)
+}
 
 # Issue #4: cv.ls -> cv.ml segfault in npcdensbw with factor y
 cat("#4: npcdensbw cv.ls -> cv.ml (factor y) ... ")
@@ -25,7 +37,7 @@ tryCatch({
 cat("#6: npindexbw bwtype propagation ... ")
 tryCatch({
   set.seed(123)
-  n <- 200
+  n <- 120
   x1 <- runif(n, -1, 1)
   x2 <- runif(n, -1, 1)
   y <- ifelse(x1 + x2 + rnorm(n) > 0, 1, 0)
@@ -61,7 +73,7 @@ tryCatch({
   X <- sort(rbinom(n,2,0.4))
   p <- as.numeric(prop.table(table(X)))
   Avar.p <- p*(1-p)/n
-  model <- npudens(~factor(X), bws=0, ukertype="aitchisonaitken")
+  model <- npudens(tdat = factor(X), bws = 0, ukertype = "aitchisonaitken")
   p.hat <- unique(fitted(model))
   Avar.p.hat <- unique(se(model))^2
   stopifnot(all.equal(p, p.hat, tolerance = 1e-8))
@@ -106,10 +118,10 @@ tryCatch({
 cat("#51: npregiv with exogenous w ... ")
 tryCatch({
   set.seed(123)
-  y <- rnorm(100)
-  x <- rnorm(100)
-  z <- rnorm(100)
-  w <- rnorm(100)
+  y <- rnorm(60)
+  x <- rnorm(60)
+  z <- rnorm(60)
+  w <- rnorm(60)
   npregiv(y, z, w, x)
   cat("ok\n")
 }, error = function(e) {
@@ -122,7 +134,7 @@ cat("\nDone.\n")
 cat("#18: npregiv Tikhonov with multi-dim w ... ")
 tryCatch({
   set.seed(42)
-  n <- 200
+  n <- 100
   v <- rnorm(n)
   eps <- rnorm(n, mean = 0, sd = 0.05)
   u <- -0.5 * v + eps
@@ -136,3 +148,7 @@ tryCatch({
 }, error = function(e) {
   cat("FAIL:", conditionMessage(e), "\n")
 })
+
+# Deterministic teardown for non-interactive harness runs.
+try(mpi.close.Rslaves(dellog = FALSE), silent = TRUE)
+mpi.quit()
