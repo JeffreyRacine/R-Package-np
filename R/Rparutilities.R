@@ -616,7 +616,7 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
         }
         return(out)
     }
-    #.mpi.applyLB <<- integer(n)
+    # .mpi.applyLB <- integer(n)
 	mpi.seq.tmp <- integer(n)
     for (i in 1:n){
        tmp<- mpi.recv.Robj(mpi.anysource,mpi.anytag,comm)
