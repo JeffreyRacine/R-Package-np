@@ -79,6 +79,7 @@ npcdens.conbandwidth <- function(bws,
                                  exdat, eydat, gradients = FALSE, ...){
 
   fit.start <- proc.time()[3]
+  gradients <- npValidateScalarLogical(gradients, "gradients")
   .npRmpi_require_active_slave_pool(where = "npcdens()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
   if (.npRmpi_autodispatch_active())

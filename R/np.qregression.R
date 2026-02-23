@@ -87,6 +87,7 @@ npqreg.condbandwidth <-
            ...){
 
     fit.start <- proc.time()[3]
+    gradients <- npValidateScalarLogical(gradients, "gradients")
     .npRmpi_require_active_slave_pool(where = "npqreg()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))

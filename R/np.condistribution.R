@@ -79,6 +79,7 @@ npcdist.condbandwidth <-
            exdat, eydat, gradients = FALSE, ...){
 
     fit.start <- proc.time()[3]
+    gradients <- npValidateScalarLogical(gradients, "gradients")
     .npRmpi_require_active_slave_pool(where = "npcdist()")
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
     if (.npRmpi_autodispatch_active())

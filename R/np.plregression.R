@@ -127,6 +127,7 @@ npplreg.plbandwidth <-
            exdat, eydat, ezdat, residuals = FALSE, ...){
 
     fit.start <- proc.time()[3]
+    residuals <- npValidateScalarLogical(residuals, "residuals")
     .npRmpi_require_active_slave_pool(where = "npplreg()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))

@@ -192,6 +192,9 @@ npindex.sibandwidth <-
            boot.num = 399, ...) {
 
     fit.start <- proc.time()[3]
+    gradients <- npValidateScalarLogical(gradients, "gradients")
+    residuals <- npValidateScalarLogical(residuals, "residuals")
+    errors <- npValidateScalarLogical(errors, "errors")
     .npRmpi_require_active_slave_pool(where = "npindex()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))

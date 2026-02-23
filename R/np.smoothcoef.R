@@ -211,6 +211,11 @@ npscoef.scbandwidth <-
            betas = FALSE, ...){
 
     fit.start <- proc.time()[3]
+    residuals <- npValidateScalarLogical(residuals, "residuals")
+    errors <- npValidateScalarLogical(errors, "errors")
+    iterate <- npValidateScalarLogical(iterate, "iterate")
+    leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
+    betas <- npValidateScalarLogical(betas, "betas")
     .npRmpi_require_active_slave_pool(where = "npscoef()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
