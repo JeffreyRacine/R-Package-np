@@ -9,8 +9,12 @@ npudensbw <- function(...){
 npudensbw.formula <-
   function(formula, data, subset, na.action, call, ...){
     orig.ts <- if (missing(data))
-      sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
-    else sapply(eval(attr(terms(formula), "variables"), data, environment(formula)), inherits, "ts")
+      .np_terms_ts_mask(terms_obj = terms(formula),
+                        data = environment(formula),
+                        eval_env = environment(formula))
+    else .np_terms_ts_mask(terms_obj = terms(formula),
+                           data = data,
+                           eval_env = environment(formula))
    
     mf <- match.call(expand.dots = FALSE)
     m <- match(c("formula", "data", "subset", "na.action"),

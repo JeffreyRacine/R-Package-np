@@ -11,8 +11,12 @@ npcdistbw.formula <-
   function(formula, data, subset, na.action, call, gdata = NULL, ...){
     orig.ts <- tryCatch({
         if (missing(data))
-            sapply(eval(attr(terms(formula), "variables"), environment(formula)), inherits, "ts")
-        else sapply(eval(attr(terms(formula, data=data), "variables"), data, environment(formula)), inherits, "ts")
+            .np_terms_ts_mask(terms_obj = terms(formula),
+                              data = environment(formula),
+                              eval_env = environment(formula))
+        else .np_terms_ts_mask(terms_obj = terms(formula, data = data),
+                               data = data,
+                               eval_env = environment(formula))
     }, error = function(e) FALSE)
 
     has.gval <- !is.null(gdata)
