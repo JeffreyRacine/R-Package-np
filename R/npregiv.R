@@ -570,20 +570,18 @@ npregiv <- function(y,
       ## Test for singularity of the generalized local polynomial
       ## estimator, shrink the mean towards the local constant mean.
 
-      ridger <- function(i) {
-        doridge[i] <<- FALSE
-        ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
-        tryCatch(chol2inv(chol(tww[,,i] + ridge[i]*I.nc))%*%tyw[,i],
-                 error = function(e){
-                   ridge[i] <<- ridge[i]+epsilon
-                   doridge[i] <<- TRUE
-                   return(rep(maxPenalty,nc))
-                 })
-      }
-
       while(any(doridge)){
         iloo <- (1:n.eval)[doridge]
-        coef.mat[,iloo] <- sapply(iloo, ridger)
+        for(i in iloo) {
+          doridge[i] <- FALSE
+          ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+          coef.mat[,i] <- tryCatch(chol2inv(chol(tww[,,i] + ridge[i]*I.nc))%*%tyw[,i],
+                                   error = function(e){
+                                     ridge[i] <- ridge[i]+epsilon
+                                     doridge[i] <- TRUE
+                                     return(rep(maxPenalty,nc))
+                                   })
+        }
       }
 
       mhat <- sapply(1:n.eval, function(i) {
@@ -679,20 +677,19 @@ npregiv <- function(y,
         ## Test for singularity of the generalized local polynomial
         ## estimator, shrink the mean towards the local constant mean.
 
-        ridger <- function(i) {
-          doridge[i] <<- FALSE
-          ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
-          W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
-                  error = function(e){
-                    ridge[i] <<- ridge[i]+epsilon
-                    doridge[i] <<- TRUE
-                    return(rep(maxPenalty,nc))
-                  })
-        }
-
         while(any(doridge)){
           iloo <- (1:n)[doridge]
-          mean.loo[iloo] <- (1-ridge[iloo])*sapply(iloo, ridger) + ridge.lc[iloo]
+          for(i in iloo) {
+            doridge[i] <- FALSE
+            ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+            mean.i <- W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
+                                                       error = function(e){
+                                                         ridge[i] <- ridge[i]+epsilon
+                                                         doridge[i] <- TRUE
+                                                         return(rep(maxPenalty,nc))
+                                                       })
+            mean.loo[i] <- (1-ridge[i])*mean.i + ridge.lc[i]
+          }
         }
 
         if (!any(is.nan(mean.loo)) && !any(mean.loo == maxPenalty)){
@@ -802,20 +799,19 @@ npregiv <- function(y,
         ## Test for singularity of the generalized local polynomial
         ## estimator, shrink the mean towards the local constant mean.
 
-        ridger <- function(i) {
-          doridge[i] <<- FALSE
-          ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
-          W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
-                  error = function(e){
-                    ridge[i] <<- ridge[i]+epsilon
-                    doridge[i] <<- TRUE
-                    return(rep(maxPenalty,nc))
-                  })
-        }
-
         while(any(doridge)){
           ii <- (1:n)[doridge]
-          ghat[ii] <- (1-ridge[ii])*sapply(ii, ridger) + ridge.lc[ii]
+          for(i in ii) {
+            doridge[i] <- FALSE
+            ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+            ghat.i <- W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
+                                                       error = function(e){
+                                                         ridge[i] <- ridge[i]+epsilon
+                                                         doridge[i] <- TRUE
+                                                         return(rep(maxPenalty,nc))
+                                                       })
+            ghat[i] <- (1-ridge[i])*ghat.i + ridge.lc[i]
+          }
         }
 
         trH <- kernel.i.eq.j*sum(sapply(1:n,function(i){
