@@ -35,7 +35,9 @@ npcdistbw.formula <-
 
     mf[[1]] <- as.name("model.frame")
     gmf[[1]] <- as.name("model.frame")
-    formula.obj <- if (!is.null(formula.call)) eval(formula.call, envir = parent.frame()) else formula
+    formula.obj <- .np_bw_resolve_formula(formula_obj = formula,
+                                        formula_call = formula.call,
+                                        eval_env = parent.frame())
 
     variableNames <- if(m[2] > 0) explodeFormula(formula.obj, data = data) else explodeFormula(formula.obj)
     
