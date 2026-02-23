@@ -11,9 +11,9 @@ mpi.setup.rngstream <- function(iseed=NULL, comm = 1){
 	seeds <- vector("list", commsize)
 	seeds[[1L]] <- .Random.seed
 	for (i in seq_len(commsize - 1L)) seeds[[i + 1L]] <- nextRNGStream(seeds[[i]])
-	initRNGstreamNode <- function(seed){
-		RNGkind("L'Ecuyer-CMRG")
-		.Random.seed <<- seed
-	}
+		initRNGstreamNode <- function(seed){
+			RNGkind("L'Ecuyer-CMRG")
+			assign(".Random.seed", seed, envir = .GlobalEnv)
+		}
     invisible(mpi.apply(seeds[-1], initRNGstreamNode,comm=comm))
 }
