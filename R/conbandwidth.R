@@ -40,7 +40,7 @@ conbandwidth <-
            total.time = NA,
            ...){
 
-  if (missing(xbw) | missing(ybw))
+  if (missing(xbw) || missing(ybw))
     stop("improper invocation of conbandwidth constructor: 'bw' or i[cuo]* missing")
   
   xndim = length(xbw)

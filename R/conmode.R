@@ -8,8 +8,7 @@ conmode =
            fit.mcfadden = NA,
            ntrain, trainiseval = FALSE){
 
-    if (missing(bws) | missing(xeval) | missing(conmode) |
-        missing(condens) | missing(ntrain))
+    if (missing(bws) || missing(xeval) || missing(conmode) || missing(condens) || missing(ntrain))
       stop("improper invocation of conmode constructor")
 
     d = list(

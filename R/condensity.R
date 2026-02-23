@@ -7,7 +7,7 @@ condensity <-
              timing = NA, total.time = NA,
              optim.time = NA, fit.time = NA){
 
-        if (missing(bws) | missing(xeval) | missing(yeval) | missing(condens) | missing(ntrain))
+        if (missing(bws) || missing(xeval) || missing(yeval) || missing(condens) || missing(ntrain))
             stop("improper invocation of condensity constructor")
 
         if (length(rows.omit) == 0)

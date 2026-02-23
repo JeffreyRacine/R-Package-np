@@ -5,8 +5,7 @@ plregression =
            timing = NA, total.time = NA,
            optim.time = NA, fit.time = NA){
 
-    if (missing(bws) | missing(evalx) | missing(evalz) | missing(mean) |
-        missing(ntrain) | missing(xcoef))
+    if (missing(bws) || missing(evalx) || missing(evalz) || missing(mean) || missing(ntrain) || missing(xcoef))
       stop("improper invocation of plregression constructor")
 
     d = list(
