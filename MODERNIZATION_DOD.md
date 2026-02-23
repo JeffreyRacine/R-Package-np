@@ -181,3 +181,21 @@ Completed in `np-npRmpi`:
    - `/tmp/nprmpi_test_autod_npudist_filter_20260223d.log` (`TEST_RC:0`)
    - `/tmp/nprmpi_issue_notes_repros_autodtests_20260223.log`
    - `/tmp/nprmpi_check_autodtests_20260223.log` (`Status: OK`)
+
+## DBandwidth `rorder` seq_len Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced fragile `rorder` reconstruction using `(1:ncol)[...]` with zero-length-safe `seq_len(ncol)` indexing.
+2. Scope:
+   - `R/np.distribution.bw.R`
+3. Commit:
+   - `np-npRmpi`: `8969569`
+4. Validation:
+   - parse gate: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/nprmpi_dist_rorder_tests_targeted_20260223.log` (`PASS 34, FAIL 0`)
+   - note on broader formula-bw filter (pre-existing unrelated failures):
+     - `/tmp/nprmpi_dist_rorder_tests_20260223.log`
+   - issue-note verified repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_dist_rorder_20260223.log`
+   - tarball check:
+     - `/tmp/nprmpi_check_dist_rorder_20260223.log` (`Status: OK`)
