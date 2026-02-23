@@ -138,6 +138,30 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
         as.integer(comm), as.integer(buffunit), PACKAGE = "npRmpi")
 }
 
+.npRmpi_bcast_cmd_ns_funref <- function(scmd) {
+    if (!is.call(scmd) || length(scmd) < 3L)
+        return(NULL)
+    hd <- scmd[[1L]]
+    if (!is.symbol(hd) || !as.character(hd) %in% c("::", ":::"))
+        return(NULL)
+
+    pkg <- scmd[[2L]]
+    tgt <- scmd[[3L]]
+    pkg_name <- if (is.symbol(pkg)) as.character(pkg) else if (is.character(pkg) && length(pkg) >= 1L) pkg[[1L]] else ""
+    tgt_name <- if (is.symbol(tgt)) as.character(tgt) else if (is.character(tgt) && length(tgt) >= 1L) tgt[[1L]] else ""
+    if (!nzchar(pkg_name) || !nzchar(tgt_name))
+        return(NULL)
+
+    if (!requireNamespace(pkg_name, quietly = TRUE))
+        return(NULL)
+
+    if (as.character(hd) == "::")
+        return(tryCatch(getExportedValue(pkg_name, tgt_name), error = function(e) NULL))
+
+    tryCatch(get(tgt_name, envir = asNamespace(pkg_name), mode = "function", inherits = FALSE),
+             error = function(e) NULL)
+}
+
 .npRmpi_bcast_cmd_funref <- function(scmd, eval_env = parent.frame()) {
     if (is.function(scmd))
         return(scmd)
@@ -148,7 +172,7 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
     if (is.call(scmd) && length(scmd) >= 1L) {
         hd <- scmd[[1L]]
         if (is.symbol(hd) && as.character(hd) %in% c("::", ":::") && length(scmd) >= 3L) {
-            fn <- tryCatch(eval(scmd, envir = eval_env), error = function(e) NULL)
+            fn <- .npRmpi_bcast_cmd_ns_funref(scmd)
             if (is.function(fn))
                 return(fn)
         }

@@ -12,4 +12,8 @@ test_that(".npRmpi_bcast_cmd_funref resolves namespace-qualified heads", {
   ref_get <- .npRmpi_bcast_cmd_funref(quote(base::get))
   expect_true(is.function(ref_get))
   expect_identical(ref_get, base::get)
+
+  ref_internal <- .npRmpi_bcast_cmd_funref(quote(base:::print.default))
+  expect_true(is.function(ref_internal))
+  expect_identical(ref_internal, get("print.default", envir = asNamespace("base"), mode = "function", inherits = FALSE))
 })
