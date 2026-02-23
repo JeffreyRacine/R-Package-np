@@ -74,3 +74,35 @@ test_that("skip-init mode fails fast without MPI pool crash", {
   expect_true(any(grepl("requires an active MPI slave pool", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
+
+test_that("manual-broadcast mode smoke completes in subprocess", {
+  skip_on_cran()
+  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
+  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
+
+  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=FALSE)",
+      "set.seed(42)",
+      "n <- 120",
+      "x <- runif(n)",
+      "y <- rnorm(n)",
+      "d <- data.frame(x=x, y=y)",
+      "mpi.bcast.Robj2slave(d)",
+      "mpi.bcast.cmd(bw <- npregbw(y~x, data=d, regtype='lc', bwmethod='cv.ls', nmulti=1), caller.execute=TRUE)",
+      "mpi.bcast.cmd(fit <- npreg(bws=bw, gradients=FALSE), caller.execute=TRUE)",
+      "stopifnot(inherits(fit, 'npregression'))",
+      "cat('MANUAL_BCAST_ROUTE_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("MANUAL_BCAST_ROUTE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
