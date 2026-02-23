@@ -286,3 +286,21 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_issue_notes_repros_seqlen_core2_20260223.log` (all verified repros passed)
    - tarball-first:
      - `/tmp/nprmpi_check_seqlen_core2_20260223.log` (`CHECK_RC:0`)
+
+## Smoothcoef NDIM `seq_len` Hardening Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced residual `sapply(1:bws$ndim, ...)` with zero-length-safe `sapply(seq_len(bws$ndim), ...)` in core smooth coefficient bandwidth scaling setup.
+2. Scope:
+   - `R/np.smoothcoef.bw.R`
+3. Commit:
+   - `np-npRmpi`: `cdd8acd`
+4. Validation:
+   - parse gate:
+     - `/tmp/nprmpi_scoef_ndim_parse_20260223.log` (`RC:0`)
+   - targeted contracts:
+     - `/tmp/nprmpi_scoef_ndim_tests_20260223.log` (`PASS 54, FAIL 0`)
+   - issue-note verified repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_scoef_ndim_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_scoef_ndim_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_scoef_ndim_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
