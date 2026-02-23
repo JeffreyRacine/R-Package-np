@@ -100,12 +100,28 @@ residuals.singleindex <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npindex(bws = object$bws, residuals =TRUE)$resid) } 
 }
 predict.singleindex <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npindex, c(list(bws = object$bws, errors = se.fit, boot.num = 99), list(...)))
-  if(se.fit)
-    return(list(fit = fitted(tr), se.fit = se(tr), 
+  dots <- list(...)
+
+  ## When no new evaluation inputs are supplied, reuse stored fit
+  ## directly. This avoids unnecessary recomputation and sidesteps
+  ## autodispatch temporary call symbols that may no longer exist.
+  if (length(dots) == 0L) {
+    if (se.fit) {
+      return(list(
+        fit = fitted(object),
+        se.fit = se(object),
+        df = object$nobs,
+        residual.scale = object$MSE
+      ))
+    }
+    return(fitted(object))
+  }
+
+  tr <- do.call(npindex, c(list(bws = object$bws, errors = se.fit, boot.num = 99), dots))
+  if (se.fit)
+    return(list(fit = fitted(tr), se.fit = se(tr),
                 df = tr$nobs, residual.scale = tr$MSE))
-  else
-    return(fitted(tr))
+  fitted(tr)
 }
 se.singleindex <- function(x){ x$merr }
 gradients.singleindex <- function(x, errors = FALSE, ...) {
