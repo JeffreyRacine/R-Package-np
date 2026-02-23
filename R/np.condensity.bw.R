@@ -94,6 +94,18 @@ npcdensbw.conbandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,(dim(ydat)[2]+dim(xdat)[2]))
     }
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    remin <- npValidateScalarLogical(remin, "remin")
+    scale.init.categorical.sample <-
+      npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
+    transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
+    itmax <- npValidatePositiveInteger(itmax, "itmax")
+    ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
+    tol <- npValidatePositiveFiniteNumeric(tol, "tol")
+    small <- npValidatePositiveFiniteNumeric(small, "small")
+    memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
+    penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
 
     if (length(bws$ybw) != dim(ydat)[2])
       stop(paste("length of bandwidth vector does not match number of columns of", "'ydat'"))
