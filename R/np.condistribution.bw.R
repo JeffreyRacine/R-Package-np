@@ -229,7 +229,7 @@ npcdistbw.condbandwidth <-
         probs <- seq(0,1,length.out = nog)
 
         evy <- oydat[1:nog,,drop = FALSE]
-        for(i in 1:ncol(evy)){
+        for (i in seq_len(ncol(evy))) {
           evy[,i] <- uocquantile(oydat[,i], probs)
         }
 
@@ -532,9 +532,11 @@ npcdistbw.default <-
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
 
+    y.idx <- seq_len(length(ydat))
+    x.idx <- seq_len(length(xdat))
     bw.args <- list(
-      xbw = bws[length(ydat)+1:length(xdat)],
-      ybw = bws[1:length(ydat)],
+      xbw = bws[length(ydat) + x.idx],
+      ybw = bws[y.idx],
       uykertype = "aitchisonaitken",
       nobs = nrow(xdat),
       xdati = untangle(xdat),

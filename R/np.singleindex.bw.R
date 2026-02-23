@@ -122,14 +122,15 @@ npindexbw.default <-
       stop(paste("manually specified 'bws' must be a numeric vector of length ncol(xdat)+1.",
                  "See documentation for details."))
 
-    tbw <- sibandwidth(beta = bws[1:ncol(xdat)],
-                       h = bws[ncol(xdat)+1], ...,
+    p <- ncol(xdat)
+    tbw <- sibandwidth(beta = bws[seq_len(p)],
+                       h = bws[p+1L], ...,
                        nobs = dim(xdat)[1],
                        xdati = untangle(xdat),
                        ydati = untangle(data.frame(ydat)),
                        xnames = names(xdat),
                        ynames = deparse(substitute(ydat)),
-                       bandwidth = bws[ncol(xdat)+1],
+                       bandwidth = bws[p+1L],
                        bandwidth.compute = bandwidth.compute)
 
     if (tbw$method == "kleinspady" && !setequal(ydat,c(0,1)))
