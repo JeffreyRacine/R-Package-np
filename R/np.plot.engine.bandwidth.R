@@ -376,61 +376,11 @@
 
       temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
       temp.dens = replicate(maxneval, NA)
-
-      ## plotting expressions
-      
-      plot.bootstrap = plot.errors.method == "bootstrap"
-
-      pfunE = expression(ifelse(xi.factor,
-          ifelse(plot.bootstrap & plot.bxp,"bxp","plotFactor"), "plot"))
-
-      pxE = expression(ifelse(common.scale,
-          ifelse(xi.factor,
-                 ifelse(plot.bootstrap & plot.bxp, "z = all.bxp[[i]],", "f = allei[,i],"),
-                 "x = allei[,i],"),
-          ifelse(xi.factor,
-                 ifelse(plot.bootstrap & plot.bxp, "z = temp.boot,", "f = ei,"), "x = ei,")))
-
-      pyE = expression(ifelse(xi.factor & plot.bootstrap & plot.bxp, "",
-          ifelse(common.scale,"y = data.eval[,i],", "y = temp.dens,")))
-
-      pylimE = ifelse(common.scale, "ylim = c(y.min,y.max),",
-        ifelse(plot.errors,
-               "ylim = if (plot.errors.type == 'all') compute.all.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.all.err) else compute.default.error.range(if (plotOnEstimate) temp.dens else temp.err[,3], temp.err),",
-               ""))
-
-      pxlabE = "xlab = ifelse(!is.null(xlab),xlab,gen.label(bws$xnames[i], paste('X', i, sep = ''))),"
-
-      pylabE = paste("ylab = ", "ifelse(!is.null(ylab),ylab,'Density')", ",")
-
-      prestE = expression(ifelse(xi.factor,"", "type = ifelse(!is.null(type),type,'l'), lty = ifelse(!is.null(lty),lty,par()$lty), col = ifelse(!is.null(col),col,par()$col), lwd = ifelse(!is.null(lwd),lwd,par()$lwd), cex.axis = ifelse(!is.null(cex.axis),cex.axis,par()$cex.axis), cex.lab = ifelse(!is.null(cex.lab),cex.lab,par()$cex.lab), cex.main = ifelse(!is.null(cex.main),cex.main,par()$cex.main), cex.sub = ifelse(!is.null(cex.sub),cex.sub,par()$cex.sub),"))
-
-      pmainE = "main = ifelse(!is.null(main),main,''), sub = ifelse(!is.null(sub),sub,''),"
-
-      ## error plotting expressions
-      plotOnEstimate = (plot.errors.center == "estimate")
-
-      efunE = "draw.errors"
-      eexE = ifelse(common.scale, "ex = as.numeric(na.omit(allei[,i])),",
-          "ex = as.numeric(na.omit(ei)),")
-      eelyE = ifelse(common.scale,
-        ifelse(plotOnEstimate, "ely = na.omit(data.eval[,i] - data.err[,3*i-2]),",
-               "ely = na.omit(data.err[,3*i] - data.err[,3*i-2]),"),
-        ifelse(plotOnEstimate, "ely = na.omit(temp.dens - temp.err[,1]),",
-               "ely = na.omit(temp.err[,3] - temp.err[,1]),"))
-      eehyE = ifelse(common.scale,
-        ifelse(plotOnEstimate, "ehy = na.omit(data.eval[,i] + data.err[,3*i-1]),",
-               "ehy = na.omit(data.err[,3*i] + data.err[,3*i-1]),"),
-        ifelse(plotOnEstimate, "ehy = na.omit(temp.dens + temp.err[,2]),",
-               "ehy = na.omit(temp.err[,3] + temp.err[,2]),"))
-
-      erestE = "plot.errors.style = ifelse(xi.factor,'bar',plot.errors.style),
-                plot.errors.bar = ifelse(xi.factor,'I',plot.errors.bar),
-                plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(!is.null(lty),lty,ifelse(xi.factor,1,2))"
+      ## plotting controls
+      plot.bootstrap <- plot.errors.method == "bootstrap"
+      plotOnEstimate <- (plot.errors.center == "estimate")
 
       ## density / distribution expressions
-
       for (i in 1:bws$ndim){
         temp.err[,] = NA
         temp.dens[] =  NA
