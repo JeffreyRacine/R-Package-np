@@ -181,3 +181,21 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_seqlen_core2_20260223.log` (`BUILD_RC:0`)
      - `/tmp/np_master_check_seqlen_core2_20260223.log` (`CHECK_RC:0`)
+
+## Smoothcoef NDIM `seq_len` Hardening Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Replaced residual `sapply(1:bws$ndim, ...)` with zero-length-safe `sapply(seq_len(bws$ndim), ...)` in core smooth coefficient bandwidth scaling setup.
+2. Scope:
+   - `R/np.smoothcoef.bw.R`
+3. Commit:
+   - `np-master`: `e9fd725`
+4. Validation:
+   - parse gate:
+     - `/tmp/np_master_scoef_ndim_parse_20260223.log` (`RC:0`)
+   - targeted contracts:
+     - `/tmp/np_master_scoef_ndim_tests_20260223.log` (`PASS 19, FAIL 0`)
+   - issue-note verified repro sweep:
+     - `/tmp/np_issue_notes_repros_scoef_ndim_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_scoef_ndim_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/np_master_check_scoef_ndim_20260223.log` (`CHECK_RC:0`)
