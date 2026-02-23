@@ -225,7 +225,7 @@ npcdist(bws, \dots)
   \code{\link{npudens}}
 }
 \examples{
-\dontrun{
+% % % % % % \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
 # cross-validated bandwidths (default) using a second-order Gaussian
@@ -237,7 +237,7 @@ attach(Italy)
 
 # First, compute the bandwidths.
 
-bw <- npcdistbw(formula=gdp~ordered(year))
+bw <- npcdistbw(formula=gdp~ordered(year), nmulti=1)
 
 # Next, compute the condistribution object...
 
@@ -252,7 +252,7 @@ summary(Fhat)
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(Italy)
 
@@ -275,7 +275,7 @@ attach(Italy)
 X <- data.frame(year=ordered(year))
 y <- data.frame(gdp)
 
-bw <- npcdistbw(xdat=X, ydat=y)
+bw <- npcdistbw(xdat=X, ydat=y, nmulti=1)
 
 # Next, compute the condistribution object...
 
@@ -289,7 +289,7 @@ summary(Fhat)
 # Call the plot() function to visualize the results (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(Italy)
 
@@ -304,7 +304,7 @@ attach(faithful)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npcdistbw(formula=eruptions~waiting)
+bw <- npcdistbw(formula=eruptions~waiting, nmulti=1)
 
 summary(bw)
 
@@ -312,7 +312,7 @@ summary(bw)
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(faithful)
 
@@ -335,18 +335,17 @@ attach(faithful)
 X <- data.frame(waiting)
 y <- data.frame(eruptions)
 
-bw <- npcdistbw(xdat=X, ydat=y)
+bw <- npcdistbw(xdat=X, ydat=y, nmulti=1)
 
 summary(bw)
 
 # Plot the conditional cumulative distribution function (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows systems)
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(faithful)
 
-} % enddontrun
+% % % % % % } % enddontrun
 }
 \keyword{nonparametric}
-

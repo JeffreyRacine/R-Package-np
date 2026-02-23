@@ -598,7 +598,7 @@ npcdistbw(\dots)
 }
 
 \examples{
-\dontrun{
+% % % % % % \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
 # cross-validated bandwidths (default) using a second-order Gaussian
 # kernel (default). Note - this may take a minute or two depending on
@@ -607,7 +607,7 @@ npcdistbw(\dots)
 data("Italy")
 attach(Italy)
 
-bw <- npcdistbw(formula=gdp~ordered(year))
+bw <- npcdistbw(formula=gdp~ordered(year), nmulti=1)
 
 # The object bw can be used for further estimation using
 # npcdist(), plotting using plot() etc. Entering the name of
@@ -629,7 +629,7 @@ detach(Italy)
 data("Italy")
 attach(Italy)
 
-bw <- npcdistbw(xdat=ordered(year), ydat=gdp)
+bw <- npcdistbw(xdat=ordered(year), ydat=gdp, nmulti=1)
 
 # The object bw can be used for further estimation using npcdist(),
 # plotting using plot() etc. Entering the name of the object provides
@@ -642,6 +642,6 @@ summary(bw)
 # of how to change the kernel function, kernel order, and so forth.
 
 detach(Italy)
-} % enddontrun
+% % % % % % } % enddontrun
 }
 \keyword{nonparametric}

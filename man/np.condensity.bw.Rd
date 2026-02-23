@@ -561,7 +561,7 @@ npcdensbw(\dots)
 }
 
 \examples{
-\dontrun{
+% % % % % % \dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we compute the
 # likelihood cross-validated bandwidths (default) using a second-order
 # Gaussian kernel (default). Note - this may take a minute or two
@@ -570,7 +570,7 @@ npcdensbw(\dots)
 data("Italy")
 attach(Italy)
 
-bw <- npcdensbw(formula=gdp~ordered(year))
+bw <- npcdensbw(formula=gdp~ordered(year), nmulti=1)
 
 # The object bw can be used for further estimation using
 # npcdens(), plotting using plot() etc. Entering the name of
@@ -592,7 +592,7 @@ detach(Italy)
 data("Italy")
 attach(Italy)
 
-bw <- npcdensbw(xdat=ordered(year), ydat=gdp)
+bw <- npcdensbw(xdat=ordered(year), ydat=gdp, nmulti=1)
 
 # The object bw can be used for further estimation using
 # npcdens(), plotting using plot() etc. Entering the name of
@@ -605,6 +605,6 @@ summary(bw)
 # of how to change the kernel function, kernel order, and so forth.
 
 detach(Italy)
-} % enddontrun
+% % % % % % } % enddontrun
 }
 \keyword{nonparametric}

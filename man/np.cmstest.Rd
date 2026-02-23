@@ -186,7 +186,7 @@ npcmstest(formula,
 }
 
 \examples{
-\dontrun{
+% % % % % % \dontrun{
 # EXAMPLE 1: For this example, we conduct a consistent model
 # specification test for a parametric wage regression model that is
 # quadratic in age. The work of Murphy and Welch (1990) would suggest
@@ -197,23 +197,19 @@ attach(cps71)
 
 model <- lm(logwage~age+I(age^2), x=TRUE, y=TRUE)
 
-plot(age, logwage)
+if (interactive()) plot(age, logwage)
 lines(age, fitted(model))
 
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-npcmstest(model = model, xdat = age, ydat = logwage)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
+npcmstest(model = model, xdat = age, ydat = logwage, boot.num=9, nmulti = 1)
 
 # Next try Murphy & Welch's (1990) suggested quintic specification.
 
 model <- lm(logwage~age+I(age^2)+I(age^3)+I(age^4)+I(age^5), x=TRUE, y=TRUE)
 
-plot(age, logwage)
+if (interactive()) plot(age, logwage)
 lines(age, fitted(model))
 
 X <- data.frame(age)
@@ -221,11 +217,7 @@ X <- data.frame(age)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-npcmstest(model = model, xdat = age, ydat = logwage)
-
-# Sleep for 5 seconds so that we can examine the output...
-
-Sys.sleep(5)
+npcmstest(model = model, xdat = age, ydat = logwage, boot.num=9, nmulti = 1)
 
 # Note - you can pass in multiple arguments to this function. For
 # instance, to use local linear rather than local constant regression, 
@@ -260,9 +252,9 @@ model <- lm(growth ~ oecd +
 
 X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
-npcmstest(model = model, xdat = X, ydat = growth)
+npcmstest(model = model, xdat = X, ydat = growth, boot.num=9, nmulti = 1)
 
 detach(oecdpanel)
-} % enddontrun
+% % % % % % } % enddontrun
 }
 \keyword{ nonparametric }

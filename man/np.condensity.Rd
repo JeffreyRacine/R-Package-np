@@ -229,7 +229,7 @@ attach(Italy)
 # First, compute the bandwidths... note that this may take a minute or
 # two depending on the speed of your computer. 
 
-bw <- npcdensbw(formula=gdp~ordered(year))
+bw <- npcdensbw(formula=gdp~ordered(year), nmulti=1)
 
 # Next, compute the condensity object...
 
@@ -268,7 +268,7 @@ attach(Italy)
 X <- data.frame(year=ordered(year))
 y <- data.frame(gdp)
 
-bw <- npcdensbw(xdat=X, ydat=y)
+bw <- npcdensbw(xdat=X, ydat=y, nmulti=1)
 
 # Next, compute the condensity object...
 
@@ -297,7 +297,7 @@ attach(faithful)
 # Note - this may take a few minutes depending on the speed of your
 # computer...
 
-bw <- npcdensbw(formula=eruptions~waiting)
+bw <- npcdensbw(formula=eruptions~waiting, nmulti=1)
 
 summary(bw)
 
@@ -327,7 +327,7 @@ attach(faithful)
 X <- data.frame(waiting)
 y <- data.frame(eruptions)
 
-bw <- npcdensbw(xdat=X, ydat=y)
+bw <- npcdensbw(xdat=X, ydat=y, nmulti=1)
 
 summary(bw)
 
