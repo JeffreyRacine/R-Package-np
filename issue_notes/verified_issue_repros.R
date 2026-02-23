@@ -128,6 +128,25 @@ tryCatch({
   cat("FAIL:", conditionMessage(e), "\n")
 })
 
+# Session routing guard: npreg factor example from docs
+cat("#reg: session npreg factor example ... ")
+tryCatch({
+  set.seed(42)
+  n <- 250
+  x <- runif(n)
+  z1 <- rbinom(n, 1, 0.5)
+  z2 <- rbinom(n, 1, 0.5)
+  y <- cos(2 * pi * x) + z1 + rnorm(n, sd = 0.25)
+  z1 <- factor(z1)
+  z2 <- factor(z2)
+  bw <- npregbw(y ~ x + z1 + z2, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
+  fit <- npreg(bws = bw, gradients = FALSE)
+  stopifnot(inherits(bw, "rbandwidth"), inherits(fit, "npregression"))
+  cat("ok\n")
+}, error = function(e) {
+  cat("FAIL:", conditionMessage(e), "\n")
+})
+
 cat("\nDone.\n")
 
 # Issue #18: multi-dimensional instruments with Tikhonov should not error
