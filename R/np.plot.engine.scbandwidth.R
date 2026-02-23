@@ -90,24 +90,25 @@
       if(!miss.z)
         zdat <- toFrame(zdat)
 
-      goodrows = 1:dim(xdat)[1]
+      keep.rows <- rep_len(TRUE, nrow(xdat))
       train.df <- data.frame(xdat, ydat)
       if (!miss.z)
         train.df <- data.frame(train.df, zdat)
       rows.omit <- attr(na.omit(train.df), "na.action")
+      if (length(rows.omit) > 0L)
+        keep.rows[as.integer(rows.omit)] <- FALSE
       
       attr(na.omit(data.frame(xdat,ydat,zdat)), "na.action")
-      goodrows[rows.omit] = 0
 
-      if (all(goodrows==0))
+      if (!any(keep.rows))
         stop("Data has no rows without NAs")
 
-      xdat = xdat[goodrows,,drop = FALSE]
+      xdat <- xdat[keep.rows,,drop = FALSE]
 
       if(!miss.z)
-        zdat <- zdat[goodrows,,drop = FALSE]
+        zdat <- zdat[keep.rows,,drop = FALSE]
       
-      ydat = ydat[goodrows]
+      ydat <- ydat[keep.rows]
     }
 
     ## ydat = as.double(ydat)

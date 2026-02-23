@@ -77,15 +77,16 @@
           
       ## catch and destroy NA's
       xdat = toFrame(xdat)
-      goodrows = 1:dim(xdat)[1]
-      rows.omit = attr(na.omit(data.frame(xdat,ydat)), "na.action")
-      goodrows[rows.omit] = 0
+      keep.rows <- rep_len(TRUE, nrow(xdat))
+      rows.omit <- attr(na.omit(data.frame(xdat, ydat)), "na.action")
+      if (length(rows.omit) > 0L)
+        keep.rows[as.integer(rows.omit)] <- FALSE
 
-      if (all(goodrows==0))
+      if (!any(keep.rows))
         stop("Data has no rows without NAs")
 
-      xdat = xdat[goodrows,,drop = FALSE]
-      ydat = ydat[goodrows]
+      xdat <- xdat[keep.rows,,drop = FALSE]
+      ydat <- ydat[keep.rows]
     }
 
     ## ydat = as.double(ydat)
@@ -763,4 +764,3 @@
 
     }
   }
-
