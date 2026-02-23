@@ -25,4 +25,6 @@ test_that(".npRmpi_bcast_cmd_funref resolves namespace-qualified heads", {
 test_that(".npRmpi_bcast_cmd_funref no longer evals full command expressions", {
   fn.body <- paste(deparse(body(.npRmpi_bcast_cmd_funref), width.cutoff = 500L), collapse = " ")
   expect_false(grepl("eval\\(scmd", fn.body))
+  expect_false(grepl("eval\\(hd", fn.body))
+  expect_match(fn.body, "\\.npRmpi_eval_scmd\\(hd, envir = eval_env\\)")
 })

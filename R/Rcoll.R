@@ -177,7 +177,7 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
                 return(fn)
         }
         if (is.call(hd)) {
-            fn <- tryCatch(eval(hd, envir = eval_env), error = function(e) NULL)
+            fn <- tryCatch(.npRmpi_eval_scmd(hd, envir = eval_env), error = function(e) NULL)
             if (is.function(fn))
                 return(fn)
         }

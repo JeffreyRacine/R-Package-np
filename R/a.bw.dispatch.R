@@ -2,7 +2,7 @@
   if (is.symbol(expr) &&
       is.environment(eval_env) &&
       exists(as.character(expr), envir = eval_env, inherits = TRUE)) {
-    return(list(ok = TRUE, value = get(as.character(expr), envir = eval_env, inherits = TRUE)))
+    return(list(ok = TRUE, value = get(as.character(expr), envir = eval_env, inherits = TRUE), error = NULL))
   }
 
   val <- tryCatch(
@@ -10,7 +10,9 @@
     error = function(e) e
   )
   if (!inherits(val, "error"))
-    return(list(ok = TRUE, value = val))
+    return(list(ok = TRUE, value = val, error = NULL))
+
+  first_error <- val
 
   frames <- sys.frames()
   for (i in rev(seq_along(frames))) {
@@ -20,32 +22,30 @@
     if (is.symbol(expr) &&
         is.environment(env_i) &&
         exists(as.character(expr), envir = env_i, inherits = TRUE)) {
-      return(list(ok = TRUE, value = get(as.character(expr), envir = env_i, inherits = TRUE)))
+      return(list(ok = TRUE, value = get(as.character(expr), envir = env_i, inherits = TRUE), error = NULL))
     }
     val_i <- tryCatch(
       if (is.null(enclos)) eval(expr, envir = env_i) else eval(expr, envir = env_i, enclos = enclos),
       error = function(e) e
     )
     if (!inherits(val_i, "error"))
-      return(list(ok = TRUE, value = val_i))
+      return(list(ok = TRUE, value = val_i, error = NULL))
   }
 
-  list(ok = FALSE, value = NULL)
+  list(ok = FALSE, value = NULL, error = first_error)
 }
 
 .np_eval_bw_call <- function(call_obj, caller_env = parent.frame()) {
   if (!is.call(call_obj))
     stop("bandwidth selector call is malformed", call. = FALSE)
 
-  val <- tryCatch(eval(call_obj, envir = caller_env), error = function(e) e)
-  if (!inherits(val, "error"))
-    return(val)
-
   fallback <- .np_try_eval_in_frames(call_obj, eval_env = caller_env)
   if (isTRUE(fallback$ok))
     return(fallback$value)
 
-  stop(conditionMessage(val), call. = FALSE)
+  if (inherits(fallback$error, "error"))
+    stop(conditionMessage(fallback$error), call. = FALSE)
+  stop("bandwidth selector call evaluation failed", call. = FALSE)
 }
 
 .np_bw_dispatch_target <- function(dots, data_arg_names = character(), eval_env = parent.frame()) {
