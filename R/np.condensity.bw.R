@@ -267,8 +267,8 @@ npcdensbw.conbandwidth <-
         total.time <- NA
       }
 
-      yr = 1:yncol
-      xr = 1:xncol
+      yr = seq_len(yncol)
+      xr = seq_len(xncol)
       rorder = numeric(yncol + xncol)
 
       ## bandwidths are passed back from the C routine in an unusual order
@@ -287,7 +287,7 @@ npcdensbw.conbandwidth <-
 
       tbw <- bws
       tbw$ybw[c(rycon,ryuno,ryord)] <- myout$bw[yr+bws$xncon]
-      tbw$xbw[c(rxcon,rxuno,rxord)] <- myout$bw[setdiff(1:(yncol+xncol),yr+bws$xncon)]
+      tbw$xbw[c(rxcon,rxuno,rxord)] <- myout$bw[setdiff(seq_len(yncol + xncol), yr + bws$xncon)]
 
       tbw$fval = myout$fval[1]
       tbw$ifval = myout$fval[2]
