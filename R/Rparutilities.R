@@ -267,8 +267,6 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 }
 
 .mpi.worker.exec <- function(tag, ret, simplify){
-    #assign(".mpi.err", FALSE,  envir = .GlobalEnv)
-    assign(".mpi.err", FALSE)
 	.comm <- 1
     #tag.ret <- mpi.bcast(integer(3), type=1, comm=.comm)
     #tag <- tag.ret[1]
@@ -277,21 +275,15 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     scmd.arg <- mpi.bcast.Robj(comm=.comm)
 
     if (ret){
-    size <- mpi.comm.size(.comm)
-    myerrcode <- as.integer(0)
-    out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = sys.parent()),
-                    error = function(e) e)
-    
-    if (get(".mpi.err")){
-        print(geterrmessage())
-        type <- integer(2)
-    }
-        else {
-        type <- .typeindex(out)
-        if (is.na(type[2]))
-            type[2] <- as.integer(0)    
-        }
-    allcode <- mpi.allgather(type, 1, integer(2*size), .comm)
+	    size <- mpi.comm.size(.comm)
+	    myerrcode <- as.integer(0)
+	    out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = sys.parent()),
+	                    error = function(e) e)
+
+	    type <- .typeindex(out)
+	    if (is.na(type[2]))
+	        type[2] <- as.integer(0)
+	    allcode <- mpi.allgather(type, 1, integer(2*size), .comm)
     type <- allcode[seq(3,2*size,2)]
         len <- allcode[seq(4,2*size,2)]
         eqlen <- all(len==len[1])
