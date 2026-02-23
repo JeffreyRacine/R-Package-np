@@ -410,7 +410,7 @@ mpi.apply <- function(X, FUN, ...,  comm=1){
     dotarg <- tmpfunarg$dot.arg
     tmpdata.arg <- list(mpi.scatter.Robj(root=0,comm=.comm))
     if (mpi.comm.rank(.comm) <= n){
-        out <- tryCatch(do.call(".tmpfun", c(tmpdata.arg, dotarg)),
+        out <- tryCatch(do.call(.tmpfun, c(tmpdata.arg, dotarg)),
                         error = function(e)
                           structure(conditionMessage(e),
                                     class = "try-error",
@@ -536,7 +536,7 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
     slave.num <- mpi.comm.size(.comm)-1
     
     while( i < slave.num*(run-1)+1){
-        out <- replicate(nsim, do.call(".tmp.statistic", c(list(do.call(".tmp.rand.gen", 
+        out <- replicate(nsim, do.call(.tmp.statistic, c(list(do.call(.tmp.rand.gen, 
                             c(list(n),rand.arg))), stat.arg)))
        
         mpi.send.Robj(obj=out, dest=0, tag=8, comm=.comm)
@@ -549,7 +549,7 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
     if ((is.character(fun) && length(fun) == 1) || is.name(fun))
         fun <- get(as.character(fun), envir = .GlobalEnv, mode = "function")
     enquote <- function(x) as.call(list(as.name("quote"), x))
-    do.call("fun", lapply(args, enquote))
+    do.call(fun, lapply(args, enquote))
 }
 
 .splitIndices <- function(nx, ncl) {
@@ -652,7 +652,7 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
         tag <- mpi.get.sourcetag()[2]
         if (tag > n)
             break
-        out <- tryCatch(do.call(".tmpfun", c(tmpdata.arg, dotarg)),
+        out <- tryCatch(do.call(.tmpfun, c(tmpdata.arg, dotarg)),
                         error = function(e)
                           structure(conditionMessage(e),
                                     class = "try-error",
@@ -760,7 +760,7 @@ mpi.iapplyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1, sleep=0.01){
 #        tag <- mpi.get.sourcetag()[2]
 #        if (tag > n)
 #            break
-#        out <- try(do.call(".tmpfun", c(tmpdata.arg, dotarg)),TRUE)
+#        out <- try(do.call(.tmpfun, c(tmpdata.arg, dotarg)),TRUE)
 #        #if (.mpi.err)
 #        #    print(geterrmessage())
 #        mpi.wait(0)

@@ -76,7 +76,7 @@
     dots$ydat <- object$mean + object$resid
   }
 
-  do.call(".np_plot_from_slot", c(list(object = object, slot = "bws"), dots))
+  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
 .np_plot_npdensity <- function(object, ...) {
   dots <- list(...)
