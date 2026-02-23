@@ -3,9 +3,13 @@
 ## this tool will help you visualize the result
 
 .np_seed_enter <- function(random.seed = 42L) {
-  .np_seed_missing <- new.env(parent = emptyenv())
-  save.seed <- get0(".Random.seed", envir = .GlobalEnv, inherits = FALSE, ifnotfound = .np_seed_missing)
-  exists.seed <- !identical(save.seed, .np_seed_missing)
+  save.seed <- NULL
+  if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    exists.seed <- TRUE
+  } else {
+    exists.seed <- FALSE
+  }
 
   set.seed(random.seed)
   list(exists.seed = exists.seed, save.seed = save.seed)
