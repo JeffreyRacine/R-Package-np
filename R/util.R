@@ -1771,15 +1771,17 @@ QFAC <- qnorm(.25,lower.tail=F)*2
       exists(as.character(expr), envir = eval.env, inherits = TRUE))
     return(get(as.character(expr), envir = eval.env, inherits = TRUE))
 
-  val <- tryCatch(eval(expr, envir = eval.env), error = function(e) e)
-  if (!inherits(val, "error"))
-    return(val)
+  val <- .np_try_eval_in_frames(expr, eval_env = eval.env, search_frames = FALSE)
+  if (isTRUE(val$ok))
+    return(val$value)
 
   fallback <- bws[[arg]]
   if (!is.null(fallback))
     return(fallback)
 
-  stop(conditionMessage(val), call. = FALSE)
+  if (inherits(val$error, "error"))
+    stop(conditionMessage(val$error), call. = FALSE)
+  stop(sprintf("unable to evaluate '%s' in bandwidth call", arg), call. = FALSE)
 }
 
 .np_eval_call_arg <- function(call_obj, arg, caller_env = parent.frame()) {
@@ -1807,19 +1809,11 @@ QFAC <- qnorm(.25,lower.tail=F)*2
       exists(as.character(expr), envir = caller_env, inherits = TRUE))
     return(get(as.character(expr), envir = caller_env, inherits = TRUE))
 
-  val <- tryCatch(eval(expr, envir = eval.env), error = function(e) e)
-  if (!inherits(val, "error"))
-    return(val)
+  val <- .np_try_eval_in_frames(expr, eval_env = eval.env)
+  if (isTRUE(val$ok))
+    return(val$value)
 
-  frames <- sys.frames()
-  for (i in rev(seq_along(frames))) {
-    env_i <- frames[[i]]
-    if (identical(env_i, eval.env))
-      next
-    val_i <- tryCatch(eval(expr, envir = env_i), error = function(e) e)
-    if (!inherits(val_i, "error"))
-      return(val_i)
-  }
-
-  stop(conditionMessage(val), call. = FALSE)
+  if (inherits(val$error, "error"))
+    stop(conditionMessage(val$error), call. = FALSE)
+  stop(sprintf("unable to evaluate call argument '%s'", arg), call. = FALSE)
 }

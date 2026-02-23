@@ -20,6 +20,14 @@ test_that(".np_eval_bws_call_arg preserves bws fallback for missing symbols", {
   expect_identical(.np_eval_bws_call_arg(bws, "txdat"), 1:4)
 })
 
+test_that("call arg helpers route evaluation through shared frame helper", {
+  call.body <- paste(deparse(body(.np_eval_call_arg), width.cutoff = 500L), collapse = " ")
+  bws.body <- paste(deparse(body(.np_eval_bws_call_arg), width.cutoff = 500L), collapse = " ")
+
+  expect_match(call.body, "\\.np_try_eval_in_frames\\(expr, eval_env = eval\\.env\\)")
+  expect_match(bws.body, "\\.np_try_eval_in_frames\\(expr, eval_env = eval\\.env, search_frames = FALSE\\)")
+})
+
 test_that("explodePipe resolves formula symbols from provided env", {
   env <- new.env(parent = baseenv())
   env$fml <- y ~ x | z
