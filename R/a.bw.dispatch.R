@@ -34,3 +34,14 @@
 
   NULL
 }
+
+.np_bw_resolve_formula <- function(formula_obj, formula_call = NULL, eval_env = parent.frame()) {
+  if (is.null(formula_call))
+    return(formula_obj)
+
+  resolved <- tryCatch(eval(formula_call, envir = eval_env), error = function(e) NULL)
+  if (inherits(resolved, "formula"))
+    return(resolved)
+
+  formula_obj
+}
