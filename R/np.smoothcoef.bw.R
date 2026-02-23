@@ -100,7 +100,8 @@ npscoefbw.NULL <-
     if(!miss.z)
       zdat <- toFrame(zdat)
 
-    bws <- double(ifelse(miss.z, ncol(xdat), ncol(zdat)))
+    n.bw <- if (miss.z) ncol(xdat) else ncol(zdat)
+    bws <- double(n.bw)
 
     bw.args <- list(xdat = xdat, ydat = ydat, bws = bws)
     if (!miss.z)
@@ -170,7 +171,7 @@ npscoefbw.scbandwidth <-
     if (cv.iterate)
       cv.num.iterations <- npValidatePositiveInteger(cv.num.iterations, "cv.num.iterations")
 
-    if (!(is.vector(ydat) | is.factor(ydat)))
+    if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
 
     if (miss.z) {
@@ -254,6 +255,14 @@ npscoefbw.scbandwidth <-
     bws$sdev <- mysd
     bws$nconfac <- nconfac
     bws$ncatfac <- ncatfac
+    bw.scale.multiplier <- NULL
+    if (bws$scaling) {
+      bw.scale.multiplier <- rep(ncatfac, bws$ndim)
+      if (any(bws$icon)) {
+        icon.cumsum <- cumsum(dati$icon)
+        bw.scale.multiplier[bws$icon] <- nconfac * bws$sdev[icon.cumsum[bws$icon]]
+      }
+    }
 
     total.time <-
       system.time({
@@ -270,8 +279,8 @@ npscoefbw.scbandwidth <-
             
             bws$bw <- param
 
-            if(bws$scaling)
-              bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+            if (bws$scaling)
+              bws$bandwidth[[1]] <- bws$bw * bw.scale.multiplier
             else
               bws$bandwidth[[1]] <- bws$bw
             
@@ -346,8 +355,8 @@ npscoefbw.scbandwidth <-
             } else {
               bws$bw <- param
 
-              if(bws$scaling)
-                bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+              if (bws$scaling)
+                bws$bandwidth[[1]] <- bws$bw * bw.scale.multiplier
               else
                 bws$bandwidth[[1]] <- bws$bw
 
@@ -503,8 +512,8 @@ npscoefbw.scbandwidth <-
                   bws$bw <- bws$bw.fitted[,j]
                   ## estimate new beta.hats
 
-                  if(bws$scaling)
-                    bws$bandwidth[[1]] <- sapply(1:bws$ndim, function(i) { bws$bw[i]*ifelse(bws$icon[i],nconfac*bws$sdev[sum(dati$icon[1:i])], ncatfac) })
+                  if (bws$scaling)
+                    bws$bandwidth[[1]] <- bws$bw * bw.scale.multiplier
                   else
                     bws$bandwidth[[1]] <- bws$bw
 
@@ -638,7 +647,7 @@ npscoefbw.default <-
     miss.z <- missing(zdat)
     xdat <- toFrame(xdat)
     
-    if(!(is.vector(ydat) | is.factor(ydat)))
+    if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
 
     if(!miss.z)
