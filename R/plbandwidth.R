@@ -73,7 +73,7 @@ plbandwidth <-
       method = bwmethod,
       pmethod = bwmToPrint(bwmethod),
       scaling = bwscaling,
-      pscaling = ifelse(bwscaling, "Scale Factor(s)", "Bandwidth(s)"),
+      pscaling = if (bwscaling) "Scale Factor(s)" else "Bandwidth(s)",
       type = bwtype,
       ptype = bwtToPrint(bwtype),
       ckertype = ckertype,    
@@ -106,7 +106,7 @@ plbandwidth <-
       vartitleabb = list(x = "Exp.", y = "Dep.", z = "Exp."),
       dati = list(x = xdati, y = ydati, z = zdati),
       rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+      nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
       total.time = total.time)
 
     mybw$klist = list(z = list(ckertype = ckertype,
