@@ -1,5 +1,17 @@
+.npRmpi_bcast_cmd_expr <- getFromNamespace(".npRmpi_bcast_cmd_expr", "npRmpi")
+.npRmpi_autodispatch_call <- getFromNamespace(".npRmpi_autodispatch_call", "npRmpi")
+.npRmpi_manual_distributed_call <- getFromNamespace(".npRmpi_manual_distributed_call", "npRmpi")
+.npRmpi_bcast_robj_by_name <- getFromNamespace(".npRmpi_bcast_robj_by_name", "npRmpi")
+.npRmpi_eval_without_dispatch <- getFromNamespace(".npRmpi_eval_without_dispatch", "npRmpi")
+.npRmpi_autodispatch_eval_arg <- getFromNamespace(".npRmpi_autodispatch_eval_arg", "npRmpi")
+.npRmpi_autodispatch_cleanup <- getFromNamespace(".npRmpi_autodispatch_cleanup", "npRmpi")
+.npRmpi_distributed_call_impl <- getFromNamespace(".npRmpi_distributed_call_impl", "npRmpi")
+.npRmpi_bootstrap_compute_payload <- getFromNamespace(".npRmpi_bootstrap_compute_payload", "npRmpi")
+.npRmpi_rm_existing <- getFromNamespace(".npRmpi_rm_existing", "npRmpi")
+.np_eval_bws_call_arg <- getFromNamespace(".np_eval_bws_call_arg", "npRmpi")
+
 test_that(".npRmpi_bcast_cmd_expr forwards command expression structurally", {
-  env <- new.env(parent = baseenv())
+  env <- new.env(parent = environment())
   env$seen <- NULL
   env$mpi.bcast.cmd <- function(cmd, comm = 1L, caller.execute = TRUE) {
     env$seen <- list(expr = substitute(cmd),
@@ -56,6 +68,32 @@ test_that("autodispatch uses safe cleanup helper for temporary symbols", {
   expect_match(impl.body, "\\.npRmpi_rm_existing\\(TMP_NAMES, envir = \\.GlobalEnv\\)")
   expect_match(boot.body, "\\.npRmpi_rm_existing\\(tmp, envir = \\.GlobalEnv\\)")
   expect_match(boot.body, "\\.npRmpi_rm_existing\\(TMP, envir = \\.GlobalEnv\\)")
+})
+
+test_that("autodispatch return rewriting covers prepublished temporary arguments", {
+  impl.body <- paste(deparse(body(.npRmpi_distributed_call_impl), width.cutoff = 500L), collapse = " ")
+
+  expect_match(impl.body, "tmpreplace <- c\\(prepared\\$tmpvals, prepared\\$prepublish\\)")
+  expect_match(impl.body, "\\.npRmpi_autodispatch_replace_tmp_calls\\(result, tmpvals = tmpreplace\\)")
+  expect_match(impl.body, "\\.npRmpi_autodispatch_replace_tmps\\(result, tmpvals = tmpreplace\\)")
+})
+
+test_that("npudist(bws=...) resolves large autodispatch temporary call arguments", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  withr::local_options(list(npRmpi.autodispatch.arg.broadcast.threshold = 1L))
+
+  data("faithful")
+  bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)
+
+  resolved_dat <- .np_eval_bws_call_arg(bw, "dat")
+  expect_true(is.data.frame(resolved_dat))
+  expect_equal(nrow(resolved_dat), nrow(faithful))
+
+  fit <- npudist(bws = bw)
+  expect_s3_class(fit, "npdistribution")
+  expect_equal(length(fitted(fit)), nrow(faithful))
 })
 
 test_that(".npRmpi_rm_existing removes only existing names", {
