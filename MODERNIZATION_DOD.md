@@ -22,6 +22,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Subprocess timeout routing contract added for manual-broadcast mode smoke (`0db36a8`).
 - [x] Opt-in `mpiexec` attach-mode smoke contract added (`c719107`, enabled by `NP_RMPI_ENABLE_ATTACH_TEST=1`).
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks in working MPI env.
+- [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`91ec5dc`).
 - [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
 - [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
