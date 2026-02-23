@@ -246,3 +246,24 @@ Completed in `np-master`:
      - `/tmp/np_master_check_unitest_20260223.log` (`CHECK_RC:0`)
 5. Note:
    - `np-master` check warning count in this run reflects pre-existing non-target tree state (top-level/codoc drift), not this `np.unitest.R` change.
+
+## Unitest Loop/P-Value Scalar Hygiene Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Replaced residual scalar bootstrap loop/index and indicator-mean pattern in `npunitest`.
+2. Scope:
+   - `R/np.unitest.R`
+3. Changes:
+   - `for(b in 1:boot.num)` -> `for (b in seq_len(boot.num))`
+   - `mean(ifelse(resampled.stat > test.stat, 1, 0))` -> `mean(resampled.stat > test.stat)`
+4. Commit:
+   - `np-master`: `dfb5ff6`
+5. Validation:
+   - parse:
+     - `/tmp/np_master_unitest2_parse_20260223.log` (`RC:0`)
+   - focused tests:
+     - `/tmp/np_master_unitest2_tests_20260223.log` (`PASS 9, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_unitest2_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_unitest2_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/np_master_check_unitest2_20260223.log` (`CHECK_RC:0`)
