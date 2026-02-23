@@ -215,7 +215,7 @@ npcdens.conbandwidth <- function(bws,
           fixed = BW_FIXED,
           generalized_nn = BW_GEN_NN,
           adaptive_nn = BW_ADAP_NN),
-      int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE),
+      int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
       xkerneval = switch(bws$cxkertype,
           gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
           epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
@@ -251,7 +251,7 @@ npcdens.conbandwidth <- function(bws,
       ymcv.numRow = attr(bws$ymcv, "num.row"),
       xmcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DENS,
-      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+      int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO)
 
   cxker.bounds.c <- npKernelBoundsMarshal(bws$cxkerlb[bws$ixcon], bws$cxkerub[bws$ixcon])
   cyker.bounds.c <- npKernelBoundsMarshal(bws$cykerlb[bws$iycon], bws$cykerub[bws$iycon])

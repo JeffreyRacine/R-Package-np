@@ -255,7 +255,7 @@ npcdistbw.condbandwidth <-
           generalized_nn = BW_GEN_NN,
           adaptive_nn = BW_ADAP_NN),
         itmax=itmax, int_RESTART_FROM_MIN=ifelse(remin,RE_MIN_TRUE,RE_MIN_FALSE), 
-        int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE), 
+        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
         bwmethod = switch(bws$method,
           cv.ls = CDBWM_CVLS),
         xkerneval = switch(bws$cxkertype,
@@ -289,7 +289,7 @@ npcdistbw.condbandwidth <-
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
         cdf_on_train = cdf_on_train,
-        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
+        int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
         scale.init.categorical.sample=scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)

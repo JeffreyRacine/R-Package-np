@@ -206,7 +206,7 @@ npqreg.condbandwidth <-
         fixed = BW_FIXED,
         generalized_nn = BW_GEN_NN,
         adaptive_nn = BW_ADAP_NN),
-      int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE),
+      int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
       xkerneval = switch(bws$cxkertype,
         gaussian = CKER_GAUSS + bws$cxkerorder/2 - 1,
         epanechnikov = CKER_EPAN + bws$cxkerorder/2 - 1,
