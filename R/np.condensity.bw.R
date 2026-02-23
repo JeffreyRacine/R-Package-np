@@ -458,9 +458,11 @@ npcdensbw.default <-
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
+    y.idx <- seq_len(length(ydat))
+    x.idx <- seq_len(length(xdat))
     bw.args <- list(
-      xbw = bws[length(ydat) + 1:length(xdat)],
-      ybw = bws[1:length(ydat)],
+      xbw = bws[length(ydat) + x.idx],
+      ybw = bws[y.idx],
       nobs = nrow(xdat),
       xdati = untangle(xdat),
       ydati = untangle(ydat),
