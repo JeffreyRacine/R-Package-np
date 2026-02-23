@@ -321,7 +321,7 @@ npscoefbw.scbandwidth <-
 
             if(!any(mean.loo == maxPenalty)){
               fv <- sum((ydat-mean.loo)^2)/n
-              cv_state$console <- printPush(msg = paste("fval:", signif(fv, digits = options('digits')$digits)), console = cv_state$console)
+              cv_state$console <- printPush(msg = paste("fval:", signif(fv, digits = getOption("digits", 7L))), console = cv_state$console)
             } else {
               cv_state$console <- printPush(msg = "near-singular system encountered, ridging", console = cv_state$console)
               fv <- maxPenalty
@@ -375,7 +375,7 @@ npscoefbw.scbandwidth <-
             
             cv_state$console <- printClear(cv_state$console)
             cv_state$console <- printPush(msg = paste("fval:",
-                                       signif(fv, digits = options('digits')$digits)),
+                                       signif(fv, digits = getOption("digits", 7L))),
                                      console = cv_state$console)
             return((if (is.finite(fv)) fv else maxPenalty))
           }
