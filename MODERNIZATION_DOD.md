@@ -226,3 +226,23 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_sigtest_20260223.log` (`BUILD_RC:0`)
      - `/tmp/np_master_check_sigtest_20260223.log` (`CHECK_RC:0`)
+
+## Unitest Bootstrap Sampling Hygiene Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Modernized null-draw bootstrap sampling in `npunitest` to use `sample.int(...)` instead of index-vector sampling via `sample(1:length(...), ...)`.
+2. Scope:
+   - `R/np.unitest.R`
+3. Commit:
+   - `np-master`: `d2ecf8c`
+4. Validation:
+   - parse:
+     - `/tmp/np_master_unitest_parse_20260223.log` (`RC:0`)
+   - focused tests:
+     - `/tmp/np_master_unitest_tests_20260223.log` (`PASS 9, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_unitest_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_unitest_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/np_master_check_unitest_20260223.log` (`CHECK_RC:0`)
+5. Note:
+   - `np-master` check warning count in this run reflects pre-existing non-target tree state (top-level/codoc drift), not this `np.unitest.R` change.
