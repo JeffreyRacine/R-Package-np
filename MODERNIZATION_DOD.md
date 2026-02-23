@@ -22,6 +22,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] Core bw selector indexing is zero-length-safe (`seq_len`) in distribution/conditional/index bw paths (`0716cd6`).
 - [x] Residual `1:n` index patterns retired in core estimator bw/index/smoothcoef/plreg paths (`37a157c`).
 - [x] Conditional bw `goodrows` row-indexing now uses `seq_len(nrow(...))` in density/distribution selectors (`6d602bb`), with pre/post perf + parity artifacts recorded.
+- [x] Conditional bw column/index reconstruction now uses `seq_len(...)`/safe ranges (`df809f8`) including hardened `gbw` split indexing for `xncon==0` edge paths.
 - [x] Verified issue-note repro harness includes `npreg` factor-dispatch guard (`4802530`).
 - [x] Native bridge stress harness added and passing for touched `.Call` surfaces (`issue_notes/native_bridge_stress.R`).
 - [x] `--as-cran` reports no code/documentation mismatches (`/tmp/np_master_check_ascran_postloadhook_20260223.log`).
@@ -82,3 +83,23 @@ Include in commit body or companion note:
   - accepted non-target technical debt with rationale, or
   - fixed before release candidate.
 - Any change touching formula evaluation semantics remains medium/high risk and requires focused contract tests.
+
+## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Replaced residual `1:n` column reconstruction and `setdiff(1:(...))` forms with `seq_len(...)` in conditional bw selectors.
+2. Hardened `gbw` split initialization in `npcdistbw.condbandwidth` to avoid `1:0`/descending range hazards when `xncon==0`.
+3. Scope:
+   - `R/np.condensity.bw.R`
+   - `R/np.condistribution.bw.R`
+4. Commit:
+   - `np-master`: `df809f8`
+5. Validation:
+   - parse gates for touched files: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/np_master_condbw_seqcols_tests_20260223.log` (`TEST_RC:0`)
+   - edge smoke (`xncon==0` path) on fresh install:
+     - `/tmp/np_condbw_xncon0_smoke_installed_20260223.out` (`NP_CONDBW_XNCON0_SMOKE_OK`)
+   - issue-note verified repro sweep:
+     - `/tmp/np_issue_notes_repros_seqcols_20260223.log`
+   - tarball check:
+     - `/tmp/np_master_check_seqcols_20260223.log` (`Status: OK`)
