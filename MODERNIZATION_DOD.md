@@ -16,6 +16,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] Active `<<-` retirement complete in R layer (`0`).
 - [x] String-based `do.call("<string>", ...)` retirement complete in active R-layer paths.
 - [x] High-risk `eval(parse(...))` absent; residual `eval(...)` centralized in shared helper with contracts.
+- [x] Assignment-inside-`if` control flow retired in active R-layer codepaths (including `npregiv`).
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks.
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`51e9232`).
 - [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
