@@ -30,10 +30,13 @@
     return(list(ok = FALSE, value = NULL, error = first_error))
   }
 
-  val <- tryCatch(
-    if (is.null(enclos)) eval(expr, envir = eval_env) else eval(expr, envir = eval_env, enclos = enclos),
-    error = function(e) e
-  )
+  eval_once <- if (is.null(enclos)) {
+    function(env) tryCatch(eval(expr, envir = env), error = function(e) e)
+  } else {
+    function(env) tryCatch(eval(expr, envir = env, enclos = enclos), error = function(e) e)
+  }
+
+  val <- eval_once(eval_env)
   if (!inherits(val, "error"))
     return(list(ok = TRUE, value = val, error = NULL))
 
@@ -46,10 +49,7 @@
     env_i <- frames[[i]]
     if (identical(env_i, eval_env))
       next
-    val_i <- tryCatch(
-      if (is.null(enclos)) eval(expr, envir = env_i) else eval(expr, envir = env_i, enclos = enclos),
-      error = function(e) e
-    )
+    val_i <- eval_once(env_i)
     if (!inherits(val_i, "error"))
       return(list(ok = TRUE, value = val_i, error = NULL))
   }
