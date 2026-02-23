@@ -16,6 +16,7 @@ export(b.star
        ,npudist
        ,npregbw
        ,npreg
+       ,npreghat
        ,npregiv
        ,npregivderiv              
        ,npplreg
@@ -56,6 +57,7 @@ S3method(print,npdensity)
 S3method(print,npdistribution)
 S3method(print,rbandwidth)
 S3method(print,npregression)
+S3method(print,npreghat)
 S3method(print,plbandwidth)
 S3method(print,plregression)
 S3method(print,conbandwidth)
@@ -127,6 +129,7 @@ S3method(vcov, plregression)
 S3method(vcov, singleindex)
 
 S3method(predict, npregression)
+S3method(predict, npreghat)
 S3method(predict, bandwidth)
 S3method(predict, dbandwidth)
 S3method(predict, conbandwidth)
@@ -225,6 +228,13 @@ S3method(npreg, formula)
 S3method(npreg, call)
 S3method(npreg, default)
 S3method(npreg, rbandwidth)
+
+S3method(npreghat, formula)
+S3method(npreghat, call)
+S3method(npreghat, default)
+S3method(npreghat, rbandwidth)
+S3method(npreghat, npregression)
+S3method(npreghat, NULL)
 
 S3method(npsigtest, formula)
 S3method(npsigtest, call)
