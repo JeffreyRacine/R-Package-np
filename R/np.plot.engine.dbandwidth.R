@@ -47,8 +47,9 @@
     oldpar <- par(no.readonly = TRUE)
     on.exit(par(oldpar), add = TRUE)
 
-    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
-        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
+    plot.par.mfrow.opt <- getOption("plot.par.mfrow")
+    if(!is.null(plot.par.mfrow.opt))
+        plot.par.mfrow <- plot.par.mfrow.opt
 
     miss.x <- missing(xdat)
 
