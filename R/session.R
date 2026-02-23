@@ -70,6 +70,15 @@ npRmpi.init <- function(...,
     )
   }
 
+  nslaves <- npValidatePositiveInteger(nslaves, "nslaves")
+  comm <- npValidatePositiveInteger(comm, "comm")
+  autodispatch <- npValidateScalarLogical(autodispatch, "autodispatch")
+  autodispatch.verify.options <- npValidateScalarLogical(autodispatch.verify.options, "autodispatch.verify.options")
+  np.messages <- npValidateScalarLogical(np.messages, "np.messages")
+  nonblock <- npValidateScalarLogical(nonblock, "nonblock")
+  quiet <- npValidateScalarLogical(quiet, "quiet")
+  sleep <- npValidatePositiveFiniteNumeric(sleep, "sleep")
+
   mode <- match.arg(mode)
   autodispatch.option.sync <- match.arg(autodispatch.option.sync)
   world.size <- .npRmpi_safe_int(mpi.comm.size(0))
@@ -124,6 +133,9 @@ npRmpi.quit <- function(force = FALSE,
                         dellog = TRUE,
                         comm = 1,
                         mode = c("auto", "spawn", "attach")) {
+  force <- npValidateScalarLogical(force, "force")
+  dellog <- npValidateScalarLogical(dellog, "dellog")
+  comm <- npValidatePositiveInteger(comm, "comm")
   mode <- match.arg(mode)
   size.comm <- .npRmpi_safe_int(mpi.comm.size(comm))
   size.comm <- if (is.na(size.comm)) 0L else as.integer(size.comm)
