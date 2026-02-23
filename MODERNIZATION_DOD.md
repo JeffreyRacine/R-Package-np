@@ -45,8 +45,8 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 
 ### 3) Evaluation and Call Construction
 - [x] No `eval(parse(...))` in R layer.
-- [ ] High-risk `eval(...)` paths replaced where appropriate with structured calls.
-- [ ] Any remaining `eval(...)` is documented and covered by tests.
+- [x] High-risk `eval(...)` paths replaced where appropriate with structured calls.
+- [x] Any remaining `eval(...)` is documented and covered by tests.
 
 ### 4) Native Interface Safety
 - [x] `.C` callsites in R layer are `0`.

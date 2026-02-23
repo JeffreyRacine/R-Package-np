@@ -35,8 +35,14 @@
   }
 
   eval_once <- if (is.null(enclos)) {
+    # Intentional dynamic evaluation: selector/formula NSE semantics require
+    # frame-aware call evaluation across caller frames.
+    # Guarded by helper contracts in tests/testthat:
+    # - test-call-eval-helpers-contract.R
+    # - test-bw-eval-helper-contract.R
     function(env) tryCatch(eval(expr, envir = env), error = function(e) e)
   } else {
+    # Same contract path when an explicit enclos is supplied.
     function(env) tryCatch(eval(expr, envir = env, enclos = enclos), error = function(e) e)
   }
 
