@@ -141,25 +141,28 @@ npregbw.rbandwidth <-
     if (length(bws$bw) != dim(xdat)[2])
       stop("length of bandwidth vector does not match number of columns of 'xdat'")
 
-    ccon = unlist(lapply(xdat[,bws$icon, drop = FALSE],class))
-    if ((any(bws$icon) && !all((ccon == "integer") | (ccon == "numeric"))) ||
-        (any(bws$iord) && !all(sapply(xdat[,bws$iord, drop = FALSE],inherits, "ordered"))) ||
-        (any(bws$iuno) && !all(sapply(xdat[,bws$iuno, drop = FALSE],inherits, "factor"))))
+    if ((any(bws$icon) &&
+         !all(vapply(xdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$iord) &&
+         !all(vapply(xdat[, bws$iord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+        (any(bws$iuno) &&
+         !all(vapply(xdat[, bws$iuno, drop = FALSE], inherits, logical(1), "factor"))))
       stop("supplied bandwidths do not match 'xdat' in type")
 
     if (dim(xdat)[1] != length(ydat))
       stop("number of regression data and response data do not match")
 
     ## catch and destroy NA's
-    goodrows = 1:dim(xdat)[1]
-    rows.omit = attr(na.omit(data.frame(xdat,ydat)), "na.action")
-    goodrows[rows.omit] = 0
+    keep.rows <- rep_len(TRUE, nrow(xdat))
+    rows.omit <- attr(na.omit(data.frame(xdat,ydat)), "na.action")
+    if (length(rows.omit) > 0L)
+      keep.rows[as.integer(rows.omit)] <- FALSE
 
-    if (all(goodrows==0))
+    if (!any(keep.rows))
       stop("Data has no rows without NAs")
 
-    xdat = xdat[goodrows,,drop = FALSE]
-    ydat = ydat[goodrows]
+    xdat <- xdat[keep.rows,,drop = FALSE]
+    ydat <- ydat[keep.rows]
     
     nrow = dim(xdat)[1]
     ncol = dim(xdat)[2]
