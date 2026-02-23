@@ -134,7 +134,7 @@ npcopula(bws,
 }
 
 \examples{
-\dontrun{
+% \dontrun{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## Example 1: Bivariate Mixed Data
 
@@ -158,8 +158,8 @@ set.seed(42)
 
 ## Simulate correlated Gaussian data (rho(x,y)=0.99)
 
-n <- 1000
-n.eval <- 100
+n <- 300
+n.eval <- 30
 rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
@@ -196,7 +196,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
 ## Plot the empirical copula
 
 copula.emp <- npcopula(bws=bw.cdf, data=mydat)
-plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
+if (interactive()) plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
@@ -249,8 +249,8 @@ set.seed(42)
 
 ## Simulate correlated Gaussian data (rho(x,y)=0.99)
 
-n <- 1000
-n.eval <- 100
+n <- 300
+n.eval <- 30
 rho <- 0.99
 mu <- c(0,0)
 Sigma <- matrix(c(1,rho,rho,1),2,2)
@@ -286,7 +286,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),
 ## Plot the empirical copula
 
 copula.emp <- npcopula(bws=bw.cdf, data=mydat)
-plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
+if (interactive()) plot(copula.emp$u1,copula.emp$u2,xlab="u1",ylab="u2",cex=.25,main="Empirical Copula")
 
 ## Estimate the copula density (bw object obtained from npudensbw())
 
@@ -313,7 +313,7 @@ persp(grid.seq,grid.seq,matrix(copula$copula,n.eval,n.eval),ticktype="detailed",
 
 npRmpi.quit()               ## soft close (may keep slaves alive)
 ## npRmpi.quit(force=TRUE)  ## hard close
-} % enddontrun
+% } % enddontrun
 }
 
 \keyword{ nonparametric }

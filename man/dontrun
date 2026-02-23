@@ -8,8 +8,6 @@ sed -i bak -f sed_dontrun.scr data-oecd.Rd
 sed -i bak -f sed_dontrun.scr data-wage1.Rd
 sed -i bak -f sed_dontrun.scr gradients.Rd
 sed -i bak -f sed_dontrun.scr mpi.comm.Rd
-sed -i bak -f sed_dontrun.scr mpi.dims.create.Rd
-sed -i bak -f sed_dontrun.scr mpi.sendrecv.Rd
 sed -i bak -f sed_dontrun.scr nptgauss.Rd
 sed -i bak -f sed_dontrun.scr np.cmstest.Rd
 sed -i bak -f sed_dontrun.scr np.condensity.Rd
