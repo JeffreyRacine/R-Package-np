@@ -27,7 +27,7 @@ npqcmstest <- function(formula,
                ".\nSee help for further info.",
                sep=""))
 
-  if(tau <=0 | tau >=1) stop("tau must lie in (0,1)")
+  if(tau <=0 || tau >=1) stop("tau must lie in (0,1)")
 
   if(boot.num < 9) stop("number of bootstrap replications must be >= 9")
 

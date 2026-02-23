@@ -99,8 +99,6 @@
       if (length(rows.omit) > 0L)
         keep.rows[as.integer(rows.omit)] <- FALSE
       
-      attr(na.omit(data.frame(xdat,ydat,zdat)), "na.action")
-
       if (!any(keep.rows))
         stop("Data has no rows without NAs")
 
@@ -161,7 +159,7 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
 
-    if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) & (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) & perspective & !gradients &
+    if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) && (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) && perspective && !gradients &&
         !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
 
       view = match.arg(view)
@@ -604,7 +602,7 @@
           do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
-          if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+          if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
@@ -774,7 +772,7 @@
             do.call(plot.fun, plot.args)
 
             ## error plotting evaluation
-            if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+            if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
               if (!xi.factor && !plotOnEstimate)
                 lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
@@ -831,7 +829,7 @@
         }
       }
       
-      if (common.scale & (plot.behavior != "data")){
+      if (common.scale && (plot.behavior != "data")){
         jj = 1:(bws$xndim + bws$zndim)*3
         
         if (plot.errors && plot.errors.type == "all") {
@@ -857,7 +855,7 @@
               y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
             }
           }
-        } else if (plot.errors.center == "estimate" | !plot.errors) {
+        } else if (plot.errors.center == "estimate" || !plot.errors) {
           y.max = max(na.omit(as.double(data.eval)) +
             if (plot.errors) na.omit(as.double(data.err[,jj-1]))
             else 0)
@@ -917,7 +915,7 @@
           do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
-          if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+          if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
