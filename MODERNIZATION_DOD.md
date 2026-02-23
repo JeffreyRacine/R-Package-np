@@ -155,6 +155,29 @@ Completed in `np-master`:
    - fresh-install smoke:
      - `/tmp/np_regdens_rorder_smoke_20260223.out` (`NP_REGDENS_RORDER_SMOKE_OK`)
    - issue-note verified repro sweep:
-     - `/tmp/np_issue_notes_repros_rorder3_20260223.log`
+   - `/tmp/np_issue_notes_repros_rorder3_20260223.log`
    - tarball check:
      - `/tmp/np_master_check_rorder3_20260223.log` (`Status: OK`)
+
+## Core Estimator `seq_len` Loop/Index Hardening Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Replaced residual `1:n` loop/index forms in core estimator families with zero-length-safe `seq_len(...)`.
+2. Scope:
+   - `R/np.distribution.bw.R`
+   - `R/np.condistribution.bw.R`
+   - `R/np.singleindex.bw.R`
+   - `R/np.smoothcoef.bw.R`
+   - `R/np.smoothcoef.R`
+   - `R/np.plregression.R`
+3. Commit:
+   - `np-master`: `a9b0f40`
+4. Validation:
+   - parse gates:
+     - `/tmp/np_master_seq_len_core2_parse_20260223.log` (`RC:0`)
+   - targeted contracts:
+     - `/tmp/np_master_seq_len_core2_tests_postfix_20260223.log` (`PASS 29, FAIL 0`)
+   - issue-note verified repro sweep:
+     - `/tmp/np_issue_notes_repros_seqlen_core2_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_seqlen_core2_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/np_master_check_seqlen_core2_20260223.log` (`CHECK_RC:0`)
