@@ -381,7 +381,7 @@
                 cex.sub = scalar_default(cex.sub, par()$cex.sub),
                 xlab = scalar_default(xlab, gen.label(names(xdat)[1], "X")),
                 ylab = scalar_default(ylab, gen.label(names(ydat)[1], "Y")),
-                zlab = scalar_default(zlab, paste("Conditional", ifelse(cdf,"Distribution", "Density"))),
+                zlab = scalar_default(zlab, paste("Conditional", if (cdf) "Distribution" else "Density")),
                 theta = i,
                 phi = phi,
                 main = gen.tflabel(!is.null(main), main, paste("[theta= ", i,", phi= ", phi,"]", sep="")))
@@ -663,10 +663,10 @@
                   ex = as.numeric(na.omit(ei)),
                   ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                   ehy = if (plotOnEstimate) na.omit(temp.dens + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
-                  plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
-                  plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                  plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+                  plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = ifelse(xi.factor, 1, 2)
+                  lty = if (xi.factor) 1 else 2
                 )
                 do.call(draw.errors, draw.args)
               }
@@ -674,10 +674,8 @@
           }
         
           if (plot.behavior != "plot" && plot.errors) {
-            err.name <- ifelse(gradients,
-                               paste("gc", j, "err", sep = ""),
-                               ifelse(quantreg, "quanterr", "conderr"))
-            bias.name <- ifelse(gradients, paste("gc", j, "bias", sep = ""), "bias")
+            err.name <- if (gradients) paste("gc", j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
+            bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
             plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
             plot.out[[plot.index]][[bias.name]] <- na.omit(temp.dens - temp.err[,3])
             plot.out[[plot.index]]$bxp <- temp.boot
@@ -856,10 +854,10 @@
                     ex = as.numeric(na.omit(ei)),
                     ely = if (plotOnEstimate) na.omit(temp.dens - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                     ehy = if (plotOnEstimate) na.omit(temp.dens + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
-                    plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
-                    plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                    plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+                    plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                     plot.errors.bar.num = plot.errors.bar.num,
-                    lty = ifelse(xi.factor, 1, 2)
+                    lty = if (xi.factor) 1 else 2
                   )
                   do.call(draw.errors, draw.args)
                 }
@@ -867,10 +865,8 @@
             }
               
             if (plot.behavior != "plot" && plot.errors) {
-              err.name <- ifelse(gradients,
-                                 paste("gc", j, "err", sep = ""),
-                                 ifelse(quantreg, "quanterr", "conderr"))
-              bias.name <- ifelse(gradients, paste("gc", j, "bias", sep = ""), "bias")
+              err.name <- if (gradients) paste("gc", j, "err", sep = "") else if (quantreg) "quanterr" else "conderr"
+              bias.name <- if (gradients) paste("gc", j, "bias", sep = "") else "bias"
               plot.out[[plot.index]][[err.name]] <- na.omit(cbind(-temp.err[,1], temp.err[,2]))
               plot.out[[plot.index]][[bias.name]] <- na.omit(temp.dens - temp.err[,3])
               plot.out[[plot.index]]$bxp <- temp.boot
@@ -980,10 +976,10 @@
                   ex = as.numeric(na.omit(allei[,plot.index])),
                   ely = if (plotOnEstimate) na.omit(data.eval[,idx] - data.err[,3*idx-2]) else na.omit(data.err[,3*idx] - data.err[,3*idx-2]),
                   ehy = if (plotOnEstimate) na.omit(data.eval[,idx] + data.err[,3*idx-1]) else na.omit(data.err[,3*idx] + data.err[,3*idx-1]),
-                  plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
-                  plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                  plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+                  plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                   plot.errors.bar.num = plot.errors.bar.num,
-                  lty = ifelse(xi.factor, 1, 2)
+                  lty = if (xi.factor) 1 else 2
                 )
                 do.call(draw.errors, draw.args)
               }

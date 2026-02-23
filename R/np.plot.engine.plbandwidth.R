@@ -493,7 +493,7 @@
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
+          plot.args$ylab <- paste(if (gradients) paste("Gradient Component ", i, " of", sep = "") else "",
                                   gen.label(bws$ynames, "Conditional Mean"))
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -525,10 +525,10 @@
                 ex = as.numeric(na.omit(ei)),
                 ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                 ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
-                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
-                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
+                lty = if (xi.factor) 1 else 2
               )
               do.call(draw.errors, draw.args)
             }
@@ -653,7 +653,7 @@
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
+          plot.args$ylab <- paste(if (gradients) paste("Gradient Component ", i, " of", sep = "") else "",
                                   gen.label(bws$ynames, "Conditional Mean"))
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -685,10 +685,10 @@
                 ex = as.numeric(na.omit(ei)),
                 ely = if (plotOnEstimate) na.omit(temp.mean - temp.err[,1]) else na.omit(temp.err[,3] - temp.err[,1]),
                 ehy = if (plotOnEstimate) na.omit(temp.mean + temp.err[,2]) else na.omit(temp.err[,3] + temp.err[,2]),
-                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
-                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
+                lty = if (xi.factor) 1 else 2
               )
               do.call(draw.errors, draw.args)
             }
@@ -791,7 +791,7 @@
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- paste(ifelse(gradients, paste("Gradient Component ", i, " of", sep = ""), ""),
+          plot.args$ylab <- paste(if (gradients) paste("Gradient Component ", i, " of", sep = "") else "",
                                   gen.label(bws$ynames, "Conditional Mean"))
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
@@ -826,10 +826,10 @@
                 ex = as.numeric(na.omit(allei[,plot.index])),
                 ely = if (plotOnEstimate) na.omit(data.eval[,plot.index] - data.err[,3*plot.index-2]) else na.omit(data.err[,3*plot.index] - data.err[,3*plot.index-2]),
                 ehy = if (plotOnEstimate) na.omit(data.eval[,plot.index] + data.err[,3*plot.index-1]) else na.omit(data.err[,3*plot.index] + data.err[,3*plot.index-1]),
-                plot.errors.style = ifelse(xi.factor, "bar", plot.errors.style),
-                plot.errors.bar = ifelse(xi.factor, "I", plot.errors.bar),
+                plot.errors.style = if (xi.factor) "bar" else plot.errors.style,
+                plot.errors.bar = if (xi.factor) "I" else plot.errors.bar,
                 plot.errors.bar.num = plot.errors.bar.num,
-                lty = ifelse(xi.factor, 1, 2)
+                lty = if (xi.factor) 1 else 2
               )
               do.call(draw.errors, draw.args)
             }
