@@ -137,7 +137,7 @@ npdeptest <- function(data.x = NULL,
 
     Srho.vec.boot <- numeric()
 
-    for(b in 1:boot.num) {
+    for (b in seq_len(boot.num)) {
 
       console <- printClear(console)
       console <- printPush(paste(sep="", "Bootstrap replication ",
@@ -153,7 +153,7 @@ npdeptest <- function(data.x = NULL,
 
     ## Compute P-values
 
-    P <- mean(ifelse(Srho.vec.boot>Srho.vec,1,0))
+    P <- mean(Srho.vec.boot > Srho.vec)
 
   }
 

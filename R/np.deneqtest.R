@@ -117,7 +117,7 @@ npdeneqtest <- function(x = NULL,
   
   console <- newLineConsole()
 
-  for(i in 1:boot.num) {
+  for (i in seq_len(boot.num)) {
     console <- printClear(console)
     console <- printPush(paste(sep="", "Bootstrap replication ",
                                i, "/", boot.num, "..."), console)
@@ -136,8 +136,8 @@ npdeneqtest <- function(x = NULL,
   ## Compute empirical P-values - the number of resampled statistics
   ## more extreme than the original statistic
   
-  Tn.P <- mean(ifelse(Tn.vector>output$Tn,1,0))
-  In.P <- mean(ifelse(In.vector>output$In,1,0))
+  Tn.P <- mean(Tn.vector > output$Tn)
+  In.P <- mean(In.vector > output$In)
   
   ## Restore seed
 
