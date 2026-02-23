@@ -52,8 +52,9 @@
     oldpar <- par(no.readonly = TRUE)
     on.exit(par(oldpar), add = TRUE)
 
-    if(!is.null(options('plot.par.mfrow')$plot.par.mfrow))
-        plot.par.mfrow <- options('plot.par.mfrow')$plot.par.mfrow      
+    opt.plot.par.mfrow <- getOption("plot.par.mfrow")
+    if (!is.null(opt.plot.par.mfrow))
+        plot.par.mfrow <- opt.plot.par.mfrow
 
     if(!missing(gradients))
       stop("gradients not supported with smooth coefficient models.")

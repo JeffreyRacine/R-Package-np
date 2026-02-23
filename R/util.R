@@ -797,7 +797,7 @@ explodePipe <- function(formula, env = parent.frame()){
 
 "%~%" <- function(a,b) {
   identical(class(a), class(b)) && (length(a) == length(b)) &&
-  all(unlist(lapply(a,coarseclass)) == unlist(lapply(b,coarseclass)))
+  all(vapply(a, coarseclass, character(1)) == vapply(b, coarseclass, character(1)))
 }
 
 coarseclass <- function(a) {
