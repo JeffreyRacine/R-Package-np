@@ -61,7 +61,11 @@
 }
 
 .npRmpi_bcast_robj_by_name <- function(name, caller_env = parent.frame()) {
-  expr <- substitute(mpi.bcast.Robj2slave(NM), list(NM = as.name(name)))
+  fn <- get("mpi.bcast.Robj2slave",
+            envir = asNamespace("npRmpi"),
+            mode = "function",
+            inherits = FALSE)
+  expr <- substitute(FN(NM), list(FN = fn, NM = as.name(name)))
   eval(expr, envir = caller_env)
 }
 
@@ -207,8 +211,8 @@
 }
 
 .npRmpi_autodispatch_eval_arg <- function(expr, caller_env) {
-  val <- try(eval(expr, envir = caller_env), silent = TRUE)
-  if (!inherits(val, "try-error"))
+  val <- tryCatch(eval(expr, envir = caller_env), error = function(e) e)
+  if (!inherits(val, "error"))
     return(val)
 
   frames <- sys.frames()
@@ -216,12 +220,12 @@
     env_i <- frames[[i]]
     if (identical(env_i, caller_env))
       next
-    val_i <- try(eval(expr, envir = env_i), silent = TRUE)
-    if (!inherits(val_i, "try-error"))
+    val_i <- tryCatch(eval(expr, envir = env_i), error = function(e) e)
+    if (!inherits(val_i, "error"))
       return(val_i)
   }
 
-  stop(attr(val, "condition")$message)
+  stop(conditionMessage(val), call. = FALSE)
 }
 
 .npRmpi_autodispatch_materialize_call <- function(mc, caller_env, comm = 1L) {

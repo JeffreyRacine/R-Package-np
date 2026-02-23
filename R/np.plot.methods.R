@@ -54,7 +54,30 @@
                        where = "plot()")
 }
 
-.np_plot_npregression <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
+.np_plot_npregression <- function(object, ...) {
+  dots <- list(...)
+  if (is.null(dots$xdat) && is.null(dots$ydat) &&
+      is.null(object$bws$formula) &&
+      !is.null(object$call)) {
+    bws.orig <- tryCatch(.np_eval_call_arg(object$call, "bws", caller_env = parent.frame(2L)),
+                         error = function(e) NULL)
+    if (!is.null(bws.orig) && any(grepl("bandwidth$", class(bws.orig))))
+      object$bws <- bws.orig
+  }
+
+  if (is.null(dots$xdat) && is.null(dots$ydat) &&
+      isTRUE(object$trainiseval) &&
+      !is.null(object$eval) &&
+      !is.null(object$mean) &&
+      !is.null(object$resid) &&
+      NROW(object$eval) == length(object$mean) &&
+      length(object$mean) == length(object$resid)) {
+    dots$xdat <- object$eval
+    dots$ydat <- object$mean + object$resid
+  }
+
+  do.call(".np_plot_from_slot", c(list(object = object, slot = "bws"), dots))
+}
 .np_plot_npdensity <- function(object, ...) {
   dots <- list(...)
 
