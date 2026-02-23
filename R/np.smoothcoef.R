@@ -474,7 +474,7 @@ npscoef.scbandwidth <-
       SIGN = SIGNfunc(tydat, mean)
     }
 
-    if(errors | (residuals & miss.ex)){
+    if (errors || (residuals && miss.ex)) {
 
       tywtm <- npksum(txdat = tzdat,
                       tydat = yW,

@@ -339,7 +339,7 @@ npindex.sibandwidth <-
 
       index.mean <- tww[1,2,]/NZD(tww[2,2,])
 
-      if(!no.ex & (no.ey | residuals)){
+      if (!no.ex && (no.ey || residuals)) {
 
         ## want to evaluate on training data for in sample errors even
         ## if evaluation x's are different from training but no y's
@@ -375,7 +375,7 @@ npindex.sibandwidth <-
 
       index.grad <- as.matrix(model$grad)%*%t(as.vector(bws$beta))
 
-      if(!no.ex & (no.ey | residuals)){
+      if (!no.ex && (no.ey || residuals)) {
 
         ## Want to evaluate on training data for in sample errors even
         ## if evaluation x's are different from training but no y's
@@ -402,7 +402,7 @@ npindex.sibandwidth <-
       index.tmean <- index.mean
     }
 
-    if (no.ex & gradients) {
+    if (no.ex && gradients) {
       index.tgrad <- index.grad
     }
 
@@ -412,7 +412,7 @@ npindex.sibandwidth <-
     ## (training X) - need gradients == TRUE in order for this to
     ## work.
 
-    if(bws$method == "ichimura" & gradients == TRUE) {
+    if (bws$method == "ichimura" && gradients) {
 
       ## First row & column of covariance matrix `Bvcov' are zero due
       ## to identification condition that beta_1=0. Note the n n^{-1}
@@ -473,7 +473,7 @@ npindex.sibandwidth <-
 
       ## Now export this in an S3 method...
 
-    } else if(bws$method == "kleinspady" & gradients == TRUE) {
+    } else if (bws$method == "kleinspady" && gradients) {
 
       ## We divide by P(1-P) so test for P=0 or 1...
 

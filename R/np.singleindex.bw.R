@@ -107,7 +107,7 @@ npindexbw.default <-
 
     xdat <- toFrame(xdat)
 
-    if(!(is.vector(ydat) | is.factor(ydat)))
+    if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")
 
     if (ncol(xdat) < 2) {
@@ -118,7 +118,7 @@ npindexbw.default <-
                     "dimensionality is unnecessary."))
     }
 
-    if (coarseclass(bws) != "numeric" | length(bws) != ncol(xdat)+1)
+    if (coarseclass(bws) != "numeric" || length(bws) != ncol(xdat)+1)
       stop(paste("manually specified 'bws' must be a numeric vector of length ncol(xdat)+1.",
                  "See documentation for details."))
 
@@ -132,7 +132,7 @@ npindexbw.default <-
                        bandwidth = bws[ncol(xdat)+1],
                        bandwidth.compute = bandwidth.compute)
 
-    if (tbw$method == "kleinspady" & !setequal(ydat,c(0,1)))
+    if (tbw$method == "kleinspady" && !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     if (bandwidth.compute) {
@@ -188,7 +188,7 @@ npindexbw.sibandwidth <-
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
 
-    if (bws$method == "kleinspady" & !setequal(ydat,c(0,1)))
+    if (bws$method == "kleinspady" && !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
 
     if (ncol(xdat) < 2) {
