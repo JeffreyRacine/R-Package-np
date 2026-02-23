@@ -488,7 +488,7 @@
           do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
-          if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+          if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 
@@ -611,7 +611,7 @@
           do.call(plot.fun, plot.args)
 
           ## error plotting evaluation
-          if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+          if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
             if (!xi.factor && !plotOnEstimate)
               lines(na.omit(ei), na.omit(temp.err[,3]), lty = 3)
 

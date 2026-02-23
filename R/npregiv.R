@@ -432,7 +432,7 @@ npregiv <- function(y,
     if(is.null(tydat)) stop("Error: You must provide y data")
     if(is.null(txdat)) stop("Error: You must provide X data")
     if(is.null(bws)) stop("Error: You must provide a bandwidth object")
-    if(is.null(degree) | any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
+    if(is.null(degree) || any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
     if(p>0 && (any(deriv < 0) || any(deriv > degree)))
       stop("deriv must lie between 0 and degree")
 
@@ -610,7 +610,7 @@ npregiv <- function(y,
     if(is.null(xdat)) stop("Error: You must provide X data")
     if(is.null(W)) stop("Error: You must provide a weighting matrix W")
     if(is.null(bws)) stop("Error: You must provide a bandwidth object")
-    if(is.null(degree) | any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
+    if(is.null(degree) || any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
 
     xdat <- as.data.frame(xdat)
 
@@ -719,7 +719,7 @@ npregiv <- function(y,
     if(is.null(xdat)) stop("Error: You must provide X data")
     if(!all(degree==0)) if(is.null(W)) stop("Error: You must provide a weighting matrix W")
     if(is.null(bws)) stop("Error: You must provide a bandwidth object")
-    if(is.null(degree) | any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
+    if(is.null(degree) || any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
 
     xdat <- as.data.frame(xdat)
 
@@ -868,7 +868,7 @@ npregiv <- function(y,
 
     if(is.null(ydat)) stop("Error: You must provide y data")
     if(is.null(xdat)) stop("Error: You must provide X data")
-    if(is.null(degree) | any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
+    if(is.null(degree) || any(degree < 0)) stop(paste("Error: degree vector must contain non-negative integers\ndegree is (", degree, ")\n",sep=""))
     if(!is.null(nmulti) && nmulti < 1) stop(paste("Error: nmulti must be a positive integer (minimum 1)\nnmulti is (", nmulti, ")\n",sep=""))
 
     bwmethod = match.arg(bwmethod)

@@ -28,7 +28,7 @@ gsl.bs.default <- function(x,
   ## specified - check that mix < max
 
 
-  if(!is.null(x.min)&!is.null(x.max)) if(x.min >= x.max) stop(" x.min must be less than x.max")
+  if(!is.null(x.min) && !is.null(x.max)) if(x.min >= x.max) stop(" x.min must be less than x.max")
   if(is.null(x.min)) {
 			x.min <- min(x)
 			ol <- FALSE
@@ -123,7 +123,7 @@ bs.des     <- function(x,
 		n <- length(x)
 		deriv <- as.vector(deriv)
 
-		if(!is.null(x.min)&!is.null(x.max)) if(x.min >= x.max) stop(" x.min must be less than x.max")
+		if(!is.null(x.min) && !is.null(x.max)) if(x.min >= x.max) stop(" x.min must be less than x.max")
 		if(is.null(x.min)) x.min <- min(x)
 		if(is.null(x.max)) x.max <- max(x)
 
