@@ -511,12 +511,13 @@
           REMOTE_NAME = remote.name))
 
   result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
+  tmpreplace <- c(prepared$tmpvals, prepared$prepublish)
 
   if (is.list(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = tmpreplace), mode = "auto", remote = remote.name))
 
   if (is.call(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = prepared$tmpvals), mode = "auto", remote = remote.name))
+    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = tmpreplace), mode = "auto", remote = remote.name))
 
   .npRmpi_autodispatch_tag_result(result, mode = "auto", remote = remote.name)
 }
