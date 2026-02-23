@@ -22,6 +22,21 @@
   list(ok = FALSE, value = NULL)
 }
 
+.np_eval_bw_call <- function(call_obj, caller_env = parent.frame()) {
+  if (!is.call(call_obj))
+    stop("bandwidth selector call is malformed", call. = FALSE)
+
+  val <- tryCatch(eval(call_obj, envir = caller_env), error = function(e) e)
+  if (!inherits(val, "error"))
+    return(val)
+
+  fallback <- .np_try_eval_in_frames(call_obj, eval_env = caller_env)
+  if (isTRUE(fallback$ok))
+    return(fallback$value)
+
+  stop(conditionMessage(val), call. = FALSE)
+}
+
 .np_bw_dispatch_target <- function(dots, data_arg_names = character(), eval_env = parent.frame()) {
   if (length(dots) == 0L)
     stop("invoked without arguments")

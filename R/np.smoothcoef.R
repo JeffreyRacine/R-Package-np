@@ -166,7 +166,7 @@ npscoef.default <- function(bws, txdat, tydat, tzdat, ...) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
-  tbw <- eval.parent(sc.bw)
+  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
 
   ## because of some ambiguities in how the function might be called
   ## we only drop up to two unnamed arguments, when sometimes dropping

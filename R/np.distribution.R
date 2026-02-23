@@ -246,7 +246,7 @@ npudist.default <- function(bws, tdat, ...){
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
-  tbw <- eval.parent(sc.bw)
+  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
 
   ## convention: first argument is always dropped, second, if present, propagated
   call.args <- list(bws = tbw)

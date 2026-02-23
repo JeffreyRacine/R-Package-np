@@ -350,7 +350,7 @@ npplreg.default <- function(bws, txdat, tydat, tzdat, ...) {
     names(sc.bw)[m.txy] <- nstxy[m.txy > 0]
   }
     
-  tbw <- eval.parent(sc.bw)
+  tbw <- .np_eval_bw_call(sc.bw, caller_env = parent.frame())
   
   ## convention: drop 'bws' and up to three unnamed arguments (including bws)
   ## for simplicity, we don't allow for inconsistent
