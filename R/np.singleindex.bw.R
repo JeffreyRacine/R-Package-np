@@ -10,11 +10,12 @@ npindexbw <-
 
 npindexbw.formula <-
   function(formula, data, subset, na.action, call, ...){
+    formula.terms <- terms(formula)
     orig.ts <- if (missing(data))
-      .np_terms_ts_mask(terms_obj = terms(formula),
+      .np_terms_ts_mask(terms_obj = formula.terms,
                         data = environment(formula),
                         eval_env = environment(formula))
-    else .np_terms_ts_mask(terms_obj = terms(formula),
+    else .np_terms_ts_mask(terms_obj = formula.terms,
                            data = data,
                            eval_env = environment(formula))
 
