@@ -167,7 +167,7 @@ npunitest <- function(data.x = NULL,
     
     resampled.stat <- numeric(boot.num)
 
-    for(b in 1:boot.num) {
+    for (b in seq_len(boot.num)) {
       
       console <- printClear(console)
       console <- printPush(paste(sep="", "Bootstrap replication ",
@@ -185,7 +185,7 @@ npunitest <- function(data.x = NULL,
       
     }
     
-    p.value <- mean(ifelse(resampled.stat > test.stat, 1, 0))
+    p.value <- mean(resampled.stat > test.stat)
     
   }
   
