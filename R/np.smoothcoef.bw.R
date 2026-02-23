@@ -145,8 +145,7 @@ npscoefbw.scbandwidth <-
     ## Save seed prior to setting
 
     seed.state <- .np_seed_enter(random.seed)
-    exists.seed <- seed.state$exists.seed
-    save.seed <- seed.state$save.seed
+
 
     miss.z <- missing(zdat)
     
@@ -564,7 +563,7 @@ npscoefbw.scbandwidth <-
 
     ## Restore seed
 
-    if(exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv)
+    .np_seed_exit(seed.state)
     
     bws <- scbandwidth(bw = bws$bw,
                        bwmethod = bws$method,

@@ -15,9 +15,12 @@
   list(exists.seed = exists.seed, save.seed = save.seed)
 }
 
-.np_seed_exit <- function(state) {
+.np_seed_exit <- function(state, remove_if_absent = FALSE) {
   if (isTRUE(state$exists.seed)) {
     assign(".Random.seed", state$save.seed, envir = .GlobalEnv)
+  } else if (isTRUE(remove_if_absent) &&
+             exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
+    rm(".Random.seed", envir = .GlobalEnv)
   }
   invisible(NULL)
 }

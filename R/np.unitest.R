@@ -28,8 +28,7 @@ npunitest <- function(data.x = NULL,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
-  exists.seed <- seed.state$exists.seed
-  save.seed <- seed.state$save.seed
+
 
   console <- newLineConsole()
   console <- printPush("Computing bandwidths...", console = console)
@@ -195,7 +194,7 @@ npunitest <- function(data.x = NULL,
 
   ## Restore seed
 
-  if(exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv)
+  .np_seed_exit(seed.state)
 
   if(bootstrap) {
     unitest(Srho = test.stat,

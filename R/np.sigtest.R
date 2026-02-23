@@ -135,8 +135,7 @@ npsigtest.rbandwidth <- function(bws,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
-  exists.seed <- seed.state$exists.seed
-  save.seed <- seed.state$save.seed
+
 
   boot.type <- match.arg(boot.type)
   boot.method <- match.arg(boot.method)
@@ -610,7 +609,7 @@ npsigtest.rbandwidth <- function(bws,
 
   ## Restore seed
 
-  if(exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv)
+  .np_seed_exit(seed.state)
 
   sigtest(In=In,
           In.mat,

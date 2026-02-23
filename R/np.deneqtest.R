@@ -30,8 +30,7 @@ npdeneqtest <- function(x = NULL,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
-  exists.seed <- seed.state$exists.seed
-  save.seed <- seed.state$save.seed
+
 
   ## First, define test statistic function. This will return the
   ## standardized and unstandardized test statistic along with its
@@ -142,7 +141,7 @@ npdeneqtest <- function(x = NULL,
   
   ## Restore seed
 
-  if(exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv)
+  .np_seed_exit(seed.state)
   
   deneqtest(Tn=output$Tn,
             In=output$In,

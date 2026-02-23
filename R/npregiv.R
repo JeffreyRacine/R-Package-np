@@ -851,16 +851,7 @@ npregiv <- function(y,
 
     ## Save seed prior to setting
     seed.state <- .np_seed_enter(random.seed)
-    exists.seed <- seed.state$exists.seed
-    save.seed <- seed.state$save.seed
-
-    on.exit({
-      if(exists.seed) {
-        assign(".Random.seed", save.seed, envir = .GlobalEnv)
-      } else {
-        rm(".Random.seed", envir = .GlobalEnv)
-      }
-    }, add = TRUE)
+    on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
     debug.file.optim <- "optim.debug"
     debug.file.bandwidth <- "bandwidth.out"
