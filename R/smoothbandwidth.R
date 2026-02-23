@@ -102,7 +102,7 @@ scbandwidth <-
     ifval = ifval,
     num.feval = num.feval,
     scaling = bwscaling,
-    pscaling = ifelse(bwscaling, "Scale Factor(s)", "Bandwidth(s)"),
+    pscaling = if (bwscaling) "Scale Factor(s)" else "Bandwidth(s)",
     type = bwtype,
     ptype = bwtToPrint(bwtype),
     ckertype = ckertype,    
@@ -138,7 +138,7 @@ scbandwidth <-
     vartitle = list(x = "Explanatory", y = "Dependent", z = "Explanatory"),
     vartitleabb = list(x = "Exp.", y = "Dep.", z = "Exp."),
     rows.omit = rows.omit,
-    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+    nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
     total.time = total.time)
 
   mybw$klist <-
@@ -149,7 +149,7 @@ scbandwidth <-
                 okertype = okertype,
                 pokertype = mybw$pokertype))
 
-  zorx <- ifelse(is.null(zdati), "x", "z")
+  zorx <- if (is.null(zdati)) "x" else "z"
   names(mybw$sfactor) <- zorx
   names(mybw$bandwidth) <- zorx 
   names(mybw$sumNum) <- zorx

@@ -129,7 +129,7 @@ bs.des     <- function(x,
 
 		## 0 == don't use user supplied knots, 1 = use
 
-		knots.int <- ifelse(is.null(knots), 0, 1)
+		knots.int <- if (is.null(knots)) 0 else 1
 
 		ncol <- nbreak+degree-1;
 

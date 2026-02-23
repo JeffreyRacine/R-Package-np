@@ -98,7 +98,7 @@ dbandwidth <-
       eval.history = eval.history,
       invalid.history = invalid.history,
       scaling = bwscaling,
-      pscaling = ifelse(bwscaling, "Scale Factor(s)", "Bandwidth(s)"),
+      pscaling = if (bwscaling) "Scale Factor(s)" else "Bandwidth(s)",
       type = bwtype,
       ptype = bwtToPrint(bwtype),
       ckertype = ckertype,    
@@ -133,7 +133,7 @@ dbandwidth <-
       vartitle = list(x = ""),
       vartitleabb = list(x = ""),
       rows.omit = rows.omit,
-      nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+      nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
       timing = timing,
       total.time = total.time)
 

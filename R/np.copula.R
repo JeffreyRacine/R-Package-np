@@ -34,7 +34,7 @@ npcopula <- function(bws,
 
   if(bws$nuno>0) stop("unordered factors not suitable for copula estimation")
 
-  u.provided <- ifelse(is.null(u),FALSE,TRUE)
+  u.provided <- !is.null(u)
   bw.type <- bws$type
   bw.ckerorder <- bws$ckerorder
   bw.ckertype <- bws$ckertype

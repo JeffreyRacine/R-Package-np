@@ -110,7 +110,7 @@ sibandwidth <-
     vartitle = list(x = "Explanatory", y = "Dependent", index = "Explanatory"),
     vartitleabb = list(x = "Exp.", y = "Dep.", index = "Exp."),
     rows.omit = rows.omit,
-    nobs.omit = ifelse(identical(rows.omit,NA), 0, length(rows.omit)),
+    nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
     total.time = total.time)
 
   mybw$klist <- list(
@@ -122,7 +122,7 @@ sibandwidth <-
          pckertype = mybw$pckertype))
 
   if(only.optimize.beta)
-    mybw$pmethod <- ifelse(only.optimize.beta, paste("Pilot (bandwidth) +",mybw$pmethod, "(beta)"), mybw$pmethod)
+    mybw$pmethod <- paste("Pilot (bandwidth) +", mybw$pmethod, "(beta)")
   
   if(!bandwidth.compute)
     mybw$pmethod <- "Manual"
