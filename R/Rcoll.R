@@ -288,13 +288,17 @@ mpi.bcast.Robj2slave <- function(obj, comm=1, all=FALSE){
 		#mpi.bcast.cmd(rm(.tmpRobj,envir = .GlobalEnv), rank=0, comm=comm) 
 	}
 	else {
-		master.objects <-objects(envir=.GlobalEnv)
+		master.objects <- objects(envir = .GlobalEnv)
+		object.values <- mget(master.objects,
+		                      envir = .GlobalEnv,
+		                      inherits = FALSE,
+		                      ifnotfound = vector("list", length(master.objects)))
 		obj.num=length(master.objects)
 		if (obj.num)
 			for (i in 1:obj.num){
 				mpi.bcast.cmd(cmd=.tmpRobj <- mpi.bcast.Robj(comm=1),
-                    rank=0, comm=comm)
-				mpi.bcast.Robj(list(objname=master.objects[i], obj=get(master.objects[i])), 
+	                    rank=0, comm=comm)
+				mpi.bcast.Robj(list(objname=master.objects[i], obj=object.values[[i]]), 
 					rank=0, comm=comm)
 				mpi.bcast.cmd(cmd=assign(.tmpRobj$objname,.tmpRobj$obj), rank=0, comm=comm)
 			}
@@ -302,14 +306,18 @@ mpi.bcast.Robj2slave <- function(obj, comm=1, all=FALSE){
 }
 
 mpi.bcast.Rfun2slave <- function(comm=1){
-	master.fun <-objects(envir=.GlobalEnv)
-	sync.index <- which(lapply(lapply(master.fun, get), is.function)==1)
+	master.fun <- objects(envir = .GlobalEnv)
+	fun.values <- mget(master.fun,
+	                   envir = .GlobalEnv,
+	                   inherits = FALSE,
+	                   ifnotfound = vector("list", length(master.fun)))
+	sync.index <- which(vapply(fun.values, is.function, logical(1)))
 	obj.num=length(sync.index)
 	if (obj.num)
 		for (i in sync.index){
 			mpi.bcast.cmd(cmd=.tmpRobj <- mpi.bcast.Robj(comm=1),
-                   rank=0, comm=comm)
-			mpi.bcast.Robj(list(objname=master.fun[i], obj=get(master.fun[i])), 
+	                   rank=0, comm=comm)
+			mpi.bcast.Robj(list(objname=master.fun[i], obj=fun.values[[i]]), 
 				rank=0, comm=comm)
 			mpi.bcast.cmd(cmd=assign(.tmpRobj$objname,.tmpRobj$obj), rank=0, comm=comm)
 		}
