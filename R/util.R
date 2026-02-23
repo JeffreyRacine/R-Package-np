@@ -182,7 +182,8 @@ npValidateLpBasis <- function(regtype, basis, argname = "basis") {
 }
 
 npLpBasisCode <- function(basis) {
-  switch(tolower(ifelse(is.null(basis) || !length(basis), "glp", basis)),
+  basis.value <- if (is.null(basis) || !length(basis)) "glp" else basis
+  switch(tolower(basis.value),
          additive = 0L,
          glp = 1L,
          tensor = 2L,
@@ -1092,7 +1093,8 @@ genRegEstStr <- function(x){
 }
 
 npLpBasisFamilyLabel <- function(basis){
-  b <- tolower(ifelse(is.null(basis) || !length(basis), "glp", basis))
+  basis.value <- if (is.null(basis) || !length(basis)) "glp" else basis
+  b <- tolower(basis.value)
   switch(b,
          glp = "Generalized",
          additive = "Additive",
