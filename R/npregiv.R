@@ -310,11 +310,13 @@ npregiv <- function(y,
 
           for(i in 1:ncol(K.x)) {
 
-              if(tryCatch(WzkWz.inv[[i]] <- as.matrix(chol2inv(chol(t(W.z)%*%(K.x[,i]*W.z)))),
-                          error = function(e){
-                              return(matrix(FALSE,nc,nc))
-                          })[1,1]!=FALSE) {
+              WzkWz.inv.try <- tryCatch(as.matrix(chol2inv(chol(t(W.z)%*%(K.x[,i]*W.z)))),
+                                        error = function(e){
+                                            return(matrix(FALSE,nc,nc))
+                                        })
 
+              if(WzkWz.inv.try[1,1]!=FALSE) {
+                  WzkWz.inv[[i]] <- WzkWz.inv.try
               } else {
 
                   if(shrink==FALSE) {
