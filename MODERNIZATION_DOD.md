@@ -18,7 +18,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] High-risk `eval(parse(...))` absent; residual `eval(...)` centralized in shared helper with contracts.
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks.
 - [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
-- [ ] Full `--as-cran` warning/note closure and accepted-warning ledger still required.
+- [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
 
 ## Mandatory Release Gates
