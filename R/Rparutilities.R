@@ -815,15 +815,21 @@ mpi.iparSapply <- function (X, FUN, ..., job.num=mpi.comm.size(comm)-1, apply.se
     .simplify(length(X),answer, simplify)
 }
 
+.mpi_make_replicate_fun <- function(expr, env = parent.frame()) {
+    eval(substitute(function(...) EXPR, list(EXPR = expr)), envir = env)
+}
+
 mpi.parReplicate <- function(n,  expr, job.num=mpi.comm.size(comm)-1, apply.seq=NULL,
                                 simplify = TRUE, comm=1){
-    mpi.parSapply(integer(n), eval.parent(substitute(function(...) expr)), 
+    expr_fun <- .mpi_make_replicate_fun(substitute(expr), env = parent.frame())
+    mpi.parSapply(integer(n), expr_fun, 
     job.num=job.num, apply.seq=apply.seq, simplify = simplify, comm=comm)
 }
 
 mpi.iparReplicate <- function(n,  expr, job.num=mpi.comm.size(comm)-1, apply.seq=NULL,
                                 simplify = TRUE, comm=1,sleep=0.01){
-    mpi.iparSapply(integer(n), eval.parent(substitute(function(...) expr)), 
+    expr_fun <- .mpi_make_replicate_fun(substitute(expr), env = parent.frame())
+    mpi.iparSapply(integer(n), expr_fun, 
     job.num=job.num, apply.seq=apply.seq, simplify = simplify, comm=comm,sleep=sleep)
 }
 
