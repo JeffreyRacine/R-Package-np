@@ -3,15 +3,15 @@
 }
 
 .onLoad <- function (lib, pkg) {
-  if(is.null(options('np.messages')$np.messages))
+  if (is.null(getOption("np.messages")))
     options(np.messages = TRUE)
-  if(is.null(options('np.tree')$np.tree))
+  if (is.null(getOption("np.tree")))
     options(np.tree = FALSE)
-  if(is.null(options('np.largeh.rel.tol')$np.largeh.rel.tol))
+  if (is.null(getOption("np.largeh.rel.tol")))
     options(np.largeh.rel.tol = 1e-3)
-  if(is.null(options('np.disc.upper.rel.tol')$np.disc.upper.rel.tol))
+  if (is.null(getOption("np.disc.upper.rel.tol")))
     options(np.disc.upper.rel.tol = 1e-2)
-  if(is.null(options('np.groupcv.fast')$np.groupcv.fast))
+  if (is.null(getOption("np.groupcv.fast")))
     options(np.groupcv.fast = TRUE)
 }
 
