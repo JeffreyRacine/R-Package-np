@@ -439,7 +439,7 @@ compute.bootstrap.errors.rbandwidth =
 
     all.bp <- list()
 
-    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+    if (slice.index > 0 && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])){
       boot.frame <- as.data.frame(boot.out$t)
       u.lev <- bws$xdati$all.ulev[[slice.index]]
 
@@ -553,8 +553,8 @@ compute.bootstrap.errors.scbandwidth =
 
     all.bp <- list()
 
-    if ((slice.index > 0) && (((slice.index <= ncol(xdat)) && (bws$xdati$iord | bws$xdati$iuno)[slice.index]) ||
-                              ((slice.index > ncol(xdat)) && (bws$zdati$iord | bws$zdati$iuno)[slice.index-ncol(xdat)]))) {
+    if ((slice.index > 0) && (((slice.index <= ncol(xdat)) && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])) ||
+                              ((slice.index > ncol(xdat)) && (bws$zdati$iord[slice.index-ncol(xdat)] || bws$zdati$iuno[slice.index-ncol(xdat)])))) {
       boot.frame <- as.data.frame(boot.out$t)
 
       if(slice.index <= ncol(xdat))
@@ -673,7 +673,7 @@ compute.bootstrap.errors.plbandwidth =
       ti <- slice.index - bws$xndim
     }
     
-    if (slice.index > 0 && (tdati$iord | tdati$iuno)[ti]){
+    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
       boot.frame <- as.data.frame(boot.out$t)
       u.lev <- tdati$all.ulev[[ti]]
 
@@ -776,7 +776,7 @@ compute.bootstrap.errors.bandwidth =
 
     all.bp <- list()
 
-    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+    if (slice.index > 0 && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])){
       boot.frame <- as.data.frame(boot.out$t)
       u.lev <- bws$xdati$all.ulev[[slice.index]]
 
@@ -868,7 +868,7 @@ compute.bootstrap.errors.dbandwidth =
 
     all.bp <- list()
 
-    if (slice.index > 0 && (bws$xdati$iord | bws$xdati$iuno)[slice.index]){
+    if (slice.index > 0 && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])){
       boot.frame <- as.data.frame(boot.out$t)
       u.lev <- bws$xdati$all.ulev[[slice.index]]
 
@@ -996,7 +996,7 @@ compute.bootstrap.errors.conbandwidth =
       ti <- slice.index - bws$xndim
     }
     
-    if (slice.index > 0 && (tdati$iord | tdati$iuno)[ti]){
+    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
       boot.frame <- as.data.frame(boot.out$t)
       u.lev <- tdati$all.ulev[[ti]]
 
@@ -1124,7 +1124,7 @@ compute.bootstrap.errors.condbandwidth =
       ti <- slice.index - bws$xndim
     }
     
-    if (slice.index > 0 && (tdati$iord | tdati$iuno)[ti]){
+    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
       boot.frame <- as.data.frame(boot.out$t)
       u.lev <- tdati$all.ulev[[ti]]
 
