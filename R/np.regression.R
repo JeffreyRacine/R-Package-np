@@ -326,7 +326,7 @@ npreg.rbandwidth <-
         fixed = BW_FIXED,
         generalized_nn = BW_GEN_NN,
         adaptive_nn = BW_ADAP_NN),
-      int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE), 
+      int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
       kerneval = switch(bws$ckertype,
         gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
         epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
@@ -344,7 +344,7 @@ npreg.rbandwidth <-
       regtype = reg.c$code,
       no.ex = no.ex,
       mcv.numRow = attr(bws$xmcv, "num.row"),
-      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
+      int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
       old.reg = FALSE)
 
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])

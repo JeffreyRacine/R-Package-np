@@ -153,7 +153,7 @@ npudist.dbandwidth <-
         fixed = BW_FIXED,
         generalized_nn = BW_GEN_NN,
         adaptive_nn = BW_ADAP_NN),
-      int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE),
+      int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
       ckerneval = switch(bws$ckertype,
         gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
         epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
@@ -170,7 +170,7 @@ npudist.dbandwidth <-
       mcv.numRow = attr(bws$xmcv, "num.row"),
       densOrDist = NP_DO_DIST,
       old.dist = FALSE,
-      int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO))
+      int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO)
     cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
 
     

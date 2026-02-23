@@ -167,7 +167,7 @@ npudensbw.bandwidth <-
           generalized_nn = BW_GEN_NN,
           adaptive_nn = BW_ADAP_NN),
         itmax=itmax, int_RESTART_FROM_MIN=ifelse(remin,RE_MIN_TRUE,RE_MIN_FALSE), 
-        int_MINIMIZE_IO=ifelse(options('np.messages'), IO_MIN_FALSE, IO_MIN_TRUE), 
+        int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
         bwmethod = switch(bws$method,
           cv.ml = BWM_CVML,
           cv.ls = BWM_CVLS),
@@ -187,7 +187,7 @@ npudensbw.bandwidth <-
         nord = dim(dord)[2],
         ncon = dim(dcon)[2],
         old.dens = FALSE,
-        int_do_tree = ifelse(options('np.tree'), DO_TREE_YES, DO_TREE_NO),
+        int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
         scale.init.categorical.sample = scale.init.categorical.sample,
         dfc.dir = dfc.dir,
         transform.bounds = transform.bounds)
