@@ -404,7 +404,7 @@ npscoef.scbandwidth <-
     nc <- ncol(tww[,,1])
 
     while(any(doridge)){
-      iloo <- (1:enrow)[doridge]
+      iloo <- seq_len(enrow)[doridge]
       for (ii in iloo) {
         doridge[ii] <- FALSE
         ridge.val <- ridge[ii]*tyw[,ii][1]/NZD(tww[,,ii][1,1])
@@ -424,7 +424,7 @@ npscoef.scbandwidth <-
 
     do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex)
     if (do.iterate){
-      resid <- tydat - sapply(1:enrow, function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
+      resid <- tydat - sapply(seq_len(enrow), function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
 
       i = 0
       max.err <- .Machine$double.xmax
@@ -434,7 +434,7 @@ npscoef.scbandwidth <-
 
       while((max.err > tol) && ((i <- i + 1) <= maxiter)){
         resid.old <- resid
-        for(j in 1:n.part){
+        for (j in seq_len(n.part)) {
           ## estimate partial residuals
           partial <- W[,j] * coef.mat[j,] + resid
 
@@ -458,7 +458,7 @@ npscoef.scbandwidth <-
         warning(paste("backfit iterations did not converge. max err= ", max.err,", tol= ", tol,", maxiter= ", maxiter, sep=''))
       mean <- tydat - resid
     } else {
-      mean <- sapply(1:enrow, function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
+      mean <- sapply(seq_len(enrow), function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
     }
 
     if (!miss.ey) {
@@ -526,7 +526,7 @@ npscoef.scbandwidth <-
                               epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
                               uniform = CKER_UNI)+1])^length(bws$bw)
 
-      u2.W <- sapply(1:tnrow, function(i) { W.train[i,, drop=FALSE]*u2.W[i] })
+      u2.W <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop=FALSE]*u2.W[i] })
       u2.W <- t(u2.W)
 
       vhat.args <- list(txdat = tzdat, tydat = W.train, weights = u2.W, bws = bws, leave.one.out = leave.one.out)
@@ -536,7 +536,7 @@ npscoef.scbandwidth <-
 
       ## asymptotics rely on positive definite nature of tww (ie. M.eval) and V.hat
       ## so choleski decomposition is used to assure their veracity
-      merr <- sqrt(sapply(1:enrow, function(i){
+      merr <- sqrt(sapply(seq_len(enrow), function(i){
         cm <- chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))
         k*(W[i,,drop=FALSE] %*% cm %*% V.hat[,,i] %*% cm %*% t(W[i,,drop=FALSE]))
       }))

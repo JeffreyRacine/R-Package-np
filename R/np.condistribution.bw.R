@@ -228,7 +228,7 @@ npcdistbw.condbandwidth <-
         nog = ngrid
         probs <- seq(0,1,length.out = nog)
 
-        evy <- oydat[1:nog,,drop = FALSE]
+        evy <- oydat[seq_len(nog),,drop = FALSE]
         for (i in seq_len(ncol(evy))) {
           evy[,i] <- uocquantile(oydat[,i], probs)
         }

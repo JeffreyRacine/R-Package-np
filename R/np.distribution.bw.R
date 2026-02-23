@@ -208,7 +208,7 @@ npudistbw.dbandwidth <-
         cdf_on_train = FALSE
         nog = ngrid
         probs <- seq(0,1,length.out = nog)
-        ev <- odat[1:nog,,drop = FALSE]
+        ev <- odat[seq_len(nog),,drop = FALSE]
         for (i in seq_len(ncol(ev))) {
           ev[,i] <- uocquantile(odat[,i], probs)
         }
