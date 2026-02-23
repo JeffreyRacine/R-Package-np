@@ -87,6 +87,7 @@ npqreg.condbandwidth <-
            ...){
 
     fit.start <- proc.time()[3]
+    gradients <- npValidateScalarLogical(gradients, "gradients")
 
     no.ex = missing(exdat)
 

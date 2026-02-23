@@ -127,6 +127,7 @@ npplreg.plbandwidth <-
            exdat, eydat, ezdat, residuals = FALSE, ...){
 
     fit.start <- proc.time()[3]
+    residuals <- npValidateScalarLogical(residuals, "residuals")
 
     txdat = toFrame(txdat)
     tzdat = toFrame(tzdat)

@@ -201,6 +201,11 @@ npscoef.scbandwidth <-
            betas = FALSE, ...){
 
     fit.start <- proc.time()[3]
+    residuals <- npValidateScalarLogical(residuals, "residuals")
+    errors <- npValidateScalarLogical(errors, "errors")
+    iterate <- npValidateScalarLogical(iterate, "iterate")
+    leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
+    betas <- npValidateScalarLogical(betas, "betas")
 
     miss.z <- missing(tzdat)
 

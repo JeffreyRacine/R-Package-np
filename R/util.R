@@ -142,6 +142,13 @@ npValidateGlpBernstein <- function(regtype, bernstein.basis, argname = "bernstei
   isTRUE(bernstein.basis)
 }
 
+npValidateScalarLogical <- function(value, argname) {
+  value <- as.logical(value)
+  if (length(value) != 1L || is.na(value))
+    stop(sprintf("'%s' must be TRUE or FALSE", argname))
+  value
+}
+
 npValidateLpBasis <- function(regtype, basis, argname = "basis") {
   if (!identical(regtype, "lp"))
     return("glp")

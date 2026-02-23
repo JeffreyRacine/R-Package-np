@@ -79,6 +79,7 @@ npcdens.conbandwidth <- function(bws,
                                  exdat, eydat, gradients = FALSE, ...){
 
   fit.start <- proc.time()[3]
+  gradients <- npValidateScalarLogical(gradients, "gradients")
 
   if (xor(missing(exdat),missing(eydat)))
     stop("evaluation data must be supplied for both 'exdat' and 'eydat'")

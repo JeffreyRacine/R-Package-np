@@ -182,6 +182,9 @@ npindex.sibandwidth <-
            boot.num = 399, ...) {
 
     fit.start <- proc.time()[3]
+    gradients <- npValidateScalarLogical(gradients, "gradients")
+    residuals <- npValidateScalarLogical(residuals, "residuals")
+    errors <- npValidateScalarLogical(errors, "errors")
 
     no.ex = missing(exdat)
     no.ey = missing(eydat)
