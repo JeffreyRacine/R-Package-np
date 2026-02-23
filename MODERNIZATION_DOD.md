@@ -138,3 +138,23 @@ Completed in `np-master`:
      - `/tmp/np_issue_notes_repros_dist_rorder_20260223.log`
    - tarball check:
      - `/tmp/np_master_check_dist_rorder_20260223.log` (`Status: OK`)
+
+## Density/Regression `rorder` seq_len Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Replaced residual `(1:ncol)[...]` `rorder` reconstruction with `seq_len(ncol)` in core density/regression paths.
+2. Scope:
+   - `R/np.density.bw.R`
+   - `R/np.regression.bw.R`
+   - `R/np.regression.R`
+3. Commit:
+   - `np-master`: `a6dcd09`
+4. Validation:
+   - parse gates: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/np_master_rorder_regdens_tests_20260223.log` (`TEST_RC:0`)
+   - fresh-install smoke:
+     - `/tmp/np_regdens_rorder_smoke_20260223.out` (`NP_REGDENS_RORDER_SMOKE_OK`)
+   - issue-note verified repro sweep:
+     - `/tmp/np_issue_notes_repros_rorder3_20260223.log`
+   - tarball check:
+     - `/tmp/np_master_check_rorder3_20260223.log` (`Status: OK`)
