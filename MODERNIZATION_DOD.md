@@ -217,6 +217,26 @@ Completed in `np-npRmpi`:
    - fresh-install smoke:
      - `/tmp/nprmpi_regdens_rorder_smoke_20260223.out` (`NPRMPI_REGDENS_RORDER_SMOKE_OK`)
    - issue-note verified repro sweep:
-     - `/tmp/nprmpi_issue_notes_repros_rorder3_20260223.log`
+   - `/tmp/nprmpi_issue_notes_repros_rorder3_20260223.log`
    - tarball check:
      - `/tmp/nprmpi_check_rorder3_20260223.log` (`Status: OK`)
+
+## Autodispatch Formula-Default `gdat` Routing Fix (2026-02-23)
+Completed in `np-npRmpi`:
+1. Fixed autodispatch target-argument materialization to include default-interface `gdat` (in addition to formula `gdata`), preventing unresolved symbols in worker-evaluated default calls.
+2. Kept formal-first argument forcing in materialization path to preserve forwarded-call stability for nested dispatch (`..1`/promise cases).
+3. Scope:
+   - `R/np.autodispatch.R`
+   - `tests/testthat/test-autodispatch-call-helpers.R`
+4. Commit:
+   - `np-npRmpi`: `356c09c`
+5. Validation:
+   - focused contracts:
+     - `/tmp/nprmpi_formula_autod_helpers_post_gdatfix_20260223.log` (`PASS 40, FAIL 0`)
+   - issue-note verified repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_nonstop_20260223.log` (all verified repros passed)
+   - user session-mode smoke (`npRmpi.init` + `npcdens`):
+     - `/tmp/nprmpi_user_session_smoke_20260223.out` (`SESSION_SMOKE_OK`)
+   - tarball build/check:
+     - `/tmp/nprmpi_build_gdatfix_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_gdatfix_en0_20260223.log` (`CHECK_RC:0`, `--as-cran`, `FI_*_IFACE=en0`)
