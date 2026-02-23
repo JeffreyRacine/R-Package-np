@@ -40,7 +40,7 @@ npudistbw.formula <-
     
     mf[[1]] <- as.name("model.frame")
     mf.args <- as.list(mf[-1L])
-    mf <- do.call("model.frame", mf.args, envir = parent.frame())
+    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
 
     if (attr(attr(mf, "terms"), "response") != 0)
       stop("invalid distribution formula")
@@ -55,7 +55,7 @@ npudistbw.formula <-
       gmf[[1]] <- as.name("model.frame")
       names(gmf)[3] <- "data"
       gmf.args <- as.list(gmf[-1L])
-      gmf <- do.call("model.frame", gmf.args, envir = parent.frame())
+      gmf <- do.call(stats::model.frame, gmf.args, envir = parent.frame())
 
       gdat <- gmf[, attr(attr(gmf, "terms"),"term.labels"), drop = FALSE]
 

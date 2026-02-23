@@ -66,7 +66,7 @@ npcdistbw.formula <-
     }
     
     mf.args <- as.list(mf[-1L])
-    mf <- do.call("model.frame", mf.args, envir = parent.frame())
+    mf <- do.call(stats::model.frame, mf.args, envir = parent.frame())
     
     ydat <- mf[, variableNames[[1]], drop = FALSE]
     xdat <- mf[, variableNames[[2]], drop = FALSE]
@@ -74,7 +74,7 @@ npcdistbw.formula <-
     if (has.gval) {
       gmf.args <- as.list(gmf[-1L])
       names(gmf.args)[names(gmf.args) == "gdata"] <- "data"
-      gmf <- do.call("model.frame", gmf.args, envir = parent.frame())
+      gmf <- do.call(stats::model.frame, gmf.args, envir = parent.frame())
       gydat <- gmf[, variableNames[[1]], drop = FALSE]
     }
     

@@ -38,8 +38,8 @@ npplreg.formula <-
 
     mf.args <- as.list(tmf)[-1L]
     mf.xf.args <- as.list(tmf.xf)[-1L]
-    umf <- tmf <- do.call("model.frame", mf.args, envir = environment(tt))
-    tmf.xf <- do.call("model.frame", mf.xf.args, envir = environment(tt.xf))
+    umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+    tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt.xf))
     
     tydat <- model.response(tmf)
     txdat <- tmf.xf

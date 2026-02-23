@@ -71,14 +71,14 @@
       tmf.xf[[1]] <- tmf[[1]] <- as.name("model.frame")
       tmf[["formula"]] <- tt
       mf.args <- as.list(tmf)[-1L]
-      umf <- tmf <- do.call("model.frame", mf.args, envir = environment(tt))
+      umf <- tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
 
       bronze <- lapply(bws$chromoly, paste, collapse = " + ")
 
       tmf.xf[["formula"]] <- as.formula(paste(" ~ ", bronze[[2]]),
                                       env = environment(formula))
       mf.xf.args <- as.list(tmf.xf)[-1L]
-      tmf.xf <- do.call("model.frame", mf.xf.args, envir = environment(tt))
+      tmf.xf <- do.call(stats::model.frame, mf.xf.args, envir = environment(tt))
       
       ydat <- model.response(tmf)
       xdat <- tmf.xf

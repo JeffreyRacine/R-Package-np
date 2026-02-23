@@ -1542,7 +1542,7 @@ npBuildLpTerms <- function(degree, basis = c("glp", "additive", "tensor")) {
 
   degree <- as.integer(degree)
   degree.list <- lapply(degree, function(d) 0:d)
-  z <- as.matrix(do.call("expand.grid", degree.list))
+  z <- as.matrix(do.call(base::expand.grid, degree.list))
   s <- rowSums(z)
 
   if (identical(basis, "glp")) {
