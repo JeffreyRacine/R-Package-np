@@ -17,6 +17,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] String-based `do.call("<string>", ...)` retirement complete in active R-layer paths.
 - [x] High-risk `eval(parse(...))` absent; residual `eval(...)` centralized in shared helper with contracts.
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks.
+- [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`51e9232`).
 - [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
 - [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
