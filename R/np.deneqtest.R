@@ -26,14 +26,9 @@ npdeneqtest <- function(x = NULL,
 
   ## Save seed prior to setting
 
-  if(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
-    save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-    exists.seed <- TRUE
-  } else {
-    exists.seed <- FALSE
-  }
-
-  set.seed(random.seed)
+  seed.state <- .np_seed_enter(random.seed)
+  exists.seed <- seed.state$exists.seed
+  save.seed <- seed.state$save.seed
 
   ## First, define test statistic function. This will return the
   ## standardized and unstandardized test statistic along with its
