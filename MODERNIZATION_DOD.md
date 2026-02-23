@@ -455,3 +455,26 @@ Submitted from this environment:
    - log: `/tmp/winbuilder_submit_nprmpi_20260223.log`
 3. Status:
    - submissions accepted by win-builder; final pass/fail results pending email report (~15-30 minutes post submission).
+
+## Plot Engine Scalar-Branch Hygiene Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced high-confidence scalar `ifelse(...)` branches in plot engines with scalar `if` expressions.
+2. Scope:
+   - `R/np.plot.engine.condbandwidth.R`
+   - `R/np.plot.engine.conbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+3. Changes:
+   - `dsf = ifelse(gradients, bws$xndim, 1)` -> `dsf = if (gradients) bws$xndim else 1`
+   - `i = ifelse(plot.index <= bws$xndim, ...)` -> scalar `if` index branch.
+4. Commit:
+   - `np-npRmpi`: `75f3e84`
+5. Validation:
+   - parse gate: `PARSE_OK`
+   - focused tests:
+     - `/tmp/nprmpi_plot_scalar_ifelse_tests_20260223.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_plotscalar_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_plotscalar_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_plotscalar_20260223.log` (`Status: OK`)
