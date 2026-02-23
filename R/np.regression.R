@@ -114,6 +114,12 @@ npreg.rbandwidth <-
            residuals = FALSE,
            ...){
     fit.start <- proc.time()[3]
+    gradients <- as.logical(gradients)
+    residuals <- as.logical(residuals)
+    if (length(gradients) != 1L || is.na(gradients))
+      stop("'gradients' must be TRUE or FALSE")
+    if (length(residuals) != 1L || is.na(residuals))
+      stop("'residuals' must be TRUE or FALSE")
     .npRmpi_require_active_slave_pool(where = "npreg()")
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npreg()")
     if (.npRmpi_autodispatch_active())
