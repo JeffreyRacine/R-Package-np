@@ -410,3 +410,48 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_check_sigdoc_20260223.log` (`Status: OK`)
    - `--as-cran` refresh:
      - `/tmp/nprmpi_check_ascran_refresh_20260223.log` (`Status: 1 WARNING, 1 NOTE`; no codoc warning).
+
+## Core Estimator Performance Governance Checkpoint (2026-02-23)
+Completed in `np-npRmpi` (session mode, `nslaves=1`):
+1. Pre/post commit comparison on core estimators with identical scripts/args:
+   - pre: `3e4b0da`
+   - post: `6feca6d`
+2. Workload and policy:
+   - script: `/tmp/bench_core_nprmpi_lib_20260223.R`
+   - estimators: `npreg`, `npudens`, `npcdens`
+   - run mode: session (`npRmpi.init(nslaves=1, quiet=TRUE)`)
+   - `n=200`, `times=4`
+   - seed policy: fixed (`42`) and varying (`42 + i - 1`)
+3. Invocation:
+   - `Rscript /tmp/bench_core_nprmpi_lib_20260223.R <lib> <csv> <metrics.rds> 4 200`
+   - compare: `Rscript /tmp/bench_compare_prepost_20260223.R <pre_csv> <post_csv> <pre_rds> <post_rds> <summary_csv> <parity_txt>`
+4. Mean/median percent change summary:
+   - fixed:
+     - `npreg`: mean `-2.07%`, median `-3.87%`
+     - `npudens`: mean `-2.44%`, median `-6.20%`
+     - `npcdens`: mean `-4.49%`, median `-5.24%`
+   - varying:
+     - `npreg`: mean `+3.50%`, median `+2.78%`
+     - `npudens`: mean `+4.78%`, median `+0.81%`
+     - `npcdens`: mean `+4.36%`, median `+7.14%`
+5. Parity:
+   - fixed-seed metric parity max abs diff: `0`
+   - note: `npcdens_bw_mean` is non-finite (`NA`) in both runs; fitted-value parity remained exact.
+6. Artifacts:
+   - pre/post raw:
+     - `/tmp/bench_nprmpi_pre_full_20260223.csv`
+     - `/tmp/bench_nprmpi_post_full_20260223.csv`
+   - summary/parity:
+     - `/tmp/bench_nprmpi_full_summary_20260223.csv`
+     - `/tmp/bench_nprmpi_full_parity_20260223.txt`
+
+## Win-Builder Submission Checkpoint (2026-02-23)
+Submitted from this environment:
+1. `np-master` release check submitted via:
+   - `Rscript -e \"suppressPackageStartupMessages(library(devtools)); check_win_release('/Users/jracine/Development/np-master')\"`
+   - log: `/tmp/winbuilder_submit_np_20260223.log`
+2. `np-npRmpi` release check submitted via:
+   - `Rscript -e \"suppressPackageStartupMessages(library(devtools)); check_win_release('/Users/jracine/Development/np-npRmpi')\"`
+   - log: `/tmp/winbuilder_submit_nprmpi_20260223.log`
+3. Status:
+   - submissions accepted by win-builder; final pass/fail results pending email report (~15-30 minutes post submission).
