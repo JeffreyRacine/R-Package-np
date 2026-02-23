@@ -34,10 +34,12 @@ npscoef.formula <-
 
     tydat <- model.response(tmf)
     txdat <- tmf[, bws$chromoly[[2]], drop = FALSE]
-    if (!(miss.z <- !(length(bws$chromoly) == 3)))
+    miss.z <- !(length(bws$chromoly) == 3)
+    if (!miss.z)
       tzdat <- tmf[, bws$chromoly[[3]], drop = FALSE]
 
-    if ((has.eval <- !is.null(newdata))) {
+    has.eval <- !is.null(newdata)
+    if (has.eval) {
       if (!y.eval){
         tt <- delete.response(tt)
 
@@ -420,7 +422,8 @@ npscoef.scbandwidth <-
       }
     }
 
-    if (do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex)){
+    do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex)
+    if (do.iterate){
       resid <- tydat - sapply(1:enrow, function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
 
       i = 0

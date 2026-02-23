@@ -47,7 +47,8 @@ npudistbw.formula <-
     
     dat <- mf[, attr(attr(mf, "terms"),"term.labels"), drop = FALSE]
 
-    if ((has.gval <- !is.null(gdata))) {
+    has.gval <- !is.null(gdata)
+    if (has.gval) {
       gmf <- match.call(expand.dots = FALSE)
       gm <- match(c("formula", "gdata"), names(gmf), nomatch = 0)
       gmf <- gmf[c(1,gm)]
