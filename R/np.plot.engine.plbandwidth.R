@@ -173,7 +173,7 @@
 
     plot.errors = (plot.errors.method != "none")
 
-    if ((nxcon + nxord == 1) & (nzcon + nzord == 1) & (nxuno + nzuno == 0) &
+    if ((nxcon + nxord == 1) && (nzcon + nzord == 1) && (nxuno + nzuno == 0) &&
         perspective & !gradients & !any(xor(bws$xdati$iord, bws$xdati$inumord)) &
         !any(xor(bws$zdati$iord, bws$zdati$inumord))){
 
@@ -775,7 +775,7 @@
         }
       }
 
-      if (common.scale & (plot.behavior != "data")){
+      if (common.scale && (plot.behavior != "data")){
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
@@ -797,7 +797,7 @@
           }
         } else {
           jj = 1:(bws$xndim + bws$zndim)*3
-          if (plot.errors.center == "estimate" | !plot.errors) {
+          if (plot.errors.center == "estimate" || !plot.errors) {
             y.max = max(na.omit(as.double(data.eval)) +
               if (plot.errors) na.omit(as.double(data.err[,jj-1]))
               else 0)

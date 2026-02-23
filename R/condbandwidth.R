@@ -92,7 +92,7 @@ condbandwidth <-
     cykertype = "gaussian"
   }
 
-  if (cxkerorder != cykerorder & bwscaling)
+  if (cxkerorder != cykerorder && bwscaling)
     stop("scale factors with different order kernels for dependent and explanatory variables is unsupported")
   
   uxkertype = match.arg(uxkertype)

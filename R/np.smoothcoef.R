@@ -429,7 +429,7 @@ npscoef.scbandwidth <-
 
       n.part <- (ncol(txdat)+1)
 
-      while((max.err > tol) & ((i <- i + 1) <= maxiter)){
+      while((max.err > tol) && ((i <- i + 1) <= maxiter)){
         resid.old <- resid
         for(j in 1:n.part){
           ## estimate partial residuals

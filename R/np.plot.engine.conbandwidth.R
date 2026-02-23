@@ -101,7 +101,7 @@
 
     }
 
-    if (quantreg & dim(ydat)[2] != 1)
+    if (quantreg && dim(ydat)[2] != 1)
       stop("'ydat' must have one column for quantile regression")
     
     xq = double(bws$xndim)+xq
@@ -676,7 +676,7 @@
             }
           }
         
-          if (plot.behavior != "plot" & plot.errors) {
+          if (plot.behavior != "plot" && plot.errors) {
             err.name <- ifelse(gradients,
                                paste("gc", j, "err", sep = ""),
                                ifelse(quantreg, "quanterr", "conderr"))
@@ -869,7 +869,7 @@
               }
             }
               
-            if (plot.behavior != "plot" & plot.errors) {
+            if (plot.behavior != "plot" && plot.errors) {
               err.name <- ifelse(gradients,
                                  paste("gc", j, "err", sep = ""),
                                  ifelse(quantreg, "quanterr", "conderr"))
@@ -882,7 +882,7 @@
         }
       }
       
-      if (common.scale & (plot.behavior != "data")){
+      if (common.scale && (plot.behavior != "data")){
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
@@ -904,7 +904,7 @@
           }
         } else {
           jj = 1:(dsf*tot.dim)*3
-          if (plot.errors.center == "estimate" | !plot.errors) {
+          if (plot.errors.center == "estimate" || !plot.errors) {
             y.max = max(na.omit(as.double(data.eval)) +
               if (plot.errors) na.omit(as.double(data.err[,jj-1]))
               else 0)

@@ -446,9 +446,9 @@ npregivderiv <- function(y,
     ## right of where the initial inflection point occurs.
     j <- 1
     ## Climb the initial hill...
-    while(norm.stop[j+1] >= norm.stop[j] & j < length(norm.stop)) j <- j + 1
+    while(norm.stop[j+1] >= norm.stop[j] && j < length(norm.stop)) j <- j + 1
     ## Descend into the first valley
-    while(norm.stop[j+1] < norm.stop[j] & j < length(norm.stop)) j <- j + 1
+    while(norm.stop[j+1] < norm.stop[j] && j < length(norm.stop)) j <- j + 1
     ## When you start to climb again, stop, previous location was min
     phi <- phi.mat[,j-1]
     phi.prime <- phi.prime.mat[,j-1]
