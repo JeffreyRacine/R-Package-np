@@ -101,15 +101,13 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   gout.masked[,] <- NA_real_
   cont.idx <- which(x$bws$icon)
   if (length(cont.idx)) {
-    keep.cont <- (gorder == 1L) && (x$bws$degree >= 1L)
+    keep.cont <- (gorder <= x$bws$degree)
     if (any(keep.cont)) {
       keep.idx <- cont.idx[keep.cont]
       gout.masked[, keep.idx] <- gout[, keep.idx, drop = FALSE]
     }
     if (any(gorder > x$bws$degree))
       warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
-    if (any(gorder > 1L))
-      warning("higher-order glp derivatives are not yet available at C level; returning NA for requested orders > 1")
   }
   gout.masked
 }

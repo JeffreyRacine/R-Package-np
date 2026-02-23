@@ -288,7 +288,10 @@ npreg.rbandwidth <-
 
     ## put the unordered, ordered, and continuous data in their own objects
     ## data that is not a factor is continuous.
-    
+
+    txdat.hat <- txdat
+    exdat.hat <- if (no.ex) NULL else exdat
+
     txdat = toMatrix(txdat)
 
     tuno = txdat[, bws$iuno, drop = FALSE]
@@ -380,8 +383,7 @@ npreg.rbandwidth <-
     if (gradients){
       myout$g = matrix(data=myout$g, nrow = enrow, ncol = ncol, byrow = FALSE) 
       rorder = numeric(ncol)
-      ord_idx <- seq_len(ncol)
-      rorder[c(ord_idx[bws$icon], ord_idx[bws$iuno], ord_idx[bws$iord])] <- ord_idx
+      rorder[c((1:ncol)[bws$icon], (1:ncol)[bws$iuno], (1:ncol)[bws$iord])]=1:ncol
       myout$g = as.matrix(myout$g[,rorder])
 
       myout$gerr = matrix(data=myout$gerr, nrow = enrow, ncol = ncol, byrow = FALSE) 
@@ -395,16 +397,32 @@ npreg.rbandwidth <-
         cont.idx <- which(bws$icon)
 
         if (length(cont.idx)) {
-          keep.cont <- (glp.gradient.order == 1L) && (bws$degree >= 1L)
-          if (any(keep.cont)) {
-            keep.idx <- cont.idx[keep.cont]
+          keep.first <- (glp.gradient.order == 1L) && (bws$degree >= 1L)
+          if (any(keep.first)) {
+            keep.idx <- cont.idx[keep.first]
             myout$g[, keep.idx] <- raw.g[, keep.idx, drop = FALSE]
             myout$gerr[, keep.idx] <- raw.gerr[, keep.idx, drop = FALSE]
           }
+
+          need.hat <- (glp.gradient.order > 1L) && (glp.gradient.order <= bws$degree)
+          if (any(need.hat)) {
+            for (jj in which(need.hat)) {
+              s.vec <- integer(bws$ncon)
+              s.vec[jj] <- glp.gradient.order[jj]
+              myout$g[, cont.idx[jj]] <- as.vector(npreghat(
+                bws = bws,
+                txdat = txdat.hat,
+                exdat = if (no.ex) txdat.hat else exdat.hat,
+                y = tydat,
+                output = "apply",
+                s = s.vec
+              ))
+              myout$gerr[, cont.idx[jj]] <- NA_real_
+            }
+          }
+
           if (warn.glp.gradient && any(glp.gradient.order > bws$degree))
             warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
-          if (warn.glp.gradient && any(glp.gradient.order > 1L))
-            warning("higher-order glp derivatives are not yet available at C level; returning NA for requested orders > 1")
         }
       }
     }
