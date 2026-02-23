@@ -351,3 +351,24 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_check_unitest_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
 5. Note:
    - check warning count in this run reflects pre-existing non-target tree state (top-level/codoc drift), not this `np.unitest.R` change.
+
+## Unitest Loop/P-Value Scalar Hygiene Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced residual scalar bootstrap loop/index and indicator-mean pattern in `npunitest`.
+2. Scope:
+   - `R/np.unitest.R`
+3. Changes:
+   - `for(b in 1:boot.num)` -> `for (b in seq_len(boot.num))`
+   - `mean(ifelse(resampled.stat > test.stat, 1, 0))` -> `mean(resampled.stat > test.stat)`
+4. Commit:
+   - `np-npRmpi`: `6946033`
+5. Validation:
+   - parse:
+     - `/tmp/nprmpi_unitest2_parse_20260223.log` (`RC:0`)
+   - focused tests:
+     - `/tmp/nprmpi_unitest2_tests_20260223.log` (`PASS 9, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_unitest2_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_unitest2_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_unitest2_20260223.log` (`CHECK_RC:0`, `FI_*_IFACE=en0`)
