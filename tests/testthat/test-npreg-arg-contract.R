@@ -23,8 +23,8 @@ test_that("npreg rejects non-logical gradients and residuals under autodispatch"
 
 test_that("npreg.rbandwidth validates gradient flags before autodispatch branch", {
   fn.body <- paste(deparse(body(npreg.rbandwidth), width.cutoff = 500L), collapse = " ")
-  pos.grad <- regexpr("gradients <- as\\.logical\\(gradients\\)", fn.body)[1]
-  pos.resid <- regexpr("residuals <- as\\.logical\\(residuals\\)", fn.body)[1]
+  pos.grad <- regexpr("gradients <- npValidateScalarLogical\\(gradients, \"gradients\"\\)", fn.body)[1]
+  pos.resid <- regexpr("residuals <- npValidateScalarLogical\\(residuals, \"residuals\"\\)", fn.body)[1]
   pos.auto <- regexpr("if \\(\\.npRmpi_autodispatch_active\\(\\)\\)", fn.body)[1]
 
   expect_true(pos.grad > 0L && pos.resid > 0L && pos.auto > 0L)
