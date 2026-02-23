@@ -163,3 +163,21 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_user_npcdens_smoke_fix_20260223.out` (`NPRMPI_USER_NPCDENS_SMOKE_OK`)
    - tarball check:
      - `/tmp/nprmpi_check_autodtmpfix_20260223.log` (`Status: OK`)
+
+## Routing Regression Contract Lock (2026-02-23)
+Completed in `np-npRmpi`:
+1. Added explicit tests to prevent recurrence of large-argument autodispatch call-symbol regressions in `npudist(bws=...)`.
+2. Scope:
+   - `tests/testthat/test-autodispatch-call-helpers.R`
+3. Commit:
+   - `np-npRmpi`: `1ebe1c0`
+4. New contracts:
+   - structural contract that `.npRmpi_distributed_call_impl` rewrites return objects using `c(prepared$tmpvals, prepared$prepublish)`.
+   - runtime contract forcing prepublish path (`npRmpi.autodispatch.arg.broadcast.threshold = 1L`) and asserting:
+     - `.np_eval_bws_call_arg(bw, "dat")` resolves to a full data.frame,
+     - `npudist(bws = bw)` completes and yields fitted output length equal to training rows.
+5. Validation:
+   - `/tmp/nprmpi_test_autod_call_helpers_20260223d.log` (`TEST_RC:0`)
+   - `/tmp/nprmpi_test_autod_npudist_filter_20260223d.log` (`TEST_RC:0`)
+   - `/tmp/nprmpi_issue_notes_repros_autodtests_20260223.log`
+   - `/tmp/nprmpi_check_autodtests_20260223.log` (`Status: OK`)
