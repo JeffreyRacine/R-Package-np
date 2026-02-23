@@ -649,7 +649,7 @@
             do.call(plot.fun, plot.args)
 
             ## error plotting evaluation
-            if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+            if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
               if (plot.errors.type == "all") {
                 draw.all.error.types(
                   ex = as.numeric(na.omit(ei)),
@@ -843,7 +843,7 @@
               do.call(plot.fun, plot.args)
 
               ## error plotting evaluation
-              if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+              if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
                 if (plot.errors.type == "all") {
                   draw.all.error.types(
                     ex = as.numeric(na.omit(ei)),
@@ -965,7 +965,7 @@
             do.call(plot.fun, plot.args)
 
             ## error plotting evaluation
-            if (plot.errors && !(xi.factor & plot.bootstrap & plot.bxp)){
+            if (plot.errors && !(xi.factor && plot.bootstrap && plot.bxp)){
               if (plot.errors.type == "all") {
                 draw.all.error.types(
                   ex = as.numeric(na.omit(allei[,plot.index])),

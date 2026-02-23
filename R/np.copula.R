@@ -17,7 +17,7 @@ npcopula <- function(bws,
   if(!is.data.frame(data)) stop("Object `data' must be a data frame")
   if(missing(bws)) stop("You must provide a bandwidth object")
 #  if(class(bws)!="dbandwidth"&class(bws)!="bandwidth") stop("you must provide a density (npudensbw) or distribution (npudistbw) object")
-  if(!isa(bws,"dbandwidth") & !isa(bws,"bandwidth")) stop("you must provide a density (npudensbw) or distribution (npudistbw) object")  
+  if(!isa(bws,"dbandwidth") && !isa(bws,"bandwidth")) stop("you must provide a density (npudensbw) or distribution (npudistbw) object")  
   density <- FALSE
 #  if(!missing(bws)&&class(bws)=="bandwidth") density <- TRUE
   if(!missing(bws) && isa(bws,"bandwidth")) density <- TRUE

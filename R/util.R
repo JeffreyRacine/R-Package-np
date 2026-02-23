@@ -1018,7 +1018,7 @@ formatv <- function(v){
 
 genOmitStr <- function(x){
   t.str <- ''
-  if(!is.null(x$rows.omit) & !identical(x$rows.omit, NA))
+  if(!is.null(x$rows.omit) && !identical(x$rows.omit, NA))
     t.str <- paste("\nNo. Complete Observations: ", x$nobs,
                    "\nNo. Incomplete (NA) Observations: ", x$nobs.omit,
                    "\nObservations omitted or excluded: ", paste(x$rows.omit, collapse=" "),
