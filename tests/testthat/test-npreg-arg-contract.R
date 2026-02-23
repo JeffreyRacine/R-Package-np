@@ -17,8 +17,6 @@ test_that("npreg rejects non-logical gradients and residuals", {
 
 test_that("npreg.rbandwidth validates gradient flags as logical scalars", {
   fn.body <- paste(deparse(body(npreg.rbandwidth), width.cutoff = 500L), collapse = " ")
-  expect_match(fn.body, "gradients <- as\\.logical\\(gradients\\)")
-  expect_match(fn.body, "residuals <- as\\.logical\\(residuals\\)")
-  expect_match(fn.body, "if \\(length\\(gradients\\) != 1L \\|\\| is\\.na\\(gradients\\)\\)")
-  expect_match(fn.body, "if \\(length\\(residuals\\) != 1L \\|\\| is\\.na\\(residuals\\)\\)")
+  expect_match(fn.body, "gradients <- npValidateScalarLogical\\(gradients, \"gradients\"\\)")
+  expect_match(fn.body, "residuals <- npValidateScalarLogical\\(residuals, \"residuals\"\\)")
 })

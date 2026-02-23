@@ -119,12 +119,8 @@ npreg.rbandwidth <-
     npRejectLegacyLpArgs(names(dots), where = "npreg")
     warn.glp.gradient <- if (is.null(dots$warn.glp.gradient)) TRUE else isTRUE(dots$warn.glp.gradient)
 
-    gradients <- as.logical(gradients)
-    residuals <- as.logical(residuals)
-    if (length(gradients) != 1L || is.na(gradients))
-      stop("'gradients' must be TRUE or FALSE")
-    if (length(residuals) != 1L || is.na(residuals))
-      stop("'residuals' must be TRUE or FALSE")
+    gradients <- npValidateScalarLogical(gradients, "gradients")
+    residuals <- npValidateScalarLogical(residuals, "residuals")
 
     txdat = toFrame(txdat)
 
