@@ -132,28 +132,36 @@ npqreg.condbandwidth <-
     if (length(bws$ybw) != 1)
       stop("length of bandwidth vector does not match number of columns of 'tydat'")
 
-    if (any(bws$iyord) | any(bws$iyuno) | coarseclass(tydat[,1]) != "numeric")
+    if (any(bws$iyord) || any(bws$iyuno) || coarseclass(tydat[,1]) != "numeric")
       stop("'tydat' is not continuous")
-    
-    xccon = unlist(lapply(txdat[,bws$ixcon, drop = FALSE],class))
-    if ((any(bws$ixcon) && !all((xccon == "integer") | (xccon == "numeric"))) ||
-        (any(bws$ixord) && !all(sapply(txdat[,bws$ixord, drop = FALSE],inherits, "ordered"))) ||
-        (any(bws$ixuno) && !all(sapply(txdat[,bws$ixuno, drop = FALSE],inherits, "factor"))))
+
+    if ((any(bws$ixcon) &&
+         !all(vapply(txdat[, bws$ixcon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$ixord) &&
+         !all(vapply(txdat[, bws$ixord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+        (any(bws$ixuno) &&
+         !all(vapply(txdat[, bws$ixuno, drop = FALSE], inherits, logical(1), "factor"))))
       stop("supplied bandwidths do not match 'txdat' in type")
 
     ## catch and destroy NA's
-    goodrows = 1:dim(txdat)[1]
-    rows.omit = attr(na.omit(data.frame(txdat,tydat)), "na.action")
-    goodrows[rows.omit] = 0
+    keep.rows <- rep_len(TRUE, nrow(txdat))
+    rows.omit <- attr(na.omit(data.frame(txdat, tydat)), "na.action")
+    if (length(rows.omit) > 0L)
+      keep.rows[as.integer(rows.omit)] <- FALSE
 
-    if (all(goodrows==0))
+    if (!any(keep.rows))
       stop("Training data has no rows without NAs")
 
-    txdat = txdat[goodrows,,drop = FALSE]
-    tydat = tydat[goodrows,,drop = FALSE]
+    txdat <- txdat[keep.rows,,drop = FALSE]
+    tydat <- tydat[keep.rows,,drop = FALSE]
 
-    if (!no.ex)
-      exdat = na.omit(exdat)
+    if (!no.ex){
+      keep.eval <- rep_len(TRUE, nrow(exdat))
+      rows.omit <- attr(na.omit(exdat), "na.action")
+      if (length(rows.omit) > 0L)
+        keep.eval[as.integer(rows.omit)] <- FALSE
+      exdat <- exdat[keep.eval,,drop = FALSE]
+    }
     
     tnrow = dim(txdat)[1]
     enrow = (if (no.ex) tnrow else dim(exdat)[1])

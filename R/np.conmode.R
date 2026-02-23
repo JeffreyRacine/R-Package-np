@@ -96,31 +96,32 @@ npconmode.conbandwidth <-
       eydat = toFrame(eydat)
 
     ## catch and destroy NA's
-    goodrows = 1:dim(txdat)[1]
-    rows.omit = attr(na.omit(data.frame(txdat,tydat)), "na.action")
-    goodrows[rows.omit] = 0
+    keep.rows <- rep_len(TRUE, nrow(txdat))
+    rows.omit <- attr(na.omit(data.frame(txdat, tydat)), "na.action")
+    if (length(rows.omit) > 0L)
+      keep.rows[as.integer(rows.omit)] <- FALSE
 
-    if (all(goodrows==0))
+    if (!any(keep.rows))
       stop("Tranining data has no rows without NAs")
 
-    txdat = txdat[goodrows,,drop = FALSE]
-    tydat = tydat[goodrows,,drop = FALSE]
+    txdat <- txdat[keep.rows,,drop = FALSE]
+    tydat <- tydat[keep.rows,,drop = FALSE]
 
     if (!no.ex){
-      goodrows = 1:dim(exdat)[1]
+      keep.eval <- rep_len(TRUE, nrow(exdat))
       eval.df <- data.frame(exdat)
       if (!no.ey)
         eval.df <- data.frame(eval.df, eydat)
       rows.omit <- attr(na.omit(eval.df), "na.action")
+      if (length(rows.omit) > 0L)
+        keep.eval[as.integer(rows.omit)] <- FALSE
 
-      goodrows[rows.omit] = 0
-
-      exdat = exdat[goodrows,,drop = FALSE]
+      exdat <- exdat[keep.eval,,drop = FALSE]
 
       if (!no.ey)
-        eydat = eydat[goodrows,,drop = FALSE]
+        eydat <- eydat[keep.eval,,drop = FALSE]
 
-      if (all(goodrows==0))
+      if (!any(keep.eval))
         stop("Evaluation data has no rows without NAs")
     }
 
