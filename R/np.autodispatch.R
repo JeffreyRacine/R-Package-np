@@ -66,7 +66,7 @@
             mode = "function",
             inherits = FALSE)
   call <- as.call(list(fn, as.name(name)))
-  eval(call, envir = caller_env)
+  .npRmpi_eval_scmd(call, envir = caller_env)
 }
 
 .npRmpi_autodispatch_next_remote_name <- function() {
@@ -117,7 +117,7 @@
       mc.eval[[1L]] <- get(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
     }
   }
-  eval(mc.eval, envir = caller_env)
+  .npRmpi_eval_scmd(mc.eval, envir = caller_env)
 }
 
 .npRmpi_autodispatch_called_from_bcast <- function() {
@@ -211,7 +211,7 @@
 }
 
 .npRmpi_autodispatch_eval_arg <- function(expr, caller_env) {
-  val <- tryCatch(eval(expr, envir = caller_env), error = function(e) e)
+  val <- tryCatch(.npRmpi_eval_scmd(expr, envir = caller_env), error = function(e) e)
   if (!inherits(val, "error"))
     return(val)
 
@@ -220,7 +220,7 @@
     env_i <- frames[[i]]
     if (identical(env_i, caller_env))
       next
-    val_i <- tryCatch(eval(expr, envir = env_i), error = function(e) e)
+    val_i <- tryCatch(.npRmpi_eval_scmd(expr, envir = env_i), error = function(e) e)
     if (!inherits(val_i, "error"))
       return(val_i)
   }
