@@ -125,6 +125,41 @@ test_that("session npreg factor example completes with quiet=FALSE", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session core density/distribution family smoke completes", {
+  skip_on_cran()
+  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
+  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
+
+  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "set.seed(7)",
+      "n <- 140",
+      "x <- rnorm(n)",
+      "y <- rnorm(n)",
+      "xd <- data.frame(x = x)",
+      "yd <- data.frame(y = y)",
+      "bw_ud <- npudensbw(dat = xd, bws = 0.4, bandwidth.compute = FALSE)",
+      "fit_ud <- npudens(tdat = xd, bws = bw_ud)",
+      "bw_uf <- npudistbw(dat = xd, bws = 0.4, bandwidth.compute = FALSE)",
+      "fit_uf <- npudist(tdat = xd, bws = bw_uf)",
+      "bw_cf <- npcdistbw(xdat = xd, ydat = yd, bws = c(0.4, 0.4), bandwidth.compute = FALSE)",
+      "fit_cf <- npcdist(txdat = xd, tydat = yd, bws = bw_cf)",
+      "stopifnot(inherits(fit_ud, 'npdensity'), inherits(fit_uf, 'npdistribution'), inherits(fit_cf, 'condistribution'))",
+      "cat('SESSION_DENS_DIST_CORE_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_DENS_DIST_CORE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("skip-init mode fails fast without MPI pool crash", {
   skip_on_cran()
   pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
