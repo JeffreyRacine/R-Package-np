@@ -20,6 +20,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks.
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`51e9232`).
 - [x] Verified issue-note repro harness includes `npreg` factor-dispatch guard (`4802530`).
+- [x] Native bridge stress harness added and passing for touched `.Call` surfaces (`issue_notes/native_bridge_stress.R`).
 - [x] `--as-cran` reports no code/documentation mismatches (`/tmp/np_master_check_ascran_postloadhook_20260223.log`).
 - [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
@@ -38,9 +39,9 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 
 ### 3) Native Interface Safety
 - [x] `.C` callsites in R layer are `0`.
-- [ ] `.Call` interface paths have stress tests for touched entry points.
-- [ ] PROTECT/UNPROTECT accounting validated in modified C entry points.
-- [ ] No new stack-imbalance warnings in targeted stress runs.
+- [x] `.Call` interface paths have stress tests for touched entry points.
+- [x] PROTECT/UNPROTECT accounting validated in modified C entry points.
+- [x] No new stack-imbalance warnings in targeted stress runs.
 
 ### 4) Performance Governance
 - [ ] Every performance patch includes pre/post comparison with identical script/args.
