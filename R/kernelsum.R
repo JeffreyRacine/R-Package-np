@@ -32,10 +32,9 @@ npkernelsum =
   }
 
 print.npkernelsum <- function(x, digits=NULL, ...){
+  eval.points <- if (x$trainiseval) "" else paste0(" and ", x$nobs, " evaluation points,")
   cat("\nKernel Sum data: ", x$ntrain, " training points,",
-      ifelse(x$trainiseval, "", " and "),
-      ifelse(x$trainiseval, "", x$nobs),
-      ifelse(x$trainiseval, ""," evaluation points,"),
+      eval.points,
       " in ",x$ndim," variable(s)\n",sep="")
 
   print(matrix(x$bw,ncol=x$ndim,dimnames=list(paste(x$pscaling,":",sep=""),x$data.names)))
@@ -64,4 +63,3 @@ print.npkernelsum <- function(x, digits=NULL, ...){
     print(...,digits=digits)
   invisible(x)
 }
-
