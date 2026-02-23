@@ -19,6 +19,7 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] Assignment-inside-`if` control flow retired in active R-layer codepaths (including `npregiv`).
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks.
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`51e9232`).
+- [x] Verified issue-note repro harness includes `npreg` factor-dispatch guard (`4802530`).
 - [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
 - [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
