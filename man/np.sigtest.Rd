@@ -35,7 +35,7 @@ npsigtest(bws, \dots)
           boot.type = c("I","II"),
           pivot=TRUE,
           joint=FALSE,
-          index = seq(1,ncol(xdat)),
+          index = seq_len(ncol(xdat)),
           random.seed = 42,
           \dots)
 
