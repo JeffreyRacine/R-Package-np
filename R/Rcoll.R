@@ -180,8 +180,12 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 			if (i != rank)
 				invisible(mpi.send(x=scmd.arg, type=4, dest=i, tag=50000+i, comm=comm))
 			}
-      if (caller.execute) 
-       eval(tcmd, envir = parent.frame())
+      if (caller.execute) {
+       if (length(arg) > 0)
+         do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = parent.frame())
+       else
+         eval(tcmd, envir = parent.frame())
+      }
   
     } 
     else {
