@@ -16,6 +16,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Active `<<-` retirement complete in R layer (`0`).
 - [x] String-based `do.call("<string>", ...)` retirement complete in active R-layer paths.
 - [x] High-risk `eval(parse(...))` absent; residual `eval(...)` centralized in shared helper with contracts.
+- [x] Assignment-inside-`if` control flow retired in active R-layer codepaths (including `npregiv`).
 - [x] Session-mode regression (`npRmpi.init(nslaves=1)` startup hang path) fixed in spawn-report route (`7b5ba36`).
 - [x] Session API scalar controls validated early (`npRmpi.init/quit`) to fail before MPI internals on invalid inputs (`3cf92e7`).
 - [x] Subprocess timeout routing contracts added for session smoke and skip-init fast-fail (`e6581f3`).
