@@ -111,16 +111,20 @@ npcdens.conbandwidth <- function(bws,
   if (length(bws$ybw) != length(tydat))
     stop("length of bandwidth vector does not match number of columns of 'tydat'")
 
-  xccon = unlist(lapply(txdat[,bws$ixcon, drop = FALSE],class))
-  if ((any(bws$ixcon) && !all((xccon == "integer") | (xccon == "numeric"))) ||
-      (any(bws$ixord) && !all(sapply(txdat[,bws$ixord, drop = FALSE],inherits, "ordered"))) ||
-      (any(bws$ixuno) && !all(sapply(txdat[,bws$ixuno, drop = FALSE],inherits, "factor"))))
+  if ((any(bws$ixcon) &&
+       !all(vapply(txdat[, bws$ixcon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+      (any(bws$ixord) &&
+       !all(vapply(txdat[, bws$ixord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+      (any(bws$ixuno) &&
+       !all(vapply(txdat[, bws$ixuno, drop = FALSE], inherits, logical(1), "factor"))))
     stop("supplied bandwidths do not match 'txdat' in type")
 
-  yccon = unlist(lapply(tydat[,bws$iycon, drop = FALSE],class))
-  if ((any(bws$iycon) && !all((yccon == "integer") | (yccon == "numeric"))) ||
-      (any(bws$iyord) && !all(sapply(tydat[,bws$iyord, drop = FALSE],inherits, "ordered"))) ||
-      (any(bws$iyuno) && !all(sapply(tydat[,bws$iyuno, drop = FALSE],inherits, "factor"))))
+  if ((any(bws$iycon) &&
+       !all(vapply(tydat[, bws$iycon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+      (any(bws$iyord) &&
+       !all(vapply(tydat[, bws$iyord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+      (any(bws$iyuno) &&
+       !all(vapply(tydat[, bws$iyuno, drop = FALSE], inherits, logical(1), "factor"))))
     stop("supplied bandwidths do not match 'tydat' in type")
   
   ## catch and destroy NA's

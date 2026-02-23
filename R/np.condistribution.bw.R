@@ -147,16 +147,20 @@ npcdistbw.condbandwidth <-
     if (dim(ydat)[1] != dim(xdat)[1])
       stop(paste("number of rows of", "'ydat'", "does not match", "'xdat'"))
 
-    yccon = unlist(lapply(as.data.frame(ydat[,bws$iycon]),class))
-    if ((any(bws$iycon) && !all((yccon == "integer") | (yccon == "numeric"))) ||
-        (any(bws$iyord) && !all(sapply(as.data.frame(ydat[,bws$iyord]),inherits, "ordered"))) ||
-        (any(bws$iyuno) && !all(sapply(as.data.frame(ydat[,bws$iyuno]),inherits, "factor"))))
+    if ((any(bws$iycon) &&
+         !all(vapply(as.data.frame(ydat[, bws$iycon]), inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$iyord) &&
+         !all(vapply(as.data.frame(ydat[, bws$iyord]), inherits, logical(1), "ordered"))) ||
+        (any(bws$iyuno) &&
+         !all(vapply(as.data.frame(ydat[, bws$iyuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'ydat'", "in type"))
 
-    xccon = unlist(lapply(as.data.frame(xdat[,bws$ixcon]),class))
-    if ((any(bws$ixcon) && !all((xccon == "integer") | (xccon == "numeric"))) ||
-        (any(bws$ixord) && !all(sapply(as.data.frame(xdat[,bws$ixord]),inherits, "ordered"))) ||
-        (any(bws$ixuno) && !all(sapply(as.data.frame(xdat[,bws$ixuno]),inherits, "factor"))))
+    if ((any(bws$ixcon) &&
+         !all(vapply(as.data.frame(xdat[, bws$ixcon]), inherits, logical(1), c("integer", "numeric")))) ||
+        (any(bws$ixord) &&
+         !all(vapply(as.data.frame(xdat[, bws$ixord]), inherits, logical(1), "ordered"))) ||
+        (any(bws$ixuno) &&
+         !all(vapply(as.data.frame(xdat[, bws$ixuno]), inherits, logical(1), "factor"))))
       stop(paste("supplied bandwidths do not match", "'xdat'", "in type"))
 
     ##if (bws$type != 'fixed')
