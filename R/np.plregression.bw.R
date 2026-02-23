@@ -160,6 +160,7 @@ npplregbw.plbandwidth =
     if (missing(nmulti)){
       nmulti <- min(5,dim(zdat)[2])
     }
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
     
     xdat = toFrame(xdat)
     zdat = toFrame(zdat)
@@ -233,6 +234,7 @@ npplregbw.default =
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
 
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
@@ -268,6 +270,12 @@ npplregbw.default =
 
 
     if (bandwidth.compute) {
+      if (!missing(nmulti)) nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+      if (!missing(remin)) remin <- npValidateScalarLogical(remin, "remin")
+      if (!missing(itmax)) itmax <- npValidatePositiveInteger(itmax, "itmax")
+      if (!missing(ftol)) ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
+      if (!missing(tol)) tol <- npValidatePositiveFiniteNumeric(tol, "tol")
+      if (!missing(small)) small <- npValidatePositiveFiniteNumeric(small, "small")
       opt.args <- list(xdat = xdat, ydat = ydat, zdat = zdat, bws = tbw)
       if (!missing(nmulti)) opt.args$nmulti <- nmulti
       if (!missing(remin)) opt.args$remin <- remin
