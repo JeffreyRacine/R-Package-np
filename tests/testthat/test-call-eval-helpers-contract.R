@@ -19,3 +19,11 @@ test_that(".np_eval_bws_call_arg preserves bws fallback for missing symbols", {
   bws <- list(call = call_obj, txdat = 1:4)
   expect_identical(.np_eval_bws_call_arg(bws, "txdat"), 1:4)
 })
+
+test_that("explodePipe resolves formula symbols from provided env", {
+  env <- new.env(parent = baseenv())
+  env$fml <- y ~ x | z
+
+  expect_identical(explodePipe(quote(fml), env = env),
+                   explodePipe(env$fml, env = env))
+})
