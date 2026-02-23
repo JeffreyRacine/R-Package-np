@@ -1,5 +1,11 @@
 # Bounded Continuous Kernel Rollout TODO (`np-master`)
 
+## CRAN Example Policy
+
+- `npRmpi` is submitted to CRAN with heavy examples in `\dontrun{}`.
+- Do not treat full `\dontrun{}` example execution as a release gate.
+- Run those examples only when explicitly validating behavior after code changes.
+
 ## Done (R-side plumbing/checks)
 
 - Added continuous bound args to constructors and persisted into bw objects:
@@ -29,7 +35,7 @@
 - Pass resolved bounds from R into C entry points that evaluate kernels directly:
   - `np_kernelsum`, `np_regression`, `np_density`, `np_density_conditional`
   - BW-selection entry points as needed for CV consistency.
-- Update `src/np_init.c` registrations/signatures and all `.C(...)` call sites.
+- Update `src/np_init.c` registrations/signatures and all `.Call(...)` call sites.
 
 3. Convolution/CV behavior
 - Confirm convolution-dependent objectives (`cv.ls` paths) under finite bounds.

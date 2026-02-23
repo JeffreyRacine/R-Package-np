@@ -50,6 +50,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
   - high-performance manual broadcast mode.
 - [ ] Demos include working minimal scripts for serial, attach, and profile/manual broadcast paths.
 - [ ] Examples are runnable/minimal; heavy workflows in `\dontrun{}`.
+- [ ] CRAN gate assumes `\dontrun{}` policy; full `\dontrun{}` execution is optional and used only for intentional behavior validation.
 
 ### 7) Check and Packaging Hygiene
 - [ ] Tarball-first validation is cleanly run:
