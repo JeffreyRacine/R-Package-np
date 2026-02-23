@@ -179,13 +179,13 @@
 
 .npRmpi_autodispatch_target_args <- function() {
   c("formula", "data", "bws",
-    "dat", "tdat", "edat",
-    "xdat", "ydat", "zdat", "txdat", "tydat", "tzdat",
-    "exdat", "eydat", "ezdat", "newdata",
-    "gydat", "wdat", "gdata",
-    "data.x", "data.y", "model",
-    "y", "z", "w", "x", "zeval", "weval", "xeval", "bw",
-    "gradients", "residuals", "errors", "gradient.order")
+     "dat", "tdat", "edat",
+     "xdat", "ydat", "zdat", "txdat", "tydat", "tzdat",
+     "exdat", "eydat", "ezdat", "newdata",
+     "gydat", "gdat", "wdat", "gdata",
+     "data.x", "data.y", "model",
+     "y", "z", "w", "x", "zeval", "weval", "xeval", "bw",
+     "gradients", "residuals", "errors", "gradient.order")
 }
 
 .npRmpi_autodispatch_failfast_formula_data <- function(mc, caller_env) {
@@ -275,7 +275,14 @@
     if (is.null(nm) || identical(nm, "")) next
     if (!nm %in% targets) next
 
-    val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
+    # Prefer forcing already-bound formal arguments in the caller frame.
+    # This avoids unresolved placeholders such as `..1` from match.call()
+    # when methods forward `...` through nested generic/method dispatch.
+    not_found <- new.env(parent = emptyenv())
+    val <- tryCatch(get0(nm, envir = caller_env, inherits = FALSE, ifnotfound = not_found),
+                    error = function(e) not_found)
+    if (identical(val, not_found))
+      val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
     ref <- .npRmpi_autodispatch_remote_ref(val)
     # `bws` objects can be post-processed locally (e.g. formula methods
     # rewriting call/formula metadata). Reusing a stale remote reference can
@@ -525,6 +532,7 @@
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
+  caller_env <- parent.frame()
   if (!.npRmpi_autodispatch_active())
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
@@ -534,6 +542,7 @@
 .npRmpi_manual_distributed_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
+  caller_env <- parent.frame()
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE)
 }
 

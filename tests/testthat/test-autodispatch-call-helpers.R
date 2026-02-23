@@ -9,6 +9,7 @@
 .npRmpi_bootstrap_compute_payload <- getFromNamespace(".npRmpi_bootstrap_compute_payload", "npRmpi")
 .npRmpi_rm_existing <- getFromNamespace(".npRmpi_rm_existing", "npRmpi")
 .np_eval_bws_call_arg <- getFromNamespace(".np_eval_bws_call_arg", "npRmpi")
+.npRmpi_autodispatch_target_args <- getFromNamespace(".npRmpi_autodispatch_target_args", "npRmpi")
 
 test_that(".npRmpi_bcast_cmd_expr forwards command expression structurally", {
   env <- new.env(parent = environment())
@@ -76,6 +77,13 @@ test_that("autodispatch return rewriting covers prepublished temporary arguments
   expect_match(impl.body, "tmpreplace <- c\\(prepared\\$tmpvals, prepared\\$prepublish\\)")
   expect_match(impl.body, "\\.npRmpi_autodispatch_replace_tmp_calls\\(result, tmpvals = tmpreplace\\)")
   expect_match(impl.body, "\\.npRmpi_autodispatch_replace_tmps\\(result, tmpvals = tmpreplace\\)")
+})
+
+test_that("autodispatch target argument set covers gdat alias", {
+  args <- .npRmpi_autodispatch_target_args()
+  expect_true(is.character(args))
+  expect_true("gdata" %in% args)
+  expect_true("gdat" %in% args)
 })
 
 test_that("npudist(bws=...) resolves large autodispatch temporary call arguments", {
