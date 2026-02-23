@@ -276,21 +276,23 @@ npscoefbw.scbandwidth <-
 
             nc <- ncol(tww[-1,-1,1])
 
-            ridger <- function(i) {
-              doridge[i] <<- FALSE
-              ridge.val <- ridge[i]*tww[-1,1,i][1]/NZD(tww[-1,-1,i][1,1])
-              W[i,, drop = FALSE] %*% tryCatch(solve(tww[-1,-1,i]+diag(rep(ridge[i],nc)),
-                      tww[-1,1,i]+c(ridge.val,rep(0,nc-1))),
-                      error = function(e){
-                        ridge[i] <<- ridge[i]+epsilon
-                        doridge[i] <<- TRUE
-                        return(rep(maxPenalty,nc))
-                      })
-            }
-
             while(any(doridge)){
               iloo <- (1:n)[doridge]
-              mean.loo[iloo] <- sapply(iloo, ridger)
+              for (ii in iloo) {
+                doridge[ii] <- FALSE
+                ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
+                beta.ii <- tryCatch(
+                  solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
+                        tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
+                  error = function(e) e
+                )
+                if (inherits(beta.ii, "error")) {
+                  ridge[ii] <- ridge[ii] + epsilon
+                  doridge[ii] <- TRUE
+                  beta.ii <- rep(maxPenalty, nc)
+                }
+                mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
+              }
             }
 
             cv.console <<- printClear(cv.console)

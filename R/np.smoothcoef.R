@@ -375,21 +375,23 @@ npscoef.scbandwidth <-
 
     nc <- ncol(tww[,,1])
 
-    ridger <- function(i) {
-      doridge[i] <<- FALSE
-      ridge.val <- ridge[i]*tyw[,i][1]/NZD(tww[,,i][1,1])
-      tryCatch(solve(tww[,,i]+diag(rep(ridge[i],nc)),
-                     tyw[,i]+c(ridge.val,rep(0,nc-1))),
-               error = function(e){
-                 ridge[i] <<- ridge[i]+epsilon
-                 doridge[i] <<- TRUE
-                 return(rep(maxPenalty,nc))
-               })
-    }
-
     while(any(doridge)){
       iloo <- (1:enrow)[doridge]
-      coef.mat[,iloo] <- sapply(iloo, ridger)
+      for (ii in iloo) {
+        doridge[ii] <- FALSE
+        ridge.val <- ridge[ii]*tyw[,ii][1]/NZD(tww[,,ii][1,1])
+        coef.ii <- tryCatch(
+          solve(tww[,,ii] + diag(rep(ridge[ii], nc)),
+                tyw[,ii] + c(ridge.val, rep(0, nc - 1))),
+          error = function(e) e
+        )
+        if (inherits(coef.ii, "error")) {
+          ridge[ii] <- ridge[ii] + epsilon
+          doridge[ii] <- TRUE
+          coef.ii <- rep(maxPenalty, nc)
+        }
+        coef.mat[,ii] <- coef.ii
+      }
     }
 
     if (do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex)){
@@ -464,21 +466,23 @@ npscoef.scbandwidth <-
 
       nc <- ncol(tm[,,1])
 
-      ridger <- function(i) {
-        doridge[i] <<- FALSE
-        ridge.val <- ridge.tm[i]*tyw[,i][1]/NZD(tm[,,i][1,1])
-        W.train[i,, drop = FALSE] %*% tryCatch(solve(tm[,,i]+diag(rep(ridge.tm[i],nc)),
-                      tyw[,i]+c(ridge.val,rep(0,nc-1))),
-                      error = function(e){
-                        ridge.tm[i] <<- ridge.tm[i]+epsilon
-                        doridge[i] <<- TRUE
-                        return(rep(maxPenalty,nc))
-                      })
-      }
-
       while(any(doridge)){
         ii <- (1:nrow(txdat))[doridge]
-        mean.fit[ii] <- sapply(ii, ridger)
+        for (jj in ii) {
+          doridge[jj] <- FALSE
+          ridge.val <- ridge.tm[jj]*tyw[,jj][1]/NZD(tm[,,jj][1,1])
+          beta.jj <- tryCatch(
+            solve(tm[,,jj] + diag(rep(ridge.tm[jj], nc)),
+                  tyw[,jj] + c(ridge.val, rep(0, nc - 1))),
+            error = function(e) e
+          )
+          if (inherits(beta.jj, "error")) {
+            ridge.tm[jj] <- ridge.tm[jj] + epsilon
+            doridge[jj] <- TRUE
+            beta.jj <- rep(maxPenalty, nc)
+          }
+          mean.fit[jj] <- W.train[jj,, drop = FALSE] %*% beta.jj
+        }
       }
 
       u2.W <- (resid <- tydat - mean.fit)^2
