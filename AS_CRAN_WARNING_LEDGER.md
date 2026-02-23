@@ -1,8 +1,8 @@
 # `R CMD check --as-cran` Warning/Note Ledger (`np-master`)
 
-Last refresh: 2026-02-23 (post assignment-control refactors)  
+Last refresh: 2026-02-23 (post load-hook/routing checkpoint)  
 Tarball: `np_0.70-0.tar.gz`  
-Check log: `/tmp/np_master_check_ascran_refresh3_20260223.log`
+Check log: `/tmp/np_master_check_ascran_postloadhook_20260223.log`
 
 ## Current Status
 - `Status: 2 WARNINGs, 1 NOTE`

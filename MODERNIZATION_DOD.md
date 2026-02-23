@@ -20,24 +20,24 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] Core modernization checkpoints validated with targeted contract tests + tarball checks.
 - [x] Core bandwidth constructor scalar branches (`ifelse` -> scalar `if`) aligned in `dbandwidth/rbandwidth/conbandwidth/condbandwidth/smoothbandwidth/sibandwidth` plus `npcopula` and `gsl_bspline` helper guards (`51e9232`).
 - [x] Verified issue-note repro harness includes `npreg` factor-dispatch guard (`4802530`).
-- [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
+- [x] `--as-cran` reports no code/documentation mismatches (`/tmp/np_master_check_ascran_postloadhook_20260223.log`).
 - [ ] Full `--as-cran` warning/note closure still required (accepted-warning ledger now tracked in `AS_CRAN_WARNING_LEDGER.md`).
 - [ ] Win-builder validation still required before release candidate.
 
 ## Mandatory Release Gates
 
 ### 1) Interface and Semantics
-- [ ] Public APIs for core estimators are stable (signature + return-structure contracts).
-- [ ] Formula/default method pairs have parity tests (including `subset`/`na.action` behavior).
-- [ ] S3 docs and method signatures match exactly (no codoc mismatches).
+- [x] Public APIs for core estimators are stable (signature + return-structure contracts).
+- [x] Formula/default method pairs have parity tests (including `subset`/`na.action` behavior).
+- [x] S3 docs and method signatures match exactly (no codoc mismatches).
 
 ### 2) Evaluation and Call Construction
-- [ ] No `eval(parse(...))` in R layer.
+- [x] No `eval(parse(...))` in R layer.
 - [ ] High-risk `eval(...)` call construction paths are replaced with structured calls (`do.call`, explicit call objects) where appropriate.
 - [ ] Any remaining `eval(...)` has a documented reason and a regression test.
 
 ### 3) Native Interface Safety
-- [ ] `.C` callsites in R layer are `0`.
+- [x] `.C` callsites in R layer are `0`.
 - [ ] `.Call` interface paths have stress tests for touched entry points.
 - [ ] PROTECT/UNPROTECT accounting validated in modified C entry points.
 - [ ] No new stack-imbalance warnings in targeted stress runs.
@@ -56,12 +56,12 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [ ] Any user-facing mode changes have migration notes in NEWS/CHANGELOG.
 
 ### 6) Check and Packaging Hygiene
-- [ ] Tarball-first validation is cleanly run:
+- [x] Tarball-first validation is cleanly run:
   - `R CMD build np-master`
   - `R CMD check --as-cran np_<ver>.tar.gz`
-- [ ] Issue-note regression sweep is run periodically and after core modernization touches:
+- [x] Issue-note regression sweep is run periodically and after core modernization touches:
   - `./issue_notes/run_verified_issue_repros.sh`
-- [ ] New warnings/notes are treated as regressions unless explicitly accepted and documented.
+- [x] New warnings/notes are treated as regressions unless explicitly accepted and documented.
 - [ ] Windows validation completed via win-builder prior to release candidate.
 
 ## Required Benchmark/Validation Record per Checkpoint
