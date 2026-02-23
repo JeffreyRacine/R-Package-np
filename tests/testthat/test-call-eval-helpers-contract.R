@@ -37,6 +37,21 @@ test_that("call arg helpers preserve explicit NULL symbol values", {
   expect_null(.np_eval_bws_call_arg(bws, "txdat"))
 })
 
+test_that(".np_eval_call_arg prefers explicit caller_env over ambient stack frames", {
+  call_obj <- as.call(list(as.name("f"), x = as.name("x")))
+  eval_env <- new.env(parent = emptyenv())
+  environment(call_obj) <- eval_env
+
+  caller_env <- new.env(parent = emptyenv())
+  caller_env$x <- 22L
+
+  out <- local({
+    x <- 99L
+    .np_eval_call_arg(call_obj, "x", caller_env = caller_env)
+  })
+  expect_identical(out, 22L)
+})
+
 test_that("call arg helpers route evaluation through shared frame helper", {
   call.body <- paste(deparse(body(.np_eval_call_arg), width.cutoff = 500L), collapse = " ")
   bws.body <- paste(deparse(body(.np_eval_bws_call_arg), width.cutoff = 500L), collapse = " ")
