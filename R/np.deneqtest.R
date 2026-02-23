@@ -28,9 +28,9 @@ npdeneqtest <- function(x = NULL,
 
   if(exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)) {
     save.seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
-    exists.seed = TRUE
+    exists.seed <- TRUE
   } else {
-    exists.seed = FALSE
+    exists.seed <- FALSE
   }
 
   set.seed(random.seed)
