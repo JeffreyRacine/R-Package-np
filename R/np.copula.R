@@ -31,7 +31,7 @@ npcopula <- function(bws,
 
   if(bws$nuno>0) stop("unordered factors not suitable for copula estimation")
 
-  u.provided <- ifelse(is.null(u),FALSE,TRUE)
+  u.provided <- !is.null(u)
   
   ## Test for compatible quantile vector/matrix if provided
   if(!is.null(u)) {
