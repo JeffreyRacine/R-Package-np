@@ -289,15 +289,18 @@ npcdensbw.conbandwidth <-
     ## bandwidth metadata
     tbw$sfactor <- tbw$bandwidth <- list(x = tbw$xbw, y = tbw$ybw)
 
-    bwf <- function(i){
-      tbw$bandwidth[[i]][tl[[i]]] <<- (tbw$bandwidth[[i]])[tl[[i]]]*dfactor[[i]]
+    apply_bw_meta <- function(tl, dfactor){
+      for (nm in names(tl)) {
+        idx <- tl[[nm]]
+        if (length(idx) == 0L)
+          next
+        if (tbw$scaling) {
+          tbw$bandwidth[[nm]][idx] <- tbw$bandwidth[[nm]][idx] * dfactor[[nm]]
+        } else {
+          tbw$sfactor[[nm]][idx] <- tbw$sfactor[[nm]][idx] / dfactor[[nm]]
+        }
+      }
     }
-
-    sff <- function(i){
-      tbw$sfactor[[i]][tl[[i]]] <<- (tbw$sfactor[[i]])[tl[[i]]]/dfactor[[i]]
-    }
-
-    myf <- if(tbw$scaling) bwf else sff
     
     if ((tbw$xnuno+tbw$ynuno) > 0){
       dfactor <- ncatfac
@@ -305,7 +308,7 @@ npcdensbw.conbandwidth <-
 
       tl <- list(x = tbw$xdati$iuno, y = tbw$ydati$iuno)
 
-      lapply(1:length(tl), myf)
+      apply_bw_meta(tl = tl, dfactor = dfactor)
     }
 
     if ((tbw$xnord+tbw$ynord) > 0){
@@ -314,7 +317,7 @@ npcdensbw.conbandwidth <-
 
       tl <- list(x = tbw$xdati$iord, y = tbw$ydati$iord)
 
-      lapply(1:length(tl), myf)
+      apply_bw_meta(tl = tl, dfactor = dfactor)
     }
 
       
@@ -324,7 +327,7 @@ npcdensbw.conbandwidth <-
 
       tl <- list(x = tbw$xdati$icon, y = tbw$ydati$icon)
 
-      lapply(1:length(tl), myf)
+      apply_bw_meta(tl = tl, dfactor = dfactor)
     }
   
     tbw <- conbandwidth(xbw = tbw$xbw,
