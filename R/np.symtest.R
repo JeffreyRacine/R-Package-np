@@ -155,16 +155,17 @@ npsymtest <- function(data = NULL,
   ## between boot.fun.boot and boot.fun.tsboot is the order of
   ## arguments.
 
-  B.counter <- 0
+  boot.state <- list(counter = 0L, console = console)
 
   ## Function to be fed to tsboot - accepts a vector of integers
   ## corresponding to all observations in the sample (1,2,...) that
   ## get permuted/rearranged to define resampled data.
 
 	boot.fun <- function(ii,data.null,bw) {
-    console <<- printClear(console)
-    console <<- printPush(paste(sep="", "Bootstrap replication ",
-                                    B.counter, "/", boot.num, "..."), console = console)
+    boot.state$console <- printClear(boot.state$console)
+    boot.state$console <- printPush(paste(sep="", "Bootstrap replication ",
+                                          boot.state$counter, "/", boot.num, "..."),
+                                    console = boot.state$console)
     null.sample1 <- data.null[ii]
     if(is.numeric(data.null)) {
       null.sample2 <- -(null.sample1-mean(null.sample1))+mean(null.sample1)
@@ -183,7 +184,7 @@ npsymtest <- function(data = NULL,
         null.sample2 <- factor(-(tmp-location)+location,levels=data.levels)
       }
     }
-    B.counter <<- B.counter + 1
+    boot.state$counter <- boot.state$counter + 1L
     return(Srho.sym(null.sample1,null.sample2,bw,method=method))
 	}
 
@@ -227,7 +228,7 @@ npsymtest <- function(data = NULL,
 
   }
 
-  console <- printClear(console)
+  console <- printClear(boot.state$console)
   console <- printPop(console)  
 
   p.value <- mean(ifelse(resampled.stat > test.stat, 1, 0))
