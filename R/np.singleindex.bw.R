@@ -180,6 +180,13 @@ npindexbw.sibandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,ncol(xdat))
     }
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    only.optimize.beta <- npValidateScalarLogical(only.optimize.beta, "only.optimize.beta")
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    optim.maxattempts <- npValidatePositiveInteger(optim.maxattempts, "optim.maxattempts")
+    optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
+    optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
+    optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
 
     if (bws$method == "kleinspady" & !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
