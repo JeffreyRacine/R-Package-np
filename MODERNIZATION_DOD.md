@@ -240,3 +240,49 @@ Completed in `np-npRmpi`:
    - tarball build/check:
      - `/tmp/nprmpi_build_gdatfix_20260223.log` (`BUILD_RC:0`)
      - `/tmp/nprmpi_check_gdatfix_en0_20260223.log` (`CHECK_RC:0`, `--as-cran`, `FI_*_IFACE=en0`)
+
+## Core Estimator `seq_len` Loop/Index Hardening Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:n` loop/index forms in core estimator families with zero-length-safe `seq_len(...)`.
+2. Scope:
+   - `R/np.distribution.bw.R`
+   - `R/np.condistribution.bw.R`
+   - `R/np.singleindex.bw.R`
+   - `R/np.smoothcoef.bw.R`
+   - `R/np.smoothcoef.R`
+   - `R/np.plregression.R`
+3. Commit:
+   - `np-npRmpi`: `46f706f`
+4. Validation:
+   - parse gates:
+     - `/tmp/nprmpi_seq_len_core2_parse_20260223.log` (`RC:0`)
+   - targeted contracts:
+     - `/tmp/nprmpi_seq_len_core2_tests_postfix_20260223.log` (`PASS 64, FAIL 0`)
+   - issue-note verified repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_seqlen_core2_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_seqlen_core2_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_seqlen_core2_20260223.log` (`CHECK_RC:0`, `--as-cran`, `FI_*_IFACE=en0`)
+
+## Autodispatch Missing-Arg Return-Rewrite Hardening (2026-02-23)
+Completed in `np-npRmpi`:
+1. Fixed return-call tmp replacement recursion to safely handle calls containing missing arguments (`data = , ...`) during autodispatch post-processing.
+2. Root cause:
+   - recursive replacement evaluated missing-argument placeholders and failed with `argument "xi" is missing, with no default` (surfaced by `npplregbw` path).
+3. Changes:
+   - `R/np.autodispatch.R`
+     - added `.npRmpi_is_missing_call_arg(...)` helper,
+     - switched call/pairlist traversal to `as.list(...)` reconstruction with missing-arg skip.
+   - `tests/testthat/test-autodispatch-call-helpers.R`
+     - added contract test for replacement on calls with missing arguments.
+4. Commit:
+   - `np-npRmpi`: `4415a9b`
+5. Validation:
+   - focused contracts:
+     - `/tmp/nprmpi_autod_missingarg_fix_focus2_20260223.log` (`TEST_RC:0`)
+   - broad targeted contracts (includes `npplreg`):
+     - `/tmp/nprmpi_seq_len_core2_tests_postfix_20260223.log` (`PASS 64, FAIL 0`)
+   - issue-note verified repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_seqlen_core2_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_check_seqlen_core2_20260223.log` (`CHECK_RC:0`)
