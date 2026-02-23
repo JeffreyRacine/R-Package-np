@@ -329,8 +329,8 @@
 .npRmpi_autodispatch_cleanup <- function(tmpnames, comm = 1L) {
   if (!length(tmpnames))
     return(invisible(TRUE))
-  rm(list = tmpnames, envir = .GlobalEnv)
-  cmd.rm <- substitute(rm(list = TMPS, envir = .GlobalEnv),
+  .npRmpi_rm_existing(tmpnames, envir = .GlobalEnv)
+  cmd.rm <- substitute(.npRmpi_rm_existing(TMPS, envir = .GlobalEnv),
                        list(TMPS = tmpnames))
   .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
   invisible(TRUE)
@@ -391,6 +391,16 @@
   }
 
   x
+}
+
+.npRmpi_rm_existing <- function(nms, envir = .GlobalEnv) {
+  if (!length(nms))
+    return(invisible(character(0)))
+  nms <- unique(as.character(nms))
+  present <- nms[vapply(nms, exists, logical(1), envir = envir, inherits = FALSE)]
+  if (length(present))
+    rm(list = present, envir = envir)
+  invisible(present)
 }
 
 .npRmpi_autodispatch_publish_tmps <- function(tmpvals, comm = 1L) {
@@ -469,6 +479,8 @@
 
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
   if (length(prepared$tmpnames))
+    on.exit(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm), add = TRUE)
+  if (length(prepared$tmpnames))
     for (nm in prepared$tmpnames)
       if (!is.null(prepared$tmpvals[[nm]]))
         prepared$tmpvals[[nm]] <- .npRmpi_autodispatch_untag(prepared$tmpvals[[nm]])
@@ -520,7 +532,7 @@
     on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
     on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
     if (length(TMP_NAMES))
-      on.exit(rm(list = TMP_NAMES, envir = .GlobalEnv), add = TRUE)
+      on.exit(.npRmpi_rm_existing(TMP_NAMES, envir = .GlobalEnv), add = TRUE)
 
     res <- CALL
     .GlobalEnv[[REMOTE_NAME]] <- res
@@ -606,8 +618,8 @@
   .GlobalEnv[[tmp]] <- payload
   .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
   on.exit({
-    rm(list = tmp, envir = .GlobalEnv)
-    cmd.rm <- substitute(rm(list = TMP, envir = .GlobalEnv), list(TMP = tmp))
+    .npRmpi_rm_existing(tmp, envir = .GlobalEnv)
+    cmd.rm <- substitute(.npRmpi_rm_existing(TMP, envir = .GlobalEnv), list(TMP = tmp))
     .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
   }, add = TRUE)
 

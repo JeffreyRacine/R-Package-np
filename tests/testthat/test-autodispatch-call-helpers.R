@@ -44,3 +44,23 @@ test_that("autodispatch eval helpers route through shared command executor", {
   expect_match(nodisp.body, "\\.npRmpi_eval_scmd\\(mc\\.eval, envir = caller_env\\)")
   expect_match(arg.body, "\\.npRmpi_eval_scmd\\(expr, envir = caller_env\\)")
 })
+
+test_that("autodispatch uses safe cleanup helper for temporary symbols", {
+  cleanup.body <- paste(deparse(body(.npRmpi_autodispatch_cleanup), width.cutoff = 500L), collapse = " ")
+  impl.body <- paste(deparse(body(.npRmpi_distributed_call_impl), width.cutoff = 500L), collapse = " ")
+  boot.body <- paste(deparse(body(.npRmpi_bootstrap_compute_payload), width.cutoff = 500L), collapse = " ")
+
+  expect_match(cleanup.body, "\\.npRmpi_rm_existing\\(tmpnames, envir = \\.GlobalEnv\\)")
+  expect_match(cleanup.body, "\\.npRmpi_rm_existing\\(TMPS, envir = \\.GlobalEnv\\)")
+  expect_match(impl.body, "\\.npRmpi_autodispatch_cleanup\\(prepared\\$tmpnames, comm = comm\\)")
+  expect_match(impl.body, "\\.npRmpi_rm_existing\\(TMP_NAMES, envir = \\.GlobalEnv\\)")
+  expect_match(boot.body, "\\.npRmpi_rm_existing\\(tmp, envir = \\.GlobalEnv\\)")
+  expect_match(boot.body, "\\.npRmpi_rm_existing\\(TMP, envir = \\.GlobalEnv\\)")
+})
+
+test_that(".npRmpi_rm_existing removes only existing names", {
+  env <- new.env(parent = emptyenv())
+  env$foo <- 1L
+  expect_silent(.npRmpi_rm_existing(c("foo", "bar"), envir = env))
+  expect_false(exists("foo", envir = env, inherits = FALSE))
+})
