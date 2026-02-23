@@ -199,3 +199,24 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_issue_notes_repros_dist_rorder_20260223.log`
    - tarball check:
      - `/tmp/nprmpi_check_dist_rorder_20260223.log` (`Status: OK`)
+
+## Density/Regression `rorder` seq_len Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced residual `(1:ncol)[...]` `rorder` reconstruction with `seq_len(ncol)` in core density/regression paths.
+2. Scope:
+   - `R/np.density.bw.R`
+   - `R/np.regression.bw.R`
+   - `R/np.regression.R`
+3. Commit:
+   - `np-npRmpi`: `84a75dd`
+4. Validation:
+   - parse gates: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/nprmpi_rorder_regdens_tests_20260223.log` (includes one pre-existing `npudens` formula-path failure unrelated to touched lines)
+     - `/tmp/nprmpi_dist_rorder_tests_targeted_20260223.log` (`PASS 34, FAIL 0`)
+   - fresh-install smoke:
+     - `/tmp/nprmpi_regdens_rorder_smoke_20260223.out` (`NPRMPI_REGDENS_RORDER_SMOKE_OK`)
+   - issue-note verified repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_rorder3_20260223.log`
+   - tarball check:
+     - `/tmp/nprmpi_check_rorder3_20260223.log` (`Status: OK`)
