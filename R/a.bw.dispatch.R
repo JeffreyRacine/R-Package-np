@@ -3,21 +3,23 @@
     stop("invoked without arguments")
 
   dot.names <- names(dots)
+  has.named.bws <- !is.null(dot.names) && any(dot.names == "bws")
+  has.named.data <- length(data_arg_names) > 0L &&
+    !is.null(dot.names) &&
+    any(dot.names %in% data_arg_names)
 
   if (!is.null(dot.names) && any(dot.names == "formula"))
     return(eval(dots[[which(dot.names == "formula")[1L]]], envir = eval_env))
+
+  if (has.named.data && !has.named.bws)
+    return(NULL)
 
   first.val <- eval(dots[[1L]], envir = eval_env)
   if (inherits(first.val, "formula"))
     return(first.val)
 
-  if (!is.null(dot.names) && any(dot.names == "bws"))
+  if (has.named.bws)
     return(eval(dots[[which(dot.names == "bws")[1L]]], envir = eval_env))
-
-  if (length(data_arg_names) > 0L &&
-      !is.null(dot.names) &&
-      any(dot.names %in% data_arg_names))
-    return(NULL)
 
   first.val
 }
@@ -26,7 +28,10 @@
   if (missing(call_obj) || !is.call(call_obj))
     return(NULL)
 
-  for (i in seq_along(call_obj)) {
+  if (length(call_obj) < 2L)
+    return(NULL)
+
+  for (i in 2:length(call_obj)) {
     val <- tryCatch(eval(call_obj[[i]], envir = eval_env), error = function(e) NULL)
     if (inherits(val, "formula"))
       return(call_obj[[i]])
