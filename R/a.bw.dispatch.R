@@ -45,3 +45,28 @@
 
   formula_obj
 }
+
+.np_terms_variable_values <- function(terms_obj, data, eval_env = environment(terms_obj)) {
+  if (missing(terms_obj) || is.null(terms_obj))
+    return(list())
+
+  vars <- attr(terms_obj, "variables")
+  if (is.null(vars))
+    return(list())
+
+  out <- tryCatch(eval(vars, envir = data, enclos = eval_env), error = function(e) list())
+  if (is.null(out))
+    return(list())
+  if (!is.list(out))
+    out <- as.list(out)
+
+  out
+}
+
+.np_terms_ts_mask <- function(terms_obj, data, eval_env = environment(terms_obj)) {
+  vals <- .np_terms_variable_values(terms_obj = terms_obj, data = data, eval_env = eval_env)
+  if (length(vals) == 0L)
+    return(logical(0))
+
+  vapply(vals, inherits, logical(1), "ts")
+}
