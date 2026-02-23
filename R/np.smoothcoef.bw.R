@@ -151,6 +151,18 @@ npscoefbw.scbandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,length(bws$bw))
     }
+    cv.iterate <- npValidateScalarLogical(cv.iterate, "cv.iterate")
+    backfit.iterate <- npValidateScalarLogical(backfit.iterate, "backfit.iterate")
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    backfit.maxiter <- npValidatePositiveInteger(backfit.maxiter, "backfit.maxiter")
+    backfit.tol <- npValidatePositiveFiniteNumeric(backfit.tol, "backfit.tol")
+    optim.maxattempts <- npValidatePositiveInteger(optim.maxattempts, "optim.maxattempts")
+    optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
+    optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
+    optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
+    if (cv.iterate)
+      cv.num.iterations <- npValidatePositiveInteger(cv.num.iterations, "cv.num.iterations")
 
     if (!(is.vector(ydat) | is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
@@ -166,10 +178,6 @@ npscoefbw.scbandwidth <-
 
     if (ncol(xdat) == 1 && missing(cv.iterate))
       cv.iterate = FALSE
-
-    if (cv.num.iterations < 1 & cv.iterate){
-      stop("invalid number of iterations specified")
-    }
 
     if (!all(bws$xdati$icon))
       stop("Only continuous 'x' regressors are supported in this version.")

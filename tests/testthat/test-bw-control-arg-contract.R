@@ -62,4 +62,22 @@ test_that("bandwidth wrappers reject invalid scalar control flags", {
     npcdistbw.condbandwidth(xdat = dat, ydat = dat, bws = bws, ngrid = 0),
     "'ngrid' must be a positive integer"
   )
+
+  expect_error(
+    npindexbw.sibandwidth(xdat = dat, ydat = dat$x, bws = bws, bandwidth.compute = c(TRUE, FALSE)),
+    "'bandwidth.compute' must be TRUE or FALSE"
+  )
+  expect_error(
+    npindexbw.sibandwidth(xdat = dat, ydat = dat$x, bws = bws, optim.maxit = 0),
+    "'optim.maxit' must be a positive integer"
+  )
+
+  expect_error(
+    npscoefbw.scbandwidth(xdat = dat, ydat = dat$x, bws = bws, cv.iterate = c(TRUE, FALSE)),
+    "'cv.iterate' must be TRUE or FALSE"
+  )
+  expect_error(
+    npscoefbw.scbandwidth(xdat = dat, ydat = dat$x, bws = bws, backfit.tol = 0),
+    "'backfit.tol' must be a positive finite numeric scalar"
+  )
 })
