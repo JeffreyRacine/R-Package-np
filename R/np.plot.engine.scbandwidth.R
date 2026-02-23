@@ -828,7 +828,7 @@
         xOrZ = "x"
         
         for (plot.index in 1:(bws$xndim + bws$zndim)){
-          i = ifelse(plot.index <= bws$xndim, plot.index, plot.index - bws$xndim)
+          i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)
             xOrZ <- "z"
