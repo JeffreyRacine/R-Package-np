@@ -77,8 +77,8 @@
 }
 
 .npRmpi_autodispatch_remote_ref <- function(x) {
-  ref <- try(attr(x, "npRmpi.autodispatch.remote", exact = TRUE), silent = TRUE)
-  if (inherits(ref, "try-error") || !is.character(ref) || length(ref) != 1L || !nzchar(ref))
+  ref <- tryCatch(attr(x, "npRmpi.autodispatch.remote", exact = TRUE), error = function(e) NULL)
+  if (!is.character(ref) || length(ref) != 1L || !nzchar(ref))
     return(NULL)
   ref
 }
@@ -145,9 +145,9 @@
 }
 
 .npRmpi_has_active_slave_pool <- function(comm = 1L) {
-  size <- try(mpi.comm.size(comm), silent = TRUE)
-  rank <- try(mpi.comm.rank(comm), silent = TRUE)
-  if (inherits(size, "try-error") || inherits(rank, "try-error") ||
+  size <- tryCatch(mpi.comm.size(comm), error = function(e) NA_integer_)
+  rank <- tryCatch(mpi.comm.rank(comm), error = function(e) NA_integer_)
+  if (is.null(size) || is.null(rank) ||
       is.na(size) || is.na(rank))
     return(FALSE)
   size >= 2L
@@ -258,14 +258,16 @@
     formula.expr <- arg.list[[which(nms == "formula")[1L]]]
   } else if (!is.null(nms) && any(nms == "bws")) {
     bexpr <- arg.list[[which(nms == "bws")[1L]]]
-    bval <- try(.npRmpi_autodispatch_eval_arg(bexpr, caller_env = caller_env), silent = TRUE)
-    if (!inherits(bval, "try-error") && inherits(bval, "formula"))
+    bval <- tryCatch(.npRmpi_autodispatch_eval_arg(bexpr, caller_env = caller_env),
+                     error = function(e) NULL)
+    if (!is.null(bval) && inherits(bval, "formula"))
       formula.expr <- bexpr
   } else if (length(arg.list) >= 2L) {
     nm2 <- if (!is.null(nms) && length(nms) >= 2L) nms[[2L]] else ""
     if (is.null(nm2) || identical(nm2, "")) {
-      fval <- try(.npRmpi_autodispatch_eval_arg(arg.list[[2L]], caller_env = caller_env), silent = TRUE)
-      if (!inherits(fval, "try-error") && inherits(fval, "formula"))
+      fval <- tryCatch(.npRmpi_autodispatch_eval_arg(arg.list[[2L]], caller_env = caller_env),
+                       error = function(e) NULL)
+      if (!is.null(fval) && inherits(fval, "formula"))
         formula.expr <- arg.list[[2L]]
     }
   }
@@ -343,8 +345,8 @@
 
   if (is.call(x)) {
     for (i in seq_len(length(x))) {
-      xi <- try(x[[i]], silent = TRUE)
-      if (!inherits(xi, "try-error"))
+      xi <- tryCatch(x[[i]], error = function(e) NULL)
+      if (!is.null(xi))
         x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
     }
     return(x)
@@ -352,8 +354,8 @@
 
   if (is.pairlist(x)) {
     for (i in seq_len(length(x))) {
-      xi <- try(x[[i]], silent = TRUE)
-      if (!inherits(xi, "try-error"))
+      xi <- tryCatch(x[[i]], error = function(e) NULL)
+      if (!is.null(xi))
         x[[i]] <- .npRmpi_autodispatch_replace_tmps(xi, tmpvals = tmpvals)
     }
     return(x)
@@ -415,8 +417,8 @@
 .npRmpi_autodispatch_untag <- function(x) {
   if (is.list(x) && !is.pairlist(x) && !is.call(x)) {
     for (i in seq_len(length(x))) {
-      xi <- try(x[[i]], silent = TRUE)
-      if (!inherits(xi, "try-error"))
+      xi <- tryCatch(x[[i]], error = function(e) NULL)
+      if (!is.null(xi))
         x[i] <- list(.npRmpi_autodispatch_untag(xi))
     }
   }
@@ -430,8 +432,8 @@
     return(invisible(FALSE))
   if (!.npRmpi_autodispatch_called_from_bcast())
     return(invisible(FALSE))
-  mode <- try(attr(obj, "npRmpi.dispatch.mode", exact = TRUE), silent = TRUE)
-  if (inherits(mode, "try-error") || is.null(mode))
+  mode <- tryCatch(attr(obj, "npRmpi.dispatch.mode", exact = TRUE), error = function(e) NULL)
+  if (is.null(mode))
     return(invisible(FALSE))
   if (identical(mode, "auto")) {
     stop(sprintf("%s received an object created under npRmpi.autodispatch and cannot be executed inside mpi.bcast.cmd(...): avoid mixing dispatch modes; either rerun the full workflow in manual broadcast mode or keep this call outside mpi.bcast.cmd", where))
@@ -448,8 +450,8 @@
   if (.npRmpi_autodispatch_in_context())
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
-  rank <- try(mpi.comm.rank(comm), silent = TRUE)
-  if (!inherits(rank, "try-error") && !is.na(rank) && rank != 0L)
+  rank <- tryCatch(mpi.comm.rank(comm), error = function(e) NA_integer_)
+  if (!is.na(rank) && rank != 0L)
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
   if (.npRmpi_autodispatch_called_from_bcast()) {
@@ -546,8 +548,8 @@
   if (.npRmpi_autodispatch_in_context())
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
-  rank <- try(mpi.comm.rank(comm), silent = TRUE)
-  if (!inherits(rank, "try-error") && !is.na(rank) && rank != 0L)
+  rank <- tryCatch(mpi.comm.rank(comm), error = function(e) NA_integer_)
+  if (!is.na(rank) && rank != 0L)
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
   if (.npRmpi_autodispatch_called_from_bcast())
