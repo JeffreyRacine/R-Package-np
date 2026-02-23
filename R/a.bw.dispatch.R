@@ -1,3 +1,27 @@
+.np_try_eval_in_frames <- function(expr, eval_env = parent.frame(), enclos = NULL) {
+  val <- tryCatch(
+    if (is.null(enclos)) eval(expr, envir = eval_env) else eval(expr, envir = eval_env, enclos = enclos),
+    error = function(e) e
+  )
+  if (!inherits(val, "error"))
+    return(list(ok = TRUE, value = val))
+
+  frames <- sys.frames()
+  for (i in rev(seq_along(frames))) {
+    env_i <- frames[[i]]
+    if (identical(env_i, eval_env))
+      next
+    val_i <- tryCatch(
+      if (is.null(enclos)) eval(expr, envir = env_i) else eval(expr, envir = env_i, enclos = enclos),
+      error = function(e) e
+    )
+    if (!inherits(val_i, "error"))
+      return(list(ok = TRUE, value = val_i))
+  }
+
+  list(ok = FALSE, value = NULL)
+}
+
 .np_bw_dispatch_target <- function(dots, data_arg_names = character(), eval_env = parent.frame()) {
   if (length(dots) == 0L)
     stop("invoked without arguments")
@@ -8,18 +32,27 @@
     !is.null(dot.names) &&
     any(dot.names %in% data_arg_names)
 
-  if (!is.null(dot.names) && any(dot.names == "formula"))
-    return(eval(dots[[which(dot.names == "formula")[1L]]], envir = eval_env))
+  if (!is.null(dot.names) && any(dot.names == "formula")) {
+    fval <- .np_try_eval_in_frames(dots[[which(dot.names == "formula")[1L]]], eval_env = eval_env)
+    if (isTRUE(fval$ok))
+      return(fval$value)
+  }
 
   if (has.named.data && !has.named.bws)
     return(NULL)
 
-  first.val <- eval(dots[[1L]], envir = eval_env)
+  first.eval <- .np_try_eval_in_frames(dots[[1L]], eval_env = eval_env)
+  if (!isTRUE(first.eval$ok))
+    return(NULL)
+  first.val <- first.eval$value
   if (inherits(first.val, "formula"))
     return(first.val)
 
-  if (has.named.bws)
-    return(eval(dots[[which(dot.names == "bws")[1L]]], envir = eval_env))
+  if (has.named.bws) {
+    bval <- .np_try_eval_in_frames(dots[[which(dot.names == "bws")[1L]]], eval_env = eval_env)
+    if (isTRUE(bval$ok))
+      return(bval$value)
+  }
 
   first.val
 }
@@ -32,8 +65,8 @@
     return(NULL)
 
   for (i in 2:length(call_obj)) {
-    val <- tryCatch(eval(call_obj[[i]], envir = eval_env), error = function(e) NULL)
-    if (inherits(val, "formula"))
+    val <- .np_try_eval_in_frames(call_obj[[i]], eval_env = eval_env)
+    if (isTRUE(val$ok) && inherits(val$value, "formula"))
       return(call_obj[[i]])
   }
 
@@ -44,9 +77,9 @@
   if (is.null(formula_call))
     return(formula_obj)
 
-  resolved <- tryCatch(eval(formula_call, envir = eval_env), error = function(e) NULL)
-  if (inherits(resolved, "formula"))
-    return(resolved)
+  resolved <- .np_try_eval_in_frames(formula_call, eval_env = eval_env)
+  if (isTRUE(resolved$ok) && inherits(resolved$value, "formula"))
+    return(resolved$value)
 
   formula_obj
 }
@@ -59,9 +92,10 @@
   if (is.null(vars))
     return(list())
 
-  out <- tryCatch(eval(vars, envir = data, enclos = eval_env), error = function(e) list())
-  if (is.null(out))
+  out <- .np_try_eval_in_frames(vars, eval_env = data, enclos = eval_env)
+  if (!isTRUE(out$ok) || is.null(out$value))
     return(list())
+  out <- out$value
   if (!is.list(out))
     out <- as.list(out)
 
