@@ -900,8 +900,8 @@ succeedWithResponse <- function(tt, frame){
   vars <- attr(tt, "variables")
   if (is.null(vars))
     return(FALSE)
-  out <- tryCatch(eval(expr = vars, envir = frame, enclos = NULL), error = function(e) e)
-  !inherits(out, "error")
+  out <- .np_try_eval_in_frames(vars, eval_env = frame, enclos = NULL, search_frames = FALSE)
+  isTRUE(out$ok)
 }
 
 ## determine whether a bandwidth
