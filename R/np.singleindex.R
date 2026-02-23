@@ -195,6 +195,10 @@ npindex.sibandwidth <-
     gradients <- npValidateScalarLogical(gradients, "gradients")
     residuals <- npValidateScalarLogical(residuals, "residuals")
     errors <- npValidateScalarLogical(errors, "errors")
+    if (!is.numeric(boot.num) || length(boot.num) != 1L || is.na(boot.num) ||
+        !is.finite(boot.num) || boot.num < 1 || boot.num != floor(boot.num))
+      stop("'boot.num' must be a positive integer")
+    boot.num <- as.integer(boot.num)
     .npRmpi_require_active_slave_pool(where = "npindex()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
