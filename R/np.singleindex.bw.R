@@ -346,8 +346,11 @@ npindexbw.sibandwidth <-
               ks.loo[which(ks.loo < kleinspadyFloor)] <- kleinspadyFloor
               ks.loo[which(ks.loo > 1- kleinspadyFloor)] <- 1-kleinspadyFloor
 
-              ## Maximize the log likelihood, therefore minimize minus...
-              t.ret <- - mean(ifelse(ydat==1,log(ks.loo),log(1-ks.loo)))
+              ## Maximize the log likelihood, therefore minimize minus.
+              ## Here ydat is binary (0/1), so this is equivalent to
+              ## ifelse(ydat==1, log(ks.loo), log(1-ks.loo)) but avoids
+              ## branchy ifelse and uses stable log1p for the second term.
+              t.ret <- -mean(ydat * log(ks.loo) + (1.0 - ydat) * log1p(-ks.loo))
               return(t.ret)
 
             }
