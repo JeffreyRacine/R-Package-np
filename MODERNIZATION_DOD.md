@@ -478,3 +478,27 @@ Completed in `np-npRmpi`:
    - tarball-first:
      - `/tmp/nprmpi_build_plotscalar_20260223.log` (`BUILD_RC:0`)
      - `/tmp/nprmpi_check_plotscalar_20260223.log` (`Status: OK`)
+
+## Plot Engine Scalar-`ifelse` Expansion Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Retired additional scalar `ifelse(...)` usage in plot engines where control expressions are scalar (`xi.factor`, `gradients`, `quantreg`, `cdf`).
+2. Scope:
+   - `R/np.plot.engine.condbandwidth.R`
+   - `R/np.plot.engine.conbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+3. Changes:
+   - scalar error-bar style/shape selectors now use scalar `if`
+   - scalar gradient/quantile error-name/bias-name selectors now use scalar `if` chains
+   - scalar label composition branches (`ylab`, `zlab`) now use scalar `if`
+4. Commit:
+   - `np-npRmpi`: `f4b177b`
+5. Validation:
+   - parse gate: `PARSE_OK`
+   - focused tests:
+     - `/tmp/nprmpi_plot_ifelse2_tests_20260223.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_plotifelse2_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_plotifelse2_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_plotifelse2_20260223.log` (`Status: OK`)
