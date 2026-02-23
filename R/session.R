@@ -163,9 +163,16 @@ npRmpi.session.info <- function(comm=1){
     mpi_get_version <- get0("mpi.get.version", envir = rmpi_ns, mode = "function", inherits = FALSE)
     if (is.function(mpi_get_version)) mpi_get_version() else NA
   }, fallback = NA)
-  comm_size <- .npRmpi_safe_int(mpi.comm.size(comm))
-  comm_rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
-  proc <- .npRmpi_safe(mpi.get.processor.name(), fallback = NA_character_)
+  mpi_initialized <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE))
+  if (mpi_initialized) {
+    comm_size <- .npRmpi_safe_int(mpi.comm.size(comm))
+    comm_rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
+    proc <- .npRmpi_safe(mpi.get.processor.name(), fallback = NA_character_)
+  } else {
+    comm_size <- NA_integer_
+    comm_rank <- NA_integer_
+    proc <- NA_character_
+  }
 
   info <- list(
     npRmpi = if (is.na(np_ver)[1L]) NA_character_ else as.character(np_ver),
