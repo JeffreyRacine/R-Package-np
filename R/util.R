@@ -734,16 +734,24 @@ explodeFormula <- function(formula, data=NULL){
 
 explodePipe <- function(formula, env = parent.frame()){
   if (!inherits(formula, "formula")) {
-    if (is.symbol(formula) &&
-        is.environment(env) &&
-        exists(as.character(formula), envir = env, inherits = TRUE)) {
-      formula <- get(as.character(formula), envir = env, inherits = TRUE)
+    if (is.symbol(formula) && is.environment(env)) {
+      not_found <- new.env(parent = emptyenv())
+      sym_val <- get0(as.character(formula), envir = env, inherits = TRUE, ifnotfound = not_found)
+      if (!identical(sym_val, not_found)) {
+        formula <- sym_val
+      } else {
+        out <- .np_try_eval_in_frames(formula, eval_env = env, search_frames = FALSE)
+        if (isTRUE(out$ok))
+          formula <- out$value
+        else
+          formula <- out$error
+      }
     } else {
-    out <- .np_try_eval_in_frames(formula, eval_env = env, search_frames = FALSE)
-    if (isTRUE(out$ok))
-      formula <- out$value
-    else
-      formula <- out$error
+      out <- .np_try_eval_in_frames(formula, eval_env = env, search_frames = FALSE)
+      if (isTRUE(out$ok))
+        formula <- out$value
+      else
+        formula <- out$error
     }
     if (inherits(formula, "error"))
       stop(conditionMessage(formula), call. = FALSE)
@@ -1770,10 +1778,12 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (!is.language(expr))
     return(expr)
 
-  if (is.symbol(expr) &&
-      is.environment(eval.env) &&
-      exists(as.character(expr), envir = eval.env, inherits = TRUE))
-    return(get(as.character(expr), envir = eval.env, inherits = TRUE))
+  if (is.symbol(expr) && is.environment(eval.env)) {
+    not_found <- new.env(parent = emptyenv())
+    sym_val <- get0(as.character(expr), envir = eval.env, inherits = TRUE, ifnotfound = not_found)
+    if (!identical(sym_val, not_found))
+      return(sym_val)
+  }
 
   val <- .np_try_eval_in_frames(expr, eval_env = eval.env, search_frames = FALSE)
   if (isTRUE(val$ok))
@@ -1803,15 +1813,19 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (!is.language(expr))
     return(expr)
 
-  if (is.symbol(expr) &&
-      is.environment(eval.env) &&
-      exists(as.character(expr), envir = eval.env, inherits = TRUE))
-    return(get(as.character(expr), envir = eval.env, inherits = TRUE))
+  if (is.symbol(expr) && is.environment(eval.env)) {
+    not_found <- new.env(parent = emptyenv())
+    sym_val <- get0(as.character(expr), envir = eval.env, inherits = TRUE, ifnotfound = not_found)
+    if (!identical(sym_val, not_found))
+      return(sym_val)
+  }
 
-  if (is.symbol(expr) &&
-      is.environment(caller_env) &&
-      exists(as.character(expr), envir = caller_env, inherits = TRUE))
-    return(get(as.character(expr), envir = caller_env, inherits = TRUE))
+  if (is.symbol(expr) && is.environment(caller_env)) {
+    not_found <- new.env(parent = emptyenv())
+    sym_val <- get0(as.character(expr), envir = caller_env, inherits = TRUE, ifnotfound = not_found)
+    if (!identical(sym_val, not_found))
+      return(sym_val)
+  }
 
   val <- .np_try_eval_in_frames(expr, eval_env = eval.env)
   if (isTRUE(val$ok))

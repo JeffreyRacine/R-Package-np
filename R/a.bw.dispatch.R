@@ -1,8 +1,15 @@
 .np_try_eval_in_frames <- function(expr, eval_env = parent.frame(), enclos = NULL, search_frames = TRUE) {
-  if (is.symbol(expr) &&
-      is.environment(eval_env) &&
-      exists(as.character(expr), envir = eval_env, inherits = TRUE)) {
-    return(list(ok = TRUE, value = get(as.character(expr), envir = eval_env, inherits = TRUE), error = NULL))
+  sym <- NULL
+  not_found <- NULL
+  if (is.symbol(expr)) {
+    sym <- as.character(expr)
+    not_found <- new.env(parent = emptyenv())
+  }
+
+  if (!is.null(sym) && is.environment(eval_env)) {
+    sym_val <- get0(sym, envir = eval_env, inherits = TRUE, ifnotfound = not_found)
+    if (!identical(sym_val, not_found))
+      return(list(ok = TRUE, value = sym_val, error = NULL))
   }
 
   val <- tryCatch(
@@ -21,10 +28,10 @@
     env_i <- frames[[i]]
     if (identical(env_i, eval_env))
       next
-    if (is.symbol(expr) &&
-        is.environment(env_i) &&
-        exists(as.character(expr), envir = env_i, inherits = TRUE)) {
-      return(list(ok = TRUE, value = get(as.character(expr), envir = env_i, inherits = TRUE), error = NULL))
+    if (!is.null(sym) && is.environment(env_i)) {
+      sym_val <- get0(sym, envir = env_i, inherits = TRUE, ifnotfound = not_found)
+      if (!identical(sym_val, not_found))
+        return(list(ok = TRUE, value = sym_val, error = NULL))
     }
     val_i <- tryCatch(
       if (is.null(enclos)) eval(expr, envir = env_i) else eval(expr, envir = env_i, enclos = enclos),

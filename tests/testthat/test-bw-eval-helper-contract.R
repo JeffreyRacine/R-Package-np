@@ -6,6 +6,14 @@ test_that(".np_try_eval_in_frames resolves symbols from eval env first", {
   expect_identical(out$value, 11L)
 })
 
+test_that(".np_try_eval_in_frames preserves NULL symbol values", {
+  env <- new.env(parent = emptyenv())
+  env$x <- NULL
+  out <- .np_try_eval_in_frames(quote(x), eval_env = env)
+  expect_true(out$ok)
+  expect_null(out$value)
+})
+
 test_that(".np_try_eval_in_frames resolves symbols from caller frames", {
   val <- local({
     x <- 17L

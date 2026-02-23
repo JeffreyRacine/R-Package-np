@@ -252,9 +252,12 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 .npRmpi_eval_scmd <- function(scmd, arg = list(), envir = parent.frame()) {
     if (length(arg) > 0)
         return(do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = envir))
-    if (is.symbol(scmd) &&
-        exists(as.character(scmd), envir = envir, inherits = TRUE))
-        return(get(as.character(scmd), envir = envir, inherits = TRUE))
+    if (is.symbol(scmd) && is.environment(envir)) {
+        not_found <- new.env(parent = emptyenv())
+        sym_val <- get0(as.character(scmd), envir = envir, inherits = TRUE, ifnotfound = not_found)
+        if (!identical(sym_val, not_found))
+            return(sym_val)
+    }
     out <- .np_try_eval_in_frames(scmd, eval_env = envir, search_frames = FALSE)
     if (isTRUE(out$ok))
         return(out$value)

@@ -8,6 +8,12 @@ test_that(".npRmpi_eval_scmd handles symbol, call, and argument paths", {
   expect_identical(.npRmpi_eval_scmd(quote({ y <- 9L; y }), envir = env), 9L)
 })
 
+test_that(".npRmpi_eval_scmd preserves NULL symbol values", {
+  env <- new.env(parent = baseenv())
+  env$x <- NULL
+  expect_null(.npRmpi_eval_scmd(quote(x), envir = env))
+})
+
 test_that(".npRmpi_eval_scmd evaluates through shared strict helper", {
   fn.body <- paste(deparse(body(.npRmpi_eval_scmd), width.cutoff = 500L), collapse = " ")
   expect_match(fn.body, "\\.np_try_eval_in_frames\\(scmd, eval_env = envir, search_frames = FALSE\\)")

@@ -115,11 +115,11 @@
   mc.eval <- mc
   if (is.call(mc.eval) && length(mc.eval) >= 1L && is.symbol(mc.eval[[1L]])) {
     fname <- as.character(mc.eval[[1L]])
-    in.caller <- exists(fname, envir = caller_env, mode = "function", inherits = TRUE)
-    in.ns <- exists(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
-    if (!in.caller && in.ns) {
-      mc.eval[[1L]] <- get(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE)
-    }
+    not_found <- new.env(parent = emptyenv())
+    caller_fun <- get0(fname, envir = caller_env, mode = "function", inherits = TRUE, ifnotfound = not_found)
+    ns_fun <- get0(fname, envir = asNamespace("npRmpi"), mode = "function", inherits = FALSE, ifnotfound = not_found)
+    if (identical(caller_fun, not_found) && !identical(ns_fun, not_found))
+      mc.eval[[1L]] <- ns_fun
   }
   .npRmpi_eval_scmd(mc.eval, envir = caller_env)
 }
