@@ -936,11 +936,15 @@ oMaxL <- function(c, kertype = c("wangvanryzin", "liracine", "nliracine", "racin
 updateBwNameMetadata <- function(nameList, bws){
   ## names of 'old' metadata in bw object
   onames <- names(nameList)
-  lapply(1:length(nameList), function(i) {
-    bws[[onames[i]]] <<- nameList[[i]]
-    bws$varnames[[substr(onames[i],1,1)]] <<- nameList[[i]]
-  })
-  return(bws)
+  if (length(onames) == 0L)
+    return(bws)
+
+  for (nm in onames) {
+    bws[[nm]] <- nameList[[nm]]
+    bws$varnames[[substr(nm, 1L, 1L)]] <- nameList[[nm]]
+  }
+
+  bws
 }
 
 ## some string utility functions
