@@ -1760,6 +1760,11 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (!is.language(expr))
     return(expr)
 
+  if (is.symbol(expr) &&
+      is.environment(eval.env) &&
+      exists(as.character(expr), envir = eval.env, inherits = TRUE))
+    return(get(as.character(expr), envir = eval.env, inherits = TRUE))
+
   val <- tryCatch(eval(expr, envir = eval.env), error = function(e) e)
   if (!inherits(val, "error"))
     return(val)
@@ -1786,14 +1791,19 @@ QFAC <- qnorm(.25,lower.tail=F)*2
   if (!is.language(expr))
     return(expr)
 
-  val <- tryCatch(eval(expr, envir = eval.env), error = function(e) e)
-  if (!inherits(val, "error"))
-    return(val)
+  if (is.symbol(expr) &&
+      is.environment(eval.env) &&
+      exists(as.character(expr), envir = eval.env, inherits = TRUE))
+    return(get(as.character(expr), envir = eval.env, inherits = TRUE))
 
   if (is.symbol(expr) &&
       is.environment(caller_env) &&
       exists(as.character(expr), envir = caller_env, inherits = TRUE))
     return(get(as.character(expr), envir = caller_env, inherits = TRUE))
+
+  val <- tryCatch(eval(expr, envir = eval.env), error = function(e) e)
+  if (!inherits(val, "error"))
+    return(val)
 
   frames <- sys.frames()
   for (i in rev(seq_along(frames))) {
