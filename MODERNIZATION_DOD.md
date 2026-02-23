@@ -11,6 +11,17 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 1. Core estimator families first: `npreg*`, `npudens*`, `npcdens*`, `npudist*`, `npcdist*`, `npscoef*`, `npindex*`, `npplreg*`.
 2. `npregiv*` is explicitly lower priority unless blocking core release readiness.
 
+## Gate Snapshot (2026-02-23)
+- [x] R-layer `.C(` callsite retirement complete (`0`).
+- [x] Active `<<-` retirement complete in R layer (`0`).
+- [x] String-based `do.call("<string>", ...)` retirement complete in active R-layer paths.
+- [x] High-risk `eval(parse(...))` absent; residual `eval(...)` centralized in shared helper with contracts.
+- [x] Session-mode regression (`npRmpi.init(nslaves=1)` startup hang path) fixed in spawn-report route (`7b5ba36`).
+- [x] Core modernization checkpoints validated with targeted contract tests + tarball checks in working MPI env.
+- [ ] Remaining codoc/doc-signature drift in `man/*.Rd` must be reconciled.
+- [ ] Full `--as-cran` warning/note closure and accepted-warning ledger still required.
+- [ ] Win-builder validation still required before release candidate.
+
 ## Mandatory Release Gates
 
 ### 1) Interface and Semantics
