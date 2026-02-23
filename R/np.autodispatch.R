@@ -175,30 +175,6 @@
   TRUE
 }
 
-.npRmpi_autodispatch_sync_options <- function(comm = 1L) {
-  keys <- .npRmpi_autodispatch_option_keys()
-  vals <- lapply(keys, getOption)
-  cmd.sync <- substitute({
-    for (i in seq_along(KEYS)) {
-      options(structure(list(VALS[[i]]), names = KEYS[[i]]))
-    }
-  }, list(KEYS = keys, VALS = vals))
-  .npRmpi_bcast_cmd_expr(cmd.sync, comm = comm, caller.execute = TRUE)
-
-  if (isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))) {
-    cmd.verify <- substitute({
-      for (i in seq_along(KEYS)) {
-        lval <- getOption(KEYS[[i]])
-        if (!identical(lval, VALS[[i]]))
-          stop(sprintf("failed to synchronize option '%s' across MPI ranks", KEYS[[i]]))
-      }
-    }, list(KEYS = keys, VALS = vals))
-    .npRmpi_bcast_cmd_expr(cmd.verify, comm = comm, caller.execute = TRUE)
-  }
-
-  invisible(TRUE)
-}
-
 .npRmpi_autodispatch_target_args <- function() {
   c("formula", "data", "bws",
     "dat", "tdat", "edat",
@@ -401,22 +377,6 @@
   if (length(present))
     rm(list = present, envir = envir)
   invisible(present)
-}
-
-.npRmpi_autodispatch_publish_tmps <- function(tmpvals, comm = 1L) {
-  if (!length(tmpvals))
-    return(invisible(TRUE))
-
-  # Publish all temporary call materials in one broadcast command instead of
-  # per-object broadcasts, which add substantial fixed MPI overhead.
-  cmd <- substitute({
-    vals <- VALS
-    for (nm in names(vals))
-      .GlobalEnv[[nm]] <- vals[[nm]]
-  }, list(VALS = tmpvals))
-
-  .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
-  invisible(TRUE)
 }
 
 .npRmpi_autodispatch_tag_result <- function(x, mode = "auto", remote = NULL) {
