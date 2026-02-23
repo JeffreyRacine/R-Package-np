@@ -68,8 +68,7 @@ npqcmstest <- function(formula,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
-  exists.seed <- seed.state$exists.seed
-  save.seed <- seed.state$save.seed
+
 
   distribution = match.arg(distribution)
   boot.method = match.arg(boot.method)
@@ -290,7 +289,7 @@ npqcmstest <- function(formula,
   
   ## Restore seed
 
-  if(exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv)
+  .np_seed_exit(seed.state)
   
   cmstest(Jn = tJn$Jn,
           In = tJn$In,

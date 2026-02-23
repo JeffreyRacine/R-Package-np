@@ -23,8 +23,7 @@ npsymtest <- function(data = NULL,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
-  exists.seed <- seed.state$exists.seed
-  save.seed <- seed.state$save.seed
+
 
   console <- newLineConsole()
   console <- printPush(paste(sep="", "Working..."), console = console)
@@ -230,7 +229,7 @@ npsymtest <- function(data = NULL,
 
   ## Restore seed
 
-  if(exists.seed) assign(".Random.seed", save.seed, envir = .GlobalEnv)
+  .np_seed_exit(seed.state)
   
   symtest(Srho = test.stat,
           Srho.bootstrap = resampled.stat,
