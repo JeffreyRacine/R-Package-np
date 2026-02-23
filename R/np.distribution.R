@@ -98,7 +98,7 @@ npudist.dbandwidth <-
     }
 
     tnrow = nrow(tdat)
-    enrow = ifelse(no.e,tnrow,nrow(edat))
+    enrow = (if (no.e) tnrow else nrow(edat))
 
     ## re-assign levels in training and evaluation data to ensure correct
     ## conversion to numeric type.
@@ -145,7 +145,7 @@ npudist.dbandwidth <-
       num_uno = bws$nuno,
       num_ord = bws$nord,
       num_con = bws$ncon,
-      int_LARGE_SF = ifelse(bws$scaling, SF_NORMAL, SF_ARB),
+      int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
       BANDWIDTH_den_extern = switch(bws$type,
         fixed = BW_FIXED,
         generalized_nn = BW_GEN_NN,

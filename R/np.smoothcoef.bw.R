@@ -312,7 +312,7 @@ npscoefbw.scbandwidth <-
               fv <- maxPenalty
             }
 
-            return(ifelse(is.finite(fv),fv,maxPenalty))
+            return((if (is.finite(fv)) fv else maxPenalty))
 
           }
 
@@ -362,7 +362,7 @@ npscoefbw.scbandwidth <-
             cv_state$console <- printPush(msg = paste("fval:",
                                        signif(fv, digits = options('digits')$digits)),
                                      console = cv_state$console)
-            return(ifelse(is.finite(fv),fv,maxPenalty))
+            return((if (is.finite(fv)) fv else maxPenalty))
           }
 
           ## Now we implement multistarting
@@ -374,16 +374,16 @@ npscoefbw.scbandwidth <-
 
           x.scale <- sapply(1:bws$ndim, function(i){
             if (dati$icon[i]){
-              return(1.059224*(ifelse(bws$scaling, 1.0, mysd[sum(dati$icon[1:i])]*nconfac)))
+              return(1.059224*((if (bws$scaling) 1.0 else mysd[sum(dati$icon[1:i])]*nconfac)))
             }
             
             if (dati$iord[i])
               return(0.5*oMaxL(dati$all.nlev[[i]], kertype = bws$okertype)*
-                     ifelse(bws$scaling,ncatfac,1.0))
+                     (if (bws$scaling) ncatfac else 1.0))
             
             if (dati$iuno[i])
               return(0.5*uMaxL(dati$all.nlev[[i]], kertype = bws$ukertype)*
-                     ifelse(bws$scaling,ncatfac,1.0))       
+                     (if (bws$scaling) ncatfac else 1.0))       
           })
 
           console <- newLineConsole()

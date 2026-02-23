@@ -218,9 +218,9 @@ npksum.default <-
     ## end catch and destroy NA's
 
     tnrow = nrow(txdat)
-    enrow = ifelse(miss.ex, tnrow, nrow(exdat))
-    twncol = ifelse(miss.weights, 0, ncol(weights))
-    tyncol = ifelse(miss.ty, 0, ncol(tydat))
+    enrow = (if (miss.ex) tnrow else nrow(exdat))
+    twncol = (if (miss.weights) 0 else ncol(weights))
+    tyncol = (if (miss.ty) 0 else ncol(tydat))
 
     dim.in = c(twncol, tyncol, enrow)
 
@@ -229,7 +229,7 @@ npksum.default <-
     length.out = prod(dim.out[which(dim.out > 0)])
 
     if((permutation.operator != "none") || compute.ocg){
-      npvar <- ifelse((permutation.operator != "none"), bws$ncon, 0) + ifelse(compute.score | compute.ocg, bws$nuno + bws$nord, 0)
+      npvar <- (if ((permutation.operator != "none")) bws$ncon else 0) + (if (compute.score | compute.ocg) bws$nuno + bws$nord else 0)
       p.length.out <- npvar*length.out
       p.dim.out <- c(dim.out, max(npvar, 0))      
     }
@@ -278,7 +278,7 @@ npksum.default <-
       econ = data.frame()
     }
 
-    nkw <- ifelse(return.kernel.weights, tnrow*enrow, 0)
+    nkw <- (if (return.kernel.weights) tnrow*enrow else 0)
 
     return.names <- c("ksum","kernel.weights","p.ksum")
       

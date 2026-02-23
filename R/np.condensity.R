@@ -144,7 +144,7 @@ npcdens.conbandwidth <- function(bws,
 
 
   tnrow = nrow(txdat)
-  enrow = ifelse(no.exy,tnrow,nrow(exdat))
+  enrow = (if (no.exy) tnrow else nrow(exdat))
 
   ## re-assign levels in training and evaluation data to ensure correct
   ## conversion to numeric type.
@@ -210,7 +210,7 @@ npcdens.conbandwidth <- function(bws,
   myopti <- list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
-      int_LARGE_SF = ifelse(bws$scaling, SF_NORMAL, SF_ARB),
+      int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
       BANDWIDTH_den_extern = switch(bws$type,
           fixed = BW_FIXED,
           generalized_nn = BW_GEN_NN,

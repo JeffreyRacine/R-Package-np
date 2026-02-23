@@ -373,7 +373,7 @@ npscoef.scbandwidth <-
     tww <- tww[-1,-1,,drop=FALSE]
 
     tnrow <- nrow(txdat)
-    enrow <- ifelse(miss.ex, nrow(txdat), nrow(exdat))
+    enrow <- (if (miss.ex) nrow(txdat) else nrow(exdat))
 
     if (!miss.ex)
       W <- as.matrix(data.frame(1,exdat))

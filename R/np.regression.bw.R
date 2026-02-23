@@ -181,7 +181,7 @@ npregbw.rbandwidth <-
     ncatfac <- nrow^(-2.0/(2.0*bws$ckerorder+bws$ncon))
 
     invalid.penalty <- match.arg(invalid.penalty)
-    penalty_mode <- ifelse(invalid.penalty == "baseline", 1L, 0L)
+    penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
 
     reg.c <- npRegtypeToC(regtype = tbw$regtype,
                           degree = tbw$degree,
@@ -205,15 +205,15 @@ npregbw.rbandwidth <-
 
     if (bandwidth.compute){
       myopti = list(num_obs_train = dim(xdat)[1], 
-        iMultistart = ifelse(nmulti==0,IMULTI_FALSE,IMULTI_TRUE),
+        iMultistart = (if (nmulti==0) IMULTI_FALSE else IMULTI_TRUE),
         iNum_Multistart = nmulti,
-        int_use_starting_values = ifelse(all(bws$bw==0),USE_START_NO, USE_START_YES),
-        int_LARGE_SF = ifelse(bws$scaling, SF_NORMAL, SF_ARB),
+        int_use_starting_values = (if (all(bws$bw==0)) USE_START_NO else USE_START_YES),
+        int_LARGE_SF = (if (bws$scaling) SF_NORMAL else SF_ARB),
         BANDWIDTH_reg_extern = switch(bws$type,
           fixed = BW_FIXED,
           generalized_nn = BW_GEN_NN,
           adaptive_nn = BW_ADAP_NN),
-        itmax=itmax, int_RESTART_FROM_MIN=ifelse(remin,RE_MIN_TRUE,RE_MIN_FALSE), 
+        itmax=itmax, int_RESTART_FROM_MIN=(if (remin) RE_MIN_TRUE else RE_MIN_FALSE), 
         int_MINIMIZE_IO=if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE, 
         bwmethod = switch(bws$method,
           cv.aic = BWM_CVAIC,
