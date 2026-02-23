@@ -438,7 +438,7 @@
         }
     } else {
 
-      dsf = ifelse(gradients,bws$xndim,1)
+      dsf = if (gradients) bws$xndim else 1
       tot.dim = bws$xndim + bws$yndim - quantreg
 
       if (plot.behavior != "data" && plot.par.mfrow)
@@ -924,7 +924,7 @@
         xOrY = "x"
         
         for (plot.index in 1:tot.dim){
-          i = ifelse(plot.index <= bws$xndim, plot.index, plot.index - bws$xndim)
+          i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)
             xOrY <- "y"
