@@ -123,6 +123,17 @@ npregbw.rbandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,dim(xdat)[2])
     }
+    bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
+    remin <- npValidateScalarLogical(remin, "remin")
+    scale.init.categorical.sample <-
+      npValidateScalarLogical(scale.init.categorical.sample, "scale.init.categorical.sample")
+    transform.bounds <- npValidateScalarLogical(transform.bounds, "transform.bounds")
+    itmax <- npValidatePositiveInteger(itmax, "itmax")
+    ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
+    tol <- npValidatePositiveFiniteNumeric(tol, "tol")
+    small <- npValidatePositiveFiniteNumeric(small, "small")
+    penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
+    nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
 
     if(!(is.vector(ydat) | is.factor(ydat)))
       stop("'ydat' must be a vector")

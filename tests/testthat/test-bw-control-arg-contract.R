@@ -35,4 +35,31 @@ test_that("bandwidth wrappers reject invalid scalar control flags", {
     npudistbw.dbandwidth(dat = dat, bws = bws, memfac = 0),
     "'memfac' must be a positive finite numeric scalar"
   )
+
+  expect_error(
+    npregbw.rbandwidth(xdat = dat, ydat = dat$x, bws = bws, bandwidth.compute = c(TRUE, FALSE)),
+    "'bandwidth.compute' must be TRUE or FALSE"
+  )
+  expect_error(
+    npregbw.rbandwidth(xdat = dat, ydat = dat$x, bws = bws, itmax = 0),
+    "'itmax' must be a positive integer"
+  )
+
+  expect_error(
+    npcdensbw.conbandwidth(xdat = dat, ydat = dat, bws = bws, memfac = 0),
+    "'memfac' must be a positive finite numeric scalar"
+  )
+  expect_error(
+    npcdensbw.conbandwidth(xdat = dat, ydat = dat, bws = bws, nmulti = -1),
+    "'nmulti' must be a non-negative integer"
+  )
+
+  expect_error(
+    npcdistbw.condbandwidth(xdat = dat, ydat = dat, bws = bws, do.full.integral = c(TRUE, FALSE)),
+    "'do.full.integral' must be TRUE or FALSE"
+  )
+  expect_error(
+    npcdistbw.condbandwidth(xdat = dat, ydat = dat, bws = bws, ngrid = 0),
+    "'ngrid' must be a positive integer"
+  )
 })
