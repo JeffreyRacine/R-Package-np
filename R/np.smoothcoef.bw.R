@@ -24,8 +24,8 @@ npscoefbw.formula <-
 
     mf[[1]] <- as.name("model.frame")
 
-    formula_to_explode <- eval(mf[["formula"]], parent.frame())
-    chromoly <- explodePipe(formula_to_explode, env = environment(formula))
+    formula.obj <- if (!is.null(formula.call)) eval(formula.call, envir = parent.frame()) else formula
+    chromoly <- explodePipe(formula.obj, env = environment(formula))
 
     bronze <- sapply(chromoly, paste, collapse = " + ")
     mf[["formula"]] <-
