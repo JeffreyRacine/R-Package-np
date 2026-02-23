@@ -176,6 +176,11 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
             if (is.function(fn))
                 return(fn)
         }
+        if (is.call(hd)) {
+            fn <- tryCatch(eval(hd, envir = eval_env), error = function(e) NULL)
+            if (is.function(fn))
+                return(fn)
+        }
         if (is.function(hd))
             return(hd)
         if (is.symbol(hd))
@@ -183,9 +188,6 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
         if (is.character(hd) && length(hd) >= 1L)
             return(hd[[1L]])
     }
-    fn <- tryCatch(eval(scmd, envir = eval_env), error = function(e) NULL)
-    if (is.function(fn))
-        return(fn)
     as.character(scmd)[1L]
 }
 
@@ -214,12 +216,12 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 			if (i != rank)
 				invisible(mpi.send(x=scmd.arg, type=4, dest=i, tag=50000+i, comm=comm))
 			}
-      if (caller.execute) {
-       if (length(arg) > 0)
-         do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = parent.frame())
-       else
-         eval(tcmd, envir = parent.frame())
-      }
+	      if (caller.execute) {
+	       if (length(arg) > 0)
+	         do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = parent.frame())
+	       else
+	         .npRmpi_eval_scmd(tcmd, envir = parent.frame())
+	      }
   
     } 
     else {

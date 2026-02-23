@@ -12,3 +12,8 @@ test_that("session attach loop executes messages through helper", {
   fn.body <- paste(deparse(body(.npRmpi_session_attach_worker_loop), width.cutoff = 500L), collapse = " ")
   expect_match(fn.body, "\\.npRmpi_eval_scmd\\(msg, envir = \\.GlobalEnv\\)")
 })
+
+test_that("mpi.bcast.cmd caller path executes no-arg commands through helper", {
+  fn.body <- paste(deparse(body(mpi.bcast.cmd), width.cutoff = 500L), collapse = " ")
+  expect_match(fn.body, "\\.npRmpi_eval_scmd\\(tcmd, envir = parent\\.frame\\(\\)\\)")
+})

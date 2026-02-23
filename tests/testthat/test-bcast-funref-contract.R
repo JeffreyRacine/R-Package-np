@@ -16,4 +16,13 @@ test_that(".npRmpi_bcast_cmd_funref resolves namespace-qualified heads", {
   ref_internal <- .npRmpi_bcast_cmd_funref(quote(base:::print.default))
   expect_true(is.function(ref_internal))
   expect_identical(ref_internal, get("print.default", envir = asNamespace("base"), mode = "function", inherits = FALSE))
+
+  ref_call_head <- .npRmpi_bcast_cmd_funref(quote((base::assign)("tmp", 1L)))
+  expect_true(is.function(ref_call_head))
+  expect_identical(ref_call_head, base::assign)
+})
+
+test_that(".npRmpi_bcast_cmd_funref no longer evals full command expressions", {
+  fn.body <- paste(deparse(body(.npRmpi_bcast_cmd_funref), width.cutoff = 500L), collapse = " ")
+  expect_false(grepl("eval\\(scmd", fn.body))
 })
