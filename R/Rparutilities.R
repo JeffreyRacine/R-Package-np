@@ -540,9 +540,15 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
 }
 
 #from snow
-.docall <- function(fun, args) {
-    if ((is.character(fun) && length(fun) == 1) || is.name(fun))
-        fun <- get(as.character(fun), envir = .GlobalEnv, mode = "function")
+.docall <- function(fun, args, envir = parent.frame()) {
+    if ((is.character(fun) && length(fun) == 1) || is.name(fun)) {
+        fname <- as.character(fun)
+        fun <- get0(fname, envir = envir, mode = "function", inherits = TRUE)
+        if (is.null(fun))
+            fun <- get0(fname, envir = .GlobalEnv, mode = "function", inherits = FALSE)
+        if (is.null(fun))
+            stop(sprintf("object '%s' of mode 'function' was not found", fname), call. = FALSE)
+    }
     enquote <- function(x) as.call(list(as.name("quote"), x))
     do.call(fun, lapply(args, enquote))
 }
