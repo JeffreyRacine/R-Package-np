@@ -216,9 +216,12 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 			}
 		}
 		#parse(text=out)
-		if (length(scmd.arg$arg)>0)
-			enquote(do.call(.npRmpi_bcast_cmd_funref(scmd.arg$scmd), scmd.arg$arg, envir=.GlobalEnv))
-		else 
+		if (length(scmd.arg$arg)>0) {
+			as.call(list(as.name("do.call"),
+			             .npRmpi_bcast_cmd_funref(scmd.arg$scmd),
+			             scmd.arg$arg,
+			             .GlobalEnv))
+		} else 
 			scmd.arg$scmd
 	}
 }
