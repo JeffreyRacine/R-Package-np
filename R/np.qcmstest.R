@@ -224,7 +224,7 @@ npqcmstest <- function(formula,
 
   if(distribution == "bootstrap"){
     Sn.bootstrap <- numeric(boot.num)
-    for(ii in 1:boot.num) {
+    for (ii in seq_len(boot.num)) {
       console <- printPush(paste(sep="", "Bootstrap replication ",
                                  ii, "/", boot.num, "..."), console)
       if(boot.method == "iid"){

@@ -126,7 +126,7 @@ npsdeptest <- function(data = NULL,
   
   ## Save the bandwidths for resampling exercise...
   
-  for(k in 1:lag.num) {
+  for (k in seq_len(lag.num)) {
     
     console <- printClear(console)
     console <- printPop(console)  
@@ -154,7 +154,7 @@ npsdeptest <- function(data = NULL,
 
   }
 
-  for(k in 1:lag.num) Srho.cumulant.vec[k] <- sum(Srho.vec[1:k])
+  for (k in seq_len(lag.num)) Srho.cumulant.vec[k] <- sum(Srho.vec[seq_len(k)])
 
   ## Bootstrap if requested - null is independence so simple iid
   ## bootstrap (sample(x,replace=TRUE)) will work
@@ -170,7 +170,7 @@ npsdeptest <- function(data = NULL,
     Srho.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
 		Srho.cumulant.bootstrap.mat <- matrix(NA,boot.num,(lag.num))
 
-    for(b in 1:boot.num) {
+    for (b in seq_len(boot.num)) {
 
       console <- printClear(console)
       console <- printPush(paste(sep="", "Bootstrap replication ",
@@ -178,18 +178,17 @@ npsdeptest <- function(data = NULL,
 
       ## Resample under the null
 
-      tmp <- as.ts(sample(data,replace=TRUE))
-      tmp <- ts.intersect(tmp,lag(tmp,k))
-      y <- as.numeric(tmp[,1])
-      y.lag <- as.numeric(tmp[,2])
-      rm(tmp)
+      resampled.ts <- as.ts(sample(data, replace = TRUE))
 
-      for(k in 1:lag.num) {
-        Srho.vec.boot[k] <- Srho.bivar(y,y.lag,bw.y[k],bw.y.lag[k],c(bw.joint.y[k],bw.joint.y.lag[k]),method=method)
+      for (k in seq_len(lag.num)) {
+        tmp <- ts.intersect(resampled.ts, lag(resampled.ts, k))
+        y <- as.numeric(tmp[,1])
+        y.lag <- as.numeric(tmp[,2])
+        Srho.vec.boot[k] <- Srho.bivar(y, y.lag, bw.y[k], bw.y.lag[k], c(bw.joint.y[k], bw.joint.y.lag[k]), method = method)
         Srho.bootstrap.mat[b,k] <- Srho.vec.boot[k]
-				## `Portmanteau' cumulant of all lags
-				Srho.cumulant.vec.boot[k] <- sum(Srho.vec.boot[1:k])
-				Srho.cumulant.bootstrap.mat[b,k] <- Srho.cumulant.vec.boot[k]          
+        ## `Portmanteau' cumulant of all lags
+        Srho.cumulant.vec.boot[k] <- sum(Srho.vec.boot[seq_len(k)])
+        Srho.cumulant.bootstrap.mat[b,k] <- Srho.cumulant.vec.boot[k]
       }
 
     }
@@ -199,9 +198,9 @@ npsdeptest <- function(data = NULL,
     P.vec <- numeric()
     P.cumulant.vec <- numeric()
     
-    for(k in 1:lag.num) {
-      P.vec[k] <- mean(ifelse(Srho.bootstrap.mat[,k]>Srho.vec[k],1,0))
-      P.cumulant.vec[k] <- mean(ifelse(Srho.cumulant.bootstrap.mat[,k]>Srho.cumulant.vec[k],1,0))
+    for (k in seq_len(lag.num)) {
+      P.vec[k] <- mean(Srho.bootstrap.mat[,k] > Srho.vec[k])
+      P.cumulant.vec[k] <- mean(Srho.cumulant.bootstrap.mat[,k] > Srho.cumulant.vec[k])
     }
 
   }
