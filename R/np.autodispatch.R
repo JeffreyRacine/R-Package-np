@@ -55,11 +55,9 @@
 }
 
 .npRmpi_bcast_cmd_expr <- function(expr, comm = 1L, caller.execute = TRUE) {
-  call <- as.call(list(as.name("mpi.bcast.cmd"),
-                       cmd = expr,
-                       comm = comm,
-                       caller.execute = caller.execute))
-  eval(call, envir = parent.frame())
+  do.call("mpi.bcast.cmd",
+          list(cmd = expr, comm = comm, caller.execute = caller.execute),
+          envir = parent.frame())
 }
 
 .npRmpi_bcast_robj_by_name <- function(name, caller_env = parent.frame()) {
