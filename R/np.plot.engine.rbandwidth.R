@@ -146,7 +146,7 @@
         warning("higher-order glp derivatives are not yet available at C level; plotting NA for requested orders > 1")
     }
 
-    if ((bws$ncon + bws$nord == 2) & (bws$nuno == 0) & perspective & !gradients &
+    if ((bws$ncon + bws$nord == 2) && (bws$nuno == 0) && perspective && !gradients &&
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
 
       view = match.arg(view)
@@ -639,7 +639,7 @@
         }
       }
       
-      if (common.scale & (plot.behavior != "data")){
+      if (common.scale && (plot.behavior != "data")){
         jj = 1:bws$ndim*3
 
         if (plot.errors && plot.errors.type == "all") {
@@ -665,7 +665,7 @@
               y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
             }
           }
-        } else if (plot.errors.center == "estimate" | !plot.errors) {
+        } else if (plot.errors.center == "estimate" || !plot.errors) {
           y.max = max(na.omit(as.double(data.eval)) +
             if (plot.errors) na.omit(as.double(data.err[,jj-1]))
             else 0

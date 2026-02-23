@@ -112,7 +112,7 @@
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
 
-    if ((bws$ncon + bws$nord == 2) & (bws$nuno == 0) & perspective &
+    if ((bws$ncon + bws$nord == 2) && (bws$nuno == 0) && perspective &&
         !any(xor(bws$xdati$iord, bws$xdati$inumord))){
       view = match.arg(view)
       rotate = (view == "rotate")
@@ -573,7 +573,7 @@
         }
       }
       
-      if (common.scale & (plot.behavior != "data")){
+      if (common.scale && (plot.behavior != "data")){
         jj = 1:bws$ndim*3
 
         if (plot.errors && plot.errors.type == "all") {
@@ -599,7 +599,7 @@
               y.min = min(na.omit(as.double(data.err[,jj] - data.err[,jj-2])))
             }
           }
-        } else if (plot.errors.center == "estimate" | !plot.errors) {
+        } else if (plot.errors.center == "estimate" || !plot.errors) {
           y.max = max(na.omit(as.double(data.eval)) +
             if (plot.errors) na.omit(as.double(data.err[,jj-1]))
             else 0

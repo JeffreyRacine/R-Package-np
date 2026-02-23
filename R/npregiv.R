@@ -760,7 +760,7 @@ npregiv <- function(y,
 
         aic.penalty <- (1+trH/n)/(1-(trH+2)/n)
 
-        if (!any(ghat == maxPenalty) & (aic.penalty > 0)){
+        if (!any(ghat == maxPenalty) && (aic.penalty > 0)){
           fv <- log(mean((ydat-ghat)^2)) + aic.penalty
         } else {
           fv <- maxPenalty
@@ -817,7 +817,7 @@ npregiv <- function(y,
 
         aic.penalty <- (1+trH/n)/(1-(trH+2)/n)
 
-        if (!any(ghat == maxPenalty) & (aic.penalty > 0)){
+        if (!any(ghat == maxPenalty) && (aic.penalty > 0)){
           fv <- log(mean((ydat-ghat)^2)) + aic.penalty
         } else {
           fv <- maxPenalty
