@@ -103,3 +103,22 @@ Completed in `np-master`:
      - `/tmp/np_issue_notes_repros_seqcols_20260223.log`
    - tarball check:
      - `/tmp/np_master_check_seqcols_20260223.log` (`Status: OK`)
+
+## BW Guarded-Slice `seq_len` Checkpoint (2026-02-23)
+Completed in `np-master`:
+1. Replaced guarded `1:gbw` fallback slices with explicit `seq_len(gbw)` indices in bw constructors.
+2. Scope:
+   - `R/np.condensity.bw.R`
+   - `R/np.distribution.bw.R`
+3. Commit:
+   - `np-master`: `495c8a3`
+4. Validation:
+   - parse gates: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/np_master_gbwidx_tests_20260223.log` (`TEST_RC:0`)
+   - fresh-install surface smoke:
+     - `/tmp/np_gbwidx_surface_smoke3_20260223.out` (`NP_GBWIDX_SURFACE_SMOKE_OK`)
+   - issue-note verified repro sweep:
+     - `/tmp/np_issue_notes_repros_gbwidx_20260223.log`
+   - tarball check:
+     - `/tmp/np_master_check_gbwidx_20260223.log` (`Status: OK`)
