@@ -1304,7 +1304,7 @@ Completed in `np-npRmpi`:
    - density inid session smoke added as opt-in contract:
      - `NP_RMPI_ENABLE_DENSITY_INID_TEST=1`.
 6. Commit:
-   - `np-npRmpi`: `896ca4b`.
+   - `np-npRmpi`: `896ca4b` (staging + guards), `91132b8` (serial-`np` routing for opt-in path).
 7. Validation:
    - `/tmp/nprmpi_session_routing_contract_20260224_101550.log` (`PASS 20, FAIL 0, SKIP 2`)
    - `/tmp/nprmpi_issue_notes_repros_20260224_102108.log` (`all verified issue-note repros passed`)
