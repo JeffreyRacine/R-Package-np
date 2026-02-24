@@ -577,7 +577,7 @@ Completed in `np-npRmpi`:
    - `R/symtest.R`
    - `R/unitest.R`
 3. Commit:
-   - `np-npRmpi`: `<pending>`
+   - `np-npRmpi`: `513057c`
 4. Validation:
    - parse gates: `PARSE_OK`
    - targeted tests:
