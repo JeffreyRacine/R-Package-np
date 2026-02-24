@@ -599,7 +599,7 @@ Completed in `np-npRmpi`:
    - `R/b.star.R`
    - `tests/testthat/test-utils.R`
 5. Commit:
-   - `np-npRmpi`: `<pending>`
+   - `np-npRmpi`: `4e78cae`
 6. Validation:
    - focused tests:
      - `/tmp/nprmpi_bstar_fix_tests_20260224.log` (`PASS 6, FAIL 0`)
