@@ -892,3 +892,28 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_wilddraw_alloc_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_wilddraw_alloc_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Sequence-Range Edge-Safety Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Eliminated `1:n` edge behavior in key utility/MPI helpers:
+   - `dlev()` now uses `as.numeric(seq_len(nlevels(x)))`,
+   - `.splitIndices()` now uses `seq_len/seq.int`, fixing the `nx=0` phantom index bug.
+2. Scope:
+   - `R/util.R`
+   - `R/Rparutilities.R`
+3. Commit:
+   - `np-npRmpi`: `3fc6792`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); invisible(parse(file='R/Rparutilities.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='mpi-helpers|nptests|utils', reporter='summary')` (`RC:0`)
+     - log: `/tmp/nprmpi_splitindices_dlev_tests_20260224.log`
+   - direct edge-case smoke:
+     - `/tmp/nprmpi_splitindices_zero_smoke_20260224.out` (`NPRMPI_SPLITINDICES_ZERO_OK`)
+     - `/tmp/np_dlev_seq_smoke_20260224.out` (`DLEV_SEQ_OK`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_052223.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_seq_edge_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_seq_edge_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
