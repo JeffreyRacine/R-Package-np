@@ -23,6 +23,7 @@
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 399,
            plot.errors.boot.method = c("inid", "fixed", "geom"),
+           plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
@@ -57,6 +58,7 @@
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.wild = plot.errors.boot.wild,
       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
       plot.errors.center = plot.errors.center,
       plot.errors.type = plot.errors.type,
@@ -75,6 +77,7 @@
                                               where = "plot(...)",
                                               allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.wild <- normalized.opts$plot.errors.boot.wild
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
     plot.errors.type <- normalized.opts$plot.errors.type
@@ -119,6 +122,7 @@
                   xdat = xdat, ydat = ydat,
                   gradients = gradients,
                   plot.errors.boot.method = plot.errors.boot.method,
+                  plot.errors.boot.wild = plot.errors.boot.wild,
                   plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                   plot.errors.boot.num = plot.errors.boot.num,
                   plot.errors.center = plot.errors.center,

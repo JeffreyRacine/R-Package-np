@@ -34,6 +34,7 @@
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 399,
            plot.errors.boot.method = c("inid", "fixed", "geom"),
+           plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
@@ -111,6 +112,7 @@
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.wild = plot.errors.boot.wild,
       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
       plot.errors.center = plot.errors.center,
       plot.errors.type = plot.errors.type,
@@ -128,6 +130,7 @@
                                               where = "plot(...)",
                                               allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.wild <- normalized.opts$plot.errors.boot.wild
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
     plot.errors.type <- normalized.opts$plot.errors.type
@@ -145,8 +148,6 @@
         plot.gradient.order.label[which(bws$icon)] <- go
       if (any(go > bws$degree))
         warning("some requested glp derivatives exceed polynomial degree; plotting NA for those components")
-      if (any(go > 1L))
-        warning("higher-order glp derivatives are not yet available at C level; plotting NA for requested orders > 1")
     }
 
     if ((bws$ncon + bws$nord == 2) && (bws$nuno == 0) && perspective && !gradients &&
@@ -202,6 +203,7 @@
           gradient.order = gradient.order,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
@@ -472,6 +474,7 @@
                       gradient.order = gradient.order,
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,
