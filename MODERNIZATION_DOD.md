@@ -1344,3 +1344,21 @@ Status: deferred (no code change).
 1. Ran bounded session-mode probes to evaluate promoting `np.plot.inid.ksum.fastpath.nprmpi` from opt-in to default-on.
 2. In this sandbox/runtime, method-level probes did not complete within practical time bounds for all density-family cases, so promotion was not enabled in this checkpoint.
 3. Safety decision: keep current default-off gate, retain fallback behavior, and require explicit opt-in until bounded reproducible performance/parity evidence is complete.
+
+## MPI Mode Validation Coverage Checkpoint (Session/Attach/Profile) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Confirmed existing subprocess contract coverage for:
+   - session mode (`npRmpi.init(nslaves=1)`)
+   - attach mode (`mpiexec` + `npRmpi.init(mode='attach')`)
+2. Added explicit profile-mode subprocess contract under `mpiexec` using package `inst/Rprofile` bootstrap (`R_PROFILE_USER`/`R_PROFILE`).
+3. Test file:
+   - `tests/testthat/test-session-routing-subprocess-contract.R`
+4. Opt-in environment gates:
+   - `NP_RMPI_ENABLE_ATTACH_TEST=1`
+   - `NP_RMPI_ENABLE_PROFILE_TEST=1`
+5. Runtime-environment handling:
+   - attach/profile tests now auto-skip (not fail) when MPI initialization fails due host interface constraints (e.g., OFI `ep_enable` failures), after `en0` then `lo0` fallback attempts.
+6. Validation command:
+   - `NOT_CRAN=true NP_RMPI_ENABLE_ATTACH_TEST=1 NP_RMPI_ENABLE_PROFILE_TEST=1 FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0 Rscript -e "setwd('/Users/jracine/Development/np-npRmpi'); library(testthat); testthat::test_file('tests/testthat/test-session-routing-subprocess-contract.R', reporter='summary', stop_on_failure=TRUE)"`
+7. Validation artifact:
+   - `/tmp/nprmpi_session_attach_profile_contract_notcran2_20260224.log` (`session` + `attach` pass, `profile` conditionally skipped on MPI init-interface limitation in this host runtime)
