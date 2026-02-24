@@ -115,16 +115,34 @@ npuniden.boundary <- function(X=NULL,
             t <- (X-x)/h
             if(x < a+h && h < (b-a)) {
                 c <- (a-x)/h
-                ifelse(c <= t & t <= 2+c,.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
+                out <- numeric(length(t))
+                mask <- (c <= t) & (t <= 2 + c)
+                if(any(mask)) {
+                    tm <- t[mask]
+                    out[mask] <- .75 * (c + 1 - 1.25 * (1 + 2 * c) * (tm - c)^2) * (tm - (c + 2))^2
+                }
+                out / h
             } else if((a+h <= x && x <= b-h) || h >= (b-a)) {
                 z.a <- (a-x)/h
                 z.b <- (b-x)/h  
                 rw <- (3*(z.b^5-z.a^5)-10*(z.b^3-z.a^3)+15*(z.b-z.a))/16
                 rw[rw>1] <- 1
-                ifelse(abs(t)<1,(15/16)*(1-t**2)**2/(h*rw),0)
+                out <- numeric(length(t))
+                mask <- abs(t) < 1
+                if(any(mask)) {
+                    tm <- t[mask]
+                    out[mask] <- (15 / 16) * (1 - tm^2)^2 / (h * rw)
+                }
+                out
             } else if(x > b-h && h < (b-a)) {
                 c <- (b-x)/h
-                ifelse(c-2 <= t & t <= c,.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
+                out <- numeric(length(t))
+                mask <- (c - 2 <= t) & (t <= c)
+                if(any(mask)) {
+                    tm <- t[mask]
+                    out[mask] <- .75 * (1 - c + 1.25 * (-1 + 2 * c) * (tm - c)^2) * (tm - (c - 2))^2
+                }
+                out / h
             }
         }
     } else if(kertype=="fbl") {
@@ -133,9 +151,21 @@ npuniden.boundary <- function(X=NULL,
             t <- (X-x)/h
             if(x < a+h) {
                 c <- (a-x)/h
-                ifelse(c <= t & t <= 2+c,.75*(c+1-1.25*(1+2*c)*(t-c)^2)*(t-(c+2))^2,0)/h
+                out <- numeric(length(t))
+                mask <- (c <= t) & (t <= 2 + c)
+                if(any(mask)) {
+                    tm <- t[mask]
+                    out[mask] <- .75 * (c + 1 - 1.25 * (1 + 2 * c) * (tm - c)^2) * (tm - (c + 2))^2
+                }
+                out / h
             } else {
-                ifelse(abs(t)<1,(15/16)*(1-t**2)**2/h,0)
+                out <- numeric(length(t))
+                mask <- abs(t) < 1
+                if(any(mask)) {
+                    tm <- t[mask]
+                    out[mask] <- (15 / 16) * (1 - tm^2)^2 / h
+                }
+                out
             }
         }
     } else if(kertype=="fbu") {
@@ -143,10 +173,22 @@ npuniden.boundary <- function(X=NULL,
             ## Floating boundary kernel (Scott (1992), Page 46), right bound
             t <- (X-x)/h
             if(x <= b-h) {
-                ifelse(abs(t)<1,(15/16)*(1-t**2)**2/h,0)
+                out <- numeric(length(t))
+                mask <- abs(t) < 1
+                if(any(mask)) {
+                    tm <- t[mask]
+                    out[mask] <- (15 / 16) * (1 - tm^2)^2 / h
+                }
+                out
             } else {
                 c <- (b-x)/h
-                ifelse(c-2 <= t & t <= c,.75*(1-c+1.25*(-1+2*c)*(t-c)^2)*(t-(c-2))^2,0)/h
+                out <- numeric(length(t))
+                mask <- (c - 2 <= t) & (t <= c)
+                if(any(mask)) {
+                    tm <- t[mask]
+                    out[mask] <- .75 * (1 - c + 1.25 * (-1 + 2 * c) * (tm - c)^2) * (tm - (c - 2))^2
+                }
+                out / h
             }
         }
     }

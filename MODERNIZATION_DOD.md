@@ -205,6 +205,25 @@ Completed in `np-npRmpi`:
    - subprocess routing contract file:
      - `/tmp/nprmpi_session_routing_contract_after_inidsmoke_20260224.log` (`RC:0`).
 
+## Boundary Kernel Masked-Assignment Modernization (2026-02-24)
+Completed in `np-npRmpi`:
+1. Modernized floating-boundary kernel branches in `npuniden.boundary` by replacing vectorized `ifelse(...)` gating with explicit masked assignment.
+2. Scope:
+   - `R/npuniden.boundary.R` (`fb`, `fbl`, `fbu` branches)
+3. Why:
+   - avoids eager evaluation of both `ifelse` branches in hot kernel math,
+   - preserves vectorized semantics with explicit masks.
+4. Validation:
+   - parse gate: `NPRMPI_PARSE_OK`,
+   - targeted tests:
+     - `/tmp/nprmpi_npuniden_maskmodern_tests_20260224.log` (`NO_FAIL_MARKERS`)
+   - old-vs-new parity/perf harness:
+     - `/tmp/nprmpi_npuniden_maskmodern_parity_20260224.csv` (max abs diff `0` for `f` and `F`)
+     - `/tmp/nprmpi_npuniden_maskmodern_perf_20260224.csv` (mean speedup ~16.6%-22.0%, median ~20% for tested kernels)
+     - `/tmp/nprmpi_npuniden_maskmodern_parity_perf_20260224.out` (`NPRMPI_NPUNIDEN_MASK_PARITY_OK`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_npuniden_maskmodern_20260224.log` (`RC:0`).
+
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-npRmpi`:
 1. Replaced residual `1:n` column reconstruction and `setdiff(1:(...))` forms with `seq_len(...)` in conditional bw selectors.
