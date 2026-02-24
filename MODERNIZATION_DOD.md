@@ -48,10 +48,21 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
    - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix,
    - MPI utility index-range hardening in `Rparutilities`/`Rmpi` (`1:n` -> `seq_len`, plus safe cart slicing),
    - bootstrap index sampling micro-modernization in `npdeneqtest` (`sample(...)` index draws -> `sample.int(...)`).
-3. Remaining highest-priority work:
-   - bounded-kernel/convolution native-path completion and MPI-path parity validation,
-   - performance-governance closure with fixed/varying seed comparisons for performance-sensitive changes,
-   - win-builder closure before release candidate.
+3. Modernization-phase closure decision:
+   - active modernization push is considered substantially complete for current objectives,
+   - bounded-kernel/convolution completion is explicitly deferred to future work (`issue_notes/bounded_kernel_todo.md`),
+   - remaining near-term release hygiene is doc/codoc triage and win-builder closure.
+4. Remaining highest-priority near-term work:
+   - doc/codoc triage for pre-existing `man/*.Rd` drift,
+   - win-builder closure before release candidate,
+   - optional performance-governance backfills and mode-specific perf characterization where ROI warrants.
+
+## Branch Readiness (2026-02-24)
+1. Technical risk for keeping this modernization tranche as the active `npRmpi` branch baseline is moderate/acceptable if standard gates keep running.
+2. Non-blocking deferred item:
+   - bounded convolution/native completion remains in future backlog and is not required for this tranche closure.
+3. Recommended continuing gate:
+   - keep session/attach/profile routing contracts plus issue-note repro sweeps in the checkpoint cadence.
 
 ## Native Guard + Harness Timeout Checkpoint (2026-02-24)
 Completed in `np-npRmpi`:

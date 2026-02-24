@@ -1,4 +1,10 @@
-# Bounded Continuous Kernel Rollout TODO (`np-master`)
+# Bounded Continuous Kernel Rollout TODO (`np-npRmpi`)
+
+## Status (2026-02-24)
+
+- Deferred to future modernization tranche by decision.
+- This file remains the canonical backlog for bounded convolution/native completion.
+- It is not a blocker for concluding the current modernization push.
 
 ## CRAN Example Policy
 
