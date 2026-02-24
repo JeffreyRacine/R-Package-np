@@ -932,3 +932,30 @@ Completed in `np-master`:
        - `/tmp/np_master_check_ascran_util_genBwKerStrs_withcrs_20260224.log`
      - bounded quick gate:
        - `/tmp/np_master_check_quick_util_genBwKerStrs_20260224.log` (`RC:0`, `Status: OK`)
+
+## Core NA/Range Guard Hardening (`npquantile`/`npcopula`/`npsigtest`/`npreg`) (2026-02-24)
+Completed in `np-master`:
+1. Hardened argument-validation paths to fail deterministically on missing values and fixed one ordering bug in `npquantile`:
+   - `tau` validation now rejects missing values explicitly and range-checks with `na.rm = TRUE`,
+   - `npquantile` now validates `bws$xnames` only after constructing/validating `bws`,
+   - `u`/`prob`/`index` range checks now guard missing values explicitly,
+   - Bernstein-support guard in `npreg` now uses `na.rm = TRUE` for deterministic behavior.
+2. Scope:
+   - `R/np.quantile.R`
+   - `R/np.copula.R`
+   - `R/np.plot.helpers.R`
+   - `R/np.sigtest.R`
+   - `R/np.regression.R`
+3. Commit:
+   - `np-master`: `c939edd`
+4. Validation:
+   - parse gate:
+     - log: `/tmp/np_master_na_guard_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests:
+     - log: `/tmp/np_master_na_guard_tests_20260224.log` (`FAIL 0`; expected pre-existing `npregiv` warnings only)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_na_guard.log` (all verified repros passed)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_063809.log`
+   - tarball-first:
+     - `/tmp/np_master_build_na_guard_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_na_guard_20260224.log` (`RC:0`, `Status: OK`)
