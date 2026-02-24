@@ -831,3 +831,19 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_bwmeta_seq2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_bwmeta_seq2_20260224.log` (`RC:0`, `Status: 1 WARNING, 1 NOTE`; warning set unchanged from existing top-level-file debt)
+
+## `b.star` Index-Range Guard Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced the `1:(mmax-Kn+1)` insignificant-run index builder with bounded `seq_len(max(mmax - Kn + 1L, 0L))` to avoid `1:0`/descending edge behavior while preserving normal positive-range semantics.
+2. Scope:
+   - `R/b.star.R`
+3. Commit:
+   - `np-npRmpi`: `21627e1`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='utils|nptests|sdeptest|npuniden', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_045406.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_bstar_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_bstar_seq_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
