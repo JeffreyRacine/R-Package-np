@@ -211,6 +211,27 @@ tryCatch({
   cat("FAIL:", conditionMessage(e), "\n")
 })
 
+# Session routing/performance guard: inid bootstrap plot path
+cat("#inidplot: session plot bootstrap inid path ... ")
+tryCatch({
+  set.seed(42)
+  n <- 400
+  x <- rnorm(n)
+  y <- rnorm(n)
+  g <- npreg(y ~ x)
+  png(tempfile(fileext = ".png"))
+  on.exit(try(dev.off(), silent = TRUE), add = TRUE)
+  suppressWarnings(plot(
+    g,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "inid",
+    plot.errors.boot.num = 199
+  ))
+  cat("ok\n")
+}, error = function(e) {
+  cat("FAIL:", conditionMessage(e), "\n")
+})
+
 cat("\nDone.\n")
 
 # Issue #18: multi-dimensional instruments with Tikhonov should not error

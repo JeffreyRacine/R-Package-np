@@ -269,6 +269,39 @@ test_that("session wild-hat plot smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session inid plot smoke completes in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "set.seed(42)",
+      "n <- 400",
+      "x <- rnorm(n)",
+      "y <- rnorm(n)",
+      "g <- npreg(y~x)",
+      "png(tempfile(fileext='.png'))",
+      "on.exit(dev.off(), add=TRUE)",
+      "suppressWarnings(plot(",
+      "  g,",
+      "  plot.errors.method='bootstrap',",
+      "  plot.errors.boot.method='inid',",
+      "  plot.errors.boot.num=199",
+      "))",
+      "cat('SESSION_INID_PLOT_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_INID_PLOT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session core density/distribution family smoke completes", {
   skip_on_cran()
   env <- subprocess_env()

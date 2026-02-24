@@ -288,6 +288,35 @@ plotFactor <- function(f, y, ...){
   invisible(TRUE)
 }
 
+.npRmpi_with_local_bootstrap <- function(expr) {
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  force(expr)
+}
+
+.npRmpi_bootstrap_estimator <- local({
+  np.ns <- NULL
+  checked <- FALSE
+
+  function(name) {
+    if (!checked) {
+      checked <<- TRUE
+      has.np <- isTRUE(suppressWarnings(suppressMessages(
+        requireNamespace("np", quietly = TRUE)
+      )))
+      if (has.np)
+        np.ns <<- asNamespace("np")
+    }
+
+    if (!is.null(np.ns) &&
+        exists(name, envir = np.ns, mode = "function", inherits = FALSE))
+      return(get(name, envir = np.ns, inherits = FALSE))
+
+    get(name, mode = "function", envir = parent.frame(), inherits = TRUE)
+  }
+})
+
 .npRmpi_plot_behavior_for_rank <- function(plot.behavior) {
   if (!.npRmpi_autodispatch_called_from_bcast())
     return(plot.behavior)
@@ -519,6 +548,9 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    npreg_fit <- .npRmpi_bootstrap_estimator("npreg")
+    npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat")
+
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
     is.wild.hat <- plot.errors.boot.method == "wild-hat"
@@ -537,7 +569,7 @@ compute.bootstrap.errors.rbandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- suppressWarnings(npreg(
+      fit.train <- suppressWarnings(npreg_fit(
         txdat = xdat,
         tydat = ydat,
         bws = bws,
@@ -560,7 +592,7 @@ compute.bootstrap.errors.rbandwidth =
         s.vec[cpos] <- gorder[cpos]
       }
 
-      H <- suppressWarnings(npreghat(
+      H <- suppressWarnings(npreghat_fit(
         bws = bws,
         txdat = xdat,
         exdat = exdat,
@@ -586,7 +618,7 @@ compute.bootstrap.errors.rbandwidth =
     } else {
       boofun <- if (is.inid) {
         function(data, indices) {
-          fit <- suppressWarnings(npreg(
+          fit <- suppressWarnings(npreg_fit(
             txdat = xdat[indices, , drop = FALSE],
             tydat = ydat[indices],
             exdat = exdat, bws = bws,
@@ -598,7 +630,7 @@ compute.bootstrap.errors.rbandwidth =
         }
       } else {
         function(tsb) {
-          fit <- suppressWarnings(npreg(
+          fit <- suppressWarnings(npreg_fit(
             txdat = tsb[, 1:(ncol(tsb) - 1), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
             exdat = exdat, bws = bws,
@@ -610,21 +642,23 @@ compute.bootstrap.errors.rbandwidth =
         }
       }
 
-      if (is.inid){
-        boot.out <- boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boot.out <- tsboot(
-          tseries = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
+      boot.out <- .npRmpi_with_local_bootstrap({
+        if (is.inid) {
+          boot(
+            data = data.frame(xdat, ydat),
+            statistic = boofun,
+            R = plot.errors.boot.num
+          )
+        } else {
+          tsboot(
+            tseries = data.frame(xdat, ydat),
+            statistic = boofun,
+            R = plot.errors.boot.num,
+            l = plot.errors.boot.blocklen,
+            sim = plot.errors.boot.method
+          )
+        }
+      })
     }
 
     all.bp <- list()
@@ -777,14 +811,16 @@ compute.bootstrap.errors.scbandwidth =
       }
 
       boot.data <- if (miss.z) data.frame(xdat, ydat) else data.frame(xdat, ydat, zdat)
-      if (is.inid) {
-        boot.out <- boot(data = boot.data, statistic = boofun, R = plot.errors.boot.num)
-      } else {
-        boot.out <- tsboot(
-          tseries = boot.data, statistic = boofun, R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
-        )
-      }
+      boot.out <- .npRmpi_with_local_bootstrap({
+        if (is.inid) {
+          boot(data = boot.data, statistic = boofun, R = plot.errors.boot.num)
+        } else {
+          tsboot(
+            tseries = boot.data, statistic = boofun, R = plot.errors.boot.num,
+            l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
+          )
+        }
+      })
     }
 
     all.bp <- list()
@@ -927,15 +963,17 @@ compute.bootstrap.errors.plbandwidth =
         }
       }
 
-      if (is.inid){
-        boot.out = boot(data = data.frame(xdat,ydat,zdat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat,ydat,zdat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      boot.out <- .npRmpi_with_local_bootstrap({
+        if (is.inid) {
+          boot(data = data.frame(xdat, ydat, zdat), statistic = boofun,
+               R = plot.errors.boot.num)
+        } else {
+          tsboot(tseries = data.frame(xdat, ydat, zdat), statistic = boofun,
+                 R = plot.errors.boot.num,
+                 l = plot.errors.boot.blocklen,
+                 sim = plot.errors.boot.method)
+        }
+      })
     }
 
     all.bp <- list()
@@ -1039,15 +1077,17 @@ compute.bootstrap.errors.bandwidth =
       }
     }
 
-    if (is.inid) {
-      boot.out = boot(data = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
-    }
+    boot.out <- .npRmpi_with_local_bootstrap({
+      if (is.inid) {
+        boot(data = data.frame(xdat), statistic = boofun,
+             R = plot.errors.boot.num)
+      } else {
+        tsboot(tseries = data.frame(xdat), statistic = boofun,
+               R = plot.errors.boot.num,
+               l = plot.errors.boot.blocklen,
+               sim = plot.errors.boot.method)
+      }
+    })
 
     all.bp <- list()
 
@@ -1131,15 +1171,17 @@ compute.bootstrap.errors.dbandwidth =
       }
     }
 
-    if (is.inid) {
-      boot.out = boot(data = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
-    }
+    boot.out <- .npRmpi_with_local_bootstrap({
+      if (is.inid) {
+        boot(data = data.frame(xdat), statistic = boofun,
+             R = plot.errors.boot.num)
+      } else {
+        tsboot(tseries = data.frame(xdat), statistic = boofun,
+               R = plot.errors.boot.num,
+               l = plot.errors.boot.blocklen,
+               sim = plot.errors.boot.method)
+      }
+    })
 
     all.bp <- list()
 
@@ -1251,15 +1293,17 @@ compute.bootstrap.errors.conbandwidth =
         ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
       ))
     }
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
-    }
+    boot.out <- .npRmpi_with_local_bootstrap({
+      if (is.inid) {
+        boot(data = data.frame(xdat, ydat), statistic = boofun,
+             R = plot.errors.boot.num)
+      } else {
+        tsboot(tseries = data.frame(xdat, ydat), statistic = boofun,
+               R = plot.errors.boot.num,
+               l = plot.errors.boot.blocklen,
+               sim = plot.errors.boot.method)
+      }
+    })
 
     all.bp <- list()
 
@@ -1379,15 +1423,17 @@ compute.bootstrap.errors.condbandwidth =
         ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
       ))
     }
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
-    }
+    boot.out <- .npRmpi_with_local_bootstrap({
+      if (is.inid) {
+        boot(data = data.frame(xdat, ydat), statistic = boofun,
+             R = plot.errors.boot.num)
+      } else {
+        tsboot(tseries = data.frame(xdat, ydat), statistic = boofun,
+               R = plot.errors.boot.num,
+               l = plot.errors.boot.blocklen,
+               sim = plot.errors.boot.method)
+      }
+    })
 
     all.bp <- list()
 
@@ -1529,15 +1575,17 @@ compute.bootstrap.errors.sibandwidth =
         }
       }
 
-      if (is.inid){
-        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      boot.out <- .npRmpi_with_local_bootstrap({
+        if (is.inid) {
+          boot(data = data.frame(xdat, ydat), statistic = boofun,
+               R = plot.errors.boot.num)
+        } else {
+          tsboot(tseries = data.frame(xdat, ydat), statistic = boofun,
+                 R = plot.errors.boot.num,
+                 l = plot.errors.boot.blocklen,
+                 sim = plot.errors.boot.method)
+        }
+      })
     }
     
     if (plot.errors.type == "pmzsd") {
