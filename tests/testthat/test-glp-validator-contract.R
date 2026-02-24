@@ -23,3 +23,16 @@ test_that("GLP validators handle non-numeric and missing inputs deterministicall
     "finite positive integers"
   )
 })
+
+test_that("dim_basis validates integer-like vectors before coercion", {
+  expect_error(dim_basis(degree = "a"), "degree must contain finite non-negative integers")
+  expect_error(dim_basis(degree = 1L, segments = "a"), "segments must contain finite positive integers")
+  expect_error(
+    dim_basis(degree = integer(0), include = c("a"), categories = c(0L)),
+    "include must contain finite non-negative integers"
+  )
+  expect_error(
+    dim_basis(degree = integer(0), include = c(0L), categories = c("a")),
+    "categories must contain finite non-negative integers"
+  )
+})

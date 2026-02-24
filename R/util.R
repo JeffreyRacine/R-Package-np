@@ -338,30 +338,46 @@ dim_basis <- function(basis = c("additive", "glp", "tensor"),
   if (is.null(segments))
     segments <- rep.int(1L, length(degree))
 
-  degree <- as.integer(degree)
-  segments <- as.integer(segments)
-
   if (length(degree) != length(segments))
     stop("degree and segments must have the same length")
-  if (any(!is.finite(degree)) || any(degree < 0L))
+  if (!is.numeric(degree) ||
+      anyNA(degree) ||
+      any(!is.finite(degree)) ||
+      any(degree < 0L) ||
+      any(degree != floor(degree)))
     stop("degree must contain finite non-negative integers")
-  if (any(!is.finite(segments)) || any(segments <= 0L))
+  if (!is.numeric(segments) ||
+      anyNA(segments) ||
+      any(!is.finite(segments)) ||
+      any(segments <= 0L) ||
+      any(segments != floor(segments)))
     stop("segments must contain finite positive integers")
+
+  degree <- as.integer(degree)
+  segments <- as.integer(segments)
 
   if (is.null(include))
     include <- integer(0)
   if (is.null(categories))
     categories <- integer(0)
 
-  include <- as.integer(include)
-  categories <- as.integer(categories)
-
   if (length(include) != length(categories))
     stop("include and categories must have the same length")
-  if (any(!is.finite(include)) || any(include < 0L))
+  if (!is.numeric(include) ||
+      anyNA(include) ||
+      any(!is.finite(include)) ||
+      any(include < 0L) ||
+      any(include != floor(include)))
     stop("include must contain finite non-negative integers")
-  if (any(!is.finite(categories)) || any(categories < 0L))
+  if (!is.numeric(categories) ||
+      anyNA(categories) ||
+      any(!is.finite(categories)) ||
+      any(categories < 0L) ||
+      any(categories != floor(categories)))
     stop("categories must contain finite non-negative integers")
+
+  include <- as.integer(include)
+  categories <- as.integer(categories)
 
   basis.code <- switch(basis, additive = 0L, glp = 1L, tensor = 2L)
 
