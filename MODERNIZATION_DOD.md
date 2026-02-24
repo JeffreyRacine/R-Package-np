@@ -610,3 +610,21 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_bstarfix_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_bstarfix_20260224.log` (`Status: OK`)
+
+## Session Hat/Bootstrap Routing Guard Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Added bounded subprocess contracts to lock session-mode routing for modern hat/bootstrap surfaces:
+   - `npreghat` parity smoke (`npRmpi.init` -> `npregbw/npreg/npreghat` -> `npRmpi.quit`).
+   - `plot(..., plot.errors.boot.method="wild-hat")` session smoke.
+2. Extended periodic verified-issue repro harness with matching session guards so resolved regressions are rechecked by default.
+3. Scope:
+   - `tests/testthat/test-session-routing-subprocess-contract.R`
+   - `issue_notes/verified_issue_repros.R`
+4. Commits:
+   - `np-npRmpi`: `a550e9b`
+   - `np-npRmpi`: `5635b05`
+5. Validation:
+   - subprocess contracts (`NOT_CRAN=true`):
+     - `/tmp` console run (8 pass, attach-mode test skipped unless `NP_RMPI_ENABLE_ATTACH_TEST=1`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_032316.log` (all verified repros passed)
