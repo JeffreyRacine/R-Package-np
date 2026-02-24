@@ -1391,13 +1391,14 @@ Completed in `np-npRmpi`:
    - `predict.npdistribution`: `newdata -> edat`
    - `predict.condensity`: `newdata -> (eydat, exdat)` via `(ynames, xnames)` mapping
    - `predict.condistribution`: `newdata -> (eydat, exdat)` via `(ynames, xnames)` mapping
+   - `predict.singleindex`: `newdata -> exdat`
 3. Added mirror contracts:
    - `tests/testthat/test-predict-newdata-contract.R`
 4. Validation:
    - install artifact:
-     - `/tmp/nprmpi_install_predfix_20260224.log` (`RC:0`)
-   - MPI session smoke (`npRmpi.init(nslaves=1)`) covering all five patched predict routes:
-     - `/tmp/nprmpi_predfix_session_smoke_20260224.out` (`NPRMPI_PRED_NEWDATA_OK`)
+     - `/tmp/nprmpi_install_predfix2_20260224.log` (`RC:0`)
+   - MPI session smoke (`npRmpi.init(nslaves=1)`) covering all patched predict routes above:
+     - `/tmp/nprmpi_predfix2_session_smoke_20260224.out` (`NPRMPI_PRED_NEWDATA2_OK`)
    - verified issue repro sweep:
-     - `/tmp/nprmpi_issue_notes_repros_predfix_20260224.log` (`RC:0`)
-     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_113055.log`
+     - `/tmp/nprmpi_issue_notes_repros_predfix2_20260224.log` (`RC:0`)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_113634.log`

@@ -101,6 +101,12 @@ residuals.singleindex <- function(object, ...) {
 }
 predict.singleindex <- function(object, se.fit = FALSE, ...) {
   dots <- list(...)
+  has.formula.route <- !is.null(object$bws$formula)
+
+  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+    dots$exdat <- dots$newdata
+    dots$newdata <- NULL
+  }
 
   ## When no new evaluation inputs are supplied, reuse stored fit
   ## directly. This avoids unnecessary recomputation and sidesteps
