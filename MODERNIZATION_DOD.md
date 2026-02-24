@@ -47,6 +47,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Session mode (`npRmpi.init/quit`) works for core workflows.
 - [x] Manual broadcast high-performance path remains functional.
 - [ ] Any new MPI helper path has explicit cleanup guarantees (`npRmpi.stop(force=TRUE)` or `mpi.quit()` route).
+- [x] Smoke protocol explicitly requires `npRmpi.init(...)` before estimator calls and guaranteed `npRmpi.quit(...)` cleanup (never run `npRmpi` smoke as plain `np`).
 
 ### 3) Evaluation and Call Construction
 - [x] No `eval(parse(...))` in R layer.
@@ -93,6 +94,7 @@ Include in commit body or companion note:
 3. Numerical parity outcome and tolerance.
 4. MPI lifecycle notes (spawn/attach cleanup behavior).
 5. Output artifact paths (`/tmp/...`).
+6. Timeout/cleanup notes for aborted runs (including residual `slavedaemon.R` / `Rslaves.sh` handling).
 
 ## Current Residual Risks (Known)
 - Attach/session mode behavior may differ by environment and MPI interface settings (`FI_TCP_IFACE`), so smoke gates must run in both modes before release.
