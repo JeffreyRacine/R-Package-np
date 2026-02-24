@@ -815,3 +815,19 @@ Completed in `np-npRmpi`:
 5. Environment note:
    - local `--as-cran` checks required `crs` in `R_LIBS`; commands used:
      - `R_LIBS=/tmp/crs_check_lib FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0 R CMD check --as-cran --no-manual npRmpi_0.70-0.tar.gz`
+
+## Bandwidth Metadata Parity Follow-On Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Applied matching `seq_len(...)` metadata-index conversion in `R/bandwidth.R` for cross-file parity.
+2. Scope:
+   - `R/bandwidth.R`
+3. Commit:
+   - `np-npRmpi`: `457098b`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='bw-dispatch|formula-bw-contract|bandwidth', reporter='summary')` (`RC:0`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_044753.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_bwmeta_seq2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_bwmeta_seq2_20260224.log` (`RC:0`, `Status: 1 WARNING, 1 NOTE`; warning set unchanged from existing top-level-file debt)
