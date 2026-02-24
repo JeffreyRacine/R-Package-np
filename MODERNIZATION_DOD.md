@@ -1304,3 +1304,18 @@ Completed in `np-master`:
      - `/tmp/np_master_symtest_seqmodern_tests_20260224.log`
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_symtest_seqmodern_20260224.log` (`RC:0`)
+
+## Singleindex BW `seq_len` Beta-Slice Safety Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced remaining guarded `1:(ncol(xdat)-1)` beta slicing in `np.singleindex.bw` with `seq_len(ncol(xdat)-1L)` in:
+   - Ichimura objective,
+   - Klein-Spady objective,
+   - final `bws$beta` assembly.
+2. Scope:
+   - `R/np.singleindex.bw.R`
+3. Validation:
+   - parse + targeted tests:
+     - `/tmp/np_master_npindexbw_seqlen_parse_20260224.log`
+     - `/tmp/np_master_npindexbw_seqlen_tests_20260224.log`
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_npindexbw_seqlen_20260224.log` (`RC:0`)

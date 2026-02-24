@@ -241,10 +241,7 @@ npindexbw.sibandwidth <-
             ##Define the leave-one-out objective function, sum (y - \hat
             ## G(X\hat\beta))^2. We let beta denote beta_2...beta_k (first k-1
             ## parameters in `param') and then let h denote the kth column.
-            if (ncol(xdat) == 1)
-              beta = numeric(0)
-            else
-              beta <- param[1:(ncol(xdat)-1)]
+            beta <- param[seq_len(ncol(xdat)-1L)]
 
             h <- param[ncol(xdat)]
 
@@ -304,10 +301,7 @@ npindexbw.sibandwidth <-
             ## Define the leave-one-out objective function, sum (y - \hat
             ## G(X\hat\beta))^2. We let beta denote beta_2...beta_k (first k-1
             ## parameters in `param') and then let h denote the kth column.
-            if (ncol(xdat) == 1)
-              beta = numeric(0)
-            else
-              beta <- param[1:(ncol(xdat)-1)]
+            beta <- param[seq_len(ncol(xdat)-1L)]
 
             h <- param[ncol(xdat)]
 
@@ -486,8 +480,7 @@ npindexbw.sibandwidth <-
           }
           console <- printClear(console)
 
-          bws$beta <- if(ncol(xdat) == 1) 1.0
-          else c(1,param[1:(ncol(xdat)-1)])
+          bws$beta <- c(1.0, param[seq_len(ncol(xdat)-1L)])
           bws$bw <- param[ncol(xdat)]
           bws$fval <- fval.min
           bws$ifval <- best
