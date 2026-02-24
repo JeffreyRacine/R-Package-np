@@ -1040,3 +1040,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_util_scalar3_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_util_scalar3_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `util.R` Scalar-Branch Follow-On (`genBwKerStrs`/`genBwKerStrsXY`) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced nested `ifelse(...)` branch construction in kernel-summary string helpers with explicit scalar/vector-safe branching.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-npRmpi`: `0546ebe`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); cat('PARSE_OK\n')"` (`RC:0`)
+     - log: `/tmp/nprmpi_util_genBwKerStrs_parse_20260224.log`
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='plot-contract|formula-bw-contract|bw-dispatch-contract|call-bounds-guard-contract|npksum|session-arg-contract')` (`RC:0`)
+     - log: `/tmp/nprmpi_util_genBwKerStrs_tests2_20260224.log`
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_util_genBwKerStrs.log` (all verified repros passed)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_062150.log`
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_util_genBwKerStrs_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_util_genBwKerStrs_withcrs_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
