@@ -1608,3 +1608,19 @@ Completed in `np-npRmpi`:
 4. Regression note:
    - an intermediate mechanical rewrite incorrectly produced `seq_len(bws + bws)` in `sc/pl` plot label/loop paths,
    - corrected in the same checkpoint before commit.
+
+## MPI Utility `seq_len` Safety Checkpoint (`Rcoll`/`Rparutilities`) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual colon-range indexing in MPI utility runtime paths:
+   - `R/Rcoll.R`:
+     - `.tmp.obj[1:(.tinfo[2]*.tinfo[3]+.tinfo[4])]` -> `.tmp.obj[seq_len(.tinfo[2]*.tinfo[3]+.tinfo[4])]`
+   - `R/Rparutilities.R`:
+     - `ranks[1:9]`/`ranks[10:(size-1)]` -> `seq_len(9L)` and `seq.int(10L, size - 1L)` when `size > 10`.
+2. Validation:
+   - parse:
+     - `/tmp/nprmpi_rcoll_rpar_seq_len_parse_20260224.log` (`NPRMPI_RCOLL_RPAR_PARSE_OK`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_rcoll_rpar_seq_len_20260224.log` (`RC:0`)
+3. Runtime caveat:
+   - a direct internal probe using `npRmpi:::mpi.bcast.data2slave(...)` + `Rmpi::mpi.remote.exec(...)` segfaulted in this host runtime (`/tmp/nprmpi_rcoll_bcastdata_smoke_20260224.out`);
+   - this probe is non-gating here and was not used as release evidence.

@@ -31,7 +31,10 @@ slave.hostinfo <- function(comm=1, short=TRUE){
         commm <- paste(comm, ")",sep="")
         if (size > 10){
         rank0 <- paste("master  (rank 0 , comm", commm)
-            ranks <- c(paste(ranks[1:9]," ",sep=""), ranks[10:(size-1)])
+            ranks <- c(
+              paste(ranks[seq_len(9L)], " ", sep = ""),
+              ranks[seq.int(10L, size - 1L)]
+            )
         }
         else
         rank0 <- paste("master (rank 0, comm", commm)
