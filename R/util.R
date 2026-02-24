@@ -670,7 +670,7 @@ validateBandwidth <- function(bws){
       (a-b)/(a+b+.Machine$double.eps) > 5.0*.Machine$double.eps
     }
     
-    vb <- sapply(1:length(bwv), function(i){
+    vb <- sapply(seq_along(bwv), function(i){
       falg <- (bwv[i] < 0)
 
       if (dati$icon[i] && (falg || (!is.finite(bwv[i])))){
@@ -696,7 +696,7 @@ validateBandwidth <- function(bws){
     
     return(vb)
   }
-  vbl <- lapply(1:length(vari), bchecker)
+  vbl <- lapply(seq_along(vari), bchecker)
   invisible(vbl)
 }
 
@@ -714,7 +714,7 @@ validateBandwidthTF <- function(bws){
       (a-b)/(a+b+.Machine$double.eps) > 5.0*.Machine$double.eps
     }
     
-    vb <- sapply(1:length(bwv), function(i){
+    vb <- sapply(seq_along(bwv), function(i){
       falg <- (bwv[i] < 0)
 
       if (dati$icon[i]) {
@@ -743,7 +743,7 @@ validateBandwidthTF <- function(bws){
     
     return(all(vb))
   }
-  vbl <- all(unlist(lapply(1:length(vari), bchecker)))
+  vbl <- all(unlist(lapply(seq_along(vari), bchecker)))
   return(vbl)
 }
 
@@ -871,12 +871,12 @@ mcvConstruct <- function(dati){
   cnt <- 0
   if (nuno > 0)
     for (i in which(dati$iuno)) 
-      mcv[1:length(dati$all.lev[[i]]), (cnt <- cnt+1)] <- dati$all.dlev[[i]]
+      mcv[seq_along(dati$all.lev[[i]]), (cnt <- cnt+1)] <- dati$all.dlev[[i]]
 
   cnt <- 0
   if (nord > 0)
     for (i in which(dati$iord))
-      mcv[1:length(dati$all.lev[[i]]), (cnt <- cnt+1)+nuno] <- dati$all.dlev[[i]]
+      mcv[seq_along(dati$all.lev[[i]]), (cnt <- cnt+1)+nuno] <- dati$all.dlev[[i]]
 
   mcv
 }
@@ -1011,7 +1011,7 @@ blank <- function(len){
 }
 
 formatv <- function(v){
-  sapply(1:length(v), function(j){ format(v[j]) })
+  sapply(seq_along(v), function(j){ format(v[j]) })
 }
 
 ## strings used in various report generating functions
@@ -1210,7 +1210,7 @@ genBwScaleStrs <- function(x){
   t.icon <- lapply(vari, function(v){
     x$dati[[v]]$icon })
 
-  sumText <- lapply(1:length(vari), function(i) {
+  sumText <- lapply(seq_along(vari), function(i) {
     ifelse(t.icon[[i]],
            ifelse(x$type == "fixed",
                   "Scale Factor:",""), "Lambda Max:")
@@ -1220,7 +1220,7 @@ genBwScaleStrs <- function(x){
   maxNameLen <- max(nchar(unlist(sumText)))
   print.sumText <- lapply(sumText, '!=', "")
 
-  sumText <- lapply(1:length(sumText), function(i){
+  sumText <- lapply(seq_along(sumText), function(i){
     paste(blank(maxNameLen - nchar(sumText[[i]])), sumText[[i]], sep="")
   })
 
@@ -1228,7 +1228,7 @@ genBwScaleStrs <- function(x){
                     
   maxNameLen <- max(unlist(t.nchar))
 
-  vatText <- lapply(1:length(t.nchar), function(j){
+  vatText <- lapply(seq_along(t.nchar), function(j){
     paste("\n", rpad(x$vartitleabb[[vari[j]]]), "Var. Name: ",
           x$varnames[[vari[j]]],
           sapply(t.nchar[[j]], function(nc){
@@ -1236,7 +1236,7 @@ genBwScaleStrs <- function(x){
           }), sep='')
   })
 
-  return(sapply(1:length(t.nchar), function(j){
+  return(sapply(seq_along(t.nchar), function(j){
     paste(vatText[[j]], " Bandwidth: ", npFormat(x$bandwidth[[j]]), " ",
           ifelse(print.sumText[[j]],
                  paste(sumText[[j]], " ", npFormat(x$sumNum[[j]]), sep=""), ""),
@@ -1282,7 +1282,7 @@ genBwKerStrs <- function(x){
                 ifelse(length(unique(cktype)) == 1,
                        paste("\nContinuous Kernel Type:",
                              x$klist[[vari[1]]]$pckertype),
-                       paste(sapply(1:length(vari), function(v){
+                       paste(sapply(seq_along(vari), function(v){
                          ifelse(ncon[v] > 0,
                                 paste("\nContinuous Kernel Type (",
                                       x$vartitleabb[[vari[v]]],
@@ -1290,7 +1290,7 @@ genBwKerStrs <- function(x){
                        }), collapse = "")),
                 sep = "")
     tt <-
-      paste(tt, paste(sapply(1:length(vari), function(i){
+      paste(tt, paste(sapply(seq_along(vari), function(i){
         ifelse(ncon[i] > 0,
                paste("\nNo. Continuous", pad(x$vartitle[[vari[i]]]), "Vars.: ",
                      ncon[i], sep=""), "")
@@ -1303,7 +1303,7 @@ genBwKerStrs <- function(x){
                 ifelse(length(unique(uktype)) == 1,
                        paste("\nUnordered Categorical Kernel Type:",
                              x$klist[[vari[1]]]$pukertype),
-                       paste(sapply(1:length(vari), function(i){
+                       paste(sapply(seq_along(vari), function(i){
                          ifelse(nuno[i] > 0,
                                 paste("\nUnordered Categorical Kernel Type (",
                                       x$vartitleabb[[vari[i]]],
@@ -1311,7 +1311,7 @@ genBwKerStrs <- function(x){
                        }), collapse = "")),
                 sep = "")
     tt <-
-      paste(tt, paste(sapply(1:length(vari), function(i){
+      paste(tt, paste(sapply(seq_along(vari), function(i){
         ifelse(nuno[i] > 0,
                paste("\nNo. Unordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
                      nuno[i], sep=""), "")
@@ -1324,7 +1324,7 @@ genBwKerStrs <- function(x){
                 ifelse(length(unique(oktype)) == 1,
                 paste("\nOrdered Categorical Kernel Type:",
                       x$klist[[vari[1]]]$pokertype),
-                paste(sapply(1:length(vari), function(i){
+                paste(sapply(seq_along(vari), function(i){
                   ifelse(nord[i] > 0,
                          paste("\nOrdered Categorical Kernel Type (",
                                x$vartitleabb[[vari[i]]],
@@ -1332,7 +1332,7 @@ genBwKerStrs <- function(x){
                 }), collapse = "")),
          sep = "")
     tt <-
-      paste(tt, paste(sapply(1:length(vari), function(i){
+      paste(tt, paste(sapply(seq_along(vari), function(i){
         ifelse(nord[i] > 0,
                paste("\nNo. Ordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
                      nord[i], sep=""), "")
@@ -1618,7 +1618,7 @@ W.lp <- function(xdat = NULL,
 
   xdat <- as.data.frame(xdat)
 
-  xdat.col.numeric <- sapply(1:ncol(xdat),function(i){is.numeric(xdat[,i])})
+  xdat.col.numeric <- sapply(seq_len(ncol(xdat)), function(i){is.numeric(xdat[,i])})
   k <- ncol(as.data.frame(xdat[,xdat.col.numeric]))
 
   xdat.numeric <- NULL
