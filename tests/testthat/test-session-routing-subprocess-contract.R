@@ -136,6 +136,36 @@ test_that("session npcdens user-style example completes with quiet=FALSE", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npcdens user-style example completes with default quiet", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "set.seed(42)",
+      "n <- 500",
+      "x <- rnorm(n)",
+      "y <- rnorm(n)",
+      "F <- npcdens(y~x)",
+      "summary(F$bws)",
+      "png(tempfile(fileext='.png'))",
+      "plot(F)",
+      "dev.off()",
+      "stopifnot(inherits(F, 'condensity'))",
+      "cat('SESSION_NPCDENS_DEFAULT_QUIET_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPCDENS_DEFAULT_QUIET_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npreg factor example completes with quiet=FALSE", {
   skip_on_cran()
   env <- subprocess_env()
