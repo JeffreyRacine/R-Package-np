@@ -1061,3 +1061,32 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_util_genBwKerStrs_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_util_genBwKerStrs_withcrs_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Core NA/Range Guard Hardening (`npquantile`/`npcopula`/`npsigtest`/`npreg`) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Hardened argument-validation paths to fail deterministically on missing values and fixed one ordering bug in `npquantile`:
+   - `tau` validation now rejects missing values explicitly and range-checks with `na.rm = TRUE`,
+   - `npquantile` now validates `bws$xnames` only after constructing/validating `bws`,
+   - `u`/`prob`/`index` range checks now guard missing values explicitly,
+   - Bernstein-support guard in `npreg` now uses `na.rm = TRUE` for deterministic behavior.
+2. Scope:
+   - `R/np.quantile.R`
+   - `R/np.copula.R`
+   - `R/np.plot.helpers.R`
+   - `R/np.sigtest.R`
+   - `R/np.regression.R`
+3. Commit:
+   - `np-npRmpi`: `07c93cb`
+4. Validation:
+   - parse gate:
+     - log: `/tmp/nprmpi_na_guard_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests (`NOT_CRAN=true`):
+     - logs:
+       - `/tmp/nprmpi_na_guard_tests_20260224.log` (`partial in this environment due long-running MPI `npreg-glp-higher-order` context`)
+       - `/tmp/nprmpi_na_guard_tests2_20260224.log` (`FAIL 0`, `PASS 42` on MPI-safe filter)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_na_guard.log` (all verified repros passed)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_063809.log`
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_na_guard_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_na_guard_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
