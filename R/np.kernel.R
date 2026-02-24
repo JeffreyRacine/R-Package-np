@@ -22,8 +22,9 @@ npksum.formula <-
     miss.new <- missing(newdata)
     if (!miss.new){
       tt <- delete.response(attr(mf,"terms"))
-      umf <- emf <- model.frame(tt, data = newdata)
-      exdat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
+      umf.args <- list(formula = tt, data = newdata)
+      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      exdat <- umf[, attr(attr(umf, "terms"),"term.labels"), drop = FALSE]
     }
 
     call_args <- list(txdat = txdat)
