@@ -15,16 +15,19 @@ npuniden.boundary <- function(X=NULL,
     kertype <- match.arg(kertype)
     cv <- match.arg(cv)
     bwmethod <- match.arg(bwmethod)
-    if(!is.null(grid) && any(grid<=0)) stop(" the grid vector must contain positive values")
+    if(!is.null(grid) && anyNA(grid)) stop("grid must not contain missing values")
+    if(!is.null(grid) && any(grid<=0, na.rm = TRUE)) stop(" the grid vector must contain positive values")
     if(is.null(X)) stop("you must pass a vector X")
+    if(anyNA(X)) stop("X must not contain missing values")
     if(kertype=="gamma" || kertype=="rigaussian") b <- Inf
     if(kertype=="fbl") b <- Inf
     if(kertype=="fbu") a <- -Inf
     if(a>=b) stop("a must be less than b")
-    if(any(X<a)) stop("X must be >= a")
-    if(any(X>b)) stop("X must be <= b")
-    if(!is.null(Y) && any(Y<a)) stop("Y must be >= a")
-    if(!is.null(Y) && any(Y>b)) stop("Y must be <= b")
+    if(any(X<a, na.rm = TRUE)) stop("X must be >= a")
+    if(any(X>b, na.rm = TRUE)) stop("X must be <= b")
+    if(!is.null(Y) && anyNA(Y)) stop("Y must not contain missing values")
+    if(!is.null(Y) && any(Y<a, na.rm = TRUE)) stop("Y must be >= a")
+    if(!is.null(Y) && any(Y>b, na.rm = TRUE)) stop("Y must be <= b")
     if(is.null(Y)) Y <- X
     if(!is.null(h) && h <= 0) stop("bandwidth h must be positive")
     if(nmulti < 1) stop("number of multistarts nmulti must be positive")

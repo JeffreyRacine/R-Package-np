@@ -7,12 +7,14 @@ npuniden.reflect <- function(X = NULL,
     ## Data reflection - note that the bandwidth should be based on
     ## the original sample of n observations (SCOTT (1992), Page 149)
     if(is.null(X)) stop("you must pass a vector X")
+    if(anyNA(X)) stop("X must not contain missing values")
     if(!is.finite(a) && !is.finite(b)) stop("one of either a or b must be finite")
     if(a>=b) stop("a must be less than b")
-    if(any(X<a)) stop("X must be >= a")
-    if(any(X>b)) stop("X must be <= b")
-    if(!is.null(Y) && any(Y<a)) stop("Y must be >= a")
-    if(!is.null(Y) && any(Y>b)) stop("Y must be <= b")
+    if(any(X<a, na.rm = TRUE)) stop("X must be >= a")
+    if(any(X>b, na.rm = TRUE)) stop("X must be <= b")
+    if(!is.null(Y) && anyNA(Y)) stop("Y must not contain missing values")
+    if(!is.null(Y) && any(Y<a, na.rm = TRUE)) stop("Y must be >= a")
+    if(!is.null(Y) && any(Y>b, na.rm = TRUE)) stop("Y must be <= b")
     if(is.null(Y)) Y <- X
     if(!is.null(h) && h <= 0) stop("bandwidth h must be positive")
     if(is.null(h)) {
