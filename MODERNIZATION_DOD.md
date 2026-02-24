@@ -42,7 +42,9 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 2. Recent completed slices include:
    - default-quiet `npRmpi.init(nslaves=1)` + `npcdens` subprocess contract lock,
    - GLP/`dim_basis` contract hardening parity with `np-master`,
-   - deterministic NA/range guard hardening and helper micro-modernization.
+   - deterministic NA/range guard hardening and helper micro-modernization,
+   - explicit session/attach/profile subprocess coverage with env-safe skips,
+   - predict `newdata` alias fixes for non-formula core estimator objects.
 3. Remaining highest-priority work:
    - bounded-kernel/convolution native-path completion and MPI-path parity validation,
    - performance-governance closure with fixed/varying seed comparisons for performance-sensitive changes,
