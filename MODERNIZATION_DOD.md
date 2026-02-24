@@ -735,3 +735,9 @@ Completed in `np-npRmpi`:
      - `testthat::test_local(filter='mpi-helpers|mpi-mixed-mode-guards|session-routing-subprocess-contract|plot-autodispatch|semihat|rngstream-contract', reporter='summary')` (`RC:0`; attach smoke intentionally skipped unless `NP_RMPI_ENABLE_ATTACH_TEST=1`)
    - issue-note repro sweep (MPI env pinned):
      - `/tmp/nprmpi_issue_notes_repros_20260224_040132.log` (all verified repros passed)
+
+## Consolidated Tarball Gate (2026-02-24)
+1. `R CMD build /Users/jracine/Development/np-npRmpi`
+   - `/tmp/nprmpi_build_postmodern_final_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+2. `FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0 R CMD check --as-cran npRmpi_0.70-0.tar.gz`
+   - `/tmp/nprmpi_check_ascran_postmodern_final_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
