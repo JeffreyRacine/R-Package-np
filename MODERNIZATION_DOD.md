@@ -1019,3 +1019,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_util_scalar2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_util_scalar2_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `util.R` Vector-Branch Follow-On (`tgauss`/`pad`/`rpad`) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced additional `ifelse(...)` usages with explicit vector-safe masked assignments in utility hot paths:
+   - `nptgauss()` local `tgauss` now uses precomputed vector + mask assignment,
+   - `pad()` and `rpad()` now use vector-safe index assignment while preserving names.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-npRmpi`: `687bb21`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='utils|nptests|sdeptest|npuniden|bandwidth', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+     - log: `/tmp/nprmpi_util_scalar3_tests_20260224.log`
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_061008.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_util_scalar3_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_util_scalar3_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
