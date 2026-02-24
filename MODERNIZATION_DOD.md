@@ -537,7 +537,7 @@ Completed in `np-npRmpi`:
    - initial scalarization of `ifelse(htest, ...)` was invalid because `htest` is vector-valued,
    - finalized to vector-safe equivalent `hdelta = pmin(yg, hbardist)/2`.
 4. Commit:
-   - `np-npRmpi`: `<pending>`
+   - `np-npRmpi`: `4847719`
 5. Validation:
    - targeted tests:
      - `/tmp/nprmpi_plot_ifelse4_tests2_20260224.log` (`PASS 17, FAIL 0, SKIP 1`)
