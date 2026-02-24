@@ -582,39 +582,28 @@ npregbw(\dots)
 ## vignette for further details on running parallel np programs via
 ## vignette("npRmpi",package="npRmpi").
 
-## Preferred robust launch for this example:
-##   FI_TCP_IFACE=en0 mpiexec -n 2 Rscript myscript.R
-## (use lo0 instead of en0 if needed on your machine).
+npRmpi.init(nslaves=1)
 
-world.size <- tryCatch(mpi.comm.size(0), error = function(e) 1L)
-if (world.size < 2L) {
-  message("Skipping: launch with mpiexec -n 2 and use npRmpi.init(mode='attach').")
-} else {
-  is.master <- isTRUE(npRmpi.init(mode = "attach",
-                                  autodispatch = TRUE,
-                                  np.messages = FALSE))
-  if (is.master) {
-    set.seed(42)
+set.seed(42)
 
-    n <- 250
+n <- 250
 
-    x <- runif(n)
-    z1 <- rbinom(n,1,.5)
-    z2 <- rbinom(n,1,.5)
-    y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
-    z1 <- factor(z1)
-    z2 <- factor(z2)
+x <- runif(n)
+z1 <- rbinom(n,1,.5)
+z2 <- rbinom(n,1,.5)
+y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
+z1 <- factor(z1)
+z2 <- factor(z2)
 
-    bw <- npregbw(y~x+z1+z2,
-                  regtype="lc",
-                  bwmethod="cv.ls",
-                  nmulti=1)
+bw <- npregbw(y~x+z1+z2,
+              regtype="lc",
+              bwmethod="cv.ls",
+              nmulti=1)
 
-    summary(bw)
+summary(bw)
 
-    npRmpi.quit(mode = "attach")
-  }
-}
+npRmpi.quit()
+## npRmpi.quit(force=TRUE)
 } % enddontrun     
 }
 \keyword{nonparametric}
