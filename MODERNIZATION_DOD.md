@@ -1624,3 +1624,16 @@ Completed in `np-npRmpi`:
 3. Runtime caveat:
    - a direct internal probe using `npRmpi:::mpi.bcast.data2slave(...)` + `Rmpi::mpi.remote.exec(...)` segfaulted in this host runtime (`/tmp/nprmpi_rcoll_bcastdata_smoke_20260224.out`);
    - this probe is non-gating here and was not used as release evidence.
+
+## Bounded `cv.ls` Convolution Contract Mirror Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Added mirrored bounded-kernel `cv.ls` contract file to keep parity with `np-master`:
+   - `tests/testthat/test-bounded-kernel-cvls-contract.R`
+2. Validation:
+   - mirror-file execution under serial `np` namespace:
+     - `/tmp/nprmpi_mirror_bounded_cvls_contract_serialnp_20260224.log` (`NPRMPI_MIRROR_BOUNDED_CVLS_CONTRACT_SERIALNP_OK`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_bounded_cvls_contract_20260224.log` (`RC:0`)
+3. Test-harness note:
+   - `testthat::test_local(...)` on bounded filters in this `npRmpi` source tree resolves unqualified bounded tests through `npRmpi` namespace and requires an active MPI pool;
+   - this is pre-existing harness behavior and separate from the mirrored contract file content.
