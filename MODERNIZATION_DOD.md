@@ -1362,3 +1362,22 @@ Completed in `np-npRmpi`:
    - `NOT_CRAN=true NP_RMPI_ENABLE_ATTACH_TEST=1 NP_RMPI_ENABLE_PROFILE_TEST=1 FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0 Rscript -e "setwd('/Users/jracine/Development/np-npRmpi'); library(testthat); testthat::test_file('tests/testthat/test-session-routing-subprocess-contract.R', reporter='summary', stop_on_failure=TRUE)"`
 7. Validation artifact:
    - `/tmp/nprmpi_session_attach_profile_contract_notcran2_20260224.log` (`session` + `attach` pass, `profile` conditionally skipped on MPI init-interface limitation in this host runtime)
+
+## Bounded Kernel Contract Coverage Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Added focused bounded-kernel regression contracts to mirror serial-core behavior expectations:
+   - `tests/testthat/test-bounded-kernel-contract.R`
+2. New contracts lock:
+   - `ckerbound='none'` parity with `ckerbound='fixed'` + `(-Inf, Inf)`,
+   - scalar-vs-vector fixed-bound recycling for multivariate continuous data,
+   - explicit diagnostics for invalid fixed bounds and training-support coverage violations,
+   - finite-bound + non-fixed `bwtype` hard-stop,
+   - pre-native eval support checks with offending variable reporting.
+3. Validation:
+   - bounded contracts:
+     - `/tmp/nprmpi_bounded_contract_tests_20260224.log` (`RC:0`)
+   - verified issue repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_bounded_contract_20260224.log` (`RC:0`)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_112201.log`
+4. Scope note:
+   - this is coverage hardening for bounded behavior already in code; remaining native bounded-convolution/CV completion items remain tracked in `issue_notes/bounded_kernel_todo.md`.
