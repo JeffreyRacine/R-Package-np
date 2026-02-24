@@ -721,3 +721,17 @@ Completed in `np-npRmpi`:
      - `testthat::test_local(filter='plot-autodispatch|semihat', reporter='summary')` (`RC:0`)
    - issue-note repro sweep (MPI env pinned):
      - `/tmp/nprmpi_issue_notes_repros_20260224_035414.log` (all verified repros passed)
+
+## MPI Helper Loop-Bounds Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:...` loop/index ranges in MPI utility helpers with `seq_len(...)`-safe forms to eliminate `1:0` style edge behavior.
+2. Scope:
+   - `R/Rcoll.R`
+   - `R/Rparutilities.R`
+3. Commit:
+   - `np-npRmpi`: `855b097`
+4. Validation:
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='mpi-helpers|mpi-mixed-mode-guards|session-routing-subprocess-contract|plot-autodispatch|semihat|rngstream-contract', reporter='summary')` (`RC:0`; attach smoke intentionally skipped unless `NP_RMPI_ENABLE_ATTACH_TEST=1`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_040132.log` (all verified repros passed)
