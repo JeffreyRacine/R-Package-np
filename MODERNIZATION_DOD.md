@@ -1279,3 +1279,30 @@ Completed in `np-npRmpi`:
      - `/tmp/repro_plot_npreg_session_20260224_gated.out`
    - session `npcdens` plot example completes without hang:
      - `/tmp/repro_user_npcdens_session_20260224.out`
+
+## Plot Bootstrap `npksum` Inid Fast Path (Staged, Default-Off) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Ported `np-master` helper tranche for inid `npksum` acceleration into `R/np.plot.helpers.R`:
+   - `.np_boot_matrix_from_ksum`
+   - `.np_inid_boot_from_ksum_unconditional`
+   - `.np_inid_boot_from_ksum_conditional`
+   - supporting conditional kbandwidth helper constructors.
+2. Wired routes in:
+   - `compute.bootstrap.errors.bandwidth`
+   - `compute.bootstrap.errors.dbandwidth`
+   - `compute.bootstrap.errors.conbandwidth`
+   - `compute.bootstrap.errors.condbandwidth`
+3. Runtime finding:
+   - in this session-mode runtime, direct `npksum(...)` usage under density inid plot paths can stall/hang.
+4. Safety gate:
+   - fast path is now explicit opt-in and disabled by default:
+     - `options(np.plot.inid.ksum.fastpath.nprmpi = TRUE)`.
+5. Contract strategy:
+   - default subprocess routing contracts stay in the stable path,
+   - density inid session smoke added as opt-in contract:
+     - `NP_RMPI_ENABLE_DENSITY_INID_TEST=1`.
+6. Commit:
+   - `np-npRmpi`: `896ca4b`.
+7. Validation:
+   - `/tmp/nprmpi_session_routing_contract_20260224_101550.log` (`PASS 20, FAIL 0, SKIP 2`)
+   - `/tmp/nprmpi_issue_notes_repros_20260224_102108.log` (`all verified issue-note repros passed`)
