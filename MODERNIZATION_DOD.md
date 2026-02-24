@@ -1099,3 +1099,41 @@ Completed in `np-master`:
      - summary: `/tmp/bench_np_inid_n10000_b999_bounded_summary_20260224.txt`
      - fixed-seed mean/median delta: `-93.26% / -93.26%`
      - varying-seed mean/median delta: `-93.46% / -93.46%`
+
+## GLP Higher-Order Derivative Native Path Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Enabled higher-order local-polynomial derivative evaluation in the C regression path for GLP bases.
+2. Added per-variable derivative-order plumbing from `C_np_regression` into native evaluation.
+3. Removed the stale plot-time warning that claimed higher-order GLP derivatives were unavailable.
+4. Scope:
+   - `src/jksum.c`
+   - `src/np.c`
+   - `src/np_init.c`
+   - `tests/testthat/test-npreg-glp-higher-order.R`
+5. Commit:
+   - `np-master`: `e46696c`
+6. Validation:
+   - targeted contracts: `/tmp/np_master_plot_glp_fastpath_20260224.log` (`npreg-glp-higher-order` passed)
+   - issue-note sweep: `/tmp/np_issue_notes_repros_20260224_afterpatch.log` (`all verified issue-note repros passed`)
+   - tarball build: `/tmp/np_master_build_20260224_checkpoint.log` (`creating vignettes ... OK`)
+
+## Inid Ksum Fast Path Expansion (Density Families) Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Extended `inid` bootstrap fast-path support in plot helpers from fixed-`lc` regression to density/distribution families via `npksum`:
+   - unconditional density/distribution (`compute.bootstrap.errors.bandwidth`, `compute.bootstrap.errors.dbandwidth`)
+   - conditional density/distribution (`compute.bootstrap.errors.conbandwidth`, `compute.bootstrap.errors.condbandwidth`) where kernel compatibility gates are satisfied.
+2. Added robust shape checks and fallback behavior to legacy bootstrap routes when fast-path eligibility or `npksum` shape checks fail.
+3. Wired `plot.errors.boot.wild` through all core plot engines (`rbandwidth`, `scbandwidth`, `plbandwidth`, `sibandwidth`) for consistent bootstrap draw control.
+4. Scope:
+   - `R/np.plot.helpers.R`
+   - `R/np.plot.engine.rbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+   - `R/np.plot.engine.sibandwidth.R`
+   - `tests/testthat/test-plot-bootstrap-inid-fastpath.R`
+5. Commit:
+   - `np-master`: `5400a08`
+6. Validation:
+   - targeted contracts: `/tmp/np_master_plot_glp_fastpath_20260224.log` (`plot-bootstrap-inid-fastpath`, `plot-contract` passed)
+   - issue-note sweep: `/tmp/np_issue_notes_repros_20260224_afterpatch.log` (`all verified issue-note repros passed`)
+   - tarball build: `/tmp/np_master_build_20260224_checkpoint.log` (`creating vignettes ... OK`)
