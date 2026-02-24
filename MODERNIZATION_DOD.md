@@ -1194,3 +1194,28 @@ Completed in `np-npRmpi`:
    - issue-note repro sweep:
      - `/tmp/nprmpi_issue_notes_repros_20260224_plothelpers_anyna.log` (all verified repros passed)
      - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_071545.log`
+
+## Session Plot Bootstrap `inid` Stall Fix (2026-02-24)
+Completed in `np-npRmpi`:
+1. Fixed user-facing `plot(npreg(...), plot.errors.method="bootstrap", plot.errors.boot.method="inid")` session stalls by removing MPI/distributed refit pressure from bootstrap inner loops.
+2. Changes:
+   - Added `.npRmpi_with_local_bootstrap(...)` wrapper to disable autodispatch during bootstrap/tsboot loops.
+   - Added `.npRmpi_bootstrap_estimator(...)` resolver to use serial `np` estimators (`np::npreg`, `np::npreghat`) when available, with safe fallback to `npRmpi` implementations.
+   - Applied local-bootstrap wrapper across all `compute.bootstrap.errors.*` bootstrap branches.
+   - Added explicit session subprocess contract for `inid` plot path and mirrored issue-note smoke guard.
+3. Scope:
+   - `R/np.plot.helpers.R`
+   - `tests/testthat/test-session-routing-subprocess-contract.R`
+   - `issue_notes/verified_issue_repros.R`
+4. Commit:
+   - `np-npRmpi`: `3da77d0`
+5. Validation:
+   - exact user-style repro (`n=1000`, `boot.num=9999`) now completes:
+     - `/tmp/repro_plot_boot_npRmpi_fix3_20260224.out`
+     - elapsed:
+       - plain `plot(g)`: `0.794s`
+       - wild-hat bootstrap: `3.286s`
+       - inid bootstrap: `9.307s`
+   - issue-note sweep with inid plot guard:
+     - `/tmp/nprmpi_issue_notes_repros_20260224_inidguard3.log` (`REPRO_RC:0`)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_073703.log`
