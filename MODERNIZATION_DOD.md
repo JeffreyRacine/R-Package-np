@@ -1333,3 +1333,27 @@ Completed in `np-master`:
      - `/tmp/np_master_plothelpers_seqlen_geom_smoke_20260224.out` (`NP_PLOTHELPERS_SEQLEN_GEOM_SMOKE_OK`)
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_plothelpers_seqlen_20260224.log` (`RC:0`)
+
+## Plot Engine `seq_len(xi.neval)` Index-Safety Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced residual `1:xi.neval` eval/assignment slices with `seq_len(xi.neval)` across core plot engines:
+   - `R/np.plot.engine.bandwidth.R`
+   - `R/np.plot.engine.dbandwidth.R`
+   - `R/np.plot.engine.rbandwidth.R`
+   - `R/np.plot.engine.conbandwidth.R`
+   - `R/np.plot.engine.condbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+2. Also replaced residual plot-loop/name ranges:
+   - `for (plot.index in 1:(bws$xndim + bws$zndim))` -> `seq_len(...)`
+   - `paste("sc"/"plr", 1:(...), ...)` -> `seq_len(...)`.
+3. Validation:
+   - parse:
+     - `/tmp/plot_engine_parse_postfix_20260224.log` (`PLOT_ENGINE_PARSE_POSTFIX_OK`)
+   - targeted plot contracts:
+     - `/tmp/np_master_plotengine_seq_len_tests_fix_20260224.log` (`FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_plotengine_seq_len_fix_20260224.log` (`RC:0`)
+4. Regression note:
+   - an intermediate mechanical rewrite incorrectly produced `seq_len(bws + bws)` in `sc/pl` plot label/loop paths,
+   - this was caught by `test-semihat.R` and corrected in the same checkpoint before commit.

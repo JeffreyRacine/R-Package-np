@@ -403,17 +403,17 @@
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        eval.slice <- subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE]
+        eval.slice <- subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
         tobj <- npudens(tdat = xdat, edat = eval.slice, bws = bws)
-        temp.dens[1:xi.neval] <- tobj$dens
+        temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
-            temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr)
+            temp.err[seq_len(xi.neval),1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr)
           else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat,
-                      exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+                      exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                       cdf = FALSE,
                       slice.index = i,
                       plot.errors.boot.method = plot.errors.boot.method,
@@ -423,7 +423,7 @@
                       plot.errors.type = plot.errors.type,
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
-            temp.err[1:xi.neval,] = temp.boot.raw[["boot.err"]]
+            temp.err[seq_len(xi.neval),] = temp.boot.raw[["boot.err"]]
             temp.all.err <- temp.boot.raw[["boot.all.err"]]
             temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){

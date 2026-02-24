@@ -431,13 +431,13 @@
         tx.args <- list(
           txdat = xdat,
           tydat = ydat,
-          exdat = subcol(exdat, ei, i)[1:xi.neval, , drop = FALSE],
+          exdat = subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
           bws = bws,
           errors = plot.errors
         )
         if (!miss.z) {
           tx.args$tzdat <- zdat
-          tx.args$ezdat <- ezdat[1:xi.neval, , drop = FALSE]
+          tx.args$ezdat <- ezdat[seq_len(xi.neval), , drop = FALSE]
         }
         do.call(npscoef, tx.args)
       }
@@ -470,16 +470,16 @@
 
         tobj <- txobj_call(i, ei, xi.neval)
 
-        temp.mean[1:xi.neval] = tobj$mean
+        temp.mean[seq_len(xi.neval)] = tobj$mean
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
-            temp.err[1:xi.neval,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
+            temp.err[seq_len(xi.neval),1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
           else if (plot.errors.method == "bootstrap"){
             boot.args <- list(
               xdat = xdat,
               ydat = ydat,
-              exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+              exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
               gradients = gradients,
               slice.index = plot.index,
               plot.errors.boot.method = plot.errors.boot.method,
@@ -493,10 +493,10 @@
             )
             if (!miss.z) {
               boot.args$zdat <- zdat
-              boot.args$ezdat <- ezdat[1:xi.neval,, drop = FALSE]
+              boot.args$ezdat <- ezdat[seq_len(xi.neval),, drop = FALSE]
             }
             temp.boot.raw <- do.call(compute.bootstrap.errors, boot.args)
-            temp.err[1:xi.neval,] <- temp.boot.raw[["boot.err"]]
+            temp.err[seq_len(xi.neval),] <- temp.boot.raw[["boot.err"]]
             temp.all.err <- temp.boot.raw[["boot.all.err"]]
             temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){
@@ -590,10 +590,10 @@
           if (gradients){
           } else {
             eval.obj <- if (miss.z) {
-              subcol(exdat, ei, i)[1:xi.neval,, drop = FALSE]
+              subcol(exdat, ei, i)[seq_len(xi.neval),, drop = FALSE]
             } else {
-              list(exdat = subcol(exdat, ei, i)[1:xi.neval,, drop = FALSE],
-                   ezdat = ezdat[1:xi.neval,, drop = FALSE])
+              list(exdat = subcol(exdat, ei, i)[seq_len(xi.neval),, drop = FALSE],
+                   ezdat = ezdat[seq_len(xi.neval),, drop = FALSE])
             }
             plot.out[[plot.index]] <-
               smoothcoefficient(bws = bws,
@@ -641,22 +641,22 @@
           }
 
           tobj <- npscoef(txdat = xdat, tydat = ydat, tzdat = zdat,
-                          exdat = exdat[1:xi.neval,, drop = FALSE],
-                          ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
+                          exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+                          ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                           bws = bws)
 
-          temp.mean[1:xi.neval] = tobj$mean
+          temp.mean[seq_len(xi.neval)] = tobj$mean
 
           if (plot.errors){
             if (plot.errors.method == "asymptotic")
-              temp.err[1:xi.neval,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
+              temp.err[seq_len(xi.neval),1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
           else if (plot.errors.method == "bootstrap"){
               temp.boot.raw <- compute.bootstrap.errors(
                                                     xdat = xdat,
                                                     ydat = ydat,
                                                     zdat = zdat,
-                                                    exdat = exdat[1:xi.neval,, drop = FALSE],
-                                                    ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
+                                                    exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+                                                    ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                                                     gradients = gradients,
                                                     slice.index = plot.index,
                                                     plot.errors.boot.method = plot.errors.boot.method,
@@ -667,7 +667,7 @@
                                                     plot.errors.type = plot.errors.type,
                                                     plot.errors.alpha = plot.errors.alpha,
                                                     bws = bws)
-              temp.err[1:xi.neval,] <- temp.boot.raw[["boot.err"]]
+              temp.err[seq_len(xi.neval),] <- temp.boot.raw[["boot.err"]]
               temp.all.err <- temp.boot.raw[["boot.all.err"]]
               temp.boot <- temp.boot.raw[["bxp"]]
               if (!plot.bxp.out){
@@ -763,8 +763,8 @@
             } else {
               plot.out[[plot.index]] =
                 smoothcoefficient(bws = bws, 
-                                  eval = list(exdat = exdat[1:xi.neval,, drop = FALSE],
-                                    ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE]),
+                                  eval = list(exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+                                    ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]),
                                   mean = na.omit(temp.mean),
                                   ntrain = dim(zdat)[1],
                                   trainiseval = FALSE)
@@ -828,7 +828,7 @@
         
         xOrZ = "x"
         
-        for (plot.index in 1:(bws$xndim + bws$zndim)){
+        for (plot.index in seq_len(bws$xndim + bws$zndim)){
           i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)
@@ -908,7 +908,7 @@
         names(plot.out) =
           if (gradients){ }
           else
-            paste("sc",1:(bws$xndim+bws$zndim),sep="")
+            paste("sc", seq_len(bws$xndim + bws$zndim), sep = "")
         
         return (plot.out)
       }

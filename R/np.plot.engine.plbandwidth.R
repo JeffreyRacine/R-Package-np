@@ -431,11 +431,11 @@
 
 
         tobj <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-          exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-          ezdat = ezdat[1:xi.neval,, drop = FALSE],
+          exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+          ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
           bws = bws)
 
-        temp.mean[1:xi.neval] = tobj$mean
+        temp.mean[seq_len(xi.neval)] = tobj$mean
 
         if (plot.errors){
           if (plot.errors.method == "bootstrap"){
@@ -443,8 +443,8 @@
                       xdat = xdat,
                       ydat = ydat,
                       zdat = zdat,
-                      exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-                      ezdat = ezdat[1:xi.neval,, drop = FALSE],
+                      exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                      ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
                       gradients = gradients,
                       slice.index = plot.index,
                       plot.errors.boot.method = plot.errors.boot.method,
@@ -455,7 +455,7 @@
                       plot.errors.type = plot.errors.type,
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
-            temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+            temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
             temp.all.err <- temp.boot[["boot.all.err"]]
             temp.boot <- temp.boot[["bxp"]]
             if (!plot.bxp.out){
@@ -548,8 +548,8 @@
             plot.out[[plot.index]] =
               plregression(bws = bws, xcoef = tobj$xcoef, xcoefvcov = vcov(tobj),
                            xcoeferr = tobj$xcoeferr,
-                           evalx = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-                           evalz = ezdat[1:xi.neval,, drop = FALSE],
+                           evalx = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                           evalz = ezdat[seq_len(xi.neval),, drop = FALSE],
                            mean = na.omit(temp.mean),
                            ntrain = dim(xdat)[1],
                            trainiseval = FALSE,
@@ -592,11 +592,11 @@
         }
 
         tobj <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-          exdat = exdat[1:xi.neval,, drop = FALSE],
-          ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
+          exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+          ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
           bws = bws)
 
-        temp.mean[1:xi.neval] = tobj$mean
+        temp.mean[seq_len(xi.neval)] = tobj$mean
 
         if (plot.errors){
           if (plot.errors.method == "bootstrap"){
@@ -604,8 +604,8 @@
                       xdat = xdat,
                       ydat = ydat,
                       zdat = zdat,
-                      exdat = exdat[1:xi.neval,, drop = FALSE],
-                      ezdat = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
+                      exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+                      ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                       gradients = gradients,
                       slice.index = plot.index,
                       plot.errors.boot.method = plot.errors.boot.method,
@@ -616,7 +616,7 @@
                       plot.errors.type = plot.errors.type,
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
-            temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+            temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
             temp.all.err <- temp.boot[["boot.all.err"]]
             temp.boot <- temp.boot[["bxp"]]
             if (!plot.bxp.out){
@@ -711,8 +711,8 @@
               plregression(bws = bws, xcoef = tobj$xcoef,
                            xcoeferr = tobj$xcoeferr,
                            xcoefvcov = vcov(tobj),
-                           evalx = exdat[1:xi.neval,, drop = FALSE],
-                           evalz = subcol(ezdat,ei,i)[1:xi.neval,, drop = FALSE],
+                           evalx = exdat[seq_len(xi.neval),, drop = FALSE],
+                           evalz = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                            mean = na.omit(temp.mean),
                            ntrain = dim(zdat)[1],
                            trainiseval = FALSE,
@@ -772,7 +772,7 @@
         
         xOrZ = "x"
         
-        for (plot.index in 1:(bws$xndim + bws$zndim)){
+        for (plot.index in seq_len(bws$xndim + bws$zndim)){
           i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)
@@ -852,7 +852,7 @@
         names(plot.out) =
           if (gradients){ }
           else
-            paste("plr",1:(bws$xndim+bws$zndim),sep="")
+            paste("plr", seq_len(bws$xndim + bws$zndim), sep = "")
         
         return (plot.out)
       }
