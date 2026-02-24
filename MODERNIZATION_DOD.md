@@ -440,3 +440,22 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_plotifelse4_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_plotifelse4_20260224.log` (`Status: OK`)
+
+## Indicator/Scalar `ifelse` Cleanup Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced remaining scalar/indicator `ifelse(...)` in active runtime paths:
+   - `R/np.plot.engine.sibandwidth.R`: scalar gradient-name prefix branch.
+   - `R/np.cmstest.R`, `R/np.qcmstest.R`, `R/np.symtest.R`: p-value indicator means now use direct logical means.
+2. Changes:
+   - `paste(ifelse(gradients, ...))` -> scalar `if` branch.
+   - `mean(ifelse(condition, 1, 0))` -> `mean(condition)`.
+3. Commit:
+   - `np-master`: `<pending>`
+4. Validation:
+   - targeted tests:
+     - `/tmp/np_master_nptests_plotifelse5_20260224.log` (`PASS 26, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_ifelse5_20260224.log` (`RC:0`)
+   - tarball-first:
+     - `/tmp/np_master_build_ifelse5_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ifelse5_20260224.log` (`Status: OK`)
