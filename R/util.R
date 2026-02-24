@@ -433,7 +433,7 @@ dlev <- function(x){
   if(is.ordered(x))
     x.dlev <- suppressWarnings(as.numeric(levels(x)))
   if (!is.ordered(x) || any(is.na(x.dlev)))
-    x.dlev <- as.numeric(1:nlevels(x))
+    x.dlev <- as.numeric(seq_len(nlevels(x)))
   x.dlev
 }
 

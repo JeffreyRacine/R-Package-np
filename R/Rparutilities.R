@@ -561,13 +561,13 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
 .splitIndices <- function(nx, ncl) {
     #i <- 1:nx;
     #structure(split(i, cut(i, ncl)), names=NULL)
-    x <- 1:nx
+    x <- seq_len(nx)
     r <- nx/ncl
-    ii <- 0:(ncl - 1) * r
+    ii <- seq.int(0L, ncl - 1L) * r
     if (nx < ncl)
-        intv <- 0:ncl
+        intv <- seq.int(0L, ncl)
     else
-        intv <- c(x[round(1 + ii)]-1,nx)
+        intv <- c(x[round(1 + ii)] - 1L, nx)
     structure(split(x, cut(x, intv)), names = NULL)
 }
 
