@@ -980,3 +980,23 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_uniden_na_guard_novigs_20260224.log` (`RC:0`)
      - `/tmp/np_master_check_uniden_na_guard_novigs_20260224.log` (`RC:0`, `Status: OK`)
+
+## GLP Validator Typing/NA Contract Hardening (2026-02-24)
+Completed in `np-master`:
+1. Hardened GLP validation helpers to reject non-numeric and missing derivative/degree vectors deterministically before numeric comparisons.
+2. Scope:
+   - `R/util.R`
+   - `tests/testthat/test-glp-validator-contract.R`
+3. Commit:
+   - `np-master`: `07a1fde`
+4. Validation:
+   - parse gate:
+     - `/tmp/np_master_glp_validator_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests:
+     - `/tmp/np_master_glp_validator_tests_20260224.log` (`FAIL 0`, `PASS 29`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_glp_validator.log` (all verified repros passed)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_065332.log`
+   - tarball-first:
+     - `/tmp/np_master_build_glp_validator_20260224.log` (`RC:0`)
+     - `/tmp/np_master_check_glp_validator_20260224.log` (`RC:0`, `Status: OK`)
