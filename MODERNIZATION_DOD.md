@@ -1242,3 +1242,27 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_issue_notes_repros_fastinid_20260224_080637.log` (`all verified repros passed`)
 6. Environment note:
    - in this sandbox, `FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0` was required for stable MPI init.
+
+## Plot Bootstrap Modernization: `wild` Clean Break + Chunked `inid` Fast Path (2026-02-24)
+Completed in `np-npRmpi`:
+1. Standardized plot-bootstrap method naming on `plot.errors.boot.method="wild"` as a clean break (deprecated `wild-hat` removed).
+2. Ported chunked fixed-`lc` `inid` fast-path execution in `compute.bootstrap.errors.rbandwidth` to bound memory for large bootstrap jobs:
+   - new option: `np.plot.inid.chunk.size` (positive integer).
+3. Updated session subprocess contract to exercise `wild` alias in user-mode routing tests.
+4. Scope:
+   - `R/np.plot.helpers.R`
+   - `tests/testthat/test-session-routing-subprocess-contract.R`
+   - `tests/testthat/test-semihat.R`
+   - `issue_notes/verified_issue_repros.R`
+5. Validation:
+   - targeted session-routing subprocess contracts (`NOT_CRAN=true`, MPI env pinned):
+     - `/tmp/npwildchunk_test_nprmpi_20260224.log` (`FAIL 0`, one expected attach-mode skip)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_wildchunk_20260224_083729.log` (all verified repros passed)
+   - bounded performance benchmark (`n=10000`, `boot.num=999`, session `npRmpi.init(nslaves=1)`, fixed+varying seeds):
+     - raw: `/tmp/bench_nprmpi_inid_n10000_b999_bounded_raw_20260224.csv`
+     - summary: `/tmp/bench_nprmpi_inid_n10000_b999_bounded_summary_20260224.txt`
+     - fixed-seed mean/median delta: `-94.83% / -94.83%`
+     - varying-seed mean/median delta: `-94.54% / -94.54%`
+6. Runtime note:
+   - sandbox MPI execution used `FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0`.

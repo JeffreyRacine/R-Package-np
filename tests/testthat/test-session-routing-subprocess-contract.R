@@ -229,7 +229,7 @@ test_that("session npreghat smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
-test_that("session wild-hat plot smoke completes in subprocess", {
+test_that("session wild alias plot smoke completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
@@ -254,7 +254,7 @@ test_that("session wild-hat plot smoke completes in subprocess", {
       "  ydat=y,",
       "  plot.behavior='data',",
       "  plot.errors.method='bootstrap',",
-      "  plot.errors.boot.method='wild-hat',",
+      "  plot.errors.boot.method='wild',",
       "  plot.errors.boot.num=9",
       "))",
       "stopifnot(is.list(out), length(out) > 0)",

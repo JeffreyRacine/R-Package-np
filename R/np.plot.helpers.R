@@ -81,7 +81,7 @@
   B <- as.integer(B)
   n <- length(residuals)
   if (length(fit.mean) != n)
-    stop("length mismatch between fitted means and residuals for wild-hat bootstrap")
+    stop("length mismatch between fitted means and residuals for wild bootstrap")
   if (B < 1L)
     stop("argument 'plot.errors.boot.num' must be a positive integer")
 
@@ -104,8 +104,31 @@
   out
 }
 
+.np_plot_is_wild_method <- function(method) {
+  isTRUE(length(method) == 1L && !is.na(method) && method == "wild")
+}
+
 .np_plot_inid_fastpath_enabled <- function() {
   !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
+}
+
+.np_inid_chunk_size <- function(n, B) {
+  chunk.opt <- getOption("np.plot.inid.chunk.size")
+  if (!is.null(chunk.opt)) {
+    chunk.opt <- as.integer(chunk.opt)
+    if (length(chunk.opt) != 1L || is.na(chunk.opt) || chunk.opt < 1L)
+      stop("option 'np.plot.inid.chunk.size' must be a positive integer")
+    return(min(B, chunk.opt))
+  }
+
+  if (n < 1L || B < 1L)
+    return(1L)
+
+  target.bytes <- 64 * 1024 * 1024
+  chunk <- as.integer(floor(target.bytes / (8 * n)))
+  if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
+    chunk <- 1L
+  min(B, chunk)
 }
 
 .np_inid_counts_matrix <- function(n, B, counts = NULL) {
@@ -131,18 +154,41 @@
   ydat <- as.double(ydat)
   B <- as.integer(B)
   n <- length(ydat)
+  if (B < 1L)
+    stop("argument 'plot.errors.boot.num' must be a positive integer")
   if (ncol(H) != n)
     stop("hat matrix columns must match length of ydat")
 
-  counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
   W <- t(H)
   Wy <- W * ydat
-  den <- crossprod(counts.mat, W)
-  num <- crossprod(counts.mat, Wy)
-  list(
-    t = num / pmax(den, .Machine$double.eps),
-    t0 = as.vector(H %*% ydat)
-  )
+  t0 <- as.vector(H %*% ydat)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    den <- crossprod(counts.mat, W)
+    num <- crossprod(counts.mat, Wy)
+    return(list(
+      t = num / pmax(den, .Machine$double.eps),
+      t0 = t0
+    ))
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  prob <- rep.int(1 / n, n)
+  tmat <- matrix(NA_real_, nrow = B, ncol = nrow(H))
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+    den <- crossprod(counts.chunk, W)
+    num <- crossprod(counts.chunk, Wy)
+    tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
 }
 
 gen.label = function(label, altlabel){
@@ -501,8 +547,8 @@ compute.default.error.range <- function(center, err) {
     c("none", "bootstrap", "asymptotic")
   )
   plot.errors.boot.method <- match.arg(
-    scalar_choice(plot.errors.boot.method, "wild-hat"),
-    c("wild-hat", "inid", "fixed", "geom")
+    scalar_choice(plot.errors.boot.method, "wild"),
+    c("wild", "inid", "fixed", "geom")
   )
   plot.errors.boot.wild <- match.arg(
     scalar_choice(plot.errors.boot.wild, "rademacher"),
@@ -601,13 +647,13 @@ compute.bootstrap.errors.rbandwidth =
 
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
-    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
 
     if (is.wild.hat && gradients) {
       cont.idx <- which(bws$xdati$icon)
       if (is.na(match(slice.index, cont.idx))) {
-        warning("plot.errors.boot.method='wild-hat' supports gradients only for continuous slices; using requested bootstrap method fallback")
+        warning("plot.errors.boot.method='wild' supports gradients only for continuous slices; using requested bootstrap method fallback")
         is.wild.hat <- FALSE
       }
     }
@@ -798,7 +844,7 @@ compute.bootstrap.errors.scbandwidth =
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
-    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
 
     if (is.wild.hat) {
@@ -968,7 +1014,7 @@ compute.bootstrap.errors.plbandwidth =
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
-    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
 
     if (is.wild.hat) {
@@ -1578,7 +1624,7 @@ compute.bootstrap.errors.sibandwidth =
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
     boot.all.err <- NULL
 
-    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
 
     if (is.wild.hat) {

@@ -183,7 +183,7 @@ tryCatch({
   cat("FAIL:", conditionMessage(e), "\n")
 })
 
-# Session routing guard: wild-hat bootstrap plot path
+# Session routing guard: wild bootstrap plot path
 cat("#wildhat: session plot bootstrap path ... ")
 tryCatch({
   set.seed(27182)
@@ -202,7 +202,7 @@ tryCatch({
     ydat = y,
     plot.behavior = "data",
     plot.errors.method = "bootstrap",
-    plot.errors.boot.method = "wild-hat",
+    plot.errors.boot.method = "wild",
     plot.errors.boot.num = 9
   ))
   stopifnot(is.list(out), length(out) > 0)

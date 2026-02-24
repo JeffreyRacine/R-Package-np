@@ -254,7 +254,7 @@ test_that("semihat validates class and scalar controls", {
   )
 })
 
-test_that("plot bootstrap supports wild-hat for sc/pl/si bandwidth objects", {
+test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -288,7 +288,7 @@ test_that("plot bootstrap supports wild-hat for sc/pl/si bandwidth objects", {
       perspective = FALSE,
       plot.behavior = "data",
       plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild-hat",
+      plot.errors.boot.method = "wild",
       plot.errors.boot.num = 19
     )
   )
@@ -304,7 +304,7 @@ test_that("plot bootstrap supports wild-hat for sc/pl/si bandwidth objects", {
       perspective = FALSE,
       plot.behavior = "data",
       plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild-hat",
+      plot.errors.boot.method = "wild",
       plot.errors.boot.wild = "rademacher",
       plot.errors.type = "pointwise",
       plot.errors.boot.num = 19
@@ -335,7 +335,7 @@ test_that("plot bootstrap supports wild-hat for sc/pl/si bandwidth objects", {
       perspective = FALSE,
       plot.behavior = "data",
       plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild-hat",
+      plot.errors.boot.method = "wild",
       plot.errors.boot.num = 19
     )
   )
@@ -355,7 +355,7 @@ test_that("plot bootstrap supports wild-hat for sc/pl/si bandwidth objects", {
       ydat = y,
       plot.behavior = "data",
       plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild-hat",
+      plot.errors.boot.method = "wild",
       plot.errors.boot.num = 19
     )
   )
