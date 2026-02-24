@@ -99,6 +99,10 @@ npindexbw.default <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
            bws, bandwidth.compute = TRUE,
+           regtype = c("lc", "ll", "lp"),
+           basis = c("glp", "additive", "tensor"),
+           degree = NULL,
+           bernstein.basis = FALSE,
            nmulti, random.seed, optim.method, optim.maxattempts,
            optim.reltol, optim.abstol, optim.maxit, only.optimize.beta, ...){
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
@@ -123,8 +127,13 @@ npindexbw.default <-
                  "See documentation for details."))
 
     p <- ncol(xdat)
+    regtype <- match.arg(regtype)
     tbw <- sibandwidth(beta = bws[seq_len(p)],
                        h = bws[p+1L], ...,
+                       regtype = regtype,
+                       basis = basis,
+                       degree = degree,
+                       bernstein.basis = bernstein.basis,
                        nobs = dim(xdat)[1],
                        xdati = untangle(xdat),
                        ydati = untangle(data.frame(ydat)),
@@ -507,6 +516,10 @@ npindexbw.sibandwidth <-
     bws <- sibandwidth(beta = bws$beta,
                        h = bws$bw,
                        method = bws$method,
+                       regtype = bws$regtype,
+                       basis = bws$basis,
+                       degree = bws$degree,
+                       bernstein.basis = bws$bernstein.basis,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder,
                        ckerbound = bws$ckerbound,

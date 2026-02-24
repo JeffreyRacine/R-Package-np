@@ -328,47 +328,73 @@ npindex.sibandwidth <-
       index.eval <- exdat %*% bws$beta
     }
 
+    regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+    npreg.idx.args <- list(
+      txdat = index,
+      tydat = tydat,
+      bws = bws$bw,
+      ckertype = bws$ckertype,
+      ckerorder = bws$ckerorder,
+      regtype = regtype,
+      warn.glp.gradient = FALSE
+    )
+    if (identical(regtype, "lp")) {
+      npreg.idx.args$basis <- bws$basis
+      npreg.idx.args$degree <- bws$degree
+      npreg.idx.args$bernstein.basis <- bws$bernstein.basis
+    }
+
     ## Next, if no gradients are requested, use (faster) npksum
 
     if(gradients==FALSE) {
-
-      tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
-                    tydat=as.matrix(data.frame(tydat,1)),
-                    weights=as.matrix(data.frame(tydat,1)),
-                    exdat=as.matrix(exdat) %*% as.matrix(bws$beta),
-                    bws=bws$bw,
-                    ckertype = bws$ckertype,
-                    ckerorder = bws$ckerorder)$ksum
-
-      index.mean <- tww[1,2,]/NZD(tww[2,2,])
-
-      if (!no.ex && (no.ey || residuals)) {
-
-        ## want to evaluate on training data for in sample errors even
-        ## if evaluation x's are different from training but no y's
-        ## are specified
-
+      if (identical(regtype, "lc")) {
         tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
                       tydat=as.matrix(data.frame(tydat,1)),
                       weights=as.matrix(data.frame(tydat,1)),
+                      exdat=as.matrix(exdat) %*% as.matrix(bws$beta),
                       bws=bws$bw,
                       ckertype = bws$ckertype,
                       ckerorder = bws$ckerorder)$ksum
 
-        index.tmean <- tww[1,2,]/NZD(tww[2,2,])
+        index.mean <- tww[1,2,]/NZD(tww[2,2,])
+
+        if (!no.ex && (no.ey || residuals)) {
+
+          ## want to evaluate on training data for in sample errors even
+          ## if evaluation x's are different from training but no y's
+          ## are specified
+
+          tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
+                        tydat=as.matrix(data.frame(tydat,1)),
+                        weights=as.matrix(data.frame(tydat,1)),
+                        bws=bws$bw,
+                        ckertype = bws$ckertype,
+                        ckerorder = bws$ckerorder)$ksum
+
+          index.tmean <- tww[1,2,]/NZD(tww[2,2,])
+
+        }
+      } else {
+        model <- do.call(npreg, c(npreg.idx.args, list(
+          exdat = index.eval,
+          gradients = FALSE
+        )))
+        index.mean <- model$mean
+
+        if (!no.ex && (no.ey || residuals)) {
+          model <- do.call(npreg, c(npreg.idx.args, list(
+            gradients = FALSE
+          )))
+          index.tmean <- model$mean
+        }
 
       }
 
     } else if(gradients==TRUE) {
-
-      model <- npreg(txdat=index,
-                     tydat=tydat,
-                     exdat=index.eval,
-                     bws=bws$bw,
-                     ckertype = bws$ckertype,
-                     ckerorder = bws$ckerorder,
-                     regtype="lc",
-                     gradients=TRUE)
+      model <- do.call(npreg, c(npreg.idx.args, list(
+        exdat = index.eval,
+        gradients = TRUE
+      )))
 
       index.mean <- model$mean
 
@@ -385,13 +411,9 @@ npindex.sibandwidth <-
         ## are specified. Also, needed for variance-covariance matrix
         ## (uses on ly the training data)
 
-        model <- npreg(txdat=index,
-                       tydat=tydat,
-                       bws=bws$bw,
-                       ckertype = bws$ckertype,
-                       ckerorder = bws$ckerorder,
-                       regtype="lc",
-                       gradients=TRUE)
+        model <- do.call(npreg, c(npreg.idx.args, list(
+          gradients = TRUE
+        )))
 
         index.tmean <- model$mean
 
@@ -502,14 +524,23 @@ npindex.sibandwidth <-
     if (gradients){
       boofun = function(data, indices){
         rindex <- txdat[indices,] %*% bws$beta
-        model <- npreg(regtype = 'lc',
-                       gradients = TRUE,
-                       txdat = rindex,
-                       tydat = tydat[indices],
-                       exdat = index.eval,
-                       bws = bws$bw,
-                       ckertype = bws$ckertype,
-                       ckerorder = bws$ckerorder)[c('mean','grad')]
+        boot.args <- list(
+          txdat = rindex,
+          tydat = tydat[indices],
+          exdat = index.eval,
+          bws = bws$bw,
+          ckertype = bws$ckertype,
+          ckerorder = bws$ckerorder,
+          regtype = regtype,
+          gradients = TRUE,
+          warn.glp.gradient = FALSE
+        )
+        if (identical(regtype, "lp")) {
+          boot.args$basis <- bws$basis
+          boot.args$degree <- bws$degree
+          boot.args$bernstein.basis <- bws$bernstein.basis
+        }
+        model <- do.call(npreg, boot.args)[c('mean','grad')]
         
         c(model$mean, model$grad, mean(model$grad))
       }
@@ -517,15 +548,35 @@ npindex.sibandwidth <-
     } else {
       boofun = function(data, indices){
         rindex = txdat[indices,] %*% bws$beta
-        tww <- npksum(txdat = rindex,
-                      tydat = cbind(tydat[indices],1),
-                      weights = cbind(tydat[indices],1),
-                      exdat = index.eval,
-                      bws = bws$bw,
-                      ckertype = bws$ckertype,
-                      ckerorder = bws$ckerorder)$ksum
+        if (identical(regtype, "lc")) {
+          tww <- npksum(txdat = rindex,
+                        tydat = cbind(tydat[indices],1),
+                        weights = cbind(tydat[indices],1),
+                        exdat = index.eval,
+                        bws = bws$bw,
+                        ckertype = bws$ckertype,
+                        ckerorder = bws$ckerorder)$ksum
 
-        tww[1,2,]/NZD(tww[2,2,])
+          tww[1,2,]/NZD(tww[2,2,])
+        } else {
+          boot.args <- list(
+            txdat = rindex,
+            tydat = tydat[indices],
+            exdat = index.eval,
+            bws = bws$bw,
+            ckertype = bws$ckertype,
+            ckerorder = bws$ckerorder,
+            regtype = regtype,
+            gradients = FALSE,
+            warn.glp.gradient = FALSE
+          )
+          if (identical(regtype, "lp")) {
+            boot.args$basis <- bws$basis
+            boot.args$degree <- bws$degree
+            boot.args$bernstein.basis <- bws$bernstein.basis
+          }
+          do.call(npreg, boot.args)$mean
+        }
         
       }
     }

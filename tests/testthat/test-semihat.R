@@ -284,6 +284,63 @@ test_that("npindexhat reproduces npindex fit and approximates gradient", {
   )))
 })
 
+test_that("npindex and npindexhat support ll/lp basis variants", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(314160)
+  n <- 90
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(2 * (x1 + x2)) + rnorm(n, sd = 0.05)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(30), , drop = FALSE]
+
+  cfgs <- list(
+    list(regtype = "ll", basis = NULL, label = "ll"),
+    list(regtype = "lp", basis = "glp", label = "lp-glp"),
+    list(regtype = "lp", basis = "additive", label = "lp-additive"),
+    list(regtype = "lp", basis = "tensor", label = "lp-tensor")
+  )
+
+  for (cfg in cfgs) {
+    bw.args <- list(
+      xdat = tx,
+      ydat = y,
+      bws = c(1, 1, 0.25),
+      bandwidth.compute = FALSE,
+      regtype = cfg$regtype
+    )
+    if (!is.null(cfg$basis)) {
+      bw.args$basis <- cfg$basis
+      bw.args$degree <- 2L
+    }
+    bw <- do.call(npindexbw, bw.args)
+    expect_identical(bw$regtype, cfg$regtype, info = cfg$label)
+    if (!is.null(cfg$basis))
+      expect_identical(bw$basis, cfg$basis, info = cfg$label)
+
+    fit <- npindex(
+      bws = bw,
+      txdat = tx,
+      tydat = y,
+      exdat = ex,
+      gradients = FALSE
+    )
+    H <- npindexhat(
+      bws = bw,
+      txdat = tx,
+      exdat = ex,
+      s = 0L,
+      output = "matrix"
+    )
+    expect_equal(as.vector(H %*% y), as.vector(fit$mean), tolerance = 1e-8, info = cfg$label)
+  }
+})
+
 
 test_that("semihat validates class and scalar controls", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
