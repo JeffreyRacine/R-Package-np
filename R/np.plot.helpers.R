@@ -34,19 +34,17 @@
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
-  ifelse(
-    matrix(stats::runif(n * B), nrow = n, ncol = B) <= p.a,
-    a,
-    1 - a
-  )
+  u <- matrix(stats::runif(n * B), nrow = n, ncol = B)
+  out <- matrix(1 - a, nrow = n, ncol = B)
+  out[u <= p.a] <- a
+  out
 }
 
 .np_rademacher_draws <- function(n, B) {
-  ifelse(
-    matrix(stats::runif(n * B), nrow = n, ncol = B) <= 0.5,
-    -1.0,
-    1.0
-  )
+  u <- matrix(stats::runif(n * B), nrow = n, ncol = B)
+  out <- matrix(1.0, nrow = n, ncol = B)
+  out[u <= 0.5] <- -1.0
+  out
 }
 
 .np_wild_draws <- function(n, B, wild = c("mammen", "rademacher")) {
