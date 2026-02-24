@@ -826,3 +826,25 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_qresidual_helper_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_qresidual_helper_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
+
+## `npuniden.boundary` + `npregiv` Edge-Safety Follow-On (2026-02-24)
+Completed in `np-master`:
+1. Hardened remaining low-risk edge paths:
+   - replaced vector `ifelse(...)` finite clamp in CV-ML objective with explicit mask assignment (`f.safe`) to reduce branch allocation and keep invalid values at `.Machine$double.xmin`,
+   - replaced debug-only `seq(1:num.bw)` with `seq_len(num.bw)` in `npregiv`.
+2. Scope:
+   - `R/npuniden.boundary.R`
+   - `R/npregiv.R`
+3. Commit:
+   - `np-master`: `759d749`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/npuniden.boundary.R')); invisible(parse(file='R/npregiv.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests:
+     - `testthat::test_local(filter='npuniden|npregiv', reporter='summary')` (`RC:0`; expected pre-existing `npregiv` and `npuniden.sc` warnings)
+     - log: `/tmp/np_master_uniden_npregiv_edge_tests_20260224.log`
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_054656.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_uniden_npregiv_edge_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_uniden_npregiv_edge_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
