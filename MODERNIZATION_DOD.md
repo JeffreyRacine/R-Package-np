@@ -39,7 +39,8 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
    - `uocquantile` helper NA-guard micro-modernization,
    - bounded-kernel contract coverage hardening (invalid bounds/support/eval/parity),
    - predict `newdata` alias fixes for non-formula objects in core estimator families,
-   - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix.
+   - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix,
+   - bootstrap index sampling micro-modernization in `npdeneqtest` (`sample(...)` index draws -> `sample.int(...)`).
 3. Remaining highest-priority work:
    - bounded-kernel/convolution native-path completion and validation (`issue_notes/bounded_kernel_todo.md`),
    - full performance-governance artifacts for performance-sensitive native patches,
@@ -125,6 +126,18 @@ Completed in `np-master`:
      - `/tmp/np_plot_session_smoke_20260224.out` (`NP_PLOT_SESSION_SMOKE_OK`)
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_plotseq_20260224.log` (`RC:0`)
+
+## Deneqtest Sampling Micro-Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced index bootstrap draws in `npdeneqtest` with `sample.int(...)` for direct integer sampling.
+2. Scope:
+   - `R/np.deneqtest.R`
+3. Validation:
+   - parse gate: `PARSE_OK`,
+   - targeted tests:
+     - `/tmp/np_master_npdeptest_sampleint_20260224b.log` (`RC:0`),
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_sampleint_20260224.log` (`RC:0`).
 
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-master`:
