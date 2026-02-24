@@ -193,6 +193,18 @@ Completed in `np-npRmpi`:
      - `/tmp/sampleint_bootstrap_expr_prepost_summary_20260224.csv`
      - `/tmp/sampleint_bootstrap_expr_prepost_parity_20260224.csv`.
 
+## Session Inid Plot Contract Tightening (2026-02-24)
+Completed in `np-npRmpi`:
+1. Strengthened subprocess routing coverage for the previously regressed user-facing path:
+   - `npRmpi.init(nslaves=1)` session,
+   - `g <- npreg(y ~ x)` with `n = 1000`,
+   - `plot(g, plot.errors.method='bootstrap', plot.errors.boot.method='inid', plot.errors.boot.num=999)`.
+2. Scope:
+   - `tests/testthat/test-session-routing-subprocess-contract.R`
+3. Validation:
+   - subprocess routing contract file:
+     - `/tmp/nprmpi_session_routing_contract_after_inidsmoke_20260224.log` (`RC:0`).
+
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-npRmpi`:
 1. Replaced residual `1:n` column reconstruction and `setdiff(1:(...))` forms with `seq_len(...)` in conditional bw selectors.

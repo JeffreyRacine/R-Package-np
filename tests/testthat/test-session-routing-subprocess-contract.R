@@ -285,22 +285,22 @@ test_that("session inid plot smoke completes in subprocess", {
       "npRmpi.init(nslaves=1)",
       "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
       "set.seed(42)",
-      "n <- 400",
+      "n <- 1000",
       "x <- rnorm(n)",
       "y <- rnorm(n)",
-      "bw <- npregbw(y~x, regtype='lc', bws=0.25, bandwidth.compute=FALSE)",
-      "g <- npreg(bws=bw)",
+      "g <- npreg(y ~ x)",
       "png(tempfile(fileext='.png'))",
       "on.exit(dev.off(), add=TRUE)",
+      "suppressWarnings(plot(g))",
       "suppressWarnings(plot(",
       "  g,",
       "  plot.errors.method='bootstrap',",
       "  plot.errors.boot.method='inid',",
-      "  plot.errors.boot.num=199",
+      "  plot.errors.boot.num=999",
       "))",
       "cat('SESSION_INID_PLOT_OK\\n')"
     ),
-    timeout = 120L,
+    timeout = 180L,
     env = env
   )
 
