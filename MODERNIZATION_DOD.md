@@ -530,3 +530,6 @@ Completed in `np-master`:
      - `/tmp/np_master_copula_quantile_tests_20260224.log` (`RC:0`)
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_20260224_032635.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_loophyg_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_loophyg_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
