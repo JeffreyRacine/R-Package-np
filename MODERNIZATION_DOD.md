@@ -523,3 +523,26 @@ Completed in `np-npRmpi`:
    - tarball-first:
      - `/tmp/nprmpi_build_plotifelse3_20260223.log` (`BUILD_RC:0`)
      - `/tmp/nprmpi_check_plotifelse3_20260223.log` (`Status: OK`)
+
+## Plot `rbandwidth` Scalar-Branch + Vector-Safe Error-Bar Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced remaining scalar `ifelse(...)` branches in `np.plot.engine.rbandwidth.R` with scalar `if` for:
+   - gradient label prefix,
+   - factor plot error style/bar selection,
+   - factor/continuous `lty` selection.
+2. Modernized scalar helper branches in `np.plot.helpers.R`:
+   - `gen.label(...)`,
+   - `gen.tflabel(...)`.
+3. Guarded vector semantics in `draw.error.bars(...)`:
+   - initial scalarization of `ifelse(htest, ...)` was invalid because `htest` is vector-valued,
+   - finalized to vector-safe equivalent `hdelta = pmin(yg, hbardist)/2`.
+4. Commit:
+   - `np-npRmpi`: `<pending>`
+5. Validation:
+   - targeted tests:
+     - `/tmp/nprmpi_plot_ifelse4_tests2_20260224.log` (`PASS 17, FAIL 0, SKIP 1`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_plotifelse4_20260224.log` (`RC:0`)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_plotifelse4_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_plotifelse4_20260224.log` (`Status: OK`)

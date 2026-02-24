@@ -32,11 +32,11 @@
 }
 
 gen.label = function(label, altlabel){
-  paste(ifelse(is.null(label), altlabel, label))
+  paste(if (is.null(label)) altlabel else label)
 }
 
 gen.tflabel = function(condition, tlabel, flabel){
-  paste(ifelse(condition,tlabel,flabel))
+  paste(if (condition) tlabel else flabel)
 }
 
 draw.error.bands = function(ex, ely, ehy, lty = 2, col = par("col")){
@@ -70,8 +70,9 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, 
     yg = abs(yy[jj-2]-yy[jj-1])/golden
     htest = (hbardist >= yg)
     
-    xx[jj-2] = ex - ifelse(htest, yg/2, hbardist/2) 
-    xx[jj-1] = ex + ifelse(htest, yg/2, hbardist/2) 
+    hdelta = pmin(yg, hbardist)/2
+    xx[jj-2] = ex - hdelta
+    xx[jj-1] = ex + hdelta
     
     ty = yy[jj-1]
     yy[jj-1] = yy[jj-2]
