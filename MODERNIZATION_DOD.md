@@ -587,3 +587,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_printifelse6_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_printifelse6_20260224.log` (`Status: OK`)
+
+## `b.star` Elementwise Rounding/Bounds Fix Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Fixed a multivariate rounding/bounds bug in `b.star(..., round=TRUE)` where `BstarCB` used scalar `max(1, round(BstarCB))` inside vectorized `ifelse`, which could collapse column-wise outputs.
+2. Modernized bounds logic with elementwise vector ops:
+   - `M <- min(2 * mhat, mmax)`
+   - `pmin(...)` / `pmax(...)` for SB/CB bounds.
+3. Added regression coverage for multivariate `round=TRUE` elementwise behavior.
+4. Scope:
+   - `R/b.star.R`
+   - `tests/testthat/test-utils.R`
+5. Commit:
+   - `np-npRmpi`: `<pending>`
+6. Validation:
+   - focused tests:
+     - `/tmp/nprmpi_bstar_fix_tests_20260224.log` (`PASS 6, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_bstarfix_20260224.log` (`RC:0`)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_bstarfix_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_bstarfix_20260224.log` (`Status: OK`)

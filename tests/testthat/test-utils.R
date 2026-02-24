@@ -26,3 +26,21 @@ test_that("b.star works", {
   expect_type(b, "double")
   expect_equal(nrow(b), 1)
 })
+
+test_that("b.star round=TRUE applies elementwise bounds for multivariate input", {
+  set.seed(1)
+  x <- cbind(arima.sim(n = 200, list(ar = 0.5)),
+             arima.sim(n = 200, list(ar = 0.8)))
+
+  b.raw <- b.star(x, round = FALSE)
+  b.round <- b.star(x, round = TRUE)
+  b.max <- ceiling(min(3 * sqrt(nrow(x)), nrow(x) / 3))
+
+  expected <- cbind(
+    pmax(1, pmin(b.max, round(b.raw[, "BstarSB"]))),
+    pmax(1, pmin(b.max, round(b.raw[, "BstarCB"])))
+  )
+  colnames(expected) <- colnames(b.raw)
+
+  expect_equal(b.round, expected)
+})

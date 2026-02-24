@@ -144,7 +144,7 @@ b.star <- function(data,
 
     ## Compute M (mhat is at least one).
 
-    M <- ifelse(2*mhat > mmax, mmax, 2*mhat)
+    M <- min(2 * mhat, mmax)
 
     ## We compute BstarSB and BstarCB using the formulas in the above
     ## references. Now we require the autocovariance R(k) (hence
@@ -175,13 +175,13 @@ b.star <- function(data,
 
   if(round == FALSE) {
     
-    BstarSB <- ifelse(BstarSB > Bmax, Bmax, BstarSB)
-    BstarCB <- ifelse(BstarCB > Bmax, Bmax, BstarCB)
+    BstarSB <- pmin(BstarSB, Bmax)
+    BstarCB <- pmin(BstarCB, Bmax)
 
   } else {
 
-    BstarSB <- ifelse(BstarSB > Bmax, Bmax, ifelse(BstarSB < 1, 1, round(BstarSB)))
-    BstarCB <- ifelse(BstarCB > Bmax, Bmax, ifelse(BstarCB < 1, 1, max(1,round(BstarCB))))
+    BstarSB <- pmax(1, pmin(Bmax, round(BstarSB)))
+    BstarCB <- pmax(1, pmin(Bmax, round(BstarCB)))
 
   }
   
