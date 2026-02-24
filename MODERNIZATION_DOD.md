@@ -1131,3 +1131,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_glp_validator_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_glp_validator_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `dim_basis` Integer-Like Contract Hardening (2026-02-24)
+Completed in `np-npRmpi`:
+1. Hardened `dim_basis()` input contracts to validate numeric/integer-like vectors before coercion for `degree`, `segments`, `include`, and `categories`.
+2. This closes a latent coercion hazard where character inputs could be silently coerced and fail later with less precise diagnostics.
+3. Scope:
+   - `R/util.R`
+   - `tests/testthat/test-glp-validator-contract.R`
+4. Commit:
+   - `np-npRmpi`: `a4302df`
+5. Validation:
+   - parse gate:
+     - `/tmp/nprmpi_dimbasis_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `/tmp/nprmpi_dimbasis_tests_20260224.log` (`FAIL 0`, `PASS 36`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_dimbasis.log` (all verified repros passed)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_070017.log`
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_dimbasis_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_dimbasis_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
