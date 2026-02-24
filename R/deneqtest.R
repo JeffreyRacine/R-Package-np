@@ -42,13 +42,17 @@ deneqtest <- function(Tn,
 }
 
 print.deneqtest <- function(x, ...){
+  reject.msg <- if (x$reject == ' ') {
+    "\nFail to reject the null of equality at the 10% level"
+  } else {
+    paste("\nNull of equality is rejected at the ", x$rejectNum, "% level", sep = "")
+  }
   cat("\nConsistent Density Equality Test",
       paste("\n", format(x$boot.num), " Bootstrap Replications",sep=""),
       "\n\nTest Statistic ", sQuote("Tn"), ": ",
       format(x$Tn), "\tP Value: ", format.pval(x$Tn.P)," ", x$reject,
       "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
-      ifelse(x$reject == ' ', "\nFail to reject the null of equality at the 10% level",
-             paste("\nNull of equality is rejected at the ", x$rejectNum, "% level", sep="")),
+      reject.msg,
       "\n\n", sep="")
 }
 

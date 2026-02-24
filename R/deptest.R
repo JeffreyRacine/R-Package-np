@@ -54,13 +54,17 @@ deptest <- function(Srho,
 
 print.deptest <- function(x, ...){
   if(x$bootstrap) {
+    reject.msg <- if (x$reject == ' ') {
+      paste("\nFail to reject the null of independence at the 10% level\n\n", sep = "")
+    } else {
+      paste("\nNull of independence is rejected at the ", x$rejectNum, "% level\n\n", sep = "")
+    }
     cat("\nConsistent Metric Entropy Test for Dependence",
         paste("\n", format(x$boot.num), " Bootstrap Replications",sep=""))
     cat(paste("\n\nTest Statistic ", sQuote("Srho"), ": ",
               format(x$Srho), "\tP Value: ", format.pval(x$P)," ", x$reject,sep=""))
     cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
-    cat(ifelse(x$reject == ' ', paste("\nFail to reject the null of independence at the 10% level\n\n",sep=""),
-               paste("\nNull of independence is rejected at the ", x$rejectNum, "% level\n\n", sep="")))
+    cat(reject.msg)
   } else {
     cat("\nConsistent Dependence Metric Entropy",
         paste("\nStatistic ", sQuote("Srho"),sep=""), ": ",

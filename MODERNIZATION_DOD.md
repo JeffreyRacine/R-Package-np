@@ -459,3 +459,25 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_ifelse5_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ifelse5_20260224.log` (`Status: OK`)
+
+## Print/Reporting Scalar-Branch Cleanup Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced scalar `ifelse(...)` in print/reporting paths with explicit scalar `if` branches.
+2. Scope:
+   - `R/cmstest.R`
+   - `R/deneqtest.R`
+   - `R/deptest.R`
+   - `R/sdeptest.R`
+   - `R/symtest.R`
+   - `R/unitest.R`
+3. Commit:
+   - `np-master`: `<pending>`
+4. Validation:
+   - parse gates: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/np_master_print_ifelse6_tests_20260224.log` (`PASS 13, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_printifelse6_20260224.log` (`RC:0`)
+   - tarball-first:
+     - `/tmp/np_master_build_printifelse6_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_printifelse6_20260224.log` (`Status: OK`)
