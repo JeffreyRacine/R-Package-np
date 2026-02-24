@@ -55,7 +55,7 @@ npcopula <- function(bws,
     ## Compute the marginal quantiles from the marginal CDFs (u_i=\hat
     ## F(x_i))
     u <- matrix(NA,bws$nobs,num.var)
-    for(j in 1:num.var) {
+    for (j in seq_len(num.var)) {
       console <- printClear(console)
       console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the sample realizations...",sep=""), console)
       bws.F.marginal <- npudistbw(formula(paste("~",bws$xnames[j])),
@@ -91,7 +91,7 @@ npcopula <- function(bws,
     n.u <- nrow(u)
     x.u <- data.frame(matrix(NA,n.u,num.var))
     names(x.u) <- bws$xnames
-    for(j in 1:num.var) {
+    for (j in seq_len(num.var)) {
       console <- printClear(console)
       console <- printPush(msg = paste("Computing the quasi-inverse for the marginal of ",bws$xnames[j],"...",sep=""), console)
       ## Compute the quasi-inverse (Definition 2.3.6, Nelson
@@ -115,7 +115,7 @@ npcopula <- function(bws,
         x.eval <- sort(c(seq(x.er[1],x.er[2],length=round(n.quasi.inv/2)),x.q))
       } else {
         x.u[,j] <- ordered(x.u[,j],levels=levels(x.marginal))
-        x.q <- sapply(1:round(n.quasi.inv/2),function(i){uocquantile(x.marginal,quantile.seq[i])})
+        x.q <- sapply(seq_len(round(n.quasi.inv/2)), function(i) { uocquantile(x.marginal, quantile.seq[i]) })
         x.eval <- sort(ordered(c(as.character(x.q),as.character(x.q)),levels=levels(x.marginal)))
       }
       ## Compute the CDF at this set of evaluation points.
@@ -132,7 +132,7 @@ npcopula <- function(bws,
       ## the CDF values for the evaluation points, reset them to the
       ## min/max CDF values for the evaluation data (otherwise the
       ## quantiles are undefined).
-      for(i in 1:n.u) {
+      for (i in seq_len(n.u)) {
         u[u[,j]<min(F),j] <- min(F)
         u[u[,j]>max(F),j] <- max(F)        
         x.u[i,j] <-  min(x.eval[F>=u[i,j]])
@@ -143,7 +143,7 @@ npcopula <- function(bws,
     console <- printClear(console)
     console <- printPush(msg = "Expanding the u matrix...", console)
     x.u <- expand.grid(data.frame(x.u))
-    for(k in 1:ncol(x.u)) {
+    for (k in seq_len(ncol(x.u))) {
       if(is.ordered(data[,k])) x.u[,k] <- ordered(x.u[,k],levels=levels(data[,k]))
     }
     console <- printClear(console)
@@ -157,7 +157,7 @@ npcopula <- function(bws,
       ## have the same bws in numerator and denominator, so use those
       ## from the joint (mirror regression, conditional density
       ## estimation etc.)
-      for(j in 1:num.var) {
+      for (j in seq_len(num.var)) {
         console <- printClear(console)
         console <- printPush(msg = paste("Computing the marginal of ",bws$xnames[j]," for the expanded grid...",sep=""), console)
         bws.f.marginal <- npudensbw(formula(paste("~",bws$xnames[j])),
@@ -181,13 +181,13 @@ npcopula <- function(bws,
 
   if(!u.provided) {
     u <- data.frame(u)
-    names(u) <- paste("u",1:num.var,sep="")
+    names(u) <- paste("u", seq_len(num.var), sep = "")
     return(data.frame(copula,u))
   } else {
     ## If u was provided we expand its grid as was done for the
     ## marginals
     u <- expand.grid(data.frame(u))
-    names(u) <- paste("u",1:num.var,sep="")
+    names(u) <- paste("u", seq_len(num.var), sep = "")
     return(data.frame(copula,u,x.u))
   }
 

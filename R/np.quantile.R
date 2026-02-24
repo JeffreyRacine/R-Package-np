@@ -39,7 +39,7 @@ npquantile <- function(x=NULL,
 
   x.tau <- numeric(length(tau))
   
-  for(i in 1:length(tau)) {
+  for (i in seq_along(tau)) {
     tau[tau<min(F)] <- min(F)
     tau[tau>max(F)] <- max(F)        
     x.tau[i] <-  min(x.eval[F>=tau[i]])
