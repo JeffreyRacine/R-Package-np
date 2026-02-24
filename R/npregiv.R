@@ -235,7 +235,7 @@ npregiv <- function(y,
       if(ncol(X.train)!=ncol(X.eval))
           stop("Error: training and evaluation data have unequal number of columns\n")
 
-      X.col.numeric <- sapply(1:ncol(X.train),function(i){is.numeric(X.train[,i])})
+      X.col.numeric <- sapply(seq_len(ncol(X.train)),function(i){is.numeric(X.train[,i])})
 
       ## k represents the number of numeric regressors, this will return
       ## zero if there are none
@@ -311,7 +311,7 @@ npregiv <- function(y,
 
           WzkWz.inv <- list()
 
-          for(i in 1:ncol(K.x)) {
+          for(i in seq_len(ncol(K.x))) {
 
               WzkWz.inv.try <- tryCatch(as.matrix(chol2inv(chol(t(W.z)%*%(K.x[,i]*W.z)))),
                                         error = function(e){
@@ -890,7 +890,7 @@ npregiv <- function(y,
 
     ## Which variables are categorical, which are discrete...
 
-    xdat.numeric <- sapply(1:ncol(xdat),function(i){is.numeric(xdat[,i])})
+    xdat.numeric <- sapply(seq_len(ncol(xdat)),function(i){is.numeric(xdat[,i])})
 
     ## First initialize initial search values of the vector of
     ## bandwidths to lie in [0,1]
@@ -953,7 +953,7 @@ npregiv <- function(y,
 
         init.search.vals <- runif(ncol(xdat),0,1)
 
-        for(i in 1:ncol(xdat)) {
+        for(i in seq_len(ncol(xdat))) {
           if(xdat.numeric[i]==TRUE) {
             init.search.vals[i] <- runif(1,.5,1.5)*EssDee(xdat[,i])*nrow(xdat)^{-1/(4+num.numeric)}
           }
@@ -2408,7 +2408,7 @@ npregiv <- function(y,
 
     if(is.null(bw))  {
 
-      norm.value <- norm.stop/(1:length(norm.stop))
+      norm.value <- norm.stop/seq_along(norm.stop)
 
       if(which.min(norm.stop) == 1 && is.monotone.increasing(norm.stop)) {
           warning("Stopping rule increases monotonically (consult model$norm.stop):\nThis could be the result of an inspired initial value (unlikely)\nNote: we suggest manually choosing phi.0 and restarting (e.g. instead set `starting.values' to E[E(Y|w)|z])")
