@@ -847,3 +847,27 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_bstar_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_bstar_seq_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `npuniden.boundary` Scalar-Branch Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced scalar `ifelse(...)` branches in `npuniden.boundary` CV/optimizer routing with scalar `if` expressions:
+   - finite fallback in LS-CV objective,
+   - optimizer start-index choice (`cv.ml` max vs `cv.ls` min),
+   - optimizer upper-bound choice for `beta2` kernels.
+2. Scope:
+   - `R/npuniden.boundary.R`
+3. Commit:
+   - `np-npRmpi`: `03d0e3f`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/npuniden.boundary.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='npuniden|nptests|sdeptest')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+     - log: `/tmp/nprmpi_npuniden_scalar_ifelse_tests_20260224.log`
+   - direct runtime smoke:
+     - `/tmp/nprmpi_npuniden_scalar_ifelse_smoke_20260224.out` (`NPRMPI_NPUNIDEN_BOUNDARY_SMOKE_OK`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_050442.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_npuniden_scalar_ifelse_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_npuniden_scalar_ifelse_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
