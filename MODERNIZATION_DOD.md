@@ -45,7 +45,8 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
    - deterministic NA/range guard hardening and helper micro-modernization,
    - explicit session/attach/profile subprocess coverage with env-safe skips,
    - predict `newdata` alias fixes for non-formula core estimator objects,
-   - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix.
+   - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix,
+   - MPI utility index-range hardening in `Rparutilities`/`Rmpi` (`1:n` -> `seq_len`, plus safe cart slicing).
 3. Remaining highest-priority work:
    - bounded-kernel/convolution native-path completion and MPI-path parity validation,
    - performance-governance closure with fixed/varying seed comparisons for performance-sensitive changes,
@@ -140,6 +141,22 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_plot_session_smoke_20260224.out` (`NPRMPI_PLOT_SESSION_SMOKE_OK`)
    - issue-note repro sweep:
      - `/tmp/nprmpi_issue_notes_repros_plotseq_20260224.log` (`RC:0`)
+
+## MPI Utility Index-Safety Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:n` ranges with `seq_len(...)` in MPI apply helpers to remove potential zero-length indexing hazards.
+2. Hardened `mpi.cart.get(...)` slicing to use indexed `seq_len(maxdims)` offsets instead of `1:maxdims` style ranges.
+3. Scope:
+   - `R/Rparutilities.R`
+   - `R/Rmpi.R`
+4. Commit:
+   - `np-npRmpi`: `1618d8f`
+5. Validation:
+   - parse gate: `PARSE_OK` for both touched files,
+   - focused contract check:
+     - `/tmp/nprmpi_rpar_docall_seqmodern_loadall_20260224.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_rpar_seqmodern_20260224.log` (`RC:0`)
 
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-npRmpi`:
