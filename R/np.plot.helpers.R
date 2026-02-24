@@ -625,7 +625,7 @@ compute.bootstrap.errors.rbandwidth =
       all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
       all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
 
-      for (i in 1:length(u.lev)){
+      for (i in seq_along(u.lev)){
         t.bp <- boxplot.stats(boot.frame[,i])
         all.bp$stats[,i] <- t.bp$stats
         all.bp$conf[,i] <- t.bp$conf
@@ -790,7 +790,7 @@ compute.bootstrap.errors.scbandwidth =
       all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
       all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
 
-      for (i in 1:length(u.lev)){
+      for (i in seq_along(u.lev)){
         t.bp <- boxplot.stats(boot.frame[,i])
         all.bp$stats[,i] <- t.bp$stats
         all.bp$conf[,i] <- t.bp$conf
@@ -904,7 +904,7 @@ compute.bootstrap.errors.plbandwidth =
       } else {
         function(tsb) {
           npplreg(
-            txdat = tsb[, 1:ncol(xdat), drop = FALSE],
+            txdat = tsb[, seq_len(ncol(xdat)), drop = FALSE],
             tydat = tsb[, ncol(xdat) + 1L],
             tzdat = tsb[, (ncol(xdat) + 2L):ncol(tsb), drop = FALSE],
             exdat = exdat, ezdat = ezdat, bws = bws
@@ -944,7 +944,7 @@ compute.bootstrap.errors.plbandwidth =
       all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
       all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
 
-      for (i in 1:length(u.lev)){
+      for (i in seq_along(u.lev)){
         t.bp <- boxplot.stats(boot.frame[,i])
         all.bp$stats[,i] <- t.bp$stats
         all.bp$conf[,i] <- t.bp$conf
@@ -1047,7 +1047,7 @@ compute.bootstrap.errors.bandwidth =
       all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
       all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
 
-      for (i in 1:length(u.lev)){
+      for (i in seq_along(u.lev)){
         t.bp <- boxplot.stats(boot.frame[,i])
         all.bp$stats[,i] <- t.bp$stats
         all.bp$conf[,i] <- t.bp$conf
@@ -1139,7 +1139,7 @@ compute.bootstrap.errors.dbandwidth =
       all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
       all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
 
-      for (i in 1:length(u.lev)){
+      for (i in seq_along(u.lev)){
         t.bp <- boxplot.stats(boot.frame[,i])
         all.bp$stats[,i] <- t.bp$stats
         all.bp$conf[,i] <- t.bp$conf
@@ -1232,7 +1232,7 @@ compute.bootstrap.errors.conbandwidth =
       ))
     } else {
       function(tsb) out.cond(fit.cond(
-        tx = tsb[, 1:ncol(xdat), drop = FALSE],
+        tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
         ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
       ))
     }
@@ -1267,7 +1267,7 @@ compute.bootstrap.errors.conbandwidth =
       all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
       all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
 
-      for (i in 1:length(u.lev)){
+      for (i in seq_along(u.lev)){
         t.bp <- boxplot.stats(boot.frame[,i])
         all.bp$stats[,i] <- t.bp$stats
         all.bp$conf[,i] <- t.bp$conf
@@ -1360,7 +1360,7 @@ compute.bootstrap.errors.condbandwidth =
       ))
     } else {
       function(tsb) out.cond(fit.cond(
-        tx = tsb[, 1:ncol(xdat), drop = FALSE],
+        tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
         ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
       ))
     }
@@ -1395,7 +1395,7 @@ compute.bootstrap.errors.condbandwidth =
       all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
       all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
 
-      for (i in 1:length(u.lev)){
+      for (i in seq_along(u.lev)){
         t.bp <- boxplot.stats(boot.frame[,i])
         all.bp$stats[,i] <- t.bp$stats
         all.bp$conf[,i] <- t.bp$conf
@@ -1565,7 +1565,7 @@ uocquantile <- function(x, prob) {
     tq = tq / sum(tq)
     tq[length(tq)] <- 1.0
     bscape <- levels(x)
-    tq <- sapply(1:length(tq), function(y){ sum(tq[1:y]) })
+    tq <- cumsum(tq)
     j <- sapply(prob, function(p){ which(tq >= p)[1] })
     bscape[j]
   } else if (is.factor(x)) {
