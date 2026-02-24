@@ -672,3 +672,17 @@ Completed in `np-npRmpi`:
      - `testthat::test_local(filter='npuniden|utils', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
    - issue-note repro sweep (MPI env pinned):
      - `/tmp/nprmpi_issue_notes_repros_20260224_033821.log` (all verified repros passed)
+
+## Plot-Helper Indexing Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:length(...)` / `1:ncol(...)` indexing in plot helper paths with `seq_along(...)` / `seq_len(...)`.
+2. Replaced manual cumulative-loop `sapply(1:length(tq), ...)` with `cumsum(tq)` in quantile helper.
+3. Scope:
+   - `R/np.plot.helpers.R`
+4. Commit:
+   - `np-npRmpi`: `2b6b0c6`
+5. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='semihat|npreghat|plot|npindex|npplreg|npscoef', reporter='summary')` (`RC:0`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_034151.log` (all verified repros passed)
