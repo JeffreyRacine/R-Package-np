@@ -46,7 +46,8 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
    - explicit session/attach/profile subprocess coverage with env-safe skips,
    - predict `newdata` alias fixes for non-formula core estimator objects,
    - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix,
-   - MPI utility index-range hardening in `Rparutilities`/`Rmpi` (`1:n` -> `seq_len`, plus safe cart slicing).
+   - MPI utility index-range hardening in `Rparutilities`/`Rmpi` (`1:n` -> `seq_len`, plus safe cart slicing),
+   - bootstrap index sampling micro-modernization in `npdeneqtest` (`sample(...)` index draws -> `sample.int(...)`).
 3. Remaining highest-priority work:
    - bounded-kernel/convolution native-path completion and MPI-path parity validation,
    - performance-governance closure with fixed/varying seed comparisons for performance-sensitive changes,
@@ -157,6 +158,18 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_rpar_docall_seqmodern_loadall_20260224.log` (`RC:0`)
    - issue-note repro sweep:
      - `/tmp/nprmpi_issue_notes_repros_rpar_seqmodern_20260224.log` (`RC:0`)
+
+## Deneqtest Sampling Micro-Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced index bootstrap draws in `npdeneqtest` with `sample.int(...)` for direct integer sampling.
+2. Scope:
+   - `R/np.deneqtest.R`
+3. Validation:
+   - parse gate: `PARSE_OK`,
+   - source-tree targeted check:
+     - `/tmp/nprmpi_npdeptest_sampleint_20260224b.log` (`DONE`),
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_sampleint_20260224.log` (`RC:0`).
 
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-npRmpi`:
