@@ -285,7 +285,8 @@ npqreg.condbandwidth <-
     if(gradients){
       myout$yqgrad = matrix(data=myout$yqgrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
       rorder = numeric(bws$xndim)
-      rorder[c((1:bws$xndim)[bws$ixcon], (1:bws$xndim)[bws$ixuno], (1:bws$xndim)[bws$ixord])]=1:bws$xndim
+      xidx <- seq_len(bws$xndim)
+      rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
       myout$yqgrad = myout$yqgrad[, rorder, drop = FALSE]
 
     } else {

@@ -290,7 +290,8 @@ npcdist.condbandwidth <-
     if(gradients){
       myout$congrad = matrix(data=myout$congrad, nrow = enrow, ncol = bws$xndim, byrow = FALSE) 
       rorder = numeric(bws$xndim)
-      rorder[c((1:bws$xndim)[bws$ixcon], (1:bws$xndim)[bws$ixuno], (1:bws$xndim)[bws$ixord])]=1:bws$xndim
+      xidx <- seq_len(bws$xndim)
+      rorder[c(xidx[bws$ixcon], xidx[bws$ixuno], xidx[bws$ixord])] <- xidx
       myout$congrad = myout$congrad[, rorder, drop = FALSE]
 
       myout$congerr = matrix(data=myout$congerr, nrow = enrow, ncol = bws$xndim, byrow = FALSE)

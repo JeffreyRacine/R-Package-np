@@ -62,7 +62,7 @@ print.plregression <- function(x, digits=NULL, ...){
 
   bwmat = matrix(data = 0, nrow = x$xndim+1, ncol = x$bw$bw$yzbw$ndim)
   
-  for (i in 1:length(x$bw$bw))
+  for (i in seq_along(x$bw$bw))
     bwmat[i,] = x$bw$bw[[i]]$bw
   
   print(matrix(bwmat[1,], ncol=x$zndim,
@@ -125,7 +125,7 @@ summary.plregression <- function(object, ...){
 
   bwmat = matrix(data = 0, nrow = object$xndim+1, ncol = object$bw$bw$yzbw$ndim)
   
-  for (i in 1:length(object$bw$bw))
+  for (i in seq_along(object$bw$bw))
     bwmat[i,] = object$bw$bw[[i]]$bw
   
   print(matrix(bwmat[1,], ncol=object$zndim,
