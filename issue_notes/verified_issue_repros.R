@@ -147,6 +147,24 @@ tryCatch({
   cat("FAIL:", conditionMessage(e), "\n")
 })
 
+# Session routing guard: npcdens user-style example with plot()
+cat("#npcdens: session user-style plot example ... ")
+tryCatch({
+  set.seed(42)
+  n <- 1000
+  x <- rnorm(n)
+  y <- rnorm(n)
+  F <- npcdens(y ~ x)
+  summary(F$bws)
+  png(tempfile(fileext = ".png"))
+  on.exit(try(dev.off(), silent = TRUE), add = TRUE)
+  plot(F)
+  stopifnot(inherits(F, "condensity"))
+  cat("ok\n")
+}, error = function(e) {
+  cat("FAIL:", conditionMessage(e), "\n")
+})
+
 cat("\nDone.\n")
 
 # Issue #18: multi-dimensional instruments with Tikhonov should not error
