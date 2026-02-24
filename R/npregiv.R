@@ -361,7 +361,7 @@ npregiv <- function(y,
 
           if(deriv==0) {
               Kmat <- matrix(NA, n.eval, n.train)
-              for(i in 1:n.eval) {
+              for(i in seq_len(n.eval)) {
                   Kmat[i,] <- W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
               }
           }
@@ -372,7 +372,7 @@ npregiv <- function(y,
                                          gradient.vec = 1)
 
               Kmat <- matrix(NA, n.eval, n.train)
-              for(i in 1:n.eval) {
+              for(i in seq_len(n.eval)) {
                   Kmat[i,] <- W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
               }
           }
@@ -383,7 +383,7 @@ npregiv <- function(y,
 
           Kmat <- matrix(NA, n.eval, n.train)
           if(deriv==0) {
-              for(i in 1:n.eval) {
+              for(i in seq_len(n.eval)) {
                   Kmat[i,] <- W.z.eval[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
               }
           }
@@ -396,7 +396,7 @@ npregiv <- function(y,
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 1)
 
-              for(i in 1:n.eval) {
+              for(i in seq_len(n.eval)) {
                   Kmat[i,] <- W.z.deriv.1[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
               }
 
@@ -409,7 +409,7 @@ npregiv <- function(y,
                                          degree=rep(p,NCOL(X.train.numeric)),
                                          gradient.vec = 2)
 
-              for(i in 1:n.eval) {
+              for(i in seq_len(n.eval)) {
                   Kmat[i,] <- W.z.deriv.2[i,,drop=FALSE]%*%WzkWz.inv[[i]]%*%t(W.z)*K.x[,i]
               }
 
@@ -573,7 +573,7 @@ npregiv <- function(y,
       ## estimator, shrink the mean towards the local constant mean.
 
       while(any(doridge)){
-        iloo <- (1:n.eval)[doridge]
+        iloo <- seq_len(n.eval)[doridge]
         for(i in iloo) {
           doridge[i] <- FALSE
           ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
@@ -586,11 +586,11 @@ npregiv <- function(y,
         }
       }
 
-      mhat <- sapply(1:n.eval, function(i) {
+      mhat <- sapply(seq_len(n.eval), function(i) {
         (1-ridge[i])*W.eval[i,, drop = FALSE] %*% coef.mat[,i] + ridge.lc[i]
       })
 
-      grad <- sapply(1:n.eval, function(i) {W.eval.deriv[i,-1, drop = FALSE] %*% coef.mat[-1,i]})
+      grad <- sapply(seq_len(n.eval), function(i) {W.eval.deriv[i,-1, drop = FALSE] %*% coef.mat[-1,i]})
 
       return(list(mean = mhat,
                   grad = grad))
@@ -680,7 +680,7 @@ npregiv <- function(y,
         ## estimator, shrink the mean towards the local constant mean.
 
         while(any(doridge)){
-          iloo <- (1:n)[doridge]
+          iloo <- seq_len(n)[doridge]
           for(i in iloo) {
             doridge[i] <- FALSE
             ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
@@ -802,7 +802,7 @@ npregiv <- function(y,
         ## estimator, shrink the mean towards the local constant mean.
 
         while(any(doridge)){
-          ii <- (1:n)[doridge]
+          ii <- seq_len(n)[doridge]
           for(i in ii) {
             doridge[i] <- FALSE
             ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
@@ -816,7 +816,7 @@ npregiv <- function(y,
           }
         }
 
-        trH <- kernel.i.eq.j*sum(sapply(1:n,function(i){
+        trH <- kernel.i.eq.j*sum(sapply(seq_len(n),function(i){
           (1-ridge[i])*W[i,, drop = FALSE] %*% chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc)))) %*% t(W[i,, drop = FALSE]) + ridge[i]/NZD(tww[,,i][1,1])
         }))
 
@@ -941,7 +941,7 @@ npregiv <- function(y,
 
     ## Pass in the W matrix rather than recomputing it each time
 
-    for(iMulti in 1:nmulti) {
+    for(iMulti in seq_len(nmulti)) {
 
       num.numeric <- ncol(as.data.frame(xdat[,xdat.numeric]))
 
@@ -1109,10 +1109,10 @@ npregiv <- function(y,
       if(!is.null(zeval)&&!is.null(xeval)) zeval <- data.frame(zeval,xeval)
   }
 
-  z.numeric <- sapply(1:NCOL(z),function(i){is.numeric(z[,i])})
+  z.numeric <- sapply(seq_len(NCOL(z)),function(i){is.numeric(z[,i])})
   num.z.numeric <- NCOL(as.data.frame(z[,z.numeric]))
 
-  w.numeric <- sapply(1:NCOL(w),function(i){is.numeric(w[,i])})
+  w.numeric <- sapply(seq_len(NCOL(w)),function(i){is.numeric(w[,i])})
   num.w.numeric <- NCOL(as.data.frame(w[,w.numeric]))
 
   if(method=="Tikhonov") {
