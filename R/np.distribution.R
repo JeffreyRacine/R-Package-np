@@ -37,7 +37,9 @@ npudist.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
-      umf <- emf <- model.frame(tt, data = newdata)
+      umf.args <- list(formula = tt, data = newdata)
+      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      emf <- umf
 
       edat <- emf[, attr(attr(emf, "terms"),"term.labels"), drop = FALSE]
     }

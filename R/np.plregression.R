@@ -78,8 +78,11 @@ npplreg.formula <-
           
       }
       
-      umf <- emf <- model.frame(tt, data = newdata)
-      emf.xf <- model.frame(tt.xf, data = newdata)
+      umf.args <- list(formula = tt, data = newdata)
+      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      emf <- umf
+      emf.xf.args <- list(formula = tt.xf, data = newdata)
+      emf.xf <- do.call(stats::model.frame, emf.xf.args, envir = parent.frame())
       
       if (y.eval)
         eydat <- model.response(emf)

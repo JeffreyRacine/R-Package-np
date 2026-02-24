@@ -38,7 +38,9 @@ npqreg.formula <-
     has.eval <- !is.null(newdata)
     if (has.eval) {
       tt <- drop.terms(tt, match(bws$variableNames$response, attr(tt, 'term.labels')))
-      umf <- emf <- model.frame(tt, data = newdata)
+      umf.args <- list(formula = tt, data = newdata)
+      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      emf <- umf
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]
     }
 
