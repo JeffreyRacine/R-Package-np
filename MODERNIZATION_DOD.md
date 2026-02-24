@@ -1272,3 +1272,35 @@ Completed in `np-master`:
    - verified issue repro sweep:
      - `/tmp/np_issue_notes_repros_predfix2_20260224.log` (`RC:0`)
      - run artifact: `/tmp/np_issue_notes_repros_20260224_113634.log`
+
+## Singleindex BW Invariant-Hoist Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Optimized `np.singleindex.bw` objective internals by hoisting invariant matrix construction out of repeated objective calls:
+   - `xmat <- as.matrix(xdat)`
+   - `wmat <- cbind(ydat, 1.0)`
+   - reused by both Ichimura and Klein-Spady objective paths.
+2. Scope:
+   - `R/np.singleindex.bw.R`
+3. Validation:
+   - parse + targeted tests:
+     - `/tmp/np_master_npindexbw_xmat_parse_20260224.log`
+     - `/tmp/np_master_npindexbw_xmat_tests_20260224.log`
+   - fixed/varying-seed pre/post benchmark (`n=2000`, identical script/args):
+     - `/tmp/np_master_npindexbw_libcmp_summary_20260224.csv`
+     - `/tmp/np_master_npindexbw_libcmp_parity_20260224.csv`
+     - signal: small speedup with exact parity (`max_abs_beta1/beta2/fval = 0`).
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_npindexbw_xmat_20260224.log` (`RC:0`)
+
+## Symtest `seq_len` Index-Safety Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced residual colon-range bootstrap index construction in `np.symtest`:
+   - `1:(2*length(data))` -> `seq_len(2L * length(data))`.
+2. Scope:
+   - `R/np.symtest.R`
+3. Validation:
+   - parse + focused tests:
+     - `/tmp/np_master_symtest_seqmodern_parse_20260224.log`
+     - `/tmp/np_master_symtest_seqmodern_tests_20260224.log`
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_symtest_seqmodern_20260224.log` (`RC:0`)
