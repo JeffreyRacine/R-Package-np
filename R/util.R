@@ -117,7 +117,10 @@ npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
     stop(sprintf("%s must have one entry per continuous predictor (%d expected, got %d)",
                  argname, ncon, length(degree)))
 
-  if (any(!is.finite(degree)))
+  if (!is.numeric(degree))
+    stop(sprintf("%s must contain finite non-negative integers", argname))
+
+  if (anyNA(degree) || any(!is.finite(degree)))
     stop(sprintf("%s must contain finite non-negative integers", argname))
 
   if (any(degree < 0))
@@ -216,7 +219,10 @@ npValidateGlpGradientOrder <- function(regtype,
     stop(sprintf("%s must have one entry per continuous predictor (%d expected, got %d)",
                  argname, ncon, length(gradient.order)))
 
-  if (any(!is.finite(gradient.order)))
+  if (!is.numeric(gradient.order))
+    stop(sprintf("%s must contain finite positive integers", argname))
+
+  if (anyNA(gradient.order) || any(!is.finite(gradient.order)))
     stop(sprintf("%s must contain finite positive integers", argname))
 
   if (any(gradient.order <= 0))
