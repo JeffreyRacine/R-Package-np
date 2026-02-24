@@ -1219,3 +1219,26 @@ Completed in `np-npRmpi`:
    - issue-note sweep with inid plot guard:
      - `/tmp/nprmpi_issue_notes_repros_20260224_inidguard3.log` (`REPRO_RC:0`)
      - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_073703.log`
+
+## `npRmpi` `inid` Plot Path: Fixed-`lc` Fast Path + Session Guards (2026-02-24)
+Completed in `np-npRmpi`:
+1. Ported the fixed-`lc` `inid` counts-weighted hat-operator fast path to `compute.bootstrap.errors.rbandwidth` under the same contract gate as `np-master`.
+2. Added robust fallback semantics:
+   - if `npreghat` is unavailable/fails/returns incompatible shape, code falls back to legacy bootstrap-refit route.
+3. Strengthened routing regression guards to lock this exact route:
+   - session subprocess contract now builds `bw <- npregbw(..., regtype='lc', bws=0.25, bandwidth.compute=FALSE)` before `plot(..., plot.errors.boot.method='inid')`,
+   - issue-note verified repro `#inidplot` now mirrors the same fixed-`lc` setup.
+4. Scope:
+   - `R/np.plot.helpers.R`
+   - `tests/testthat/test-session-routing-subprocess-contract.R`
+   - `issue_notes/verified_issue_repros.R`
+5. Validation:
+   - install/smoke in temp library:
+     - `/tmp/npfast_install_nprmpi.log` (`RC:0`)
+     - `/tmp/npfast_nprmpi_validate.out` (`NPRMPI_VALIDATE_OK`)
+   - subprocess routing contracts (`NOT_CRAN=true`, MPI env pinned):
+     - `/tmp/nprmpi_test_session_routing_20260224.log` (`FAIL 0`, one expected attach test skip)
+   - issue-note regression sweep:
+     - `/tmp/nprmpi_issue_notes_repros_fastinid_20260224_080637.log` (`all verified repros passed`)
+6. Environment note:
+   - in this sandbox, `FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0` was required for stable MPI init.

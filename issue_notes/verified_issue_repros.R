@@ -218,7 +218,8 @@ tryCatch({
   n <- 400
   x <- rnorm(n)
   y <- rnorm(n)
-  g <- npreg(y ~ x)
+  bw <- npregbw(y ~ x, regtype = "lc", bws = 0.25, bandwidth.compute = FALSE)
+  g <- npreg(bws = bw)
   png(tempfile(fileext = ".png"))
   on.exit(try(dev.off(), silent = TRUE), add = TRUE)
   suppressWarnings(plot(
