@@ -708,3 +708,16 @@ Completed in `np-npRmpi`:
      - `testthat::test_local(filter='utils|nptests|sdeptest|npuniden', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
    - issue-note repro sweep (MPI env pinned):
      - `/tmp/nprmpi_issue_notes_repros_20260224_035016.log` (all verified repros passed)
+
+## Plot-Helper Residual Index Cleanup Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Removed remaining `1:length(...)` index helpers in low-level plot helper vectors (`jj` and factor plotting separators) using `seq_along(...)`.
+2. Scope:
+   - `R/np.plot.helpers.R`
+3. Commit:
+   - `np-npRmpi`: `5bd980b`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='plot-autodispatch|semihat', reporter='summary')` (`RC:0`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_035414.log` (all verified repros passed)
