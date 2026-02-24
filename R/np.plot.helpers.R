@@ -131,7 +131,7 @@
 }
 
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
-  if (!isTRUE(getOption("np.plot.inid.ksum.fastpath.nprmpi", FALSE)))
+  if (isFALSE(getOption("np.plot.inid.ksum.fastpath.nprmpi", TRUE)))
     return(FALSE)
   isTRUE(suppressWarnings(suppressMessages(
     requireNamespace("np", quietly = TRUE)
