@@ -7,6 +7,7 @@ RUN_LOG="${1:-/tmp/nprmpi_native_bridge_stress_${STAMP}.log}"
 INSTALL_LOG="${RUN_LOG%.log}.install.log"
 TMP_LIB="$(mktemp -d /tmp/nprmpi_native_bridge_lib.XXXXXX)"
 
+# shellcheck disable=SC2329 # Invoked via trap.
 cleanup() {
   rm -rf "${TMP_LIB}"
 }
