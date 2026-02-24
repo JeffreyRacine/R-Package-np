@@ -938,3 +938,22 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_bootdraw_refactor_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_bootdraw_refactor_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `npqcmstest` Quantile-Residual Helper Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced repeated `ifelse(model.resid <= 0, 1 - tau, -tau)` logic with a local helper preserving NA semantics, reused across bandwidth selection and test-statistic internals.
+2. Scope:
+   - `R/np.qcmstest.R`
+3. Commit:
+   - `np-npRmpi`: `013efc9`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/np.qcmstest.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='qcmstest|cmstest|sigtest', reporter='summary')` (`RC:0`)
+     - log: `/tmp/nprmpi_qresidual_helper_tests_20260224.log`
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_053830.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_qresidual_helper_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_qresidual_helper_20260224.log` (`RC:0`, `Status: 1 WARNING, 1 NOTE`; warning set unchanged from existing top-level-file debt)
