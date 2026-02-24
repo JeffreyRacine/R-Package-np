@@ -77,6 +77,7 @@ Include in commit body or companion note:
 3. Numerical parity outcome and tolerance.
 4. Known regime-specific caveats.
 5. Output artifact paths (`/tmp/...`).
+6. If shared `np`/`npRmpi` codepaths are touched, record separate smoke outcomes for each package; do not treat one as a proxy for the other.
 
 ## Current Residual Risks (Known)
 - Some documentation/check warnings in non-core areas are still present and must be triaged as either:
