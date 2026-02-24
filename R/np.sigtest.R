@@ -132,6 +132,13 @@ npsigtest.rbandwidth <- function(bws,
   b <- 1.6180339887499   # (1+sqrt(5))/2
   P.a <-0.72360679774998 # (1+sqrt(5))/(2*sqrt(5))
 
+  draw.wild.mult <- function(n.obs, a, b, p.a) {
+    u <- stats::runif(n.obs)
+    mult <- rep.int(b, n.obs)
+    mult[u <= p.a] <- a
+    mult
+  }
+
   ## A vector for storing the resampled statistics
 
   In.vec <- numeric(boot.num)
@@ -246,7 +253,7 @@ npsigtest.rbandwidth <- function(bws,
         ## holding the variable tested at its median, and add to that
         ## a wild bootstrap draw from the original disturbance vector
 
-        ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, a, b)
+        ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
 
       } else if(boot.method == "wild-rademacher") {
 
@@ -255,7 +262,7 @@ npsigtest.rbandwidth <- function(bws,
         ## holding the variable tested at its median, and add to that
         ## a wild bootstrap draw from the original disturbance vector
 
-        ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, -1, 1)
+        ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
 
       } else if(boot.method =="pairwise") {
 
@@ -463,7 +470,7 @@ npsigtest.rbandwidth <- function(bws,
           ## holding the variable tested at its median, and add to that
           ## a wild bootstrap draw from the original disturbance vector
           
-          ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, a, b)
+          ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
           
         } else if(boot.method == "wild-rademacher") {
           
@@ -472,7 +479,7 @@ npsigtest.rbandwidth <- function(bws,
           ## holding the variable tested at its median, and add to that
           ## a wild bootstrap draw from the original disturbance vector
           
-          ydat.star <- mhat.xi + ei*ifelse(rbinom(num.obs, 1, P.a) == 1, -1, 1)
+          ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
           
         } else if(boot.method =="pairwise") {
           

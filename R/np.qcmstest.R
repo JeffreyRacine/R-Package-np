@@ -169,6 +169,13 @@ npqcmstest <- function(formula,
 
   ## data is y,xdat for the rq model...
 
+  draw.wild.mult <- function(n.obs, a, b, p.a) {
+    u <- stats::runif(n.obs)
+    mult <- rep.int(b, n.obs)
+    mult[u <= p.a] <- a
+    mult
+  }
+
   boot.wild <- function(model.resid) {
 
     a <- -0.6180339887499 # (1-sqrt(5))/2
@@ -181,9 +188,10 @@ npqcmstest <- function(formula,
     ## non-zero, first render mean zero, apply the wild bootstrap,
     ## then add back in the mean
 
-    y.star <- yhat + (model.resid-mean(model.resid))*
-      ifelse(rbinom(length(model.resid),1,P.a)==1,a,b)+
-        mean(model.resid)
+    resid.mean <- mean(model.resid)
+    y.star <- yhat + (model.resid - resid.mean) *
+      draw.wild.mult(length(model.resid), a, b, P.a) +
+      resid.mean
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
@@ -200,9 +208,10 @@ npqcmstest <- function(formula,
     ## Use the wild bootstrap to get a bootstrap vector for y under
     ## the null that the model is correct, using Rademacher variables
 
-    y.star <- yhat + (model.resid-mean(model.resid))*
-      ifelse(rbinom(length(model.resid),1,P.a)==1,a,b)+
-        mean(model.resid)
+    resid.mean <- mean(model.resid)
+    y.star <- yhat + (model.resid - resid.mean) *
+      draw.wild.mult(length(model.resid), a, b, P.a) +
+      resid.mean
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 
