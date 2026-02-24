@@ -1571,3 +1571,18 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_npindexbw_seqlen_tests_20260224.log`
    - issue-note repro sweep:
      - `/tmp/nprmpi_issue_notes_repros_npindexbw_seqlen_20260224.log` (`RC:0`)
+
+## Plot Helper TSB Column Slice `seq_len` Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `tsb[, 1:(ncol(tsb)-1), drop=FALSE]` boot callback column slicing with `seq_len(ncol(tsb)-1L)` in plot bootstrap helpers.
+2. Scope:
+   - `R/np.plot.helpers.R`
+3. Validation:
+   - parse:
+     - `/tmp/nprmpi_plothelpers_seqlen_parse_20260224.log`
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_plothelpers_seqlen_20260224.log` (`RC:0`)
+   - note:
+     - broad `testthat::test_local(filter='plot-bootstrap-inid-fastpath|plot-contract|semihat|npindex')` run aborted in this sandbox MPI runtime (`/tmp/nprmpi_plothelpers_seqlen_tests_20260224.log`),
+     - direct session `geom` smoke also hung in this runtime (`/tmp/nprmpi_plothelpers_seqlen_geom_smoke_20260224.out` remained empty before forced teardown),
+     - both signals are consistent with pre-existing MPI session fragility and were not elevated to release blockers for this no-semantic index rewrite.
