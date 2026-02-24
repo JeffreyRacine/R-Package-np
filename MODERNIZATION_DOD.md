@@ -29,6 +29,19 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 - [x] Local `--as-cran` warning closure achieved; only accepted CRAN incoming version-jump NOTE remains (`/tmp/np_master_check_ascran_compact_shellcheck_20260223.log`).
 - [ ] Win-builder validation still required before release candidate.
 
+## Current Status (2026-02-24)
+1. Core estimator modernization is in late hardening mode:
+   - contract-focused safeguards and low-risk runtime cleanups are still being applied,
+   - each slice is checkpointed with targeted tests + issue-note repro sweeps.
+2. Recent completed slices include:
+   - GLP validator and `dim_basis` integer-like contract hardening,
+   - deterministic NA/range guard hardening in core interfaces,
+   - `uocquantile` helper NA-guard micro-modernization.
+3. Remaining highest-priority work:
+   - bounded-kernel/convolution native-path completion and validation (`issue_notes/bounded_kernel_todo.md`),
+   - full performance-governance artifacts for performance-sensitive native patches,
+   - win-builder closure before release candidate.
+
 ## Mandatory Release Gates
 
 ### 1) Interface and Semantics
