@@ -1000,3 +1000,24 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_glp_validator_20260224.log` (`RC:0`)
      - `/tmp/np_master_check_glp_validator_20260224.log` (`RC:0`, `Status: OK`)
+
+## `dim_basis` Integer-Like Contract Hardening (2026-02-24)
+Completed in `np-master`:
+1. Hardened `dim_basis()` input contracts to validate numeric/integer-like vectors before coercion for `degree`, `segments`, `include`, and `categories`.
+2. This closes a latent coercion hazard where character inputs could be silently coerced and fail later with less precise diagnostics.
+3. Scope:
+   - `R/util.R`
+   - `tests/testthat/test-glp-validator-contract.R`
+4. Commit:
+   - `np-master`: `4f29c6f`
+5. Validation:
+   - parse gate:
+     - `/tmp/np_master_dimbasis_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests:
+     - `/tmp/np_master_dimbasis_tests_20260224.log` (`FAIL 0`, `PASS 33`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_dimbasis.log` (all verified repros passed)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_070017.log`
+   - tarball-first:
+     - `/tmp/np_master_build_dimbasis_20260224.log` (`RC:0`)
+     - `/tmp/np_master_check_dimbasis_20260224.log` (`RC:0`, `Status: OK`)
