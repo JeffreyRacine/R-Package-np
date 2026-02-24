@@ -29,12 +29,60 @@ run_cmd_subprocess <- function(cmd, args = character(), timeout = 60L, env = cha
   list(status = as.integer(status), output = out)
 }
 
+ensure_subprocess_npRmpi_lib <- local({
+  lib.path.cache <- NULL
+
+  function() {
+    if (!is.null(lib.path.cache) && dir.exists(lib.path.cache))
+      return(lib.path.cache)
+
+    pkg.root <- tryCatch(
+      normalizePath(testthat::test_path("..", ".."), mustWork = TRUE),
+      error = function(e) ""
+    )
+    if (!nzchar(pkg.root))
+      return(NULL)
+
+    lib.path.cache <<- tempfile("npRmpi-subprocess-lib-")
+    dir.create(lib.path.cache, recursive = TRUE, showWarnings = FALSE)
+
+    cmd <- file.path(R.home("bin"), "R")
+    out <- suppressWarnings(system2(
+      cmd,
+      c("CMD", "INSTALL", "--no-test-load", "-l", lib.path.cache, pkg.root),
+      stdout = TRUE,
+      stderr = TRUE
+    ))
+    status <- attr(out, "status")
+    if (is.null(status))
+      status <- 0L
+
+    if (status != 0L) {
+      warning(paste(out, collapse = "\n"))
+      unlink(lib.path.cache, recursive = TRUE, force = TRUE)
+      lib.path.cache <<- NULL
+      return(NULL)
+    }
+
+    lib.path.cache
+  }
+})
+
+subprocess_env <- function(extra = character()) {
+  lib.path <- ensure_subprocess_npRmpi_lib()
+  if (is.null(lib.path))
+    return(NULL)
+
+  c(
+    sprintf("R_LIBS=%s", paste(c(lib.path, .libPaths()), collapse = .Platform$path.sep)),
+    extra
+  )
+}
+
 test_that("session routing smoke completes in subprocess", {
   skip_on_cran()
-  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
-  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
-
-  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
@@ -60,10 +108,8 @@ test_that("session routing smoke completes in subprocess", {
 
 test_that("session npcdens user-style example completes with quiet=FALSE", {
   skip_on_cran()
-  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
-  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
-
-  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
@@ -92,10 +138,8 @@ test_that("session npcdens user-style example completes with quiet=FALSE", {
 
 test_that("session npreg factor example completes with quiet=FALSE", {
   skip_on_cran()
-  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
-  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
-
-  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
@@ -127,10 +171,8 @@ test_that("session npreg factor example completes with quiet=FALSE", {
 
 test_that("session core density/distribution family smoke completes", {
   skip_on_cran()
-  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
-  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
-
-  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
@@ -162,13 +204,8 @@ test_that("session core density/distribution family smoke completes", {
 
 test_that("skip-init mode fails fast without MPI pool crash", {
   skip_on_cran()
-  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
-  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
-
-  env <- c(
-    sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep)),
-    "NP_RMPI_SKIP_INIT=1"
-  )
+  env <- subprocess_env(extra = "NP_RMPI_SKIP_INIT=1")
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
@@ -192,10 +229,8 @@ test_that("skip-init mode fails fast without MPI pool crash", {
 
 test_that("manual-broadcast mode smoke completes in subprocess", {
   skip_on_cran()
-  pkg_path <- tryCatch(find.package("npRmpi"), error = function(e) "")
-  skip_if(!nzchar(pkg_path), "installed npRmpi unavailable for subprocess smoke")
-
-  env <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
@@ -247,7 +282,8 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
     "}"
   ), script, useBytes = TRUE)
 
-  env_common <- sprintf("R_LIBS=%s", paste(.libPaths(), collapse = .Platform$path.sep))
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
   res <- run_cmd_subprocess(
     mpiexec,
     args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--vanilla", script),
