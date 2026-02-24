@@ -75,6 +75,15 @@ npqcmstest <- function(formula,
   boot.method = match.arg(boot.method)
   bwydat = match.arg(bwydat)  
 
+  qresidual <- function(resid, tau) {
+    n.obs <- length(resid)
+    out <- rep.int(-tau, n.obs)
+    nonmissing <- !is.na(resid)
+    out[nonmissing & resid <= 0] <- 1 - tau
+    out[!nonmissing] <- NA_real_
+    out
+  }
+
   ## Here we go...
 
   model.resid <- residuals(model, type = "response")
@@ -93,7 +102,7 @@ npqcmstest <- function(formula,
   if(bwydat == "y") {
     bw <- npregbw(xdat=xdat, ydat=model$y, ...)
   } else if(bwydat == "varepsilon"){
-    varepsilon <- ifelse(model.resid<=0,1-tau,-tau)
+    varepsilon <- qresidual(model.resid, tau)
     bw <- npregbw(xdat=xdat, ydat=varepsilon, ...)
   }
 
@@ -127,7 +136,7 @@ npqcmstest <- function(formula,
     ## Compute In (equation 2.10, Hsiao/Li/racine 2005)
     ## Residuals in cms test replaced with varepsilon
     
-    varepsilon <- ifelse(model.resid<=0,1-tau,-tau)
+    varepsilon <- qresidual(model.resid, tau)
 
     return( sum(varepsilon*npksum(txdat=xdat,
                                   tydat=varepsilon,
@@ -143,7 +152,7 @@ npqcmstest <- function(formula,
 
     ## Residuals in cms test replaced with varepsilon
     
-    varepsilon <- ifelse(model.resid<=0,1-tau,-tau)
+    varepsilon <- qresidual(model.resid, tau)
 
     return( 2*prod(bw$bw[bw$icon])*
            sum(varepsilon^2*
