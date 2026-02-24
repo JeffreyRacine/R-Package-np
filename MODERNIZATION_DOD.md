@@ -628,3 +628,17 @@ Completed in `np-npRmpi`:
      - `/tmp` console run (8 pass, attach-mode test skipped unless `NP_RMPI_ENABLE_ATTACH_TEST=1`)
    - issue-note repro sweep (MPI env pinned):
      - `/tmp/nprmpi_issue_notes_repros_20260224_032316.log` (all verified repros passed)
+
+## Quantile/Copula Loop-Index Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:length(...)` / `1:n...` loop patterns in auxiliary quantile/copula runtime paths with `seq_along(...)` / `seq_len(...)`.
+2. Scope:
+   - `R/np.quantile.R`
+   - `R/np.copula.R`
+3. Commit:
+   - `np-npRmpi`: `4a2376a`
+4. Validation:
+   - targeted tests:
+     - `/tmp/nprmpi_copula_quantile_tests_20260224.log` (`RC:0`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_032635.log` (all verified repros passed)
