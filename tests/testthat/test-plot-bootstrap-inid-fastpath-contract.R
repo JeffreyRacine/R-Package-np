@@ -12,12 +12,11 @@ test_that("npindex inid fast path matches explicit resample refits", {
   y <- sin(x1 + x2) + rnorm(n, sd = 0.1)
   tx <- data.frame(x1 = x1, x2 = x2)
   bw <- npindexbw(xdat = tx, ydat = y, method = "ichimura", nmulti = 1)
-
-  H <- npindexhat(bws = bw, txdat = tx, exdat = tx, output = "matrix", s = 0L)
   B <- 11L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
 
   fast.fun <- getFromNamespace(".np_inid_lc_boot_from_hat", "npRmpi")
+  H <- npindexhat(bws = bw, txdat = tx, exdat = tx, output = "matrix", s = 0L)
   fast.out <- fast.fun(H = H, ydat = y, B = B, counts = counts)
 
   explicit.t <- matrix(NA_real_, nrow = B, ncol = n)

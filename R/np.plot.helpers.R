@@ -2198,9 +2198,11 @@ compute.bootstrap.errors.sibandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
+    regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(is.inid) &&
       isTRUE(!gradients) &&
+      isTRUE(identical(regtype, "lc")) &&
       isTRUE(identical(bws$type, "fixed"))
 
     if (is.wild.hat) {
