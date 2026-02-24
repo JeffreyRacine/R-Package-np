@@ -70,8 +70,12 @@ NZD <- function(a) {
     return(a)
   }
   idx <- which(abs(a) < eps)
-  if (length(idx) > 0)
-    a[idx] <- ifelse(a[idx] >= 0, eps, -eps)
+  if (length(idx) > 0) {
+    small <- a[idx]
+    small[small >= 0] <- eps
+    small[small < 0] <- -eps
+    a[idx] <- small
+  }
   a
 }
 
@@ -1216,10 +1220,11 @@ genBwScaleStrs <- function(x){
     x$dati[[v]]$icon })
 
   sumText <- lapply(seq_along(vari), function(i) {
-    ifelse(t.icon[[i]],
-           ifelse(x$type == "fixed",
-                  "Scale Factor:",""), "Lambda Max:")
-    
+    if (isTRUE(t.icon[[i]])) {
+      if (x$type == "fixed") "Scale Factor:" else ""
+    } else {
+      "Lambda Max:"
+    }
   })
 
   maxNameLen <- max(nchar(unlist(sumText)))
@@ -1242,10 +1247,11 @@ genBwScaleStrs <- function(x){
   })
 
   return(sapply(seq_along(t.nchar), function(j){
+    sum.str <- ""
+    if (isTRUE(print.sumText[[j]]))
+      sum.str <- paste(sumText[[j]], " ", npFormat(x$sumNum[[j]]), sep = "")
     paste(vatText[[j]], " Bandwidth: ", npFormat(x$bandwidth[[j]]), " ",
-          ifelse(print.sumText[[j]],
-                 paste(sumText[[j]], " ", npFormat(x$sumNum[[j]]), sep=""), ""),
-          sep="", collapse="")
+          sum.str, sep = "", collapse = "")
   }))
 }
 
