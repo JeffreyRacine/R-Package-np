@@ -1021,3 +1021,17 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_dimbasis_20260224.log` (`RC:0`)
      - `/tmp/np_master_check_dimbasis_20260224.log` (`RC:0`, `Status: OK`)
+
+## `uocquantile` NA-Guard Micro-Modernization (`anyNA`) (2026-02-24)
+Completed in `np-master`:
+1. Replaced `any(is.na(x) | is.nan(x))` with `anyNA(x)` in `uocquantile` for clearer semantics and lower overhead in a hot helper path.
+2. Scope:
+   - `R/np.plot.helpers.R`
+3. Commit:
+   - `np-master`: `2a125fa`
+4. Validation:
+   - targeted tests:
+     - `/tmp/np_master_plothelpers_anyna_tests_20260224.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_plothelpers_anyna.log` (all verified repros passed)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_071545.log`
