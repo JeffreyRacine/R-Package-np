@@ -11,13 +11,14 @@ npquantile <- function(x=NULL,
 #  if(class(x) != "numeric") stop("x must be numeric and univariate")
   if(!isa(x,"numeric")) stop("x must be numeric and univariate")
 
-  if(any(tau<0 | tau>1)) stop("tau must lie in the closed interval [0,1]")
-  if(length(bws$xnames)>1) stop("bw object must be univariate")
+  if(anyNA(tau)) stop("tau must not contain missing values")
+  if(any(tau<0 | tau>1, na.rm = TRUE)) stop("tau must lie in the closed interval [0,1]")
   if(num.eval < 100) stop("num.eval must be >= 100")
 
   if(is.null(bws)) bws <- npudistbw(~x,...)
 #  if(class(bws)!="dbandwidth") stop("bw object must be a npudistbw() object")
   if(!isa(bws,"dbandwidth")) stop("bw object must be a npudistbw() object")
+  if(length(bws$xnames)>1) stop("bw object must be univariate")
 
   ## Create grid from which quasi-inverse is extracted - extend the
   ## range of x for evaluation grid, also add empirical quantiles to

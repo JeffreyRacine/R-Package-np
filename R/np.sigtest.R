@@ -116,7 +116,8 @@ npsigtest.rbandwidth <- function(bws,
 
   ## Test for valid entries in index
 
-  if(any(index < 1 | index > NCOL(xdat))) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
+  if(anyNA(index)) stop("index must not contain missing values")
+  if(any(index < 1 | index > NCOL(xdat), na.rm = TRUE)) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
   if(length(unique(index)) < length(index)) stop("index contains repeated values (must be unique)")
 
   if(!joint) {
