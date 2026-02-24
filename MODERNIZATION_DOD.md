@@ -1156,3 +1156,23 @@ Completed in `np-master`:
      - run artifact: `/tmp/np_issue_notes_repros_20260224_112201.log`
 4. Scope note:
    - this checkpoint hardens regression coverage; bounded-kernel native convolution/CV completion items in `issue_notes/bounded_kernel_todo.md` remain active.
+
+## Predict `newdata` Alias Contract Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Fixed non-formula predict routing so `newdata` is no longer silently ignored for default-interface objects in core estimator families.
+2. Updated predict methods:
+   - `predict.npregression`: `newdata -> exdat`
+   - `predict.npdensity`: `newdata -> edat`
+   - `predict.npdistribution`: `newdata -> edat`
+   - `predict.condensity`: `newdata -> (eydat, exdat)` using `(ynames, xnames)` column mapping
+   - `predict.condistribution`: `newdata -> (eydat, exdat)` using `(ynames, xnames)` column mapping
+3. Added contracts:
+   - `tests/testthat/test-predict-newdata-contract.R`
+4. Validation:
+   - installed-package contract tests:
+     - `/tmp/np_master_predfix_contract_installed_20260224.log` (`RC:0`)
+   - install artifact:
+     - `/tmp/np_master_install_predfix_20260224.log` (`RC:0`)
+   - verified issue repro sweep:
+     - `/tmp/np_issue_notes_repros_predfix_20260224.log` (`RC:0`)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_113055.log`

@@ -68,7 +68,15 @@ fitted.npdensity <- function(object, ...){
 se.npdensity <- function(x){ x$derr }
 
 predict.npdensity <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npudens, c(list(bws = object$bws), list(...)))
+  dots <- list(...)
+  has.formula.route <- !is.null(object$bws$formula)
+
+  if (!has.formula.route && is.null(dots$edat) && !is.null(dots$newdata)) {
+    dots$edat <- dots$newdata
+    dots$newdata <- NULL
+  }
+
+  tr <- do.call(npudens, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, log.likelihood = tr$ll))
