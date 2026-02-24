@@ -109,3 +109,19 @@ test_that("plot contract: plot.errors.alpha is enforced in (0,0.5)", {
     "must lie in \\(0,0\\.5\\)"
   )
 })
+
+test_that("plot contract: default condensity plot call stays scalar-safe", {
+  skip_if_not_installed("np")
+
+  set.seed(104)
+  n <- 80
+  x <- rnorm(n)
+  y <- rnorm(n)
+
+  bw <- npcdensbw(y ~ x, bws = c(1.0, 1.0), bandwidth.compute = FALSE)
+  fit <- npcdens(bws = bw)
+
+  pdf(file = tempfile(fileext = ".pdf"))
+  on.exit(dev.off(), add = TRUE)
+  expect_error(plot(fit, perspective = FALSE), NA)
+})
