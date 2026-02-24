@@ -200,7 +200,10 @@ npuniden.boundary <- function(X=NULL,
         fnscale <- list(fnscale = -1)
         cv.function <- function(h,X,a=0,b=1) {
             f.loo <- fhat.loo(X,h,a,b)
-            return(sum(log(ifelse(f.loo > 0 & is.finite(f.loo), f.loo, .Machine$double.xmin))))
+            good <- (f.loo > 0) & is.finite(f.loo)
+            f.safe <- f.loo
+            f.safe[!good] <- .Machine$double.xmin
+            return(sum(log(f.safe)))
         }
     } else {
         ## Least-squares cross-validation function (minimizing)

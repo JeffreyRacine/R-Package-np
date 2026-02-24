@@ -892,7 +892,7 @@ npregiv <- function(y,
     ## First initialize initial search values of the vector of
     ## bandwidths to lie in [0,1]
 
-    if(debug) write(c("cv",paste(rep("x",num.bw),seq(1:num.bw),sep="")),file=debug.file.optim,ncolumns=(num.bw+1))
+    if(debug) write(c("cv",paste(rep("x",num.bw),seq_len(num.bw),sep="")),file=debug.file.optim,ncolumns=(num.bw+1))
 
     ## Pass in the local polynomial weight matrix rather than
     ## recomputing with each iteration.
