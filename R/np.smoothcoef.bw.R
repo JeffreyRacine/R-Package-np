@@ -140,10 +140,6 @@ npscoefbw.scbandwidth <-
            optim.abstol = .Machine$double.eps,
            optim.maxit = 500,
            ...){
-    .npRmpi_require_active_slave_pool(where = "npscoefbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-    
     ## Save seed prior to setting
 
     seed.state <- .np_seed_enter(random.seed)
@@ -171,6 +167,9 @@ npscoefbw.scbandwidth <-
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
     if (cv.iterate)
       cv.num.iterations <- npValidatePositiveInteger(cv.num.iterations, "cv.num.iterations")
+    .npRmpi_require_active_slave_pool(where = "npscoefbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")

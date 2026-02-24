@@ -108,16 +108,10 @@ npregbw.rbandwidth <-
            lbd.init = 0.1, hbd.init = 0.9, dfac.init = 0.375, 
           scale.init.categorical.sample = FALSE,
           transform.bounds = FALSE,
-          invalid.penalty = c("baseline","dbmax"),
-          penalty.multiplier = 10,
-          ...){
+           invalid.penalty = c("baseline","dbmax"),
+           penalty.multiplier = 10,
+           ...){
     elapsed.start <- proc.time()[3]
-    .npRmpi_require_active_slave_pool(where = "npregbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(
-        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
-        parent.frame()))
-
     xdat <- toFrame(xdat)
 
     if (missing(nmulti)){
@@ -134,6 +128,11 @@ npregbw.rbandwidth <-
     small <- npValidatePositiveFiniteNumeric(small, "small")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    .npRmpi_require_active_slave_pool(where = "npregbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(
+        .npRmpi_autodispatch_as_generic_call("npregbw", match.call()),
+        parent.frame()))
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector")

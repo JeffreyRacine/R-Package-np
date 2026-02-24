@@ -113,10 +113,6 @@ npcdistbw.condbandwidth <-
            invalid.penalty = c("baseline","dbmax"),
            penalty.multiplier = 10,
            ...){
-    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
     ydat = toFrame(ydat)
     xdat = toFrame(xdat)
 
@@ -137,6 +133,9 @@ npcdistbw.condbandwidth <-
     memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
+    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     if (length(bws$ybw) != dim(ydat)[2])
       stop(paste("length of bandwidth vector does not match number of columns of", "'ydat'"))

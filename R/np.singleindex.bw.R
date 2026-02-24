@@ -167,10 +167,6 @@ npindexbw.sibandwidth <-
            optim.maxit = 500,
            only.optimize.beta = FALSE,
            ...){
-    .npRmpi_require_active_slave_pool(where = "npindexbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
     ## Save seed prior to setting
 
     seed.state <- .np_seed_enter(random.seed)
@@ -188,6 +184,9 @@ npindexbw.sibandwidth <-
     optim.maxit <- npValidatePositiveInteger(optim.maxit, "optim.maxit")
     optim.reltol <- npValidatePositiveFiniteNumeric(optim.reltol, "optim.reltol")
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
+    .npRmpi_require_active_slave_pool(where = "npindexbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     if (bws$method == "kleinspady" && !setequal(ydat,c(0,1)))
       stop("Klein and Spady's estimator requires binary ydat with 0/1 values only")
