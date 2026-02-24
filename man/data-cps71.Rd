@@ -20,7 +20,7 @@
 data("cps71")
 attach(cps71)
 
-plot(age, logwage, xlab="Age", ylab="log(wage)")
+if (interactive()) plot(age, logwage, xlab="Age", ylab="log(wage)")
 
 detach(cps71)
 }

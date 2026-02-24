@@ -225,7 +225,7 @@ npcdist(bws, \dots)
   \code{\link{npudens}}
 }
 \examples{
-% \dontrun{
+\dontrun{
 # EXAMPLE 1 (INTERFACE=FORMULA): For this example, we load Giovanni
 # Baiocchi's Italian GDP panel (see Italy for details), and compute the
 # cross-validated bandwidths (default) using a second-order Gaussian
@@ -348,6 +348,6 @@ if (interactive()) plot(bw)
 
 detach(faithful)
 
-% } % enddontrun
+} % enddontrun
 }
 \keyword{nonparametric}

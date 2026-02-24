@@ -252,7 +252,7 @@ persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)), 
         gdp.seq, 
@@ -264,13 +264,13 @@ contour(as.integer(levels(year.seq)),
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Alternatively, you could use the plot() command (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(Italy)
 
@@ -326,7 +326,7 @@ persp(as.integer(levels(year.seq)), gdp.seq, f, col="lightblue",
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 contour(as.integer(levels(year.seq)),
         gdp.seq, 
@@ -338,13 +338,13 @@ contour(as.integer(levels(year.seq)),
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Alternatively, you could use the plot() command (<ctrl>-C will
 # interrupt on *NIX systems, <esc> will interrupt on MS Windows
 # systems).
 
-plot(bw)
+if (interactive()) plot(bw)
 
 detach(Italy)
 
@@ -368,7 +368,7 @@ summary(bw)
 # -0.2 to extend the plot outside the support of the data (i.e., extend
 # the tails of the estimate to meet the horizontal axis).
 
-plot(bw, xtrim=-0.2)
+if (interactive()) plot(bw, xtrim=-0.2)
 
 detach(faithful)
 
@@ -392,7 +392,7 @@ summary(bw)
 # -0.2 to extend the plot outside the support of the data (i.e., extend
 # the tails of the estimate to meet the horizontal axis).
 
-plot(bw, xtrim=-0.2)
+if (interactive()) plot(bw, xtrim=-0.2)
 
 detach(faithful)
 } % enddontrun

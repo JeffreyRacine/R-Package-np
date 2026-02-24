@@ -186,7 +186,7 @@ npcmstest(formula,
 }
 
 \examples{
-% % % % % % \dontrun{
+\dontrun{
 # EXAMPLE 1: For this example, we conduct a consistent model
 # specification test for a parametric wage regression model that is
 # quadratic in age. The work of Murphy and Welch (1990) would suggest
@@ -255,6 +255,6 @@ X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 npcmstest(model = model, xdat = X, ydat = growth, boot.num=9, nmulti = 1)
 
 detach(oecdpanel)
-% % % % % % } % enddontrun
+} % enddontrun
 }
 \keyword{ nonparametric }

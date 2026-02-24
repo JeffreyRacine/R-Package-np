@@ -144,13 +144,13 @@ y <- rnorm(n)
 
 npunitest(x,y,bootstrap=FALSE)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Conduct the test for this data
 
 npunitest(x,y,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Conduct the test for data drawn from different distributions having
 ## the same mean and variance
@@ -164,7 +164,7 @@ sd(y)
 
 npunitest(x,y,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Two sample t-test for equality of means
 t.test(x,y)
@@ -179,10 +179,10 @@ fx <- density(x)
 fy <- density(y)
 xlim <- c(min(fx$x,fy$x),max(fx$x,fy$x))
 ylim <- c(min(fx$y,fy$y),max(fx$y,fy$y))
-plot(fx,xlim=xlim,ylim=ylim,xlab="Data",main="f(x), f(y)")
+if (interactive()) plot(fx,xlim=xlim,ylim=ylim,xlab="Data",main="f(x), f(y)")
 lines(fy$x,fy$y,col="red")
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Test for equality of log(wage) distributions
 
@@ -193,7 +193,7 @@ lwage.female <- lwage[female=="Female"]
 
 npunitest(lwage.male,lwage.female,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Plot the nonparametric density estimates on the same axes
 
@@ -210,7 +210,7 @@ legend(-1,1.2,c("Male","Female"),lty=c(1,2),col=c("black","red"))
 
 detach(wage1)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Conduct the test for data drawn from different discrete probability
 ## distributions

@@ -344,14 +344,14 @@ summary(model)
 # all computations are completed (if you use
 # plot.errors.method="asymptotic" the figure will instantly appear).
 
-plot(bw, plot.errors.method="bootstrap")
+if (interactive()) plot(bw, plot.errors.method="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
 detach(Italy)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): For this example, we compute a
 # bivariate nonparametric regression estimate for Giovanni Baiocchi's
@@ -380,14 +380,14 @@ summary(model)
 # all computations are completed (if you use
 # plot.errors.method="asymptotic" the figure will instantly appear).
 
-plot(bw, plot.errors.method="bootstrap")
+if (interactive()) plot(bw, plot.errors.method="bootstrap")
 points(ordered(year), gdp, cex=.2, col="red")
 
 detach(Italy)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 2 (INTERFACE=FORMULA): For this example, we compute a local
 # linear fit using the AIC_c bandwidth selection criterion. We then plot
@@ -400,22 +400,22 @@ bw <- npregbw(logwage~age, regtype="ll", bwmethod="cv.aic")
 
 # Next, plot the regression function...
 
-plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, plot.errors.method="asymptotic")
 points(age, logwage, cex=.2, col="red")
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, plot the derivative...
 
-plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
+if (interactive()) plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
 
 detach(cps71)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): For this example, we compute a local
 # linear fit using the AIC_c bandwidth selection criterion. We then plot
@@ -428,22 +428,22 @@ bw <- npregbw(xdat=age, ydat=logwage, regtype="ll", bwmethod="cv.aic")
 
 # Next, plot the regression function...
 
-plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, plot.errors.method="asymptotic")
 points(age, logwage, cex=.2, col="red")
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, plot the derivative...
 
-plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
+if (interactive()) plot(bw, plot.errors.method="asymptotic", gradient=TRUE)
 
 detach(cps71)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 3 (INTERFACE=FORMULA): For this example, we replicate the
 # nonparametric regression in Maasoumi, Racine, and Stengos
@@ -462,7 +462,7 @@ bw <- npregbw(formula=growth~
               inv+
               humancap)
 
-plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, plot.errors.method="asymptotic")
 
 detach(oecdpanel)
 
@@ -480,7 +480,7 @@ X <- data.frame(factor(oecd), factor(year), initgdp, popgro, inv, humancap)
 
 bw <- npregbw(xdat=X, ydat=y)
 
-plot(bw, plot.errors.method="asymptotic")
+if (interactive()) plot(bw, plot.errors.method="asymptotic")
 
 detach(oecdpanel)
 
@@ -517,7 +517,7 @@ bw <- npregbw(formula=len~factor(supp)+ordered(dose))
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
+if (interactive()) plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
 
 detach(ToothGrowth)
 
@@ -556,7 +556,7 @@ bw <- npregbw(X, y)
 # Now plot the partial regression surfaces with bootstrapped
 # nonparametric confidence bounds
 
-plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
+if (interactive()) plot(bw, plot.errors.method="bootstrap", plot.errors.type="simultaneous")
 
 detach(ToothGrowth)
 

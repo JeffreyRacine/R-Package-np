@@ -275,7 +275,7 @@ z <- runif(n, min=-2, max=2)
 y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
 bw <- npscoefbw(y~x|z)
 model <- npscoef(bw)
-plot(model)
+if (interactive()) plot(model)
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): 
 
@@ -285,7 +285,7 @@ z <- runif(n, min=-2, max=2)
 y <- x*exp(z)*(1.0+rnorm(n,sd = 0.2))
 bw <- npscoefbw(xdat=x, ydat=y, zdat=z)
 model <- npscoef(bw)
-plot(model)
+if (interactive()) plot(model)
 } % enddontrun
 }
 \keyword{nonparametric}

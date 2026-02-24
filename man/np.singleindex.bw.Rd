@@ -359,7 +359,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): Generate a simple linear model then
 # compute coefficients and the bandwidth using Ichimura's nonlinear
@@ -387,7 +387,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): Generate a simple binary outcome
 # model then compute coefficients and the bandwidth using Klein and

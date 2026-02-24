@@ -143,21 +143,21 @@ n <- 100
 x <- factor(rbinom(n,2,.8))
 npsymtest(x,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Symmetric discrete probability distribution function
 
 x <- factor(rbinom(n,2,.5))
 npsymtest(x,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Asymmetric continuous distribution function
 
 y <- rchisq(n,df=2)
 npsymtest(y,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Symmetric continuous distribution function
 

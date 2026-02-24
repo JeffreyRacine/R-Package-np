@@ -359,7 +359,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # You may want to tweak some of the bandwidths
 bw$bw[[1]] # y on Z, alternatively bw$bw$yzbw
@@ -413,7 +413,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # You may want to tweak some of the bandwidths
 bw$bw[[1]] # y on Z, alternatively bw$bw$yzbw

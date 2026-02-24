@@ -271,13 +271,13 @@ summary(model)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Or you can visualize the input with plot.
 
-plot(bw)
+if (interactive()) plot(bw)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 1 (INTERFACE=DATA FRAME): Generate a simple linear model then
 # estimate it using a semiparametric single index specification and
@@ -311,13 +311,13 @@ summary(model)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Or you can visualize the input with plot.
 
-plot(bw)
+if (interactive()) plot(bw)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 2 (INTERFACE=FORMULA): Generate a simple binary outcome linear
 # model then estimate it using a semiparametric single index
@@ -351,7 +351,7 @@ summary(model)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 2 (INTERFACE=DATA FRAME): Generate a simple binary outcome
 # linear model then estimate it using a semiparametric single index
@@ -387,7 +387,7 @@ summary(model)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # EXAMPLE 3 (INTERFACE=FORMULA): Replicate the DGP of Klein & Spady
 # (1993) (see their description on page 405, pay careful attention to

@@ -589,7 +589,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Supply your own bandwidth...
 
@@ -600,7 +600,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Treat year as continuous and supply your own scaling factor c in
 # c sigma n^{-1/(2p+q)}
@@ -633,7 +633,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Supply your own bandwidth...
 
@@ -644,7 +644,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Treat year as continuous and supply your own scaling factor c in
 # c sigma n^{-1/(2p+q)}

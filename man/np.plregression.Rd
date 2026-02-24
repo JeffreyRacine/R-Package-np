@@ -286,7 +286,7 @@ summary(pl)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Retrieve the coefficient estimates and their standard errors...
 
@@ -307,12 +307,12 @@ sqrt(diag(vcov(ols)))[2:3]
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Plot the regression surfaces via plot() (i.e., plot the `partial
 # regression surface plots').
 
-plot(bw)
+if (interactive()) plot(bw)
 
 # Note - to plot regression surfaces with variability bounds constructed
 # from bootstrapped standard errors, use the following (note that this
@@ -361,7 +361,7 @@ summary(pl)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Retrieve the coefficient estimates and their standard errors...
 
@@ -382,12 +382,12 @@ sqrt(diag(vcov(ols)))[2:3]
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Plot the regression surfaces via plot() (i.e., plot the `partial
 # regression surface plots').
 
-plot(bw)
+if (interactive()) plot(bw)
 
 # Note - to plot regression surfaces with variability bounds constructed
 # from bootstrapped standard errors, use the following (note that this

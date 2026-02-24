@@ -151,7 +151,7 @@ y.fit <- fitted(model)
 
 npdeptest(y,y.fit,boot.num=99,method="summation")
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Test/measure lack of fit between y and its fitted value from a
 ## regression model when x is irrelevant using the `summation' version.
@@ -176,7 +176,7 @@ y.fit <- fitted(model)
 
 npdeptest(y,y.fit,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Test/measure lack of fit between y and its fitted value from a
 ## regression model when x is irrelevant using the `integration'

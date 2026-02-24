@@ -112,7 +112,7 @@ sample.B <- data.frame(x=rnorm(n))
 
 npdeneqtest(sample.A,sample.B,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Distributions are unequal
 
@@ -128,7 +128,7 @@ sample.B <- data.frame(a=rnorm(n),b=factor(rbinom(n,2,.5)))
 
 npdeneqtest(sample.A,sample.B,boot.num=99)
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Mixed datatypes, distributions are unequal
 

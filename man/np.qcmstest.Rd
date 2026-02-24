@@ -207,7 +207,7 @@ attach(cps71)
 
 model <- rq(logwage~age+I(age^2), tau=0.5, model=TRUE)
 
-plot(age, logwage)
+if (interactive()) plot(age, logwage)
 lines(age, fitted(model))
 
 X <- data.frame(age)
@@ -219,13 +219,13 @@ npqcmstest(model = model, xdat = X, ydat = logwage, tau=0.5)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next try Murphy & Welch's (1990) suggested quintic specification.
 
 model <- rq(logwage~age+I(age^2)+I(age^3)+I(age^4)+I(age^5), model=TRUE)
 
-plot(age, logwage)
+if (interactive()) plot(age, logwage)
 lines(age, fitted(model))
 
 X <- data.frame(age)

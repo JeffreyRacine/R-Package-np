@@ -536,7 +536,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, specify a value for the bandwidths manually (0.5 for the first
 # variable, 1.0 for the second)...
@@ -548,7 +548,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, if you wanted to use the 1.06 sigma n^{-1/(2p+q)} rule-of-thumb
 # for the bandwidth for the continuous variable and, say, no smoothing
@@ -566,7 +566,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # If you wished to use, say, an eighth order Epanechnikov kernel for the
 # continuous variables and specify your own bandwidths, you could do
@@ -581,7 +581,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # If you preferred, say, nearest-neighbor bandwidths and a generalized
 # kernel estimator for the continuous variable, you would use the
@@ -593,7 +593,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, compute bandwidths using likelihood cross-validation, fixed
 # bandwidths, and a second order Gaussian kernel for the continuous
@@ -606,7 +606,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Finally, if you wish to use initial values for numerical search, you
 # can either provide a vector of bandwidths as in bws=c(...) or a
@@ -640,7 +640,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, specify a value for the bandwidths manually (0.5 for the first
 # variable, 1.0 for the second)...
@@ -651,7 +651,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, if you wanted to use the 1.06 sigma n^{-1/(2p+q)} rule-of-thumb
 # for the bandwidth for the continuous variable and, say, no smoothing
@@ -669,7 +669,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # If you wished to use, say, an eighth order Epanechnikov kernel for the
 # continuous variables and specify your own bandwidths, you could do
@@ -684,7 +684,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # If you preferred, say, nearest-neighbor bandwidths and a generalized
 # kernel estimator for the continuous variable, you would use the
@@ -696,7 +696,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Next, compute bandwidths using likelihood cross-validation, fixed
 # bandwidths, and a second order Gaussian kernel for the continuous
@@ -709,7 +709,7 @@ summary(bw)
 
 # Sleep for 5 seconds so that we can examine the output...
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 # Finally, if you wish to use initial values for numerical search, you
 # can either provide a vector of bandwidths as in bws=c(...) or a

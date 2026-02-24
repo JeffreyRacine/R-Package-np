@@ -152,7 +152,7 @@ n <- 100
 yt <- ar.series(0.95,rnorm(n))
 npsdeptest(yt,lag.num=2,boot.num=99,method="summation")
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Stationary independent time-series
 
@@ -164,7 +164,7 @@ npsdeptest(yt,lag.num=2,boot.num=99,method="summation")
 yt <- ar.series(0.95,rnorm(n))
 npsdeptest(yt,lag.num=2,boot.num=99,method="integration")
 
-Sys.sleep(5)
+if (interactive()) Sys.sleep(5)
 
 ## Stationary independent time-series
 
