@@ -157,6 +157,13 @@ npcmstest <- function(formula,
   ## jracine March 8, 2006... not using boot() library (problematic I
   ## realized with [indices] hence unnecessary)
 
+  draw.wild.mult <- function(n.obs, a, b, p.a) {
+    u <- stats::runif(n.obs)
+    mult <- rep.int(b, n.obs)
+    mult[u <= p.a] <- a
+    mult
+  }
+
   boot.wild <- function(model.resid) {
 
     a <- -0.6180339887499 # (1-sqrt(5))/2
@@ -169,7 +176,7 @@ npcmstest <- function(formula,
 
     ## jracine removed [indices]
 
-    y.star <- yhat + model.resid*ifelse(rbinom(length(model.resid),1,P.a)==1,a,b)
+    y.star <- yhat + model.resid * draw.wild.mult(length(model.resid), a, b, P.a)
     resid <-
       if(is.null(model$family)) {
         residuals(glm(y.star~ model$x - 1), type = "response")
@@ -192,7 +199,7 @@ npcmstest <- function(formula,
 
     ## jracine removed [indices]
 
-    y.star <- yhat + model.resid*ifelse(rbinom(length(model.resid),1,P.a)==1,a,b)
+    y.star <- yhat + model.resid * draw.wild.mult(length(model.resid), a, b, P.a)
     resid <-
       if(is.null(model$family)) {
         residuals(glm(y.star~ model$x - 1), type = "response")
