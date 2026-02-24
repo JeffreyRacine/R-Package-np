@@ -516,3 +516,17 @@ Completed in `np-master`:
 4. Validation:
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_20260224_032316.log` (all verified repros passed)
+
+## Quantile/Copula Loop-Index Hygiene Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced residual `1:length(...)` / `1:n...` loop patterns in auxiliary quantile/copula runtime paths with `seq_along(...)` / `seq_len(...)`.
+2. Scope:
+   - `R/np.quantile.R`
+   - `R/np.copula.R`
+3. Commit:
+   - `np-master`: `b99c0f2`
+4. Validation:
+   - targeted tests:
+     - `/tmp/np_master_copula_quantile_tests_20260224.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_032635.log` (all verified repros passed)
