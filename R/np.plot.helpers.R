@@ -32,11 +32,11 @@
 }
 
 gen.label = function(label, altlabel){
-  paste(ifelse(is.null(label), altlabel, label))
+  paste(if (is.null(label)) altlabel else label)
 }
 
 gen.tflabel = function(condition, tlabel, flabel){
-  paste(ifelse(condition,tlabel,flabel))
+  paste(if (condition) tlabel else flabel)
 }
 
 draw.error.bands = function(ex, ely, ehy, lty = 2, col = par("col")){
@@ -70,8 +70,9 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, 
     yg = abs(yy[jj-2]-yy[jj-1])/golden
     htest = (hbardist >= yg)
     
-    xx[jj-2] = ex - ifelse(htest, yg/2, hbardist/2) 
-    xx[jj-1] = ex + ifelse(htest, yg/2, hbardist/2) 
+    hdelta = pmin(yg, hbardist)/2
+    xx[jj-2] = ex - hdelta
+    xx[jj-1] = ex + hdelta
     
     ty = yy[jj-1]
     yy[jj-1] = yy[jj-2]
@@ -328,7 +329,7 @@ compute.default.error.range <- function(center, err) {
                                              allow_asymptotic_quantile = TRUE) {
   plot.behavior <- match.arg(plot.behavior, c("plot", "plot-data", "data"))
   plot.errors.method <- match.arg(plot.errors.method, c("none", "bootstrap", "asymptotic"))
-  plot.errors.boot.method <- match.arg(plot.errors.boot.method, c("inid", "fixed", "geom", "wild-hat"))
+  plot.errors.boot.method <- match.arg(plot.errors.boot.method, c("inid", "fixed", "geom"))
   plot.errors.center <- match.arg(plot.errors.center, c("estimate", "bias-corrected"))
   plot.errors.type <- match.arg(plot.errors.type, c("pmzsd", "pointwise", "bonferroni", "simultaneous", "all"))
 
@@ -398,111 +399,43 @@ compute.bootstrap.errors.rbandwidth =
            bws){
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
-    is.wild.hat <- plot.errors.boot.method == "wild-hat"
-    is.inid <- plot.errors.boot.method == "inid"
 
-    if (is.wild.hat && gradients) {
-      cont.idx <- which(bws$xdati$icon)
-      if (is.na(match(slice.index, cont.idx))) {
-        warning("plot.errors.boot.method='wild-hat' supports gradients only for continuous slices; using requested bootstrap method fallback")
-        is.wild.hat <- FALSE
+    is.inid = plot.errors.boot.method=="inid"
+
+    boofun <- if (is.inid) {
+      function(data, indices) {
+        fit <- suppressWarnings(npreg(
+          txdat = xdat[indices, , drop = FALSE],
+          tydat = ydat[indices],
+          exdat = exdat, bws = bws,
+          gradients = gradients,
+          gradient.order = gradient.order,
+          warn.glp.gradient = FALSE
+        ))
+        if (gradients) fit$grad[, slice.index] else fit$mean
+      }
+    } else {
+      function(tsb) {
+        fit <- suppressWarnings(npreg(
+          txdat = tsb[, 1:(ncol(tsb) - 1), drop = FALSE],
+          tydat = tsb[, ncol(tsb)],
+          exdat = exdat, bws = bws,
+          gradients = gradients,
+          gradient.order = gradient.order,
+          warn.glp.gradient = FALSE
+        ))
+        if (gradients) fit$grad[, slice.index] else fit$mean
       }
     }
 
-    if (is.wild.hat) {
-      fit.train <- suppressWarnings(npreg(
-        txdat = xdat,
-        tydat = ydat,
-        bws = bws,
-        gradients = FALSE,
-        warn.glp.gradient = FALSE
-      ))
-
-      s.vec <- NULL
-      if (gradients) {
-        cont.idx <- which(bws$xdati$icon)
-        cpos <- match(slice.index, cont.idx)
-        gorder <- if (length(gradient.order) == 1L) {
-          rep.int(as.integer(gradient.order), length(cont.idx))
-        } else {
-          as.integer(gradient.order)
-        }
-        if (length(gorder) != length(cont.idx))
-          gorder <- rep.int(1L, length(cont.idx))
-        s.vec <- integer(length(cont.idx))
-        s.vec[cpos] <- gorder[cpos]
-      }
-
-      H <- suppressWarnings(npreghat(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        s = s.vec,
-        output = "matrix"
-      ))
-
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - fit.train$mean)
-      n <- length(eps)
-      B <- plot.errors.boot.num
-
-      a <- (1 - sqrt(5)) / 2
-      p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
-      draws <- ifelse(
-        matrix(stats::runif(n * B), nrow = n, ncol = B) <= p.a,
-        a,
-        1 - a
-      )
-
-      ystar <- matrix(fit.train$mean, nrow = n, ncol = B) +
-        matrix(eps, nrow = n, ncol = B) * draws
-
-      boot.out <- list(
-        t = t(H %*% ystar),
-        t0 = t0
-      )
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num)
     } else {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          fit <- suppressWarnings(npreg(
-            txdat = xdat[indices, , drop = FALSE],
-            tydat = ydat[indices],
-            exdat = exdat, bws = bws,
-            gradients = gradients,
-            gradient.order = gradient.order,
-            warn.glp.gradient = FALSE
-          ))
-          if (gradients) fit$grad[, slice.index] else fit$mean
-        }
-      } else {
-        function(tsb) {
-          fit <- suppressWarnings(npreg(
-            txdat = tsb[, 1:(ncol(tsb) - 1), drop = FALSE],
-            tydat = tsb[, ncol(tsb)],
-            exdat = exdat, bws = bws,
-            gradients = gradients,
-            gradient.order = gradient.order,
-            warn.glp.gradient = FALSE
-          ))
-          if (gradients) fit$grad[, slice.index] else fit$mean
-        }
-      }
-
-      if (is.inid){
-        boot.out <- boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boot.out <- tsboot(
-          tseries = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
+      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
     }
 
     all.bp <- list()
