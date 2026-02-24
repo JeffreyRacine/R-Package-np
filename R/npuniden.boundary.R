@@ -207,7 +207,7 @@ npuniden.boundary <- function(X=NULL,
         fnscale <- list(fnscale = 1) 
         cv.function <- function(h,X,a=0,b=1) {
             cv.ls <- (integrate.trapezoidal(X,fhat(X,X,h,a,b)**2)[order(X)])[length(X)]-2*mean(fhat.loo(X,h,a,b))
-            ifelse(is.finite(cv.ls),cv.ls,sqrt(sqrt(.Machine$double.xmax)))
+            if (is.finite(cv.ls)) cv.ls else sqrt(sqrt(.Machine$double.xmax))
         }
     }
     ## Grid search and then numeric optimization search (no
@@ -222,11 +222,13 @@ npuniden.boundary <- function(X=NULL,
             constant <- rob.spread*length(X)**(-0.2)
             h.vec <- c(seq(0.25,1.75,length=10),2^(1:25))*constant
             cv.vec <- sapply(seq_along(h.vec), function(i){cv.function(h.vec[i],X,a,b)})
-            foo <- optim(h.vec[ifelse(bwmethod=="cv.ml",which.max(cv.vec),which.min(cv.vec))],
+            start.idx <- if (bwmethod=="cv.ml") which.max(cv.vec) else which.min(cv.vec)
+            upper.bound <- if (kertype=="beta2") (b-a)/4 else Inf
+            foo <- optim(h.vec[start.idx],
                          cv.function,
                          method="L-BFGS-B",
                          lower=sqrt(.Machine$double.eps),
-                         upper=ifelse(kertype=="beta2",(b-a)/4,Inf),
+                         upper=upper.bound,
                          control = fnscale,
                          X=X,
                          a=a,
@@ -235,11 +237,13 @@ npuniden.boundary <- function(X=NULL,
             cv.opt <- foo$value
         } else {
             cv.vec <- sapply(seq_along(grid), function(i){cv.function(grid[i],X,a,b)})
-            foo <- optim(grid[ifelse(bwmethod=="cv.ml",which.max(cv.vec),which.min(cv.vec))],
+            start.idx <- if (bwmethod=="cv.ml") which.max(cv.vec) else which.min(cv.vec)
+            upper.bound <- if (kertype=="beta2") (b-a)/4 else Inf
+            foo <- optim(grid[start.idx],
                          cv.function,
                          method="L-BFGS-B",
                          lower=sqrt(.Machine$double.eps),
-                         upper=ifelse(kertype=="beta2",(b-a)/4,Inf),
+                         upper=upper.bound,
                          control = fnscale,
                          X=X,
                          a=a,
