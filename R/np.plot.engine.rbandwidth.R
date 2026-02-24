@@ -449,27 +449,27 @@
         
         tr <- if (gradients && identical(bws$regtype, "lp")) {
           suppressWarnings(npreg(txdat = xdat, tydat = ydat,
-            exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE], bws = bws,
             gradients = gradients,
             gradient.order = gradient.order,
             warn.glp.gradient = FALSE))
         } else {
           npreg(txdat = xdat, tydat = ydat,
-            exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE], bws = bws,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE], bws = bws,
             gradients = gradients,
             gradient.order = gradient.order,
             warn.glp.gradient = FALSE)
         }
 
-        temp.mean[1:xi.neval] = if(gradients) tr$grad[,i] else tr$mean
+        temp.mean[seq_len(xi.neval)] = if(gradients) tr$grad[,i] else tr$mean
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
-            temp.err[1:xi.neval,1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*(if(gradients) tr$gerr[,i] else tr$merr))
+            temp.err[seq_len(xi.neval),1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*(if(gradients) tr$gerr[,i] else tr$merr))
           else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat, ydat = ydat,
-                      exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+                      exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                       gradients = gradients,
                       gradient.order = gradient.order,
                       slice.index = i,
@@ -481,7 +481,7 @@
                       plot.errors.type = plot.errors.type,
                       plot.errors.alpha = plot.errors.alpha,
                       bws = bws)
-            temp.err[1:xi.neval,] = temp.boot.raw[["boot.err"]]
+            temp.err[seq_len(xi.neval),] = temp.boot.raw[["boot.err"]]
             temp.all.err <- temp.boot.raw[["boot.all.err"]]
             temp.boot <- temp.boot.raw[["bxp"]]
             if (!plot.bxp.out){
@@ -576,7 +576,7 @@
           if (gradients){
             plot.out[[i]] =
               npregression(bws = bws,
-                           eval = as.data.frame(subcol(exdat,ei,i)[1:xi.neval,]),
+                           eval = as.data.frame(subcol(exdat,ei,i)[seq_len(xi.neval),]),
                            mean = tr$mean,
                            merr = tr$merr,
                            grad = na.omit(temp.mean),
@@ -587,7 +587,7 @@
           } else {
             plot.out[[i]] =
               npregression(bws = bws,
-                           eval = as.data.frame(subcol(exdat,ei,i)[1:xi.neval,]),
+                           eval = as.data.frame(subcol(exdat,ei,i)[seq_len(xi.neval),]),
                            mean = na.omit(temp.mean),
                            merr = na.omit(cbind(-temp.err[,1],
                              temp.err[,2])),

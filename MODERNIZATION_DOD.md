@@ -1586,3 +1586,25 @@ Completed in `np-npRmpi`:
      - broad `testthat::test_local(filter='plot-bootstrap-inid-fastpath|plot-contract|semihat|npindex')` run aborted in this sandbox MPI runtime (`/tmp/nprmpi_plothelpers_seqlen_tests_20260224.log`),
      - direct session `geom` smoke also hung in this runtime (`/tmp/nprmpi_plothelpers_seqlen_geom_smoke_20260224.out` remained empty before forced teardown),
      - both signals are consistent with pre-existing MPI session fragility and were not elevated to release blockers for this no-semantic index rewrite.
+
+## Plot Engine `seq_len(xi.neval)` Index-Safety Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:xi.neval` eval/assignment slices with `seq_len(xi.neval)` across core plot engines:
+   - `R/np.plot.engine.bandwidth.R`
+   - `R/np.plot.engine.dbandwidth.R`
+   - `R/np.plot.engine.rbandwidth.R`
+   - `R/np.plot.engine.conbandwidth.R`
+   - `R/np.plot.engine.condbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+2. Also replaced residual plot-loop/name ranges:
+   - `for (plot.index in 1:(bws$xndim + bws$zndim))` -> `seq_len(...)`
+   - `paste("sc"/"plr", 1:(...), ...)` -> `seq_len(...)`.
+3. Validation:
+   - parse:
+     - `/tmp/plot_engine_parse_postfix_20260224.log` (`PLOT_ENGINE_PARSE_POSTFIX_OK`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_plotengine_seq_len_fix_20260224.log` (`RC:0`)
+4. Regression note:
+   - an intermediate mechanical rewrite incorrectly produced `seq_len(bws + bws)` in `sc/pl` plot label/loop paths,
+   - corrected in the same checkpoint before commit.

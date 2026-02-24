@@ -522,14 +522,14 @@
         margs <- list(
           txdat = xdat,
           tydat = ydat,
-          exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
+          exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
           gradients = gradients,
           bws = bws
         )
         if (quantreg)
           margs$tau <- tau
         else
-          margs$eydat <- eydat[1:xi.neval,, drop = FALSE]
+          margs$eydat <- eydat[seq_len(xi.neval),, drop = FALSE]
         tobj <- do.call(method.fun, margs)
 
         
@@ -564,12 +564,12 @@
         for (j in seq_len(dsf)){
           temp.boot = list()
           temp.all.err <- NULL
-          temp.dens[1:xi.neval] <- eval.extract(tobj, j)
+          temp.dens[seq_len(xi.neval)] <- eval.extract(tobj, j)
           
           if (plot.errors){
             if (plot.errors.method == "asymptotic") {
               terr.j <- err.extract(tobj, j)
-              temp.err[1:xi.neval,1:2] <- if (all(is.na(terr.j))) {
+              temp.err[seq_len(xi.neval),1:2] <- if (all(is.na(terr.j))) {
                 matrix(NA_real_, nrow = xi.neval, ncol = 2)
               } else {
                 replicate(2, qnorm(plot.errors.alpha/2, lower.tail = FALSE) * terr.j)
@@ -579,8 +579,8 @@
               temp.boot <- compute.bootstrap.errors(
                         xdat = xdat,
                         ydat = ydat,
-                        exdat = subcol(exdat,ei,i)[1:xi.neval,, drop = FALSE],
-                        eydat = eydat[1:xi.neval,, drop = FALSE],
+                        exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                        eydat = eydat[seq_len(xi.neval),, drop = FALSE],
                         cdf = cdf,
                         quantreg = quantreg,
                         tau = tau,
@@ -594,7 +594,7 @@
                         plot.errors.type = plot.errors.type,
                         plot.errors.alpha = plot.errors.alpha,
                         bws = bws)
-              temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+              temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
               temp.all.err <- temp.boot[["boot.all.err"]]
               temp.boot <- temp.boot[["bxp"]]
               if (!plot.bxp.out){
@@ -713,14 +713,14 @@
           margs <- list(
             txdat = xdat,
             tydat = ydat,
-            eydat = subcol(eydat,ei,i)[1:xi.neval,, drop = FALSE],
+            eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
             gradients = gradients,
             bws = bws
           )
           if (quantreg)
             margs$tau <- tau
           else
-            margs$exdat <- exdat[1:xi.neval,, drop = FALSE]
+            margs$exdat <- exdat[seq_len(xi.neval),, drop = FALSE]
           tobj <- do.call(method.fun, margs)
 
           
@@ -755,12 +755,12 @@
           for (j in seq_len(dsf)){
             temp.boot = list()
             temp.all.err <- NULL
-            temp.dens[1:xi.neval] <- eval.extract(tobj, j)
+            temp.dens[seq_len(xi.neval)] <- eval.extract(tobj, j)
             
             if (plot.errors){
               if (plot.errors.method == "asymptotic") {
                 terr.j <- err.extract(tobj, j)
-                temp.err[1:xi.neval,1:2] <- if (all(is.na(terr.j))) {
+                temp.err[seq_len(xi.neval),1:2] <- if (all(is.na(terr.j))) {
                   matrix(NA_real_, nrow = xi.neval, ncol = 2)
                 } else {
                   replicate(2, qnorm(plot.errors.alpha/2, lower.tail = FALSE) * terr.j)
@@ -770,8 +770,8 @@
                 temp.boot <- compute.bootstrap.errors(
                           xdat = xdat,
                           ydat = ydat,
-                          exdat = exdat[1:xi.neval,, drop = FALSE],
-                          eydat = subcol(eydat,ei,i)[1:xi.neval,, drop = FALSE],
+                          exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+                          eydat = subcol(eydat,ei,i)[seq_len(xi.neval),, drop = FALSE],
                           cdf = cdf,
                           quantreg = quantreg,
                           tau = tau,
@@ -785,7 +785,7 @@
                           plot.errors.type = plot.errors.type,
                           plot.errors.alpha = plot.errors.alpha,
                           bws = bws)
-                temp.err[1:xi.neval,] <- temp.boot[["boot.err"]]
+                temp.err[seq_len(xi.neval),] <- temp.boot[["boot.err"]]
                 temp.all.err <- temp.boot[["boot.all.err"]]
                 temp.boot <- temp.boot[["bxp"]]
                 if (!plot.bxp.out){
