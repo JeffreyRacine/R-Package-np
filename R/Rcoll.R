@@ -46,7 +46,7 @@ mpi.scatter.Robj <- function(obj=NULL, root=0, comm=1){
     if (mpi.comm.rank(comm) == root){
 		size<-mpi.comm.size(comm)
         #subobj<-lapply(obj,serialize, connection=NULL)
-		subobj<-lapply(1:size, function(i) serialize(obj[[i]], NULL))
+		subobj<-lapply(seq_len(size), function(i) serialize(obj[[i]], NULL))
 
 		sublen<-unlist(lapply(subobj,length))
         #newsubobj<-strings.link(subobj,string(sum(sublen)+1))
@@ -88,7 +88,7 @@ mpi.gather.Robj <- function(obj=NULL, root=0, comm=1, ...){
                         ,rcounts=rcounts,root=root,comm=comm)
     pos=c(0,cumsum(rcounts))
     cutobj=list()
-    for(i in 1:size)
+    for(i in seq_len(size))
         cutobj[[i]]=allbiobj[(pos[i]+1):pos[i+1]]
 		out <- sapply(cutobj,unserialize, ...)
 		gc()
@@ -111,7 +111,7 @@ mpi.allgather.Robj <- function(obj=NULL, comm=1){
         ,rcounts=rcounts,comm=comm)
     pos=c(0,cumsum(rcounts))
     cutobj=list()
-    for(i in 1:size)
+    for(i in seq_len(size))
           cutobj[[i]]=allbiobj[(pos[i]+1):pos[i+1]]
     out <- sapply(cutobj,unserialize)
 	gc()
@@ -295,7 +295,7 @@ mpi.bcast.Robj2slave <- function(obj, comm=1, all=FALSE){
 		                      ifnotfound = vector("list", length(master.objects)))
 		obj.num=length(master.objects)
 		if (obj.num)
-			for (i in 1:obj.num){
+			for (i in seq_len(obj.num)){
 				mpi.bcast.cmd(cmd=.tmpRobj <- mpi.bcast.Robj(comm=1),
 	                    rank=0, comm=comm)
 				mpi.bcast.Robj(list(objname=master.objects[i], obj=object.values[[i]]), 

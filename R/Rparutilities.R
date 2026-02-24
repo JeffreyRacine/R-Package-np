@@ -27,7 +27,7 @@ slave.hostinfo <- function(comm=1, short=TRUE){
         master <-mpi.get.processor.name() 
         slavehost <- unlist(mpi.remote.exec(mpi.get.processor.name(),comm=comm))
         slavecomm <- 1 #as.integer(mpi.remote.exec(.comm,comm=comm))
-        ranks <- 1:(size-1)
+        ranks <- seq_len(size - 1L)
         commm <- paste(comm, ")",sep="")
         if (size > 10){
         rank0 <- paste("master  (rank 0 , comm", commm)
@@ -39,7 +39,7 @@ slave.hostinfo <- function(comm=1, short=TRUE){
         slavename <- paste("slave", ranks,sep="")
         ranks <- paste("(rank ",ranks, ", comm ",slavecomm,")", sep="")
 		if (short && size > 8){
-          for (i in 1:3) {
+          for (i in seq_len(3L)) {
             cat(slavename[i], ranks[i], "of size",size, 
           "is running on:",slavehost[i], "\n")	
 		  }
@@ -50,7 +50,7 @@ slave.hostinfo <- function(comm=1, short=TRUE){
 		  }
 		}
 		else {
-          for (i in 1:(size-1)){
+          for (i in seq_len(size - 1L)){
             cat(slavename[i], ranks[i], "of size",size, 
           "is running on:",slavehost[i], "\n")
           }
@@ -63,7 +63,7 @@ lamhosts <- function(){
     base <-character(0)
     for (host in hosts)
         base <- c(base, unlist(strsplit(host, "\\."))[1])
-    nn <- 0:(length(hosts)-1)
+    nn <- seq_len(length(hosts)) - 1L
         names(nn) <- base
     nn
 }
@@ -184,8 +184,8 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
             uplen <- cumsum(len)+1
             lowlen <-c(2, uplen[-(size-1)]+1)
                 out <- as.list(integer(size-1))
-                names(out) <- paste("slave",1:(size-1), sep="")
-                for (i in 1:(size-1))
+                names(out) <- paste("slave", seq_len(size - 1L), sep="")
+                for (i in seq_len(size - 1L))
             out[[i]]<- out1[lowlen[i]:uplen[i]]
         }
     }
@@ -201,8 +201,8 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
             uplen <- cumsum(len)+1
             lowlen <-c(2, uplen[-(size-1)]+1)
                 out <- as.list(integer(size-1))
-                names(out) <- paste("slave",1:(size-1), sep="")
-                for (i in 1:(size-1))
+                names(out) <- paste("slave", seq_len(size - 1L), sep="")
+                for (i in seq_len(size - 1L))
             out[[i]]<- out1[lowlen[i]:uplen[i]]
         }
     }
@@ -218,16 +218,16 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
             uplen <- cumsum(len)+1
             lowlen <-c(2, uplen[-(size-1)]+1)
                 out <- as.list(integer(size-1))
-                names(out) <- paste("slave",1:(size-1), sep="")
-                for (i in 1:(size-1))
+                names(out) <- paste("slave", seq_len(size - 1L), sep="")
+                for (i in seq_len(size - 1L))
                     out[[i]]<- out1[lowlen[i]:uplen[i]]
         }
     }
 
     else {
             out <- as.list(integer(size-1))
-            names(out) <- paste("slave",1:(size-1), sep="")
-            for (i in 1:(size-1)){
+            names(out) <- paste("slave", seq_len(size - 1L), sep="")
+            for (i in seq_len(size - 1L)){
         tmp<- mpi.recv.Robj(mpi.any.source(),tag,comm)
         src <- mpi.get.sourcetag()[1] 
         out[[src]]<- tmp 
@@ -391,7 +391,7 @@ mpi.apply <- function(X, FUN, ...,  comm=1){
     mpi.scatter.Robj(c(list("master"),as.list(X)),root=0,comm=comm)
 
     out <- as.list(integer(n))
-    for (i in 1:n){
+    for (i in seq_len(n)){
        tmp<- mpi.recv.Robj(mpi.any.source(),tag,comm)
        src <- mpi.get.sourcetag()[1]
        out[[src]]<- tmp
@@ -488,7 +488,7 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
     result <- as.list(integer(slave.num*run))
 
     if (!is.null(sim.seq)){
-        for ( i in 1:(slave.num*run)){
+        for ( i in seq_len(slave.num * run)){
             result[[i]] <- mpi.recv.Robj(source=sim.seq[i], tag=8, comm=comm)
             mpi.send(as.integer(i), type=1, dest=sim.seq[i], tag=88, comm=comm)
         }
@@ -507,9 +507,9 @@ mpi.parSim <- function(n=100,rand.gen=rnorm, rand.arg=NULL,
         mpi.parSim.tmp[i] <- src
     }
     if (slaveinfo){
-        slavename <- paste("slave",1:slave.num, sep="")
+        slavename <- paste("slave", seq_len(slave.num), sep="")
         cat("Finished slave jobs summary:\n")
-        for (i in 1:slave.num){
+        for (i in seq_len(slave.num)){
             if (i < 10)
                 cat(slavename[i], " finished",sum(mpi.parSim==i), "job(s)\n")
             else
@@ -611,11 +611,11 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
     out <- as.list(integer(n))
     mpi.anysource <- mpi.any.source()
     mpi.anytag <- mpi.any.tag()
-    for (i in 1:slave.num)
+    for (i in seq_len(slave.num))
         mpi.send.Robj(list(data.arg=list(X[[i]])), dest=i,tag=i, comm=comm)
   
     if (!is.null(apply.seq)){
-        for ( i in 1:n){
+        for ( i in seq_len(n)){
             tmp <- mpi.recv.Robj(source=apply.seq[i], tag=mpi.anytag, comm=comm)
             tag <- mpi.get.sourcetag()[2]
             out[[tag]]<- tmp
@@ -629,7 +629,7 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
     }
     # .mpi.applyLB <- integer(n)
 	mpi.seq.tmp <- integer(n)
-    for (i in 1:n){
+    for (i in seq_len(n)){
        tmp<- mpi.recv.Robj(mpi.anysource,mpi.anytag,comm)
        srctag <- mpi.get.sourcetag()
        out[[srctag[2]]]<- tmp
@@ -696,7 +696,7 @@ mpi.iapplyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1, sleep=0.01){
     out <- as.list(integer(n))
     mpi.anysource <- mpi.any.source()
     mpi.anytag <- mpi.any.tag()
-    for (i in 1:slave.num)
+    for (i in seq_len(slave.num))
         mpi.send.Robj(list(data.arg=list(X[[i]])), dest=i,tag=i,comm=comm)
     #for (i in 1:slave.num)
     #    mpi.waitany(slave.num)
