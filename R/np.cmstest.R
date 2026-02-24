@@ -210,7 +210,7 @@ npcmstest <- function(formula,
 
   boot.iid <- function(model.resid) {
 
-    y.star <- yhat + sample(model.resid,replace=TRUE)
+    y.star <- yhat + model.resid[sample.int(length(model.resid), replace = TRUE)]
     resid <-
       if(is.null(model$family)) {
         residuals(glm(y.star~ model$x - 1), type = "response")

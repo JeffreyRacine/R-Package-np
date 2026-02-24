@@ -232,7 +232,7 @@ npqcmstest <- function(formula,
 
     ## Simple iid resampling
 
-    y.star <- yhat + sample(model.resid, replace=TRUE)
+    y.star <- yhat + model.resid[sample.int(length(model.resid), replace = TRUE)]
 
     suppressWarnings(resid <- residuals(rq(y.star~ model$x - 1, tau=tau), type = "response"))
 

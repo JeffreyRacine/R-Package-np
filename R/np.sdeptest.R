@@ -178,7 +178,7 @@ npsdeptest <- function(data = NULL,
 
       ## Resample under the null
 
-      resampled.ts <- as.ts(sample(data, replace = TRUE))
+      resampled.ts <- as.ts(data[sample.int(length(data), replace = TRUE)])
 
       for (k in seq_len(lag.num)) {
         tmp <- ts.intersect(resampled.ts, lag(resampled.ts, k))

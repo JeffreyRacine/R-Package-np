@@ -245,7 +245,7 @@ npsigtest.rbandwidth <- function(bws,
 
       if(boot.method == "iid") {
 
-        ydat.star <- mhat.xi + sample(ei, replace=TRUE)
+        ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
 
       } else if(boot.method == "wild") {
 
@@ -462,7 +462,7 @@ npsigtest.rbandwidth <- function(bws,
         
         if(boot.method == "iid") {
           
-          ydat.star <- mhat.xi + sample(ei, replace=TRUE)
+          ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
           
         } else if(boot.method == "wild") {
           

@@ -142,7 +142,7 @@ npdeptest <- function(data.x = NULL,
       
       ## Break systematic relationship between x and y (null)
       
-      data.x.boot <- sample(data.x,replace=TRUE)
+      data.x.boot <- data.x[sample.int(length(data.x), replace = TRUE)]
       
       Srho.vec.boot[b] <- Srho.bivar(data.x.boot,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
 
