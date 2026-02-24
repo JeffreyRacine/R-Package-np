@@ -35,6 +35,19 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 - [x] Local `--as-cran` warning closure achieved; only accepted CRAN incoming version-jump NOTE remains (`/tmp/nprmpi_check_ascran_compact_shellcheck_20260223.log`).
 - [ ] Win-builder validation still required before release candidate.
 
+## Current Status (2026-02-24)
+1. `npRmpi` modernization is in late routing/runtime hardening mode:
+   - core estimator paths are stable with subprocess session contracts and periodic issue-note sweeps,
+   - recent patches continue to prioritize regression prevention in user-facing `npRmpi.init(...)` workflows.
+2. Recent completed slices include:
+   - default-quiet `npRmpi.init(nslaves=1)` + `npcdens` subprocess contract lock,
+   - GLP/`dim_basis` contract hardening parity with `np-master`,
+   - deterministic NA/range guard hardening and helper micro-modernization.
+3. Remaining highest-priority work:
+   - bounded-kernel/convolution native-path completion and MPI-path parity validation,
+   - performance-governance closure with fixed/varying seed comparisons for performance-sensitive changes,
+   - win-builder closure before release candidate.
+
 ## Mandatory Release Gates
 
 ### 1) Interface and Semantics
