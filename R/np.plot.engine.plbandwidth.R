@@ -35,6 +35,7 @@
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
+           plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.boot.num = 399,
            plot.errors.center = c("estimate","bias-corrected"),
@@ -139,6 +140,7 @@
       plot.behavior = plot.behavior,
       plot.errors.method = plot.errors.method,
       plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.wild = plot.errors.boot.wild,
       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
       plot.errors.center = plot.errors.center,
       plot.errors.type = plot.errors.type,
@@ -154,6 +156,7 @@
     plot.behavior <- normalized.opts$plot.behavior
     plot.errors.method <- normalized.opts$plot.errors.method
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
+    plot.errors.boot.wild <- normalized.opts$plot.errors.boot.wild
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center
     plot.errors.type <- normalized.opts$plot.errors.type
@@ -218,6 +221,7 @@
           gradients = FALSE,
           slice.index = 0,
           plot.errors.boot.method = plot.errors.boot.method,
+          plot.errors.boot.wild = plot.errors.boot.wild,
           plot.errors.boot.blocklen = plot.errors.boot.blocklen,
           plot.errors.boot.num = plot.errors.boot.num,
           plot.errors.center = plot.errors.center,
@@ -444,6 +448,7 @@
                       gradients = gradients,
                       slice.index = plot.index,
                       plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,
@@ -604,6 +609,7 @@
                       gradients = gradients,
                       slice.index = plot.index,
                       plot.errors.boot.method = plot.errors.boot.method,
+                      plot.errors.boot.wild = plot.errors.boot.wild,
                       plot.errors.boot.blocklen = plot.errors.boot.blocklen,
                       plot.errors.boot.num = plot.errors.boot.num,
                       plot.errors.center = plot.errors.center,

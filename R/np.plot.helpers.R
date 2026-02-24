@@ -191,6 +191,278 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum fast path") {
+  if (is.null(dim(ksum))) {
+    if (B == 1L && length(ksum) == nout)
+      return(matrix(as.double(ksum), nrow = 1L))
+    stop(sprintf("%s returned unexpected vector shape", where))
+  }
+
+  km <- as.matrix(ksum)
+  if (nrow(km) == B && ncol(km) == nout)
+    return(km)
+  if (nrow(km) == nout && ncol(km) == B)
+    return(t(km))
+  if (B == 1L && length(km) == nout)
+    return(matrix(as.double(km), nrow = 1L))
+
+  stop(sprintf("%s returned unexpected matrix shape", where))
+}
+
+.np_inid_boot_from_ksum_unconditional <- function(xdat,
+                                                  exdat,
+                                                  bws,
+                                                  B,
+                                                  operator,
+                                                  counts = NULL) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid unconditional inid bootstrap dimensions")
+
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
+  ksum0 <- npksum(
+    txdat = xdat,
+    tydat = ones,
+    exdat = exdat,
+    bws = bws,
+    weights = ones,
+    operator = operator,
+    bandwidth.divide = TRUE
+  )$ksum
+  t0 <- as.numeric(.np_boot_matrix_from_ksum(ksum0, B = 1L, nout = neval,
+                                             where = "npksum unconditional baseline")[1L, ]) / n
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    ksum <- npksum(
+      txdat = xdat,
+      tydat = ones,
+      exdat = exdat,
+      bws = bws,
+      weights = counts.mat,
+      operator = operator,
+      bandwidth.divide = TRUE
+    )$ksum
+    tmat <- .np_boot_matrix_from_ksum(ksum, B = B, nout = neval,
+                                      where = "npksum unconditional counts")
+    return(list(t = tmat / n, t0 = t0))
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  prob <- rep.int(1 / n, n)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+    ksum.chunk <- npksum(
+      txdat = xdat,
+      tydat = ones,
+      exdat = exdat,
+      bws = bws,
+      weights = counts.chunk,
+      operator = operator,
+      bandwidth.divide = TRUE
+    )$ksum
+    tmat[start:stopi, ] <- .np_boot_matrix_from_ksum(
+      ksum.chunk, B = bsz, nout = neval, where = "npksum unconditional chunk"
+    ) / n
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_con_inid_ksum_eligible <- function(bws) {
+  isTRUE(identical(bws$type, "fixed")) &&
+    isTRUE(identical(bws$cxkertype, bws$cykertype)) &&
+    isTRUE(identical(bws$cxkerorder, bws$cykerorder)) &&
+    isTRUE(identical(bws$cxkerbound, bws$cykerbound)) &&
+    isTRUE(identical(bws$uxkertype, bws$uykertype)) &&
+    isTRUE(identical(bws$oxkertype, bws$oykertype))
+}
+
+.np_con_make_kbandwidth_x <- function(bws, xdat) {
+  xdat <- toFrame(xdat)
+  kbandwidth.numeric(
+    bw = bws$xbw,
+    bwscaling = FALSE,
+    bwtype = bws$type,
+    ckertype = bws$cxkertype,
+    ckerorder = bws$cxkerorder,
+    ckerbound = bws$cxkerbound,
+    ckerlb = if (!is.null(bws$cxkerlb)) bws$cxkerlb else NULL,
+    ckerub = if (!is.null(bws$cxkerub)) bws$cxkerub else NULL,
+    ukertype = bws$uxkertype,
+    okertype = bws$oxkertype,
+    nobs = nrow(xdat),
+    xdati = untangle(xdat),
+    xnames = names(xdat)
+  )
+}
+
+.np_con_make_kbandwidth_xy <- function(bws, xdat, ydat) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  xydat <- data.frame(xdat, ydat)
+  ckerlb <- c(if (is.null(bws$cxkerlb)) numeric(0) else bws$cxkerlb,
+              if (is.null(bws$cykerlb)) numeric(0) else bws$cykerlb)
+  ckerub <- c(if (is.null(bws$cxkerub)) numeric(0) else bws$cxkerub,
+              if (is.null(bws$cykerub)) numeric(0) else bws$cykerub)
+
+  kbandwidth.numeric(
+    bw = c(bws$xbw, bws$ybw),
+    bwscaling = FALSE,
+    bwtype = bws$type,
+    ckertype = bws$cxkertype,
+    ckerorder = bws$cxkerorder,
+    ckerbound = bws$cxkerbound,
+    ckerlb = if (length(ckerlb)) ckerlb else NULL,
+    ckerub = if (length(ckerub)) ckerub else NULL,
+    ukertype = bws$uxkertype,
+    okertype = bws$oxkertype,
+    nobs = nrow(xydat),
+    xdati = untangle(xydat),
+    xnames = names(xydat)
+  )
+}
+
+.np_inid_boot_from_ksum_conditional <- function(xdat,
+                                                ydat,
+                                                exdat,
+                                                eydat,
+                                                bws,
+                                                B,
+                                                cdf,
+                                                counts = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+
+  if (nrow(ydat) != n || nrow(eydat) != neval)
+    stop("conditional inid fast path requires aligned x/y training and evaluation rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid conditional inid bootstrap dimensions")
+  if (!.np_con_inid_ksum_eligible(bws))
+    return(NULL)
+
+  kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
+                  error = function(e) NULL)
+  kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat),
+                   error = function(e) NULL)
+  if (is.null(kbx) || is.null(kbxy))
+    return(NULL)
+
+  xop <- rep.int("normal", ncol(xdat))
+  yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  xyop <- c(xop, yop)
+
+  xydat <- data.frame(xdat, ydat)
+  exydat <- data.frame(exdat, eydat)
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
+
+  den0 <- npksum(
+    txdat = xdat,
+    tydat = ones,
+    exdat = exdat,
+    bws = kbx,
+    weights = ones,
+    operator = xop,
+    bandwidth.divide = TRUE
+  )$ksum
+  num0 <- npksum(
+    txdat = xydat,
+    tydat = ones,
+    exdat = exydat,
+    bws = kbxy,
+    weights = ones,
+    operator = xyop,
+    bandwidth.divide = TRUE
+  )$ksum
+  den0 <- as.numeric(.np_boot_matrix_from_ksum(den0, B = 1L, nout = neval,
+                                               where = "npksum conditional denominator baseline")[1L, ]) / n
+  num0 <- as.numeric(.np_boot_matrix_from_ksum(num0, B = 1L, nout = neval,
+                                               where = "npksum conditional numerator baseline")[1L, ]) / n
+  t0 <- num0 / pmax(den0, .Machine$double.eps)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    den <- npksum(
+      txdat = xdat,
+      tydat = ones,
+      exdat = exdat,
+      bws = kbx,
+      weights = counts.mat,
+      operator = xop,
+      bandwidth.divide = TRUE
+    )$ksum
+    num <- npksum(
+      txdat = xydat,
+      tydat = ones,
+      exdat = exydat,
+      bws = kbxy,
+      weights = counts.mat,
+      operator = xyop,
+      bandwidth.divide = TRUE
+    )$ksum
+    den <- .np_boot_matrix_from_ksum(den, B = B, nout = neval,
+                                     where = "npksum conditional denominator counts") / n
+    num <- .np_boot_matrix_from_ksum(num, B = B, nout = neval,
+                                     where = "npksum conditional numerator counts") / n
+    return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
+  }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  prob <- rep.int(1 / n, n)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+
+    den <- npksum(
+      txdat = xdat,
+      tydat = ones,
+      exdat = exdat,
+      bws = kbx,
+      weights = counts.chunk,
+      operator = xop,
+      bandwidth.divide = TRUE
+    )$ksum
+    num <- npksum(
+      txdat = xydat,
+      tydat = ones,
+      exdat = exydat,
+      bws = kbxy,
+      weights = counts.chunk,
+      operator = xyop,
+      bandwidth.divide = TRUE
+    )$ksum
+
+    den <- .np_boot_matrix_from_ksum(den, B = bsz, nout = neval,
+                                     where = "npksum conditional denominator chunk") / n
+    num <- .np_boot_matrix_from_ksum(num, B = bsz, nout = neval,
+                                     where = "npksum conditional numerator chunk") / n
+    tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+    start <- stopi + 1L
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 gen.label = function(label, altlabel){
   paste(if (is.null(label)) altlabel else label)
 }
@@ -1112,35 +1384,59 @@ compute.bootstrap.errors.bandwidth =
     boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
+    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      isTRUE(is.inid) &&
+      isTRUE(identical(bws$type, "fixed"))
 
-    boofun <- if (is.inid) {
-      function(data, indices) {
-        fit <- if (cdf) {
-          npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
-        } else {
-          npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+    boot.out <- NULL
+    if (fast.inid) {
+      op <- if (cdf) "integral" else "normal"
+      boot.out <- tryCatch(
+        .np_inid_boot_from_ksum_unconditional(
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          operator = op
+        ),
+        error = function(e) {
+          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.bandwidth (%s); using bootstrap fallback",
+                          conditionMessage(e)))
+          NULL
         }
-        if (cdf) fit$dist else fit$dens
-      }
-    } else {
-      function(tsb) {
-        fit <- if (cdf) {
-          npudist(tdat = tsb, edat = exdat, bws = bws)
-        } else {
-          npudens(tdat = tsb, edat = exdat, bws = bws)
-        }
-        if (cdf) fit$dist else fit$dens
-      }
+      )
     }
 
-    if (is.inid) {
-      boot.out = boot(data = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+    if (is.null(boot.out)) {
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          fit <- if (cdf) {
+            npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+          } else {
+            npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+          }
+          if (cdf) fit$dist else fit$dens
+        }
+      } else {
+        function(tsb) {
+          fit <- if (cdf) {
+            npudist(tdat = tsb, edat = exdat, bws = bws)
+          } else {
+            npudens(tdat = tsb, edat = exdat, bws = bws)
+          }
+          if (cdf) fit$dist else fit$dens
+        }
+      }
+
+      if (is.inid) {
+        boot.out = boot(data = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -1214,25 +1510,48 @@ compute.bootstrap.errors.dbandwidth =
     boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
+    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      isTRUE(is.inid) &&
+      isTRUE(identical(bws$type, "fixed"))
 
-    boofun <- if (is.inid) {
-      function(data, indices) {
-        npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
-      }
-    } else {
-      function(tsb) {
-        npudist(tdat = tsb, edat = exdat, bws = bws)$dist
-      }
+    boot.out <- NULL
+    if (fast.inid) {
+      boot.out <- tryCatch(
+        .np_inid_boot_from_ksum_unconditional(
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          operator = "integral"
+        ),
+        error = function(e) {
+          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.dbandwidth (%s); using bootstrap fallback",
+                          conditionMessage(e)))
+          NULL
+        }
+      )
     }
 
-    if (is.inid) {
-      boot.out = boot(data = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+    if (is.null(boot.out)) {
+      boofun <- if (is.inid) {
+        function(data, indices) {
+          npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
+        }
+      } else {
+        function(tsb) {
+          npudist(tdat = tsb, edat = exdat, bws = bws)$dist
+        }
+      }
+
+      if (is.inid) {
+        boot.out = boot(data = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -1317,6 +1636,11 @@ compute.bootstrap.errors.conbandwidth =
       else "dens"
 
     is.inid = plot.errors.boot.method=="inid"
+    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      isTRUE(is.inid) &&
+      isTRUE(!quantreg) &&
+      isTRUE(!gradients) &&
+      isTRUE(identical(bws$type, "fixed"))
 
     fit.cond <- function(tx, ty) {
       switch(
@@ -1334,25 +1658,47 @@ compute.bootstrap.errors.conbandwidth =
         dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
       )
     }
-    boofun <- if (is.inid) {
-      function(data, indices) out.cond(fit.cond(
-        tx = xdat[indices, , drop = FALSE],
-        ty = ydat[indices, , drop = FALSE]
-      ))
-    } else {
-      function(tsb) out.cond(fit.cond(
-        tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
-        ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
-      ))
+    boot.out <- NULL
+    if (fast.inid) {
+      boot.out <- tryCatch(
+        .np_inid_boot_from_ksum_conditional(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          cdf = cdf
+        ),
+        error = function(e) {
+          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.conbandwidth (%s); using bootstrap fallback",
+                          conditionMessage(e)))
+          NULL
+        }
+      )
     }
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+
+    if (is.null(boot.out)) {
+      boofun <- if (is.inid) {
+        function(data, indices) out.cond(fit.cond(
+          tx = xdat[indices, , drop = FALSE],
+          ty = ydat[indices, , drop = FALSE]
+        ))
+      } else {
+        function(tsb) out.cond(fit.cond(
+          tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
+          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
+        ))
+      }
+      if (is.inid){
+        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
@@ -1445,6 +1791,11 @@ compute.bootstrap.errors.condbandwidth =
       else "dens"
 
     is.inid = plot.errors.boot.method=="inid"
+    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      isTRUE(is.inid) &&
+      isTRUE(!quantreg) &&
+      isTRUE(!gradients) &&
+      isTRUE(identical(bws$type, "fixed"))
 
     fit.cond <- function(tx, ty) {
       switch(
@@ -1462,25 +1813,47 @@ compute.bootstrap.errors.condbandwidth =
         dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
       )
     }
-    boofun <- if (is.inid) {
-      function(data, indices) out.cond(fit.cond(
-        tx = xdat[indices, , drop = FALSE],
-        ty = ydat[indices, , drop = FALSE]
-      ))
-    } else {
-      function(tsb) out.cond(fit.cond(
-        tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
-        ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
-      ))
+    boot.out <- NULL
+    if (fast.inid) {
+      boot.out <- tryCatch(
+        .np_inid_boot_from_ksum_conditional(
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          eydat = eydat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          cdf = cdf
+        ),
+        error = function(e) {
+          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.condbandwidth (%s); using bootstrap fallback",
+                          conditionMessage(e)))
+          NULL
+        }
+      )
     }
-    if (is.inid){
-      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num)
-    } else {
-      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
+
+    if (is.null(boot.out)) {
+      boofun <- if (is.inid) {
+        function(data, indices) out.cond(fit.cond(
+          tx = xdat[indices, , drop = FALSE],
+          ty = ydat[indices, , drop = FALSE]
+        ))
+      } else {
+        function(tsb) out.cond(fit.cond(
+          tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
+          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
+        ))
+      }
+      if (is.inid){
+        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num)
+      } else {
+        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+          R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method)
+      }
     }
 
     all.bp <- list()
