@@ -1090,3 +1090,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_na_guard_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_na_guard_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `npuniden*` NA-Safe Range Validation Hardening (2026-02-24)
+Completed in `np-npRmpi`:
+1. Added deterministic missing-value guards and NA-safe range checks for univariate density helper entry points.
+2. Scope:
+   - `R/npuniden.boundary.R`
+   - `R/npuniden.reflect.R`
+   - `R/npuniden.sc.R`
+3. Commit:
+   - `np-npRmpi`: `565ee2e`
+4. Validation:
+   - parse gate:
+     - log: `/tmp/nprmpi_uniden_na_guard_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests (`NOT_CRAN=true`):
+     - log: `/tmp/nprmpi_uniden_na_guard_tests_20260224.log` (`FAIL 0`; expected pre-existing `npuniden.sc` warning only)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_uniden_na_guard.log` (all verified repros passed)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_064531.log`
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_uniden_na_guard_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_uniden_na_guard_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
