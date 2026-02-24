@@ -77,7 +77,10 @@ mpi.bcast.Robj2slave(Engel95)
 mpi.bcast.cmd(attach(Engel95),
               caller.execute=TRUE)
 
-mpi.bcast.cmd(model.iv <- npregiv(y=food,z=logexp,w=logwages,method="Landweber-Fridman"),
+mpi.bcast.cmd(model.iv <- npregiv(y=food,
+                                  z=logexp,
+                                  w=logwages,
+                                  method="Landweber-Fridman"),
               caller.execute=TRUE)
 phi <- model.iv$phi
 
