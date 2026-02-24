@@ -744,3 +744,24 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_npuniden_scalar_ifelse_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_npuniden_scalar_ifelse_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
+
+## Wild-Bootstrap Draw Allocation Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Reduced allocations in wild-bootstrap draw helpers by replacing matrix `ifelse(...)` draw generation with preallocated matrices and logical indexing.
+2. Scope:
+   - `R/np.plot.helpers.R`
+3. Commit:
+   - `np-master`: `da2eee9`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/np.plot.helpers.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests:
+     - `testthat::test_local(filter='plot|semihat|npreghat|wild', reporter='summary')` (`RC:0`)
+     - log: `/tmp/np_master_wilddraw_alloc_tests_20260224.log`
+   - direct helper contract smoke:
+     - `/tmp/np_master_wilddraw_contract_20260224b.out` (`NP_WILDDRAW_CONTRACT_OK`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_051458.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_wilddraw_alloc_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_wilddraw_alloc_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
