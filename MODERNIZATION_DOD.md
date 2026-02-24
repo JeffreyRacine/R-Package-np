@@ -1167,3 +1167,17 @@ Completed in `np-npRmpi`:
    - issue-note repro sweep (post-change):
      - `/tmp/nprmpi_issue_notes_repros_20260224_defaultquiet_contract.log` (all verified repros passed)
      - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_071246.log`
+
+## `uocquantile` NA-Guard Micro-Modernization (`anyNA`) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced `any(is.na(x) | is.nan(x))` with `anyNA(x)` in `uocquantile` for clearer semantics and lower overhead in a hot helper path.
+2. Scope:
+   - `R/np.plot.helpers.R`
+3. Commit:
+   - `np-npRmpi`: `8c823eb`
+4. Validation:
+   - targeted tests (`NOT_CRAN=true`, MPI env pinned):
+     - `/tmp/nprmpi_plothelpers_anyna_tests_20260224.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_20260224_plothelpers_anyna.log` (all verified repros passed)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_071545.log`
