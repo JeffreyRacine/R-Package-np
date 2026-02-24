@@ -400,23 +400,16 @@ npreg.rbandwidth <-
       myout$gerr = as.matrix(myout$gerr[,rorder])
 
       if (identical(bws$regtype, "lp")) {
-        raw.g <- myout$g
-        raw.gerr <- myout$gerr
-        myout$g[,] <- NA_real_
-        myout$gerr[,] <- NA_real_
         cont.idx <- which(bws$icon)
-
         if (length(cont.idx)) {
-          keep.cont <- (glp.gradient.order == 1L) && (bws$degree >= 1L)
-          if (any(keep.cont)) {
-            keep.idx <- cont.idx[keep.cont]
-            myout$g[, keep.idx] <- raw.g[, keep.idx, drop = FALSE]
-            myout$gerr[, keep.idx] <- raw.gerr[, keep.idx, drop = FALSE]
+          invalid.order <- glp.gradient.order > bws$degree
+          if (any(invalid.order)) {
+            bad.idx <- cont.idx[invalid.order]
+            myout$g[, bad.idx] <- NA_real_
+            myout$gerr[, bad.idx] <- NA_real_
+            if (warn.glp.gradient)
+              warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
           }
-          if (warn.glp.gradient && any(glp.gradient.order > bws$degree))
-            warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
-          if (warn.glp.gradient && any(glp.gradient.order > 1L))
-            warning("higher-order glp derivatives are not yet available at C level; returning NA for requested orders > 1")
         }
       }
     }
