@@ -574,3 +574,6 @@ Completed in `np-master`:
      - `testthat::test_local(filter='semihat|npreghat|plot|npindex|npplreg|npscoef', reporter='summary')` (`RC:0`)
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_20260224_034150.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_posthyg3_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_posthyg3_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
