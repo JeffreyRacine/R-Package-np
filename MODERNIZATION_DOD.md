@@ -979,3 +979,22 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_uniden_npregiv_edge_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_uniden_npregiv_edge_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `genGofStr` Scalar-Branch Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced nested scalar `ifelse(...)` in `genGofStr()` with explicit scalar `if` branches for `MSE`/`R2` report fragments.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-npRmpi`: `333d64a`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='utils|nptests|sdeptest|npuniden', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+     - log: `/tmp/nprmpi_gofstr_scalar_tests_20260224.log`
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_055424.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_gofstr_scalar_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_gofstr_scalar_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
