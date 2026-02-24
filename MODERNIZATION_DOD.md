@@ -793,3 +793,25 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_npregiv_seq2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_npregiv_seq2_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Bandwidth Metadata / `npregivderiv` Loop-Range Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual metadata/index range builders with `seq_len(...)` in bandwidth metadata constructors and `npregivderiv` numeric-column detection.
+2. Scope:
+   - `R/dbandwidth.R`
+   - `R/rbandwidth.R`
+   - `R/smoothbandwidth.R`
+   - `R/npregivderiv.R`
+3. Commit:
+   - `np-npRmpi`: `04199a4`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='npregiv|bandwidth|bw-dispatch|formula-bw-contract', reporter='summary')` (`RC:0`; expected pre-existing monotone-stopping warnings)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_043811.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_bwmeta_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_bwmeta_seq_20260224_withcrs.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+5. Environment note:
+   - local `--as-cran` checks required `crs` in `R_LIBS`; commands used:
+     - `R_LIBS=/tmp/crs_check_lib FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0 R CMD check --as-cran --no-manual npRmpi_0.70-0.tar.gz`
