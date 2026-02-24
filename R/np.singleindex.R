@@ -74,7 +74,9 @@ npindex.formula <-
             }
           }
           
-          umf <- emf <- model.frame(tt, data = newdata)
+          umf.args <- list(formula = tt, data = newdata)
+          umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+          emf <- umf
 
           if (y.eval)
             eydat <- model.response(emf)

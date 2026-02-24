@@ -37,7 +37,9 @@ npcdens.formula <-
 
     has.eval <- !is.null(newdata)
     if (has.eval) {
-      umf <- emf <- model.frame(tt, data = newdata)
+      umf.args <- list(formula = tt, data = newdata)
+      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      emf <- umf
 
       eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]

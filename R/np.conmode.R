@@ -40,10 +40,14 @@ npconmode.formula <-
       has.ey <- succeedWithResponse(tt, newdata)
 
       if (has.ey){
-        umf <- emf <- model.frame(tt, data = newdata)
+        umf.args <- list(formula = tt, data = newdata)
+        umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+        emf <- umf
         eydat <- emf[, bws$variableNames[["response"]], drop = FALSE]
       } else {
-        umf <- emf <- model.frame(formula(bws)[-2], data = newdata)
+        umf.args <- list(formula = formula(bws)[-2], data = newdata)
+        umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+        emf <- umf
       }
 
       exdat <- emf[, bws$variableNames[["terms"]], drop = FALSE]

@@ -59,7 +59,9 @@ npreg.formula <-
         }
       }
       
-      umf <- emf <- model.frame(tt, data = newdata)
+      umf.args <- list(formula = tt, data = newdata)
+      umf <- do.call(stats::model.frame, umf.args, envir = parent.frame())
+      emf <- umf
 
       if (y.eval)
         eydat <- model.response(emf)
@@ -289,9 +291,6 @@ npreg.rbandwidth <-
     ## put the unordered, ordered, and continuous data in their own objects
     ## data that is not a factor is continuous.
 
-    txdat.hat <- txdat
-    exdat.hat <- if (no.ex) NULL else exdat
-
     txdat = toMatrix(txdat)
 
     tuno = txdat[, bws$iuno, drop = FALSE]
@@ -362,6 +361,12 @@ npreg.rbandwidth <-
    }
 
 
+    glp.gradient.order.c <- if (bws$ncon > 0L) {
+      as.integer(if (is.null(glp.gradient.order)) rep.int(1L, bws$ncon) else glp.gradient.order)
+    } else {
+      integer(1)
+    }
+
     myout <-
       .Call("C_np_regression",
             asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
@@ -371,6 +376,7 @@ npreg.rbandwidth <-
             asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
             as.integer(myopti),
             as.integer(degree.c),
+            as.integer(glp.gradient.order.c),
             as.integer(isTRUE(bws$bernstein.basis)),
             as.integer(npLpBasisCode(bws$basis)),
             as.integer(enrow),
@@ -390,39 +396,16 @@ npreg.rbandwidth <-
       myout$gerr = as.matrix(myout$gerr[,rorder])
 
       if (identical(bws$regtype, "lp")) {
-        raw.g <- myout$g
-        raw.gerr <- myout$gerr
-        myout$g[,] <- NA_real_
-        myout$gerr[,] <- NA_real_
         cont.idx <- which(bws$icon)
-
         if (length(cont.idx)) {
-          keep.first <- (glp.gradient.order == 1L) && (bws$degree >= 1L)
-          if (any(keep.first)) {
-            keep.idx <- cont.idx[keep.first]
-            myout$g[, keep.idx] <- raw.g[, keep.idx, drop = FALSE]
-            myout$gerr[, keep.idx] <- raw.gerr[, keep.idx, drop = FALSE]
+          invalid.order <- glp.gradient.order > bws$degree
+          if (any(invalid.order)) {
+            bad.idx <- cont.idx[invalid.order]
+            myout$g[, bad.idx] <- NA_real_
+            myout$gerr[, bad.idx] <- NA_real_
+            if (warn.glp.gradient)
+              warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
           }
-
-          need.hat <- (glp.gradient.order > 1L) && (glp.gradient.order <= bws$degree)
-          if (any(need.hat)) {
-            for (jj in which(need.hat)) {
-              s.vec <- integer(bws$ncon)
-              s.vec[jj] <- glp.gradient.order[jj]
-              myout$g[, cont.idx[jj]] <- as.vector(npreghat(
-                bws = bws,
-                txdat = txdat.hat,
-                exdat = if (no.ex) txdat.hat else exdat.hat,
-                y = tydat,
-                output = "apply",
-                s = s.vec
-              ))
-              myout$gerr[, cont.idx[jj]] <- NA_real_
-            }
-          }
-
-          if (warn.glp.gradient && any(glp.gradient.order > bws$degree))
-            warning("some requested glp derivatives exceed polynomial degree; returning NA for those components")
         }
       }
     }
