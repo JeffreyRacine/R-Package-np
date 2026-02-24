@@ -57,12 +57,12 @@
   .np_rademacher_draws(n = n, B = B)
 }
 
-.np_wildhat_chunk_size <- function(n, B) {
-  chunk.opt <- getOption("np.plot.wildhat.chunk.size")
+.np_wild_chunk_size <- function(n, B) {
+  chunk.opt <- getOption("np.plot.wild.chunk.size")
   if (!is.null(chunk.opt)) {
     chunk.opt <- as.integer(chunk.opt)
     if (length(chunk.opt) != 1L || is.na(chunk.opt) || chunk.opt < 1L)
-      stop("option 'np.plot.wildhat.chunk.size' must be a positive integer")
+      stop("option 'np.plot.wild.chunk.size' must be a positive integer")
     return(min(B, chunk.opt))
   }
 
@@ -77,7 +77,7 @@
   min(B, chunk)
 }
 
-.np_wildhat_boot_t <- function(H, fit.mean, residuals, B, wild = c("mammen", "rademacher")) {
+.np_wild_boot_t <- function(H, fit.mean, residuals, B, wild = c("mammen", "rademacher")) {
   B <- as.integer(B)
   n <- length(residuals)
   if (length(fit.mean) != n)
@@ -85,7 +85,7 @@
   if (B < 1L)
     stop("argument 'plot.errors.boot.num' must be a positive integer")
 
-  t.mpi <- .npRmpi_wildhat_boot_t_parallel(
+  t.mpi <- .npRmpi_wild_boot_t_parallel(
     H = H,
     fit.mean = fit.mean,
     residuals = residuals,
@@ -96,7 +96,7 @@
   if (is.matrix(t.mpi))
     return(t.mpi)
 
-  chunk.size <- .np_wildhat_chunk_size(n = n, B = B)
+  chunk.size <- .np_wild_chunk_size(n = n, B = B)
   out <- matrix(NA_real_, nrow = B, ncol = nrow(H))
   fit.mean <- as.double(fit.mean)
   residuals <- as.double(residuals)
@@ -117,6 +117,13 @@
 
 .np_plot_is_wild_method <- function(method) {
   isTRUE(length(method) == 1L && !is.na(method) && method == "wild")
+}
+
+.np_plot_reject_wild_unsupervised <- function(method, where) {
+  if (.np_plot_is_wild_method(method)) {
+    stop(sprintf("plot.errors.boot.method='wild' is not supported for %s; use one of 'inid', 'fixed', or 'geom'", where))
+  }
+  invisible(NULL)
 }
 
 .np_plot_inid_fastpath_enabled <- function() {
@@ -208,7 +215,7 @@
   out
 }
 
-.npRmpi_wildhat_boot_t_parallel <- function(H, fit.mean, residuals, B, wild, comm = 1L) {
+.npRmpi_wild_boot_t_parallel <- function(H, fit.mean, residuals, B, wild, comm = 1L) {
   if (isTRUE(getOption("np.plot.wild.mpi.parallel.disable", FALSE)))
     return(NULL)
   if (!.npRmpi_bootstrap_fanout_enabled(comm = comm))
@@ -216,7 +223,7 @@
 
   n <- length(residuals)
   p <- nrow(H)
-  chunk.size <- .np_wildhat_chunk_size(n = n, B = B)
+  chunk.size <- .np_wild_chunk_size(n = n, B = B)
   tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   if (!length(tasks))
     return(NULL)
@@ -1158,7 +1165,7 @@ compute.bootstrap.errors.rbandwidth =
       B <- plot.errors.boot.num
 
       boot.out <- list(
-        t = .np_wildhat_boot_t(
+        t = .np_wild_boot_t(
           H = H,
           fit.mean = fit.train$mean,
           residuals = eps,
@@ -1322,7 +1329,7 @@ compute.bootstrap.errors.scbandwidth =
       B <- plot.errors.boot.num
 
       boot.out <- list(
-        t = .np_wildhat_boot_t(
+        t = .np_wild_boot_t(
           H = H,
           fit.mean = as.vector(fit.train$mean),
           residuals = eps,
@@ -1485,7 +1492,7 @@ compute.bootstrap.errors.plbandwidth =
       B <- plot.errors.boot.num
 
       boot.out <- list(
-        t = .np_wildhat_boot_t(
+        t = .np_wild_boot_t(
           H = H,
           fit.mean = as.vector(fit.train$mean),
           residuals = eps,
@@ -1604,6 +1611,7 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -1735,6 +1743,7 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -1868,6 +1877,10 @@ compute.bootstrap.errors.conbandwidth =
       if(quantreg) "quant"
       else if (cdf) "dist"
       else "dens"
+
+    if (!identical(tboo, "quant")) {
+      .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "conditional density/distribution estimators")
+    }
 
     is.inid = plot.errors.boot.method=="inid"
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
@@ -2029,6 +2042,10 @@ compute.bootstrap.errors.condbandwidth =
       else if (cdf) "dist"
       else "dens"
 
+    if (!identical(tboo, "quant")) {
+      .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "conditional density/distribution estimators")
+    }
+
     is.inid = plot.errors.boot.method=="inid"
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
@@ -2181,6 +2198,10 @@ compute.bootstrap.errors.sibandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
+    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      isTRUE(is.inid) &&
+      isTRUE(!gradients) &&
+      isTRUE(identical(bws$type, "fixed"))
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -2207,7 +2228,7 @@ compute.bootstrap.errors.sibandwidth =
       B <- plot.errors.boot.num
 
       boot.out <- list(
-        t = .np_wildhat_boot_t(
+        t = .np_wild_boot_t(
           H = H,
           fit.mean = as.vector(fit.train$mean),
           residuals = eps,
@@ -2216,6 +2237,34 @@ compute.bootstrap.errors.sibandwidth =
         ),
         t0 = t0
       )
+    } else if (fast.inid) {
+      H.fast <- .npRmpi_with_local_bootstrap({
+        tryCatch(
+          npindexhat(
+            bws = bws,
+            txdat = xdat,
+            exdat = xdat,
+            s = 0L,
+            output = "matrix"
+          ),
+          error = function(e) {
+            warning(sprintf("inid hat fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
+                            conditionMessage(e)))
+            NULL
+          }
+        )
+      })
+      if (is.null(H.fast) || !is.matrix(H.fast) || ncol(H.fast) != length(ydat)) {
+        fast.inid <- FALSE
+      } else {
+        boot.out <- .npRmpi_with_local_bootstrap({
+          .np_inid_lc_boot_from_hat(
+            H = H.fast,
+            ydat = ydat,
+            B = plot.errors.boot.num
+          )
+        })
+      }
     } else {
       ## beta[1] is always 1.0, so use first column of gradients matrix ... 
       boofun <- if (is.inid) {
@@ -2241,10 +2290,10 @@ compute.bootstrap.errors.sibandwidth =
       }
 
       boot.out <- .npRmpi_with_local_bootstrap({
-        if (is.inid) {
+        if (is.inid && !fast.inid) {
           boot(data = data.frame(xdat, ydat), statistic = boofun,
                R = plot.errors.boot.num)
-        } else {
+        } else if (!fast.inid) {
           tsboot(tseries = data.frame(xdat, ydat), statistic = boofun,
                  R = plot.errors.boot.num,
                  l = plot.errors.boot.blocklen,

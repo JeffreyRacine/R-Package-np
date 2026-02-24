@@ -788,7 +788,7 @@ Completed in `np-npRmpi`:
 Completed in `np-npRmpi`:
 1. Added bounded subprocess contracts to lock session-mode routing for modern hat/bootstrap surfaces:
    - `npreghat` parity smoke (`npRmpi.init` -> `npregbw/npreg/npreghat` -> `npRmpi.quit`).
-   - `plot(..., plot.errors.boot.method="wild-hat")` session smoke.
+   - `plot(..., plot.errors.boot.method="wild")` session smoke.
 2. Extended periodic verified-issue repro harness with matching session guards so resolved regressions are rechecked by default.
 3. Scope:
    - `tests/testthat/test-session-routing-subprocess-contract.R`
@@ -1374,7 +1374,7 @@ Completed in `np-npRmpi`:
      - `/tmp/repro_plot_boot_npRmpi_fix3_20260224.out`
      - elapsed:
        - plain `plot(g)`: `0.794s`
-       - wild-hat bootstrap: `3.286s`
+       - wild bootstrap: `3.286s`
        - inid bootstrap: `9.307s`
    - issue-note sweep with inid plot guard:
      - `/tmp/nprmpi_issue_notes_repros_20260224_inidguard3.log` (`REPRO_RC:0`)
@@ -1405,7 +1405,7 @@ Completed in `np-npRmpi`:
 
 ## Plot Bootstrap Modernization: `wild` Clean Break + Chunked `inid` Fast Path (2026-02-24)
 Completed in `np-npRmpi`:
-1. Standardized plot-bootstrap method naming on `plot.errors.boot.method="wild"` as a clean break (deprecated `wild-hat` removed).
+1. Standardized plot-bootstrap method naming on `plot.errors.boot.method="wild"` as a clean break (legacy alias removed).
 2. Ported chunked fixed-`lc` `inid` fast-path execution in `compute.bootstrap.errors.rbandwidth` to bound memory for large bootstrap jobs:
    - new option: `np.plot.inid.chunk.size` (positive integer).
 3. Updated session subprocess contract to exercise `wild` alias in user-mode routing tests.

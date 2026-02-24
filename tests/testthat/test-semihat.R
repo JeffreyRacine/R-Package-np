@@ -284,6 +284,7 @@ test_that("npindexhat reproduces npindex fit and approximates gradient", {
   )))
 })
 
+
 test_that("semihat validates class and scalar controls", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -328,9 +329,9 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
   options(npRmpi.autodispatch = TRUE)
 
-  old.chunk <- getOption("np.plot.wildhat.chunk.size")
-  on.exit(options(np.plot.wildhat.chunk.size = old.chunk), add = TRUE)
-  options(np.plot.wildhat.chunk.size = 5L)
+  old.chunk <- getOption("np.plot.wild.chunk.size")
+  on.exit(options(np.plot.wild.chunk.size = old.chunk), add = TRUE)
+  options(np.plot.wild.chunk.size = 5L)
 
   set.seed(20260223)
   n <- 80

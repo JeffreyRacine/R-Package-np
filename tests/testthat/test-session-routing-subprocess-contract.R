@@ -235,7 +235,7 @@ test_that("session npreghat smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
-test_that("session wild alias plot smoke completes in subprocess", {
+test_that("session wild selector plot smoke completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
@@ -249,9 +249,9 @@ test_that("session wild alias plot smoke completes in subprocess", {
       "x <- runif(n)",
       "y <- sin(2*pi*x) + rnorm(n, sd=0.1)",
       "bw <- npregbw(y~x, bws=0.2, bandwidth.compute=FALSE)",
-      "old.chunk <- getOption('np.plot.wildhat.chunk.size')",
-      "on.exit(options(np.plot.wildhat.chunk.size = old.chunk), add=TRUE)",
-      "options(np.plot.wildhat.chunk.size = 5L)",
+      "old.chunk <- getOption('np.plot.wild.chunk.size')",
+      "on.exit(options(np.plot.wild.chunk.size = old.chunk), add=TRUE)",
+      "options(np.plot.wild.chunk.size = 5L)",
       "png(tempfile(fileext='.png'))",
       "on.exit(dev.off(), add=TRUE)",
       "out <- suppressWarnings(plot(",
@@ -264,14 +264,14 @@ test_that("session wild alias plot smoke completes in subprocess", {
       "  plot.errors.boot.num=9",
       "))",
       "stopifnot(is.list(out), length(out) > 0)",
-      "cat('SESSION_WILDHAT_PLOT_OK\\n')"
+      "cat('SESSION_WILD_PLOT_OK\\n')"
     ),
     timeout = 90L,
     env = env
   )
 
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("SESSION_WILDHAT_PLOT_OK", res$output, fixed = TRUE)),
+  expect_true(any(grepl("SESSION_WILD_PLOT_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
 
