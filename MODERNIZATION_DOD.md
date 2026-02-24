@@ -1297,6 +1297,8 @@ Completed in `np-npRmpi`:
 4. Safety gate:
    - fast path is now explicit opt-in and disabled by default:
      - `options(np.plot.inid.ksum.fastpath.nprmpi = TRUE)`.
+   - opt-in path uses serial `np` namespace kernels (`np::npksum` + `np` kbandwidth helpers)
+     via `.npRmpi_bootstrap_estimator(...)` to avoid session-mode `npRmpi::npksum` stalls.
 5. Contract strategy:
    - default subprocess routing contracts stay in the stable path,
    - density inid session smoke added as opt-in contract:

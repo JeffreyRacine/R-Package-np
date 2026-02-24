@@ -124,7 +124,11 @@
 }
 
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
-  isTRUE(getOption("np.plot.inid.ksum.fastpath.nprmpi", FALSE))
+  if (!isTRUE(getOption("np.plot.inid.ksum.fastpath.nprmpi", FALSE)))
+    return(FALSE)
+  isTRUE(suppressWarnings(suppressMessages(
+    requireNamespace("np", quietly = TRUE)
+  )))
 }
 
 .npRmpi_bootstrap_worker_count <- function(comm = 1L) {
@@ -384,8 +388,9 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional inid bootstrap dimensions")
 
+  npksum.fun <- .npRmpi_bootstrap_estimator("npksum")
   ones <- matrix(1.0, nrow = n, ncol = 1L)
-  ksum0 <- npksum(
+  ksum0 <- npksum.fun(
     txdat = xdat,
     tydat = ones,
     exdat = exdat,
@@ -399,7 +404,7 @@
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    ksum <- npksum(
+    ksum <- npksum.fun(
       txdat = xdat,
       tydat = ones,
       exdat = exdat,
@@ -422,7 +427,7 @@
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
     counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-    ksum.chunk <- npksum(
+    ksum.chunk <- npksum.fun(
       txdat = xdat,
       tydat = ones,
       exdat = exdat,
@@ -451,7 +456,9 @@
 
 .np_con_make_kbandwidth_x <- function(bws, xdat) {
   xdat <- toFrame(xdat)
-  kbandwidth.numeric(
+  kbandwidth.numeric.fun <- .npRmpi_bootstrap_estimator("kbandwidth.numeric")
+  untangle.fun <- .npRmpi_bootstrap_estimator("untangle")
+  kbandwidth.numeric.fun(
     bw = bws$xbw,
     bwscaling = FALSE,
     bwtype = bws$type,
@@ -463,7 +470,7 @@
     ukertype = bws$uxkertype,
     okertype = bws$oxkertype,
     nobs = nrow(xdat),
-    xdati = untangle(xdat),
+    xdati = untangle.fun(xdat),
     xnames = names(xdat)
   )
 }
@@ -472,12 +479,14 @@
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   xydat <- data.frame(xdat, ydat)
+  kbandwidth.numeric.fun <- .npRmpi_bootstrap_estimator("kbandwidth.numeric")
+  untangle.fun <- .npRmpi_bootstrap_estimator("untangle")
   ckerlb <- c(if (is.null(bws$cxkerlb)) numeric(0) else bws$cxkerlb,
               if (is.null(bws$cykerlb)) numeric(0) else bws$cykerlb)
   ckerub <- c(if (is.null(bws$cxkerub)) numeric(0) else bws$cxkerub,
               if (is.null(bws$cykerub)) numeric(0) else bws$cykerub)
 
-  kbandwidth.numeric(
+  kbandwidth.numeric.fun(
     bw = c(bws$xbw, bws$ybw),
     bwscaling = FALSE,
     bwtype = bws$type,
@@ -489,7 +498,7 @@
     ukertype = bws$uxkertype,
     okertype = bws$oxkertype,
     nobs = nrow(xydat),
-    xdati = untangle(xydat),
+    xdati = untangle.fun(xydat),
     xnames = names(xydat)
   )
 }
@@ -516,6 +525,7 @@
     stop("invalid conditional inid bootstrap dimensions")
   if (!.np_con_inid_ksum_eligible(bws))
     return(NULL)
+  npksum.fun <- .npRmpi_bootstrap_estimator("npksum")
 
   kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
                   error = function(e) NULL)
@@ -532,7 +542,7 @@
   exydat <- data.frame(exdat, eydat)
   ones <- matrix(1.0, nrow = n, ncol = 1L)
 
-  den0 <- npksum(
+  den0 <- npksum.fun(
     txdat = xdat,
     tydat = ones,
     exdat = exdat,
@@ -541,7 +551,7 @@
     operator = xop,
     bandwidth.divide = TRUE
   )$ksum
-  num0 <- npksum(
+  num0 <- npksum.fun(
     txdat = xydat,
     tydat = ones,
     exdat = exydat,
@@ -558,7 +568,7 @@
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    den <- npksum(
+    den <- npksum.fun(
       txdat = xdat,
       tydat = ones,
       exdat = exdat,
@@ -567,7 +577,7 @@
       operator = xop,
       bandwidth.divide = TRUE
     )$ksum
-    num <- npksum(
+    num <- npksum.fun(
       txdat = xydat,
       tydat = ones,
       exdat = exydat,
@@ -593,7 +603,7 @@
     bsz <- stopi - start + 1L
     counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
 
-    den <- npksum(
+    den <- npksum.fun(
       txdat = xdat,
       tydat = ones,
       exdat = exdat,
@@ -602,7 +612,7 @@
       operator = xop,
       bandwidth.divide = TRUE
     )$ksum
-    num <- npksum(
+    num <- npksum.fun(
       txdat = xydat,
       tydat = ones,
       exdat = exydat,

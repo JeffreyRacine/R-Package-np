@@ -312,8 +312,10 @@ test_that("session inid density plot smoke completes in subprocess", {
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
+      "suppressPackageStartupMessages(library(np))",
       "npRmpi.init(nslaves=1, quiet=TRUE)",
       "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(np.plot.inid.ksum.fastpath.nprmpi=TRUE)",
       "set.seed(77)",
       "n <- 80",
       "x <- rnorm(n)",
