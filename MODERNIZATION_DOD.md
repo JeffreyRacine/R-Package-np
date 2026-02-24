@@ -38,7 +38,8 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
    - deterministic NA/range guard hardening in core interfaces,
    - `uocquantile` helper NA-guard micro-modernization,
    - bounded-kernel contract coverage hardening (invalid bounds/support/eval/parity),
-   - predict `newdata` alias fixes for non-formula objects in core estimator families.
+   - predict `newdata` alias fixes for non-formula objects in core estimator families,
+   - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix.
 3. Remaining highest-priority work:
    - bounded-kernel/convolution native-path completion and validation (`issue_notes/bounded_kernel_todo.md`),
    - full performance-governance artifacts for performance-sensitive native patches,
@@ -99,6 +100,31 @@ Include in commit body or companion note:
   - accepted non-target technical debt with rationale, or
   - fixed before release candidate.
 - Any change touching formula evaluation semantics remains medium/high risk and requires focused contract tests.
+
+## Plot Engine Index-Safety Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced residual `1:n...` loop/slice patterns in plot engines with `seq_len(...)` / `seq_along(...)`.
+2. Fixed `plot.sibandwidth` data-return bootstrap path to persist computed `merr` (and bias-corrected center metadata) in returned objects.
+3. Scope:
+   - `R/np.plot.engine.bandwidth.R`
+   - `R/np.plot.engine.dbandwidth.R`
+   - `R/np.plot.engine.rbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+   - `R/np.plot.engine.sibandwidth.R`
+   - `R/np.plot.engine.conbandwidth.R`
+   - `R/np.plot.engine.condbandwidth.R`
+4. Commit:
+   - `np-master`: `bb53bcf`
+5. Validation:
+   - parse gate (`PARSE_OK`) for all touched plot-engine files,
+   - targeted tests:
+     - `/tmp/np_master_semihat_after_patch_20260224.log` (`RC:0`)
+     - `/tmp/np_master_plot_seqmodern_tests_20260224b.log` (`RC:0`)
+   - session smoke:
+     - `/tmp/np_plot_session_smoke_20260224.out` (`NP_PLOT_SESSION_SMOKE_OK`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_plotseq_20260224.log` (`RC:0`)
 
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-master`:
