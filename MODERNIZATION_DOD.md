@@ -565,3 +565,25 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_ifelse5_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ifelse5_20260224.log` (`Status: OK`)
+
+## Print/Reporting Scalar-Branch Cleanup Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced scalar `ifelse(...)` in print/reporting paths with explicit scalar `if` branches.
+2. Scope:
+   - `R/cmstest.R`
+   - `R/deneqtest.R`
+   - `R/deptest.R`
+   - `R/sdeptest.R`
+   - `R/symtest.R`
+   - `R/unitest.R`
+3. Commit:
+   - `np-npRmpi`: `<pending>`
+4. Validation:
+   - parse gates: `PARSE_OK`
+   - targeted tests:
+     - `/tmp/nprmpi_print_ifelse6_tests_20260224.log` (`PASS 13, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_printifelse6_20260224.log` (`RC:0`)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_printifelse6_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_printifelse6_20260224.log` (`Status: OK`)

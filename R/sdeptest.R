@@ -76,8 +76,12 @@ print.sdeptest <- function(x, ...){
     cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
     
     for(k in 1:x$lag.num) {
-      cat(ifelse(x$reject[k] == ' ', paste("\nFail to reject the null of independence at lag ", k, " at the 10% level",sep=""),
-                 paste("\nNull of independence is rejected at lag ", k, " at the ", x$rejectNum[k], "% level", sep="")))
+      reject.msg <- if (x$reject[k] == ' ') {
+        paste("\nFail to reject the null of independence at lag ", k, " at the 10% level", sep = "")
+      } else {
+        paste("\nNull of independence is rejected at lag ", k, " at the ", x$rejectNum[k], "% level", sep = "")
+      }
+      cat(reject.msg)
     }
   } else {
     cat("\nConsistent Nonlinear Dependence Metric Entropy",

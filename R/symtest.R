@@ -35,13 +35,17 @@ symtest <- function(Srho, Srho.bootstrap, P, boot.num, data.rotate, bw) {
 }
 
 print.symtest <- function(x, ...){
+  reject.msg <- if (x$reject == ' ') {
+    "\nFail to reject the null of symmetry at the 10% level"
+  } else {
+    paste("\nNull of symmetry is rejected at the ", x$rejectNum, "% level", sep = "")
+  }
   cat("\nConsistent Entropy Asymmetry Test",
       paste("\n", format(x$boot.num), " Bootstrap Replications",sep=""),
       "\n\nTest Statistic ", sQuote("Srho"), ": ",
       format(x$Srho), "\tP Value: ", format.pval(x$P)," ", x$reject,
       "\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1",
-      ifelse(x$reject == ' ', "\nFail to reject the null of symmetry at the 10% level",
-             paste("\nNull of symmetry is rejected at the ", x$rejectNum, "% level", sep="")),
+      reject.msg,
       "\n\n", sep="")
 }
 
