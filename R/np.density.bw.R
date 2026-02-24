@@ -212,9 +212,10 @@ npudensbw.bandwidth <-
       } else {
         nbw = double(ncol)
         if (bws$ncon > 0){
-          nbw[1:bws$ncon] = 1.059224
+          con_idx <- seq_len(bws$ncon)
+          nbw[con_idx] = 1.059224
           if(!bws$scaling)
-            nbw[1:bws$ncon]=nbw[1:bws$ncon]*mysd*nconfac
+            nbw[con_idx] = nbw[con_idx] * mysd * nconfac
         }
         myout= list( bw = nbw, fval = c(NA,NA) )
         total.time <- NA
