@@ -102,8 +102,8 @@ npdeneqtest <- function(x = NULL,
     n2 <- nrow(y)
     ## Resample from pooled data
     z <- data.frame(rbind(x,y))
-    x.bootstrap <- data.frame(z[sample(nrow(z),size=n1,replace=TRUE),])      
-    y.bootstrap <- data.frame(z[sample(nrow(z),size=n2,replace=TRUE),])      
+    x.bootstrap <- data.frame(z[sample.int(nrow(z), size = n1, replace = TRUE), ])      
+    y.bootstrap <- data.frame(z[sample.int(nrow(z), size = n2, replace = TRUE), ])      
     output.boot <- teststat(x.bootstrap,y.bootstrap,bw.x,bw.y)
     return(list(Tn=output.boot$Tn,
                 In=output.boot$In))
