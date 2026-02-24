@@ -228,7 +228,7 @@ npsymtest <- function(data = NULL,
   console <- printClear(boot.state$console)
   console <- printPop(console)  
 
-  p.value <- mean(ifelse(resampled.stat > test.stat, 1, 0))
+  p.value <- mean(resampled.stat > test.stat)
 
   ## Restore seed
 

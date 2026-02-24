@@ -546,3 +546,22 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_plotifelse4_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_plotifelse4_20260224.log` (`Status: OK`)
+
+## Indicator/Scalar `ifelse` Cleanup Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced remaining scalar/indicator `ifelse(...)` in active runtime paths:
+   - `R/np.plot.engine.sibandwidth.R`: scalar gradient-name prefix branch.
+   - `R/np.cmstest.R`, `R/np.qcmstest.R`, `R/np.symtest.R`: p-value indicator means now use direct logical means.
+2. Changes:
+   - `paste(ifelse(gradients, ...))` -> scalar `if` branch.
+   - `mean(ifelse(condition, 1, 0))` -> `mean(condition)`.
+3. Commit:
+   - `np-npRmpi`: `<pending>`
+4. Validation:
+   - targeted tests:
+     - `/tmp/nprmpi_nptests_plotifelse5_20260224.log` (`PASS 18, FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_ifelse5_20260224.log` (`RC:0`)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_ifelse5_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ifelse5_20260224.log` (`Status: OK`)

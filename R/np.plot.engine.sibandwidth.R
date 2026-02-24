@@ -368,7 +368,7 @@
       par(mfrow=c(1,1),cex=par()$cex)
     
     if (plot.behavior != "plot"){
-      names(plot.out) = paste(ifelse(gradients, "si.grad", "si"),1:length(plot.out),sep="")
+      names(plot.out) = paste(if (gradients) "si.grad" else "si", 1:length(plot.out), sep = "")
       
       return (plot.out)
     }

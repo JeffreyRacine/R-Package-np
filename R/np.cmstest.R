@@ -281,7 +281,7 @@ npcmstest <- function(formula,
 
     Sn = if (pivot) tJn$Jn else tIn
 
-    tJn$P <- mean(ifelse(Sn.bootstrap > Sn, 1, 0))
+    tJn$P <- mean(Sn.bootstrap > Sn)
 
     
   }
