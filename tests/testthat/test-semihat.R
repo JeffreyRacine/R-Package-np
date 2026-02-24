@@ -152,6 +152,72 @@ test_that("npplreghat reproduces npplreg fitted values and supports matrix RHS",
   expect_equal(hy, H.eval %*% ystar, tolerance = 1e-10)
 })
 
+test_that("npplreghat supports ll/lp with lp basis variants", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(97532)
+  n <- 90
+  x <- runif(n)
+  z <- runif(n)
+  y <- sin(2 * z) + 1.25 * x + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+  ex <- data.frame(x = seq(min(x), max(x), length.out = 27))
+  ez <- data.frame(z = seq(min(z), max(z), length.out = 27))
+
+  cfgs <- list(
+    list(regtype = "ll", basis = NULL, label = "ll"),
+    list(regtype = "lp", basis = "glp", label = "lp-glp"),
+    list(regtype = "lp", basis = "additive", label = "lp-additive"),
+    list(regtype = "lp", basis = "tensor", label = "lp-tensor")
+  )
+
+  for (cfg in cfgs) {
+    bw.args <- list(
+      xdat = x,
+      zdat = z,
+      ydat = y,
+      bws = matrix(c(0.22, 0.22), nrow = 2, ncol = 1),
+      bandwidth.compute = FALSE,
+      regtype = cfg$regtype
+    )
+    if (!is.null(cfg$basis)) {
+      bw.args$basis <- cfg$basis
+      bw.args$degree <- 2L
+    }
+    bw <- do.call(npplregbw, bw.args)
+    if (!is.null(cfg$basis))
+      expect_identical(bw$basis, cfg$basis, info = cfg$label)
+
+    fit.eval <- npplreg(
+      bws = bw,
+      txdat = tx,
+      tydat = y,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez
+    )
+    H.eval <- npplreghat(
+      bws = bw,
+      txdat = tx,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez,
+      output = "matrix"
+    )
+    expect_equal(
+      as.vector(H.eval %*% y),
+      as.vector(fit.eval$mean),
+      tolerance = 1e-8,
+      info = cfg$label
+    )
+  }
+})
+
 test_that("npindexhat reproduces npindex fit and approximates gradient", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -319,28 +385,43 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
     check.attributes = FALSE
   )))
 
-  plbw <- npplregbw(
-    xdat = x,
-    zdat = z,
-    ydat = y,
-    bws = matrix(c(0.2, 0.2), nrow = 2, ncol = 1),
-    bandwidth.compute = FALSE
+  pl.cfgs <- list(
+    list(regtype = "lc", basis = NULL, label = "lc"),
+    list(regtype = "ll", basis = NULL, label = "ll"),
+    list(regtype = "lp", basis = "glp", label = "lp-glp"),
+    list(regtype = "lp", basis = "additive", label = "lp-additive"),
+    list(regtype = "lp", basis = "tensor", label = "lp-tensor")
   )
-  pl.out <- suppressWarnings(
-    plot(
-      plbw,
-      xdat = data.frame(x = x),
+  for (cfg in pl.cfgs) {
+    pl.args <- list(
+      xdat = x,
+      zdat = z,
       ydat = y,
-      zdat = data.frame(z = z),
-      perspective = FALSE,
-      plot.behavior = "data",
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 19
+      bws = matrix(c(0.2, 0.2), nrow = 2, ncol = 1),
+      bandwidth.compute = FALSE,
+      regtype = cfg$regtype
     )
-  )
-  expect_type(pl.out, "list")
-  expect_true(length(pl.out) > 0)
+    if (!is.null(cfg$basis)) {
+      pl.args$basis <- cfg$basis
+      pl.args$degree <- 2L
+    }
+    plbw <- do.call(npplregbw, pl.args)
+    pl.out <- suppressWarnings(
+      plot(
+        plbw,
+        xdat = data.frame(x = x),
+        ydat = y,
+        zdat = data.frame(z = z),
+        perspective = FALSE,
+        plot.behavior = "data",
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "wild",
+        plot.errors.boot.num = 9
+      )
+    )
+    expect_true(is.list(pl.out), info = cfg$label)
+    expect_true(length(pl.out) > 0, info = cfg$label)
+  }
 
   sibw <- npindexbw(
     xdat = data.frame(x1 = x, x2 = z),
