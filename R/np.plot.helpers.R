@@ -145,7 +145,7 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, 
     yg = abs(yy[jj-2]-yy[jj-1])/golden
     htest = (hbardist >= yg)
     
-    hdelta = if (htest) yg/2 else hbardist/2
+    hdelta = pmin(yg, hbardist)/2
     xx[jj-2] = ex - hdelta
     xx[jj-1] = ex + hdelta
     
