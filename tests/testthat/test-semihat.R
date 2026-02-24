@@ -293,9 +293,9 @@ test_that("semihat validates class and scalar controls", {
 test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
   skip_on_cran()
 
-  old.chunk <- getOption("np.plot.wildhat.chunk.size")
-  on.exit(options(np.plot.wildhat.chunk.size = old.chunk), add = TRUE)
-  options(np.plot.wildhat.chunk.size = 5L)
+  old.chunk <- getOption("np.plot.wild.chunk.size")
+  on.exit(options(np.plot.wild.chunk.size = old.chunk), add = TRUE)
+  options(np.plot.wild.chunk.size = 5L)
 
   set.seed(20260223)
   n <- 80

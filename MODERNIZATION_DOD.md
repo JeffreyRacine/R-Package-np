@@ -652,7 +652,7 @@ Completed in `np-master`:
 Completed in `np-master`:
 1. Extended periodic verified-issue repro harness with explicit serial guards for modern hat/bootstrap paths:
    - `npreghat` fit-operator parity versus `npreg` fitted values.
-   - `plot(..., plot.errors.boot.method="wild-hat")` smoke on `rbandwidth`.
+   - `plot(..., plot.errors.boot.method="wild")` smoke on `rbandwidth`.
 2. Scope:
    - `issue_notes/verified_issue_repros.R`
 3. Commit:
@@ -1210,7 +1210,7 @@ Completed in `np-master`:
 
 ## Plot Bootstrap Modernization: `wild` Clean Break + Chunked `inid` Fast Path (2026-02-24)
 Completed in `np-master`:
-1. Standardized plot-bootstrap method naming on `plot.errors.boot.method="wild"` as a clean break (deprecated `wild-hat` removed).
+1. Standardized plot-bootstrap method naming on `plot.errors.boot.method="wild"` as a clean break (legacy alias removed).
 2. Extended fixed-`lc` `inid` fast path with chunked replication processing to bound memory and stabilize runtime on large `n`/`B`:
    - new option: `np.plot.inid.chunk.size` (positive integer) to control replication chunking.
 3. Added explicit helper contracts:

@@ -172,16 +172,16 @@ tryCatch({
 })
 
 # Serial guard: wild bootstrap plot path
-cat("#wildhat: serial plot bootstrap path ... ")
+cat("#wild: serial plot bootstrap path ... ")
 tryCatch({
   set.seed(27182)
   n <- 80
   x <- runif(n)
   y <- sin(2 * pi * x) + rnorm(n, sd = 0.1)
   bw <- npregbw(y ~ x, bws = 0.2, bandwidth.compute = FALSE)
-  old.chunk <- getOption("np.plot.wildhat.chunk.size")
-  on.exit(options(np.plot.wildhat.chunk.size = old.chunk), add = TRUE)
-  options(np.plot.wildhat.chunk.size = 5L)
+  old.chunk <- getOption("np.plot.wild.chunk.size")
+  on.exit(options(np.plot.wild.chunk.size = old.chunk), add = TRUE)
+  options(np.plot.wild.chunk.size = 5L)
   png(tempfile(fileext = ".png"))
   on.exit(try(dev.off(), silent = TRUE), add = TRUE)
   out <- suppressWarnings(plot(
