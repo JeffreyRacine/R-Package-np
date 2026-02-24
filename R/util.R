@@ -1300,65 +1300,77 @@ genBwKerStrs <- function(x){
   tt <- ''
 
   if(any(ncon > 0)){
-    tt <- paste("\n",
-                ifelse(length(unique(cktype)) == 1,
-                       paste("\nContinuous Kernel Type:",
-                             x$klist[[vari[1]]]$pckertype),
-                       paste(sapply(seq_along(vari), function(v){
-                         ifelse(ncon[v] > 0,
-                                paste("\nContinuous Kernel Type (",
-                                      x$vartitleabb[[vari[v]]],
-                                      " Var.): ", x$klist[[vari[v]]]$pckertype, sep=""),"")
-                       }), collapse = "")),
-                sep = "")
-    tt <-
-      paste(tt, paste(sapply(seq_along(vari), function(i){
-        ifelse(ncon[i] > 0,
-               paste("\nNo. Continuous", pad(x$vartitle[[vari[i]]]), "Vars.: ",
-                     ncon[i], sep=""), "")
-      }), collapse = ""), sep="")
+    ctype.str <- ""
+    if (length(unique(cktype)) == 1) {
+      ctype.str <- paste("\nContinuous Kernel Type:",
+                         x$klist[[vari[1]]]$pckertype)
+    } else {
+      ctype.str <- paste(sapply(seq_along(vari), function(v){
+        if (ncon[v] > 0)
+          paste("\nContinuous Kernel Type (",
+                x$vartitleabb[[vari[v]]],
+                " Var.): ", x$klist[[vari[v]]]$pckertype, sep = "")
+        else ""
+      }), collapse = "")
+    }
+    tt <- paste("\n", ctype.str, sep = "")
+    cont.str <- paste(sapply(seq_along(vari), function(i){
+      if (ncon[i] > 0)
+        paste("\nNo. Continuous", pad(x$vartitle[[vari[i]]]), "Vars.: ",
+              ncon[i], sep = "")
+      else ""
+    }), collapse = "")
+    tt <- paste(tt, cont.str, sep = "")
   }
                 
     
   if(any(nuno > 0)) {
-    tt <- paste(tt, "\n",
-                ifelse(length(unique(uktype)) == 1,
-                       paste("\nUnordered Categorical Kernel Type:",
-                             x$klist[[vari[1]]]$pukertype),
-                       paste(sapply(seq_along(vari), function(i){
-                         ifelse(nuno[i] > 0,
-                                paste("\nUnordered Categorical Kernel Type (",
-                                      x$vartitleabb[[vari[i]]],
-                                      " Var.): ", x$klist[[vari[i]]]$pukertype, sep=""),"")
-                       }), collapse = "")),
-                sep = "")
-    tt <-
-      paste(tt, paste(sapply(seq_along(vari), function(i){
-        ifelse(nuno[i] > 0,
-               paste("\nNo. Unordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
-                     nuno[i], sep=""), "")
-      }), collapse = ""), sep="")
+    utype.str <- ""
+    if (length(unique(uktype)) == 1) {
+      utype.str <- paste("\nUnordered Categorical Kernel Type:",
+                         x$klist[[vari[1]]]$pukertype)
+    } else {
+      utype.str <- paste(sapply(seq_along(vari), function(i){
+        if (nuno[i] > 0)
+          paste("\nUnordered Categorical Kernel Type (",
+                x$vartitleabb[[vari[i]]],
+                " Var.): ", x$klist[[vari[i]]]$pukertype, sep = "")
+        else ""
+      }), collapse = "")
+    }
+    tt <- paste(tt, "\n", utype.str, sep = "")
+    uno.str <- paste(sapply(seq_along(vari), function(i){
+      if (nuno[i] > 0)
+        paste("\nNo. Unordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
+              nuno[i], sep = "")
+      else ""
+    }), collapse = "")
+    tt <- paste(tt, uno.str, sep = "")
 
   }
 
   if(any(nord > 0)) {
-    tt <- paste(tt, "\n",
-                ifelse(length(unique(oktype)) == 1,
-                paste("\nOrdered Categorical Kernel Type:",
-                      x$klist[[vari[1]]]$pokertype),
-                paste(sapply(seq_along(vari), function(i){
-                  ifelse(nord[i] > 0,
-                         paste("\nOrdered Categorical Kernel Type (",
-                               x$vartitleabb[[vari[i]]],
-                               " Var.): ", x$klist[[vari[i]]]$pokertype, sep=""),"")
-                }), collapse = "")),
-         sep = "")
-    tt <-
-      paste(tt, paste(sapply(seq_along(vari), function(i){
-        ifelse(nord[i] > 0,
-               paste("\nNo. Ordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
-                     nord[i], sep=""), "")
-      }), collapse = ""), sep="")
+    otype.str <- ""
+    if (length(unique(oktype)) == 1) {
+      otype.str <- paste("\nOrdered Categorical Kernel Type:",
+                         x$klist[[vari[1]]]$pokertype)
+    } else {
+      otype.str <- paste(sapply(seq_along(vari), function(i){
+        if (nord[i] > 0)
+          paste("\nOrdered Categorical Kernel Type (",
+                x$vartitleabb[[vari[i]]],
+                " Var.): ", x$klist[[vari[i]]]$pokertype, sep = "")
+        else ""
+      }), collapse = "")
+    }
+    tt <- paste(tt, "\n", otype.str, sep = "")
+    ord.str <- paste(sapply(seq_along(vari), function(i){
+      if (nord[i] > 0)
+        paste("\nNo. Ordered Categorical", pad(x$vartitle[[vari[i]]]), "Vars.: ",
+              nord[i], sep = "")
+      else ""
+    }), collapse = "")
+    tt <- paste(tt, ord.str, sep = "")
 
   }
 
@@ -1370,45 +1382,60 @@ genBwKerStrsXY <- function(x){
   cnt <- 0
   
   if (x$xncon + x$yncon > 0){
+    cker.str <- ""
+    if (x$pcxkertype == x$pcykertype) {
+      cker.str <- paste("\n\nContinuous Kernel Type:", x$pcxkertype)
+    } else {
+      exp.str <- if (x$xncon > 0)
+        paste("\nContinuous Kernel Type (Exp. Var.):", x$pcxkertype)
+      else ""
+      dep.str <- if (x$yncon > 0)
+        paste("\nContinuous Kernel Type (Dep. Var.):", x$pcykertype)
+      else ""
+      cker.str <- paste("\n", exp.str, dep.str)
+    }
+    ycon.str <- if (x$yncon > 0) paste("\nNo. Continuous Dependent Vars.:", x$yncon) else ""
+    xcon.str <- if (x$xncon > 0) paste("\nNo. Continuous Explanatory Vars.:", x$xncon) else ""
     t.str[cnt <- cnt + 1] <-
-      paste(ifelse(x$pcxkertype == x$pcykertype,
-                   paste("\n\nContinuous Kernel Type:",x$pcxkertype),
-                   paste("\n", ifelse(x$xncon > 0,
-                                      paste("\nContinuous Kernel Type (Exp. Var.):",
-                                            x$pcxkertype), ""),
-                         ifelse(x$yncon > 0,
-                                paste("\nContinuous Kernel Type (Dep. Var.):",
-                                      x$pcykertype), ""))),
-            ifelse(x$yncon > 0,paste("\nNo. Continuous Dependent Vars.:",x$yncon),""),
-            ifelse(x$xncon > 0,paste("\nNo. Continuous Explanatory Vars.:",x$xncon),""))
+      paste(cker.str, ycon.str, xcon.str)
   }
 
   if (x$xnuno + x$ynuno > 0){
+    uker.str <- ""
+    if (x$puxkertype == x$puykertype) {
+      uker.str <- paste("\n\nUnordered Categorical Kernel Type:", x$puxkertype)
+    } else {
+      exp.str <- if (x$xnuno > 0)
+        paste("\nUnordered Categorical Kernel Type (Exp. Var.):", x$puxkertype)
+      else ""
+      dep.str <- if (x$ynuno > 0)
+        paste("\nUnordered Categorical Kernel Type (Dep. Var.):", x$puykertype)
+      else ""
+      uker.str <- paste("\n", exp.str, dep.str)
+    }
+    yuno.str <- if (x$ynuno > 0) paste("\nNo. Unordered Categorical Dependent Vars.:", x$ynuno) else ""
+    xuno.str <- if (x$xnuno > 0) paste("\nNo. Unordered Categorical Explanatory Vars.:", x$xnuno) else ""
     t.str[cnt <- cnt + 1] <-
-      paste(ifelse(x$puxkertype == x$puykertype,
-                   paste("\n\nUnordered Categorical Kernel Type:",x$puxkertype),
-                   paste("\n", ifelse(x$xnuno > 0,
-                                      paste("\nUnordered Categorical Kernel Type (Exp. Var.):",
-                                            x$puxkertype), ""),
-                         ifelse(x$ynuno > 0,
-                                paste("\nUnordered Categorical Kernel Type (Dep. Var.):",
-                                      x$puykertype), ""))),
-            ifelse(x$ynuno > 0,paste("\nNo. Unordered Categorical Dependent Vars.:",x$ynuno),""),
-            ifelse(x$xnuno > 0,paste("\nNo. Unordered Categorical Explanatory Vars.:",x$xnuno),""))
+      paste(uker.str, yuno.str, xuno.str)
   }
 
   if (x$xnord + x$ynord > 0){
+    oker.str <- ""
+    if (x$poxkertype == x$poykertype) {
+      oker.str <- paste("\n\nOrdered Categorical Kernel Type:", x$poxkertype)
+    } else {
+      exp.str <- if (x$xnord > 0)
+        paste("\nOrdered Categorical Kernel Type (Exp. Var.):", x$poxkertype)
+      else ""
+      dep.str <- if (x$ynord > 0)
+        paste("\nOrdered Categorical Kernel Type (Dep. Var.):", x$poykertype)
+      else ""
+      oker.str <- paste("\n", exp.str, dep.str)
+    }
+    yord.str <- if (x$ynord > 0) paste("\nNo. Ordered Categorical Dependent Vars.:", x$ynord) else ""
+    xord.str <- if (x$xnord > 0) paste("\nNo. Ordered Categorical Explanatory Vars.:", x$xnord) else ""
     t.str[cnt <- cnt + 1] <-
-      paste(ifelse(x$poxkertype == x$poykertype,
-                   paste("\n\nOrdered Categorical Kernel Type:",x$poxkertype),
-                   paste("\n", ifelse(x$xnord > 0,
-                                      paste("\nOrdered Categorical Kernel Type (Exp. Var.):",
-                                            x$poxkertype), ""),
-                         ifelse(x$ynord > 0,
-                                paste("\nOrdered Categorical Kernel Type (Dep. Var.):",
-                                      x$poykertype), ""))),
-            ifelse(x$ynord > 0,paste("\nNo. Ordered Categorical Dependent Vars.:",x$ynord),""),
-            ifelse(x$xnord > 0,paste("\nNo. Ordered Categorical Explanatory Vars.:",x$xnord),""))
+      paste(oker.str, yord.str, xord.str)
   }
   return(t.str)
 }
