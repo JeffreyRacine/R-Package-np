@@ -450,7 +450,7 @@ Completed in `np-master`:
    - `paste(ifelse(gradients, ...))` -> scalar `if` branch.
    - `mean(ifelse(condition, 1, 0))` -> `mean(condition)`.
 3. Commit:
-   - `np-master`: `<pending>`
+   - `np-master`: `f8f1ff4`
 4. Validation:
    - targeted tests:
      - `/tmp/np_master_nptests_plotifelse5_20260224.log` (`PASS 26, FAIL 0`)
