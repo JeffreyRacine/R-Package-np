@@ -650,3 +650,19 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_npregiv_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_npregiv_seq_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
+
+## `npregiv` Loop-Range Hygiene Follow-On Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Completed residual `1:n...` conversions in `npregiv` iterative/LOO loops and `sapply` index ranges.
+2. Scope:
+   - `R/npregiv.R`
+3. Commit:
+   - `np-master`: `de162bf`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='npregiv', reporter='summary')` (`RC:0`; expected pre-existing monotone-stopping warnings)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_043014.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_npregiv_seq2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_npregiv_seq2_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 1 NOTE`; warning set unchanged from existing top-level/vignette-size debt)
