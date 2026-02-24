@@ -741,3 +741,23 @@ Completed in `np-npRmpi`:
    - `/tmp/nprmpi_build_postmodern_final_20260224.log` (`RC:0`, `creating vignettes ... OK`)
 2. `FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0 R CMD check --as-cran npRmpi_0.70-0.tar.gz`
    - `/tmp/nprmpi_check_ascran_postmodern_final_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Plot-Engine Loop-Range Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:...` loop/index ranges in plot-engine runtime paths with `seq_len(...)`-safe forms.
+2. Scope:
+   - `R/np.plot.engine.bandwidth.R`
+   - `R/np.plot.engine.dbandwidth.R`
+   - `R/np.plot.engine.conbandwidth.R`
+   - `R/np.plot.engine.condbandwidth.R`
+3. Commit:
+   - `np-npRmpi`: `6fdeaa9`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='plot-autodispatch|semihat', reporter='summary')` (`RC:0`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_041140.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_plotengine_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_plotengine_seq_20260224_en0.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+     - `/tmp/nprmpi_check_ascran_plotengine_seq_20260224.log` (`RC:1`; `lo0` NIC setting failed during MPI init in install stage, retried successfully with `en0`)
