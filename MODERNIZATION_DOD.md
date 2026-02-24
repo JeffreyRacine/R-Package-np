@@ -688,3 +688,19 @@ Completed in `np-master`:
 5. Environment note:
    - local `--as-cran` checks required `crs` in `R_LIBS`; command used:
      - `R_LIBS=/tmp/crs_check_lib R CMD check --as-cran --no-manual np_0.70-0.tar.gz`
+
+## Bandwidth Metadata Parity Follow-On Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Applied matching `seq_len(...)` metadata-index conversion in `R/dbandwidth.R` for cross-file parity.
+2. Scope:
+   - `R/dbandwidth.R`
+3. Commit:
+   - `np-master`: `1ff6a07`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='bw-dispatch|formula-bw-contract|bandwidth', reporter='summary')` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_044753.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_bwmeta_seq2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_bwmeta_seq2_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
