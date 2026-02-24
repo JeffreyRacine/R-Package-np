@@ -1557,7 +1557,7 @@ compute.bootstrap.errors.sibandwidth =
 uocquantile <- function(x, prob) {
   if(anyNA(prob)) stop("'prob' contains missing values")
   if(any(prob < 0 | prob > 1, na.rm = TRUE)) stop("'prob' outside [0,1]")
-  if(any(is.na(x) | is.nan(x))) stop("missing values and NaN's not allowed")
+  if(anyNA(x)) stop("missing values and NaN's not allowed")
   if (is.ordered(x)){
     x <- droplevels(x)
     tq = unclass(table(x))
