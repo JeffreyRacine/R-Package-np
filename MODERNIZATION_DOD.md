@@ -161,6 +161,25 @@ Completed in `np-master`:
      - `/tmp/sampleint_bootstrap_expr_prepost_summary_20260224.csv`
      - `/tmp/sampleint_bootstrap_expr_prepost_parity_20260224.csv`.
 
+## Boundary Kernel Masked-Assignment Modernization (2026-02-24)
+Completed in `np-master`:
+1. Modernized floating-boundary kernel branches in `npuniden.boundary` by replacing vectorized `ifelse(...)` gating with explicit masked assignment.
+2. Scope:
+   - `R/npuniden.boundary.R` (`fb`, `fbl`, `fbu` branches)
+3. Why:
+   - avoids eager evaluation of both `ifelse` branches in hot kernel math,
+   - preserves vectorized semantics with explicit masks.
+4. Validation:
+   - parse gate: `NP_PARSE_OK`,
+   - targeted tests:
+     - `/tmp/np_master_npuniden_maskmodern_tests_20260224.log` (`NO_FAIL_MARKERS`)
+   - old-vs-new parity/perf harness:
+     - `/tmp/np_master_npuniden_maskmodern_parity_20260224.csv` (max abs diff `0` for `f` and `F`)
+     - `/tmp/np_master_npuniden_maskmodern_perf_20260224.csv` (mean speedup ~16.6%-22.0%, median ~20% for tested kernels)
+     - `/tmp/np_master_npuniden_maskmodern_parity_perf_20260224.out` (`NPUNIDEN_MASK_PARITY_OK`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_npuniden_maskmodern_20260224.log` (`RC:0`).
+
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-master`:
 1. Replaced residual `1:n` column reconstruction and `setdiff(1:(...))` forms with `seq_len(...)` in conditional bw selectors.
