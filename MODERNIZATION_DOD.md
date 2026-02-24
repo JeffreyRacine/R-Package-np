@@ -888,3 +888,24 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_util_scalar2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_util_scalar2_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 1 NOTE`; warning set unchanged from existing top-level/vignette-size debt)
+
+## `util.R` Vector-Branch Follow-On (`tgauss`/`pad`/`rpad`) (2026-02-24)
+Completed in `np-master`:
+1. Replaced additional `ifelse(...)` usages with explicit vector-safe masked assignments in utility hot paths:
+   - `nptgauss()` local `tgauss` now uses precomputed vector + mask assignment,
+   - `pad()` and `rpad()` now use vector-safe index assignment while preserving names.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-master`: `f08e8d4`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests:
+     - `testthat::test_local(filter='utils|nptests|sdeptest|npuniden|bandwidth', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+     - log: `/tmp/np_master_util_scalar3_tests_20260224.log`
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_061008.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_util_scalar3_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_util_scalar3_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
