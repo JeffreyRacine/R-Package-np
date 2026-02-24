@@ -1076,3 +1076,26 @@ Completed in `np-master`:
 5. Notes:
    - fast path is feature-flagged via option `np.plot.inid.fastpath.disable` for safe rollback/testing.
    - this slice is limited to test-locked fixed-bandwidth `lc` semantics.
+
+## Plot Bootstrap Modernization: `wild` Clean Break + Chunked `inid` Fast Path (2026-02-24)
+Completed in `np-master`:
+1. Standardized plot-bootstrap method naming on `plot.errors.boot.method="wild"` as a clean break (deprecated `wild-hat` removed).
+2. Extended fixed-`lc` `inid` fast path with chunked replication processing to bound memory and stabilize runtime on large `n`/`B`:
+   - new option: `np.plot.inid.chunk.size` (positive integer) to control replication chunking.
+3. Added explicit helper contracts:
+   - chunked generation path parity against explicit chunked multinomial draws.
+4. Scope:
+   - `R/np.plot.helpers.R`
+   - `tests/testthat/test-plot-bootstrap-inid-fastpath.R`
+   - `tests/testthat/test-semihat.R`
+   - `issue_notes/verified_issue_repros.R`
+5. Validation:
+   - targeted contracts:
+     - `/tmp/npwildchunk_test_np_20260224.log` (`FAIL 0`, `PASS 10`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_wildchunk_20260224_083619.log` (all verified repros passed)
+   - bounded performance benchmark (`n=10000`, `boot.num=999`, serial `np`, fixed+varying seeds):
+     - raw: `/tmp/bench_np_inid_n10000_b999_bounded_raw_20260224.csv`
+     - summary: `/tmp/bench_np_inid_n10000_b999_bounded_summary_20260224.txt`
+     - fixed-seed mean/median delta: `-93.26% / -93.26%`
+     - varying-seed mean/median delta: `-93.46% / -93.46%`
