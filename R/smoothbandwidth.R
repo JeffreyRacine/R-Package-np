@@ -72,7 +72,7 @@ scbandwidth <-
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
 
   if (!identical(sfactor,NA)){
-    sumNum <- sapply(1:ndim, function(i) {
+    sumNum <- sapply(seq_len(ndim), function(i) {
       if (tdati$icon[i])
         return(sfactor[i])
 

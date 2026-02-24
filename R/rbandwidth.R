@@ -92,7 +92,7 @@ rbandwidth <-
   ## calculate some info to be pretty-printed
 
   if (!identical(sfactor,NA)){
-    sumNum <- sapply(1:ndim, function(i) {
+    sumNum <- sapply(seq_len(ndim), function(i) {
       if (xdati$icon[i])
         return(sfactor[i])
 
