@@ -122,6 +122,7 @@ extern double **matrix_X_ordered_quantile_extern;
 
 extern int int_ll_extern;
 extern int *vector_glp_degree_extern;
+extern int *vector_glp_gradient_order_extern;
 extern int int_glp_bernstein_extern;
 extern int int_glp_basis_extern;
 
@@ -6827,7 +6828,18 @@ static void np_glp_fill_basis_eval_raw(const int ncon,
   }
 }
 
+static inline double np_glp_falling_factorial(const int p, const int r){
+  int k;
+  double c = 1.0;
+  if(r <= 0) return 1.0;
+  if(p < r) return 0.0;
+  for(k = 0; k < r; k++)
+    c *= (double)(p - k);
+  return c;
+}
+
 static void np_glp_fill_basis_eval_deriv_raw(const int which_var,
+                                             const int deriv_order,
                                              const int ncon,
                                              const int *terms,
                                              const int nterms,
@@ -6842,11 +6854,11 @@ static void np_glp_fill_basis_eval_deriv_raw(const int which_var,
       const int p = et[j];
       const double x = matrix_X_continuous_eval[j][eval_index];
       if(j == which_var){
-        if(p <= 0){
+        if(p < deriv_order){
           b = 0.0;
           break;
         }
-        b *= ((double)p)*ipow(x, p - 1);
+        b *= np_glp_falling_factorial(p, deriv_order)*ipow(x, p - deriv_order);
       } else if(p > 0){
         b *= ipow(x, p);
       }
@@ -6858,6 +6870,7 @@ static void np_glp_fill_basis_eval_deriv_raw(const int which_var,
 typedef struct {
   int degree;
   int use_basis;
+  int max_deriv;
   double xmin;
   double xmax;
   gsl_bspline_workspace *bw;
@@ -6872,8 +6885,10 @@ static int np_glp_basis_ctx_init(NPGLPBasisCtx *ctx, const int degree, const dou
   const size_t k = (size_t)(degree + 1);
   const size_t nbreak = 2;
   const size_t ncoeff = (size_t)(degree + 1);
+  const size_t nderiv = (size_t)(degree + 1);
   ctx->degree = degree;
   ctx->use_basis = (degree > 0) && (xmax > xmin);
+  ctx->max_deriv = degree;
   ctx->xmin = xmin;
   ctx->xmax = xmax;
   ctx->bw = NULL;
@@ -6889,7 +6904,7 @@ static int np_glp_basis_ctx_init(NPGLPBasisCtx *ctx, const int degree, const dou
   }
   ctx->B = gsl_vector_alloc(ncoeff);
   ctx->dw = gsl_bspline_deriv_alloc(k);
-  ctx->dB = gsl_matrix_alloc(ncoeff, 2);
+  ctx->dB = gsl_matrix_alloc(ncoeff, nderiv);
   if((ctx->B == NULL) || (ctx->dw == NULL) || (ctx->dB == NULL)){
     np_glp_basis_ctx_free(ctx);
     return 0;
@@ -6912,12 +6927,6 @@ static inline double np_glp_basis_factor_value(const NPGLPBasisCtx *ctx, const i
   if(idx == 0) return 1.0;
   if((ctx->degree <= 0) || (idx < 1) || (idx > ctx->degree) || !ctx->use_basis) return 0.0;
   return gsl_vector_get(ctx->B, (size_t)idx);
-}
-
-static inline double np_glp_basis_factor_deriv(const NPGLPBasisCtx *ctx, const int idx){
-  if(idx == 0) return 0.0;
-  if((ctx->degree <= 0) || (idx < 1) || (idx > ctx->degree) || !ctx->use_basis) return 0.0;
-  return gsl_matrix_get(ctx->dB, (size_t)idx, 1);
 }
 
 static void np_glp_fill_basis_train(const int ncon,
@@ -6963,6 +6972,7 @@ static void np_glp_fill_basis_eval(const int ncon,
 }
 
 static void np_glp_fill_basis_eval_deriv(const int which_var,
+                                         const int deriv_order,
                                          const int ncon,
                                          const int *terms,
                                          const int nterms,
@@ -6974,15 +6984,32 @@ static void np_glp_fill_basis_eval_deriv(const int which_var,
   for(j = 0; j < ncon; j++)
     if(ctx[j].use_basis)
       gsl_bspline_eval(matrix_X_continuous_eval[j][eval_index], ctx[j].B, ctx[j].bw);
-  if(ctx[which_var].use_basis)
-    gsl_bspline_deriv_eval(matrix_X_continuous_eval[which_var][eval_index], 1, ctx[which_var].dB, ctx[which_var].bw, ctx[which_var].dw);
+  if((deriv_order > 0) && ctx[which_var].use_basis){
+    if(deriv_order <= ctx[which_var].max_deriv){
+      gsl_bspline_deriv_eval(matrix_X_continuous_eval[which_var][eval_index],
+                             deriv_order,
+                             ctx[which_var].dB,
+                             ctx[which_var].bw,
+                             ctx[which_var].dw);
+    }
+  }
   for(t = 0; t < nterms; t++){
     const int *et = terms + t*ncon;
     double b = 1.0;
     for(j = 0; j < ncon; j++){
       const int idx = et[j];
       if(j == which_var){
-        b *= np_glp_basis_factor_deriv(&ctx[j], idx);
+        if(deriv_order <= 0){
+          b *= np_glp_basis_factor_value(&ctx[j], idx);
+        } else if(idx == 0){
+          b = 0.0;
+          break;
+        } else if((ctx[j].degree <= 0) || (idx < 1) || (idx > ctx[j].degree) || !ctx[j].use_basis || (deriv_order > ctx[j].max_deriv)){
+          b = 0.0;
+          break;
+        } else {
+          b *= gsl_matrix_get(ctx[j].dB, (size_t)idx, (size_t)deriv_order);
+        }
       } else {
         b *= np_glp_basis_factor_value(&ctx[j], idx);
       }
@@ -12557,8 +12584,10 @@ double *SIGN){
 
       if(do_grad){
         for(l = 0; l < num_reg_continuous; l++){
+          const int grad_order = (vector_glp_gradient_order_extern != NULL) ? MAX(1, vector_glp_gradient_order_extern[l]) : 1;
           if(use_bernstein)
             np_glp_fill_basis_eval_deriv(l,
+                                         grad_order,
                                          num_reg_continuous,
                                          glp_terms,
                                          glp_nterms,
@@ -12568,6 +12597,7 @@ double *SIGN){
                                          eval_deriv);
           else
             np_glp_fill_basis_eval_deriv_raw(l,
+                                             grad_order,
                                              num_reg_continuous,
                                              glp_terms,
                                              glp_nterms,

@@ -589,6 +589,7 @@ double *vector_Y_null;
 
 int int_ll_extern=0;
 int *vector_glp_degree_extern=NULL;
+int *vector_glp_gradient_order_extern=NULL;
 int int_glp_bernstein_extern=0;
 int int_glp_basis_extern=1;
 
@@ -777,6 +778,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * nconfac, double * ncatfac, double * mysd,
                    int * myopti,
                    int * glp_degree,
+                   int * glp_gradient_order,
                    int * glp_bernstein,
                    int * glp_basis,
                    double * cm, double * cmerr, double * g, double *gerr,
@@ -978,6 +980,7 @@ SEXP C_np_regression(SEXP tuno,
                      SEXP mysd,
                      SEXP myopti,
                      SEXP glp_degree,
+                     SEXP glp_gradient_order,
                      SEXP glp_bernstein,
                      SEXP glp_basis,
                      SEXP enrow,
@@ -990,7 +993,7 @@ SEXP C_np_regression(SEXP tuno,
   SEXP euno_r = R_NilValue, eord_r = R_NilValue, econ_r = R_NilValue, ey_r = R_NilValue;
   SEXP rbw_r = R_NilValue, mcv_r = R_NilValue, padnum_r = R_NilValue;
   SEXP nconfac_r = R_NilValue, ncatfac_r = R_NilValue, mysd_r = R_NilValue, myopti_i = R_NilValue;
-  SEXP degree_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
+  SEXP degree_i = R_NilValue, gradient_order_i = R_NilValue, ckerlb_r = R_NilValue, ckerub_r = R_NilValue;
   SEXP out = R_NilValue, out_names = R_NilValue;
   SEXP out_mean = R_NilValue, out_merr = R_NilValue, out_g = R_NilValue, out_gerr = R_NilValue, out_xtra = R_NilValue;
   int bern = asInteger(glp_bernstein);
@@ -1026,6 +1029,7 @@ SEXP C_np_regression(SEXP tuno,
   PROTECT(mysd_r = duplicate(coerceVector(mysd, REALSXP)));
   PROTECT(myopti_i = duplicate(coerceVector(myopti, INTSXP)));
   PROTECT(degree_i = duplicate(coerceVector(glp_degree, INTSXP)));
+  PROTECT(gradient_order_i = duplicate(coerceVector(glp_gradient_order, INTSXP)));
   PROTECT(ckerlb_r = duplicate(coerceVector(ckerlb, REALSXP)));
   PROTECT(ckerub_r = duplicate(coerceVector(ckerub, REALSXP)));
 
@@ -1053,7 +1057,7 @@ SEXP C_np_regression(SEXP tuno,
                 REAL(rbw_r), REAL(mcv_r), REAL(padnum_r),
                 REAL(nconfac_r), REAL(ncatfac_r), REAL(mysd_r),
                 INTEGER(myopti_i),
-                INTEGER(degree_i), &bern, &basis,
+                INTEGER(degree_i), INTEGER(gradient_order_i), &bern, &basis,
                 REAL(out_mean), REAL(out_merr), REAL(out_g), REAL(out_gerr), REAL(out_xtra),
                 ckerlb_p, ckerub_p);
 
@@ -1072,7 +1076,7 @@ SEXP C_np_regression(SEXP tuno,
   SET_STRING_ELT(out_names, 4, mkChar("xtra"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(25);
+  UNPROTECT(26);
   return out;
 }
 
@@ -5724,6 +5728,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
 
   int_ll_extern = myopti[RBW_LL];
   vector_glp_degree_extern = glp_degree;
+  vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = *glp_bernstein;
   int_glp_basis_extern = *glp_basis;
 
@@ -6258,6 +6263,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   vector_glp_degree_extern = NULL;
+  vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
 
@@ -6274,6 +6280,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * nconfac, double * ncatfac, double * mysd,
                    int * myopti, 
                    int * glp_degree,
+                   int * glp_gradient_order,
                    int * glp_bernstein,
                    int * glp_basis,
                    double * cm, double * cmerr, double * g, double *gerr, 
@@ -6322,6 +6329,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   do_grad = myopti[REG_GRAD];
   int_ll_extern = myopti[REG_LL];
   vector_glp_degree_extern = glp_degree;
+  vector_glp_gradient_order_extern = glp_gradient_order;
   int_glp_bernstein_extern = *glp_bernstein;
   int_glp_basis_extern = *glp_basis;
 
@@ -6717,6 +6725,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
   vector_ckerlb_extern = NULL;
   vector_ckerub_extern = NULL;
   vector_glp_degree_extern = NULL;
+  vector_glp_gradient_order_extern = NULL;
   int_glp_bernstein_extern = 0;
   int_glp_basis_extern = 1;
 
