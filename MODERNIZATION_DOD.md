@@ -1308,3 +1308,33 @@ Completed in `np-npRmpi`:
 7. Validation:
    - `/tmp/nprmpi_session_routing_contract_20260224_101550.log` (`PASS 20, FAIL 0, SKIP 2`)
    - `/tmp/nprmpi_issue_notes_repros_20260224_102108.log` (`all verified issue-note repros passed`)
+
+## GLP Gradient Mask Alignment Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Updated `gradients.npregression(...)` GLP masking logic to preserve any requested derivative order up to polynomial degree (instead of first-order-only masking).
+2. Removed stale warning text claiming higher-order GLP derivatives were unavailable.
+3. Scope:
+   - `R/regression.R`
+4. Commit:
+   - `np-npRmpi`: `8be3fc1`
+5. Validation:
+   - direct session smoke: `/tmp/nprmpi_glp_gradmask_repro_20260224.out` (`NPRMPI_GLP_GRADMASK_OK`)
+   - issue-note sweep: `/tmp/nprmpi_issue_notes_repros_20260224_afterpatch.log` (`all verified issue-note repros passed`)
+
+## Plot Bootstrap Wild-Selector Wiring Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Wired `plot.errors.boot.wild` through MPI plot engines to fully propagate draw-selector choice into bootstrap helper calls:
+   - `plot.rbandwidth`, `plot.scbandwidth`, `plot.plbandwidth`, `plot.sibandwidth`.
+2. Preserved `npRmpi`-specific session/autodispatch guards and rank behavior while adding selector propagation.
+3. Scope:
+   - `R/np.plot.engine.rbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+   - `R/np.plot.engine.sibandwidth.R`
+4. Commit:
+   - `np-npRmpi`: `bada05c`
+5. Validation:
+   - user-style session repro: `/tmp/repro_nprmpi_plot_hang_check_20260224_en0_afterpatch.out` (`NPRMPI_PLOT_REPRO_OK`)
+   - small session repro: `/tmp/nprmpi_plot_repro_small_20260224.out` (`NPRMPI_PLOT_SMALL_OK`)
+   - issue-note sweep: `/tmp/nprmpi_issue_notes_repros_20260224_afterpatch.log` (`all verified issue-note repros passed`)
+   - tarball build: `/tmp/nprmpi_build_20260224_checkpoint.log` (`creating vignettes ... OK`)
