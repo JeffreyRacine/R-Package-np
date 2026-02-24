@@ -431,7 +431,7 @@ Completed in `np-master`:
    - initial scalarization of `ifelse(htest, ...)` was invalid because `htest` is vector-valued,
    - finalized to vector-safe equivalent `hdelta = pmin(yg, hbardist)/2`.
 4. Commit:
-   - `np-master`: `<pending>`
+   - `np-master`: `dfe83c8`
 5. Validation:
    - targeted tests:
      - `/tmp/np_master_plot_ifelse4_tests2_20260224.log` (`PASS 26, FAIL 0`)
