@@ -871,3 +871,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_npuniden_scalar_ifelse_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_npuniden_scalar_ifelse_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Wild-Bootstrap Draw Allocation Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Reduced allocations in wild-bootstrap draw helpers by replacing matrix `ifelse(...)` draw generation with preallocated matrices and logical indexing.
+2. Scope:
+   - `R/np.plot.helpers.R`
+3. Commit:
+   - `np-npRmpi`: `6fe2c3e`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/np.plot.helpers.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='plot-autodispatch|semihat', reporter='summary')` (`RC:0`)
+     - log: `/tmp/nprmpi_wilddraw_alloc_tests_20260224b.log`
+   - direct helper contract smoke:
+     - `/tmp/nprmpi_wilddraw_contract_20260224.out` (`NPRMPI_WILDDRAW_CONTRACT_OK`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_051458.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_wilddraw_alloc_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_wilddraw_alloc_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
