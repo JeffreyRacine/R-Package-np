@@ -471,7 +471,7 @@ Completed in `np-master`:
    - `R/symtest.R`
    - `R/unitest.R`
 3. Commit:
-   - `np-master`: `<pending>`
+   - `np-master`: `9ea1c59`
 4. Validation:
    - parse gates: `PARSE_OK`
    - targeted tests:
