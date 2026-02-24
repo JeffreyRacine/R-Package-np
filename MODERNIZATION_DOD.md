@@ -1137,3 +1137,22 @@ Completed in `np-master`:
    - targeted contracts: `/tmp/np_master_plot_glp_fastpath_20260224.log` (`plot-bootstrap-inid-fastpath`, `plot-contract` passed)
    - issue-note sweep: `/tmp/np_issue_notes_repros_20260224_afterpatch.log` (`all verified issue-note repros passed`)
    - tarball build: `/tmp/np_master_build_20260224_checkpoint.log` (`creating vignettes ... OK`)
+
+## Bounded Kernel Contract Coverage Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Added focused bounded-kernel regression contracts to lock already-implemented behavior in the R/C pipeline:
+   - `tests/testthat/test-bounded-kernel-contract.R`
+2. New contracts cover:
+   - `ckerbound='none'` parity with `ckerbound='fixed'` + `(-Inf, Inf)`,
+   - scalar-vs-vector bound recycling in multivariate continuous settings,
+   - invalid fixed bounds diagnostics (`lower < upper`, training support coverage violations),
+   - finite-bound incompatibility with non-fixed `bwtype`,
+   - eval-data support violations caught before native execution with offending variable labels.
+3. Validation:
+   - bounded contracts:
+     - `/tmp/np_master_bounded_contract_tests_20260224.log` (`RC:0`)
+   - verified issue repro sweep:
+     - `/tmp/np_issue_notes_repros_bounded_contract_20260224.log` (`RC:0`)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_112201.log`
+4. Scope note:
+   - this checkpoint hardens regression coverage; bounded-kernel native convolution/CV completion items in `issue_notes/bounded_kernel_todo.md` remain active.
