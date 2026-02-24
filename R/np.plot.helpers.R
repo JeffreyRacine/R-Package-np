@@ -104,6 +104,47 @@
   out
 }
 
+.np_plot_inid_fastpath_enabled <- function() {
+  !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
+}
+
+.np_inid_counts_matrix <- function(n, B, counts = NULL) {
+  n <- as.integer(n)
+  B <- as.integer(B)
+  if (n < 1L || B < 1L)
+    stop("invalid inid bootstrap dimensions")
+
+  if (!is.null(counts)) {
+    counts <- as.matrix(counts)
+    if (!is.numeric(counts) ||
+        nrow(counts) != n ||
+        ncol(counts) != B)
+      stop("counts must be an n x B numeric matrix")
+    return(counts)
+  }
+
+  stats::rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+}
+
+.np_inid_lc_boot_from_hat <- function(H, ydat, B, counts = NULL) {
+  H <- as.matrix(H)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+  n <- length(ydat)
+  if (ncol(H) != n)
+    stop("hat matrix columns must match length of ydat")
+
+  counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  W <- t(H)
+  Wy <- W * ydat
+  den <- crossprod(counts.mat, W)
+  num <- crossprod(counts.mat, Wy)
+  list(
+    t = num / pmax(den, .Machine$double.eps),
+    t0 = as.vector(H %*% ydat)
+  )
+}
+
 gen.label = function(label, altlabel){
   paste(if (is.null(label)) altlabel else label)
 }
@@ -502,6 +543,14 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    H.fast <- NULL
+    fast.inid.lc <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      isTRUE(plot.errors.boot.method == "inid") &&
+      isTRUE(!gradients) &&
+      isTRUE(identical(bws$regtype, "lc")) &&
+      isTRUE(identical(bws$type, "fixed")) &&
+      isTRUE(is.numeric(ydat))
+
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
     is.wild.hat <- plot.errors.boot.method == "wild-hat"
@@ -515,7 +564,23 @@ compute.bootstrap.errors.rbandwidth =
       }
     }
 
-    if (is.wild.hat) {
+    if (fast.inid.lc) {
+      H.fast <- tryCatch(suppressWarnings(npreghat(
+        bws = bws,
+        txdat = xdat,
+        exdat = exdat,
+        output = "matrix"
+      )), error = function(e) NULL)
+      fast.inid.lc <- is.matrix(H.fast) && ncol(H.fast) == length(ydat)
+    }
+
+    if (fast.inid.lc) {
+      boot.out <- .np_inid_lc_boot_from_hat(
+        H = H.fast,
+        ydat = ydat,
+        B = plot.errors.boot.num
+      )
+    } else if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))

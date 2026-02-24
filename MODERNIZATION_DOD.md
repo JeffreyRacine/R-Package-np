@@ -1048,3 +1048,31 @@ Completed in `np-master`:
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_20260224_plothelpers_anyna.log` (all verified repros passed)
      - run artifact: `/tmp/np_issue_notes_repros_20260224_071545.log`
+
+## `npreg` Plot Bootstrap `inid` Fixed-`lc` Fast Path (Counts-Weighted Hat Operator) (2026-02-24)
+Completed in `np-master`:
+1. Added a semantics-preserving `inid` bootstrap fast path for `compute.bootstrap.errors.rbandwidth` when:
+   - `plot.errors.boot.method == "inid"`,
+   - `regtype == "lc"`,
+   - fixed bandwidth (`type == "fixed"`),
+   - `gradients == FALSE`.
+2. Implementation:
+   - build `H <- npreghat(..., output="matrix")` once,
+   - draw multinomial resample count matrix `C` (`n x B`),
+   - compute all bootstrap means by matrix algebra (`crossprod(C, t(H)*y)` / `crossprod(C, t(H))`),
+   - keep legacy fallback if `npreghat` build fails or shape checks fail.
+3. Scope:
+   - `R/np.plot.helpers.R`
+   - `tests/testthat/test-plot-bootstrap-inid-fastpath.R`
+4. Validation:
+   - direct parity probe (`H`+counts vs explicit resample/refit):
+     - `/tmp/npfast_np_validate.out`
+     - `NP_FAST_MAX_ABS=8.881784e-16`
+     - `NP_FAST_T0_MAX_ABS=0e+00`
+   - targeted contract tests:
+     - `/tmp/np_test_fastinid_contract_20260224.log` (`FAIL 0`)
+   - issue-note regression sweep:
+     - `/tmp/np_issue_notes_repros_fastinid_20260224_080637.log` (`all verified repros passed`)
+5. Notes:
+   - fast path is feature-flagged via option `np.plot.inid.fastpath.disable` for safe rollback/testing.
+   - this slice is limited to test-locked fixed-bandwidth `lc` semantics.
