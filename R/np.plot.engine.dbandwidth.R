@@ -354,14 +354,14 @@
 
       ev = xdat[1,,drop = FALSE]
 
-      for (i in 1:bws$ndim)
+      for (i in seq_len(bws$ndim))
         ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
 
       maxneval = max(c(sapply(xdat,nlevels),neval))
 
       exdat = xdat[rep(1, maxneval), , drop = FALSE]
 
-      for (i in 1:bws$ndim)
+      for (i in seq_len(bws$ndim))
         exdat[,i] = ev[1,i]
       
       if (common.scale){
@@ -385,7 +385,7 @@
 
       ## density / distribution expressions
 
-      for (i in 1:bws$ndim){
+      for (i in seq_len(bws$ndim)){
         temp.err[,] = NA
         temp.dens[] =  NA
         temp.boot = list()
@@ -528,12 +528,12 @@
       }
       
       if (common.scale && (plot.behavior != "data")){
-        jj = 1:bws$ndim*3
+        jj = seq_len(bws$ndim)*3
 
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
-          for (k in 1:bws$ndim) {
+          for (k in seq_len(bws$ndim)) {
             if (is.null(data.err.all[[k]])) next
             nkeep.k <- nrow(data.err.all[[k]]$pointwise)
             center.k <- if (plot.errors.center == "estimate")
@@ -572,7 +572,7 @@
           y.max = ylim[2]
         }
         
-        for (i in 1:bws$ndim){
+        for (i in seq_len(bws$ndim)){
           xi.factor = is.factor(xdat[,i])
 
           ## plot evaluation
@@ -641,7 +641,7 @@
         par(mfrow=c(1,1),cex=par()$cex)
 
       if (plot.behavior != "plot"){
-        names(plot.out) = paste("d",1:bws$ndim,sep="")
+        names(plot.out) = paste("d",seq_len(bws$ndim),sep="")
         return (plot.out)
       }
     }

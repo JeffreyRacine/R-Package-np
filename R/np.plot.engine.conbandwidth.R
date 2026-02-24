@@ -447,10 +447,10 @@
       x.ev = xdat[1,,drop = FALSE]
       y.ev = ydat[1,,drop = FALSE]
 
-      for (i in 1:bws$xndim)
+      for (i in seq_len(bws$xndim))
         x.ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
 
-      for (i in 1:bws$yndim)
+      for (i in seq_len(bws$yndim))
         y.ev[1,i] = uocquantile(ydat[,i], prob=yq[i])
 
 
@@ -459,10 +459,10 @@
       exdat = xdat[rep(1, maxneval), , drop = FALSE]
       eydat = as.data.frame(matrix(data = 0, nrow = maxneval, ncol = bws$yndim))
 
-      for (i in 1:bws$xndim)
+      for (i in seq_len(bws$xndim))
         exdat[,i] = x.ev[1,i]
 
-      for (i in 1:bws$yndim)
+      for (i in seq_len(bws$yndim))
         eydat[,i] = y.ev[1,i]
 
       if (common.scale){
@@ -493,7 +493,7 @@
       plot.index = 0
       xOrY = "x"
 
-      for (i in 1:bws$xndim){
+      for (i in seq_len(bws$xndim)){
         plot.index = plot.index + 1
         temp.err[,] = NA
         temp.dens[] =  NA
@@ -558,7 +558,7 @@
           plot.out[[plot.index]] = tobj
         }
 
-        for (j in 1:dsf){
+        for (j in seq_len(dsf)){
           temp.boot = list()
           temp.all.err <- NULL
           temp.dens[1:xi.neval] <- eval.extract(tobj, j)
@@ -685,7 +685,7 @@
 
       if (!quantreg){
         xOrY = "y"
-        for (i in 1:bws$yndim){
+        for (i in seq_len(bws$yndim)){
           plot.index = plot.index + 1
           temp.err[,] = NA
           temp.dens[] =  NA
@@ -749,7 +749,7 @@
             plot.out[[plot.index]] = tobj
           }
 
-          for (j in 1:dsf){
+          for (j in seq_len(dsf)){
             temp.boot = list()
             temp.all.err <- NULL
             temp.dens[1:xi.neval] <- eval.extract(tobj, j)
@@ -879,7 +879,7 @@
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
-          for (k in 1:(tot.dim*dsf)) {
+          for (k in seq_len(tot.dim*dsf)) {
             if (is.null(data.err.all[[k]])) next
             nkeep.k <- nrow(data.err.all[[k]]$pointwise)
             if (nkeep.k == 0) next
@@ -917,7 +917,7 @@
         
         xOrY = "x"
         
-        for (plot.index in 1:tot.dim){
+        for (plot.index in seq_len(tot.dim)){
           i = if (plot.index <= bws$xndim) plot.index else plot.index - bws$xndim
 
           if (plot.index > bws$xndim)
@@ -925,7 +925,7 @@
             
           xi.factor = all.isFactor[plot.index]
 
-          for (j in 1:dsf){
+          for (j in seq_len(dsf)){
             ## plot evaluation
             idx <- (plot.index-1)*dsf+j
             plot.fun <- if (xi.factor) {
@@ -992,7 +992,7 @@
         par(mfrow=c(1,1),cex=par()$cex)
 
       if (plot.behavior != "plot"){
-        names(plot.out) = paste("cd", 1:tot.dim, sep="")
+        names(plot.out) = paste("cd", seq_len(tot.dim), sep="")
         return (plot.out)
       }
     }
