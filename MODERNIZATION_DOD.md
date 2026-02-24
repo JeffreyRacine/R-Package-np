@@ -686,3 +686,6 @@ Completed in `np-npRmpi`:
      - `testthat::test_local(filter='semihat|npreghat|plot|npindex|npplreg|npscoef', reporter='summary')` (`RC:0`)
    - issue-note repro sweep (MPI env pinned):
      - `/tmp/nprmpi_issue_notes_repros_20260224_034151.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_posthyg3_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_posthyg3_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
