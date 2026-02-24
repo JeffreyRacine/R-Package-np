@@ -1111,3 +1111,23 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_uniden_na_guard_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_uniden_na_guard_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## GLP Validator Typing/NA Contract Hardening (2026-02-24)
+Completed in `np-npRmpi`:
+1. Hardened GLP validation helpers to reject non-numeric and missing derivative/degree vectors deterministically before numeric comparisons.
+2. Scope:
+   - `R/util.R`
+   - `tests/testthat/test-glp-validator-contract.R`
+3. Commit:
+   - `np-npRmpi`: `990dbc5`
+4. Validation:
+   - parse gate:
+     - `/tmp/nprmpi_glp_validator_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `/tmp/nprmpi_glp_validator_tests_20260224.log` (`FAIL 0`, `PASS 32`)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_glp_validator.log` (all verified repros passed)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_065332.log`
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_glp_validator_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_glp_validator_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
