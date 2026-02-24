@@ -36,7 +36,9 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 2. Recent completed slices include:
    - GLP validator and `dim_basis` integer-like contract hardening,
    - deterministic NA/range guard hardening in core interfaces,
-   - `uocquantile` helper NA-guard micro-modernization.
+   - `uocquantile` helper NA-guard micro-modernization,
+   - bounded-kernel contract coverage hardening (invalid bounds/support/eval/parity),
+   - predict `newdata` alias fixes for non-formula objects in core estimator families.
 3. Remaining highest-priority work:
    - bounded-kernel/convolution native-path completion and validation (`issue_notes/bounded_kernel_todo.md`),
    - full performance-governance artifacts for performance-sensitive native patches,
