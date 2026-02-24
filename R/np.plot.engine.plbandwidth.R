@@ -360,10 +360,10 @@
       x.ev = xdat[1,,drop = FALSE]
       z.ev = zdat[1,,drop = FALSE]
 
-      for (i in 1:bws$xndim)
+      for (i in seq_len(bws$xndim))
         x.ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
 
-      for (i in 1:bws$zndim)
+      for (i in seq_len(bws$zndim))
         z.ev[1,i] = uocquantile(zdat[,i], prob=zq[i])
 
 
@@ -373,10 +373,10 @@
       exdat = xdat[rep(1, maxneval), , drop = FALSE]
       ezdat = zdat[rep(1, maxneval), , drop = FALSE]
 
-      for (i in 1:bws$xndim)
+      for (i in seq_len(bws$xndim))
         exdat[,i] = x.ev[1,i]
 
-      for (i in 1:bws$zndim)
+      for (i in seq_len(bws$zndim))
         ezdat[,i] = z.ev[1,i]
 
       if (common.scale){
@@ -409,7 +409,7 @@
       plot.index = 0
       xOrZ = "x"
 
-      for (i in 1:bws$xndim){
+      for (i in seq_len(bws$xndim)){
         plot.index = plot.index + 1
         temp.err[,] = NA
         temp.mean[] =  NA
@@ -571,7 +571,7 @@
       }
 
       xOrZ = "z"
-      for (i in 1:bws$zndim){
+      for (i in seq_len(bws$zndim)){
         plot.index = plot.index + 1
         temp.err[,] = NA
         temp.mean[] =  NA
@@ -737,7 +737,7 @@
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
-          for (k in 1:(bws$xndim + bws$zndim)) {
+          for (k in seq_len(bws$xndim + bws$zndim)) {
             if (is.null(data.err.all[[k]])) next
             nkeep.k <- nrow(data.err.all[[k]]$pointwise)
             if (nkeep.k == 0) next
@@ -754,7 +754,7 @@
             y.max <- max(na.omit(as.double(data.eval)))
           }
         } else {
-          jj = 1:(bws$xndim + bws$zndim)*3
+          jj = seq_len(bws$xndim + bws$zndim)*3
           if (plot.errors.center == "estimate" || !plot.errors) {
             y.max = max(na.omit(as.double(data.eval)) +
               if (plot.errors) na.omit(as.double(data.err[,jj-1]))
