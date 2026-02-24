@@ -227,6 +227,12 @@
       if (plot.behavior != "plot") {
         plot.out[1] = NA
         plot.out[[1]] = tobj
+        if (plot.errors) {
+          plot.out[[1]]$merr <- cbind(-temp.err[,1], temp.err[,2])
+          if (plot.errors.center == "bias-corrected") {
+            plot.out[[1]]$bias <- temp.err[,3] - temp.mean
+          }
+        }
       }
 
     } else {
@@ -267,7 +273,7 @@
         }
 
 
-        for (i in 1:ncol(xdat)){
+        for (i in seq_len(ncol(xdat))) {
           if (plot.behavior != "data"){
 
             if (is.null(ylim)) {
@@ -369,7 +375,7 @@
       par(mfrow=c(1,1),cex=par()$cex)
     
     if (plot.behavior != "plot"){
-      names(plot.out) = paste(if (gradients) "si.grad" else "si", 1:length(plot.out), sep = "")
+      names(plot.out) = paste(if (gradients) "si.grad" else "si", seq_along(plot.out), sep = "")
       
       return (plot.out)
     }

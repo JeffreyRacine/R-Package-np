@@ -381,23 +381,23 @@
       
       x.ev = xdat[1,,drop = FALSE]
 
-      for (i in 1:bws$xndim)
+      for (i in seq_len(bws$xndim))
         x.ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
 
       exdat = xdat[rep(1, maxneval), , drop = FALSE]
 
-      for (i in 1:bws$xndim)
+      for (i in seq_len(bws$xndim))
         exdat[,i] = x.ev[1,i]
 
       if (!miss.z){
         z.ev = zdat[1,,drop = FALSE]
         
-        for (i in 1:bws$zndim)
+        for (i in seq_len(bws$zndim))
           z.ev[1,i] = uocquantile(zdat[,i], prob=zq[i])
 
         ezdat = zdat[rep(1, maxneval), , drop = FALSE]
 
-        for (i in 1:bws$zndim)
+        for (i in seq_len(bws$zndim))
           ezdat[,i] = z.ev[1,i]
 
       }
@@ -445,7 +445,7 @@
       plot.index = 0
       xOrZ = "x"
 
-      for (i in 1:bws$xndim){
+      for (i in seq_len(bws$xndim)){
         plot.index = plot.index + 1
         temp.err[,] = NA
         temp.mean[] =  NA
@@ -617,7 +617,7 @@
 
       if (!miss.z){
         xOrZ = "z"
-        for (i in 1:bws$zndim){
+        for (i in seq_len(bws$zndim)){
           plot.index = plot.index + 1
           temp.err[,] = NA
           temp.mean[] =  NA
@@ -784,18 +784,18 @@
       }
       
       if (common.scale && (plot.behavior != "data")){
-        jj = 1:(bws$xndim + bws$zndim)*3
+        jj = seq_len(bws$xndim + bws$zndim)*3
         
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
-          for (k in 1:(bws$xndim + bws$zndim)) {
+          for (k in seq_len(bws$xndim + bws$zndim)) {
             if (is.null(data.err.all[[k]])) next
             nkeep.k <- nrow(data.err.all[[k]]$pointwise)
             center.k <- if (plot.errors.center == "estimate")
-              data.eval[1:nkeep.k,k]
+              data.eval[seq_len(nkeep.k),k]
             else
-              data.err[1:nkeep.k,3*k]
+              data.err[seq_len(nkeep.k),3*k]
             range.k <- compute.all.error.range(center.k, data.err.all[[k]])
             y.min <- min(y.min, range.k[1], na.rm = TRUE)
             y.max <- max(y.max, range.k[2], na.rm = TRUE)

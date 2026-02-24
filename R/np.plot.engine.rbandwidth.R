@@ -393,14 +393,14 @@
 
       ev = xdat[1,,drop = FALSE]
 
-      for (i in 1:bws$ndim)
+      for (i in seq_len(bws$ndim))
         ev[1,i] = uocquantile(xdat[,i], prob=xq[i])
 
       maxneval = max(c(sapply(xdat,nlevels),neval))
 
       exdat = xdat[rep(1, maxneval), , drop = FALSE]
 
-      for (i in 1:bws$ndim)
+      for (i in seq_len(bws$ndim))
         exdat[,i] = ev[1,i]
       
       if (common.scale){
@@ -423,7 +423,7 @@
       plotOnEstimate = (plot.errors.center == "estimate")
 
 
-      for (i in 1:bws$ndim){
+      for (i in seq_len(bws$ndim)){
         temp.err[,] = NA
         temp.mean[] =  NA
         temp.boot = list()
@@ -597,18 +597,18 @@
       }
       
       if (common.scale && (plot.behavior != "data")){
-        jj = 1:bws$ndim*3
+        jj = seq_len(bws$ndim)*3
 
         if (plot.errors && plot.errors.type == "all") {
           y.min <- Inf
           y.max <- -Inf
-          for (k in 1:bws$ndim) {
+          for (k in seq_len(bws$ndim)) {
             if (is.null(data.err.all[[k]])) next
             nkeep.k <- nrow(data.err.all[[k]]$pointwise)
             center.k <- if (plot.errors.center == "estimate")
-              data.eval[1:nkeep.k,k]
+              data.eval[seq_len(nkeep.k),k]
             else
-              data.err[1:nkeep.k,3*k]
+              data.err[seq_len(nkeep.k),3*k]
             range.k <- compute.all.error.range(center.k, data.err.all[[k]])
             y.min <- min(y.min, range.k[1], na.rm = TRUE)
             y.max <- max(y.max, range.k[2], na.rm = TRUE)
@@ -641,7 +641,7 @@
           y.max = ylim[2]
         }
         
-        for (i in 1:bws$ndim){
+        for (i in seq_len(bws$ndim)){
           xi.factor = is.factor(xdat[,i])
 
           ## plot evaluation
@@ -714,9 +714,9 @@
       if (plot.behavior != "plot"){
         names(plot.out) =
           if (gradients)
-            paste("rg",1:bws$ndim,sep="")
+            paste("rg",seq_len(bws$ndim),sep="")
           else
-            paste("r",1:bws$ndim,sep="")
+            paste("r",seq_len(bws$ndim),sep="")
         
         return (plot.out)
       }

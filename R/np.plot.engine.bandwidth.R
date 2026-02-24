@@ -533,9 +533,9 @@
             if (is.null(data.err.all[[k]])) next
             nkeep.k <- nrow(data.err.all[[k]]$pointwise)
             center.k <- if (plot.errors.center == "estimate")
-              data.eval[1:nkeep.k,k]
+              data.eval[seq_len(nkeep.k),k]
             else
-              data.err[1:nkeep.k,3*k]
+              data.err[seq_len(nkeep.k),3*k]
             range.k <- compute.all.error.range(center.k, data.err.all[[k]])
             y.min <- min(y.min, range.k[1], na.rm = TRUE)
             y.max <- max(y.max, range.k[2], na.rm = TRUE)

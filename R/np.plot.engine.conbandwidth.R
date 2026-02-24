@@ -896,7 +896,7 @@
             y.max <- max(na.omit(as.double(data.eval)))
           }
         } else {
-          jj = 1:(dsf*tot.dim)*3
+          jj = seq_len(dsf*tot.dim)*3
           if (plot.errors.center == "estimate" || !plot.errors) {
             y.max = max(na.omit(as.double(data.eval)) +
               if (plot.errors) na.omit(as.double(data.err[,jj-1]))
