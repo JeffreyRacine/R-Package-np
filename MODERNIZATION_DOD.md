@@ -1152,3 +1152,18 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_dimbasis_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_dimbasis_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Session Routing Contract Extension (Default-Quiet `npcdens`) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Added a subprocess regression contract for user-style session initialization with default `npRmpi.init(nslaves=1)` (no explicit `quiet=`), followed by `npcdens` + `plot`.
+2. This locks the exact class of session hang regression seen when examples are run interactively without an explicit `quiet` argument.
+3. Scope:
+   - `tests/testthat/test-session-routing-subprocess-contract.R`
+4. Commit:
+   - `np-npRmpi`: `4ec0b8c`
+5. Validation:
+   - focused contracts (`NOT_CRAN=true`, MPI env pinned):
+     - `/tmp/nprmpi_session_routing_contract_tests_20260224b.log` (`RC:0`)
+   - issue-note repro sweep (post-change):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_defaultquiet_contract.log` (all verified repros passed)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_071246.log`
