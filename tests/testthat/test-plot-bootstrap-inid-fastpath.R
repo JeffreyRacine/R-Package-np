@@ -111,12 +111,11 @@ test_that("npindex inid fast path matches explicit resample refits", {
   y <- sin(x1 + x2) + rnorm(n, sd = 0.1)
   tx <- data.frame(x1 = x1, x2 = x2)
   bw <- npindexbw(xdat = tx, ydat = y, method = "ichimura", nmulti = 1)
-
-  H <- npindexhat(bws = bw, txdat = tx, exdat = tx, output = "matrix", s = 0L)
   B <- 11L
   counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
 
   fast.fun <- getFromNamespace(".np_inid_lc_boot_from_hat", "np")
+  H <- npindexhat(bws = bw, txdat = tx, exdat = tx, output = "matrix", s = 0L)
   fast.out <- fast.fun(H = H, ydat = y, B = B, counts = counts)
 
   explicit.t <- matrix(NA_real_, nrow = B, ncol = n)
@@ -133,6 +132,53 @@ test_that("npindex inid fast path matches explicit resample refits", {
 
   expect_equal(fast.out$t, explicit.t, tolerance = 1e-10)
   expect_equal(fast.out$t0, as.vector(H %*% y), tolerance = 1e-12)
+})
+
+test_that("npindex plot bootstrap inid supports ll/lp basis variants", {
+  skip_if_not_installed("np")
+
+  set.seed(3232)
+  n <- 70
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.1)
+  tx <- data.frame(x1 = x1, x2 = x2)
+
+  cfgs <- list(
+    list(regtype = "ll", basis = NULL, label = "ll"),
+    list(regtype = "lp", basis = "glp", label = "lp-glp"),
+    list(regtype = "lp", basis = "additive", label = "lp-additive"),
+    list(regtype = "lp", basis = "tensor", label = "lp-tensor")
+  )
+
+  for (cfg in cfgs) {
+    bw.args <- list(
+      xdat = tx,
+      ydat = y,
+      bws = c(1, 1, 0.25),
+      bandwidth.compute = FALSE,
+      regtype = cfg$regtype
+    )
+    if (!is.null(cfg$basis)) {
+      bw.args$basis <- cfg$basis
+      bw.args$degree <- 2L
+    }
+    bw <- do.call(npindexbw, bw.args)
+    out <- suppressWarnings(
+      plot(
+        bw,
+        xdat = tx,
+        ydat = y,
+        plot.behavior = "data",
+        perspective = FALSE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "inid",
+        plot.errors.boot.num = 7
+      )
+    )
+    expect_type(out, "list")
+    expect_true(length(out) > 0, info = cfg$label)
+  }
 })
 
 test_that("inid lc chunked generation matches explicit chunked draws", {
