@@ -1357,3 +1357,16 @@ Completed in `np-master`:
 4. Regression note:
    - an intermediate mechanical rewrite incorrectly produced `seq_len(bws + bws)` in `sc/pl` plot label/loop paths,
    - this was caught by `test-semihat.R` and corrected in the same checkpoint before commit.
+
+## Bounded `cv.ls` Convolution Contract Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Added explicit bounded-kernel `cv.ls` contracts to lock convolution-path stability under finite bounds for gaussian order 2 and 4:
+   - unconditional density (`npudensbw`)
+   - conditional density (`npcdensbw`)
+2. Scope:
+   - `tests/testthat/test-bounded-kernel-cvls-contract.R`
+3. Validation:
+   - targeted bounded test filters:
+     - `/tmp/np_master_bounded_cvls_contract_20260224.log` (`FAIL 0`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_bounded_cvls_contract_20260224.log` (`RC:0`)
