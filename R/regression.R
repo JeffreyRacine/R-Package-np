@@ -117,7 +117,15 @@ gradients.npregression <- function(x, errors = FALSE, gradient.order = NULL, ...
   gout.masked
 }
 predict.npregression <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npreg, c(list(bws = object$bws), list(...)))
+  dots <- list(...)
+  has.formula.route <- !is.null(object$bws$formula)
+
+  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+    dots$exdat <- dots$newdata
+    dots$newdata <- NULL
+  }
+
+  tr <- do.call(npreg, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

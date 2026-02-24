@@ -65,7 +65,15 @@ fitted.npdistribution <- function(object, ...){
 se.npdistribution <- function(x){ x$derr }
 
 predict.npdistribution <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npudist, c(list(bws = object$bws), list(...)))
+  dots <- list(...)
+  has.formula.route <- !is.null(object$bws$formula)
+
+  if (!has.formula.route && is.null(dots$edat) && !is.null(dots$newdata)) {
+    dots$edat <- dots$newdata
+    dots$newdata <- NULL
+  }
+
+  tr <- do.call(npudist, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs))

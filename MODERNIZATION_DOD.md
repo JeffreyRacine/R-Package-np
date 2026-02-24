@@ -1381,3 +1381,23 @@ Completed in `np-npRmpi`:
      - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_112201.log`
 4. Scope note:
    - this is coverage hardening for bounded behavior already in code; remaining native bounded-convolution/CV completion items remain tracked in `issue_notes/bounded_kernel_todo.md`.
+
+## Predict `newdata` Alias Contract Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Fixed non-formula predict routing so `newdata` is correctly mapped into native eval args in core estimator classes.
+2. Updated predict methods:
+   - `predict.npregression`: `newdata -> exdat`
+   - `predict.npdensity`: `newdata -> edat`
+   - `predict.npdistribution`: `newdata -> edat`
+   - `predict.condensity`: `newdata -> (eydat, exdat)` via `(ynames, xnames)` mapping
+   - `predict.condistribution`: `newdata -> (eydat, exdat)` via `(ynames, xnames)` mapping
+3. Added mirror contracts:
+   - `tests/testthat/test-predict-newdata-contract.R`
+4. Validation:
+   - install artifact:
+     - `/tmp/nprmpi_install_predfix_20260224.log` (`RC:0`)
+   - MPI session smoke (`npRmpi.init(nslaves=1)`) covering all five patched predict routes:
+     - `/tmp/nprmpi_predfix_session_smoke_20260224.out` (`NPRMPI_PRED_NEWDATA_OK`)
+   - verified issue repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_predfix_20260224.log` (`RC:0`)
+     - run artifact: `/tmp/nprmpi_issue_notes_repros_20260224_113055.log`

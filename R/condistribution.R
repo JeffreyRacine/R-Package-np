@@ -90,7 +90,26 @@ gradients.condistribution <- function(x, errors = FALSE, ...) {
 }
 
 predict.condistribution <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npcdist, c(list(bws = object$bws), list(...)))
+  dots <- list(...)
+  has.formula.route <- !is.null(object$bws$formula)
+
+  if (!has.formula.route &&
+      is.null(dots$exdat) &&
+      is.null(dots$eydat) &&
+      !is.null(dots$newdata)) {
+    nd <- toFrame(dots$newdata)
+    req <- c(object$ynames, object$xnames)
+    miss <- setdiff(req, names(nd))
+    if (length(miss) > 0L) {
+      stop(sprintf("'newdata' must include columns %s, or supply both 'exdat' and 'eydat'.",
+                   paste(shQuote(req), collapse = ", ")))
+    }
+    dots$eydat <- nd[, object$ynames, drop = FALSE]
+    dots$exdat <- nd[, object$xnames, drop = FALSE]
+    dots$newdata <- NULL
+  }
+
+  tr <- do.call(npcdist, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs))
