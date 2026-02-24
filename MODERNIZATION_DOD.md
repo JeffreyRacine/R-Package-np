@@ -546,3 +546,17 @@ Completed in `np-master`:
      - `testthat::test_local(filter='utils|npcopula|npudist|npuniden', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_20260224_033540.log` (all verified repros passed)
+
+## Univariate Density Loop-Index Hygiene Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced residual `1:length(...)` / `1:n...` loop/index patterns in univariate boundary/shape-constrained density helpers with `seq_along(...)` / `seq_len(...)`.
+2. Scope:
+   - `R/npuniden.boundary.R`
+   - `R/npuniden.sc.R`
+3. Commit:
+   - `np-master`: `f2ec364`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='npuniden|utils', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_033821.log` (all verified repros passed)
