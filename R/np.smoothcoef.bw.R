@@ -153,6 +153,7 @@ npscoefbw.scbandwidth <-
     if (missing(nmulti)){
       nmulti <- min(5,length(bws$bw))
     }
+    regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
     cv.iterate <- npValidateScalarLogical(cv.iterate, "cv.iterate")
     backfit.iterate <- npValidateScalarLogical(backfit.iterate, "backfit.iterate")
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
@@ -165,6 +166,10 @@ npscoefbw.scbandwidth <-
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
     if (cv.iterate)
       cv.num.iterations <- npValidatePositiveInteger(cv.num.iterations, "cv.num.iterations")
+    if (!identical(regtype, "lc") && cv.iterate) {
+      warning("cv.iterate currently supports regtype='lc' for npscoefbw; using cv.iterate=FALSE")
+      cv.iterate <- FALSE
+    }
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
@@ -258,6 +263,14 @@ npscoefbw.scbandwidth <-
         bw.scale.multiplier[bws$icon] <- nconfac * bws$sdev[icon.cumsum[bws$icon]]
       }
     }
+    apply_bw_to_scbw <- function(scbw, param) {
+      scbw$bw <- param
+      if (scbw$scaling)
+        scbw$bandwidth[[1]] <- scbw$bw * bw.scale.multiplier
+      else
+        scbw$bandwidth[[1]] <- scbw$bw
+      scbw
+    }
 
     total.time <-
       system.time({
@@ -266,47 +279,54 @@ npscoefbw.scbandwidth <-
           cv_state <- new.env(parent = emptyenv())
           cv_state$console <- NULL
           overall.cv.ls <- function(param) {
-            sbw <- bws
-            sbw$bw <- param
-            sbw$bandwidth[[1]] <- param
+            sbw <- apply_bw_to_scbw(bws, param)
             if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
-            
-            bws$bw <- param
-
-            if (bws$scaling)
-              bws$bandwidth[[1]] <- bws$bw * bw.scale.multiplier
-            else
-              bws$bandwidth[[1]] <- bws$bw
-            
-            
-            tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = bws,
-                          leave.one.out = TRUE)$ksum
 
             mean.loo <- rep(maxPenalty,n)
-            epsilon <- 1.0/n
-            ridge <- double(n)
-            doridge <- !logical(n)
+            if (identical(regtype, "lc")) {
+              tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
+                            leave.one.out = TRUE)$ksum
 
-            nc <- ncol(tww[-1,-1,1])
+              epsilon <- 1.0/n
+              ridge <- double(n)
+              doridge <- !logical(n)
 
-            while(any(doridge)){
-              iloo <- seq_len(n)[doridge]
-              for (ii in iloo) {
-                doridge[ii] <- FALSE
-                ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
-                beta.ii <- tryCatch(
-                  solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
-                        tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
-                  error = function(e) e
-                )
-                if (inherits(beta.ii, "error")) {
-                  ridge[ii] <- ridge[ii] + epsilon
-                  doridge[ii] <- TRUE
-                  beta.ii <- rep(maxPenalty, nc)
+              nc <- ncol(tww[-1,-1,1])
+
+              while(any(doridge)){
+                iloo <- seq_len(n)[doridge]
+                for (ii in iloo) {
+                  doridge[ii] <- FALSE
+                  ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
+                  beta.ii <- tryCatch(
+                    solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
+                          tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
+                    error = function(e) e
+                  )
+                  if (inherits(beta.ii, "error")) {
+                    ridge[ii] <- ridge[ii] + epsilon
+                    doridge[ii] <- TRUE
+                    beta.ii <- rep(maxPenalty, nc)
+                  }
+                  mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
                 }
-                mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
               }
+            } else {
+              mean.loo.try <- tryCatch(
+                npscoefhat(
+                  bws = sbw,
+                  txdat = as.data.frame(xdat),
+                  tzdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
+                  y = ydat,
+                  output = "apply",
+                  leave.one.out = TRUE,
+                  iterate = FALSE
+                ),
+                error = function(e) e
+              )
+              if (!inherits(mean.loo.try, "error"))
+                mean.loo <- as.vector(mean.loo.try)
             }
 
             cv_state$console <- printClear(cv_state$console)
@@ -336,9 +356,7 @@ npscoefbw.scbandwidth <-
             scoef.loo.args$tzdat <- zdat
           
           partial.cv.ls <- function(param, partial.index) {
-            sbw <- bws
-            sbw$bw <- param
-            sbw$bandwidth[[1]] <- param
+            sbw <- apply_bw_to_scbw(bws, param)
 
             if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
@@ -348,21 +366,26 @@ npscoefbw.scbandwidth <-
               scoef.loo <- do.call(npscoef, scoef.loo.args)
               partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
             } else {
-              bws$bw <- param
+              if (identical(regtype, "lc")) {
+                tww <- npksum(txdat=zdat,
+                              tydat=cbind(partial.orig * W[,partial.index],W[,partial.index]^2),
+                              weights=cbind(partial.orig * W[,partial.index],1),
+                              bws=sbw,
+                              leave.one.out=TRUE)$ksum
 
-              if (bws$scaling)
-                bws$bandwidth[[1]] <- bws$bw * bw.scale.multiplier
-              else
-                bws$bandwidth[[1]] <- bws$bw
-
-              tww <- npksum(txdat=zdat,
-                            tydat=cbind(partial.orig * W[,partial.index],W[,partial.index]^2),
-                            weights=cbind(partial.orig * W[,partial.index],1),
-                            bws=bws,
-                            leave.one.out=TRUE)$ksum
-
-              partial.loo <- W[,partial.index]*tww[1,2,]/NZD(tww[2,2,])
-              
+                partial.loo <- W[,partial.index]*tww[1,2,]/NZD(tww[2,2,])
+              } else {
+                kw <- .npscoef_weight_matrix(
+                  bws = sbw,
+                  tzdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
+                  ezdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
+                  leave.one.out = TRUE
+                )
+                wj <- W[,partial.index]
+                num <- as.vector(crossprod(kw, partial.orig * wj))
+                den <- as.vector(crossprod(kw, wj * wj))
+                partial.loo <- wj * num / NZD(den)
+              }
             }
             
 
@@ -507,17 +530,26 @@ npscoefbw.scbandwidth <-
                   bws$bw <- bws$bw.fitted[,j]
                   ## estimate new beta.hats
 
-                  if (bws$scaling)
-                    bws$bandwidth[[1]] <- bws$bw * bw.scale.multiplier
-                  else
-                    bws$bandwidth[[1]] <- bws$bw
+                  bws <- apply_bw_to_scbw(bws, bws$bw)
 
-                  tww <- npksum(txdat=zdat,
-                                tydat=cbind(partial.orig * W[,j],W[,j]^2),
-                                weights=cbind(partial.orig * W[,j],1),
-                                bws=bws)$ksum
-                  
-                  scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
+                  if (identical(regtype, "lc")) {
+                    tww <- npksum(txdat=zdat,
+                                  tydat=cbind(partial.orig * W[,j],W[,j]^2),
+                                  weights=cbind(partial.orig * W[,j],1),
+                                  bws=bws)$ksum
+                    scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
+                  } else {
+                    kw <- .npscoef_weight_matrix(
+                      bws = bws,
+                      tzdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
+                      ezdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
+                      leave.one.out = FALSE
+                    )
+                    wj <- W[,j]
+                    num <- as.vector(crossprod(kw, partial.orig * wj))
+                    den <- as.vector(crossprod(kw, wj * wj))
+                    scoef$beta[,j] <- num / NZD(den)
+                  }
                   
                   bws$bw <- param.overall
                   ## estimate new full residuals 
@@ -578,6 +610,10 @@ npscoefbw.scbandwidth <-
     .np_seed_exit(seed.state)
     
     bws <- scbandwidth(bw = bws$bw,
+                       regtype = regtype,
+                       basis = if (is.null(bws$basis)) "glp" else bws$basis,
+                       degree = bws$degree,
+                       bernstein.basis = bws$bernstein.basis,
                        bwmethod = bws$method,
                        bwscaling = bws$scaling,
                        bwtype = bws$type,
@@ -624,6 +660,7 @@ npscoefbw.default <-
            backfit.tol,
            bandwidth.compute = TRUE,
            ## dummy arguments for scbandwidth()
+           regtype, basis, degree, bernstein.basis,
            bwmethod, bwscaling, bwtype,
            ckertype, ckerorder, ckerbound, ckerlb, ckerub,
            ukertype, okertype,
@@ -648,7 +685,8 @@ npscoefbw.default <-
     ## bandwidth call
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
+    margs <- c("regtype", "basis", "degree", "bernstein.basis",
+               "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
                "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype")
 
     m <- match(margs, mc.names, nomatch = 0)

@@ -1,5 +1,9 @@
 scbandwidth <-
   function(bw = stop("scbandwidth:argument 'bw' missing"),
+           regtype = c("lc","ll","lp"),
+           basis = c("glp","additive","tensor"),
+           degree = NULL,
+           bernstein.basis = FALSE,
            bwmethod = c("cv.ls", "manual"),
            bwscaling = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
@@ -33,6 +37,9 @@ scbandwidth <-
            ...){
 
   ndim = length(bw)
+  npRejectLegacyLpArgs(names(list(...)), where = "scbandwidth")
+  regtype = match.arg(regtype)
+  basis <- npValidateLpBasis(regtype = regtype, basis = basis)
   bwmethod = match.arg(bwmethod)
   bwtype = match.arg(bwtype)
   ckertype = match.arg(ckertype)
@@ -68,6 +75,22 @@ scbandwidth <-
     argprefix = "cker")
   if (bwtype != "fixed" && cbounds$bound != "none")
     stop("finite continuous kernel bounds require bwtype = \"fixed\"")
+  ncon <- sum(tdati$icon)
+  degree <- npValidateGlpDegree(regtype = regtype,
+                                degree = degree,
+                                ncon = ncon)
+  bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
+                                            bernstein.basis = bernstein.basis)
+  if (identical(regtype, "lp") && ncon > 0L && is.finite(nobs)) {
+    lp.dim <- dim_basis(basis = basis,
+                        kernel = TRUE,
+                        degree = degree,
+                        segments = rep.int(1L, ncon))
+    if (is.finite(lp.dim) && lp.dim > (nobs - 1.0))
+      stop(sprintf("LP basis dimension (%s) exceeds nobs - 1 (%s); reduce degree",
+                   format(lp.dim, trim = TRUE, scientific = FALSE),
+                   format(nobs - 1.0, trim = TRUE, scientific = FALSE)))
+  }
 
   porder = switch( ckerorder/2, "Second-Order", "Fourth-Order", "Sixth-Order", "Eighth-Order" )
 
@@ -92,6 +115,14 @@ scbandwidth <-
   
   mybw = list(
     bw=bw,
+    regtype = regtype,
+    pregtype = switch(regtype,
+      lc = "Local-Constant",
+      ll = "Local-Linear",
+      lp = "Local-Polynomial"),
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
     method = bwmethod,
     pmethod = bwmToPrint(bwmethod),
     pomethod = switch(optim.method,
@@ -117,7 +148,7 @@ scbandwidth <-
     pokertype = oktToPrint(okertype),
     nobs = nobs,
     ndim = ndim,
-    ncon = sum(tdati$icon),
+    ncon = ncon,
     nuno = sum(tdati$iuno),
     nord = sum(tdati$iord),
     icon = tdati$icon,

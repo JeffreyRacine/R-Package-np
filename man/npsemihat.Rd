@@ -64,7 +64,9 @@ These operators are intended for fixed-\eqn{X} workflows such as one-shot wild
 bootstrap calculations where many response draws are projected through the same
 operator. The implementation is intentionally conservative: class and scalar
 argument contracts are validated explicitly, and unsupported iterative
-\code{npscoefhat()} paths fail fast.
+\code{npscoefhat()} paths fail fast. \code{npscoefhat()} inherits
+\code{regtype}/LP-basis controls from the supplied \code{scbandwidth}
+object.
 }
 \examples{
 \dontrun{

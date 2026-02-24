@@ -74,6 +74,65 @@ test_that("npscoefhat reproduces npscoef fitted values and supports matrix RHS",
   )))
 })
 
+test_that("npscoef and npscoefhat support ll/lp basis variants", {
+  set.seed(2469)
+  n <- 95
+  x <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + x) * sin(2 * pi * z) + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+  ex <- data.frame(x = seq(min(x), max(x), length.out = 32))
+  ez <- data.frame(z = seq(min(z), max(z), length.out = 32))
+
+  cfgs <- list(
+    list(regtype = "ll", basis = NULL, label = "ll"),
+    list(regtype = "lp", basis = "glp", label = "lp-glp"),
+    list(regtype = "lp", basis = "additive", label = "lp-additive"),
+    list(regtype = "lp", basis = "tensor", label = "lp-tensor")
+  )
+
+  for (cfg in cfgs) {
+    bw.args <- list(
+      xdat = x,
+      zdat = z,
+      ydat = y,
+      bws = 0.18,
+      bandwidth.compute = FALSE,
+      regtype = cfg$regtype
+    )
+    if (!is.null(cfg$basis)) {
+      bw.args$basis <- cfg$basis
+      bw.args$degree <- 2L
+    }
+    bw <- do.call(npscoefbw, bw.args)
+    expect_identical(bw$regtype, cfg$regtype, info = cfg$label)
+    if (!is.null(cfg$basis))
+      expect_identical(bw$basis, cfg$basis, info = cfg$label)
+
+    fit.eval <- npscoef(
+      bws = bw,
+      txdat = tx,
+      tydat = y,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez,
+      errors = FALSE,
+      iterate = FALSE
+    )
+    H.eval <- npscoefhat(
+      bws = bw,
+      txdat = tx,
+      tzdat = tz,
+      exdat = ex,
+      ezdat = ez,
+      output = "matrix",
+      iterate = FALSE
+    )
+    expect_equal(as.vector(H.eval %*% y), as.vector(fit.eval$mean), tolerance = 1e-8, info = cfg$label)
+  }
+})
+
 test_that("npplreghat reproduces npplreg fitted values and supports matrix RHS", {
   set.seed(97531)
   n <- 120
@@ -400,6 +459,43 @@ test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {
     tolerance = 0,
     check.attributes = FALSE
   )))
+
+  sc.cfgs <- list(
+    list(regtype = "ll", basis = NULL, label = "ll"),
+    list(regtype = "lp", basis = "glp", label = "lp-glp"),
+    list(regtype = "lp", basis = "additive", label = "lp-additive"),
+    list(regtype = "lp", basis = "tensor", label = "lp-tensor")
+  )
+  for (cfg in sc.cfgs) {
+    sc.args <- list(
+      xdat = x,
+      zdat = z,
+      ydat = y,
+      bws = 0.2,
+      bandwidth.compute = FALSE,
+      regtype = cfg$regtype
+    )
+    if (!is.null(cfg$basis)) {
+      sc.args$basis <- cfg$basis
+      sc.args$degree <- 2L
+    }
+    scbw.cfg <- do.call(npscoefbw, sc.args)
+    sc.out.cfg <- suppressWarnings(
+      plot(
+        scbw.cfg,
+        xdat = data.frame(x = x),
+        ydat = y,
+        zdat = data.frame(z = z),
+        perspective = FALSE,
+        plot.behavior = "data",
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "wild",
+        plot.errors.boot.num = 11
+      )
+    )
+    expect_type(sc.out.cfg, "list")
+    expect_true(length(sc.out.cfg) > 0, info = cfg$label)
+  }
 
   pl.cfgs <- list(
     list(regtype = "lc", basis = NULL, label = "lc"),
