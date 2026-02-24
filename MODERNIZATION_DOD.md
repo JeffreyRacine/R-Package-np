@@ -53,6 +53,31 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
    - performance-governance closure with fixed/varying seed comparisons for performance-sensitive changes,
    - win-builder closure before release candidate.
 
+## Native Guard + Harness Timeout Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Switched known-positive denominator guards from `NZD(...)` to `NZD_POS(...)` in hot native paths.
+2. Scope:
+   - `src/jksum.c`
+   - touched surfaces: kernel marginal denominators, ridge-adjusted `KWM[0][0]` correction terms, and all-large-h CV leave-one-out denominator guard (`1 - hii`).
+3. Hardened issue-note automation harnesses to prevent indefinite MPI hangs:
+   - added timeout wrappers (`timeout`/`gtimeout`/Perl alarm fallback),
+   - added interface fallback (`en0` -> `lo0`),
+   - added stray slave-daemon cleanup on failed attempts.
+4. Scope:
+   - `issue_notes/run_native_bridge_stress.sh`
+   - `issue_notes/run_verified_issue_repros.sh`
+5. Validation:
+   - bounded CV-LS contracts:
+     - `/tmp/nprmpi_bounded_cvls_contract_nzdpos_20260224.log`
+   - native bridge stress:
+     - `/tmp/nprmpi_native_bridge_stress_20260224_132406.log`
+   - verified issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_20260224_132500.log`
+   - shellcheck:
+     - `shellcheck issue_notes/run_native_bridge_stress.sh issue_notes/run_verified_issue_repros.sh`
+   - tarball build:
+     - `/tmp/nprmpi_build_nzdpos_20260224.log` (`creating vignettes ... OK`)
+
 ## Mandatory Release Gates
 
 ### 1) Interface and Semantics
