@@ -66,3 +66,23 @@ test_that("autodispatch keeps formula bws usable for condensity plot()", {
   expect_error(plot(fit, perspective = FALSE, plot.errors.method = "none"), NA)
   expect_false(grepl("\\.__npRmpi_autod_", paste(deparse(fit$bws$call), collapse = " ")))
 })
+
+test_that("autodispatch default condensity plot options stay scalar-safe", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(43)
+  n <- 100
+  x <- rnorm(n)
+  y <- rnorm(n)
+
+  bw <- npcdensbw(y ~ x, bws = c(1.0, 1.0), bandwidth.compute = FALSE)
+  fit <- npcdens(bws = bw)
+
+  pdf(file = tempfile(fileext = ".pdf"))
+  on.exit(dev.off(), add = TRUE)
+  expect_error(plot(fit, perspective = FALSE), NA)
+})

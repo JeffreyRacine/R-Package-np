@@ -31,12 +31,87 @@
   force(code)
 }
 
+.np_mammen_draws <- function(n, B) {
+  a <- (1 - sqrt(5)) / 2
+  p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
+  ifelse(
+    matrix(stats::runif(n * B), nrow = n, ncol = B) <= p.a,
+    a,
+    1 - a
+  )
+}
+
+.np_rademacher_draws <- function(n, B) {
+  ifelse(
+    matrix(stats::runif(n * B), nrow = n, ncol = B) <= 0.5,
+    -1.0,
+    1.0
+  )
+}
+
+.np_wild_draws <- function(n, B, wild = c("mammen", "rademacher")) {
+  if (length(wild) > 1L)
+    wild <- wild[1L]
+  wild <- match.arg(wild, c("mammen", "rademacher"))
+  if (identical(wild, "mammen")) {
+    return(.np_mammen_draws(n = n, B = B))
+  }
+  .np_rademacher_draws(n = n, B = B)
+}
+
+.np_wildhat_chunk_size <- function(n, B) {
+  chunk.opt <- getOption("np.plot.wildhat.chunk.size")
+  if (!is.null(chunk.opt)) {
+    chunk.opt <- as.integer(chunk.opt)
+    if (length(chunk.opt) != 1L || is.na(chunk.opt) || chunk.opt < 1L)
+      stop("option 'np.plot.wildhat.chunk.size' must be a positive integer")
+    return(min(B, chunk.opt))
+  }
+
+  if (n < 1L || B < 1L)
+    return(1L)
+
+  # Keep the temporary n x chunk response matrix in a moderate memory range.
+  target.bytes <- 64 * 1024 * 1024
+  chunk <- as.integer(floor(target.bytes / (8 * n)))
+  if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
+    chunk <- 1L
+  min(B, chunk)
+}
+
+.np_wildhat_boot_t <- function(H, fit.mean, residuals, B, wild = c("mammen", "rademacher")) {
+  B <- as.integer(B)
+  n <- length(residuals)
+  if (length(fit.mean) != n)
+    stop("length mismatch between fitted means and residuals for wild-hat bootstrap")
+  if (B < 1L)
+    stop("argument 'plot.errors.boot.num' must be a positive integer")
+
+  chunk.size <- .np_wildhat_chunk_size(n = n, B = B)
+  out <- matrix(NA_real_, nrow = B, ncol = nrow(H))
+  fit.mean <- as.double(fit.mean)
+  residuals <- as.double(residuals)
+
+  start <- 1L
+  while (start <= B) {
+    stopi <- min(B, start + chunk.size - 1L)
+    bsz <- stopi - start + 1L
+    draws <- .np_wild_draws(n = n, B = bsz, wild = wild)
+    ystar <- matrix(fit.mean, nrow = n, ncol = bsz) +
+      matrix(residuals, nrow = n, ncol = bsz) * draws
+    out[start:stopi, ] <- t(H %*% ystar)
+    start <- stopi + 1L
+  }
+
+  out
+}
+
 gen.label = function(label, altlabel){
-  paste(if (is.null(label)) altlabel else label)
+  paste(ifelse(is.null(label), altlabel, label))
 }
 
 gen.tflabel = function(condition, tlabel, flabel){
-  paste(if (condition) tlabel else flabel)
+  paste(ifelse(condition,tlabel,flabel))
 }
 
 draw.error.bands = function(ex, ely, ehy, lty = 2, col = par("col")){
@@ -70,9 +145,8 @@ draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, 
     yg = abs(yy[jj-2]-yy[jj-1])/golden
     htest = (hbardist >= yg)
     
-    hdelta = pmin(yg, hbardist)/2
-    xx[jj-2] = ex - hdelta
-    xx[jj-1] = ex + hdelta
+    xx[jj-2] = ex - ifelse(htest, yg/2, hbardist/2) 
+    xx[jj-1] = ex + ifelse(htest, yg/2, hbardist/2) 
     
     ty = yy[jj-1]
     yy[jj-1] = yy[jj-2]
@@ -334,6 +408,7 @@ compute.default.error.range <- function(center, err) {
 .np_plot_normalize_common_options <- function(plot.behavior,
                                              plot.errors.method,
                                              plot.errors.boot.method,
+                                             plot.errors.boot.wild = c("rademacher", "mammen"),
                                              plot.errors.boot.blocklen,
                                              plot.errors.center,
                                              plot.errors.type,
@@ -344,18 +419,47 @@ compute.default.error.range <- function(center, err) {
                                              common.scale,
                                              ylim,
                                              allow_asymptotic_quantile = TRUE) {
-  plot.behavior <- match.arg(plot.behavior, c("plot", "plot-data", "data"))
-  plot.errors.method <- match.arg(plot.errors.method, c("none", "bootstrap", "asymptotic"))
-  plot.errors.boot.method <- match.arg(plot.errors.boot.method, c("inid", "fixed", "geom"))
-  plot.errors.center <- match.arg(plot.errors.center, c("estimate", "bias-corrected"))
-  plot.errors.type <- match.arg(plot.errors.type, c("pmzsd", "pointwise", "bonferroni", "simultaneous", "all"))
+  scalar_choice <- function(value, default) {
+    if (is.null(value) || length(value) < 1L || is.na(value[1L])) default else value[1L]
+  }
+
+  plot.behavior <- match.arg(
+    scalar_choice(plot.behavior, "plot"),
+    c("plot", "plot-data", "data")
+  )
+  plot.errors.method <- match.arg(
+    scalar_choice(plot.errors.method, "none"),
+    c("none", "bootstrap", "asymptotic")
+  )
+  plot.errors.boot.method <- match.arg(
+    scalar_choice(plot.errors.boot.method, "wild-hat"),
+    c("wild-hat", "inid", "fixed", "geom")
+  )
+  plot.errors.boot.wild <- match.arg(
+    scalar_choice(plot.errors.boot.wild, "rademacher"),
+    c("rademacher", "mammen")
+  )
+  plot.errors.center <- match.arg(
+    scalar_choice(plot.errors.center, "estimate"),
+    c("estimate", "bias-corrected")
+  )
+  plot.errors.type <- match.arg(
+    scalar_choice(plot.errors.type, "simultaneous"),
+    c("simultaneous", "pointwise", "bonferroni", "pmzsd", "all")
+  )
 
   if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
       is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
     stop("the tail probability plot.errors.alpha must lie in (0,0.5)")
 
-  plot.errors.style <- match.arg(plot.errors.style, c("band", "bar"))
-  plot.errors.bar <- match.arg(plot.errors.bar, c("|", "I"))
+  plot.errors.style <- match.arg(
+    scalar_choice(plot.errors.style, "band"),
+    c("band", "bar")
+  )
+  plot.errors.bar <- match.arg(
+    scalar_choice(plot.errors.bar, "|"),
+    c("|", "I")
+  )
 
   common.scale <- common.scale | (!is.null(ylim))
 
@@ -384,6 +488,7 @@ compute.default.error.range <- function(center, err) {
     plot.behavior = plot.behavior,
     plot.errors.method = plot.errors.method,
     plot.errors.boot.method = plot.errors.boot.method,
+    plot.errors.boot.wild = plot.errors.boot.wild,
     plot.errors.boot.blocklen = plot.errors.boot.blocklen,
     plot.errors.center = plot.errors.center,
     plot.errors.type = plot.errors.type,
@@ -407,6 +512,7 @@ compute.bootstrap.errors.rbandwidth =
            gradient.order,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -414,42 +520,71 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
+    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.inid <- plot.errors.boot.method == "inid"
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
+    if (is.wild.hat && gradients) {
+      cont.idx <- which(bws$xdati$icon)
+      if (is.na(match(slice.index, cont.idx))) {
+        warning("plot.errors.boot.method='wild-hat' supports gradients only for continuous slices; using requested bootstrap method fallback")
+        is.wild.hat <- FALSE
+      }
+    }
 
-    is.inid = plot.errors.boot.method=="inid"
+    if (is.wild.hat) {
+      if (length(plot.errors.boot.wild) > 1L)
+        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
+      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
+      fit.train <- suppressWarnings(npreg(
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        gradients = FALSE,
+        warn.glp.gradient = FALSE
+      ))
 
-      payload <- list(
-        family = "npreg",
-        xdat = xdat,
-        ydat = ydat,
+      s.vec <- NULL
+      if (gradients) {
+        cont.idx <- which(bws$xdati$icon)
+        cpos <- match(slice.index, cont.idx)
+        gorder <- if (length(gradient.order) == 1L) {
+          rep.int(as.integer(gradient.order), length(cont.idx))
+        } else {
+          as.integer(gradient.order)
+        }
+        if (length(gorder) != length(cont.idx))
+          gorder <- rep.int(1L, length(cont.idx))
+        s.vec <- integer(length(cont.idx))
+        s.vec[cpos] <- gorder[cpos]
+      }
+
+      H <- suppressWarnings(npreghat(
+        bws = bws,
+        txdat = xdat,
         exdat = exdat,
-        bws = .npRmpi_autodispatch_untag(bws),
-        gradients = gradients,
-        gradient.order = gradient.order,
-        out.field = if (gradients) "grad" else "mean",
-        out.index = if (gradients) slice.index else NULL,
-        indices = idx.mat
-      )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
-    } else {
+        s = s.vec,
+        output = "matrix"
+      ))
 
+      t0 <- as.vector(H %*% as.double(ydat))
+      eps <- as.double(ydat - fit.train$mean)
+      n <- length(eps)
+      B <- plot.errors.boot.num
+
+      boot.out <- list(
+        t = .np_wildhat_boot_t(
+          H = H,
+          fit.mean = fit.train$mean,
+          residuals = eps,
+          B = B,
+          wild = plot.errors.boot.wild
+        ),
+        t0 = t0
+      )
+    } else {
       boofun <- if (is.inid) {
         function(data, indices) {
           fit <- suppressWarnings(npreg(
@@ -477,13 +612,19 @@ compute.bootstrap.errors.rbandwidth =
       }
 
       if (is.inid){
-        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num)
+        boot.out <- boot(
+          data = data.frame(xdat, ydat),
+          statistic = boofun,
+          R = plot.errors.boot.num
+        )
       } else {
-        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        boot.out <- tsboot(
+          tseries = data.frame(xdat, ydat),
+          statistic = boofun,
           R = plot.errors.boot.num,
           l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
+          sim = plot.errors.boot.method
+        )
       }
     }
 
@@ -548,6 +689,7 @@ compute.bootstrap.errors.scbandwidth =
            gradients,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -555,41 +697,55 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
+    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.inid <- plot.errors.boot.method == "inid"
 
-    is.inid = plot.errors.boot.method=="inid"
+    if (is.wild.hat) {
+      if (length(plot.errors.boot.wild) > 1L)
+        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
+      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
-      payload <- list(
-        family = "npscoef",
-        xdat = xdat,
-        ydat = ydat,
-        zdat = if (miss.z) NULL else zdat,
-        exdat = exdat,
-        ezdat = if (miss.z) NULL else ezdat,
-        bws = .npRmpi_autodispatch_untag(bws),
-        gradients = gradients,
-        out.field = "mean",
-        out.index = NULL,
-        indices = idx.mat
+      fit.args <- list(
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        iterate = FALSE
       )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
+      hat.args <- list(
+        bws = bws,
+        txdat = xdat,
+        exdat = exdat,
+        output = "matrix",
+        iterate = FALSE
+      )
+      if (!miss.z) {
+        fit.args$tzdat <- zdat
+        hat.args$tzdat <- zdat
+        hat.args$ezdat <- ezdat
+      }
+
+      fit.train <- do.call(npscoef, fit.args)
+      H <- do.call(npscoefhat, hat.args)
+
+      t0 <- as.vector(H %*% as.double(ydat))
+      eps <- as.double(ydat - as.vector(fit.train$mean))
+      n <- length(eps)
+      B <- plot.errors.boot.num
+
+      boot.out <- list(
+        t = .np_wildhat_boot_t(
+          H = H,
+          fit.mean = as.vector(fit.train$mean),
+          residuals = eps,
+          B = B,
+          wild = plot.errors.boot.wild
+        ),
+        t0 = t0
+      )
     } else {
       xcols <- seq_len(ncol(xdat))
       ycol <- ncol(xdat) + 1L
@@ -702,6 +858,7 @@ compute.bootstrap.errors.plbandwidth =
            gradients,
            slice.index,
            plot.errors.boot.method,
+           plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -709,40 +866,47 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
+    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.inid <- plot.errors.boot.method == "inid"
 
-    is.inid = plot.errors.boot.method=="inid"
+    if (is.wild.hat) {
+      if (length(plot.errors.boot.wild) > 1L)
+        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
+      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
-      payload <- list(
-        family = "npplreg",
-        xdat = xdat,
-        ydat = ydat,
-        zdat = zdat,
+      fit.train <- npplreg(
+        txdat = xdat,
+        tydat = ydat,
+        tzdat = zdat,
+        bws = bws
+      )
+      H <- npplreghat(
+        bws = bws,
+        txdat = xdat,
+        tzdat = zdat,
         exdat = exdat,
         ezdat = ezdat,
-        bws = .npRmpi_autodispatch_untag(bws),
-        gradients = gradients,
-        out.field = "mean",
-        out.index = NULL,
-        indices = idx.mat
+        output = "matrix"
       )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
+
+      t0 <- as.vector(H %*% as.double(ydat))
+      eps <- as.double(ydat - as.vector(fit.train$mean))
+      n <- length(eps)
+      B <- plot.errors.boot.num
+
+      boot.out <- list(
+        t = .np_wildhat_boot_t(
+          H = H,
+          fit.mean = as.vector(fit.train$mean),
+          residuals = eps,
+          B = B,
+          wild = plot.errors.boot.wild
+        ),
+        t0 = t0
+      )
     } else {
       boofun <- if (is.inid) {
         function(data, indices) {
@@ -851,67 +1015,39 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
-
     is.inid = plot.errors.boot.method=="inid"
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
-
-      payload <- list(
-        family = if (cdf) "npudist" else "npudens",
-        xdat = xdat,
-        exdat = exdat,
-        bws = .npRmpi_autodispatch_untag(bws),
-        out.field = if (cdf) "dist" else "dens",
-        out.index = NULL,
-        indices = idx.mat
-      )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
+    boofun <- if (is.inid) {
+      function(data, indices) {
+        fit <- if (cdf) {
+          npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+        } else {
+          npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+        }
+        if (cdf) fit$dist else fit$dens
+      }
     } else {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          fit <- if (cdf) {
-            npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
-          } else {
-            npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
-          }
-          if (cdf) fit$dist else fit$dens
+      function(tsb) {
+        fit <- if (cdf) {
+          npudist(tdat = tsb, edat = exdat, bws = bws)
+        } else {
+          npudens(tdat = tsb, edat = exdat, bws = bws)
         }
-      } else {
-        function(tsb) {
-          fit <- if (cdf) {
-            npudist(tdat = tsb, edat = exdat, bws = bws)
-          } else {
-            npudens(tdat = tsb, edat = exdat, bws = bws)
-          }
-          if (cdf) fit$dist else fit$dens
-        }
+        if (cdf) fit$dist else fit$dens
       }
+    }
 
-      if (is.inid) {
-        boot.out = boot(data = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+    if (is.inid) {
+      boot.out = boot(data = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
     }
 
     all.bp <- list()
@@ -981,57 +1117,29 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
-
     is.inid = plot.errors.boot.method=="inid"
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
-
-      payload <- list(
-        family = "npudist",
-        xdat = xdat,
-        exdat = exdat,
-        bws = .npRmpi_autodispatch_untag(bws),
-        out.field = "dist",
-        out.index = NULL,
-        indices = idx.mat
-      )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
+    boofun <- if (is.inid) {
+      function(data, indices) {
+        npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
+      }
     } else {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
-        }
-      } else {
-        function(tsb) {
-          npudist(tdat = tsb, edat = exdat, bws = bws)$dist
-        }
+      function(tsb) {
+        npudist(tdat = tsb, edat = exdat, bws = bws)$dist
       }
+    }
 
-      if (is.inid) {
-        boot.out = boot(data = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+    if (is.inid) {
+      boot.out = boot(data = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
     }
 
     all.bp <- list()
@@ -1106,9 +1214,6 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1118,83 +1223,43 @@ compute.bootstrap.errors.conbandwidth =
       else if (cdf) "dist"
       else "dens"
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
-
     is.inid = plot.errors.boot.method=="inid"
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
-
-      out.field <- switch(tboo,
-                          quant = if (gradients) "yqgrad" else "quantile",
-                          dist = if (gradients) "congrad" else "condist",
-                          dens = if (gradients) "congrad" else "condens")
-      out.index <- if (gradients) gradient.index else NULL
-      family <- switch(tboo,
-                       quant = "npqreg",
-                       dist = "npcdist",
-                       dens = "npcdens")
-
-      payload <- list(
-        family = family,
-        xdat = xdat,
-        ydat = ydat,
-        exdat = exdat,
-        eydat = eydat,
-        tau = tau,
-        bws = .npRmpi_autodispatch_untag(bws),
-        gradients = gradients,
-        out.field = out.field,
-        out.index = out.index,
-        indices = idx.mat
+    fit.cond <- function(tx, ty) {
+      switch(
+        tboo,
+        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
       )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
+    }
+    out.cond <- function(fit) {
+      switch(
+        tboo,
+        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
+        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
+        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
+      )
+    }
+    boofun <- if (is.inid) {
+      function(data, indices) out.cond(fit.cond(
+        tx = xdat[indices, , drop = FALSE],
+        ty = ydat[indices, , drop = FALSE]
+      ))
     } else {
-
-      fit.cond <- function(tx, ty) {
-        switch(
-          tboo,
-          quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-          dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-          dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-        )
-      }
-      out.cond <- function(fit) {
-        switch(
-          tboo,
-          quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-          dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-          dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-        )
-      }
-      boofun <- if (is.inid) {
-        function(data, indices) out.cond(fit.cond(
-          tx = xdat[indices, , drop = FALSE],
-          ty = ydat[indices, , drop = FALSE]
-        ))
-      } else {
-        function(tsb) out.cond(fit.cond(
-          tx = tsb[, 1:ncol(xdat), drop = FALSE],
-          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
-        ))
-      }
-      if (is.inid){
-        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      function(tsb) out.cond(fit.cond(
+        tx = tsb[, 1:ncol(xdat), drop = FALSE],
+        ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
+      ))
+    }
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
     }
 
     all.bp <- list()
@@ -1277,9 +1342,6 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1289,83 +1351,43 @@ compute.bootstrap.errors.condbandwidth =
       else if (cdf) "dist"
       else "dens"
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
-
     is.inid = plot.errors.boot.method=="inid"
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
-
-      out.field <- switch(tboo,
-                          quant = if (gradients) "yqgrad" else "quantile",
-                          dist = if (gradients) "congrad" else "condist",
-                          dens = if (gradients) "congrad" else "condens")
-      out.index <- if (gradients) gradient.index else NULL
-      family <- switch(tboo,
-                       quant = "npqreg",
-                       dist = "npcdist",
-                       dens = "npcdens")
-
-      payload <- list(
-        family = family,
-        xdat = xdat,
-        ydat = ydat,
-        exdat = exdat,
-        eydat = eydat,
-        tau = tau,
-        bws = .npRmpi_autodispatch_untag(bws),
-        gradients = gradients,
-        out.field = out.field,
-        out.index = out.index,
-        indices = idx.mat
+    fit.cond <- function(tx, ty) {
+      switch(
+        tboo,
+        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
       )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
+    }
+    out.cond <- function(fit) {
+      switch(
+        tboo,
+        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
+        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
+        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
+      )
+    }
+    boofun <- if (is.inid) {
+      function(data, indices) out.cond(fit.cond(
+        tx = xdat[indices, , drop = FALSE],
+        ty = ydat[indices, , drop = FALSE]
+      ))
     } else {
-
-      fit.cond <- function(tx, ty) {
-        switch(
-          tboo,
-          quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-          dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-          dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-        )
-      }
-      out.cond <- function(fit) {
-        switch(
-          tboo,
-          quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-          dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-          dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-        )
-      }
-      boofun <- if (is.inid) {
-        function(data, indices) out.cond(fit.cond(
-          tx = xdat[indices, , drop = FALSE],
-          ty = ydat[indices, , drop = FALSE]
-        ))
-      } else {
-        function(tsb) out.cond(fit.cond(
-          tx = tsb[, 1:ncol(xdat), drop = FALSE],
-          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
-        ))
-      }
-      if (is.inid){
-        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      function(tsb) out.cond(fit.cond(
+        tx = tsb[, 1:ncol(xdat), drop = FALSE],
+        ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
+      ))
+    }
+    if (is.inid){
+      boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num)
+    } else {
+      boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
+        R = plot.errors.boot.num,
+        l = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method)
     }
 
     all.bp <- list()
@@ -1435,6 +1457,7 @@ compute.bootstrap.errors.sibandwidth =
   function(xdat, ydat,
            gradients,
            plot.errors.boot.method,
+           plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen,
            plot.errors.boot.num,
            plot.errors.center,
@@ -1442,62 +1465,68 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .npRmpi_guard_bootstrap_plot_autodispatch("bootstrap",
-                                              where = "compute.bootstrap.errors(...)",
-                                              allow.direct.bootstrap = TRUE)
 
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
     boot.all.err <- NULL
 
-    use.payload <- .npRmpi_autodispatch_active() &&
-      !.npRmpi_autodispatch_in_context() &&
-      !.npRmpi_autodispatch_called_from_bcast()
+    is.wild.hat <- plot.errors.boot.method == "wild-hat"
+    is.inid <- plot.errors.boot.method=="inid"
 
-    is.inid = plot.errors.boot.method=="inid"
+    if (is.wild.hat) {
+      if (length(plot.errors.boot.wild) > 1L)
+        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
+      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-    if (use.payload) {
-      idx.mat <- .npRmpi_bootstrap_make_indices(
-        n = nrow(xdat),
-        boot.num = plot.errors.boot.num,
-        boot.method = plot.errors.boot.method,
-        boot.blocklen = plot.errors.boot.blocklen)
-      payload <- list(
-        family = "npindex",
-        xdat = xdat,
-        ydat = ydat,
-        exdat = xdat,
-        bws = .npRmpi_autodispatch_untag(bws),
-        gradients = gradients,
-        out.field = if (gradients) "grad" else "mean",
-        out.index = if (gradients) 1L else NULL,
-        indices = idx.mat
+      fit.train <- npindex(
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        gradients = FALSE
       )
-      boot.out <- .npRmpi_bootstrap_compute_payload(payload = payload)
-      boot.out$t0 <- as.numeric(boot.out$t0)
-      boot.out$t <- as.matrix(boot.out$t)
+      H <- npindexhat(
+        bws = bws,
+        txdat = xdat,
+        exdat = xdat,
+        output = "matrix",
+        s = if (gradients) 1L else 0L
+      )
+
+      t0 <- as.vector(H %*% as.double(ydat))
+      eps <- as.double(ydat - as.vector(fit.train$mean))
+      n <- length(eps)
+      B <- plot.errors.boot.num
+
+      boot.out <- list(
+        t = .np_wildhat_boot_t(
+          H = H,
+          fit.mean = as.vector(fit.train$mean),
+          residuals = eps,
+          B = B,
+          wild = plot.errors.boot.wild
+        ),
+        t0 = t0
+      )
     } else {
-      ## beta[1] is always 1.0, so use first column of gradients matrix ...
+      ## beta[1] is always 1.0, so use first column of gradients matrix ... 
       boofun <- if (is.inid) {
         function(data, indices) {
           fit <- npindex(
             txdat = xdat[indices, , drop = FALSE],
             tydat = ydat[indices],
-            exdat = xdat,
-            bws = bws,
+            exdat = xdat, bws = bws,
             gradients = gradients
           )
-          if (gradients) fit$grad[, 1] else fit$mean
+          if (gradients) fit$grad[,1] else fit$mean
         }
       } else {
         function(tsb) {
           fit <- npindex(
-            txdat = tsb[, 1:(ncol(tsb) - 1), drop = FALSE],
+            txdat = tsb[, 1:(ncol(tsb)-1), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
-            exdat = xdat,
-            bws = bws,
+            exdat = xdat, bws = bws,
             gradients = gradients
           )
-          if (gradients) fit$grad[, 1] else fit$mean
+          if (gradients) fit$grad[,1] else fit$mean
         }
       }
 
