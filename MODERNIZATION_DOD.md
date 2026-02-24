@@ -1166,13 +1166,14 @@ Completed in `np-master`:
    - `predict.npdistribution`: `newdata -> edat`
    - `predict.condensity`: `newdata -> (eydat, exdat)` using `(ynames, xnames)` column mapping
    - `predict.condistribution`: `newdata -> (eydat, exdat)` using `(ynames, xnames)` column mapping
+   - `predict.singleindex`: `newdata -> exdat`
 3. Added contracts:
    - `tests/testthat/test-predict-newdata-contract.R`
 4. Validation:
    - installed-package contract tests:
-     - `/tmp/np_master_predfix_contract_installed_20260224.log` (`RC:0`)
+     - `/tmp/np_master_predfix2_contract_installed_20260224.log` (`RC:0`)
    - install artifact:
-     - `/tmp/np_master_install_predfix_20260224.log` (`RC:0`)
+     - `/tmp/np_master_install_predfix2_20260224.log` (`RC:0`)
    - verified issue repro sweep:
-     - `/tmp/np_issue_notes_repros_predfix_20260224.log` (`RC:0`)
-     - run artifact: `/tmp/np_issue_notes_repros_20260224_113055.log`
+     - `/tmp/np_issue_notes_repros_predfix2_20260224.log` (`RC:0`)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_113634.log`

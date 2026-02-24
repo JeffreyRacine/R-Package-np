@@ -1,6 +1,6 @@
 library(np)
 
-test_that("predict aliases newdata to native eval args for default npreg/npudens/npudist", {
+test_that("predict aliases newdata to native eval args for default npreg/npudens/npudist/npindex", {
   set.seed(20260224)
   x <- runif(70)
   y <- rnorm(70)
@@ -40,6 +40,25 @@ test_that("predict aliases newdata to native eval args for default npreg/npudens
   expect_equal(
     as.numeric(predict(fit.dist, newdata = nd)),
     as.numeric(predict(fit.dist, edat = nd)),
+    tolerance = 1e-12
+  )
+
+  x2 <- runif(70)
+  nd.si <- data.frame(x = c(0.15, 0.35), x2 = c(0.4, 0.8))
+  bw.si <- npindexbw(
+    xdat = data.frame(x = x, x2 = x2),
+    ydat = y,
+    bws = c(0.25, 0.25, 1),
+    bandwidth.compute = FALSE
+  )
+  fit.si <- npindex(
+    bws = bw.si,
+    txdat = data.frame(x = x, x2 = x2),
+    tydat = y
+  )
+  expect_equal(
+    as.numeric(predict(fit.si, newdata = nd.si)),
+    as.numeric(predict(fit.si, exdat = nd.si)),
     tolerance = 1e-12
   )
 })
