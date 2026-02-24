@@ -406,8 +406,11 @@ nptgauss <- function(b){
 
   alpha <- 1.0/(pnorm(b)-pnorm(-b)-2*b*dnorm(b))
 
-  tgauss <- function(z)
-    ifelse(abs(z) >= b, 0.0, alpha*(dnorm(z) - dnorm(b)))
+  tgauss <- function(z) {
+    out <- alpha * (dnorm(z) - dnorm(b))
+    out[abs(z) >= b] <- 0.0
+    out
+  }
 
   c0 <- alpha*dnorm(b)
 
@@ -1001,11 +1004,19 @@ updateBwNameMetadata <- function(nameList, bws){
 ## some string utility functions
 
 pad <- function(s){
-  ifelse(nchar(s) > 0, paste("",s,""), " ")
+  idx <- nchar(s) > 0
+  out <- rep.int(" ", length(s))
+  out[idx] <- paste("", s[idx], "")
+  names(out) <- names(s)
+  out
 }
 
 rpad <- function(s){
-  ifelse(nchar(s) > 0, paste(s,""), "")
+  idx <- nchar(s) > 0
+  out <- rep.int("", length(s))
+  out[idx] <- paste(s[idx], "")
+  names(out) <- names(s)
+  out
 }
 
 blank <- function(len){
