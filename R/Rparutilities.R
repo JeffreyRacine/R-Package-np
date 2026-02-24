@@ -887,7 +887,7 @@ mpi.parApply <- function(X, MARGIN, FUN, ..., job.num = mpi.comm.size(comm)-1,
     dl <- length(d)
     if(dl == 0)
     stop("dim(X) must have a positive length")
-    ds <- 1:dl
+    ds <- seq_len(dl)
 
     if(length(oldClass(X)) > 0)
     X <- if(dl == 2) as.matrix(X) else as.array(X)
@@ -912,11 +912,11 @@ mpi.parApply <- function(X, MARGIN, FUN, ..., job.num = mpi.comm.size(comm)-1,
     dim(newX) <- c(prod(d.call), d2)
     if(length(d.call) < 2) {
         if (length(dn.call)) dimnames(newX) <- c(dn.call, list(NULL))
-        ans <- mpi.parLapply(1:d2, function(i, ...) FUN(newX[,i], ...), 
+        ans <- mpi.parLapply(seq_len(d2), function(i, ...) FUN(newX[,i], ...), 
                 ..., job.num = job.num, apply.seq=apply.seq, comm=comm )
     } 
     else
-        ans <- mpi.parLapply(1:d2,
+        ans <- mpi.parLapply(seq_len(d2),
             function(i, ...) FUN(array(newX[,i], d.call, dn.call), ...),
                 ..., job.num = job.num, apply.seq=apply.seq, comm=comm)
                     
@@ -953,7 +953,7 @@ mpi.iparApply <- function(X, MARGIN, FUN, ..., job.num = mpi.comm.size(comm)-1,
     dl <- length(d)
     if(dl == 0)
     stop("dim(X) must have a positive length")
-    ds <- 1:dl
+    ds <- seq_len(dl)
 
     if(length(oldClass(X)) > 0)
     X <- if(dl == 2) as.matrix(X) else as.array(X)
@@ -978,11 +978,11 @@ mpi.iparApply <- function(X, MARGIN, FUN, ..., job.num = mpi.comm.size(comm)-1,
     dim(newX) <- c(prod(d.call), d2)
     if(length(d.call) < 2) {
         if (length(dn.call)) dimnames(newX) <- c(dn.call, list(NULL))
-        ans <- mpi.iparLapply(1:d2, function(i, ...) FUN(newX[,i], ...), 
+        ans <- mpi.iparLapply(seq_len(d2), function(i, ...) FUN(newX[,i], ...), 
                 ..., job.num = job.num, apply.seq=apply.seq, comm=comm, sleep=sleep )
     } 
     else
-        ans <- mpi.iparLapply(1:d2,
+        ans <- mpi.iparLapply(seq_len(d2),
             function(i, ...) FUN(array(newX[,i], d.call, dn.call), ...),
                 ..., job.num = job.num, apply.seq=apply.seq, comm=comm, sleep=sleep)
                     

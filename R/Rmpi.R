@@ -142,9 +142,10 @@ mpi.cartdim.get <- function(comm=3) {
 mpi.cart.get <- function(comm=3, maxdims) {
 
         out <- .Call("mpi_cart_get",as.integer(comm), as.integer(maxdims), PACKAGE = "npRmpi")
-        dims <- out[1:maxdims]
-        periods <- out[(maxdims+1):(maxdims*2)]
-        coords <- out[(maxdims*2 + 1):(maxdims*3)]
+        idx <- seq_len(maxdims)
+        dims <- out[idx]
+        periods <- out[maxdims + idx]
+        coords <- out[2L * maxdims + idx]
         list(dims=dims,periods=periods,coords=coords)
 }
 
