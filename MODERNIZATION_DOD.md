@@ -44,7 +44,8 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
    - GLP/`dim_basis` contract hardening parity with `np-master`,
    - deterministic NA/range guard hardening and helper micro-modernization,
    - explicit session/attach/profile subprocess coverage with env-safe skips,
-   - predict `newdata` alias fixes for non-formula core estimator objects.
+   - predict `newdata` alias fixes for non-formula core estimator objects,
+   - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix.
 3. Remaining highest-priority work:
    - bounded-kernel/convolution native-path completion and MPI-path parity validation,
    - performance-governance closure with fixed/varying seed comparisons for performance-sensitive changes,
@@ -114,6 +115,31 @@ Include in commit body or companion note:
 ## Current Residual Risks (Known)
 - Attach/session mode behavior may differ by environment and MPI interface settings (`FI_TCP_IFACE`), so smoke gates must run in both modes before release.
 - Remaining non-target doc warnings and duplicated alias/cross-reference warnings should be triaged and either fixed or explicitly accepted.
+
+## Plot Engine Index-Safety Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:n...` loop/slice patterns in plot engines with `seq_len(...)` / `seq_along(...)`.
+2. Fixed `plot.sibandwidth` data-return bootstrap path to persist computed `merr` (and bias-corrected center metadata) in returned objects.
+3. Scope:
+   - `R/np.plot.engine.bandwidth.R`
+   - `R/np.plot.engine.dbandwidth.R`
+   - `R/np.plot.engine.rbandwidth.R`
+   - `R/np.plot.engine.scbandwidth.R`
+   - `R/np.plot.engine.plbandwidth.R`
+   - `R/np.plot.engine.sibandwidth.R`
+   - `R/np.plot.engine.conbandwidth.R`
+   - `R/np.plot.engine.condbandwidth.R`
+4. Commit:
+   - `np-npRmpi`: `946e60a`
+5. Validation:
+   - parse gate (`PARSE_OK`) for all touched plot-engine files,
+   - source-tree checks:
+     - `/tmp/nprmpi_semihat_seqmodern_20260224.log` (spawn-dependent tests skipped in this sandbox)
+     - `/tmp/nprmpi_plot_autodispatch_seqmodern_20260224.log` (spawn-dependent tests skipped in this sandbox)
+     - `/tmp/nprmpi_sibandwidth_merr_loadall_20260224.out` (`NPRMPI_SI_MERR_LOADALL_OK`)
+     - `/tmp/nprmpi_plot_session_smoke_20260224.out` (`NPRMPI_PLOT_SESSION_SMOKE_OK`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_plotseq_20260224.log` (`RC:0`)
 
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-npRmpi`:
