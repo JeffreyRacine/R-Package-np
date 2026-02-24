@@ -29,7 +29,7 @@ sdeptest <- function(Srho,
     tsdep$reject <- numeric()
     tsdep$rejectNum <- character()
 
-    for(k in 1:lag.num) {
+    for(k in seq_len(lag.num)) {
 
       reject <- ' '
       
@@ -68,14 +68,14 @@ print.sdeptest <- function(x, ...){
     cat("\nConsistent Metric Entropy Test for Nonlinear Dependence",
         paste("\n", format(x$boot.num), " Bootstrap Replications, ",
               format(x$lag.num), " Lags\n",sep=""))
-    for(k in 1:x$lag.num) {
+    for(k in seq_len(x$lag.num)) {
       cat(paste("\nTest Statistic ", sQuote(paste("Srho[", k , "]",sep="")), ": ",
           format(x$Srho[k]), "\tP Value: ", format.pval(x$P[k])," ", x$reject[k],sep=""))
     }
 
     cat("\n---\nSignif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1")
     
-    for(k in 1:x$lag.num) {
+    for(k in seq_len(x$lag.num)) {
       reject.msg <- if (x$reject[k] == ' ') {
         paste("\nFail to reject the null of independence at lag ", k, " at the 10% level", sep = "")
       } else {
@@ -86,7 +86,7 @@ print.sdeptest <- function(x, ...){
   } else {
     cat("\nConsistent Nonlinear Dependence Metric Entropy",
         paste("\n", format(x$lag.num), " Lags\n",sep=""))
-    for(k in 1:x$lag.num) {
+    for(k in seq_len(x$lag.num)) {
       cat(paste("\nStatistic ", sQuote(paste("Srho[", k , "]",sep="")), ": ",
           format(x$Srho[k]),sep=""))
     }

@@ -844,7 +844,7 @@ cast <- function(a, b, same.levels = TRUE){
   else if (is.data.frame(b)) {
     if (dim(a)[2] == dim(b)[2]){
       r = data.frame(a)
-      for (i in 1: length(b))
+      for (i in seq_along(b))
         r[,i] = cast(a[,i],b[,i], same.levels = same.levels)
       r
     } else { stop("a could not be cast as b") }
@@ -1533,7 +1533,7 @@ mypoly <- function(x,
 
     if(gradient.compute) {
       Z <- NULL
-      for(i in 1:degree) {
+      for(i in seq_len(degree)) {
         if((i-r) >= 0) {
           tmp <- (factorial(i)/factorial(i-r))*x^max(0,i-r)
         } else {

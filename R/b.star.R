@@ -67,7 +67,7 @@ b.star <- function(data,
   ## Now we loop through each variable in data (i.e., column,
   ## data[,i]).
 
-  for(i in 1:k) {
+  for(i in seq_len(k)) {
 
     ## We first obtain the autocorrelations rho(1),...,rho(mmax) (we
     ## need to drop the first autocorrelation as it is rho(0), hence
