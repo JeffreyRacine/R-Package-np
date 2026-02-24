@@ -157,7 +157,7 @@ npsdeptest <- function(data = NULL,
   for (k in seq_len(lag.num)) Srho.cumulant.vec[k] <- sum(Srho.vec[seq_len(k)])
 
   ## Bootstrap if requested - null is independence so simple iid
-  ## bootstrap (sample(x,replace=TRUE)) will work
+  ## index resampling under replacement is sufficient
 
   if(bootstrap) {
 

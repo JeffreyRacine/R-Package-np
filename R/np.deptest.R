@@ -128,7 +128,7 @@ npdeptest <- function(data.x = NULL,
   Srho.vec <- Srho.bivar(data.x,data.y,bw.data.x,bw.data.y,bw.joint,method=method)
 
   ## Bootstrap if requested - null is independence so simple iid
-  ## bootstrap (sample(x,replace=TRUE)) will work
+  ## index resampling under replacement is sufficient
 
   if(bootstrap) {
 
