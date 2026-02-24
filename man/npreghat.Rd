@@ -1,0 +1,77 @@
+\name{npreghat}
+\alias{npreghat}
+\alias{npreghat.formula}
+\alias{npreghat.call}
+\alias{npreghat.rbandwidth}
+\alias{npreghat.npregression}
+\alias{predict.npreghat}
+\alias{print.npreghat}
+\title{Nonparametric Regression Hat Operator}
+\description{
+Constructs nonparametric regression hat operators for \code{npreg}-compatible
+bandwidth objects. The returned operator \eqn{H^{(s)}} maps responses to fitted
+values or derivative estimates via \eqn{H^{(s)} y}.
+}
+\usage{
+npreghat(bws, ...)
+
+\method{npreghat}{formula}(bws, data = NULL, newdata = NULL, ...)
+
+\method{npreghat}{call}(bws, ...)
+
+\method{npreghat}{rbandwidth}(bws,
+  txdat = stop("training data 'txdat' missing"),
+  exdat, y = NULL,
+  output = c("matrix", "apply"),
+  s = NULL, deriv = NULL,
+  degree = NULL, basis = NULL,
+  bernstein.basis = NULL,
+  ridge = 1.0e-12, ...)
+
+\method{npreghat}{npregression}(bws, txdat, y, ...)
+
+\method{predict}{npreghat}(object, newdata = NULL, y = NULL,
+  output = c("matrix", "apply"),
+  s = attr(object, "s"), deriv = NULL, ...)
+}
+\arguments{
+  \item{bws}{An object of class \code{rbandwidth} or \code{npregression}.}
+  \item{txdat}{Training predictors.}
+  \item{exdat}{Optional evaluation predictors.}
+  \item{y}{Optional response vector or matrix for apply mode.}
+  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+  \item{s}{Derivative multi-index over continuous predictors.}
+  \item{deriv}{Convenience alias for \code{s}.}
+  \item{degree}{Optional local polynomial degree vector override (LP path).}
+  \item{basis}{Local polynomial basis: \code{"glp"}, \code{"additive"}, or \code{"tensor"}.}
+  \item{bernstein.basis}{Logical; use Bernstein basis for LP terms.}
+  \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned.}
+  \item{data}{A data frame used with the formula interface.}
+  \item{newdata}{Optional evaluation data for formula and predict methods.}
+  \item{object}{An object returned by \code{npreghat}.}
+  \item{...}{Additional arguments passed to methods.}
+}
+\details{
+For \code{output = "matrix"}, the return value is a matrix with class
+\code{c("npreghat", "matrix")} so it can be used directly in matrix products,
+e.g. \code{H \%*\% y}. Attributes on the matrix store metadata used by
+\code{predict.npreghat}.
+
+For \code{output = "apply"}, the function returns \code{H^{(s)} y} directly and
+accepts matrix right-hand sides for one-shot bootstrap-style calculations.
+}
+\value{
+Either a hat matrix (class \code{"npreghat"}) or the applied result
+\code{H^{(s)} y}, depending on \code{output}.
+}
+\examples{
+\dontrun{
+data(cps71)
+bw <- npregbw(xdat = cps71$age, ydat = cps71$logwage,
+              regtype = "ll", bandwidth.compute = FALSE, bws = 1.0)
+H <- npreghat(bws = bw, txdat = data.frame(age = cps71$age))
+fitted.fast <- H %*% cps71$logwage
+}
+}
+\keyword{nonparametric}
+\keyword{regression}
