@@ -577,3 +577,22 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_posthyg3_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_posthyg3_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
+
+## Utility/Test-Stat Loop Finalization Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Finalized residual scalar range loops in utility/test-stat helpers:
+   - `cast(...)` dataframe-column loop,
+   - raw polynomial derivative loop in `mypoly(...)`,
+   - `b.star(...)` column loop,
+   - `sdeptest` bootstrap/report loops.
+2. Scope:
+   - `R/util.R`
+   - `R/b.star.R`
+   - `R/sdeptest.R`
+3. Commit:
+   - `np-master`: `55aafa4`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='utils|nptests|sdeptest|npuniden', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_035016.log` (all verified repros passed)
