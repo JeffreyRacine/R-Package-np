@@ -364,6 +364,12 @@ npreg.rbandwidth <-
    }
 
 
+    glp.gradient.order.c <- if (bws$ncon > 0L) {
+      as.integer(if (is.null(glp.gradient.order)) rep.int(1L, bws$ncon) else glp.gradient.order)
+    } else {
+      integer(1)
+    }
+
     myout <-
       .Call("C_np_regression",
             asDouble(tuno), asDouble(tord), asDouble(tcon), asDouble(tydat),
@@ -373,6 +379,7 @@ npreg.rbandwidth <-
             asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
             as.integer(myopti),
             as.integer(degree.c),
+            as.integer(glp.gradient.order.c),
             as.integer(isTRUE(bws$bernstein.basis)),
             as.integer(npLpBasisCode(bws$basis)),
             as.integer(enrow),

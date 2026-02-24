@@ -19,7 +19,7 @@ extern SEXP C_np_distribution_conditional_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP,
 extern SEXP C_np_kernelsum(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_quantile_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_set_tgauss2(SEXP);
 extern SEXP C_np_release_static_buffers(void);
@@ -38,7 +38,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_kernelsum",                 (DL_FUNC) &C_np_kernelsum,                 19},
     {"C_np_quantile_conditional",      (DL_FUNC) &C_np_quantile_conditional,      19},
     {"C_np_regression_bw",             (DL_FUNC) &C_np_regression_bw,             16},
-    {"C_np_regression",                (DL_FUNC) &C_np_regression,                23},
+    {"C_np_regression",                (DL_FUNC) &C_np_regression,                24},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
     {"C_np_set_tgauss2",               (DL_FUNC) &C_np_set_tgauss2,                1},
     {"C_np_release_static_buffers",    (DL_FUNC) &C_np_release_static_buffers,     0},
