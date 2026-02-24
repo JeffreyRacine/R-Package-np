@@ -645,3 +645,16 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_loophyg_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_loophyg_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Utility Loop-Index Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:length(...)` / `1:ncol(...)` index patterns in shared utility/runtime helpers with `seq_along(...)` / `seq_len(...)`.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-npRmpi`: `3560c2b`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='utils|npcopula|npudist|npuniden', reporter='summary')` (`RC:0`; expected pre-existing `npuniden.sc` warning)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_033540.log` (all verified repros passed)
