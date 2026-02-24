@@ -303,6 +303,58 @@ test_that("session inid plot smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session inid density plot smoke completes in subprocess", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_DENSITY_INID_TEST"), "1"),
+              "set NP_RMPI_ENABLE_DENSITY_INID_TEST=1 to run density inid session smoke")
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "set.seed(77)",
+      "n <- 80",
+      "x <- rnorm(n)",
+      "y <- rnorm(n)",
+      "xd <- data.frame(x=x)",
+      "yd <- data.frame(y=y)",
+      "bw_ud <- npudensbw(dat=xd, bws=0.35, bandwidth.compute=FALSE)",
+      "bw_cd <- npcdensbw(xdat=xd, ydat=yd, bws=c(0.45,0.45), bandwidth.compute=FALSE)",
+      "png(tempfile(fileext='.png'))",
+      "on.exit(dev.off(), add=TRUE)",
+      "out.ud <- suppressWarnings(plot(",
+      "  bw_ud,",
+      "  xdat=xd,",
+      "  plot.behavior='data',",
+      "  plot.errors.method='bootstrap',",
+      "  plot.errors.boot.method='inid',",
+      "  plot.errors.boot.num=5",
+      "))",
+      "out.cd <- suppressWarnings(plot(",
+      "  bw_cd,",
+      "  xdat=xd,",
+      "  ydat=yd,",
+      "  plot.behavior='data',",
+      "  plot.errors.method='bootstrap',",
+      "  plot.errors.boot.method='inid',",
+      "  plot.errors.boot.num=3",
+      "))",
+      "stopifnot(is.list(out.ud), length(out.ud) > 0)",
+      "stopifnot(is.list(out.cd), length(out.cd) > 0)",
+      "cat('SESSION_INID_DENSITY_PLOT_OK\\n')",
+      "cat('SESSION_INID_DENSITY_PLOT_DONE\\n')"
+    ),
+    timeout = 180L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_INID_DENSITY_PLOT_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session core density/distribution family smoke completes", {
   skip_on_cran()
   env <- subprocess_env()
