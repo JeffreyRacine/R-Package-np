@@ -41,10 +41,21 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
    - predict `newdata` alias fixes for non-formula objects in core estimator families,
    - plot-engine index/slice safety hardening (`1:n` -> `seq_len`/`seq_along`) plus `sibandwidth` bootstrap `merr` writeback fix,
    - bootstrap index sampling micro-modernization in `npdeneqtest` (`sample(...)` index draws -> `sample.int(...)`).
-3. Remaining highest-priority work:
-   - bounded-kernel/convolution native-path completion and validation (`issue_notes/bounded_kernel_todo.md`),
-   - full performance-governance artifacts for performance-sensitive native patches,
-   - win-builder closure before release candidate.
+3. Modernization-phase closure decision:
+   - active modernization push is considered substantially complete for current objectives,
+   - bounded-kernel/convolution completion is explicitly deferred to future work (`issue_notes/bounded_kernel_todo.md`),
+   - remaining near-term release hygiene is doc/codoc triage and win-builder closure.
+4. Remaining highest-priority near-term work:
+   - doc/codoc triage for pre-existing `man/*.Rd` drift,
+   - win-builder closure before release candidate,
+   - optional performance-governance backfills for selected checkpoints where ROI warrants.
+
+## Merge Readiness (2026-02-24)
+1. Technical risk for merging this modernization tranche to `master` is moderate/acceptable if merge hygiene is followed.
+2. Non-blocking deferred item:
+   - bounded convolution/native completion remains in future backlog and is not required for this tranche merge.
+3. Recommended pre-merge gate:
+   - rerun issue-note repro harness and tarball build/check from fresh tree before merge commit.
 
 ## C Denominator Guard Checkpoint (2026-02-24)
 Completed in `np-master`:
