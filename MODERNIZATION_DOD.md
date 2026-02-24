@@ -666,3 +666,25 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_npregiv_seq2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_npregiv_seq2_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 1 NOTE`; warning set unchanged from existing top-level/vignette-size debt)
+
+## Bandwidth Metadata / `npregivderiv` Loop-Range Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced residual metadata/index range builders with `seq_len(...)` in bandwidth metadata constructors and `npregivderiv` numeric-column detection.
+2. Scope:
+   - `R/bandwidth.R`
+   - `R/rbandwidth.R`
+   - `R/smoothbandwidth.R`
+   - `R/npregivderiv.R`
+3. Commit:
+   - `np-master`: `e5fb784`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='npregiv|bandwidth|bw-dispatch|formula-bw-contract', reporter='summary')` (`RC:0`; expected pre-existing monotone-stopping warnings)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_043811.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_bwmeta_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_bwmeta_seq_20260224_withcrs.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
+5. Environment note:
+   - local `--as-cran` checks required `crs` in `R_LIBS`; command used:
+     - `R_LIBS=/tmp/crs_check_lib R CMD check --as-cran --no-manual np_0.70-0.tar.gz`
