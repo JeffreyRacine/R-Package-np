@@ -867,3 +867,24 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_gofstr_scalar_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_gofstr_scalar_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
+
+## `util.R` Scalar-Branch Follow-On (`NZD`/`genBwScaleStrs`) (2026-02-24)
+Completed in `np-master`:
+1. Removed additional scalar `ifelse(...)` usage in hot/summary utility paths:
+   - `NZD()` small-value assignment now uses direct sign-mask replacement,
+   - `genBwScaleStrs()` scalar label/summary string branches now use explicit scalar `if`.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-master`: `b795e3b`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests:
+     - `testthat::test_local(filter='utils|bandwidth|bw-dispatch|formula-bw-contract', reporter='summary')` (`RC:0`)
+     - log: `/tmp/np_master_util_scalar2_tests_20260224.log`
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_060257.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/np_master_build_util_scalar2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/np_master_check_ascran_util_scalar2_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 1 NOTE`; warning set unchanged from existing top-level/vignette-size debt)
