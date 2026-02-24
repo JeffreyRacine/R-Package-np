@@ -1338,3 +1338,9 @@ Completed in `np-npRmpi`:
    - small session repro: `/tmp/nprmpi_plot_repro_small_20260224.out` (`NPRMPI_PLOT_SMALL_OK`)
    - issue-note sweep: `/tmp/nprmpi_issue_notes_repros_20260224_afterpatch.log` (`all verified issue-note repros passed`)
    - tarball build: `/tmp/nprmpi_build_20260224_checkpoint.log` (`creating vignettes ... OK`)
+
+## `npRmpi` Ksum Fast-Path Default-On Promotion Probe (2026-02-24)
+Status: deferred (no code change).
+1. Ran bounded session-mode probes to evaluate promoting `np.plot.inid.ksum.fastpath.nprmpi` from opt-in to default-on.
+2. In this sandbox/runtime, method-level probes did not complete within practical time bounds for all density-family cases, so promotion was not enabled in this checkpoint.
+3. Safety decision: keep current default-off gate, retain fallback behavior, and require explicit opt-in until bounded reproducible performance/parity evidence is complete.
