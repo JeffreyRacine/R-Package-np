@@ -156,16 +156,16 @@ npuniden.boundary <- function(X=NULL,
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-        sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
+        sapply(seq_along(X), function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b)**2)[length(X.seq)]})
     }
     fhat <- function(X,Y,h,a=0,b=1,proper=FALSE) {
-        f <- sapply(1:length(Y),function(i){mean(kernel(Y[i],X,h,a,b))})
+        f <- sapply(seq_along(Y), function(i){mean(kernel(Y[i],X,h,a,b))})
         if(proper) {
             if(is.finite(a) && is.finite(b)) X.seq <- seq(a,b,length=1000)
             if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
             if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
             if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-            f.seq <- sapply(1:length(X.seq),function(i){mean(kernel(X.seq[i],X,h,a,b))})
+            f.seq <- sapply(seq_along(X.seq), function(i){mean(kernel(X.seq[i],X,h,a,b))})
             if(any(f.seq<0)) {
                 f <- f - min(f.seq)
                 f.seq <- f.seq - min(f.seq)
@@ -193,7 +193,7 @@ npuniden.boundary <- function(X=NULL,
         F
     }
     fhat.loo <- function(X,h,a=0,b=1) {
-        sapply(1:length(X),function(i){mean(kernel(X[i],X[-i],h,a,b))})
+        sapply(seq_along(X), function(i){mean(kernel(X[i],X[-i],h,a,b))})
     }
     if(bwmethod=="cv.ml") {
         ## Likelihood cross-validation function (maximizing)
@@ -221,7 +221,7 @@ npuniden.boundary <- function(X=NULL,
             rob.spread <- min(rob.spread[rob.spread>0])
             constant <- rob.spread*length(X)**(-0.2)
             h.vec <- c(seq(0.25,1.75,length=10),2^(1:25))*constant
-            cv.vec <- sapply(1:length(h.vec),function(i){cv.function(h.vec[i],X,a,b)})
+            cv.vec <- sapply(seq_along(h.vec), function(i){cv.function(h.vec[i],X,a,b)})
             foo <- optim(h.vec[ifelse(bwmethod=="cv.ml",which.max(cv.vec),which.min(cv.vec))],
                          cv.function,
                          method="L-BFGS-B",
@@ -234,7 +234,7 @@ npuniden.boundary <- function(X=NULL,
             h.opt <- foo$par
             cv.opt <- foo$value
         } else {
-            cv.vec <- sapply(1:length(grid),function(i){cv.function(grid[i],X,a,b)})
+            cv.vec <- sapply(seq_along(grid), function(i){cv.function(grid[i],X,a,b)})
             foo <- optim(grid[ifelse(bwmethod=="cv.ml",which.max(cv.vec),which.min(cv.vec))],
                          cv.function,
                          method="L-BFGS-B",

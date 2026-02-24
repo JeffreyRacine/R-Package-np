@@ -80,11 +80,11 @@ npuniden.sc <- function(X=NULL,
         if(is.finite(a) && !is.finite(b)) X.seq <- seq(a,extendrange(X,f=10)[2],length=1000)
         if(!is.finite(a) && is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],b,length=1000)
         if(!is.finite(a) && !is.finite(b)) X.seq <- seq(extendrange(X,f=10)[1],extendrange(X,f=10)[2],length=1000)
-        sapply(1:length(X),function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b,deriv=0)^2)[length(X.seq)]})
+        sapply(seq_along(X), function(i){integrate.trapezoidal(X.seq,h*kernel(X[i],X.seq,h,a,b,deriv=0)^2)[length(X.seq)]})
     }
 
     W.kernel <- function(x,X,h,a=0,b=1,deriv=0) {
-        sapply(1:length(x),function(i){kernel(x[i],X,h,a,b,deriv)})
+        sapply(seq_along(x), function(i){kernel(x[i],X,h,a,b,deriv)})
     }
     
     if(is.null(X)) stop("you must pass a vector X")
@@ -240,9 +240,9 @@ npuniden.sc <- function(X=NULL,
     ## points Y if Y is specified)
 
     if(is.null(Y)) {
-        index <- 1:n.train
+        index <- seq_len(n.train)
     } else {
-        index <- 1:length(Y)
+        index <- seq_along(Y)
     }
 
     se.f <- sqrt(abs(f*int.kernel.squared(X.grid,h,a,b)/(h*length(f))))[index]
