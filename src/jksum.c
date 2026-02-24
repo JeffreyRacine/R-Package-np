@@ -12265,12 +12265,14 @@ double *SIGN){
     int glp_nterms = 0;
     const int use_bernstein = (int_glp_bernstein_extern != 0);
     MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+    MATRIX KWM2 = NULL, KWM_INV = NULL, IDEN = NULL;
     double **basis = NULL;
     double **TCON = NULL, **TUNO = NULL, **TORD = NULL;
     double **Ycols = NULL, **Wcols = NULL;
-    double *y2 = NULL, *out = NULL;
+    double *y2 = NULL, *out = NULL, *out2 = NULL;
     NPGLPBasisCtx *basis_ctx = NULL;
     double *eval_basis = NULL, *eval_deriv = NULL;
+    double *tmp_v = NULL, *tmp_w = NULL;
     const double epsilon = 1.0/(double)MAX(1, num_obs_train);
 
     if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
@@ -12284,6 +12286,9 @@ double *SIGN){
     KWM = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
     XTKY = mat_creat(glp_nterms, 1, UNDEFINED);
     DELTA = mat_creat(glp_nterms, 1, UNDEFINED);
+    KWM2 = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
+    KWM_INV = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
+    IDEN = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
     basis = alloc_matd(num_obs_train, glp_nterms);
     TCON = alloc_matd(1, num_reg_continuous);
     TUNO = alloc_matd(1, num_reg_unordered);
@@ -12292,17 +12297,22 @@ double *SIGN){
     Wcols = (double **)malloc((size_t)glp_nterms*sizeof(double *));
     y2 = (double *)malloc((size_t)num_obs_train*sizeof(double));
     out = (double *)malloc((size_t)(glp_nterms + 2)*(size_t)glp_nterms*sizeof(double));
+    out2 = (double *)malloc((size_t)glp_nterms*(size_t)glp_nterms*sizeof(double));
+    tmp_v = (double *)malloc((size_t)glp_nterms*sizeof(double));
+    tmp_w = (double *)malloc((size_t)glp_nterms*sizeof(double));
     eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
     eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
     if(use_bernstein)
       basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
 
     if(!((KWM != NULL) && (XTKY != NULL) && (DELTA != NULL) &&
+      (KWM2 != NULL) && (KWM_INV != NULL) && (IDEN != NULL) &&
       (basis != NULL) &&
       ((num_reg_continuous == 0) || (TCON != NULL)) &&
       ((num_reg_unordered == 0) || (TUNO != NULL)) &&
       ((num_reg_ordered == 0) || (TORD != NULL)) &&
       (Ycols != NULL) && (Wcols != NULL) && (y2 != NULL) && (out != NULL) &&
+      (out2 != NULL) && (tmp_v != NULL) && (tmp_w != NULL) &&
       (eval_basis != NULL) && (eval_deriv != NULL) &&
       (!use_bernstein || (basis_ctx != NULL))))
       error("memory allocation failed in glp path");
@@ -12341,7 +12351,8 @@ double *SIGN){
 
     for(j = 0; j < num_obs_eval; j++){
       double nepsilon = 0.0;
-      double sk, ey, ey2;
+      double sk, ey, ey2, sigma2hat;
+      int have_vcov = 0;
 
       for(l = 0; l < num_reg_continuous; l++)
         TCON[l][0] = matrix_X_continuous_eval[l][j];
@@ -12450,8 +12461,99 @@ double *SIGN){
       sk = copysign(DBL_MIN, out[2]) + out[2]; /* sum K * W0 * W0 */
       ey = out[1]/sk;  /* sum K * W0 * y / sk */
       ey2 = out[0]/sk; /* sum K * W0 * y^2 / sk */
-      mean_stderr[j] = (ey2 - ey*ey);
-      mean_stderr[j] = (mean_stderr[j] <= 0.0) ? 0.0 : sqrt(mean_stderr[j] * K_INT_KERNEL_P / (sk*hprod));
+      sigma2hat = ey2 - ey*ey;
+      mean_stderr[j] = (sigma2hat <= 0.0) ? 0.0 : sqrt(sigma2hat * K_INT_KERNEL_P / (sk*hprod));
+      sigma2hat = (sigma2hat <= 0.0) ? 0.0 : sigma2hat;
+
+      for(l = 0; l < glp_nterms; l++){
+        Ycols[l] = basis[l];
+        Wcols[l] = basis[l];
+      }
+
+      kernel_weighted_sum_np(kernel_c,
+                             kernel_u,
+                             kernel_o,
+                             BANDWIDTH_reg,
+                             num_obs_train,
+                             1,
+                             num_reg_unordered,
+                             num_reg_ordered,
+                             num_reg_continuous,
+                             0,
+                             0,
+                             2,
+                             1,
+                             0,
+                             0,
+                             0,
+                             0,
+                             0,
+                             operator,
+                             OP_NOOP,
+                             0,
+                             0,
+                             NULL,
+                             1,
+                             glp_nterms,
+                             glp_nterms,
+                             (BANDWIDTH_reg == BW_ADAP_NN) ? NP_TREE_FALSE : int_TREE_X,
+                             0,
+                             (BANDWIDTH_reg == BW_ADAP_NN) ? NULL : kdt_extern_X,
+                             NULL, NULL, NULL,
+                             matrix_X_unordered_train,
+                             matrix_X_ordered_train,
+                             matrix_X_continuous_train,
+                             TUNO,
+                             TORD,
+                             TCON,
+                             Ycols,
+                             Wcols,
+                             NULL,
+                             vector_scale_factor,
+                             1,
+                             matrix_bandwidth,
+                             matrix_bandwidth,
+                             lambda,
+                             num_categories,
+                             matrix_categorical_vals,
+                             NULL,
+                             out2,
+                             NULL,
+                             NULL);
+
+      for(i = 0; i < glp_nterms; i++){
+        const int base = i*glp_nterms;
+        for(l = 0; l < glp_nterms; l++){
+          KWM2[i][l] = out2[base + l];
+          IDEN[i][l] = (i == l) ? 1.0 : 0.0;
+        }
+      }
+
+      if(mat_solve(KWM, IDEN, KWM_INV) != NULL)
+        have_vcov = 1;
+
+      if(have_vcov){
+        double q = 0.0;
+        for(i = 0; i < glp_nterms; i++){
+          double vv = 0.0;
+          for(int ii = 0; ii < glp_nterms; ii++)
+            vv += KWM_INV[i][ii]*eval_basis[ii];
+          tmp_v[i] = vv;
+        }
+        for(i = 0; i < glp_nterms; i++){
+          double ww = 0.0;
+          for(int ii = 0; ii < glp_nterms; ii++)
+            ww += KWM2[i][ii]*tmp_v[ii];
+          tmp_w[i] = ww;
+        }
+        for(i = 0; i < glp_nterms; i++)
+          q += tmp_v[i]*tmp_w[i];
+        {
+          const double mv = sigma2hat*q;
+          if((mv > 0.0) && isfinite(mv))
+            mean_stderr[j] = sqrt(mv);
+        }
+      }
 
       if(do_grad){
         for(l = 0; l < num_reg_continuous; l++){
@@ -12475,8 +12577,31 @@ double *SIGN){
           gradient[l][j] = 0.0;
           for(i = 0; i < glp_nterms; i++)
             gradient[l][j] += eval_deriv[i]*DELTA[i][0];
-          if(do_gerr)
-            gradient_stderr[l][j] = 0.0;
+          if(do_gerr){
+            if(have_vcov){
+              double q = 0.0;
+              for(i = 0; i < glp_nterms; i++){
+                double vv = 0.0;
+                for(int ii = 0; ii < glp_nterms; ii++)
+                  vv += KWM_INV[i][ii]*eval_deriv[ii];
+                tmp_v[i] = vv;
+              }
+              for(i = 0; i < glp_nterms; i++){
+                double ww = 0.0;
+                for(int ii = 0; ii < glp_nterms; ii++)
+                  ww += KWM2[i][ii]*tmp_v[ii];
+                tmp_w[i] = ww;
+              }
+              for(i = 0; i < glp_nterms; i++)
+                q += tmp_v[i]*tmp_w[i];
+              {
+                const double gv = sigma2hat*q;
+                gradient_stderr[l][j] = (gv > 0.0 && isfinite(gv)) ? sqrt(gv) : 0.0;
+              }
+            } else {
+              gradient_stderr[l][j] = 0.0;
+            }
+          }
         }
         for(l = num_reg_continuous; l < (num_reg_continuous + num_reg_unordered + num_reg_ordered); l++){
           gradient[l][j] = 0.0;
@@ -12488,6 +12613,9 @@ double *SIGN){
     mat_free(KWM);
     mat_free(XTKY);
     mat_free(DELTA);
+    mat_free(KWM2);
+    mat_free(KWM_INV);
+    mat_free(IDEN);
     free_mat(basis, glp_nterms);
     if((TCON != NULL) && (num_reg_continuous > 0)) free_mat(TCON, num_reg_continuous);
     if((TUNO != NULL) && (num_reg_unordered > 0)) free_mat(TUNO, num_reg_unordered);
@@ -12496,6 +12624,9 @@ double *SIGN){
     free(Wcols);
     free(y2);
     free(out);
+    free(out2);
+    free(tmp_v);
+    free(tmp_w);
     if(use_bernstein){
       for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
       free(basis_ctx);
