@@ -503,3 +503,16 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_bstarfix_20260224.log` (`BUILD_RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_bstarfix_20260224.log` (`Status: OK`)
+
+## Issue-Note Hat/Bootstrap Regression Guard Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Extended periodic verified-issue repro harness with explicit serial guards for modern hat/bootstrap paths:
+   - `npreghat` fit-operator parity versus `npreg` fitted values.
+   - `plot(..., plot.errors.boot.method="wild-hat")` smoke on `rbandwidth`.
+2. Scope:
+   - `issue_notes/verified_issue_repros.R`
+3. Commit:
+   - `np-master`: `80191c2`
+4. Validation:
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_032316.log` (all verified repros passed)
