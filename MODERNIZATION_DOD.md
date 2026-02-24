@@ -493,7 +493,7 @@ Completed in `np-master`:
    - `R/b.star.R`
    - `tests/testthat/test-utils.R`
 5. Commit:
-   - `np-master`: `<pending>`
+   - `np-master`: `c2916ae`
 6. Validation:
    - focused tests:
      - `/tmp/np_master_bstar_fix_tests_20260224.log` (`PASS 6, FAIL 0`)
