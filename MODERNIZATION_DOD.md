@@ -917,3 +917,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_seq_edge_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_seq_edge_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## Bootstrap Wild-Draw Refactor Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced repeated `ifelse(rbinom(...))` bootstrap multipliers with a lightweight preallocated vector helper (`runif` + logical assignment) in test/bootstrap-heavy paths.
+2. Scope:
+   - `R/np.cmstest.R`
+   - `R/np.qcmstest.R`
+   - `R/np.sigtest.R`
+3. Commit:
+   - `np-npRmpi`: `b07921f`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/np.cmstest.R')); invisible(parse(file='R/np.qcmstest.R')); invisible(parse(file='R/np.sigtest.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='cmstest|qcmstest|sigtest', reporter='summary')` (`RC:0`)
+     - log: `/tmp/nprmpi_bootdraw_refactor_tests_20260224.log`
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_053149.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_bootdraw_refactor_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_bootdraw_refactor_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
