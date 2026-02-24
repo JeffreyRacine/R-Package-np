@@ -1028,10 +1028,15 @@ genOmitStr <- function(x){
 
 ## Estimation-related rgf's
 genGofStr <- function(x){
-  paste(ifelse(is.na(x$MSE),"",paste("\nResidual standard error:",
-                                     format(sqrt(x$MSE)))),
-        ifelse(is.na(x$R2),"",paste("\nR-squared:",
-                                    format(x$R2))), sep="")
+  mse.str <- ""
+  if (!is.na(x$MSE))
+    mse.str <- paste("\nResidual standard error:", format(sqrt(x$MSE)))
+
+  r2.str <- ""
+  if (!is.na(x$R2))
+    r2.str <- paste("\nR-squared:", format(x$R2))
+
+  paste(mse.str, r2.str, sep = "")
 }
 
 genTimingStr <- function(x){
