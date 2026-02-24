@@ -94,10 +94,10 @@ npregivderiv <- function(y,
   if(!is.null(x)) z <- data.frame(z,x)
   if(!is.null(xeval)) zeval <- data.frame(zeval,xeval)
 
-  z.numeric <- sapply(1:NCOL(z),function(i){is.numeric(z[,i])})
+  z.numeric <- sapply(seq_len(NCOL(z)),function(i){is.numeric(z[,i])})
   num.z.numeric <- NCOL(as.data.frame(z[,z.numeric]))
 
-  w.numeric <- sapply(1:NCOL(w),function(i){is.numeric(w[,i])})
+  w.numeric <- sapply(seq_len(NCOL(w)),function(i){is.numeric(w[,i])})
   num.w.numeric <- NCOL(as.data.frame(w[,w.numeric]))
 
   ## Landweber-Fridman
@@ -574,4 +574,3 @@ plot.npregivderiv <- function(x,
          ...)
   }
 }
-
