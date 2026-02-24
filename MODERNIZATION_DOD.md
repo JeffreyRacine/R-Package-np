@@ -224,6 +224,19 @@ Completed in `np-npRmpi`:
    - issue-note repro sweep:
      - `/tmp/nprmpi_issue_notes_repros_npuniden_maskmodern_20260224.log` (`RC:0`).
 
+## Bounded Predict-Path Contract Expansion (2026-02-24)
+Completed in `np-npRmpi`:
+1. Extended bounded-kernel contract coverage to assert that `predict(...)` entry points enforce eval-bound hard stops with variable-specific diagnostics.
+2. Scope:
+   - `tests/testthat/test-bounded-kernel-contract.R`
+3. Covered classes:
+   - `npdensity`, `npdistribution`, `npregression`, `condensity`, `condistribution`.
+4. Validation:
+   - targeted contract file:
+     - `/tmp/nprmpi_bounded_predict_contract_20260224.log` (`NO_FAIL_MARKERS`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_postboundedtests_20260224.log` (`RC:0`).
+
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-npRmpi`:
 1. Replaced residual `1:n` column reconstruction and `setdiff(1:(...))` forms with `seq_len(...)` in conditional bw selectors.

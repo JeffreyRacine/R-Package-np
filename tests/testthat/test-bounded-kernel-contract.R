@@ -122,3 +122,84 @@ test_that("evaluation support violations are caught before native execution", {
     "x >"
   )
 })
+
+test_that("predict paths enforce bounded eval checks with variable diagnostics", {
+  set.seed(20260224)
+  x <- runif(80)
+  y <- runif(80)
+  dat.x <- data.frame(x = x)
+  dat.y <- data.frame(y = y)
+
+  bw.den <- npudensbw(
+    dat = dat.x,
+    bws = 0.2,
+    bandwidth.compute = FALSE,
+    ckerbound = "range"
+  )
+  fit.den <- npudens(bws = bw.den, tdat = dat.x)
+  expect_error(
+    predict(fit.den, edat = data.frame(x = max(x) + 0.01)),
+    "Evaluation data violate 'ckerbound' bounds: x >"
+  )
+
+  bw.dist <- npudistbw(
+    dat = dat.x,
+    bws = 0.2,
+    bandwidth.compute = FALSE,
+    ckerbound = "range"
+  )
+  fit.dist <- npudist(bws = bw.dist, tdat = dat.x)
+  expect_error(
+    predict(fit.dist, edat = data.frame(x = max(x) + 0.01)),
+    "Evaluation data violate 'ckerbound' bounds: x >"
+  )
+
+  bw.reg <- npregbw(
+    xdat = dat.x,
+    ydat = y,
+    bws = 0.2,
+    bandwidth.compute = FALSE,
+    ckerbound = "range"
+  )
+  fit.reg <- npreg(bws = bw.reg, txdat = dat.x, tydat = y)
+  expect_error(
+    predict(fit.reg, exdat = data.frame(x = max(x) + 0.01)),
+    "Evaluation data violate 'ckerbound' bounds: x >"
+  )
+
+  bw.cd <- npcdensbw(
+    xdat = dat.x,
+    ydat = dat.y,
+    bws = c(0.2, 0.2),
+    bandwidth.compute = FALSE,
+    cxkerbound = "range",
+    cykerbound = "range"
+  )
+  fit.cd <- npcdens(bws = bw.cd, txdat = dat.x, tydat = dat.y)
+  expect_error(
+    predict(fit.cd, exdat = data.frame(x = max(x) + 0.01), eydat = data.frame(y = mean(y))),
+    "Evaluation data violate 'cxkerbound' bounds: x >"
+  )
+  expect_error(
+    predict(fit.cd, exdat = data.frame(x = mean(x)), eydat = data.frame(y = max(y) + 0.01)),
+    "Evaluation data violate 'cykerbound' bounds: y >"
+  )
+
+  bw.cdist <- npcdistbw(
+    xdat = dat.x,
+    ydat = dat.y,
+    bws = c(0.2, 0.2),
+    bandwidth.compute = FALSE,
+    cxkerbound = "range",
+    cykerbound = "range"
+  )
+  fit.cdist <- npcdist(bws = bw.cdist, txdat = dat.x, tydat = dat.y)
+  expect_error(
+    predict(fit.cdist, exdat = data.frame(x = max(x) + 0.01), eydat = data.frame(y = mean(y))),
+    "Evaluation data violate 'cxkerbound' bounds: x >"
+  )
+  expect_error(
+    predict(fit.cdist, exdat = data.frame(x = mean(x)), eydat = data.frame(y = max(y) + 0.01)),
+    "Evaluation data violate 'cykerbound' bounds: y >"
+  )
+})
