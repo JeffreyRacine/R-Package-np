@@ -121,7 +121,7 @@ draw.error.bands = function(ex, ely, ehy, lty = 2, col = par("col")){
 
 draw.error.bars = function(ex, ely, ehy, hbar = TRUE, hbarscale = 0.3, lty = 2, col = par("col")){
   yy = double(3*length(ex))
-  jj = 1:length(ex)*3
+  jj = seq_along(ex)*3
 
   yy[jj-2] = ely
   yy[jj-1] = ehy
@@ -234,7 +234,7 @@ plotFactor <- function(f, y, ...){
   }
 
   l.f = rep(f, each=3)
-  l.f[3*(1:length(f))] = NA
+  l.f[3*seq_along(f)] = NA
 
   l.y = unlist(lapply(y, function (p) { c(0,p,NA) }))
 
