@@ -1319,3 +1319,17 @@ Completed in `np-master`:
      - `/tmp/np_master_npindexbw_seqlen_tests_20260224.log`
    - issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_npindexbw_seqlen_20260224.log` (`RC:0`)
+
+## Plot Helper TSB Column Slice `seq_len` Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Replaced residual `tsb[, 1:(ncol(tsb)-1), drop=FALSE]` boot callback column slicing with `seq_len(ncol(tsb)-1L)` in plot bootstrap helpers.
+2. Scope:
+   - `R/np.plot.helpers.R`
+3. Validation:
+   - parse + plot-focused tests:
+     - `/tmp/np_master_plothelpers_seqlen_parse_20260224.log`
+     - `/tmp/np_master_plothelpers_seqlen_tests_20260224.log`
+   - session smoke (`geom` bootstrap route):
+     - `/tmp/np_master_plothelpers_seqlen_geom_smoke_20260224.out` (`NP_PLOTHELPERS_SEQLEN_GEOM_SMOKE_OK`)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_plothelpers_seqlen_20260224.log` (`RC:0`)

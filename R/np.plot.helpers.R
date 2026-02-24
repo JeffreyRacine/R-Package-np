@@ -965,7 +965,7 @@ compute.bootstrap.errors.rbandwidth =
       } else {
         function(tsb) {
           fit <- suppressWarnings(npreg(
-            txdat = tsb[, 1:(ncol(tsb) - 1), drop = FALSE],
+            txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
             exdat = exdat, bws = bws,
             gradients = gradients,
@@ -1987,7 +1987,7 @@ compute.bootstrap.errors.sibandwidth =
       } else {
         function(tsb) {
           fit <- npindex(
-            txdat = tsb[, 1:(ncol(tsb)-1), drop = FALSE],
+            txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
             exdat = xdat, bws = bws,
             gradients = gradients
