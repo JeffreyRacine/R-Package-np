@@ -761,3 +761,19 @@ Completed in `np-npRmpi`:
      - `/tmp/nprmpi_build_plotengine_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_plotengine_seq_20260224_en0.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
      - `/tmp/nprmpi_check_ascran_plotengine_seq_20260224.log` (`RC:1`; `lo0` NIC setting failed during MPI init in install stage, retried successfully with `en0`)
+
+## `npregiv` Loop-Range Hygiene Checkpoint (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual `1:ncol(...)` / `1:length(...)` index ranges in `npregiv` support paths with `seq_len(...)` / `seq_along(...)` to avoid `1:0` edge behavior.
+2. Scope:
+   - `R/npregiv.R`
+3. Commit:
+   - `np-npRmpi`: `4a1fe8f`
+4. Validation:
+   - targeted tests:
+     - `testthat::test_local(filter='npregiv', reporter='summary')` (`RC:0`; expected pre-existing monotone-stopping warnings)
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_042226.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_npregiv_seq_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_npregiv_seq_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
