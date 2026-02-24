@@ -959,3 +959,24 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_na_guard_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_na_guard_20260224.log` (`RC:0`, `Status: OK`)
+
+## `npuniden*` NA-Safe Range Validation Hardening (2026-02-24)
+Completed in `np-master`:
+1. Added deterministic missing-value guards and NA-safe range checks for univariate density helper entry points.
+2. Scope:
+   - `R/npuniden.boundary.R`
+   - `R/npuniden.reflect.R`
+   - `R/npuniden.sc.R`
+3. Commit:
+   - `np-master`: `4d91eeb`
+4. Validation:
+   - parse gate:
+     - log: `/tmp/np_master_uniden_na_guard_parse_20260224.log` (`PARSE_OK`)
+   - targeted tests:
+     - log: `/tmp/np_master_uniden_na_guard_tests_20260224.log` (`FAIL 0`; expected pre-existing `npuniden.sc` warning only)
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_uniden_na_guard.log` (all verified repros passed)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_064531.log`
+   - tarball-first:
+     - `/tmp/np_master_build_uniden_na_guard_novigs_20260224.log` (`RC:0`)
+     - `/tmp/np_master_check_uniden_na_guard_novigs_20260224.log` (`RC:0`, `Status: OK`)
