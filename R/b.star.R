@@ -91,7 +91,7 @@ b.star <- function(data,
     ## Compute the number of insignificant runs following each rho(k),
     ## k=1,...,mmax.
     
-    num.insignificant <- sapply(1:(mmax-Kn+1),
+    num.insignificant <- sapply(seq_len(max(mmax - Kn + 1L, 0L)),
                                 function(j){
                                   sum((abs(rho.k) < rho.k.crit)[j:(j+Kn-1)])
                                 })
