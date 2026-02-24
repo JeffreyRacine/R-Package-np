@@ -171,6 +171,28 @@ Completed in `np-npRmpi`:
    - issue-note repro sweep:
      - `/tmp/nprmpi_issue_notes_repros_sampleint_20260224.log` (`RC:0`).
 
+## Bootstrap Residual/Data `sample.int` Expansion (2026-02-24)
+Completed in `np-npRmpi`:
+1. Replaced residual/data bootstrap value-resampling with explicit index-resampling in:
+   - `R/np.cmstest.R`
+   - `R/np.qcmstest.R`
+   - `R/np.deptest.R`
+   - `R/np.sdeptest.R`
+   - `R/np.sigtest.R`
+2. Transformation:
+   - `sample(v, replace=TRUE)` -> `v[sample.int(length(v), replace=TRUE)]`.
+3. Validation:
+   - targeted tests:
+     - `/tmp/nprmpi_testslice_sampleint_20260224.log` (`NO_FAIL_MARKERS`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_sampleint_20260224.log` (`RC:0`)
+   - RNG-parity expression lock:
+     - `/tmp/sampleint_expression_parity_20260224.out` (`SAMPLE_INT_EQ_OK`)
+   - fixed/varying seed pre/post expression benchmark:
+     - `/tmp/sampleint_bootstrap_expr_prepost_raw_20260224.csv`
+     - `/tmp/sampleint_bootstrap_expr_prepost_summary_20260224.csv`
+     - `/tmp/sampleint_bootstrap_expr_prepost_parity_20260224.csv`.
+
 ## Conditional BW Column-Index Safety Checkpoint (2026-02-23)
 Completed in `np-npRmpi`:
 1. Replaced residual `1:n` column reconstruction and `setdiff(1:(...))` forms with `seq_len(...)` in conditional bw selectors.
