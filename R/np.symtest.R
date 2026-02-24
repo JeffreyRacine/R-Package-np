@@ -188,6 +188,8 @@ npsymtest <- function(data = NULL,
   ## Need to bootstrap integers for data.null to accommodate both
   ## numeric and factor/ordered.
 
+  tseries.idx <- seq_len(2L * length(data))
+
   if(boot.method == "iid")  {
 
     ## data.null is of length 2*n - if we use boot() we automatically
@@ -196,7 +198,7 @@ npsymtest <- function(data = NULL,
     ## bootstrap with a block length of 1 which is presumed to
     ## generate an iid bootstrap.
 
-    resampled.stat <- tsboot(tseries = 1:(2*length(data)),
+    resampled.stat <- tsboot(tseries = tseries.idx,
                              statistic = boot.fun,
                              R = boot.num,
                              n.sim = length(data),
@@ -214,7 +216,7 @@ npsymtest <- function(data = NULL,
       boot.blocklen <- b.star(as.numeric(data.matrix(data)),round=TRUE)[1,1]
     }
 
-    resampled.stat <- tsboot(tseries = 1:(2*length(data)),
+    resampled.stat <- tsboot(tseries = tseries.idx,
                              statistic = boot.fun,
                              R = boot.num,
                              n.sim = length(data),

@@ -226,6 +226,10 @@ npindexbw.sibandwidth <-
 
         if(bandwidth.compute){
 
+          ## Invariant objects used by objective evaluations.
+          xmat <- as.matrix(xdat)
+          wmat <- cbind(ydat, 1.0)
+
           ## Note - there are two methods currently implemented, Ichimura's
           ## least squares approach and Klein and Spady's likelihood approach.
 
@@ -251,20 +255,18 @@ npindexbw.sibandwidth <-
 
             ## Next we define the sum of squared leave-one-out residuals
 
-            sum.squares.leave.one.out <- function(xdat,ydat,beta,h) {
+            sum.squares.leave.one.out <- function(beta,h) {
 
               ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
 
-              index <- as.matrix(xdat) %*% c(1,beta)
+              index <- xmat %*% c(1,beta)
 
               ## One call to npksum to avoid repeated computation of the
               ## product kernel (the expensive part)
 
-              W <- as.matrix(data.frame(ydat,1))
-
               tww <- npksum(txdat=index,
-                            tydat=W,
-                            weights=W,
+                            tydat=wmat,
+                            weights=wmat,
                             leave.one.out=TRUE,
                             bandwidth.divide=TRUE,
                             bws=c(h),
@@ -285,7 +287,7 @@ npindexbw.sibandwidth <-
             ## return an infinite penalty for negative h
 
             if(h > 0) {
-              return(sum.squares.leave.one.out(xdat,ydat,beta,h))
+              return(sum.squares.leave.one.out(beta,h))
             } else {
               return(ichimuraMaxPenalty)
             }
@@ -316,20 +318,18 @@ npindexbw.sibandwidth <-
 
             ## Next we define the sum of logs
 
-            sum.log.leave.one.out <- function(xdat,ydat,beta,h) {
+            sum.log.leave.one.out <- function(beta,h) {
 
               ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
 
-              index <- as.matrix(xdat) %*% c(1,beta)
+              index <- xmat %*% c(1,beta)
 
               ## One call to npksum to avoid repeated computation of the
               ## product kernel (the expensive part)
 
-              W <- as.matrix(data.frame(ydat,1))
-
               tww <- npksum(txdat=index,
-                            tydat=W,
-                            weights=W,
+                            tydat=wmat,
+                            weights=wmat,
                             leave.one.out=TRUE,
                             bandwidth.divide=TRUE,
                             bws=c(h),
@@ -360,7 +360,7 @@ npindexbw.sibandwidth <-
             ## return an infinite penalty for negative h
 
             if(h > 0) {
-              return(sum.log.leave.one.out(xdat,ydat,beta,h))
+              return(sum.log.leave.one.out(beta,h))
             } else {
               ## No natural counterpart to var of y here, unlike Ichimura above...
               return(sqrt(.Machine$double.xmax))
