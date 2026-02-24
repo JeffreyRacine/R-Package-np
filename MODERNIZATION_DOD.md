@@ -52,13 +52,22 @@ Completed in `np-master`:
 2. Scope:
    - `src/jksum.c`
    - touched surfaces: kernel marginal denominators, ridge-adjusted `KWM[0][0]` correction terms, and all-large-h CV leave-one-out denominator guard (`1 - hii`).
-3. Validation:
+3. Hardened `np` issue-note runner scripts with bounded execution time:
+   - `issue_notes/run_native_bridge_stress.sh`
+   - `issue_notes/run_verified_issue_repros.sh`
+   - added timeout wrappers (`timeout`/`gtimeout`/Perl alarm fallback).
+4. Validation:
    - bounded CV-LS contracts:
      - `/tmp/np_master_bounded_cvls_contract_nzdpos_20260224.log`
    - native bridge stress:
      - `/tmp/np_master_native_bridge_stress_nzdpos_20260224.log`
    - verified issue-note repro sweep:
      - `/tmp/np_issue_notes_repros_nzdpos_20260224.log`
+   - timeout-hardened runner validation:
+     - `/tmp/np_native_bridge_stress_20260224_133122.log`
+     - `/tmp/np_issue_notes_repros_20260224_133143.log`
+   - shellcheck:
+     - `shellcheck issue_notes/run_native_bridge_stress.sh issue_notes/run_verified_issue_repros.sh`
    - tarball build:
      - `/tmp/np_master_build_nzdpos_20260224.log` (`creating vignettes ... OK`)
 
