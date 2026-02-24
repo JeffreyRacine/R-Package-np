@@ -154,7 +154,7 @@ npconmode.conbandwidth <-
       efac <- factor(union(bws$ydati$all.lev[[1]], levels(eydat[,1])),
                      levels = union(bws$ydati$all.lev[[1]], levels(eydat[,1])), ordered = is.ordered(tydat[,1]))
 
-    for(i in 1:nlevels(efac)){
+    for (i in seq_len(nlevels(efac))) {
         tdens <- npcdens(
           txdat = txdat,
           tydat = tydat,
