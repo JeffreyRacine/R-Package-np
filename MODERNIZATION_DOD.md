@@ -502,3 +502,24 @@ Completed in `np-npRmpi`:
    - tarball-first:
      - `/tmp/nprmpi_build_plotifelse2_20260223.log` (`BUILD_RC:0`)
      - `/tmp/nprmpi_check_plotifelse2_20260223.log` (`Status: OK`)
+
+## Plot Bandwidth/Dbandwidth Scalar-Branch Checkpoint (2026-02-23)
+Completed in `np-npRmpi`:
+1. Replaced residual scalar `ifelse(...)` branches in density/regression bandwidth plot engines.
+2. Scope:
+   - `R/np.plot.engine.bandwidth.R`
+   - `R/np.plot.engine.dbandwidth.R`
+3. Changes:
+   - scalar `xi.factor` error-style/error-bar selectors now use scalar `if`
+   - scalar `xi.factor` linetype selector in `dbandwidth` now uses scalar `if`
+4. Commit:
+   - `np-npRmpi`: `cc25213`
+5. Validation:
+   - parse gate: `PARSE_OK`
+   - focused tests:
+     - `/tmp/nprmpi_plot_ifelse3_tests_20260223.log` (`RC:0`)
+   - issue-note repro sweep:
+     - `/tmp/nprmpi_issue_notes_repros_plotifelse3_20260223.log` (all verified repros passed)
+   - tarball-first:
+     - `/tmp/nprmpi_build_plotifelse3_20260223.log` (`BUILD_RC:0`)
+     - `/tmp/nprmpi_check_plotifelse3_20260223.log` (`Status: OK`)
