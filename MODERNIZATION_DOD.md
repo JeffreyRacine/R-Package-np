@@ -556,7 +556,7 @@ Completed in `np-npRmpi`:
    - `paste(ifelse(gradients, ...))` -> scalar `if` branch.
    - `mean(ifelse(condition, 1, 0))` -> `mean(condition)`.
 3. Commit:
-   - `np-npRmpi`: `<pending>`
+   - `np-npRmpi`: `528c639`
 4. Validation:
    - targeted tests:
      - `/tmp/nprmpi_nptests_plotifelse5_20260224.log` (`PASS 18, FAIL 0`)
