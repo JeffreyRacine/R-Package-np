@@ -22,6 +22,10 @@
   - `npudens`, `npudist`, `npreg`, `npcdens`, `npcdist`, `npksum`.
 - Completed semiparametric propagation in:
   - `np.plregression.bw.R`, `np.singleindex.bw.R`.
+- Added positive-only denominator guards (`NZD_POS`) in bounded/native hot paths where denominator sign is known nonnegative:
+  - kernel marginal denominator guards in convolution CV loops,
+  - ridge-adjusted `KWM[0][0]` correction terms,
+  - all-large-h CV leave-one-out denominator guard (`1 - hii`).
 
 ## Remaining (core implementation)
 
@@ -42,9 +46,8 @@
 - If bounded convolution is unavailable for a path, define/implement explicit fallback behavior and document it.
 
 4. Denominator micro-optimization (`NZD_pos` in C)
-- Add/use a positive-only fast denominator guard for known-positive quantities in `jksum.c` (C analogue of R-side `NZD_pos` usage in `util.R`).
-- Apply this in hot paths where denominator sign is known positive (including bounded-kernel normalization), instead of generic signed guards.
-- Benchmark before/after because this path is called very frequently.
+- Expand/verify positive-only guard coverage for any remaining known-nonnegative denominator sites in `jksum.c` beyond the current rollout.
+- Add focused pre/post perf artifacts for this micro-optimization slice (fixed and varying seed policy where applicable).
 
 5. Predict/eval policy
 - Verify hard-stop behavior is consistent across all user-facing predict/eval paths.

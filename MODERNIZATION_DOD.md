@@ -46,6 +46,22 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
    - full performance-governance artifacts for performance-sensitive native patches,
    - win-builder closure before release candidate.
 
+## C Denominator Guard Checkpoint (2026-02-24)
+Completed in `np-master`:
+1. Switched known-positive denominator guards from `NZD(...)` to `NZD_POS(...)` in hot native paths to align with bounded-kernel positivity contracts and reduce unnecessary signed-guard branching.
+2. Scope:
+   - `src/jksum.c`
+   - touched surfaces: kernel marginal denominators, ridge-adjusted `KWM[0][0]` correction terms, and all-large-h CV leave-one-out denominator guard (`1 - hii`).
+3. Validation:
+   - bounded CV-LS contracts:
+     - `/tmp/np_master_bounded_cvls_contract_nzdpos_20260224.log`
+   - native bridge stress:
+     - `/tmp/np_master_native_bridge_stress_nzdpos_20260224.log`
+   - verified issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_nzdpos_20260224.log`
+   - tarball build:
+     - `/tmp/np_master_build_nzdpos_20260224.log` (`creating vignettes ... OK`)
+
 ## Mandatory Release Gates
 
 ### 1) Interface and Semantics

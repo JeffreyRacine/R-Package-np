@@ -6617,7 +6617,7 @@ double *cv){
       *cv = DBL_MAX;
       break;
       } jracine 16/05/10, test for zero respecting sign */
-    sum_ker_marginalf[j] =  NZD(sum_ker_marginalf[j]);
+    sum_ker_marginalf[j] =  NZD_POS(sum_ker_marginalf[j]);
     *cv += (sum_ker_convolf[j]/sum_ker_marginalf[j]-2.0*sum_kerf[j])/sum_ker_marginalf[j];
   }
 #else
@@ -6626,7 +6626,7 @@ double *cv){
       *cv = DBL_MAX;
       break;
       } jracine 16/05/10 */
-    sum_ker_marginal[j] =  NZD(sum_ker_marginal[j]);
+    sum_ker_marginal[j] =  NZD_POS(sum_ker_marginal[j]);
     *cv += (sum_ker_convol[j]/sum_ker_marginal[j]-2.0*sum_ker[j])/sum_ker_marginal[j];
   }
 
@@ -7643,7 +7643,7 @@ int gate_override_active = 0;
         nepsilon += epsilon;
       }
 
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
       if(nepsilon > 0.0){
         if(mat_solve(KWM, XTKY, DELTA) == NULL){
           glp_ok = 0;
@@ -7955,7 +7955,7 @@ int gate_override_active = 0;
 
             const double err = vector_Y[i] - yhat;
             if(bwm == RBWM_CVLS){
-              const double den = NZD(1.0 - hii);
+              const double den = NZD_POS(1.0 - hii);
               const double err_loo = err/den;
               cv += err_loo*err_loo;
             } else {
@@ -8621,7 +8621,7 @@ int gate_override_active = 0;
         nepsilon += epsilon;
       }
 
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
       if(nepsilon > 0.0){
         if(mat_solve(KWM, XTKY, DELTA) == NULL)
           error("mat_solve failed after ridge adjustment");
@@ -12460,7 +12460,7 @@ double *SIGN){
         nepsilon += epsilon;
       }
 
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
       if(nepsilon > 0.0){
         if(mat_solve(KWM, XTKY, DELTA) == NULL)
           error("mat_solve failed in glp path");
@@ -12943,7 +12943,7 @@ double *SIGN){
         nepsilon += epsilon;
       }
 
-      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+      XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
       if(nepsilon > 0.0){
         if(mat_solve(KWM, XTKY, DELTA) == NULL)
           error("mat_solve failed after ridge adjustment");
@@ -12986,7 +12986,7 @@ double *SIGN){
             nepsilon += epsilon;
           }
 
-          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
           if(nepsilon > 0.0){
             if(mat_solve(KWM, XTKY, DELTA) == NULL)
               error("mat_solve failed after ridge adjustment");
@@ -13031,7 +13031,7 @@ double *SIGN){
             nepsilon += epsilon;
           }
 
-          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD(KWM[0][0]);
+          XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
           if(nepsilon > 0.0){
             if(mat_solve(KWM, XTKY, DELTA) == NULL)
               error("mat_solve failed after ridge adjustment");
