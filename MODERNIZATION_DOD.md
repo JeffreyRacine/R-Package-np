@@ -998,3 +998,24 @@ Completed in `np-npRmpi`:
    - tarball-first (MPI env pinned):
      - `/tmp/nprmpi_build_gofstr_scalar_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/nprmpi_check_ascran_gofstr_scalar_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
+
+## `util.R` Scalar-Branch Follow-On (`NZD`/`genBwScaleStrs`) (2026-02-24)
+Completed in `np-npRmpi`:
+1. Removed additional scalar `ifelse(...)` usage in hot/summary utility paths:
+   - `NZD()` small-value assignment now uses direct sign-mask replacement,
+   - `genBwScaleStrs()` scalar label/summary string branches now use explicit scalar `if`.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-npRmpi`: `162b09e`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); cat('PARSE_OK\n')"` (`RC:0`)
+   - targeted tests (`NOT_CRAN=true`):
+     - `testthat::test_local(filter='utils|bandwidth|bw-dispatch|formula-bw-contract', reporter='summary')` (`RC:0`)
+     - log: `/tmp/nprmpi_util_scalar2_tests_20260224.log`
+   - issue-note repro sweep (MPI env pinned):
+     - `/tmp/nprmpi_issue_notes_repros_20260224_060257.log` (all verified repros passed)
+   - tarball-first (MPI env pinned):
+     - `/tmp/nprmpi_build_util_scalar2_20260224.log` (`RC:0`, `creating vignettes ... OK`)
+     - `/tmp/nprmpi_check_ascran_util_scalar2_20260224.log` (`RC:0`, `Status: 1 WARNING, 2 NOTEs`; warning set unchanged from existing top-level-file debt)
