@@ -237,7 +237,7 @@ npreg.rbandwidth <-
       for (ii in which(bws$icon)) {
         tr <- range(as.numeric(txdat[[ii]]))
         ex <- as.numeric(exdat[[ii]])
-        if (any(ex < tr[1] | ex > tr[2])) {
+        if (any(ex < tr[1] | ex > tr[2], na.rm = TRUE)) {
           stop("bernstein.basis=TRUE requires evaluation continuous predictors to lie within training support; use bernstein.basis=FALSE for extrapolation")
         }
       }
