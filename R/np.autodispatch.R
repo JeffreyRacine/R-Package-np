@@ -185,6 +185,8 @@
      "gydat", "gdat", "wdat", "gdata",
      "data.x", "data.y", "model",
      "y", "z", "w", "x", "zeval", "weval", "xeval", "bw",
+     "regtype", "basis", "degree", "bernstein.basis",
+     "nmulti", "bandwidth.compute", "remin", "itmax", "ftol", "tol", "small",
      "gradients", "residuals", "errors", "gradient.order")
 }
 

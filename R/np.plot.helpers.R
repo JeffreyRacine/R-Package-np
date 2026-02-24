@@ -853,6 +853,23 @@ plotFactor <- function(f, y, ...){
   }
 })
 
+.npRmpi_bootstrap_uses_np_namespace <- function(fun) {
+  if (!is.function(fun))
+    return(FALSE)
+  env <- environment(fun)
+  if (is.null(env))
+    return(FALSE)
+  environmentName(env) %in% c("np", "namespace:np")
+}
+
+.npRmpi_bootstrap_maybe_local <- function(expr, estimators = list()) {
+  use.local <- length(estimators) > 0L &&
+    all(vapply(estimators, .npRmpi_bootstrap_uses_np_namespace, logical(1)))
+  if (use.local)
+    return(.npRmpi_with_local_bootstrap(expr))
+  force(expr)
+}
+
 .npRmpi_plot_behavior_for_rank <- function(plot.behavior) {
   if (!.npRmpi_autodispatch_called_from_bcast())
     return(plot.behavior)
@@ -1084,8 +1101,8 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    npreg_fit <- .npRmpi_bootstrap_estimator("npreg")
-    npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat")
+    npreg_fit <- .npRmpi_bootstrap_estimator("npreg.rbandwidth")
+    npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat.rbandwidth")
     H.fast <- NULL
     fast.inid.lc <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(plot.errors.boot.method == "inid") &&
@@ -1201,7 +1218,7 @@ compute.bootstrap.errors.rbandwidth =
         }
       }
 
-      boot.out <- .npRmpi_with_local_bootstrap({
+      boot.out <- .npRmpi_bootstrap_maybe_local({
         if (is.inid) {
           boot(
             data = data.frame(xdat, ydat),
@@ -1217,7 +1234,7 @@ compute.bootstrap.errors.rbandwidth =
             sim = plot.errors.boot.method
           )
         }
-      })
+      }, estimators = list(npreg_fit, npreghat_fit))
     }
 
     all.bp <- list()
@@ -1290,6 +1307,8 @@ compute.bootstrap.errors.scbandwidth =
            ...,
            bws){
     miss.z <- missing(zdat)
+    npscoef_fit <- .npRmpi_bootstrap_estimator("npscoef.scbandwidth")
+    npscoefhat_fit <- .npRmpi_bootstrap_estimator("npscoefhat")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -1320,8 +1339,8 @@ compute.bootstrap.errors.scbandwidth =
         hat.args$ezdat <- ezdat
       }
 
-      fit.train <- do.call(npscoef, fit.args)
-      H <- do.call(npscoefhat, hat.args)
+      fit.train <- do.call(npscoef_fit, fit.args)
+      H <- do.call(npscoefhat_fit, hat.args)
 
       t0 <- as.vector(H %*% as.double(ydat))
       eps <- as.double(ydat - as.vector(fit.train$mean))
@@ -1345,7 +1364,7 @@ compute.bootstrap.errors.scbandwidth =
 
       boofun <- if (is.inid) {
         function(data, indices) {
-          npscoef(
+          npscoef_fit(
             txdat = xdat[indices, , drop = FALSE],
             tydat = ydat[indices],
             tzdat = if (miss.z) NULL else zdat[indices, , drop = FALSE],
@@ -1357,7 +1376,7 @@ compute.bootstrap.errors.scbandwidth =
         }
       } else {
         function(tsb) {
-          npscoef(
+          npscoef_fit(
             txdat = tsb[, xcols, drop = FALSE],
             tydat = tsb[, ycol],
             tzdat = if (miss.z) NULL else tsb[, zcols, drop = FALSE],
@@ -1370,7 +1389,7 @@ compute.bootstrap.errors.scbandwidth =
       }
 
       boot.data <- if (miss.z) data.frame(xdat, ydat) else data.frame(xdat, ydat, zdat)
-      boot.out <- .npRmpi_with_local_bootstrap({
+      boot.out <- .npRmpi_bootstrap_maybe_local({
         if (is.inid) {
           boot(data = boot.data, statistic = boofun, R = plot.errors.boot.num)
         } else {
@@ -1379,7 +1398,7 @@ compute.bootstrap.errors.scbandwidth =
             l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
           )
         }
-      })
+      }, estimators = list(npscoef_fit, npscoefhat_fit))
     }
 
     all.bp <- list()
@@ -1460,6 +1479,8 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    npplreg_fit <- .npRmpi_bootstrap_estimator("npplreg.plbandwidth")
+    npplreghat_fit <- .npRmpi_bootstrap_estimator("npplreghat")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -1471,13 +1492,13 @@ compute.bootstrap.errors.plbandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- npplreg(
+      fit.train <- npplreg_fit(
         txdat = xdat,
         tydat = ydat,
         tzdat = zdat,
         bws = bws
       )
-      H <- npplreghat(
+      H <- npplreghat_fit(
         bws = bws,
         txdat = xdat,
         tzdat = zdat,
@@ -1504,7 +1525,7 @@ compute.bootstrap.errors.plbandwidth =
     } else {
       boofun <- if (is.inid) {
         function(data, indices) {
-          npplreg(
+          npplreg_fit(
             txdat = xdat[indices, , drop = FALSE],
             tydat = ydat[indices],
             tzdat = zdat[indices, , drop = FALSE],
@@ -1513,7 +1534,7 @@ compute.bootstrap.errors.plbandwidth =
         }
       } else {
         function(tsb) {
-          npplreg(
+          npplreg_fit(
             txdat = tsb[, seq_len(ncol(xdat)), drop = FALSE],
             tydat = tsb[, ncol(xdat) + 1L],
             tzdat = tsb[, (ncol(xdat) + 2L):ncol(tsb), drop = FALSE],
@@ -1522,7 +1543,7 @@ compute.bootstrap.errors.plbandwidth =
         }
       }
 
-      boot.out <- .npRmpi_with_local_bootstrap({
+      boot.out <- .npRmpi_bootstrap_maybe_local({
         if (is.inid) {
           boot(data = data.frame(xdat, ydat, zdat), statistic = boofun,
                R = plot.errors.boot.num)
@@ -1532,7 +1553,7 @@ compute.bootstrap.errors.plbandwidth =
                  l = plot.errors.boot.blocklen,
                  sim = plot.errors.boot.method)
         }
-      })
+      }, estimators = list(npplreg_fit, npplreghat_fit))
     }
 
     all.bp <- list()
@@ -2193,6 +2214,8 @@ compute.bootstrap.errors.sibandwidth =
            ...,
            bws){
 
+    npindex_fit <- .npRmpi_bootstrap_estimator("npindex.sibandwidth")
+    npindexhat_fit <- .npRmpi_bootstrap_estimator("npindexhat")
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
     boot.all.err <- NULL
 
@@ -2210,13 +2233,13 @@ compute.bootstrap.errors.sibandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- npindex(
+      fit.train <- npindex_fit(
         txdat = xdat,
         tydat = ydat,
         bws = bws,
         gradients = FALSE
       )
-      H <- npindexhat(
+      H <- npindexhat_fit(
         bws = bws,
         txdat = xdat,
         exdat = xdat,
@@ -2240,9 +2263,9 @@ compute.bootstrap.errors.sibandwidth =
         t0 = t0
       )
     } else if (fast.inid) {
-      H.fast <- .npRmpi_with_local_bootstrap({
+      H.fast <- .npRmpi_bootstrap_maybe_local({
         tryCatch(
-          npindexhat(
+          npindexhat_fit(
             bws = bws,
             txdat = xdat,
             exdat = xdat,
@@ -2255,23 +2278,23 @@ compute.bootstrap.errors.sibandwidth =
             NULL
           }
         )
-      })
+      }, estimators = list(npindex_fit, npindexhat_fit))
       if (is.null(H.fast) || !is.matrix(H.fast) || ncol(H.fast) != length(ydat)) {
         fast.inid <- FALSE
       } else {
-        boot.out <- .npRmpi_with_local_bootstrap({
+        boot.out <- .npRmpi_bootstrap_maybe_local({
           .np_inid_lc_boot_from_hat(
             H = H.fast,
             ydat = ydat,
             B = plot.errors.boot.num
           )
-        })
+        }, estimators = list(npindex_fit, npindexhat_fit))
       }
     } else {
       ## beta[1] is always 1.0, so use first column of gradients matrix ... 
       boofun <- if (is.inid) {
         function(data, indices) {
-          fit <- npindex(
+          fit <- npindex_fit(
             txdat = xdat[indices, , drop = FALSE],
             tydat = ydat[indices],
             exdat = xdat, bws = bws,
@@ -2281,7 +2304,7 @@ compute.bootstrap.errors.sibandwidth =
         }
       } else {
         function(tsb) {
-          fit <- npindex(
+          fit <- npindex_fit(
             txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
             exdat = xdat, bws = bws,
@@ -2291,7 +2314,7 @@ compute.bootstrap.errors.sibandwidth =
         }
       }
 
-      boot.out <- .npRmpi_with_local_bootstrap({
+      boot.out <- .npRmpi_bootstrap_maybe_local({
         if (is.inid && !fast.inid) {
           boot(data = data.frame(xdat, ydat), statistic = boofun,
                R = plot.errors.boot.num)
@@ -2301,7 +2324,7 @@ compute.bootstrap.errors.sibandwidth =
                  l = plot.errors.boot.blocklen,
                  sim = plot.errors.boot.method)
         }
-      })
+      }, estimators = list(npindex_fit, npindexhat_fit))
     }
     
     if (plot.errors.type == "pmzsd") {
