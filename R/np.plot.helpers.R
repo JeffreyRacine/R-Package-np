@@ -85,6 +85,17 @@
   if (B < 1L)
     stop("argument 'plot.errors.boot.num' must be a positive integer")
 
+  t.mpi <- .npRmpi_wildhat_boot_t_parallel(
+    H = H,
+    fit.mean = fit.mean,
+    residuals = residuals,
+    B = B,
+    wild = wild,
+    comm = 1L
+  )
+  if (is.matrix(t.mpi))
+    return(t.mpi)
+
   chunk.size <- .np_wildhat_chunk_size(n = n, B = B)
   out <- matrix(NA_real_, nrow = B, ncol = nrow(H))
   fit.mean <- as.double(fit.mean)
@@ -110,6 +121,122 @@
 
 .np_plot_inid_fastpath_enabled <- function() {
   !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
+}
+
+.npRmpi_bootstrap_worker_count <- function(comm = 1L) {
+  size <- tryCatch(as.integer(mpi.comm.size(comm = comm)), error = function(e) NA_integer_)
+  if (is.na(size) || size <= 1L)
+    return(0L)
+  size - 1L
+}
+
+.npRmpi_bootstrap_fanout_enabled <- function(comm = 1L) {
+  # Experimental gate: session-mode daemon execution has unresolved hangs
+  # for apply-style fan-out in this environment.
+  if (!isTRUE(getOption("np.plot.bootstrap.mpi.experimental", FALSE)))
+    return(FALSE)
+  if (isTRUE(getOption("np.plot.bootstrap.mpi.disable", FALSE)))
+    return(FALSE)
+  if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    return(FALSE)
+  if (!isTRUE(.npRmpi_has_active_slave_pool(comm = comm)))
+    return(FALSE)
+  .npRmpi_bootstrap_worker_count(comm = comm) >= 1L
+}
+
+.npRmpi_bootstrap_chunk_tasks <- function(B, chunk.size) {
+  B <- as.integer(B)
+  chunk.size <- as.integer(chunk.size)
+  if (B < 1L || chunk.size < 1L)
+    stop("invalid chunk configuration")
+
+  starts <- seq.int(1L, B, by = chunk.size)
+  lens <- pmin(chunk.size, B - starts + 1L)
+  seeds <- sample.int(.Machine$integer.max, length(starts))
+
+  lapply(seq_along(starts), function(i) {
+    list(
+      start = as.integer(starts[i]),
+      bsz = as.integer(lens[i]),
+      seed = as.integer(seeds[i])
+    )
+  })
+}
+
+.npRmpi_bootstrap_collect_chunks <- function(parts, tasks, ncol.out, what = "bootstrap") {
+  if (!is.list(parts) || length(parts) != length(tasks)) {
+    warning(sprintf("MPI %s fan-out returned malformed chunk results; using local path", what))
+    return(NULL)
+  }
+
+  has.try.error <- vapply(parts, function(x) inherits(x, "try-error"), logical(1))
+  if (any(has.try.error)) {
+    warning(sprintf("MPI %s fan-out worker error detected; using local path", what))
+    return(NULL)
+  }
+
+  total.rows <- sum(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1)))
+  out <- matrix(NA_real_, nrow = total.rows, ncol = as.integer(ncol.out))
+  rowi <- 1L
+
+  for (i in seq_along(parts)) {
+    bsz <- as.integer(tasks[[i]]$bsz)
+    chunk <- parts[[i]]
+    if (!is.matrix(chunk))
+      chunk <- as.matrix(chunk)
+
+    if (!identical(dim(chunk), c(bsz, as.integer(ncol.out)))) {
+      if (length(chunk) != (bsz * as.integer(ncol.out))) {
+        warning(sprintf("MPI %s fan-out chunk dimension mismatch; using local path", what))
+        return(NULL)
+      }
+      chunk <- matrix(as.numeric(chunk), nrow = bsz, ncol = as.integer(ncol.out))
+    }
+
+    out[rowi:(rowi + bsz - 1L), ] <- chunk
+    rowi <- rowi + bsz
+  }
+
+  out
+}
+
+.npRmpi_wildhat_boot_t_parallel <- function(H, fit.mean, residuals, B, wild, comm = 1L) {
+  if (isTRUE(getOption("np.plot.wild.mpi.parallel.disable", FALSE)))
+    return(NULL)
+  if (!.npRmpi_bootstrap_fanout_enabled(comm = comm))
+    return(NULL)
+
+  n <- length(residuals)
+  p <- nrow(H)
+  chunk.size <- .np_wildhat_chunk_size(n = n, B = B)
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+  if (!length(tasks))
+    return(NULL)
+
+  H <- as.matrix(H)
+  fit.mean <- as.double(fit.mean)
+  residuals <- as.double(residuals)
+  wild <- match.arg(if (length(wild) > 1L) wild[1L] else wild,
+                    c("mammen", "rademacher"))
+
+  worker <- function(task) {
+    set.seed(as.integer(task$seed))
+    bsz <- as.integer(task$bsz)
+    draws <- .np_wild_draws(n = n, B = bsz, wild = wild)
+    ystar <- matrix(fit.mean, nrow = n, ncol = bsz) +
+      matrix(residuals, nrow = n, ncol = bsz) * draws
+    t(H %*% ystar)
+  }
+
+  parts <- tryCatch(mpi.applyLB(tasks, worker, comm = comm), error = function(e) e)
+  if (inherits(parts, "error")) {
+    warning(sprintf("MPI wild bootstrap fan-out failed (%s); using local path",
+                    conditionMessage(parts)))
+    return(NULL)
+  }
+
+  .npRmpi_bootstrap_collect_chunks(parts = parts, tasks = tasks,
+                                   ncol.out = p, what = "wild")
 }
 
 .np_inid_chunk_size <- function(n, B) {
@@ -171,6 +298,35 @@
       t = num / pmax(den, .Machine$double.eps),
       t0 = t0
     ))
+  }
+
+  if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
+      .npRmpi_bootstrap_fanout_enabled(comm = 1L)) {
+    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    prob <- rep.int(1 / n, n)
+
+    worker <- function(task) {
+      set.seed(as.integer(task$seed))
+      bsz <- as.integer(task$bsz)
+      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      den <- crossprod(counts.chunk, W)
+      num <- crossprod(counts.chunk, Wy)
+      num / pmax(den, .Machine$double.eps)
+    }
+
+    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+    if (!inherits(parts, "error")) {
+      t.mpi <- .npRmpi_bootstrap_collect_chunks(parts = parts,
+                                                tasks = tasks,
+                                                ncol.out = nrow(H),
+                                                what = "inid")
+      if (is.matrix(t.mpi))
+        return(list(t = t.mpi, t0 = t0))
+    } else {
+      warning(sprintf("MPI inid bootstrap fan-out failed (%s); using local path",
+                      conditionMessage(parts)))
+    }
   }
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B)

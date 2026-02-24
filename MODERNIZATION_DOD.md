@@ -1266,3 +1266,16 @@ Completed in `np-npRmpi`:
      - varying-seed mean/median delta: `-94.54% / -94.54%`
 6. Runtime note:
    - sandbox MPI execution used `FI_TCP_IFACE=en0 FI_PROVIDER=tcp FI_SOCKETS_IFACE=en0`.
+
+## Plot Bootstrap MPI Fan-Out Probe (2026-02-24)
+Completed in `np-npRmpi`:
+1. Added chunk-fanout scaffolding for bootstrap `wild`/`inid` paths in `R/np.plot.helpers.R`.
+2. Found reproducible hangs in session-mode (`npRmpi.init(nslaves=1)`) when using apply/remote-exec style fanout primitives in this runtime.
+3. Implemented a safety gate so fanout is disabled by default:
+   - `options(np.plot.bootstrap.mpi.experimental = TRUE)` is now required to activate the experimental path.
+4. Default behavior remains the known-safe local/chunked execution path.
+5. Validation:
+   - session script (`npreg` plot timing with `wild` + `inid`) completes without hang:
+     - `/tmp/repro_plot_npreg_session_20260224_gated.out`
+   - session `npcdens` plot example completes without hang:
+     - `/tmp/repro_user_npcdens_session_20260224.out`
