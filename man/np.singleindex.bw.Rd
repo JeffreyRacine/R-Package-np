@@ -34,6 +34,10 @@ npindexbw(\dots)
           ydat = stop("training data ydat missing"),
           bws,
           bandwidth.compute = TRUE,
+          regtype = c("lc", "ll", "lp"),
+          basis = c("glp", "additive", "tensor"),
+          degree = NULL,
+          bernstein.basis = FALSE,
           nmulti,
           random.seed,
           optim.method,
@@ -123,6 +127,30 @@ npindexbw(\dots)
     (Ichimura (1993)) or \dQuote{kleinspady} (Klein and Spady
     (1993)). Defaults to
     \code{ichimura}.
+  }
+
+  \item{regtype}{
+    a character string specifying local smoothing type for the
+    nonparametric index regression fit used downstream in
+    \code{npindex}. Supported values are \code{"lc"}, \code{"ll"}, and
+    \code{"lp"}.
+  }
+
+  \item{basis}{
+    local polynomial basis selector used when
+    \code{regtype="lp"}: one of \code{"glp"}, \code{"additive"}, or
+    \code{"tensor"}. Ignored for \code{"lc"} and \code{"ll"}.
+  }
+
+  \item{degree}{
+    optional integer degree vector for continuous predictors when
+    \code{regtype="lp"}. For single-index regression this is typically
+    length one.
+  }
+
+  \item{bernstein.basis}{
+    logical flag used when \code{regtype="lp"}; if \code{TRUE}, use a
+    Bernstein/B-spline basis for local polynomial terms.
   }
 
   \item{nmulti}{

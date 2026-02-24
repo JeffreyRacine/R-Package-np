@@ -1,6 +1,10 @@
 sibandwidth <-
   function(beta, h,
            method=c("ichimura","kleinspady"),
+           regtype = c("lc", "ll", "lp"),
+           basis = c("glp", "additive", "tensor"),
+           degree = NULL,
+           bernstein.basis = FALSE,
            bwtype = c("fixed","generalized_nn","adaptive_nn"),
            ckertype = c("gaussian","truncated gaussian","epanechnikov","uniform"), 
            ckerorder = c(2,4,6,8),
@@ -24,7 +28,10 @@ sibandwidth <-
            ...){
 
   ndim = length(beta)
-  regtype = "lc"
+  regtype <- match.arg(regtype)
+  basis <- npValidateLpBasis(regtype = regtype, basis = basis)
+  degree <- npValidateGlpDegree(regtype = regtype, degree = degree, ncon = 1L)
+  bernstein.basis <- npValidateGlpBernstein(regtype = regtype, bernstein.basis = bernstein.basis)
   method = match.arg(method)
   ckertype = match.arg(ckertype)
   ckerbound = match.arg(ckerbound)
@@ -66,7 +73,11 @@ sibandwidth <-
     regtype = regtype,
     pregtype = switch(regtype,
       lc = "Local-Constant",
-      ll = "Local-Linear"),
+      ll = "Local-Linear",
+      lp = "Local-Polynomial"),
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
     method = method,
     pmethod = switch( method,
       ichimura = "Ichimura",

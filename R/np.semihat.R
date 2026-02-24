@@ -4,15 +4,23 @@
 }
 
 .np_indexhat_rbw <- function(bws, idx.train) {
-  npregbw(
+  regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+  args <- list(
     xdat = idx.train,
     ydat = rep.int(0.0, nrow(idx.train)),
     bws = as.double(bws$bw),
-    regtype = "lc",
+    regtype = regtype,
     bandwidth.compute = FALSE,
     ckertype = bws$ckertype,
     ckerorder = bws$ckerorder
   )
+  if (!is.null(bws$basis))
+    args$basis <- bws$basis
+  if (!is.null(bws$degree))
+    args$degree <- bws$degree
+  if (!is.null(bws$bernstein.basis))
+    args$bernstein.basis <- bws$bernstein.basis
+  do.call(npregbw, args)
 }
 
 npindexhat <-
