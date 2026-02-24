@@ -909,3 +909,26 @@ Completed in `np-master`:
    - tarball-first:
      - `/tmp/np_master_build_util_scalar3_20260224.log` (`RC:0`, `creating vignettes ... OK`)
      - `/tmp/np_master_check_ascran_util_scalar3_20260224.log` (`RC:0`, `Status: 2 WARNINGs, 2 NOTEs`; warning set unchanged from existing top-level/vignette-size debt)
+
+## `util.R` Scalar-Branch Follow-On (`genBwKerStrs`/`genBwKerStrsXY`) (2026-02-24)
+Completed in `np-master`:
+1. Replaced nested `ifelse(...)` branch construction in kernel-summary string helpers with explicit scalar/vector-safe branching.
+2. Scope:
+   - `R/util.R`
+3. Commit:
+   - `np-master`: `468dc88`
+4. Validation:
+   - parse gate:
+     - `Rscript -e "invisible(parse(file='R/util.R')); cat('PARSE_OK\n')"` (`RC:0`)
+     - log: `/tmp/np_master_util_genBwKerStrs_parse_20260224.log`
+   - targeted tests:
+     - `testthat::test_local(filter='plot-contract|formula-bw-contract|bw-dispatch-contract|call-bounds-guard-contract|npksum')` (`RC:0`)
+     - log: `/tmp/np_master_util_genBwKerStrs_tests_20260224.log`
+   - issue-note repro sweep:
+     - `/tmp/np_issue_notes_repros_20260224_util_genBwKerStrs.log` (all verified repros passed)
+     - run artifact: `/tmp/np_issue_notes_repros_20260224_062150.log`
+   - tarball/check:
+     - full `--as-cran` run in this environment advanced through vignettes then stalled in late check phase (non-regression observed in completed phases):
+       - `/tmp/np_master_check_ascran_util_genBwKerStrs_withcrs_20260224.log`
+     - bounded quick gate:
+       - `/tmp/np_master_check_quick_util_genBwKerStrs_20260224.log` (`RC:0`, `Status: OK`)
