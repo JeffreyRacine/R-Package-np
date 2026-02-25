@@ -41,11 +41,16 @@ test_that("plot coef option: npplreg supports coef=TRUE plot-data payload", {
   x <- runif(n)
   z <- runif(n, -2, 2)
   y <- 1 + 0.7 * x + sin(z) + rnorm(n, sd = 0.15)
+  xdat <- data.frame(x = x)
+  zdat <- data.frame(z = z)
 
   fit <- npplreg(y ~ x | z, regtype = "ll")
   out <- suppressWarnings(
     plot(
       fit,
+      xdat = xdat,
+      ydat = y,
+      zdat = zdat,
       coef = TRUE,
       plot.behavior = "plot-data",
       plot.errors.method = "none"

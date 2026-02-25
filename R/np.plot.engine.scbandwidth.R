@@ -66,6 +66,7 @@
     if(!missing(gradients))
       stop("gradients not supported with smooth coefficient models.")
     coef <- isTRUE(coef)
+    coef_flag <- isTRUE(coef)
     coef.index <- as.integer(coef.index)[1L]
     if (!is.finite(coef.index) || is.na(coef.index) || coef.index < 1L)
       coef.index <- 1L
@@ -667,11 +668,18 @@
             ei[(xi.neval+1):maxneval] = NA
           }
 
-          tobj <- npscoef(txdat = xdat, tydat = ydat, tzdat = zdat,
-                          exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-                          ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-                          bws = bws,
-                          betas = coef)
+          tobj <- do.call(
+            npscoef,
+            list(
+              txdat = xdat,
+              tydat = ydat,
+              tzdat = zdat,
+              exdat = exdat[seq_len(xi.neval),, drop = FALSE],
+              ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+              bws = bws,
+              betas = coef_flag
+            )
+          )
 
           temp.mean[seq_len(xi.neval)] = extract_scoef_value(tobj)
 
