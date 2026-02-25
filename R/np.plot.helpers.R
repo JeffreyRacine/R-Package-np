@@ -461,6 +461,196 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_plreg_numeric_x_matrix <- function(txdat, exdat, bws) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+
+  p <- ncol(txdat)
+  if (p < 1L)
+    stop("plreg inid fast path requires at least one linear regressor")
+  if (ncol(exdat) != p)
+    stop("training/evaluation linear regressor dimensions do not match")
+
+  x.train.num <- matrix(0.0, nrow = nrow(txdat), ncol = p)
+  x.eval.num <- matrix(0.0, nrow = nrow(exdat), ncol = p)
+
+  for (j in seq_len(p)) {
+    if (is.factor(txdat[[j]])) {
+      trj <- adjustLevels(txdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati)
+      evj <- adjustLevels(exdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati, allowNewCells = TRUE)
+      lev <- bws$bw[[j + 1L]]$ydati$all.dlev[[1L]]
+      x.train.num[, j] <- lev[as.integer(trj[, 1L])]
+      x.eval.num[, j] <- lev[as.integer(evj[, 1L])]
+    } else {
+      x.train.num[, j] <- as.double(txdat[[j]])
+      x.eval.num[, j] <- as.double(exdat[[j]])
+    }
+  }
+
+  list(train = x.train.num, eval = x.eval.num)
+}
+
+.np_plreg_weighted_coef <- function(X, y, w, ridge = 1.0e-12) {
+  X <- as.matrix(X)
+  y <- as.double(y)
+  w <- as.double(w)
+  if (nrow(X) != length(y) || length(w) != length(y))
+    stop("weighted plreg solve dimension mismatch")
+
+  w <- pmax(w, 0.0)
+  sw <- sqrt(w)
+  Xw <- X * sw
+  yw <- y * sw
+
+  beta <- tryCatch(
+    qr.solve(Xw, yw, tol = .Machine$double.eps),
+    error = function(e) NULL
+  )
+  if (!is.null(beta) && all(is.finite(beta)))
+    return(as.double(beta))
+
+  XtWX <- crossprod(X, X * w)
+  XtWy <- crossprod(X, y * w)
+  ridge <- max(0.0, as.double(ridge))
+
+  for (attempt in 0:8) {
+    A <- XtWX
+    if (ridge > 0)
+      diag(A) <- diag(A) + ridge
+    beta <- tryCatch(
+      qr.solve(A, XtWy, tol = .Machine$double.eps),
+      error = function(e) NULL
+    )
+    if (!is.null(beta) && all(is.finite(beta)))
+      return(as.double(beta))
+    ridge <- if (ridge > 0) ridge * 10 else 1.0e-12
+  }
+
+  stop("plreg weighted solve failed")
+}
+
+.np_inid_boot_from_plreg <- function(txdat,
+                                     ydat,
+                                     tzdat,
+                                     exdat,
+                                     ezdat,
+                                     bws,
+                                     B,
+                                     counts = NULL,
+                                     ridge = 1.0e-12) {
+  txdat <- toFrame(txdat)
+  tzdat <- toFrame(tzdat)
+  exdat <- toFrame(exdat)
+  ezdat <- toFrame(ezdat)
+  B <- as.integer(B)
+
+  n <- nrow(txdat)
+  neval <- nrow(exdat)
+  p <- ncol(txdat)
+  if (nrow(tzdat) != n)
+    stop("plreg inid fast path requires aligned txdat/tzdat rows")
+  if (nrow(ezdat) != neval)
+    stop("plreg inid fast path requires aligned exdat/ezdat rows")
+  if (n < 1L || neval < 1L || p < 1L || B < 1L)
+    stop("invalid plreg inid fast path dimensions")
+
+  y.num <- if (is.factor(ydat)) {
+    ty <- adjustLevels(data.frame(ydat), bws$bw$yzbw$ydati)
+    bws$bw$yzbw$ydati$all.dlev[[1L]][as.integer(ty[, 1L])]
+  } else {
+    as.double(ydat)
+  }
+  if (length(y.num) != n)
+    stop("length of ydat must match training rows")
+
+  x.num <- .np_plreg_numeric_x_matrix(txdat = txdat, exdat = exdat, bws = bws)
+  x.train.num <- x.num$train
+  x.eval.num <- x.num$eval
+
+  counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+
+  y.train <- .np_inid_boot_from_regression(
+    xdat = tzdat,
+    exdat = tzdat,
+    bws = bws$bw$yzbw,
+    ydat = y.num,
+    B = B,
+    counts = counts.mat,
+    ridge = ridge
+  )
+  y.eval <- .np_inid_boot_from_regression(
+    xdat = tzdat,
+    exdat = ezdat,
+    bws = bws$bw$yzbw,
+    ydat = y.num,
+    B = B,
+    counts = counts.mat,
+    ridge = ridge
+  )
+
+  x.train <- vector("list", p)
+  x.eval <- vector("list", p)
+  for (j in seq_len(p)) {
+    x.train[[j]] <- .np_inid_boot_from_regression(
+      xdat = tzdat,
+      exdat = tzdat,
+      bws = bws$bw[[j + 1L]],
+      ydat = x.train.num[, j],
+      B = B,
+      counts = counts.mat,
+      ridge = ridge
+    )
+    x.eval[[j]] <- .np_inid_boot_from_regression(
+      xdat = tzdat,
+      exdat = ezdat,
+      bws = bws$bw[[j + 1L]],
+      ydat = x.train.num[, j],
+      B = B,
+      counts = counts.mat,
+      ridge = ridge
+    )
+  }
+
+  xres.train0 <- matrix(0.0, nrow = n, ncol = p)
+  xres.eval0 <- matrix(0.0, nrow = neval, ncol = p)
+  for (j in seq_len(p)) {
+    xres.train0[, j] <- x.train.num[, j] - as.double(x.train[[j]]$t0)
+    xres.eval0[, j] <- x.eval.num[, j] - as.double(x.eval[[j]]$t0)
+  }
+  yres0 <- y.num - as.double(y.train$t0)
+  beta0 <- .np_plreg_weighted_coef(
+    X = xres.train0,
+    y = yres0,
+    w = rep.int(1.0, n),
+    ridge = ridge
+  )
+  t0 <- as.double(y.eval$t0) + as.vector(xres.eval0 %*% beta0)
+
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  xres.train.b <- matrix(0.0, nrow = n, ncol = p)
+  xres.eval.b <- matrix(0.0, nrow = neval, ncol = p)
+
+  for (b in seq_len(B)) {
+    for (j in seq_len(p)) {
+      xres.train.b[, j] <- x.train.num[, j] - x.train[[j]]$t[b, ]
+      xres.eval.b[, j] <- x.eval.num[, j] - x.eval[[j]]$t[b, ]
+    }
+    yres.b <- y.num - y.train$t[b, ]
+    beta.b <- .np_plreg_weighted_coef(
+      X = xres.train.b,
+      y = yres.b,
+      w = counts.mat[, b],
+      ridge = ridge
+    )
+    tmat[b, ] <- y.eval$t[b, ] + as.vector(xres.eval.b %*% beta.b)
+  }
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("plreg inid fast path produced non-finite values")
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum fast path") {
   if (is.null(dim(ksum))) {
     if (B == 1L && length(ksum) == nout)
@@ -1530,6 +1720,7 @@ compute.bootstrap.errors.plbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
+    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) && isTRUE(is.inid)
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -1567,6 +1758,28 @@ compute.bootstrap.errors.plbandwidth =
         t0 = t0
       )
     } else {
+      boot.out <- NULL
+      if (fast.inid) {
+        boot.out <- tryCatch(
+          .np_inid_boot_from_plreg(
+            txdat = xdat,
+            ydat = ydat,
+            tzdat = zdat,
+            exdat = exdat,
+            ezdat = ezdat,
+            bws = bws,
+            B = plot.errors.boot.num
+          ),
+          error = function(e) {
+            warning(sprintf("inid plreg fast path failed in compute.bootstrap.errors.plbandwidth (%s); using bootstrap fallback",
+                            conditionMessage(e)),
+                    call. = FALSE)
+            NULL
+          }
+        )
+      }
+
+      if (is.null(boot.out)) {
       boofun <- if (is.inid) {
         function(data, indices) {
           npplreg(
@@ -1595,6 +1808,7 @@ compute.bootstrap.errors.plbandwidth =
           R = plot.errors.boot.num,
           l = plot.errors.boot.blocklen,
           sim = plot.errors.boot.method)
+      }
       }
     }
 
