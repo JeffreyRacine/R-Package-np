@@ -2236,7 +2236,6 @@ compute.bootstrap.errors.sibandwidth =
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(is.inid) &&
       isTRUE(!gradients) &&
-      isTRUE(identical(regtype, "lc")) &&
       isTRUE(identical(bws$type, "fixed"))
 
     if (is.wild.hat) {
@@ -2274,28 +2273,48 @@ compute.bootstrap.errors.sibandwidth =
         t0 = t0
       )
     } else if (fast.inid) {
-      H.fast <- tryCatch(
-        npindexhat(
-          bws = bws,
-          txdat = xdat,
-          exdat = xdat,
-          s = 0L,
-          output = "matrix"
-        ),
-        error = function(e) {
-          warning(sprintf("inid hat fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
+      if (identical(regtype, "lc")) {
+        H.fast <- tryCatch(
+          npindexhat(
+            bws = bws,
+            txdat = xdat,
+            exdat = xdat,
+            s = 0L,
+            output = "matrix"
+          ),
+          error = function(e) {
+            warning(sprintf("inid hat fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
+                            conditionMessage(e)))
+            NULL
+          }
+        )
+        if (is.null(H.fast) || !is.matrix(H.fast) || ncol(H.fast) != length(ydat)) {
+          fast.inid <- FALSE
+        } else {
+          boot.out <- .np_inid_lc_boot_from_hat(
+            H = H.fast,
+            ydat = ydat,
+            B = plot.errors.boot.num
+          )
+        }
+      } else {
+        boot.out <- tryCatch({
+          tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+          rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
+          .np_inid_boot_from_regression(
+            xdat = tx.index,
+            exdat = tx.index,
+            bws = rbw,
+            ydat = ydat,
+            B = plot.errors.boot.num
+          )
+        }, error = function(e) {
+          warning(sprintf("inid regression fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
                           conditionMessage(e)))
           NULL
-        }
-      )
-      if (is.null(H.fast) || !is.matrix(H.fast) || ncol(H.fast) != length(ydat)) {
-        fast.inid <- FALSE
-      } else {
-        boot.out <- .np_inid_lc_boot_from_hat(
-          H = H.fast,
-          ydat = ydat,
-          B = plot.errors.boot.num
-        )
+        })
+        if (is.null(boot.out))
+          fast.inid <- FALSE
       }
     } else {
       ## beta[1] is always 1.0, so use first column of gradients matrix ... 
