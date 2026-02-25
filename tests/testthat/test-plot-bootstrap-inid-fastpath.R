@@ -158,7 +158,7 @@ test_that("npplreg inid fast path matches explicit resample refits", {
   )$mean
 
   expect_equal(fast.out$t, explicit.t, tolerance = 1e-6)
-  expect_equal(fast.out$t0, fit0, tolerance = 1e-7)
+  expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-7)
 })
 
 test_that("inid lc fast path toggle preserves plot bootstrap contract", {
