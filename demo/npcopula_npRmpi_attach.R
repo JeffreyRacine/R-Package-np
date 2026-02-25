@@ -46,7 +46,7 @@ t.1 <- system.time({
   old.autod <- getOption("npRmpi.autodispatch")
   options(npRmpi.autodispatch = FALSE)
   on.exit(options(npRmpi.autodispatch = old.autod), add = TRUE)
-  copula <- try(np::npcopula(bws=bw, data=mydat, u=grid.dat), silent=TRUE)
+  copula <- try(npcopula(bws=bw, data=mydat, u=grid.dat), silent=TRUE)
   if (inherits(copula, "try-error")) {
     warning("npcopula fit failed in attach demo; continuing with bandwidth summary only.")
     copula <- NULL

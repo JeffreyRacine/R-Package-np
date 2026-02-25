@@ -28,6 +28,8 @@
 ^demo/runall_npRmpi
 ^demo/runall_serial
 ^demo/serial/.*$
+^demo/.*_serial\.R$
+^demo/npregiv\.R$
 ^demo/timing
 ^issue_notes
 ^man/dontrun
