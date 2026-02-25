@@ -187,13 +187,16 @@ test_that("inid lc fast path toggle preserves plot bootstrap contract", {
     )
   }
 
+  set.seed(9322)
   out.fast <- run_plot(disable = FALSE)
-  out.legacy <- run_plot(disable = TRUE)
+  set.seed(9322)
+  out.slow <- run_plot(disable = TRUE)
 
   expect_type(out.fast, "list")
   expect_true(length(out.fast) > 0)
-  expect_type(out.legacy, "list")
-  expect_true(length(out.legacy) > 0)
+  expect_type(out.slow, "list")
+  expect_true(length(out.slow) > 0)
+  expect_equal(names(out.fast), names(out.slow))
 })
 
 test_that("plot bootstrap accepts wild selector", {
