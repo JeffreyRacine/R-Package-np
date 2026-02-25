@@ -1,5 +1,3 @@
-require(np)
-
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
 
