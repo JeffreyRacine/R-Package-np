@@ -130,6 +130,12 @@
   !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
 }
 
+.np_plot_require_bws <- function(bws, where) {
+  if (is.null(bws))
+    stop(sprintf("required argument 'bws' is missing or NULL in %s", where))
+  invisible(TRUE)
+}
+
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
   if (isFALSE(getOption("np.plot.inid.ksum.fastpath.nprmpi", TRUE)))
     return(FALSE)
@@ -1359,6 +1365,7 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.rbandwidth")
     npreg_fit <- .npRmpi_bootstrap_estimator("npreg.rbandwidth")
     npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat.rbandwidth")
     H.fast <- NULL
@@ -1585,6 +1592,7 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.scbandwidth")
     miss.z <- missing(zdat)
     npscoef_fit <- .npRmpi_bootstrap_estimator("npscoef.scbandwidth")
     npscoefhat_fit <- .npRmpi_bootstrap_estimator("npscoefhat")
@@ -1758,6 +1766,7 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.plbandwidth")
     npplreg_fit <- .npRmpi_bootstrap_estimator("npplreg.plbandwidth")
     npplreghat_fit <- .npRmpi_bootstrap_estimator("npplreghat")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -1911,6 +1920,7 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.bandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2043,6 +2053,7 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2169,6 +2180,7 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2333,6 +2345,7 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.condbandwidth")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2492,6 +2505,7 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
 
     npindex_fit <- .npRmpi_bootstrap_estimator("npindex.sibandwidth")
     npindexhat_fit <- .npRmpi_bootstrap_estimator("npindexhat")
