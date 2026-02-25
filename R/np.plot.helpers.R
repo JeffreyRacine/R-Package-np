@@ -362,6 +362,264 @@
   list(t = tmat, t0 = t0)
 }
 
+.np_inid_lp_unpack_sym_row <- function(mrow, p) {
+  A <- matrix(0.0, nrow = p, ncol = p)
+  idx <- 1L
+  for (a in seq_len(p)) {
+    for (b in a:p) {
+      A[a, b] <- mrow[idx]
+      A[b, a] <- mrow[idx]
+      idx <- idx + 1L
+    }
+  }
+  A
+}
+
+.np_inid_lp_predict_row <- function(A, z, rhs, ridge.base = 1.0e-12) {
+  ridge <- max(0, as.double(ridge.base))
+
+  for (attempt in 0:8) {
+    Ar <- A
+    if (ridge > 0)
+      diag(Ar) <- diag(Ar) + ridge
+
+    beta <- tryCatch(
+      qr.solve(Ar, z, tol = .Machine$double.eps),
+      error = function(e) NULL
+    )
+
+    if (!is.null(beta) && all(is.finite(beta)))
+      return(sum(rhs * beta))
+
+    ridge <- if (ridge > 0) ridge * 10 else 1.0e-12
+  }
+
+  NA_real_
+}
+
+.np_inid_lp_predict_chunk <- function(Mvals, Zvals, rhs, ridge.base = 1.0e-12) {
+  Mvals <- as.matrix(Mvals)
+  Zvals <- as.matrix(Zvals)
+  rhs <- as.double(rhs)
+
+  bsz <- nrow(Mvals)
+  p <- ncol(Zvals)
+  out <- rep(NA_real_, bsz)
+
+  if (p == 1L) {
+    den <- as.double(Mvals[, 1L])
+    out <- rhs[1L] * as.double(Zvals[, 1L]) / pmax(den, .Machine$double.eps)
+    return(out)
+  }
+
+  if (p == 2L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    u <- as.double(Zvals[, 1L])
+    v <- as.double(Zvals[, 2L])
+
+    det <- a * c - b * b
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      invdet <- 1 / det[good]
+      beta1 <- (c[good] * u[good] - b[good] * v[good]) * invdet
+      beta2 <- (a[good] * v[good] - b[good] * u[good]) * invdet
+      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2
+    }
+  } else if (p == 3L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    d <- as.double(Mvals[, 4L])
+    e <- as.double(Mvals[, 5L])
+    f <- as.double(Mvals[, 6L])
+    u <- as.double(Zvals[, 1L])
+    v <- as.double(Zvals[, 2L])
+    w <- as.double(Zvals[, 3L])
+
+    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      c11 <- d[good] * f[good] - e[good] * e[good]
+      c12 <- c[good] * e[good] - b[good] * f[good]
+      c13 <- b[good] * e[good] - c[good] * d[good]
+      c22 <- a[good] * f[good] - c[good] * c[good]
+      c23 <- b[good] * c[good] - a[good] * e[good]
+      c33 <- a[good] * d[good] - b[good] * b[good]
+      invdet <- 1 / det[good]
+
+      beta1 <- (c11 * u[good] + c12 * v[good] + c13 * w[good]) * invdet
+      beta2 <- (c12 * u[good] + c22 * v[good] + c23 * w[good]) * invdet
+      beta3 <- (c13 * u[good] + c23 * v[good] + c33 * w[good]) * invdet
+      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2 + rhs[3L] * beta3
+    }
+  }
+
+  bad <- which(!is.finite(out))
+  if (length(bad)) {
+    p <- ncol(Zvals)
+    for (ii in bad) {
+      A <- .np_inid_lp_unpack_sym_row(mrow = Mvals[ii, ], p = p)
+      out[ii] <- .np_inid_lp_predict_row(
+        A = A,
+        z = as.double(Zvals[ii, ]),
+        rhs = rhs,
+        ridge.base = ridge.base
+      )
+    }
+  }
+
+  out
+}
+
+.np_inid_boot_from_regression <- function(xdat,
+                                          exdat,
+                                          bws,
+                                          ydat,
+                                          B,
+                                          counts = NULL,
+                                          ridge = 1.0e-12) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid inid regression bootstrap dimensions")
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  ncon <- bws$ncon
+
+  degree <- if (identical(regtype, "lc")) {
+    rep.int(0L, ncon)
+  } else if (identical(regtype, "ll")) {
+    rep.int(1L, ncon)
+  } else {
+    npValidateGlpDegree(
+      regtype = "lp",
+      degree = bws$degree,
+      ncon = ncon
+    )
+  }
+
+  basis <- npValidateLpBasis(
+    regtype = "lp",
+    basis = if (is.null(bws$basis)) "glp" else bws$basis
+  )
+  bernstein.basis <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = isTRUE(bws$bernstein.basis)
+  )
+
+  npksum.fun <- .npRmpi_bootstrap_estimator("npksum.default")
+  kw <- npksum.fun(
+    txdat = xdat,
+    exdat = exdat,
+    bws = bws,
+    return.kernel.weights = TRUE,
+    bandwidth.divide = TRUE,
+    leave.one.out = FALSE
+  )$kw
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = n)
+  if (nrow(kw) != n || ncol(kw) != neval)
+    stop("kernel-weight matrix shape mismatch")
+
+  W <- W.lp(
+    xdat = xdat,
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  )
+  W.eval <- W.lp(
+    xdat = xdat,
+    exdat = exdat,
+    degree = degree,
+    basis = basis,
+    bernstein.basis = bernstein.basis
+  )
+  W <- as.matrix(W)
+  W.eval <- as.matrix(W.eval)
+
+  if (nrow(W) != n || nrow(W.eval) != neval || ncol(W.eval) != ncol(W))
+    stop("regression moment design matrix shape mismatch")
+
+  p <- ncol(W)
+  mcols <- p * (p + 1L) / 2L
+  rhs <- W.eval
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
+
+  Mfeat <- vector("list", neval)
+  Zfeat <- vector("list", neval)
+  t0 <- numeric(neval)
+
+  for (i in seq_len(neval)) {
+    k <- as.double(kw[, i])
+    WK <- W * k
+    Zfeat[[i]] <- WK * ydat
+
+    mf <- matrix(0.0, nrow = n, ncol = mcols)
+    idx <- 1L
+    for (a in seq_len(p)) {
+      for (b in a:p) {
+        mf[, idx] <- WK[, a] * W[, b]
+        idx <- idx + 1L
+      }
+    }
+    Mfeat[[i]] <- mf
+
+    M0 <- crossprod(ones, mf)
+    Z0 <- crossprod(ones, Zfeat[[i]])
+    t0[i] <- .np_inid_lp_predict_chunk(
+      Mvals = M0,
+      Zvals = Z0,
+      rhs = rhs[i, ],
+      ridge.base = ridge
+    )[1L]
+  }
+
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+
+  fill_chunk <- function(counts.chunk, start, stopi) {
+    for (i in seq_len(neval)) {
+      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
+      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
+      tmat[start:stopi, i] <<- .np_inid_lp_predict_chunk(
+        Mvals = Mvals,
+        Zvals = Zvals,
+        rhs = rhs[i, ],
+        ridge.base = ridge
+      )
+    }
+  }
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+  } else {
+    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    prob <- rep.int(1 / n, n)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      start <- stopi + 1L
+    }
+  }
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("inid regression fast path produced non-finite values")
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum fast path") {
   if (is.null(dim(ksum))) {
     if (B == 1L && length(ksum) == nout)
@@ -1104,12 +1362,14 @@ compute.bootstrap.errors.rbandwidth =
     npreg_fit <- .npRmpi_bootstrap_estimator("npreg.rbandwidth")
     npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat.rbandwidth")
     H.fast <- NULL
-    fast.inid.lc <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(plot.errors.boot.method == "inid") &&
       isTRUE(!gradients) &&
-      isTRUE(identical(bws$regtype, "lc")) &&
       isTRUE(identical(bws$type, "fixed")) &&
       isTRUE(is.numeric(ydat))
+    fast.inid.lc <- isTRUE(fast.inid) && isTRUE(identical(regtype, "lc"))
+    boot.out <- NULL
 
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1140,7 +1400,24 @@ compute.bootstrap.errors.rbandwidth =
         ydat = ydat,
         B = plot.errors.boot.num
       )
-    } else if (is.wild.hat) {
+    } else if (fast.inid) {
+      boot.out <- tryCatch(
+        .np_inid_boot_from_regression(
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          ydat = ydat,
+          B = plot.errors.boot.num
+        ),
+        error = function(e) {
+          warning(sprintf("inid regression fast path failed in compute.bootstrap.errors.rbandwidth (%s); using bootstrap fallback",
+                          conditionMessage(e)))
+          NULL
+        }
+      )
+    }
+
+    if (is.null(boot.out) && is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
@@ -1191,7 +1468,9 @@ compute.bootstrap.errors.rbandwidth =
         ),
         t0 = t0
       )
-    } else {
+    }
+
+    if (is.null(boot.out)) {
       boofun <- if (is.inid) {
         function(data, indices) {
           fit <- suppressWarnings(npreg_fit(
