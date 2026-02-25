@@ -12,6 +12,8 @@
            common.scale = TRUE,
            perspective = TRUE,
            gradients = FALSE,
+           coef = FALSE,
+           coef.index = 1L,
            main = NULL,
            type = NULL,
            border = NULL,
@@ -63,6 +65,20 @@
 
     if(!missing(gradients))
       stop("gradients not supported with smooth coefficient models.")
+    coef <- isTRUE(coef)
+    coef.index <- as.integer(coef.index)[1L]
+    if (!is.finite(coef.index) || is.na(coef.index) || coef.index < 1L)
+      coef.index <- 1L
+    extract_scoef_value <- function(obj) {
+      if (!coef)
+        return(as.double(obj$mean))
+      beta.plot <- obj$beta
+      if (is.null(beta.plot))
+        stop("coef=TRUE requires npscoef(..., betas=TRUE) output.")
+      if (is.matrix(beta.plot))
+        return(as.double(beta.plot[, min(coef.index, ncol(beta.plot))]))
+      as.double(beta.plot)
+    }
 
     miss.xy = c(missing(xdat),missing(ydat))
     miss.z = missing(zdat) & is.null(bws$zdati)
@@ -165,6 +181,11 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
+    if (coef && plot.errors.method != "none") {
+      warning("coef=TRUE currently disables plot errors for smooth coefficient plots.")
+      plot.errors.method <- "none"
+      plot.errors <- FALSE
+    }
 
     if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) && (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) && perspective && !gradients &&
         !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
@@ -213,7 +234,7 @@
       if (is.ordered(tdat))
         x2.eval <- (tdati$all.dlev[[ti]])[as.integer(x2.eval)]
 
-      scoef.args <- list(txdat = xdat, tydat = ydat, bws = bws, iterate = FALSE, errors = plot.errors)
+      scoef.args <- list(txdat = xdat, tydat = ydat, bws = bws, iterate = FALSE, errors = plot.errors, betas = coef)
       if (!miss.z)
         scoef.args$tzdat <- zdat
       if (miss.z) {
@@ -227,7 +248,7 @@
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
       
-      treg = matrix(data = tobj$mean,
+      treg = matrix(data = extract_scoef_value(tobj),
         nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       if (plot.errors.method == "bootstrap"){
@@ -438,7 +459,8 @@
           tydat = ydat,
           exdat = subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
           bws = bws,
-          errors = plot.errors
+          errors = plot.errors,
+          betas = coef
         )
         if (!miss.z) {
           tx.args$tzdat <- zdat
@@ -475,7 +497,7 @@
 
         tobj <- txobj_call(i, ei, xi.neval)
 
-        temp.mean[seq_len(xi.neval)] = tobj$mean
+        temp.mean[seq_len(xi.neval)] = extract_scoef_value(tobj)
 
         if (plot.errors){
           if (plot.errors.method == "asymptotic")
@@ -544,7 +566,7 @@
                 max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
+          plot.args$ylab <- if (coef) paste("Coefficient", min(coef.index, bws$xndim)) else gen.label(bws$ynames, "Conditional Mean")
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)
@@ -648,9 +670,10 @@
           tobj <- npscoef(txdat = xdat, tydat = ydat, tzdat = zdat,
                           exdat = exdat[seq_len(xi.neval),, drop = FALSE],
                           ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-                          bws = bws)
+                          bws = bws,
+                          betas = coef)
 
-          temp.mean[seq_len(xi.neval)] = tobj$mean
+          temp.mean[seq_len(xi.neval)] = extract_scoef_value(tobj)
 
           if (plot.errors){
             if (plot.errors.method == "asymptotic")
@@ -715,7 +738,7 @@
                   max(na.omit(c(temp.mean + temp.err[,2], temp.err[,3] + temp.err[,2]))))
             plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                         paste(toupper(xOrZ), i, sep = ""))
-            plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
+            plot.args$ylab <- if (coef) paste("Coefficient", min(coef.index, bws$xndim)) else gen.label(bws$ynames, "Conditional Mean")
             if (!xi.factor) {
               plot.args$type <- scalar_default(type, "l")
               plot.args$lty <- scalar_default(lty, par()$lty)
@@ -858,7 +881,7 @@
           plot.args$ylim <- c(y.min, y.max)
           plot.args$xlab <- gen.label(if (xOrZ == "x") bws$xnames[i] else bws$znames[i],
                                       paste(toupper(xOrZ), i, sep = ""))
-          plot.args$ylab <- gen.label(bws$ynames, "Conditional Mean")
+          plot.args$ylab <- if (coef) paste("Coefficient", min(coef.index, bws$xndim)) else gen.label(bws$ynames, "Conditional Mean")
           if (!xi.factor) {
             plot.args$type <- scalar_default(type, "l")
             plot.args$lty <- scalar_default(lty, par()$lty)

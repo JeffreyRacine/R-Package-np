@@ -381,19 +381,50 @@
   A
 }
 
+.np_inid_lp_solver_backend <- function() {
+  backend <- getOption("np.plot.inid.lp.solver", "solve")
+  backend <- as.character(backend)[1L]
+  if (is.na(backend) || !(backend %in% c("auto", "chol", "solve", "qr")))
+    backend <- "auto"
+  backend
+}
+
+.np_inid_lp_solve_once <- function(A, z, backend) {
+  if (identical(backend, "chol")) {
+    R <- tryCatch(chol(A), error = function(e) NULL)
+    if (!is.null(R))
+      return(backsolve(R, forwardsolve(t(R), z)))
+    return(NULL)
+  }
+  if (identical(backend, "solve"))
+    return(tryCatch(solve(A, z), error = function(e) NULL))
+  if (identical(backend, "qr"))
+    return(tryCatch(qr.solve(A, z, tol = .Machine$double.eps), error = function(e) NULL))
+
+  R <- tryCatch(chol(A), error = function(e) NULL)
+  if (!is.null(R)) {
+    beta <- tryCatch(backsolve(R, forwardsolve(t(R), z)), error = function(e) NULL)
+    if (!is.null(beta) && all(is.finite(beta)))
+      return(beta)
+  }
+
+  beta <- tryCatch(solve(A, z), error = function(e) NULL)
+  if (!is.null(beta) && all(is.finite(beta)))
+    return(beta)
+
+  tryCatch(qr.solve(A, z, tol = .Machine$double.eps), error = function(e) NULL)
+}
+
 .np_inid_lp_predict_row <- function(A, z, rhs, ridge.base = 1.0e-12) {
   ridge <- max(0, as.double(ridge.base))
+  backend <- .np_inid_lp_solver_backend()
 
   for (attempt in 0:8) {
     Ar <- A
     if (ridge > 0)
       diag(Ar) <- diag(Ar) + ridge
 
-    beta <- tryCatch(
-      qr.solve(Ar, z, tol = .Machine$double.eps),
-      error = function(e) NULL
-    )
-
+    beta <- .np_inid_lp_solve_once(A = Ar, z = z, backend = backend)
     if (!is.null(beta) && all(is.finite(beta)))
       return(sum(rhs * beta))
 
@@ -401,6 +432,28 @@
   }
 
   NA_real_
+}
+
+.np_inid_lp_predict_chunk_general <- function(Mvals, Zvals, rhs, ridge.base = 1.0e-12) {
+  Mvals <- as.matrix(Mvals)
+  Zvals <- as.matrix(Zvals)
+  rhs <- as.double(rhs)
+
+  bsz <- nrow(Mvals)
+  p <- ncol(Zvals)
+  out <- numeric(bsz)
+
+  for (ii in seq_len(bsz)) {
+    A <- .np_inid_lp_unpack_sym_row(mrow = Mvals[ii, ], p = p)
+    out[ii] <- .np_inid_lp_predict_row(
+      A = A,
+      z = as.double(Zvals[ii, ]),
+      rhs = rhs,
+      ridge.base = ridge.base
+    )
+  }
+
+  out
 }
 
 .np_inid_lp_predict_chunk <- function(Mvals, Zvals, rhs, ridge.base = 1.0e-12) {
@@ -581,12 +634,21 @@
 
     M0 <- crossprod(ones, mf)
     Z0 <- crossprod(ones, Zfeat[[i]])
-    t0[i] <- .np_inid_lp_predict_chunk(
-      Mvals = M0,
-      Zvals = Z0,
-      rhs = rhs[i, ],
-      ridge.base = ridge
-    )[1L]
+    t0[i] <- if (p > 3L) {
+      .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.base = ridge
+      )[1L]
+    } else {
+      .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.base = ridge
+      )[1L]
+    }
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
@@ -595,12 +657,21 @@
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      tmat[start:stopi, i] <<- .np_inid_lp_predict_chunk(
-        Mvals = Mvals,
-        Zvals = Zvals,
-        rhs = rhs[i, ],
-        ridge.base = ridge
-      )
+      tmat[start:stopi, i] <<- if (p > 3L) {
+        .np_inid_lp_predict_chunk_general(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.base = ridge
+        )
+      } else {
+        .np_inid_lp_predict_chunk(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.base = ridge
+        )
+      }
     }
   }
 
@@ -622,6 +693,266 @@
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
     stop("inid regression fast path produced non-finite values")
+
+  list(t = tmat, t0 = t0)
+}
+
+.np_inid_scoef_numeric_y <- function(ydat, bws) {
+  if (is.factor(ydat)) {
+    if (is.null(bws$ydati))
+      stop("factor response requires bws$ydati for smooth coefficient inid helper")
+    yadj <- adjustLevels(data.frame(ydat), bws$ydati)
+    return((bws$ydati$all.dlev[[1L]])[as.integer(yadj[, 1L])])
+  }
+  as.double(ydat)
+}
+
+.np_inid_scoef_predict_row <- function(mrow, zrow, rhs, epsilon) {
+  A <- .np_inid_lp_unpack_sym_row(mrow = mrow, p = length(rhs))
+  tyw <- as.double(zrow)
+  nc <- ncol(A)
+
+  maxPenalty <- sqrt(.Machine$double.xmax)
+  coef.ii <- rep(maxPenalty, nc)
+  ridge <- 0.0
+  doridge <- TRUE
+
+  while (doridge) {
+    doridge <- FALSE
+    ridge.val <- ridge * tyw[1L] / NZD(A[1L, 1L])
+    coef.try <- tryCatch(
+      solve(
+        A + diag(rep(ridge, nc)),
+        tyw + c(ridge.val, rep(0, nc - 1L))
+      ),
+      error = function(e) e
+    )
+    if (inherits(coef.try, "error") || any(!is.finite(coef.try))) {
+      ridge <- ridge + epsilon
+      doridge <- TRUE
+      coef.try <- rep(maxPenalty, nc)
+    }
+    coef.ii <- as.double(coef.try)
+  }
+
+  sum(as.double(rhs) * coef.ii)
+}
+
+.np_inid_scoef_predict_chunk <- function(Mvals, Zvals, rhs) {
+  Mvals <- as.matrix(Mvals)
+  Zvals <- as.matrix(Zvals)
+  rhs <- as.double(rhs)
+
+  bsz <- nrow(Mvals)
+  p <- ncol(Zvals)
+  out <- rep(NA_real_, bsz)
+
+  if (p == 1L) {
+    den <- as.double(Mvals[, 1L])
+    good <- is.finite(den) & (abs(den) > .Machine$double.eps)
+    out[good] <- rhs[1L] * as.double(Zvals[good, 1L]) / den[good]
+    return(out)
+  }
+
+  if (p == 2L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    u <- as.double(Zvals[, 1L])
+    v <- as.double(Zvals[, 2L])
+    det <- a * c - b * b
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      invdet <- 1 / det[good]
+      beta1 <- (c[good] * u[good] - b[good] * v[good]) * invdet
+      beta2 <- (a[good] * v[good] - b[good] * u[good]) * invdet
+      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2
+    }
+    return(out)
+  }
+
+  if (p == 3L) {
+    a <- as.double(Mvals[, 1L])
+    b <- as.double(Mvals[, 2L])
+    c <- as.double(Mvals[, 3L])
+    d <- as.double(Mvals[, 4L])
+    e <- as.double(Mvals[, 5L])
+    f <- as.double(Mvals[, 6L])
+    u <- as.double(Zvals[, 1L])
+    v <- as.double(Zvals[, 2L])
+    w <- as.double(Zvals[, 3L])
+
+    det <- a * (d * f - e * e) - b * (b * f - c * e) + c * (b * e - c * d)
+    good <- is.finite(det) & (abs(det) > .Machine$double.eps)
+    if (any(good)) {
+      c11 <- d[good] * f[good] - e[good] * e[good]
+      c12 <- c[good] * e[good] - b[good] * f[good]
+      c13 <- b[good] * e[good] - c[good] * d[good]
+      c22 <- a[good] * f[good] - c[good] * c[good]
+      c23 <- b[good] * c[good] - a[good] * e[good]
+      c33 <- a[good] * d[good] - b[good] * b[good]
+      invdet <- 1 / det[good]
+
+      beta1 <- (c11 * u[good] + c12 * v[good] + c13 * w[good]) * invdet
+      beta2 <- (c12 * u[good] + c22 * v[good] + c23 * w[good]) * invdet
+      beta3 <- (c13 * u[good] + c23 * v[good] + c33 * w[good]) * invdet
+      out[good] <- rhs[1L] * beta1 + rhs[2L] * beta2 + rhs[3L] * beta3
+    }
+    return(out)
+  }
+
+  out
+}
+
+.np_inid_boot_from_scoef <- function(txdat,
+                                     ydat,
+                                     tzdat,
+                                     exdat,
+                                     ezdat,
+                                     bws,
+                                     B,
+                                     counts = NULL,
+                                     leave.one.out = FALSE) {
+  txdat <- toFrame(txdat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+
+  miss.z <- missing(tzdat) || is.null(tzdat)
+  if (miss.z) {
+    tzdat <- txdat
+    ezdat <- exdat
+  } else {
+    tzdat <- toFrame(tzdat)
+    ezdat <- toFrame(ezdat)
+  }
+
+  if (nrow(txdat) != nrow(tzdat))
+    stop("smooth coefficient inid helper requires aligned txdat/tzdat rows")
+  if (nrow(exdat) != nrow(ezdat))
+    stop("smooth coefficient inid helper requires aligned exdat/ezdat rows")
+  if (ncol(txdat) != ncol(exdat))
+    stop("smooth coefficient inid helper requires matching txdat/exdat columns")
+  if (nrow(txdat) < 1L || nrow(exdat) < 1L || B < 1L)
+    stop("invalid smooth coefficient inid helper dimensions")
+
+  if (length(ydat) != nrow(txdat))
+    stop("length of ydat must match training rows in smooth coefficient inid helper")
+
+  txdat <- adjustLevels(txdat, bws$xdati)
+  exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+  if (!miss.z) {
+    tzdat <- adjustLevels(tzdat, bws$zdati)
+    ezdat <- adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
+  }
+
+  y.num <- .np_inid_scoef_numeric_y(ydat = ydat, bws = bws)
+  X.train <- toMatrix(txdat)
+  X.eval <- toMatrix(exdat)
+  W.train <- as.matrix(data.frame(1, X.train))
+  W.eval <- as.matrix(data.frame(1, X.eval))
+
+  npksum.fun <- .npRmpi_bootstrap_estimator("npksum.default")
+  kw <- npksum.fun(
+    txdat = tzdat,
+    exdat = ezdat,
+    bws = bws,
+    return.kernel.weights = TRUE,
+    bandwidth.divide = TRUE,
+    leave.one.out = leave.one.out
+  )$kw
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(txdat))
+
+  n <- nrow(W.train)
+  neval <- nrow(W.eval)
+  if (nrow(kw) != n || ncol(kw) != neval)
+    stop("smooth coefficient inid helper kernel-weight matrix shape mismatch")
+
+  p <- ncol(W.train)
+  mcols <- p * (p + 1L) / 2L
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
+  epsilon <- 1.0 / neval
+
+  Mfeat <- vector("list", neval)
+  Zfeat <- vector("list", neval)
+  t0 <- numeric(neval)
+
+  for (i in seq_len(neval)) {
+    k <- as.double(kw[, i])
+    WK <- W.train * k
+    zf <- WK * y.num
+
+    mf <- matrix(0.0, nrow = n, ncol = mcols)
+    idx <- 1L
+    for (a in seq_len(p)) {
+      for (b in a:p) {
+        mf[, idx] <- WK[, a] * W.train[, b]
+        idx <- idx + 1L
+      }
+    }
+
+    Mfeat[[i]] <- mf
+    Zfeat[[i]] <- zf
+
+    M0 <- crossprod(ones, mf)
+    Z0 <- crossprod(ones, zf)
+    t0i <- .np_inid_scoef_predict_chunk(Mvals = M0, Zvals = Z0, rhs = W.eval[i, ])[1L]
+    if (!is.finite(t0i)) {
+      t0i <- .np_inid_scoef_predict_row(
+        mrow = M0[1L, ],
+        zrow = Z0[1L, ],
+        rhs = W.eval[i, ],
+        epsilon = epsilon
+      )
+    }
+    t0[i] <- t0i
+  }
+
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+
+  fill_chunk <- function(counts.chunk, start, stopi) {
+    bsz <- ncol(counts.chunk)
+    for (i in seq_len(neval)) {
+      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
+      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
+      if (bsz == 1L) {
+        Mvals <- matrix(Mvals, nrow = 1L)
+        Zvals <- matrix(Zvals, nrow = 1L)
+      }
+      out <- .np_inid_scoef_predict_chunk(Mvals = Mvals, Zvals = Zvals, rhs = W.eval[i, ])
+      bad <- which(!is.finite(out))
+      if (length(bad)) {
+        for (bb in bad) {
+          out[bb] <- .np_inid_scoef_predict_row(
+            mrow = Mvals[bb, ],
+            zrow = Zvals[bb, ],
+            rhs = W.eval[i, ],
+            epsilon = epsilon
+          )
+        }
+      }
+      tmat[start:stopi, i] <<- out
+    }
+  }
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+  } else {
+    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    prob <- rep.int(1 / n, n)
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      start <- stopi + 1L
+    }
+  }
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("inid smooth coefficient helper produced non-finite values")
 
   list(t = tmat, t0 = t0)
 }
@@ -1558,11 +1889,6 @@ compute.bootstrap.errors.rbandwidth =
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.rbandwidth")
     npreg_fit <- .npRmpi_bootstrap_estimator("npreg.rbandwidth")
     npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat.rbandwidth")
-    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
-      isTRUE(plot.errors.boot.method == "inid") &&
-      isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed")) &&
-      isTRUE(is.numeric(ydat))
     boot.out <- NULL
 
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -1578,7 +1904,15 @@ compute.bootstrap.errors.rbandwidth =
       }
     }
 
-    if (fast.inid) {
+    inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      !isTRUE(gradients) &&
+      identical(bws$type, "fixed")
+
+    if (is.inid && !isTRUE(inid.helper.ok)) {
+      warning("inid regression helper unavailable for this configuration; using explicit bootstrap fallback")
+    }
+
+    if (is.inid && isTRUE(inid.helper.ok)) {
       boot.out <- tryCatch(
         .np_inid_boot_from_regression(
           xdat = xdat,
@@ -1588,9 +1922,9 @@ compute.bootstrap.errors.rbandwidth =
           B = plot.errors.boot.num
         ),
         error = function(e) {
-          warning(sprintf("inid regression fast path failed in compute.bootstrap.errors.rbandwidth (%s); using bootstrap fallback",
-                          conditionMessage(e)))
-          NULL
+          stop(sprintf("inid regression helper failed in compute.bootstrap.errors.rbandwidth (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
         }
       )
     }
@@ -1649,11 +1983,11 @@ compute.bootstrap.errors.rbandwidth =
     }
 
     if (is.null(boot.out)) {
-      boofun <- if (is.inid) {
-        function(data, indices) {
+      if (is.inid) {
+        boofun <- function(data, indices) {
           fit <- suppressWarnings(npreg_fit(
-            txdat = xdat[indices, , drop = FALSE],
-            tydat = ydat[indices],
+            txdat = data[indices, seq_len(ncol(data) - 1L), drop = FALSE],
+            tydat = data[indices, ncol(data), drop = TRUE],
             exdat = exdat, bws = bws,
             gradients = gradients,
             gradient.order = gradient.order,
@@ -1661,8 +1995,16 @@ compute.bootstrap.errors.rbandwidth =
           ))
           if (gradients) fit$grad[, slice.index] else fit$mean
         }
+
+        boot.out <- .npRmpi_bootstrap_maybe_local({
+          boot(
+            data = data.frame(xdat, ydat),
+            statistic = boofun,
+            R = plot.errors.boot.num
+          )
+        }, estimators = list(npreg_fit, npreghat_fit))
       } else {
-        function(tsb) {
+        boofun <- function(tsb) {
           fit <- suppressWarnings(npreg_fit(
             txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
@@ -1673,16 +2015,8 @@ compute.bootstrap.errors.rbandwidth =
           ))
           if (gradients) fit$grad[, slice.index] else fit$mean
         }
-      }
 
-      boot.out <- .npRmpi_bootstrap_maybe_local({
-        if (is.inid) {
-          boot(
-            data = data.frame(xdat, ydat),
-            statistic = boofun,
-            R = plot.errors.boot.num
-          )
-        } else {
+        boot.out <- .npRmpi_bootstrap_maybe_local({
           tsboot(
             tseries = data.frame(xdat, ydat),
             statistic = boofun,
@@ -1690,8 +2024,8 @@ compute.bootstrap.errors.rbandwidth =
             l = plot.errors.boot.blocklen,
             sim = plot.errors.boot.method
           )
-        }
-      }, estimators = list(npreg_fit, npreghat_fit))
+        }, estimators = list(npreg_fit, npreghat_fit))
+      }
     }
 
     all.bp <- list()
@@ -1772,43 +2106,30 @@ compute.bootstrap.errors.scbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
-    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-    fast.inid <- isTRUE(getOption("np.plot.npscoef.inid.fastpath.enable", FALSE)) &&
-      isTRUE(.np_plot_inid_fastpath_enabled()) &&
-      isTRUE(is.inid) &&
-      isTRUE(!gradients) &&
-      isTRUE(identical(regtype, "lc")) &&
-      isTRUE(is.numeric(ydat))
     boot.out <- NULL
 
-    if (fast.inid) {
-      hat.args <- list(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        output = "matrix",
-        iterate = FALSE
+    if (is.inid) {
+      if (!isTRUE(.np_plot_inid_fastpath_enabled()))
+        stop("inid bootstrap requires fastpath-enabled helper for smooth coefficient plots", call. = FALSE)
+      if (isTRUE(gradients))
+        stop("inid bootstrap for smooth coefficient gradients is not supported in helper mode", call. = FALSE)
+      boot.out <- tryCatch(
+        .np_inid_boot_from_scoef(
+          txdat = xdat,
+          ydat = ydat,
+          tzdat = if (miss.z) NULL else zdat,
+          exdat = exdat,
+          ezdat = if (miss.z) NULL else ezdat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          leave.one.out = FALSE
+        ),
+        error = function(e) {
+          stop(sprintf("inid smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
       )
-      if (!miss.z) {
-        hat.args$tzdat <- zdat
-        hat.args$ezdat <- ezdat
-      }
-
-      H.fast <- tryCatch(
-        suppressWarnings(do.call(npscoefhat_fit, hat.args)),
-        error = function(e) NULL
-      )
-
-      if (is.matrix(H.fast) && ncol(H.fast) == length(ydat)) {
-        boot.out <- .np_inid_lc_boot_from_hat(
-          H = H.fast,
-          ydat = as.double(ydat),
-          B = plot.errors.boot.num
-        )
-      } else {
-        warning("inid npscoef hat fast path unavailable in compute.bootstrap.errors.scbandwidth; using bootstrap fallback",
-                call. = FALSE)
-      }
     }
 
     if (is.null(boot.out) && is.wild.hat) {
@@ -1860,42 +2181,24 @@ compute.bootstrap.errors.scbandwidth =
       ycol <- ncol(xdat) + 1L
       zcols <- if (miss.z) integer(0) else (ycol + 1L):(ycol + ncol(zdat))
 
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          npscoef_fit(
-            txdat = xdat[indices, , drop = FALSE],
-            tydat = ydat[indices],
-            tzdat = if (miss.z) NULL else zdat[indices, , drop = FALSE],
-            exdat = exdat,
-            ezdat = if (miss.z) NULL else ezdat,
-            bws = bws,
-            iterate = FALSE
-          )$mean
-        }
-      } else {
-        function(tsb) {
-          npscoef_fit(
-            txdat = tsb[, xcols, drop = FALSE],
-            tydat = tsb[, ycol],
-            tzdat = if (miss.z) NULL else tsb[, zcols, drop = FALSE],
-            exdat = exdat,
-            ezdat = if (miss.z) NULL else ezdat,
-            bws = bws,
-            iterate = FALSE
-          )$mean
-        }
+      boofun <- function(tsb) {
+        npscoef_fit(
+          txdat = tsb[, xcols, drop = FALSE],
+          tydat = tsb[, ycol],
+          tzdat = if (miss.z) NULL else tsb[, zcols, drop = FALSE],
+          exdat = exdat,
+          ezdat = if (miss.z) NULL else ezdat,
+          bws = bws,
+          iterate = FALSE
+        )$mean
       }
 
       boot.data <- if (miss.z) data.frame(xdat, ydat) else data.frame(xdat, ydat, zdat)
       boot.out <- .npRmpi_bootstrap_maybe_local({
-        if (is.inid) {
-          boot(data = boot.data, statistic = boofun, R = plot.errors.boot.num)
-        } else {
-          tsboot(
-            tseries = boot.data, statistic = boofun, R = plot.errors.boot.num,
-            l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
-          )
-        }
+        tsboot(
+          tseries = boot.data, statistic = boofun, R = plot.errors.boot.num,
+          l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
+        )
       }, estimators = list(npscoef_fit, npscoefhat_fit))
     }
 
@@ -1985,7 +2288,6 @@ compute.bootstrap.errors.plbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
-    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) && isTRUE(is.inid)
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -2024,7 +2326,9 @@ compute.bootstrap.errors.plbandwidth =
       )
     } else {
       boot.out <- NULL
-      if (fast.inid) {
+      if (is.inid) {
+        if (!isTRUE(.np_plot_inid_fastpath_enabled()))
+          stop("inid bootstrap requires fastpath-enabled helper for partially linear plots", call. = FALSE)
         boot.out <- tryCatch(
           .np_inid_boot_from_plreg(
             txdat = xdat,
@@ -2036,45 +2340,28 @@ compute.bootstrap.errors.plbandwidth =
             B = plot.errors.boot.num
           ),
           error = function(e) {
-            warning(sprintf("inid plreg fast path failed in compute.bootstrap.errors.plbandwidth (%s); using bootstrap fallback",
-                            conditionMessage(e)),
-                    call. = FALSE)
-            NULL
+            stop(sprintf("inid plreg helper failed in compute.bootstrap.errors.plbandwidth (%s)",
+                         conditionMessage(e)),
+                 call. = FALSE)
           }
         )
       }
 
       if (is.null(boot.out)) {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          npplreg_fit(
-            txdat = xdat[indices, , drop = FALSE],
-            tydat = ydat[indices],
-            tzdat = zdat[indices, , drop = FALSE],
-            exdat = exdat, ezdat = ezdat, bws = bws
-          )$mean
-        }
-      } else {
-        function(tsb) {
-          npplreg_fit(
-            txdat = tsb[, seq_len(ncol(xdat)), drop = FALSE],
-            tydat = tsb[, ncol(xdat) + 1L],
-            tzdat = tsb[, (ncol(xdat) + 2L):ncol(tsb), drop = FALSE],
-            exdat = exdat, ezdat = ezdat, bws = bws
-          )$mean
-        }
+      boofun <- function(tsb) {
+        npplreg_fit(
+          txdat = tsb[, seq_len(ncol(xdat)), drop = FALSE],
+          tydat = tsb[, ncol(xdat) + 1L],
+          tzdat = tsb[, (ncol(xdat) + 2L):ncol(tsb), drop = FALSE],
+          exdat = exdat, ezdat = ezdat, bws = bws
+        )$mean
       }
 
       boot.out <- .npRmpi_bootstrap_maybe_local({
-        if (is.inid) {
-          boot(data = data.frame(xdat, ydat, zdat), statistic = boofun,
-               R = plot.errors.boot.num)
-        } else {
-          tsboot(tseries = data.frame(xdat, ydat, zdat), statistic = boofun,
-                 R = plot.errors.boot.num,
-                 l = plot.errors.boot.blocklen,
-                 sim = plot.errors.boot.method)
-        }
+        tsboot(tseries = data.frame(xdat, ydat, zdat), statistic = boofun,
+               R = plot.errors.boot.num,
+               l = plot.errors.boot.blocklen,
+               sim = plot.errors.boot.method)
       }, estimators = list(npplreg_fit, npplreghat_fit))
       }
     }
@@ -2749,10 +3036,6 @@ compute.bootstrap.errors.sibandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
-    fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
-      isTRUE(is.inid) &&
-      isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -2788,40 +3071,55 @@ compute.bootstrap.errors.sibandwidth =
         ),
         t0 = t0
       )
-    } else if (fast.inid) {
-      boot.out <- .npRmpi_bootstrap_maybe_local({
-        tryCatch({
-          tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
-          rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
-          .np_inid_boot_from_regression(
-            xdat = tx.index,
-            exdat = tx.index,
-            bws = rbw,
-            ydat = ydat,
-            B = plot.errors.boot.num
-          )
-        }, error = function(e) {
-          warning(sprintf("inid regression fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
-                          conditionMessage(e)))
-          NULL
-        })
-      }, estimators = list(npindex_fit, npindexhat_fit))
-      if (is.null(boot.out))
-        fast.inid <- FALSE
-    } else {
-      ## beta[1] is always 1.0, so use first column of gradients matrix ... 
-      boofun <- if (is.inid) {
-        function(data, indices) {
+    } else if (is.inid) {
+      inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
+        !isTRUE(gradients) &&
+        identical(bws$type, "fixed")
+      if (!isTRUE(inid.helper.ok)) {
+        warning("inid single-index helper unavailable for this configuration; using explicit bootstrap fallback")
+        boot.out <- NULL
+      } else {
+        boot.out <- .npRmpi_bootstrap_maybe_local({
+          tryCatch({
+            tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+            rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
+            .np_inid_boot_from_regression(
+              xdat = tx.index,
+              exdat = tx.index,
+              bws = rbw,
+              ydat = ydat,
+              B = plot.errors.boot.num
+            )
+          }, error = function(e) {
+            stop(sprintf("inid single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
+                         conditionMessage(e)),
+                 call. = FALSE)
+          })
+        }, estimators = list(npindex_fit, npindexhat_fit))
+      }
+    }
+
+    if (is.null(boot.out)) {
+      ## beta[1] is always 1.0, so use first column of gradients matrix ...
+      if (is.inid) {
+        boofun.inid <- function(data, indices) {
           fit <- npindex_fit(
-            txdat = xdat[indices, , drop = FALSE],
-            tydat = ydat[indices],
+            txdat = data[indices, seq_len(ncol(data) - 1L), drop = FALSE],
+            tydat = data[indices, ncol(data), drop = TRUE],
             exdat = xdat, bws = bws,
             gradients = gradients
           )
           if (gradients) fit$grad[,1] else fit$mean
         }
+        boot.out <- .npRmpi_bootstrap_maybe_local({
+          boot(
+            data = data.frame(xdat, ydat),
+            statistic = boofun.inid,
+            R = plot.errors.boot.num
+          )
+        }, estimators = list(npindex_fit, npindexhat_fit))
       } else {
-        function(tsb) {
+        boofun <- function(tsb) {
           fit <- npindex_fit(
             txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
@@ -2830,19 +3128,13 @@ compute.bootstrap.errors.sibandwidth =
           )
           if (gradients) fit$grad[,1] else fit$mean
         }
-      }
-
-      boot.out <- .npRmpi_bootstrap_maybe_local({
-        if (is.inid && !fast.inid) {
-          boot(data = data.frame(xdat, ydat), statistic = boofun,
-               R = plot.errors.boot.num)
-        } else if (!fast.inid) {
+        boot.out <- .npRmpi_bootstrap_maybe_local({
           tsboot(tseries = data.frame(xdat, ydat), statistic = boofun,
                  R = plot.errors.boot.num,
                  l = plot.errors.boot.blocklen,
                  sim = plot.errors.boot.method)
-        }
-      }, estimators = list(npindex_fit, npindexhat_fit))
+        }, estimators = list(npindex_fit, npindexhat_fit))
+      }
     }
     
     if (plot.errors.type == "pmzsd") {
