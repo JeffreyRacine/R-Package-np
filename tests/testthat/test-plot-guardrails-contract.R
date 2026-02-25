@@ -1,0 +1,36 @@
+test_that("plot helper runtime guard requires non-null bws", {
+  guard <- getFromNamespace(".np_plot_require_bws", "np")
+  expect_error(
+    guard(NULL, "unit-test"),
+    "required argument 'bws' is missing or NULL"
+  )
+  expect_invisible(guard(list(type = "fixed"), "unit-test"))
+})
+
+test_that("plot runtime files avoid forbidden *bw( calls", {
+  root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
+  files <- c(
+    file.path(root, "R", "np.plot.helpers.R"),
+    Sys.glob(file.path(root, "R", "np.plot.engine*.R"))
+  )
+
+  forbidden <- "\\b[A-Za-z0-9._]+bw\\s*\\("
+  allowed <- c("\\.np_indexhat_rbw\\s*\\(")
+  offenders <- character()
+
+  for (f in files) {
+    raw <- readLines(f, warn = FALSE)
+    code <- sub("#.*$", "", raw)
+    hit_idx <- which(grepl(forbidden, code, perl = TRUE))
+    if (!length(hit_idx)) next
+
+    for (i in hit_idx) {
+      ok <- any(vapply(allowed, function(p) grepl(p, code[[i]], perl = TRUE), logical(1)))
+      if (!ok) {
+        offenders <- c(offenders, sprintf("%s:%d: %s", basename(f), i, trimws(raw[[i]])))
+      }
+    }
+  }
+
+  expect_equal(length(offenders), 0, info = paste(offenders, collapse = "\n"))
+})

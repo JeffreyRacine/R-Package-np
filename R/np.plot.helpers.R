@@ -119,6 +119,12 @@
   !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
 }
 
+.np_plot_require_bws <- function(bws, where) {
+  if (is.null(bws))
+    stop(sprintf("required argument 'bws' is missing or NULL in %s", where))
+  invisible(TRUE)
+}
+
 .np_inid_chunk_size <- function(n, B) {
   chunk.opt <- getOption("np.plot.inid.chunk.size")
   if (!is.null(chunk.opt)) {
@@ -1125,6 +1131,7 @@ compute.bootstrap.errors.rbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.rbandwidth")
     H.fast <- NULL
     regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
@@ -1347,6 +1354,7 @@ compute.bootstrap.errors.scbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.scbandwidth")
     miss.z <- missing(zdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1516,6 +1524,7 @@ compute.bootstrap.errors.plbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.plbandwidth")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -1665,6 +1674,7 @@ compute.bootstrap.errors.bandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.bandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1792,6 +1802,7 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -1913,6 +1924,7 @@ compute.bootstrap.errors.conbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2072,6 +2084,7 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.condbandwidth")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2226,6 +2239,7 @@ compute.bootstrap.errors.sibandwidth =
            plot.errors.alpha,
            ...,
            bws){
+    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
 
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
     boot.all.err <- NULL
