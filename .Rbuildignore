@@ -12,7 +12,6 @@ mknpkg.sh
 ^np_.*\\.tar\\.gz$
 ^demo/n_.*/$
 ^demo/serial/.*$
-^demo/constrained\.R$
 ^demo/.*\\.tex$
 ^demo/.*\\.dat$
 ^demo/.*latex.*$
