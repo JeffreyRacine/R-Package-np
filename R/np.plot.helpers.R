@@ -1558,14 +1558,11 @@ compute.bootstrap.errors.rbandwidth =
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.rbandwidth")
     npreg_fit <- .npRmpi_bootstrap_estimator("npreg.rbandwidth")
     npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat.rbandwidth")
-    H.fast <- NULL
-    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(plot.errors.boot.method == "inid") &&
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed")) &&
       isTRUE(is.numeric(ydat))
-    fast.inid.lc <- isTRUE(fast.inid) && isTRUE(identical(regtype, "lc"))
     boot.out <- NULL
 
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -1581,23 +1578,7 @@ compute.bootstrap.errors.rbandwidth =
       }
     }
 
-    if (fast.inid.lc) {
-      H.fast <- tryCatch(suppressWarnings(npreghat_fit(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        output = "matrix"
-      )), error = function(e) NULL)
-      fast.inid.lc <- is.matrix(H.fast) && ncol(H.fast) == length(ydat)
-    }
-
-    if (fast.inid.lc) {
-      boot.out <- .np_inid_lc_boot_from_hat(
-        H = H.fast,
-        ydat = ydat,
-        B = plot.errors.boot.num
-      )
-    } else if (fast.inid) {
+    if (fast.inid) {
       boot.out <- tryCatch(
         .np_inid_boot_from_regression(
           xdat = xdat,
@@ -2768,7 +2749,6 @@ compute.bootstrap.errors.sibandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
-    regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(is.inid) &&
       isTRUE(!gradients) &&
@@ -2809,55 +2789,25 @@ compute.bootstrap.errors.sibandwidth =
         t0 = t0
       )
     } else if (fast.inid) {
-      if (identical(regtype, "lc")) {
-        H.fast <- .npRmpi_bootstrap_maybe_local({
-          tryCatch(
-            npindexhat_fit(
-              bws = bws,
-              txdat = xdat,
-              exdat = xdat,
-              s = 0L,
-              output = "matrix"
-            ),
-            error = function(e) {
-              warning(sprintf("inid hat fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
-                              conditionMessage(e)))
-              NULL
-            }
+      boot.out <- .npRmpi_bootstrap_maybe_local({
+        tryCatch({
+          tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+          rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
+          .np_inid_boot_from_regression(
+            xdat = tx.index,
+            exdat = tx.index,
+            bws = rbw,
+            ydat = ydat,
+            B = plot.errors.boot.num
           )
-        }, estimators = list(npindex_fit, npindexhat_fit))
-        if (is.null(H.fast) || !is.matrix(H.fast) || ncol(H.fast) != length(ydat)) {
-          fast.inid <- FALSE
-        } else {
-          boot.out <- .npRmpi_bootstrap_maybe_local({
-            .np_inid_lc_boot_from_hat(
-              H = H.fast,
-              ydat = ydat,
-              B = plot.errors.boot.num
-            )
-          }, estimators = list(npindex_fit, npindexhat_fit))
-        }
-      } else {
-        boot.out <- .npRmpi_bootstrap_maybe_local({
-          tryCatch({
-            tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
-            rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
-            .np_inid_boot_from_regression(
-              xdat = tx.index,
-              exdat = tx.index,
-              bws = rbw,
-              ydat = ydat,
-              B = plot.errors.boot.num
-            )
-          }, error = function(e) {
-            warning(sprintf("inid regression fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
-                            conditionMessage(e)))
-            NULL
-          })
-        }, estimators = list(npindex_fit, npindexhat_fit))
-        if (is.null(boot.out))
-          fast.inid <- FALSE
-      }
+        }, error = function(e) {
+          warning(sprintf("inid regression fast path failed in compute.bootstrap.errors.sibandwidth (%s); using bootstrap fallback",
+                          conditionMessage(e)))
+          NULL
+        })
+      }, estimators = list(npindex_fit, npindexhat_fit))
+      if (is.null(boot.out))
+        fast.inid <- FALSE
     } else {
       ## beta[1] is always 1.0, so use first column of gradients matrix ... 
       boofun <- if (is.inid) {
