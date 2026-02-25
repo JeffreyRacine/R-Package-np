@@ -40,6 +40,73 @@ test_that("inid lc fast path matches explicit resample refits", {
   expect_equal(fast.out$t0, as.vector(H %*% y), tolerance = 1e-12)
 })
 
+test_that("inid ll/lp fast path matches explicit resample refits", {
+  skip_if_not_installed("np")
+
+  set.seed(3211)
+  n <- 45
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(2 * pi * x1) + 0.6 * x2 + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(15), , drop = FALSE]
+  B <- 9L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  fast.fun <- getFromNamespace(".np_inid_boot_from_regression", "np")
+  cfgs <- list(
+    list(regtype = "ll", basis = NULL, degree = NULL, label = "ll"),
+    list(regtype = "lp", basis = "additive", degree = c(2L, 2L), label = "lp-additive"),
+    list(regtype = "lp", basis = "tensor", degree = c(2L, 2L), label = "lp-tensor"),
+    list(regtype = "lp", basis = "glp", degree = c(2L, 2L), label = "lp-glp")
+  )
+
+  for (cfg in cfgs) {
+    bw.args <- list(
+      xdat = tx,
+      ydat = y,
+      regtype = cfg$regtype,
+      bws = c(0.3, 0.3),
+      bandwidth.compute = FALSE
+    )
+    if (!is.null(cfg$basis)) {
+      bw.args$basis <- cfg$basis
+      bw.args$degree <- cfg$degree
+    }
+    bw <- do.call(npregbw, bw.args)
+
+    fast.out <- fast.fun(
+      xdat = tx,
+      exdat = ex,
+      bws = bw,
+      ydat = y,
+      B = B,
+      counts = counts
+    )
+
+    explicit.t <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+    for (b in seq_len(B)) {
+      idx <- rep.int(seq_len(n), counts[, b])
+      explicit.t[b, ] <- npreg(
+        txdat = tx[idx, , drop = FALSE],
+        tydat = y[idx],
+        exdat = ex,
+        bws = bw,
+        gradients = FALSE,
+        warn.glp.gradient = FALSE
+      )$mean
+    }
+
+    expect_equal(fast.out$t, explicit.t, tolerance = 1e-6, info = cfg$label)
+    expect_equal(
+      fast.out$t0,
+      npreg(txdat = tx, tydat = y, exdat = ex, bws = bw, gradients = FALSE, warn.glp.gradient = FALSE)$mean,
+      tolerance = 1e-6,
+      info = cfg$label
+    )
+  }
+})
+
 test_that("inid lc fast path toggle preserves plot bootstrap contract", {
   skip_if_not_installed("np")
 
