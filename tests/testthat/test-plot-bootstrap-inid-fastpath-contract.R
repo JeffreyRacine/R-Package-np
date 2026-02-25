@@ -182,6 +182,64 @@ test_that("npreg inid ll/lp fast path matches explicit resample refits", {
   }
 })
 
+test_that("npplreg inid fast path matches explicit resample refits", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(32316)
+  n <- 40
+  x1 <- runif(n)
+  x2 <- runif(n)
+  z1 <- runif(n)
+  z2 <- runif(n)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  tz <- data.frame(z1 = z1, z2 = z2)
+  y <- sin(2 * pi * z1) + 0.5 * x1 - 0.2 * x2 + rnorm(n, sd = 0.08)
+  B <- 9L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  bw <- npplregbw(xdat = tx, ydat = y, zdat = tz, regtype = "lc", nmulti = 1)
+  fast.fun <- getFromNamespace(".np_inid_boot_from_plreg", "npRmpi")
+  fast.out <- fast.fun(
+    txdat = tx,
+    ydat = y,
+    tzdat = tz,
+    exdat = tx,
+    ezdat = tz,
+    bws = bw,
+    B = B,
+    counts = counts
+  )
+
+  explicit.t <- matrix(NA_real_, nrow = B, ncol = n)
+  for (b in seq_len(B)) {
+    idx <- rep.int(seq_len(n), counts[, b])
+    explicit.t[b, ] <- npplreg(
+      bws = bw,
+      txdat = tx[idx, , drop = FALSE],
+      tydat = y[idx],
+      tzdat = tz[idx, , drop = FALSE],
+      exdat = tx,
+      ezdat = tz
+    )$mean
+  }
+
+  fit0 <- npplreg(
+    bws = bw,
+    txdat = tx,
+    tydat = y,
+    tzdat = tz,
+    exdat = tx,
+    ezdat = tz
+  )$mean
+
+  expect_equal(fast.out$t, explicit.t, tolerance = 1e-6)
+  expect_equal(fast.out$t0, fit0, tolerance = 1e-7)
+})
+
 test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   skip_if_not_installed("np")
