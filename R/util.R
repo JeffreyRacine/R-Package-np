@@ -1080,12 +1080,51 @@ genTimingStr <- function(x){
   if (is.null(x$total.time) || is.na(x$total.time))
     return("")
 
+  .npRmpiTimingProfileStr <- function() {
+    if (isFALSE(getOption("npRmpi.profile.summary", TRUE)))
+      return("")
+
+    last.fun <- tryCatch(get(".npRmpi_profile_last", envir = asNamespace("npRmpi")),
+                         error = function(e) NULL)
+    if (!is.function(last.fun))
+      return("")
+
+    rec <- tryCatch(last.fun(), error = function(e) NULL)
+    if (!is.list(rec) || is.null(rec$where))
+      return("")
+
+    wall <- suppressWarnings(as.double(rec$wall_elapsed_sec)[1L])
+    comm <- suppressWarnings(as.double(rec$comm_elapsed_sec)[1L])
+    comp <- suppressWarnings(as.double(rec$compute_elapsed_sec)[1L])
+    ratio <- suppressWarnings(as.double(rec$comm_ratio)[1L])
+    calls <- suppressWarnings(as.integer(rec$comm_calls)[1L])
+    method <- if (!is.null(rec$method)) as.character(rec$method)[1L] else NA_character_
+    B <- suppressWarnings(as.integer(rec$B)[1L])
+    where <- as.character(rec$where)[1L]
+
+    fmt <- function(v, d = 4L) ifelse(is.finite(v), format(round(v, d), nsmall = d), "NA")
+    ratio.pct <- if (is.finite(ratio)) paste0(format(round(100 * ratio, 2), nsmall = 2), "%") else "NA"
+
+    paste0(
+      "\nMPI Bootstrap Profile: ", where,
+      " [method=", ifelse(is.na(method), "NA", method),
+      ", B=", ifelse(is.finite(B), B, "NA"), "]",
+      "\n  wall=", fmt(wall),
+      "s, comm=", fmt(comm),
+      "s, compute=", fmt(comp),
+      "s, comm_ratio=", ratio.pct,
+      ", comm_calls=", ifelse(is.finite(calls), calls, "NA")
+    )
+  }
+
   if (!is.null(x$optim.time) && !is.na(x$optim.time) &&
       !is.null(x$fit.time) && !is.na(x$fit.time))
     return(paste("\nEstimation Time: ", format(x$total.time), " seconds (optim ",
-                 format(x$optim.time), "s, fit ", format(x$fit.time), "s)", sep = ""))
+                 format(x$optim.time), "s, fit ", format(x$fit.time), "s)",
+                 .npRmpiTimingProfileStr(), sep = ""))
 
-  paste("\nEstimation Time: ",format(x$total.time)," seconds",sep = "")
+  paste("\nEstimation Time: ",format(x$total.time)," seconds",
+        .npRmpiTimingProfileStr(), sep = "")
 }
   
 pCatGofStr <- function(x){

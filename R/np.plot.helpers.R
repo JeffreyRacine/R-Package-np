@@ -249,7 +249,12 @@
     t(H %*% ystar)
   }
 
+  t.comm <- proc.time()
   parts <- tryCatch(mpi.applyLB(tasks, worker, comm = comm), error = function(e) e)
+  .npRmpi_profile_add_comm_elapsed(
+    elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+    where = "mpi.applyLB:wild"
+  )
   if (inherits(parts, "error")) {
     warning(sprintf("MPI wild bootstrap fan-out failed (%s); using local path",
                     conditionMessage(parts)))
@@ -336,7 +341,12 @@
       num / pmax(den, .Machine$double.eps)
     }
 
+    t.comm <- proc.time()
     parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+    .npRmpi_profile_add_comm_elapsed(
+      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+      where = "mpi.applyLB:inid"
+    )
     if (!inherits(parts, "error")) {
       t.mpi <- .npRmpi_bootstrap_collect_chunks(parts = parts,
                                                 tasks = tasks,
@@ -1659,6 +1669,189 @@ plotFactor <- function(f, y, ...){
   "data"
 }
 
+.npRmpi_profile_env <- local({
+  env <- new.env(parent = emptyenv())
+  env$last <- NULL
+  env$history <- list()
+  env$active_id <- NULL
+  env$active <- list()
+  env
+})
+
+.npRmpi_profile_enabled <- function() {
+  !isFALSE(getOption("npRmpi.profile.enable", TRUE))
+}
+
+.npRmpi_profile_level <- function() {
+  lvl <- as.character(getOption("npRmpi.profile.level", "basic"))[1L]
+  if (is.na(lvl) || !(lvl %in% c("basic", "detailed")))
+    lvl <- "basic"
+  lvl
+}
+
+.npRmpi_profile_history_limit <- function() {
+  lim <- suppressWarnings(as.integer(getOption("npRmpi.profile.history.max", 200L))[1L])
+  if (is.na(lim) || lim < 1L)
+    lim <- 200L
+  lim
+}
+
+.np_nrows_safe <- function(x) {
+  if (is.null(x))
+    return(NA_integer_)
+  if (is.atomic(x) && is.null(dim(x)))
+    return(as.integer(length(x)))
+  xf <- tryCatch(toFrame(x), error = function(e) NULL)
+  if (is.null(xf))
+    return(NA_integer_)
+  as.integer(nrow(xf))
+}
+
+.npRmpi_profile_bootstrap_begin <- function(where, method = NA_character_,
+                                            B = NA_integer_, ntrain = NA_integer_,
+                                            neval = NA_integer_) {
+  if (!isTRUE(.npRmpi_profile_enabled()))
+    return(NULL)
+
+  rank <- tryCatch(as.integer(mpi.comm.rank()), error = function(e) NA_integer_)
+  size <- tryCatch(as.integer(mpi.comm.size()), error = function(e) NA_integer_)
+  active <- list(
+    where = where,
+    level = .npRmpi_profile_level(),
+    method = if (length(method)) as.character(method)[1L] else NA_character_,
+    B = suppressWarnings(as.integer(B)[1L]),
+    ntrain = suppressWarnings(as.integer(ntrain)[1L]),
+    neval = suppressWarnings(as.integer(neval)[1L]),
+    rank = rank,
+    size = size,
+    via_bcast = isTRUE(.npRmpi_autodispatch_called_from_bcast()),
+    comm_elapsed_sec = 0.0,
+    comm_calls = 0L,
+    comm_notes = character(0),
+    start_proc = proc.time(),
+    start_wall = Sys.time()
+  )
+  active$id <- paste0(format(active$start_wall, "%Y%m%d%H%M%OS6"), "-", sample.int(1e8, 1L))
+  .npRmpi_profile_env$active_id <- active$id
+  .npRmpi_profile_env$active[[active$id]] <- active
+  active
+}
+
+.npRmpi_profile_add_comm_elapsed <- function(elapsed_sec, where = NA_character_) {
+  id <- .npRmpi_profile_env$active_id
+  if (is.null(id))
+    return(invisible(FALSE))
+  cur <- .npRmpi_profile_env$active[[id]]
+  if (is.null(cur))
+    return(invisible(FALSE))
+
+  elapsed <- suppressWarnings(as.double(elapsed_sec)[1L])
+  if (is.na(elapsed) || elapsed < 0)
+    elapsed <- 0.0
+
+  cur$comm_elapsed_sec <- as.double(cur$comm_elapsed_sec) + elapsed
+  cur$comm_calls <- as.integer(cur$comm_calls) + 1L
+  if (!is.na(where) && nzchar(as.character(where)[1L]) &&
+      identical(cur$level, "detailed")) {
+    cur$comm_notes <- c(cur$comm_notes, as.character(where)[1L])
+  }
+
+  .npRmpi_profile_env$active[[id]] <- cur
+  invisible(TRUE)
+}
+
+.npRmpi_profile_bootstrap_end <- function(value, ctx) {
+  if (is.null(ctx))
+    return(value)
+
+  id <- ctx$id
+  active <- if (!is.null(id)) .npRmpi_profile_env$active[[id]] else NULL
+  if (is.list(active)) {
+    ctx$comm_elapsed_sec <- as.double(active$comm_elapsed_sec)
+    ctx$comm_calls <- as.integer(active$comm_calls)
+    if (identical(active$level, "detailed"))
+      ctx$comm_notes <- active$comm_notes
+  }
+
+  dt <- proc.time() - ctx$start_proc
+  wall <- unname(as.double(dt[["elapsed"]]))
+  comm <- suppressWarnings(as.double(ctx$comm_elapsed_sec)[1L])
+  if (is.na(comm) || comm < 0)
+    comm <- 0.0
+  if (!is.finite(wall) || wall <= 0)
+    wall <- 0.0
+  compute <- max(0.0, wall - comm)
+  denom <- comm + compute
+  ratio <- if (denom > 0) min(1.0, max(0.0, comm / denom)) else NA_real_
+
+  record <- list(
+    where = ctx$where,
+    level = ctx$level,
+    method = ctx$method,
+    B = ctx$B,
+    ntrain = ctx$ntrain,
+    neval = ctx$neval,
+    rank = ctx$rank,
+    size = ctx$size,
+    via_bcast = ctx$via_bcast,
+    wall_elapsed_sec = wall,
+    comm_elapsed_sec = comm,
+    compute_elapsed_sec = compute,
+    comm_ratio = ratio,
+    comm_calls = suppressWarnings(as.integer(ctx$comm_calls)[1L]),
+    user_sec = unname(as.double(dt[["user.self"]])),
+    system_sec = unname(as.double(dt[["sys.self"]])),
+    timestamp_start = ctx$start_wall,
+    timestamp_end = Sys.time()
+  )
+  if (identical(ctx$level, "detailed")) {
+    record$comm_notes <- if (length(ctx$comm_notes)) ctx$comm_notes else character(0)
+  }
+
+  .npRmpi_profile_env$last <- record
+  .npRmpi_profile_env$history <- c(.npRmpi_profile_env$history, list(record))
+  if (!is.null(id)) {
+    .npRmpi_profile_env$active[[id]] <- NULL
+    if (identical(.npRmpi_profile_env$active_id, id))
+      .npRmpi_profile_env$active_id <- NULL
+  }
+  keep <- .npRmpi_profile_history_limit()
+  if (length(.npRmpi_profile_env$history) > keep) {
+    .npRmpi_profile_env$history <- tail(.npRmpi_profile_env$history, keep)
+  }
+
+  if (is.list(value))
+    value$timing.profile <- record
+  value
+}
+
+.npRmpi_profile_finalize_bootstrap <- function(boot.err, bxp, boot.all.err, ctx) {
+  out <- list(boot.err = boot.err, bxp = bxp, boot.all.err = boot.all.err)
+  .npRmpi_profile_bootstrap_end(out, ctx)
+}
+
+.npRmpi_profile_last <- function() {
+  .npRmpi_profile_env$last
+}
+
+.npRmpi_profile_history <- function(n = NULL) {
+  h <- .npRmpi_profile_env$history
+  if (is.null(n))
+    return(h)
+  n <- suppressWarnings(as.integer(n)[1L])
+  if (is.na(n) || n < 1L)
+    return(list())
+  tail(h, n)
+}
+
+.npRmpi_profile_clear <- function() {
+  .npRmpi_profile_env$last <- NULL
+  .npRmpi_profile_env$history <- list()
+  .npRmpi_profile_env$active_id <- NULL
+  .npRmpi_profile_env$active <- list()
+  invisible(NULL)
+}
+
 ## Rank-based simultaneous confidence set helper, vendored from
 ## MCPAN::SCSrank (MCPAN 1.1-21, GPL-2; Schaarschmidt, Gerhard, Sill).
 np.plot.SCSrank <- function(x, conf.level = 0.95, alternative = "two.sided", ...) {
@@ -1880,6 +2073,13 @@ compute.bootstrap.errors.rbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.rbandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.rbandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(exdat)
+    )
     npreg_fit <- .npRmpi_bootstrap_estimator("npreg.rbandwidth")
     npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat.rbandwidth")
     boot.out <- NULL
@@ -2073,7 +2273,12 @@ compute.bootstrap.errors.rbandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = all.bp,
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 compute.bootstrap.errors.scbandwidth =
@@ -2091,6 +2296,13 @@ compute.bootstrap.errors.scbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.scbandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.scbandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(exdat)
+    )
     miss.z <- missing(zdat)
     npscoef_fit <- .npRmpi_bootstrap_estimator("npscoef.scbandwidth")
     npscoefhat_fit <- .npRmpi_bootstrap_estimator("npscoefhat")
@@ -2256,7 +2468,12 @@ compute.bootstrap.errors.scbandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = all.bp,
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 compute.bootstrap.errors.plbandwidth =
@@ -2274,6 +2491,13 @@ compute.bootstrap.errors.plbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.plbandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.plbandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(exdat)
+    )
     npplreg_fit <- .npRmpi_bootstrap_estimator("npplreg.plbandwidth")
     npplreghat_fit <- .npRmpi_bootstrap_estimator("npplreghat")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -2419,7 +2643,12 @@ compute.bootstrap.errors.plbandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = all.bp,
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 compute.bootstrap.errors.bandwidth =
@@ -2436,6 +2665,13 @@ compute.bootstrap.errors.bandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.bandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.bandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(exdat)
+    )
     npudens_fit <- .npRmpi_bootstrap_estimator("npudens.bandwidth")
     npudist_fit <- .npRmpi_bootstrap_estimator("npudist.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
@@ -2555,7 +2791,12 @@ compute.bootstrap.errors.bandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = all.bp,
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 compute.bootstrap.errors.dbandwidth =
@@ -2571,6 +2812,13 @@ compute.bootstrap.errors.dbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.dbandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.dbandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(exdat)
+    )
     npudist_fit <- .npRmpi_bootstrap_estimator("npudist.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -2678,7 +2926,12 @@ compute.bootstrap.errors.dbandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = all.bp,
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 compute.bootstrap.errors.conbandwidth =
@@ -2699,6 +2952,13 @@ compute.bootstrap.errors.conbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.conbandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(exdat)
+    )
     npqreg_fit <- .npRmpi_bootstrap_estimator("npqreg.conbandwidth")
     npcdist_fit <- .npRmpi_bootstrap_estimator("npcdist")
     npcdens_fit <- .npRmpi_bootstrap_estimator("npcdens.conbandwidth")
@@ -2846,7 +3106,12 @@ compute.bootstrap.errors.conbandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = all.bp,
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 compute.bootstrap.errors.condbandwidth =
@@ -2867,6 +3132,13 @@ compute.bootstrap.errors.condbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.condbandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.condbandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(exdat)
+    )
     npqreg_fit <- .npRmpi_bootstrap_estimator("npqreg.condbandwidth")
     npcdist_fit <- .npRmpi_bootstrap_estimator("npcdist.condbandwidth")
     npcdens_fit <- .npRmpi_bootstrap_estimator("npcdens")
@@ -3014,7 +3286,12 @@ compute.bootstrap.errors.condbandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = all.bp,
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 compute.bootstrap.errors.sibandwidth =
@@ -3030,6 +3307,13 @@ compute.bootstrap.errors.sibandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.sibandwidth")
+    prof.ctx <- .npRmpi_profile_bootstrap_begin(
+      where = "compute.bootstrap.errors.sibandwidth",
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      ntrain = .np_nrows_safe(xdat),
+      neval = .np_nrows_safe(xdat)
+    )
 
     npindex_fit <- .npRmpi_bootstrap_estimator("npindex.sibandwidth")
     npindexhat_fit <- .npRmpi_bootstrap_estimator("npindexhat")
@@ -3166,7 +3450,12 @@ compute.bootstrap.errors.sibandwidth =
     }
     if (plot.errors.center == "bias-corrected")
       boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = list(), boot.all.err = boot.all.err)
+    .npRmpi_profile_finalize_bootstrap(
+      boot.err = boot.err,
+      bxp = list(),
+      boot.all.err = boot.all.err,
+      ctx = prof.ctx
+    )
   }
 
 
