@@ -125,3 +125,56 @@ test_that("plot contract: default condensity plot call stays scalar-safe", {
   on.exit(dev.off(), add = TRUE)
   expect_error(plot(fit, perspective = FALSE), NA)
 })
+
+test_that("plot contract: npscoef supports coef=TRUE plot path", {
+  skip_if_not_installed("np")
+
+  set.seed(105)
+  n <- 60
+  x <- runif(n)
+  z <- runif(n, -2, 2)
+  y <- x * exp(z) * (1 + rnorm(n, sd = 0.15))
+
+  fit <- npscoef(y ~ x | z, regtype = "ll", betas = TRUE)
+  out <- suppressWarnings(
+    plot(
+      fit,
+      coef = TRUE,
+      coef.index = 1,
+      perspective = FALSE,
+      neval = 20,
+      plot.behavior = "plot-data",
+      plot.errors.method = "none"
+    )
+  )
+
+  expect_type(out, "list")
+  expect_true(length(out) > 0)
+  expect_true(all(vapply(out, inherits, logical(1), "smoothcoefficient")))
+  expect_true(all(vapply(out, function(xi) !is.null(xi$mean), logical(1))))
+})
+
+test_that("plot contract: npplreg supports coef=TRUE plot-data payload", {
+  skip_if_not_installed("np")
+
+  set.seed(106)
+  n <- 80
+  x <- runif(n)
+  z <- runif(n, -2, 2)
+  y <- 1 + 0.7 * x + sin(z) + rnorm(n, sd = 0.15)
+
+  fit <- npplreg(y ~ x | z, regtype = "ll")
+  out <- suppressWarnings(
+    plot(
+      fit,
+      coef = TRUE,
+      plot.behavior = "plot-data",
+      plot.errors.method = "none"
+    )
+  )
+
+  expect_type(out, "list")
+  expect_true(all(c("coefficients", "coefficient.stderr", "fit") %in% names(out)))
+  expect_true(is.numeric(out$coefficients))
+  expect_true(length(out$coefficients) >= 1L)
+})

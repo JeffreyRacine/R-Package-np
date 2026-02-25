@@ -12,6 +12,7 @@
            common.scale = TRUE,
            perspective = TRUE,
            gradients = FALSE,
+           coef = FALSE,
            main = NULL,
            type = NULL,
            border = NULL,
@@ -63,6 +64,7 @@
 
     if(!missing(gradients))
       stop("gradients not supported with partially linear models. Coefficients may be extracted with coef()")
+    coef <- isTRUE(coef)
 
     miss.xyz = c(missing(xdat), missing(ydat), missing(zdat))
     
@@ -172,6 +174,33 @@
     }
 
     plot.errors = (plot.errors.method != "none")
+
+    if (coef) {
+      fit.coef <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat, bws = bws)
+      cf <- as.double(fit.coef$xcoef)
+      se <- as.double(fit.coef$xcoeferr)
+      cf.names <- if (!is.null(names(fit.coef$xcoef))) names(fit.coef$xcoef) else bws$xnames
+      if (is.null(cf.names) || length(cf.names) != length(cf))
+        cf.names <- paste0("x", seq_along(cf))
+
+      if (plot.behavior != "data") {
+        bp <- barplot(cf,
+                      names.arg = cf.names,
+                      ylab = scalar_default(ylab, "Linear Coefficient"),
+                      xlab = scalar_default(xlab, "Regressor"),
+                      main = scalar_default(main, ""),
+                      col = scalar_default(col, "gray70"),
+                      border = scalar_default(border, par("fg")))
+        if (plot.errors && length(se) == length(cf) && all(is.finite(se))) {
+          arrows(bp, cf - se, bp, cf + se, angle = 90, code = 3, length = 0.05, lwd = 1)
+        }
+      }
+
+      if (plot.behavior == "plot")
+        return(invisible(NULL))
+
+      return(list(coefficients = cf, coefficient.stderr = se, fit = fit.coef))
+    }
 
     if ((nxcon + nxord == 1) && (nzcon + nzord == 1) && (nxuno + nzuno == 0) &&
         perspective & !gradients & !any(xor(bws$xdati$iord, bws$xdati$inumord)) &
