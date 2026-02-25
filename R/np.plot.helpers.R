@@ -1791,8 +1791,46 @@ compute.bootstrap.errors.scbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
+    regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+    fast.inid <- isTRUE(getOption("np.plot.npscoef.inid.fastpath.enable", FALSE)) &&
+      isTRUE(.np_plot_inid_fastpath_enabled()) &&
+      isTRUE(is.inid) &&
+      isTRUE(!gradients) &&
+      isTRUE(identical(regtype, "lc")) &&
+      isTRUE(is.numeric(ydat))
+    boot.out <- NULL
 
-    if (is.wild.hat) {
+    if (fast.inid) {
+      hat.args <- list(
+        bws = bws,
+        txdat = xdat,
+        exdat = exdat,
+        output = "matrix",
+        iterate = FALSE
+      )
+      if (!miss.z) {
+        hat.args$tzdat <- zdat
+        hat.args$ezdat <- ezdat
+      }
+
+      H.fast <- tryCatch(
+        suppressWarnings(do.call(npscoefhat_fit, hat.args)),
+        error = function(e) NULL
+      )
+
+      if (is.matrix(H.fast) && ncol(H.fast) == length(ydat)) {
+        boot.out <- .np_inid_lc_boot_from_hat(
+          H = H.fast,
+          ydat = as.double(ydat),
+          B = plot.errors.boot.num
+        )
+      } else {
+        warning("inid npscoef hat fast path unavailable in compute.bootstrap.errors.scbandwidth; using bootstrap fallback",
+                call. = FALSE)
+      }
+    }
+
+    if (is.null(boot.out) && is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
@@ -1834,7 +1872,9 @@ compute.bootstrap.errors.scbandwidth =
         ),
         t0 = t0
       )
-    } else {
+    }
+
+    if (is.null(boot.out)) {
       xcols <- seq_len(ncol(xdat))
       ycol <- ncol(xdat) + 1L
       zcols <- if (miss.z) integer(0) else (ycol + 1L):(ycol + ncol(zdat))
