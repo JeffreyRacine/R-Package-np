@@ -137,7 +137,7 @@
 }
 
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
-  if (isFALSE(getOption("np.plot.inid.ksum.fastpath.nprmpi", TRUE)))
+  if (isFALSE(getOption("np.plot.inid.ksum.fastpath.nprmpi", FALSE)))
     return(FALSE)
   isTRUE(suppressWarnings(suppressMessages(
     requireNamespace("np", quietly = TRUE)
@@ -1616,27 +1616,20 @@ plotFactor <- function(f, y, ...){
   force(expr)
 }
 
-.npRmpi_bootstrap_estimator <- local({
+.npRmpi_bootstrap_estimator <- function(name) {
   np.ns <- NULL
-  checked <- FALSE
+  has.np <- isTRUE(suppressWarnings(suppressMessages(
+    requireNamespace("np", quietly = TRUE)
+  )))
+  if (has.np)
+    np.ns <- asNamespace("np")
 
-  function(name) {
-    if (!checked) {
-      checked <<- TRUE
-      has.np <- isTRUE(suppressWarnings(suppressMessages(
-        requireNamespace("np", quietly = TRUE)
-      )))
-      if (has.np)
-        np.ns <<- asNamespace("np")
-    }
+  if (!is.null(np.ns) &&
+      exists(name, envir = np.ns, mode = "function", inherits = FALSE))
+    return(get(name, envir = np.ns, inherits = FALSE))
 
-    if (!is.null(np.ns) &&
-        exists(name, envir = np.ns, mode = "function", inherits = FALSE))
-      return(get(name, envir = np.ns, inherits = FALSE))
-
-    get(name, mode = "function", envir = parent.frame(), inherits = TRUE)
-  }
-})
+  get(name, mode = "function", envir = parent.frame(), inherits = TRUE)
+}
 
 .npRmpi_bootstrap_uses_np_namespace <- function(fun) {
   if (!is.function(fun))
@@ -2443,6 +2436,8 @@ compute.bootstrap.errors.bandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.bandwidth")
+    npudens_fit <- .npRmpi_bootstrap_estimator("npudens.bandwidth")
+    npudist_fit <- .npRmpi_bootstrap_estimator("npudist.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2478,18 +2473,18 @@ compute.bootstrap.errors.bandwidth =
       boofun <- if (is.inid) {
         function(data, indices) {
           fit <- if (cdf) {
-            npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+            npudist_fit(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
           } else {
-            npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+            npudens_fit(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
           }
           if (cdf) fit$dist else fit$dens
         }
       } else {
         function(tsb) {
           fit <- if (cdf) {
-            npudist(tdat = tsb, edat = exdat, bws = bws)
+            npudist_fit(tdat = tsb, edat = exdat, bws = bws)
           } else {
-            npudens(tdat = tsb, edat = exdat, bws = bws)
+            npudens_fit(tdat = tsb, edat = exdat, bws = bws)
           }
           if (cdf) fit$dist else fit$dens
         }
@@ -2576,6 +2571,7 @@ compute.bootstrap.errors.dbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.dbandwidth")
+    npudist_fit <- .npRmpi_bootstrap_estimator("npudist.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2609,11 +2605,11 @@ compute.bootstrap.errors.dbandwidth =
     if (is.null(boot.out)) {
       boofun <- if (is.inid) {
         function(data, indices) {
-          npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
+          npudist_fit(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
         }
       } else {
         function(tsb) {
-          npudist(tdat = tsb, edat = exdat, bws = bws)$dist
+          npudist_fit(tdat = tsb, edat = exdat, bws = bws)$dist
         }
       }
 
@@ -2703,6 +2699,9 @@ compute.bootstrap.errors.conbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.conbandwidth")
+    npqreg_fit <- .npRmpi_bootstrap_estimator("npqreg.conbandwidth")
+    npcdist_fit <- .npRmpi_bootstrap_estimator("npcdist")
+    npcdens_fit <- .npRmpi_bootstrap_estimator("npcdens.conbandwidth")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2727,9 +2726,9 @@ compute.bootstrap.errors.conbandwidth =
     fit.cond <- function(tx, ty) {
       switch(
         tboo,
-        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+        quant = npqreg_fit(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
       )
     }
     out.cond <- function(fit) {
@@ -2868,6 +2867,9 @@ compute.bootstrap.errors.condbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.condbandwidth")
+    npqreg_fit <- .npRmpi_bootstrap_estimator("npqreg.condbandwidth")
+    npcdist_fit <- .npRmpi_bootstrap_estimator("npcdist.condbandwidth")
+    npcdens_fit <- .npRmpi_bootstrap_estimator("npcdens")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2892,9 +2894,9 @@ compute.bootstrap.errors.condbandwidth =
     fit.cond <- function(tx, ty) {
       switch(
         tboo,
-        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+        quant = npqreg_fit(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
       )
     }
     out.cond <- function(fit) {
