@@ -137,7 +137,7 @@
 }
 
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
-  if (isFALSE(getOption("np.plot.inid.ksum.fastpath.nprmpi", FALSE)))
+  if (isFALSE(getOption("np.plot.inid.ksum.fastpath.nprmpi", TRUE)))
     return(FALSE)
   TRUE
 }
@@ -149,18 +149,74 @@
   size - 1L
 }
 
-.npRmpi_bootstrap_fanout_enabled <- function(comm = 1L) {
-  # Experimental gate: session-mode daemon execution has unresolved hangs
-  # for apply-style fan-out in this environment.
-  if (!isTRUE(getOption("np.plot.bootstrap.mpi.experimental", FALSE)))
+.npRmpi_bootstrap_mode <- function() {
+  mode <- getOption("np.plot.bootstrap.mpi.mode", NULL)
+  if (is.null(mode)) {
+    if (isTRUE(getOption("np.plot.bootstrap.mpi.experimental", FALSE)))
+      return("force")
+    return("auto")
+  }
+  mode <- tolower(as.character(mode)[1L])
+  if (is.na(mode) || !(mode %in% c("off", "auto", "force")))
+    mode <- "auto"
+  mode
+}
+
+.npRmpi_bootstrap_fanout_enabled <- function(comm = 1L,
+                                             n = NA_integer_,
+                                             B = NA_integer_,
+                                             chunk.size = NA_integer_,
+                                             what = "bootstrap") {
+  if (!isTRUE(getOption("np.plot.bootstrap.mpi.allow.applylb", FALSE)))
     return(FALSE)
   if (isTRUE(getOption("np.plot.bootstrap.mpi.disable", FALSE)))
+    return(FALSE)
+  mode <- .npRmpi_bootstrap_mode()
+  if (identical(mode, "off"))
     return(FALSE)
   if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
     return(FALSE)
   if (!isTRUE(.npRmpi_has_active_slave_pool(comm = comm)))
     return(FALSE)
-  .npRmpi_bootstrap_worker_count(comm = comm) >= 1L
+  workers <- .npRmpi_bootstrap_worker_count(comm = comm)
+  if (workers < 1L)
+    return(FALSE)
+  if (identical(mode, "force"))
+    return(TRUE)
+
+  n <- suppressWarnings(as.integer(n)[1L])
+  B <- suppressWarnings(as.integer(B)[1L])
+  if (is.na(n) || is.na(B) || n < 1L || B < 1L)
+    return(FALSE)
+
+  min.n <- suppressWarnings(as.integer(getOption("np.plot.bootstrap.mpi.auto.min.n", 2000L))[1L])
+  min.B <- suppressWarnings(as.integer(getOption("np.plot.bootstrap.mpi.auto.min.B", 256L))[1L])
+  if (is.na(min.n) || min.n < 1L) min.n <- 2000L
+  if (is.na(min.B) || min.B < 1L) min.B <- 256L
+  if (n < min.n || B < min.B)
+    return(FALSE)
+
+  min.B.per.worker <- suppressWarnings(as.integer(
+    getOption("np.plot.bootstrap.mpi.auto.min.B.per.worker", 64L)
+  )[1L])
+  if (is.na(min.B.per.worker) || min.B.per.worker < 1L)
+    min.B.per.worker <- 64L
+  if ((B / workers) < min.B.per.worker)
+    return(FALSE)
+
+  cs <- suppressWarnings(as.integer(chunk.size)[1L])
+  if (!is.na(cs) && cs > 0L) {
+    ntasks <- ceiling(B / cs)
+    min.tasks.per.worker <- suppressWarnings(as.double(
+      getOption("np.plot.bootstrap.mpi.auto.min.tasks.per.worker", 1.0)
+    )[1L])
+    if (!is.finite(min.tasks.per.worker) || min.tasks.per.worker <= 0)
+      min.tasks.per.worker <- 1.0
+    if (ntasks < (workers * min.tasks.per.worker))
+      return(FALSE)
+  }
+
+  TRUE
 }
 
 .npRmpi_bootstrap_chunk_tasks <- function(B, chunk.size) {
@@ -222,12 +278,19 @@
 .npRmpi_wild_boot_t_parallel <- function(H, fit.mean, residuals, B, wild, comm = 1L) {
   if (isTRUE(getOption("np.plot.wild.mpi.parallel.disable", FALSE)))
     return(NULL)
-  if (!.npRmpi_bootstrap_fanout_enabled(comm = comm))
-    return(NULL)
 
   n <- length(residuals)
   p <- nrow(H)
   chunk.size <- .np_wild_chunk_size(n = n, B = B)
+  if (!.npRmpi_bootstrap_fanout_enabled(
+    comm = comm,
+    n = n,
+    B = B,
+    chunk.size = chunk.size,
+    what = "wild"
+  )) {
+    return(NULL)
+  }
   tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   if (!length(tasks))
     return(NULL)
@@ -241,7 +304,16 @@
   worker <- function(task) {
     set.seed(as.integer(task$seed))
     bsz <- as.integer(task$bsz)
-    draws <- .np_wild_draws(n = n, B = bsz, wild = wild)
+    u <- matrix(stats::runif(n * bsz), nrow = n, ncol = bsz)
+    if (identical(wild, "mammen")) {
+      a <- (1 - sqrt(5)) / 2
+      p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
+      draws <- matrix(1 - a, nrow = n, ncol = bsz)
+      draws[u <= p.a] <- a
+    } else {
+      draws <- matrix(1, nrow = n, ncol = bsz)
+      draws[u <= 0.5] <- -1
+    }
     ystar <- matrix(fit.mean, nrow = n, ncol = bsz) +
       matrix(residuals, nrow = n, ncol = bsz) * draws
     t(H %*% ystar)
@@ -324,9 +396,15 @@
     ))
   }
 
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
   if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
-      .npRmpi_bootstrap_fanout_enabled(comm = 1L)) {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+      .npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = "inid-lc"
+      )) {
     tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
     prob <- rep.int(1 / n, n)
 
@@ -358,7 +436,6 @@
     }
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = nrow(H))
 
@@ -659,13 +736,14 @@
     }
   }
 
-  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-
-  fill_chunk <- function(counts.chunk, start, stopi) {
+  compute_chunk <- function(counts.chunk) {
+    counts.chunk <- as.matrix(counts.chunk)
+    bsz <- ncol(counts.chunk)
+    out <- matrix(NA_real_, nrow = bsz, ncol = neval)
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      tmat[start:stopi, i] <<- if (p > 3L) {
+      out[, i] <- if (p > 3L) {
         .np_inid_lp_predict_chunk_general(
           Mvals = Mvals,
           Zvals = Zvals,
@@ -681,21 +759,106 @@
         )
       }
     }
+    out
   }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+
+    if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-regression-counts"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
+      }
+      t.comm <- proc.time()
+      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+      .npRmpi_profile_add_comm_elapsed(
+        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+        where = "mpi.applyLB:inid-regression-counts"
+      )
+      if (!inherits(parts, "error")) {
+        t.mpi <- .npRmpi_bootstrap_collect_chunks(
+          parts = parts,
+          tasks = tasks,
+          ncol.out = neval,
+          what = "inid-regression-counts"
+        )
+        if (is.matrix(t.mpi))
+          tmat <- t.mpi
+      } else {
+        warning(sprintf("MPI inid regression-counts fan-out failed (%s); using local path",
+                        conditionMessage(parts)))
+      }
+    }
+
+    if (anyNA(tmat)) {
+      start <- 1L
+      while (start <= B) {
+        stopi <- min(B, start + chunk.size - 1L)
+        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
+        start <- stopi + 1L
+      }
+    }
   } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
     prob <- rep.int(1 / n, n)
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
-      start <- stopi + 1L
+
+    if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-regression"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        set.seed(as.integer(task$seed))
+        bsz <- as.integer(task$bsz)
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        compute_chunk(counts.chunk = counts.chunk)
+      }
+      t.comm <- proc.time()
+      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+      .npRmpi_profile_add_comm_elapsed(
+        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+        where = "mpi.applyLB:inid-regression"
+      )
+      if (!inherits(parts, "error")) {
+        t.mpi <- .npRmpi_bootstrap_collect_chunks(
+          parts = parts,
+          tasks = tasks,
+          ncol.out = neval,
+          what = "inid-regression"
+        )
+        if (is.matrix(t.mpi))
+          tmat <- t.mpi
+      } else {
+        warning(sprintf("MPI inid regression fan-out failed (%s); using local path",
+                        conditionMessage(parts)))
+      }
+    }
+
+    if (anyNA(tmat)) {
+      start <- 1L
+      while (start <= B) {
+        stopi <- min(B, start + chunk.size - 1L)
+        bsz <- stopi - start + 1L
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.chunk)
+        start <- stopi + 1L
+      }
     }
   }
 
@@ -916,10 +1079,10 @@
     t0[i] <- t0i
   }
 
-  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
-
-  fill_chunk <- function(counts.chunk, start, stopi) {
+  compute_chunk <- function(counts.chunk) {
+    counts.chunk <- as.matrix(counts.chunk)
     bsz <- ncol(counts.chunk)
+    out.chunk <- matrix(NA_real_, nrow = bsz, ncol = neval)
     for (i in seq_len(neval)) {
       Mvals <- crossprod(counts.chunk, Mfeat[[i]])
       Zvals <- crossprod(counts.chunk, Zfeat[[i]])
@@ -939,23 +1102,108 @@
           )
         }
       }
-      tmat[start:stopi, i] <<- out
+      out.chunk[, i] <- out
     }
+    out.chunk
   }
+
+  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
-    fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+
+    if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-scoef-counts"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
+      }
+      t.comm <- proc.time()
+      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+      .npRmpi_profile_add_comm_elapsed(
+        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+        where = "mpi.applyLB:inid-scoef-counts"
+      )
+      if (!inherits(parts, "error")) {
+        t.mpi <- .npRmpi_bootstrap_collect_chunks(
+          parts = parts,
+          tasks = tasks,
+          ncol.out = neval,
+          what = "inid-scoef-counts"
+        )
+        if (is.matrix(t.mpi))
+          tmat <- t.mpi
+      } else {
+        warning(sprintf("MPI inid smooth-coefficient-counts fan-out failed (%s); using local path",
+                        conditionMessage(parts)))
+      }
+    }
+
+    if (anyNA(tmat)) {
+      start <- 1L
+      while (start <= B) {
+        stopi <- min(B, start + chunk.size - 1L)
+        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
+        start <- stopi + 1L
+      }
+    }
   } else {
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
     prob <- rep.int(1 / n, n)
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-      fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
-      start <- stopi + 1L
+
+    if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-scoef"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        set.seed(as.integer(task$seed))
+        bsz <- as.integer(task$bsz)
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        compute_chunk(counts.chunk = counts.chunk)
+      }
+      t.comm <- proc.time()
+      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+      .npRmpi_profile_add_comm_elapsed(
+        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+        where = "mpi.applyLB:inid-scoef"
+      )
+      if (!inherits(parts, "error")) {
+        t.mpi <- .npRmpi_bootstrap_collect_chunks(
+          parts = parts,
+          tasks = tasks,
+          ncol.out = neval,
+          what = "inid-scoef"
+        )
+        if (is.matrix(t.mpi))
+          tmat <- t.mpi
+      } else {
+        warning(sprintf("MPI inid smooth-coefficient fan-out failed (%s); using local path",
+                        conditionMessage(parts)))
+      }
+    }
+
+    if (anyNA(tmat)) {
+      start <- 1L
+      while (start <= B) {
+        stopi <- min(B, start + chunk.size - 1L)
+        bsz <- stopi - start + 1L
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.chunk)
+        start <- stopi + 1L
+      }
     }
   }
 
@@ -1222,24 +1470,73 @@
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
-    bsz <- stopi - start + 1L
-    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-    ksum.chunk <- npksum.fun(
-      txdat = xdat,
-      tydat = ones,
-      exdat = exdat,
-      bws = bws,
-      weights = counts.chunk,
-      operator = operator,
-      bandwidth.divide = TRUE
-    )$ksum
-    tmat[start:stopi, ] <- .np_boot_matrix_from_ksum(
-      ksum.chunk, B = bsz, nout = neval, where = "npksum unconditional chunk"
-    ) / n
-    start <- stopi + 1L
+  if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
+      .npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = "inid-ksum-unconditional"
+      )) {
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    worker <- function(task) {
+      set.seed(as.integer(task$seed))
+      bsz <- as.integer(task$bsz)
+      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      ksum.chunk <- npksum.fun(
+        txdat = xdat,
+        tydat = ones,
+        exdat = exdat,
+        bws = bws,
+        weights = counts.chunk,
+        operator = operator,
+        bandwidth.divide = TRUE
+      )$ksum
+      .np_boot_matrix_from_ksum(
+        ksum.chunk, B = bsz, nout = neval, where = "npksum unconditional mpi chunk"
+      ) / n
+    }
+    t.comm <- proc.time()
+    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+    .npRmpi_profile_add_comm_elapsed(
+      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+      where = "mpi.applyLB:inid-ksum-unconditional"
+    )
+    if (!inherits(parts, "error")) {
+      t.mpi <- .npRmpi_bootstrap_collect_chunks(
+        parts = parts,
+        tasks = tasks,
+        ncol.out = neval,
+        what = "inid-ksum-unconditional"
+      )
+      if (is.matrix(t.mpi))
+        tmat <- t.mpi
+    } else {
+      warning(sprintf("MPI inid unconditional ksum fan-out failed (%s); using local path",
+                      conditionMessage(parts)))
+    }
+  }
+
+  if (anyNA(tmat)) {
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      ksum.chunk <- npksum.fun(
+        txdat = xdat,
+        tydat = ones,
+        exdat = exdat,
+        bws = bws,
+        weights = counts.chunk,
+        operator = operator,
+        bandwidth.divide = TRUE
+      )$ksum
+      tmat[start:stopi, ] <- .np_boot_matrix_from_ksum(
+        ksum.chunk, B = bsz, nout = neval, where = "npksum unconditional chunk"
+      ) / n
+      start <- stopi + 1L
+    }
   }
 
   list(t = tmat, t0 = t0)
@@ -1397,37 +1694,99 @@
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
-    bsz <- stopi - start + 1L
-    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+  if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
+      .npRmpi_bootstrap_fanout_enabled(
+        comm = 1L,
+        n = n,
+        B = B,
+        chunk.size = chunk.size,
+        what = "inid-ksum-conditional"
+      )) {
+    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+    worker <- function(task) {
+      set.seed(as.integer(task$seed))
+      bsz <- as.integer(task$bsz)
+      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      den <- npksum.fun(
+        txdat = xdat,
+        tydat = ones,
+        exdat = exdat,
+        bws = kbx,
+        weights = counts.chunk,
+        operator = xop,
+        bandwidth.divide = TRUE
+      )$ksum
+      num <- npksum.fun(
+        txdat = xydat,
+        tydat = ones,
+        exdat = exydat,
+        bws = kbxy,
+        weights = counts.chunk,
+        operator = xyop,
+        bandwidth.divide = TRUE
+      )$ksum
+      den <- .np_boot_matrix_from_ksum(
+        den, B = bsz, nout = neval, where = "npksum conditional mpi denominator chunk"
+      ) / n
+      num <- .np_boot_matrix_from_ksum(
+        num, B = bsz, nout = neval, where = "npksum conditional mpi numerator chunk"
+      ) / n
+      num / pmax(den, .Machine$double.eps)
+    }
+    t.comm <- proc.time()
+    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+    .npRmpi_profile_add_comm_elapsed(
+      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+      where = "mpi.applyLB:inid-ksum-conditional"
+    )
+    if (!inherits(parts, "error")) {
+      t.mpi <- .npRmpi_bootstrap_collect_chunks(
+        parts = parts,
+        tasks = tasks,
+        ncol.out = neval,
+        what = "inid-ksum-conditional"
+      )
+      if (is.matrix(t.mpi))
+        tmat <- t.mpi
+    } else {
+      warning(sprintf("MPI inid conditional ksum fan-out failed (%s); using local path",
+                      conditionMessage(parts)))
+    }
+  }
 
-    den <- npksum.fun(
-      txdat = xdat,
-      tydat = ones,
-      exdat = exdat,
-      bws = kbx,
-      weights = counts.chunk,
-      operator = xop,
-      bandwidth.divide = TRUE
-    )$ksum
-    num <- npksum.fun(
-      txdat = xydat,
-      tydat = ones,
-      exdat = exydat,
-      bws = kbxy,
-      weights = counts.chunk,
-      operator = xyop,
-      bandwidth.divide = TRUE
-    )$ksum
+  if (anyNA(tmat)) {
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
 
-    den <- .np_boot_matrix_from_ksum(den, B = bsz, nout = neval,
-                                     where = "npksum conditional denominator chunk") / n
-    num <- .np_boot_matrix_from_ksum(num, B = bsz, nout = neval,
-                                     where = "npksum conditional numerator chunk") / n
-    tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
-    start <- stopi + 1L
+      den <- npksum.fun(
+        txdat = xdat,
+        tydat = ones,
+        exdat = exdat,
+        bws = kbx,
+        weights = counts.chunk,
+        operator = xop,
+        bandwidth.divide = TRUE
+      )$ksum
+      num <- npksum.fun(
+        txdat = xydat,
+        tydat = ones,
+        exdat = exydat,
+        bws = kbxy,
+        weights = counts.chunk,
+        operator = xyop,
+        bandwidth.divide = TRUE
+      )$ksum
+
+      den <- .np_boot_matrix_from_ksum(den, B = bsz, nout = neval,
+                                       where = "npksum conditional denominator chunk") / n
+      num <- .np_boot_matrix_from_ksum(num, B = bsz, nout = neval,
+                                       where = "npksum conditional numerator chunk") / n
+      tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+      start <- stopi + 1L
+    }
   }
 
   list(t = tmat, t0 = t0)
@@ -1618,9 +1977,6 @@ plotFactor <- function(f, y, ...){
 }
 
 .npRmpi_with_local_bootstrap <- function(expr) {
-  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
-  options(npRmpi.autodispatch.disable = TRUE)
-  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
   force(expr)
 }
 
@@ -1638,7 +1994,7 @@ plotFactor <- function(f, y, ...){
   env <- environment(fun)
   if (is.null(env))
     return(FALSE)
-  environmentName(env) %in% c("np", "namespace:np", "npRmpi", "namespace:npRmpi")
+  environmentName(env) %in% c("np", "namespace:np")
 }
 
 .npRmpi_bootstrap_maybe_local <- function(expr, estimators = list()) {
@@ -2071,8 +2427,6 @@ compute.bootstrap.errors.rbandwidth =
       ntrain = .np_nrows_safe(xdat),
       neval = .np_nrows_safe(exdat)
     )
-    npreg_fit <- .npRmpi_bootstrap_estimator("npreg.rbandwidth")
-    npreghat_fit <- .npRmpi_bootstrap_estimator("npreghat.rbandwidth")
     boot.out <- NULL
 
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
@@ -2118,7 +2472,7 @@ compute.bootstrap.errors.rbandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- suppressWarnings(npreg_fit(
+      fit.train <- suppressWarnings(npreg.rbandwidth(
         txdat = xdat,
         tydat = ydat,
         bws = bws,
@@ -2141,7 +2495,7 @@ compute.bootstrap.errors.rbandwidth =
         s.vec[cpos] <- gorder[cpos]
       }
 
-      H <- suppressWarnings(npreghat_fit(
+      H <- suppressWarnings(npreghat.rbandwidth(
         bws = bws,
         txdat = xdat,
         exdat = exdat,
@@ -2169,7 +2523,7 @@ compute.bootstrap.errors.rbandwidth =
     if (is.null(boot.out)) {
       if (is.inid) {
         boofun <- function(data, indices) {
-          fit <- suppressWarnings(npreg_fit(
+          fit <- suppressWarnings(npreg.rbandwidth(
             txdat = data[indices, seq_len(ncol(data) - 1L), drop = FALSE],
             tydat = data[indices, ncol(data), drop = TRUE],
             exdat = exdat, bws = bws,
@@ -2186,10 +2540,10 @@ compute.bootstrap.errors.rbandwidth =
             statistic = boofun,
             R = plot.errors.boot.num
           )
-        }, estimators = list(npreg_fit, npreghat_fit))
+        }, estimators = list(npreg.rbandwidth, npreghat.rbandwidth))
       } else {
         boofun <- function(tsb) {
-          fit <- suppressWarnings(npreg_fit(
+          fit <- suppressWarnings(npreg.rbandwidth(
             txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
             exdat = exdat, bws = bws,
@@ -2208,7 +2562,7 @@ compute.bootstrap.errors.rbandwidth =
             l = plot.errors.boot.blocklen,
             sim = plot.errors.boot.method
           )
-        }, estimators = list(npreg_fit, npreghat_fit))
+        }, estimators = list(npreg.rbandwidth, npreghat.rbandwidth))
       }
     }
 
@@ -2295,8 +2649,6 @@ compute.bootstrap.errors.scbandwidth =
       neval = .np_nrows_safe(exdat)
     )
     miss.z <- missing(zdat)
-    npscoef_fit <- .npRmpi_bootstrap_estimator("npscoef.scbandwidth")
-    npscoefhat_fit <- .npRmpi_bootstrap_estimator("npscoefhat")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -2333,27 +2685,38 @@ compute.bootstrap.errors.scbandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.args <- list(
-        txdat = xdat,
-        tydat = ydat,
-        bws = bws,
-        iterate = FALSE
-      )
-      hat.args <- list(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        output = "matrix",
-        iterate = FALSE
-      )
-      if (!miss.z) {
-        fit.args$tzdat <- zdat
-        hat.args$tzdat <- zdat
-        hat.args$ezdat <- ezdat
+      if (miss.z) {
+        fit.train <- npscoef.scbandwidth(
+          txdat = xdat,
+          tydat = ydat,
+          bws = bws,
+          iterate = FALSE
+        )
+        H <- npscoefhat(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          output = "matrix",
+          iterate = FALSE
+        )
+      } else {
+        fit.train <- npscoef.scbandwidth(
+          txdat = xdat,
+          tydat = ydat,
+          tzdat = zdat,
+          bws = bws,
+          iterate = FALSE
+        )
+        H <- npscoefhat(
+          bws = bws,
+          txdat = xdat,
+          tzdat = zdat,
+          exdat = exdat,
+          ezdat = ezdat,
+          output = "matrix",
+          iterate = FALSE
+        )
       }
-
-      fit.train <- do.call(npscoef_fit, fit.args)
-      H <- do.call(npscoefhat_fit, hat.args)
 
       t0 <- as.vector(H %*% as.double(ydat))
       eps <- as.double(ydat - as.vector(fit.train$mean))
@@ -2378,7 +2741,7 @@ compute.bootstrap.errors.scbandwidth =
       zcols <- if (miss.z) integer(0) else (ycol + 1L):(ycol + ncol(zdat))
 
       boofun <- function(tsb) {
-        npscoef_fit(
+        npscoef.scbandwidth(
           txdat = tsb[, xcols, drop = FALSE],
           tydat = tsb[, ycol],
           tzdat = if (miss.z) NULL else tsb[, zcols, drop = FALSE],
@@ -2395,7 +2758,7 @@ compute.bootstrap.errors.scbandwidth =
           tseries = boot.data, statistic = boofun, R = plot.errors.boot.num,
           l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
         )
-      }, estimators = list(npscoef_fit, npscoefhat_fit))
+      }, estimators = list(npscoef.scbandwidth, npscoefhat))
     }
 
     all.bp <- list()
@@ -2489,8 +2852,6 @@ compute.bootstrap.errors.plbandwidth =
       ntrain = .np_nrows_safe(xdat),
       neval = .np_nrows_safe(exdat)
     )
-    npplreg_fit <- .npRmpi_bootstrap_estimator("npplreg.plbandwidth")
-    npplreghat_fit <- .npRmpi_bootstrap_estimator("npplreghat")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
 
@@ -2502,13 +2863,13 @@ compute.bootstrap.errors.plbandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- npplreg_fit(
+      fit.train <- npplreg.plbandwidth(
         txdat = xdat,
         tydat = ydat,
         tzdat = zdat,
         bws = bws
       )
-      H <- npplreghat_fit(
+      H <- npplreghat(
         bws = bws,
         txdat = xdat,
         tzdat = zdat,
@@ -2557,7 +2918,7 @@ compute.bootstrap.errors.plbandwidth =
 
       if (is.null(boot.out)) {
       boofun <- function(tsb) {
-        npplreg_fit(
+        npplreg.plbandwidth(
           txdat = tsb[, seq_len(ncol(xdat)), drop = FALSE],
           tydat = tsb[, ncol(xdat) + 1L],
           tzdat = tsb[, (ncol(xdat) + 2L):ncol(tsb), drop = FALSE],
@@ -2570,7 +2931,7 @@ compute.bootstrap.errors.plbandwidth =
                R = plot.errors.boot.num,
                l = plot.errors.boot.blocklen,
                sim = plot.errors.boot.method)
-      }, estimators = list(npplreg_fit, npplreghat_fit))
+      }, estimators = list(npplreg.plbandwidth, npplreghat))
       }
     }
 
@@ -2663,8 +3024,6 @@ compute.bootstrap.errors.bandwidth =
       ntrain = .np_nrows_safe(xdat),
       neval = .np_nrows_safe(exdat)
     )
-    npudens_fit <- .npRmpi_bootstrap_estimator("npudens.bandwidth")
-    npudist_fit <- .npRmpi_bootstrap_estimator("npudist.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2700,18 +3059,18 @@ compute.bootstrap.errors.bandwidth =
       boofun <- if (is.inid) {
         function(data, indices) {
           fit <- if (cdf) {
-            npudist_fit(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+            npudist.dbandwidth(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
           } else {
-            npudens_fit(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
+            npudens.bandwidth(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
           }
           if (cdf) fit$dist else fit$dens
         }
       } else {
         function(tsb) {
           fit <- if (cdf) {
-            npudist_fit(tdat = tsb, edat = exdat, bws = bws)
+            npudist.dbandwidth(tdat = tsb, edat = exdat, bws = bws)
           } else {
-            npudens_fit(tdat = tsb, edat = exdat, bws = bws)
+            npudens.bandwidth(tdat = tsb, edat = exdat, bws = bws)
           }
           if (cdf) fit$dist else fit$dens
         }
@@ -2810,7 +3169,6 @@ compute.bootstrap.errors.dbandwidth =
       ntrain = .np_nrows_safe(xdat),
       neval = .np_nrows_safe(exdat)
     )
-    npudist_fit <- .npRmpi_bootstrap_estimator("npudist.dbandwidth")
     .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2844,11 +3202,11 @@ compute.bootstrap.errors.dbandwidth =
     if (is.null(boot.out)) {
       boofun <- if (is.inid) {
         function(data, indices) {
-          npudist_fit(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
+          npudist.dbandwidth(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
         }
       } else {
         function(tsb) {
-          npudist_fit(tdat = tsb, edat = exdat, bws = bws)$dist
+          npudist.dbandwidth(tdat = tsb, edat = exdat, bws = bws)$dist
         }
       }
 
@@ -2950,9 +3308,6 @@ compute.bootstrap.errors.conbandwidth =
       ntrain = .np_nrows_safe(xdat),
       neval = .np_nrows_safe(exdat)
     )
-    npqreg_fit <- .npRmpi_bootstrap_estimator("npqreg.conbandwidth")
-    npcdist_fit <- .npRmpi_bootstrap_estimator("npcdist")
-    npcdens_fit <- .npRmpi_bootstrap_estimator("npcdens.conbandwidth")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -2977,9 +3332,9 @@ compute.bootstrap.errors.conbandwidth =
     fit.cond <- function(tx, ty) {
       switch(
         tboo,
-        quant = npqreg_fit(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+        quant = npqreg.conbandwidth(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens.conbandwidth(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
       )
     }
     out.cond <- function(fit) {
@@ -3130,9 +3485,6 @@ compute.bootstrap.errors.condbandwidth =
       ntrain = .np_nrows_safe(xdat),
       neval = .np_nrows_safe(exdat)
     )
-    npqreg_fit <- .npRmpi_bootstrap_estimator("npqreg.condbandwidth")
-    npcdist_fit <- .npRmpi_bootstrap_estimator("npcdist.condbandwidth")
-    npcdens_fit <- .npRmpi_bootstrap_estimator("npcdens")
     exdat = toFrame(exdat)
     boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
     boot.all.err <- NULL
@@ -3157,9 +3509,9 @@ compute.bootstrap.errors.condbandwidth =
     fit.cond <- function(tx, ty) {
       switch(
         tboo,
-        quant = npqreg_fit(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens_fit(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+        quant = npqreg.condbandwidth(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist.condbandwidth(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
       )
     }
     out.cond <- function(fit) {
@@ -3306,8 +3658,6 @@ compute.bootstrap.errors.sibandwidth =
       neval = .np_nrows_safe(xdat)
     )
 
-    npindex_fit <- .npRmpi_bootstrap_estimator("npindex.sibandwidth")
-    npindexhat_fit <- .npRmpi_bootstrap_estimator("npindexhat")
     boot.err = matrix(data = NA, nrow = nrow(xdat), ncol = 3)
     boot.all.err <- NULL
 
@@ -3319,13 +3669,13 @@ compute.bootstrap.errors.sibandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- npindex_fit(
+      fit.train <- npindex.sibandwidth(
         txdat = xdat,
         tydat = ydat,
         bws = bws,
         gradients = FALSE
       )
-      H <- npindexhat_fit(
+      H <- npindexhat(
         bws = bws,
         txdat = xdat,
         exdat = xdat,
@@ -3372,7 +3722,7 @@ compute.bootstrap.errors.sibandwidth =
                          conditionMessage(e)),
                  call. = FALSE)
           })
-        }, estimators = list(npindex_fit, npindexhat_fit))
+        }, estimators = list(npindex.sibandwidth, npindexhat))
       }
     }
 
@@ -3380,7 +3730,7 @@ compute.bootstrap.errors.sibandwidth =
       ## beta[1] is always 1.0, so use first column of gradients matrix ...
       if (is.inid) {
         boofun.inid <- function(data, indices) {
-          fit <- npindex_fit(
+          fit <- npindex.sibandwidth(
             txdat = data[indices, seq_len(ncol(data) - 1L), drop = FALSE],
             tydat = data[indices, ncol(data), drop = TRUE],
             exdat = xdat, bws = bws,
@@ -3394,10 +3744,10 @@ compute.bootstrap.errors.sibandwidth =
             statistic = boofun.inid,
             R = plot.errors.boot.num
           )
-        }, estimators = list(npindex_fit, npindexhat_fit))
+        }, estimators = list(npindex.sibandwidth, npindexhat))
       } else {
         boofun <- function(tsb) {
-          fit <- npindex_fit(
+          fit <- npindex.sibandwidth(
             txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
             exdat = xdat, bws = bws,
@@ -3410,7 +3760,7 @@ compute.bootstrap.errors.sibandwidth =
                  R = plot.errors.boot.num,
                  l = plot.errors.boot.blocklen,
                  sim = plot.errors.boot.method)
-        }, estimators = list(npindex_fit, npindexhat_fit))
+        }, estimators = list(npindex.sibandwidth, npindexhat))
       }
     }
     
