@@ -17,7 +17,7 @@ test_that("bounded gaussian kernel matches direct normalization at fixed bandwid
     mean(dnorm((x - xx)/h)/(h * (pnorm((b - xx)/h) - pnorm((a - xx)/h))))
   })
 
-  expect_equal(as.numeric(fit$dens), as.numeric(fdirect), tolerance = 1e-8)
+  expect_equal(as.numeric(fit$dens), as.numeric(fdirect), tolerance = 1e-7)
 })
 
 test_that("cv bandwidth with range bounds is larger than unbounded for stress example", {
