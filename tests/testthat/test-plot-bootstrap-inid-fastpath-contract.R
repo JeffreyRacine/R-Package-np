@@ -37,7 +37,6 @@ test_that("npindex inid fast path matches explicit resample refits", {
 
 test_that("npindex ll/lp inid fast path matches explicit resample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  skip_if_not_installed("np")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -91,7 +90,7 @@ test_that("npindex ll/lp inid fast path matches explicit resample refits", {
     explicit.t <- matrix(NA_real_, nrow = B, ncol = n)
     for (b in seq_len(B)) {
       idx <- rep.int(seq_len(n), counts[, b])
-      explicit.t[b, ] <- np::npindex(
+      explicit.t[b, ] <- npindex(
         txdat = tx[idx, , drop = FALSE],
         tydat = y[idx],
         exdat = tx,
@@ -103,7 +102,7 @@ test_that("npindex ll/lp inid fast path matches explicit resample refits", {
     expect_equal(fast.out$t, explicit.t, tolerance = 1e-6, info = cfg$label)
     expect_equal(
       fast.out$t0,
-      np::npindex(txdat = tx, tydat = y, exdat = tx, bws = bw, gradients = FALSE)$mean,
+      npindex(txdat = tx, tydat = y, exdat = tx, bws = bw, gradients = FALSE)$mean,
       tolerance = 1e-6,
       info = cfg$label
     )
@@ -112,7 +111,6 @@ test_that("npindex ll/lp inid fast path matches explicit resample refits", {
 
 test_that("npreg inid ll/lp fast path matches explicit resample refits", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  skip_if_not_installed("np")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
@@ -162,7 +160,7 @@ test_that("npreg inid ll/lp fast path matches explicit resample refits", {
     explicit.t <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
     for (b in seq_len(B)) {
       idx <- rep.int(seq_len(n), counts[, b])
-      explicit.t[b, ] <- np::npreg(
+      explicit.t[b, ] <- npreg(
         txdat = tx[idx, , drop = FALSE],
         tydat = y[idx],
         exdat = ex,
@@ -175,7 +173,7 @@ test_that("npreg inid ll/lp fast path matches explicit resample refits", {
     expect_equal(fast.out$t, explicit.t, tolerance = 1e-6, info = cfg$label)
     expect_equal(
       fast.out$t0,
-      np::npreg(txdat = tx, tydat = y, exdat = ex, bws = bw, gradients = FALSE, warn.glp.gradient = FALSE)$mean,
+      npreg(txdat = tx, tydat = y, exdat = ex, bws = bw, gradients = FALSE, warn.glp.gradient = FALSE)$mean,
       tolerance = 1e-6,
       info = cfg$label
     )
@@ -242,7 +240,6 @@ test_that("npplreg inid fast path matches explicit resample refits", {
 
 test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
-  skip_if_not_installed("np")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)

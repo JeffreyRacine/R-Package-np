@@ -139,9 +139,7 @@
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
   if (isFALSE(getOption("np.plot.inid.ksum.fastpath.nprmpi", FALSE)))
     return(FALSE)
-  isTRUE(suppressWarnings(suppressMessages(
-    requireNamespace("np", quietly = TRUE)
-  )))
+  TRUE
 }
 
 .npRmpi_bootstrap_worker_count <- function(comm = 1L) {
@@ -1627,32 +1625,25 @@ plotFactor <- function(f, y, ...){
 }
 
 .npRmpi_bootstrap_estimator <- function(name) {
-  np.ns <- NULL
-  has.np <- isTRUE(suppressWarnings(suppressMessages(
-    requireNamespace("np", quietly = TRUE)
-  )))
-  if (has.np)
-    np.ns <- asNamespace("np")
-
-  if (!is.null(np.ns) &&
-      exists(name, envir = np.ns, mode = "function", inherits = FALSE))
-    return(get(name, envir = np.ns, inherits = FALSE))
+  nprmpi.ns <- asNamespace("npRmpi")
+  if (exists(name, envir = nprmpi.ns, mode = "function", inherits = FALSE))
+    return(get(name, envir = nprmpi.ns, inherits = FALSE))
 
   get(name, mode = "function", envir = parent.frame(), inherits = TRUE)
 }
 
-.npRmpi_bootstrap_uses_np_namespace <- function(fun) {
+.npRmpi_bootstrap_uses_local_namespace <- function(fun) {
   if (!is.function(fun))
     return(FALSE)
   env <- environment(fun)
   if (is.null(env))
     return(FALSE)
-  environmentName(env) %in% c("np", "namespace:np")
+  environmentName(env) %in% c("np", "namespace:np", "npRmpi", "namespace:npRmpi")
 }
 
 .npRmpi_bootstrap_maybe_local <- function(expr, estimators = list()) {
   use.local <- length(estimators) > 0L &&
-    all(vapply(estimators, .npRmpi_bootstrap_uses_np_namespace, logical(1)))
+    all(vapply(estimators, .npRmpi_bootstrap_uses_local_namespace, logical(1)))
   if (use.local)
     return(.npRmpi_with_local_bootstrap(expr))
   force(expr)

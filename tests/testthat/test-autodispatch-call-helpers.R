@@ -106,7 +106,7 @@ test_that("npudist(bws=...) resolves large autodispatch temporary call arguments
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
-  withr::local_options(list(npRmpi.autodispatch.arg.broadcast.threshold = 1L))
+  local_options(npRmpi.autodispatch.arg.broadcast.threshold = 1L)
 
   data("faithful")
   bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)
