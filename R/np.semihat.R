@@ -57,18 +57,14 @@
   regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
 
   if (identical(regtype, "lc")) {
-    kw.obj <- npksum(
+    return(.np_kernel_weights_direct(
+      bws = bws,
       txdat = tzdat,
       exdat = ezdat,
-      bws = bws,
       leave.one.out = leave.one.out,
       bandwidth.divide = TRUE,
-      return.kernel.weights = TRUE
-    )
-    kw <- kw.obj$kw
-    if (!is.matrix(kw))
-      kw <- matrix(kw, nrow = nrow(tzdat))
-    return(kw)
+      kernel.pow = 1.0
+    ))
   }
 
   rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
@@ -308,7 +304,7 @@ npscoefhat <-
     if (length(ridge) != 1L || is.na(ridge) || !is.finite(ridge) || ridge <= 0)
       stop("argument 'ridge' must be a positive finite scalar")
     if (iterate)
-      stop("iterate=TRUE is not supported in npscoefhat prototype")
+      stop("iterate=TRUE is not supported in npscoefhat")
 
     miss.z <- missing(tzdat) || is.null(tzdat)
 

@@ -11,6 +11,11 @@ Ship a release-candidate-quality `np` that is modern, stable, performance-accoun
 1. Core estimator families first: `npreg*`, `npudens*`, `npcdens*`, `npudist*`, `npcdist*`, `npscoef*`, `npindex*`, `npplreg*`.
 2. `npregiv*` is explicitly lower priority unless blocking core release readiness.
 
+## Cross-Repo Runtime Contract
+1. `npRmpi` must remain runtime-independent of `np` while maintaining functional compatibility/parity.
+2. Ports from `np-master` into `npRmpi` must not introduce runtime `np::` bridge calls.
+3. MPI-selected `npRmpi` plot/bootstrap/helper paths must not silently degrade to serial fallback.
+
 ## Gate Snapshot (2026-02-23)
 - [x] R-layer `.C(` callsite retirement complete (`0`).
 - [x] Active `<<-` retirement complete in R layer (`0`).

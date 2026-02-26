@@ -119,6 +119,10 @@
   !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
 }
 
+.np_plot_block_fastpath_enabled <- function() {
+  !isTRUE(getOption("np.plot.block.fastpath.disable", FALSE))
+}
+
 .np_plot_require_bws <- function(bws, where) {
   if (is.null(bws))
     stop(sprintf("required argument 'bws' is missing or NULL in %s", where))
@@ -160,6 +164,67 @@
   }
 
   stats::rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+}
+
+.np_block_counts_drawer <- function(n,
+                                    B,
+                                    blocklen,
+                                    sim = c("fixed", "geom"),
+                                    n.sim = n,
+                                    endcorr = TRUE) {
+  sim <- match.arg(sim)
+  n <- as.integer(n)
+  B <- as.integer(B)
+  n.sim <- as.integer(n.sim)
+  blocklen <- as.integer(blocklen)
+
+  if (n < 1L || B < 1L || n.sim < 1L)
+    stop("invalid block bootstrap dimensions")
+  if (length(blocklen) != 1L || is.na(blocklen) || blocklen < 1L || blocklen > n)
+    stop("invalid block length for block bootstrap")
+
+  ts.array <- getFromNamespace("ts.array", "boot")
+  make.ends <- getFromNamespace("make.ends", "boot")
+  ts.draws <- ts.array(
+    n = n,
+    n.sim = n.sim,
+    R = B,
+    l = blocklen,
+    sim = sim,
+    endcorr = isTRUE(endcorr)
+  )
+
+  starts <- as.matrix(ts.draws$starts)
+  lengths <- ts.draws$lengths
+
+  function(start, stopi) {
+    start <- as.integer(start)
+    stopi <- as.integer(stopi)
+    if (start < 1L || stopi < start || stopi > B)
+      stop("invalid block bootstrap chunk bounds")
+
+    idx <- seq.int(start, stopi)
+    out <- matrix(0.0, nrow = n, ncol = length(idx))
+
+    for (jj in seq_along(idx)) {
+      rr <- idx[jj]
+      ends <- if (identical(sim, "geom")) {
+        cbind(starts[rr, ], lengths[rr, ])
+      } else {
+        cbind(starts[rr, ], lengths)
+      }
+
+      inds <- apply(ends, 1L, make.ends, n)
+      inds <- if (is.list(inds)) {
+        as.integer(unlist(inds)[seq_len(n.sim)])
+      } else {
+        as.integer(inds)[seq_len(n.sim)]
+      }
+      out[, jj] <- tabulate(inds, nbins = n)
+    }
+
+    out
+  }
 }
 
 .np_inid_lc_boot_from_hat <- function(H, ydat, B, counts = NULL) {
@@ -374,6 +439,7 @@
                                           ydat,
                                           B,
                                           counts = NULL,
+                                          counts.drawer = NULL,
                                           ridge = 1.0e-12) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
@@ -515,12 +581,15 @@
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B)
-    prob <- rep.int(1 / n, n)
     start <- 1L
     while (start <= B) {
       stopi <- min(B, start + chunk.size - 1L)
       bsz <- stopi - start + 1L
-      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      counts.chunk <- if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+      }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
       start <- stopi + 1L
     }
@@ -647,6 +716,7 @@
                                      bws,
                                      B,
                                      counts = NULL,
+                                     counts.drawer = NULL,
                                      leave.one.out = FALSE) {
   txdat <- toFrame(txdat)
   exdat <- toFrame(exdat)
@@ -772,12 +842,15 @@
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B)
-    prob <- rep.int(1 / n, n)
     start <- 1L
     while (start <= B) {
       stopi <- min(B, start + chunk.size - 1L)
       bsz <- stopi - start + 1L
-      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+      counts.chunk <- if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+      }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
       start <- stopi + 1L
     }
@@ -865,6 +938,7 @@
                                      bws,
                                      B,
                                      counts = NULL,
+                                     counts.drawer = NULL,
                                      ridge = 1.0e-12) {
   txdat <- toFrame(txdat)
   tzdat <- toFrame(tzdat)
@@ -895,7 +969,13 @@
   x.train.num <- x.num$train
   x.eval.num <- x.num$eval
 
-  counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  counts.mat <- if (!is.null(counts)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts)
+  } else if (!is.null(counts.drawer)) {
+    .np_inid_counts_matrix(n = n, B = B, counts = counts.drawer(1L, B))
+  } else {
+    .np_inid_counts_matrix(n = n, B = B)
+  }
 
   y.train <- .np_inid_boot_from_regression(
     xdat = tzdat,
@@ -904,6 +984,7 @@
     ydat = y.num,
     B = B,
     counts = counts.mat,
+    counts.drawer = counts.drawer,
     ridge = ridge
   )
   y.eval <- .np_inid_boot_from_regression(
@@ -913,6 +994,7 @@
     ydat = y.num,
     B = B,
     counts = counts.mat,
+    counts.drawer = counts.drawer,
     ridge = ridge
   )
 
@@ -926,6 +1008,7 @@
       ydat = x.train.num[, j],
       B = B,
       counts = counts.mat,
+      counts.drawer = counts.drawer,
       ridge = ridge
     )
     x.eval[[j]] <- .np_inid_boot_from_regression(
@@ -935,6 +1018,7 @@
       ydat = x.train.num[, j],
       B = B,
       counts = counts.mat,
+      counts.drawer = counts.drawer,
       ridge = ridge
     )
   }
@@ -1002,7 +1086,8 @@
                                                   bws,
                                                   B,
                                                   operator,
-                                                  counts = NULL) {
+                                                  counts = NULL,
+                                                  counts.drawer = NULL) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   B <- as.integer(B)
@@ -1042,14 +1127,17 @@
   }
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B)
-  prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   start <- 1L
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
-    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+    counts.chunk <- if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
     ksum.chunk <- npksum(
       txdat = xdat,
       tydat = ones,
@@ -1129,7 +1217,8 @@
                                                 bws,
                                                 B,
                                                 cdf,
-                                                counts = NULL) {
+                                                counts = NULL,
+                                                counts.drawer = NULL) {
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -1212,14 +1301,17 @@
   }
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B)
-  prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   start <- 1L
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
-    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+    counts.chunk <- if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
+    }
 
     den <- npksum(
       txdat = xdat,
@@ -1656,6 +1748,9 @@ compute.bootstrap.errors.rbandwidth =
     boot.all.err <- NULL
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat && gradients) {
       cont.idx <- which(bws$xdati$icon)
@@ -1668,22 +1763,40 @@ compute.bootstrap.errors.rbandwidth =
     inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       !isTRUE(gradients) &&
       identical(bws$type, "fixed")
+    block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled()) &&
+      !isTRUE(gradients) &&
+      identical(bws$type, "fixed")
 
     if (is.inid && !isTRUE(inid.helper.ok)) {
       warning("inid regression helper unavailable for this configuration; using explicit bootstrap fallback")
     }
+    if (is.block && !isTRUE(block.helper.ok)) {
+      warning("fixed/geom regression helper unavailable for this configuration; using explicit bootstrap fallback")
+    }
 
-    if (is.inid && isTRUE(inid.helper.ok)) {
+    if ((is.inid && isTRUE(inid.helper.ok)) || (is.block && isTRUE(block.helper.ok))) {
+      counts.drawer <- if (is.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
       boot.out <- tryCatch(
         .np_inid_boot_from_regression(
           xdat = xdat,
           exdat = exdat,
           bws = bws,
           ydat = ydat,
-          B = plot.errors.boot.num
+          B = plot.errors.boot.num,
+          counts.drawer = counts.drawer
         ),
         error = function(e) {
-          stop(sprintf("inid regression helper failed in compute.bootstrap.errors.rbandwidth (%s)",
+          stop(sprintf("%s regression helper failed in compute.bootstrap.errors.rbandwidth (%s)",
+                       if (is.block) plot.errors.boot.method else "inid",
                        conditionMessage(e)),
                call. = FALSE)
         }
@@ -1861,6 +1974,8 @@ compute.bootstrap.errors.scbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
     boot.out <- NULL
 
@@ -1882,6 +1997,37 @@ compute.bootstrap.errors.scbandwidth =
         ),
         error = function(e) {
           stop(sprintf("inid smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
+                       conditionMessage(e)),
+               call. = FALSE)
+        }
+      )
+    }
+    if (is.null(boot.out) && is.block) {
+      if (!isTRUE(.np_plot_block_fastpath_enabled()))
+        stop("fixed/geom bootstrap requires fastpath-enabled helper for smooth coefficient plots", call. = FALSE)
+      if (isTRUE(gradients))
+        stop("fixed/geom bootstrap for smooth coefficient gradients is not supported in helper mode", call. = FALSE)
+      counts.drawer <- .np_block_counts_drawer(
+        n = nrow(xdat),
+        B = plot.errors.boot.num,
+        blocklen = plot.errors.boot.blocklen,
+        sim = plot.errors.boot.method
+      )
+      boot.out <- tryCatch(
+        .np_inid_boot_from_scoef(
+          txdat = xdat,
+          ydat = ydat,
+          tzdat = if (miss.z) NULL else zdat,
+          exdat = exdat,
+          ezdat = if (miss.z) NULL else ezdat,
+          bws = bws,
+          B = plot.errors.boot.num,
+          counts.drawer = counts.drawer,
+          leave.one.out = FALSE
+        ),
+        error = function(e) {
+          stop(sprintf("%s smooth coefficient helper failed in compute.bootstrap.errors.scbandwidth (%s)",
+                       plot.errors.boot.method,
                        conditionMessage(e)),
                call. = FALSE)
         }
@@ -2040,6 +2186,7 @@ compute.bootstrap.errors.plbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -2093,6 +2240,33 @@ compute.bootstrap.errors.plbandwidth =
           ),
           error = function(e) {
             stop(sprintf("inid plreg helper failed in compute.bootstrap.errors.plbandwidth (%s)",
+                         conditionMessage(e)),
+                 call. = FALSE)
+          }
+        )
+      } else if (is.block) {
+        if (!isTRUE(.np_plot_block_fastpath_enabled()))
+          stop("fixed/geom bootstrap requires fastpath-enabled helper for partially linear plots", call. = FALSE)
+        counts.drawer <- .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+        boot.out <- tryCatch(
+          .np_inid_boot_from_plreg(
+            txdat = xdat,
+            ydat = ydat,
+            tzdat = zdat,
+            exdat = exdat,
+            ezdat = ezdat,
+            bws = bws,
+            B = plot.errors.boot.num,
+            counts.drawer = counts.drawer
+          ),
+          error = function(e) {
+            stop(sprintf("%s plreg helper failed in compute.bootstrap.errors.plbandwidth (%s)",
+                         plot.errors.boot.method,
                          conditionMessage(e)),
                  call. = FALSE)
           }
@@ -2198,23 +2372,39 @@ compute.bootstrap.errors.bandwidth =
     boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(is.inid) &&
       isTRUE(identical(bws$type, "fixed"))
+    fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
+      isTRUE(is.block) &&
+      isTRUE(identical(bws$type, "fixed"))
 
     boot.out <- NULL
-    if (fast.inid) {
+    if (fast.inid || fast.block) {
       op <- if (cdf) "integral" else "normal"
+      counts.drawer <- if (fast.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
       boot.out <- tryCatch(
         .np_inid_boot_from_ksum_unconditional(
           xdat = xdat,
           exdat = exdat,
           bws = bws,
           B = plot.errors.boot.num,
-          operator = op
+          operator = op,
+          counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.bandwidth (%s); using bootstrap fallback",
+          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.bandwidth (%s); using bootstrap fallback",
+                          if (fast.block) plot.errors.boot.method else "inid",
                           conditionMessage(e)))
           NULL
         }
@@ -2326,22 +2516,38 @@ compute.bootstrap.errors.dbandwidth =
     boot.all.err <- NULL
 
     is.inid = plot.errors.boot.method=="inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(is.inid) &&
       isTRUE(identical(bws$type, "fixed"))
+    fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
+      isTRUE(is.block) &&
+      isTRUE(identical(bws$type, "fixed"))
 
     boot.out <- NULL
-    if (fast.inid) {
+    if (fast.inid || fast.block) {
+      counts.drawer <- if (fast.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
       boot.out <- tryCatch(
         .np_inid_boot_from_ksum_unconditional(
           xdat = xdat,
           exdat = exdat,
           bws = bws,
           B = plot.errors.boot.num,
-          operator = "integral"
+          operator = "integral",
+          counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.dbandwidth (%s); using bootstrap fallback",
+          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.dbandwidth (%s); using bootstrap fallback",
+                          if (fast.block) plot.errors.boot.method else "inid",
                           conditionMessage(e)))
           NULL
         }
@@ -2457,8 +2663,14 @@ compute.bootstrap.errors.conbandwidth =
     }
 
     is.inid = plot.errors.boot.method=="inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(is.inid) &&
+      isTRUE(!quantreg) &&
+      isTRUE(!gradients) &&
+      isTRUE(identical(bws$type, "fixed"))
+    fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
+      isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
@@ -2480,7 +2692,17 @@ compute.bootstrap.errors.conbandwidth =
       )
     }
     boot.out <- NULL
-    if (fast.inid) {
+    if (fast.inid || fast.block) {
+      counts.drawer <- if (fast.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
       boot.out <- tryCatch(
         .np_inid_boot_from_ksum_conditional(
           xdat = xdat,
@@ -2489,10 +2711,12 @@ compute.bootstrap.errors.conbandwidth =
           eydat = eydat,
           bws = bws,
           B = plot.errors.boot.num,
-          cdf = cdf
+          cdf = cdf,
+          counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.conbandwidth (%s); using bootstrap fallback",
+          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.conbandwidth (%s); using bootstrap fallback",
+                          if (fast.block) plot.errors.boot.method else "inid",
                           conditionMessage(e)))
           NULL
         }
@@ -2617,8 +2841,14 @@ compute.bootstrap.errors.condbandwidth =
     }
 
     is.inid = plot.errors.boot.method=="inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(is.inid) &&
+      isTRUE(!quantreg) &&
+      isTRUE(!gradients) &&
+      isTRUE(identical(bws$type, "fixed"))
+    fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
+      isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
@@ -2640,7 +2870,17 @@ compute.bootstrap.errors.condbandwidth =
       )
     }
     boot.out <- NULL
-    if (fast.inid) {
+    if (fast.inid || fast.block) {
+      counts.drawer <- if (fast.block) {
+        .np_block_counts_drawer(
+          n = nrow(xdat),
+          B = plot.errors.boot.num,
+          blocklen = plot.errors.boot.blocklen,
+          sim = plot.errors.boot.method
+        )
+      } else {
+        NULL
+      }
       boot.out <- tryCatch(
         .np_inid_boot_from_ksum_conditional(
           xdat = xdat,
@@ -2649,10 +2889,12 @@ compute.bootstrap.errors.condbandwidth =
           eydat = eydat,
           bws = bws,
           B = plot.errors.boot.num,
-          cdf = cdf
+          cdf = cdf,
+          counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("inid ksum fast path failed in compute.bootstrap.errors.condbandwidth (%s); using bootstrap fallback",
+          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.condbandwidth (%s); using bootstrap fallback",
+                          if (fast.block) plot.errors.boot.method else "inid",
                           conditionMessage(e)))
           NULL
         }
@@ -2764,6 +3006,7 @@ compute.bootstrap.errors.sibandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method=="inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -2822,6 +3065,37 @@ compute.bootstrap.errors.sibandwidth =
                      conditionMessage(e)),
              call. = FALSE)
       })
+      }
+    } else if (is.block) {
+      block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled()) &&
+        !isTRUE(gradients) &&
+        identical(bws$type, "fixed")
+      if (!isTRUE(block.helper.ok)) {
+        warning("fixed/geom single-index helper unavailable for this configuration; using explicit bootstrap fallback")
+        boot.out <- NULL
+      } else {
+        boot.out <- tryCatch({
+          tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
+          rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
+          .np_inid_boot_from_regression(
+            xdat = tx.index,
+            exdat = tx.index,
+            bws = rbw,
+            ydat = ydat,
+            B = plot.errors.boot.num,
+            counts.drawer = .np_block_counts_drawer(
+              n = nrow(tx.index),
+              B = plot.errors.boot.num,
+              blocklen = plot.errors.boot.blocklen,
+              sim = plot.errors.boot.method
+            )
+          )
+        }, error = function(e) {
+          stop(sprintf("%s single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
+                       plot.errors.boot.method,
+                       conditionMessage(e)),
+               call. = FALSE)
+        })
       }
     }
 

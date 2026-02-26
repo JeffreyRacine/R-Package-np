@@ -82,6 +82,125 @@ npreghat <-
   list(v = v, ridge = ridge)
 }
 
+.np_kernel_weights_direct <- function(bws,
+                                      txdat,
+                                      exdat = NULL,
+                                      leave.one.out = FALSE,
+                                      bandwidth.divide = TRUE,
+                                      kernel.pow = 1.0) {
+  miss.ex <- is.null(exdat)
+  txdat <- toFrame(txdat)
+  if (!miss.ex) {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      stop("'txdat' and 'exdat' are not similar data frames!")
+  }
+
+  if (!isa(bws, "kbandwidth"))
+    bws <- kbandwidth(bws)
+
+  if (length(bws$bw) != length(txdat))
+    stop("length of bandwidth vector does not match number of columns of 'txdat'")
+
+  leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
+  bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
+  if (!miss.ex && leave.one.out)
+    stop("you may not specify 'leave.one.out = TRUE' and provide evaluation data")
+
+  txdat <- adjustLevels(txdat, bws$xdati, allowNewCells = TRUE)
+  if (!miss.ex) {
+    exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+    npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+  }
+
+  txm <- toMatrix(txdat)
+  tuno <- txm[, bws$iuno, drop = FALSE]
+  tcon <- txm[, bws$icon, drop = FALSE]
+  tord <- txm[, bws$iord, drop = FALSE]
+
+  if (!miss.ex) {
+    exm <- toMatrix(exdat)
+    euno <- exm[, bws$iuno, drop = FALSE]
+    econ <- exm[, bws$icon, drop = FALSE]
+    eord <- exm[, bws$iord, drop = FALSE]
+  } else {
+    euno <- data.frame()
+    eord <- data.frame()
+    econ <- data.frame()
+  }
+
+  tnrow <- nrow(txdat)
+  enrow <- if (miss.ex) tnrow else nrow(exdat)
+  nkw <- tnrow * enrow
+
+  myopti <- list(
+    num_obs_train = tnrow,
+    num_obs_eval = enrow,
+    num_uno = bws$nuno,
+    num_ord = bws$nord,
+    num_con = bws$ncon,
+    int_LARGE_SF = SF_ARB,
+    BANDWIDTH_reg_extern = switch(bws$type,
+      fixed = BW_FIXED,
+      generalized_nn = BW_GEN_NN,
+      adaptive_nn = BW_ADAP_NN
+    ),
+    int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
+    kerneval = switch(bws$ckertype,
+      gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
+      epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
+      uniform = CKER_UNI,
+      "truncated gaussian" = CKER_TGAUSS
+    ),
+    ukerneval = switch(bws$ukertype,
+      aitchisonaitken = UKER_AIT,
+      liracine = UKER_LR
+    ),
+    okerneval = switch(bws$okertype,
+      wangvanryzin = OKER_WANG,
+      liracine = OKER_LR,
+      nliracine = OKER_NLR,
+      racineliyan = OKER_RLY
+    ),
+    miss.ex = miss.ex,
+    leave.one.out = leave.one.out,
+    bandwidth.divide = bandwidth.divide,
+    mcv.numRow = attr(bws$xmcv, "num.row"),
+    wncol = 0L,
+    yncol = 0L,
+    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    return.kernel.weights = TRUE,
+    permutation.operator = PERMUTATION_OPERATORS[["none"]],
+    compute.score = FALSE,
+    compute.ocg = FALSE
+  )
+
+  cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+
+  asDouble <- function(data) {
+    if (is.null(data)) as.double(0.0) else as.double(data)
+  }
+
+  myout <- .Call(
+    "C_np_kernelsum",
+    asDouble(tuno), asDouble(tord), asDouble(tcon),
+    as.double(0.0), as.double(0.0),
+    asDouble(euno), asDouble(eord), asDouble(econ),
+    as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+    as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
+    as.integer(rep.int(ALL_OPERATORS[["normal"]], length(txdat))),
+    as.integer(myopti), as.double(kernel.pow),
+    as.integer(enrow),
+    as.integer(0L),
+    as.integer(nkw),
+    as.double(cker.bounds.c$lb),
+    as.double(cker.bounds.c$ub),
+    PACKAGE = "np"
+  )
+
+  matrix(as.double(myout[["kernel.weights"]]), nrow = tnrow, ncol = enrow)
+}
+
 npreghat.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
@@ -256,24 +375,14 @@ npreghat.rbandwidth <-
     if (all(degree == 0L) && any(s > 0L))
       stop("local-constant derivative hat operators are not available yet; use local polynomial degree >= 1")
 
-    kw.args <- list(
-      txdat = txdat,
+    kw <- .np_kernel_weights_direct(
       bws = bws,
-      return.kernel.weights = TRUE,
+      txdat = txdat,
+      exdat = if (no.ex) NULL else exdat,
+      leave.one.out = FALSE,
       bandwidth.divide = TRUE,
-      leave.one.out = FALSE
+      kernel.pow = 1.0
     )
-    if (!no.ex)
-      kw.args$exdat <- exdat
-
-    kw.obj <- do.call(npksum, kw.args)
-    kw <- kw.obj$kw
-
-    if (is.null(kw))
-      stop("kernel-weight extraction failed")
-
-    if (!is.matrix(kw))
-      kw <- matrix(kw, nrow = nrow(txdat))
 
     ntrain <- nrow(txdat)
     neval <- ncol(kw)
