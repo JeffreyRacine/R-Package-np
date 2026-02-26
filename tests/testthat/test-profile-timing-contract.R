@@ -118,3 +118,69 @@ test_that("summary timing formatter includes npRmpi bootstrap profile", {
   expect_true(grepl("MPI Bootstrap Profile:", txt, fixed = TRUE))
   expect_true(grepl("comm_ratio=", txt, fixed = TRUE))
 })
+
+test_that("summary timing formatter prefers object timing.profile over global profile", {
+  begin.fun <- getFromNamespace(".npRmpi_profile_bootstrap_begin", "npRmpi")
+  add.fun <- getFromNamespace(".npRmpi_profile_add_comm_elapsed", "npRmpi")
+  end.fun <- getFromNamespace(".npRmpi_profile_bootstrap_end", "npRmpi")
+  clear.fun <- getFromNamespace(".npRmpi_profile_clear", "npRmpi")
+  timing.fun <- getFromNamespace("genTimingStr", "npRmpi")
+
+  old.enable <- getOption("npRmpi.profile.enable")
+  old.level <- getOption("npRmpi.profile.level")
+  old.summary <- getOption("npRmpi.profile.summary")
+  on.exit(options(npRmpi.profile.enable = old.enable), add = TRUE)
+  on.exit(options(npRmpi.profile.level = old.level), add = TRUE)
+  on.exit(options(npRmpi.profile.summary = old.summary), add = TRUE)
+  options(
+    npRmpi.profile.enable = TRUE,
+    npRmpi.profile.level = "detailed",
+    npRmpi.profile.summary = TRUE
+  )
+  clear.fun()
+
+  ctx <- begin.fun("compute.bootstrap.errors.rbandwidth", "inid", 9L, 100L, 25L)
+  add.fun(0.001, "mpi.applyLB:inid")
+  rec.global <- end.fun(list(), ctx)$timing.profile
+
+  rec.object <- rec.global
+  rec.object$where <- "object.local.profile"
+  rec.object$method <- "wild"
+  rec.object$B <- 5L
+  clear.fun()
+
+  txt <- timing.fun(list(
+    total.time = 1.0,
+    optim.time = 0.2,
+    fit.time = 0.8,
+    timing.profile = rec.object
+  ))
+  expect_true(grepl("MPI Bootstrap Profile: object.local.profile", txt, fixed = TRUE))
+  expect_true(grepl("method=wild", txt, fixed = TRUE))
+  expect_true(grepl(", B=5]", txt, fixed = TRUE))
+})
+
+test_that("summary timing formatter includes MPI session line when initialized", {
+  timing.fun <- getFromNamespace("genTimingStr", "npRmpi")
+
+  old.summary <- getOption("npRmpi.profile.summary")
+  old.init <- getOption("npRmpi.mpi.initialized")
+  on.exit(options(npRmpi.profile.summary = old.summary), add = TRUE)
+  on.exit(options(npRmpi.mpi.initialized = old.init), add = TRUE)
+  options(npRmpi.profile.summary = TRUE, npRmpi.mpi.initialized = TRUE)
+
+  local_mocked_bindings(
+    mpi.comm.size = function(comm = 1L) {
+      if (identical(as.integer(comm), 1L)) 8L else 1L
+    },
+    mpi.comm.rank = function(comm = 1L) {
+      if (identical(as.integer(comm), 1L)) 0L else 0L
+    },
+    .package = "npRmpi"
+  )
+
+  txt <- timing.fun(list(total.time = 1.0, optim.time = 0.2, fit.time = 0.8))
+  expect_true(grepl("MPI Session:", txt, fixed = TRUE))
+  expect_true(grepl("size=8", txt, fixed = TRUE))
+  expect_true(grepl("nslaves=7", txt, fixed = TRUE))
+})

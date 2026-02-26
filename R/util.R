@@ -1080,16 +1080,55 @@ genTimingStr <- function(x){
   if (is.null(x$total.time) || is.na(x$total.time))
     return("")
 
+  .npRmpiTimingSessionStr <- function() {
+    if (isFALSE(getOption("npRmpi.profile.summary", TRUE)))
+      return("")
+
+    if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+      return("")
+
+    comm <- 1L
+    size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_)
+    rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) NA_integer_)
+    if (is.na(size)) {
+      comm <- 0L
+      size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_)
+      rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) NA_integer_)
+    }
+    if (is.na(size))
+      return("")
+
+    if (is.na(rank))
+      rank <- NA_integer_
+
+    nslaves <- max(as.integer(size) - 1L, 0L)
+    autodispatch <- isTRUE(getOption("npRmpi.autodispatch", FALSE))
+    paste0(
+      "\nMPI Session: comm=", as.integer(comm),
+      ", rank=", ifelse(is.na(rank), "NA", as.integer(rank)),
+      ", size=", as.integer(size),
+      ", nslaves=", as.integer(nslaves),
+      ", autodispatch=", ifelse(autodispatch, "on", "off")
+    )
+  }
+
   .npRmpiTimingProfileStr <- function() {
     if (isFALSE(getOption("npRmpi.profile.summary", TRUE)))
       return("")
 
-    last.fun <- tryCatch(get(".npRmpi_profile_last", envir = asNamespace("npRmpi")),
-                         error = function(e) NULL)
-    if (!is.function(last.fun))
-      return("")
+    rec <- NULL
+    if (is.list(x) && is.list(x$timing.profile) && !is.null(x$timing.profile$where)) {
+      rec <- x$timing.profile
+    } else if (is.list(x) && is.list(x$bws) && is.list(x$bws$timing.profile) &&
+               !is.null(x$bws$timing.profile$where)) {
+      rec <- x$bws$timing.profile
+    } else {
+      last.fun <- tryCatch(get(".npRmpi_profile_last", envir = asNamespace("npRmpi")),
+                           error = function(e) NULL)
+      if (is.function(last.fun))
+        rec <- tryCatch(last.fun(), error = function(e) NULL)
+    }
 
-    rec <- tryCatch(last.fun(), error = function(e) NULL)
     if (!is.list(rec) || is.null(rec$where))
       return("")
 
@@ -1121,10 +1160,10 @@ genTimingStr <- function(x){
       !is.null(x$fit.time) && !is.na(x$fit.time))
     return(paste("\nEstimation Time: ", format(x$total.time), " seconds (optim ",
                  format(x$optim.time), "s, fit ", format(x$fit.time), "s)",
-                 .npRmpiTimingProfileStr(), sep = ""))
+                 .npRmpiTimingSessionStr(), .npRmpiTimingProfileStr(), sep = ""))
 
   paste("\nEstimation Time: ",format(x$total.time)," seconds",
-        .npRmpiTimingProfileStr(), sep = "")
+        .npRmpiTimingSessionStr(), .npRmpiTimingProfileStr(), sep = "")
 }
   
 pCatGofStr <- function(x){
