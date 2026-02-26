@@ -58,7 +58,7 @@ npRmpi.init <- function(...,
                          autodispatch = TRUE,
                          autodispatch.verify.options = FALSE,
                          autodispatch.option.sync = c("onchange", "always", "never"),
-                         np.messages = FALSE,
+                         np.messages = NULL,
                          nonblock = TRUE,
                          sleep = 0.1,
                          quiet = FALSE) {
@@ -74,7 +74,8 @@ npRmpi.init <- function(...,
   comm <- npValidatePositiveInteger(comm, "comm")
   autodispatch <- npValidateScalarLogical(autodispatch, "autodispatch")
   autodispatch.verify.options <- npValidateScalarLogical(autodispatch.verify.options, "autodispatch.verify.options")
-  np.messages <- npValidateScalarLogical(np.messages, "np.messages")
+  if (!is.null(np.messages))
+    np.messages <- npValidateScalarLogical(np.messages, "np.messages")
   nonblock <- npValidateScalarLogical(nonblock, "nonblock")
   quiet <- npValidateScalarLogical(quiet, "quiet")
   sleep <- npValidatePositiveFiniteNumeric(sleep, "sleep")
@@ -94,6 +95,15 @@ npRmpi.init <- function(...,
     autodispatch.verify.options = autodispatch.verify.options,
     autodispatch.option.sync = autodispatch.option.sync
   )
+
+  {
+    clear.fun <- tryCatch(
+      get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"), inherits = FALSE),
+      error = function(e) NULL
+    )
+    if (is.function(clear.fun))
+      tryCatch(clear.fun(), error = function(e) NULL)
+  }
 
   if (identical(mode, "spawn")) {
     if (.npRmpi_session_has_active_pool(comm = comm)) {
@@ -144,6 +154,15 @@ npRmpi.quit <- function(force = FALSE,
 
   if (identical(mode, "auto")) {
     mode <- if (size.world > 1L && size.comm > 1L) "attach" else "spawn"
+  }
+
+  {
+    clear.fun <- tryCatch(
+      get(".npRmpi_profile_clear", envir = asNamespace("npRmpi"), inherits = FALSE),
+      error = function(e) NULL
+    )
+    if (is.function(clear.fun))
+      tryCatch(clear.fun(), error = function(e) NULL)
   }
 
   if (size.comm < 2L)

@@ -15,7 +15,7 @@ npRmpi.init(..., nslaves = 1, comm = 1,
             autodispatch = TRUE,
             autodispatch.verify.options = FALSE,
             autodispatch.option.sync = c("onchange", "always", "never"),
-            np.messages = FALSE,
+            np.messages = NULL,
             nonblock = TRUE, sleep = 0.1, quiet = FALSE)
 
 npRmpi.quit(force = FALSE, dellog = TRUE, comm = 1,

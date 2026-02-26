@@ -326,6 +326,39 @@
   invisible(TRUE)
 }
 
+.npRmpi_autodispatch_call_name <- function(mc) {
+  clean <- function(x) sub("\\..*$", "", x)
+  if (!is.call(mc) || length(mc) < 1L)
+    return("autodispatch-call")
+  hd <- mc[[1L]]
+  if (is.symbol(hd))
+    return(clean(as.character(hd)))
+  if (is.character(hd) && length(hd))
+    return(clean(as.character(hd)[1L]))
+  if (is.call(hd) && length(hd) >= 3L &&
+      is.symbol(hd[[1L]]) && as.character(hd[[1L]]) %in% c("::", ":::")) {
+    lhs <- hd[[2L]]
+    rhs <- hd[[3L]]
+    if (is.symbol(lhs) && is.symbol(rhs))
+      return(sprintf("%s%s%s",
+                     as.character(lhs),
+                     as.character(hd[[1L]]),
+                     as.character(rhs)))
+  }
+  "autodispatch-call"
+}
+
+.npRmpi_autodispatch_attach_timing <- function(obj, rec) {
+  if (!is.list(obj) || !is.list(rec))
+    return(obj)
+
+  if (is.null(obj$timing.profile))
+    obj$timing.profile <- rec
+  if (is.list(obj$bws) && is.null(obj$bws$timing.profile))
+    obj$bws$timing.profile <- rec
+  obj
+}
+
 .npRmpi_is_missing_call_arg <- function(arg) {
   if (missing(arg))
     return(TRUE)
@@ -443,6 +476,73 @@
                                           caller_env = parent.frame(),
                                           comm = 1L,
                                           warn_nested = FALSE) {
+  t.start <- proc.time()
+  start.wall <- Sys.time()
+  comm.elapsed <- 0.0
+  comm.calls <- 0L
+  note.vec <- character(0)
+  rec.comm <- function(expr, note = NA_character_) {
+    t0 <- proc.time()[["elapsed"]]
+    out <- force(expr)
+    dt <- proc.time()[["elapsed"]] - t0
+    if (!is.finite(dt) || dt < 0)
+      dt <- 0.0
+    comm.elapsed <<- comm.elapsed + as.double(dt)
+    comm.calls <<- as.integer(comm.calls) + 1L
+    if (!is.na(note) && nzchar(as.character(note)[1L]) &&
+        identical(getOption("npRmpi.profile.level", "basic"), "detailed")) {
+      note.vec <<- c(note.vec, as.character(note)[1L])
+    }
+    out
+  }
+  rec.step <- function(expr, note = NA_character_) {
+    t0 <- proc.time()[["elapsed"]]
+    out <- force(expr)
+    dt <- proc.time()[["elapsed"]] - t0
+    if (!is.finite(dt) || dt < 0)
+      dt <- 0.0
+    if (!is.na(note) && nzchar(as.character(note)[1L]) &&
+        identical(getOption("npRmpi.profile.level", "basic"), "detailed")) {
+      note.vec <<- c(note.vec, as.character(note)[1L])
+    }
+    out
+  }
+  make.rec <- function() {
+    dt <- proc.time() - t.start
+    wall <- unname(as.double(dt[["elapsed"]]))
+    if (!is.finite(wall) || wall < 0)
+      wall <- 0.0
+    comm <- as.double(comm.elapsed)
+    if (!is.finite(comm) || comm < 0)
+      comm <- 0.0
+    compute <- max(0.0, wall - comm)
+    denom <- comm + compute
+    ratio <- if (denom > 0) min(1.0, max(0.0, comm / denom)) else NA_real_
+    rec <- list(
+      profile_kind = "call",
+      where = .npRmpi_autodispatch_call_name(mc),
+      method = NA_character_,
+      B = NA_integer_,
+      ntrain = NA_integer_,
+      neval = NA_integer_,
+      rank = tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) NA_integer_),
+      size = tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_),
+      via_bcast = isTRUE(.npRmpi_autodispatch_called_from_bcast()),
+      wall_elapsed_sec = wall,
+      comm_elapsed_sec = comm,
+      compute_elapsed_sec = compute,
+      comm_ratio = ratio,
+      comm_calls = as.integer(comm.calls),
+      user_sec = unname(as.double(dt[["user.self"]])),
+      system_sec = unname(as.double(dt[["sys.self"]])),
+      timestamp_start = start.wall,
+      timestamp_end = Sys.time()
+    )
+    if (identical(getOption("npRmpi.profile.level", "basic"), "detailed"))
+      rec$comm_notes <- note.vec
+    rec
+  }
+
   if (.npRmpi_autodispatch_called_from_bcast()) {
     if (warn_nested)
       .npRmpi_autodispatch_warn_nested()
@@ -462,8 +562,13 @@
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
   prepared <- .npRmpi_autodispatch_materialize_call(mc = mc, caller_env = caller_env, comm = comm)
+  cleaned <- FALSE
   if (length(prepared$tmpnames))
-    on.exit(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm), add = TRUE)
+    on.exit({
+      if (!isTRUE(cleaned))
+        rec.comm(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm),
+                 note = "autodispatch.cleanup")
+    }, add = TRUE)
   if (length(prepared$tmpnames))
     for (nm in prepared$tmpnames)
       if (!is.null(prepared$tmpvals[[nm]]))
@@ -474,7 +579,8 @@
   if (length(prepared$prepublish)) {
     for (nm in names(prepared$prepublish)) {
       .GlobalEnv[[nm]] <- prepared$prepublish[[nm]]
-      .npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv)
+      rec.comm(.npRmpi_bcast_robj_by_name(nm, caller_env = .GlobalEnv),
+               note = "mpi.bcast.Robj2slave")
     }
   }
 
@@ -529,14 +635,30 @@
           OPT_VERIFY = opt.verify,
           REMOTE_NAME = remote.name))
 
-  result <- .npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE)
+  result <- rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
+                     note = "mpi.bcast.cmd.execute")
+  if (length(prepared$tmpnames)) {
+    rec.comm(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm),
+             note = "autodispatch.cleanup")
+    cleaned <- TRUE
+  }
   tmpreplace <- c(prepared$tmpvals, prepared$prepublish)
+  rec <- make.rec()
 
   if (is.list(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = tmpreplace), mode = "auto", remote = remote.name))
+    return(.npRmpi_autodispatch_attach_timing(
+      .npRmpi_autodispatch_tag_result(
+        .npRmpi_autodispatch_replace_tmp_calls(result, tmpvals = tmpreplace),
+        mode = "auto", remote = remote.name
+      ),
+      rec
+    ))
 
   if (is.call(result))
-    return(.npRmpi_autodispatch_tag_result(.npRmpi_autodispatch_replace_tmps(result, tmpvals = tmpreplace), mode = "auto", remote = remote.name))
+    return(.npRmpi_autodispatch_tag_result(
+      .npRmpi_autodispatch_replace_tmps(result, tmpvals = tmpreplace),
+      mode = "auto", remote = remote.name
+    ))
 
   .npRmpi_autodispatch_tag_result(result, mode = "auto", remote = remote.name)
 }

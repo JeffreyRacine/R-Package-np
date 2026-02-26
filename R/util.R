@@ -1080,6 +1080,22 @@ genTimingStr <- function(x){
   if (is.null(x$total.time) || is.na(x$total.time))
     return("")
 
+  .npRmpiTimingProfileRecord <- function() {
+    rec <- NULL
+
+    if (is.list(x) && is.list(x$timing.profile) && !is.null(x$timing.profile$where)) {
+      rec <- x$timing.profile
+    } else if (is.list(x) && is.list(x$bws) && is.list(x$bws$timing.profile) &&
+               !is.null(x$bws$timing.profile$where)) {
+      rec <- x$bws$timing.profile
+    }
+
+    if (!is.list(rec) || is.null(rec$where))
+      return(NULL)
+
+    rec
+  }
+
   .npRmpiTimingSessionStr <- function() {
     if (isFALSE(getOption("npRmpi.profile.summary", TRUE)))
       return("")
@@ -1104,18 +1120,7 @@ genTimingStr <- function(x){
     nslaves <- max(as.integer(size) - 1L, 0L)
     autodispatch <- isTRUE(getOption("npRmpi.autodispatch", FALSE))
 
-    rec <- NULL
-    if (is.list(x) && is.list(x$timing.profile) && !is.null(x$timing.profile$where)) {
-      rec <- x$timing.profile
-    } else if (is.list(x) && is.list(x$bws) && is.list(x$bws$timing.profile) &&
-               !is.null(x$bws$timing.profile$where)) {
-      rec <- x$bws$timing.profile
-    } else {
-      last.fun <- tryCatch(get(".npRmpi_profile_last", envir = asNamespace("npRmpi")),
-                           error = function(e) NULL)
-      if (is.function(last.fun))
-        rec <- tryCatch(last.fun(), error = function(e) NULL)
-    }
+    rec <- .npRmpiTimingProfileRecord()
     ratio <- suppressWarnings(as.double(rec$comm_ratio)[1L])
     ratio.str <- if (is.finite(ratio)) {
       paste0(", overhead_ratio=", format(round(100 * ratio, 2), nsmall = 2), "%")
@@ -1137,18 +1142,7 @@ genTimingStr <- function(x){
     if (isFALSE(getOption("npRmpi.profile.summary", TRUE)))
       return("")
 
-    rec <- NULL
-    if (is.list(x) && is.list(x$timing.profile) && !is.null(x$timing.profile$where)) {
-      rec <- x$timing.profile
-    } else if (is.list(x) && is.list(x$bws) && is.list(x$bws$timing.profile) &&
-               !is.null(x$bws$timing.profile$where)) {
-      rec <- x$bws$timing.profile
-    } else {
-      last.fun <- tryCatch(get(".npRmpi_profile_last", envir = asNamespace("npRmpi")),
-                           error = function(e) NULL)
-      if (is.function(last.fun))
-        rec <- tryCatch(last.fun(), error = function(e) NULL)
-    }
+    rec <- .npRmpiTimingProfileRecord()
 
     if (!is.list(rec) || is.null(rec$where))
       return("")
@@ -1161,9 +1155,21 @@ genTimingStr <- function(x){
     method <- if (!is.null(rec$method)) as.character(rec$method)[1L] else NA_character_
     B <- suppressWarnings(as.integer(rec$B)[1L])
     where <- as.character(rec$where)[1L]
+    kind <- if (!is.null(rec$profile_kind)) as.character(rec$profile_kind)[1L] else "bootstrap"
 
     fmt <- function(v, d = 4L) ifelse(is.finite(v), format(round(v, d), nsmall = d), "NA")
     ratio.pct <- if (is.finite(ratio)) paste0(format(round(100 * ratio, 2), nsmall = 2), "%") else "NA"
+
+    if (identical(kind, "call")) {
+      return(paste0(
+        "\nMPI Call Profile: ", ifelse(is.na(where) || !nzchar(where), "call", where),
+        "\n  wall=", fmt(wall),
+        "s, comm=", fmt(comm),
+        "s, compute=", fmt(comp),
+        "s, comm_ratio=", ratio.pct,
+        ", comm_calls=", ifelse(is.finite(calls), calls, "NA")
+      ))
+    }
 
     paste0(
       "\nMPI Bootstrap Profile: ", where,
