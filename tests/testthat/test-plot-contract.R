@@ -183,3 +183,32 @@ test_that("plot contract: npplreg supports coef=TRUE plot-data payload", {
   expect_true(is.numeric(out$coefficients))
   expect_true(length(out$coefficients) >= 1L)
 })
+
+test_that("plot contract: bootstrap defaults are wild for regression-class and inid for unsupervised engines", {
+  skip_if_not_installed("np")
+
+  reg.engines <- c(
+    ".np_plot_rbandwidth_engine",
+    ".np_plot_scbandwidth_engine",
+    ".np_plot_plbandwidth_engine",
+    ".np_plot_sibandwidth_engine"
+  )
+  unsup.engines <- c(
+    ".np_plot_bandwidth_engine",
+    ".np_plot_dbandwidth_engine",
+    ".np_plot_conbandwidth_engine",
+    ".np_plot_condbandwidth_engine"
+  )
+
+  for (nm in reg.engines) {
+    fn <- getFromNamespace(nm, "np")
+    defaults <- eval(formals(fn)$plot.errors.boot.method)
+    expect_identical(defaults[1L], "wild")
+  }
+
+  for (nm in unsup.engines) {
+    fn <- getFromNamespace(nm, "np")
+    defaults <- eval(formals(fn)$plot.errors.boot.method)
+    expect_identical(defaults[1L], "inid")
+  }
+})

@@ -22,7 +22,7 @@
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.num = 399,
-           plot.errors.boot.method = c("inid", "fixed", "geom"),
+           plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
            plot.errors.center = c("estimate","bias-corrected"),
