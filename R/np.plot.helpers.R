@@ -95,25 +95,10 @@
   )
   if (is.matrix(t.mpi))
     return(t.mpi)
-
-  # Local compute fallback is used only in broadcast/manual-dispatch contexts.
-  chunk.size <- .np_wild_chunk_size(n = n, B = B)
-  out <- matrix(NA_real_, nrow = B, ncol = nrow(H))
-  fit.mean <- as.double(fit.mean)
-  residuals <- as.double(residuals)
-
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
-    bsz <- stopi - start + 1L
-    draws <- .np_wild_draws(n = n, B = bsz, wild = wild)
-    ystar <- matrix(fit.mean, nrow = n, ncol = bsz) +
-      matrix(residuals, nrow = n, ncol = bsz) * draws
-    out[start:stopi, ] <- t(H %*% ystar)
-    start <- stopi + 1L
-  }
-
-  out
+  .npRmpi_bootstrap_fail_or_fallback(
+    msg = "wild bootstrap fan-out did not return matrix output",
+    what = "wild"
+  )
 }
 
 .np_plot_is_wild_method <- function(method) {
@@ -162,7 +147,10 @@
                                              chunk.size = NA_integer_,
                                              what = "bootstrap") {
   if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
-    return(FALSE)
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "cannot run inside mpi.bcast.cmd context; invoke plot/bootstrap from master context so work can be fanned out across workers",
+      what = what
+    )
   if (!isTRUE(.npRmpi_has_active_slave_pool(comm = comm)))
     .npRmpi_bootstrap_fail_or_fallback(
       msg = "requires an active MPI slave pool; call npRmpi.init(...) first",
@@ -258,18 +246,19 @@
       chunk.size <- min(chunk.size, max.chunk.for.lb)
     }
   }
-  if (!.npRmpi_bootstrap_fanout_enabled(
+  .npRmpi_bootstrap_fanout_enabled(
     comm = comm,
     n = n,
     B = B,
     chunk.size = chunk.size,
     what = "wild"
-  )) {
-    return(NULL)
-  }
+  )
   tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   if (!length(tasks))
-    return(NULL)
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "wild fan-out produced no tasks",
+      what = "wild"
+    )
 
   H <- as.matrix(H)
   H.vec <- as.double(H)
@@ -323,7 +312,6 @@
       msg = sprintf("fan-out failed (%s)", conditionMessage(parts)),
       what = "wild"
     )
-    return(NULL)
   }
 
   .npRmpi_bootstrap_collect_chunks(parts = parts, tasks = tasks,
@@ -504,80 +492,60 @@
     }
 
     if (anyNA(tmat)) {
-      start <- 1L
-      while (start <= B) {
-        stopi <- min(B, start + chunk.size - 1L)
-        bsz <- stopi - start + 1L
-        counts.chunk <- .np_inid_counts_matrix(
-          n = n,
-          B = bsz,
-          counts = counts.drawer(start, stopi)
-        )
-        den <- crossprod(counts.chunk, W)
-        num <- crossprod(counts.chunk, Wy)
-        tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
-        start <- stopi + 1L
-      }
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-lc-block fan-out returned incomplete results",
+        what = "inid-lc-block"
+      )
     }
 
     return(list(t = tmat, t0 = t0))
   }
 
-  if (.npRmpi_bootstrap_fanout_enabled(
-        comm = 1L,
-        n = n,
-        B = B,
-        chunk.size = chunk.size,
-        what = "inid-lc"
-      )) {
-    tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
-    prob <- rep.int(1 / n, n)
-
-    worker <- function(task) {
-      set.seed(as.integer(task$seed))
-      bsz <- as.integer(task$bsz)
-      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-      den <- crossprod(counts.chunk, W)
-      num <- crossprod(counts.chunk, Wy)
-      num / pmax(den, .Machine$double.eps)
-    }
-
-    t.comm <- proc.time()
-    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-    .npRmpi_profile_add_comm_elapsed(
-      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-      where = "mpi.applyLB:inid"
-    )
-    if (!inherits(parts, "error")) {
-      t.mpi <- .npRmpi_bootstrap_collect_chunks(parts = parts,
-                                                tasks = tasks,
-                                                ncol.out = nrow(H),
-                                                what = "inid")
-      if (is.matrix(t.mpi))
-        return(list(t = t.mpi, t0 = t0))
-    } else {
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("inid bootstrap fan-out failed (%s)", conditionMessage(parts)),
-        what = "inid"
-      )
-    }
-  }
-
+  .npRmpi_bootstrap_fanout_enabled(
+    comm = 1L,
+    n = n,
+    B = B,
+    chunk.size = chunk.size,
+    what = "inid-lc"
+  )
+  tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
   prob <- rep.int(1 / n, n)
-  tmat <- matrix(NA_real_, nrow = B, ncol = nrow(H))
 
-  start <- 1L
-  while (start <= B) {
-    stopi <- min(B, start + chunk.size - 1L)
-    bsz <- stopi - start + 1L
+  worker <- function(task) {
+    set.seed(as.integer(task$seed))
+    bsz <- as.integer(task$bsz)
     counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
     den <- crossprod(counts.chunk, W)
     num <- crossprod(counts.chunk, Wy)
-    tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
-    start <- stopi + 1L
+    num / pmax(den, .Machine$double.eps)
   }
 
-  list(t = tmat, t0 = t0)
+  t.comm <- proc.time()
+  parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+  .npRmpi_profile_add_comm_elapsed(
+    elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+    where = "mpi.applyLB:inid"
+  )
+  if (inherits(parts, "error")) {
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = sprintf("inid bootstrap fan-out failed (%s)", conditionMessage(parts)),
+      what = "inid"
+    )
+  }
+
+  t.mpi <- .npRmpi_bootstrap_collect_chunks(
+    parts = parts,
+    tasks = tasks,
+    ncol.out = nrow(H),
+    what = "inid"
+  )
+  if (!is.matrix(t.mpi))
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "inid-lc fan-out did not return matrix output",
+      what = "inid"
+    )
+
+  list(t = t.mpi, t0 = t0)
 }
 
 .np_inid_lp_unpack_sym_row <- function(mrow, p) {
@@ -919,12 +887,10 @@
     }
 
     if (anyNA(tmat)) {
-      start <- 1L
-      while (start <= B) {
-        stopi <- min(B, start + chunk.size - 1L)
-        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
-        start <- stopi + 1L
-      }
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-regression-counts fan-out returned incomplete results",
+        what = "inid-regression-counts"
+      )
     }
   } else {
     if (!is.null(counts.drawer) &&
@@ -969,20 +935,11 @@
       }
     }
 
-    if (!is.null(counts.drawer) && anyNA(tmat)) {
-      start <- 1L
-      while (start <= B) {
-        stopi <- min(B, start + chunk.size - 1L)
-        counts.chunk <- .np_inid_counts_matrix(
-          n = n,
-          B = stopi - start + 1L,
-          counts = counts.drawer(start, stopi)
-        )
-        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.chunk)
-        start <- stopi + 1L
-      }
-      counts.drawer <- NULL
-    }
+    if (!is.null(counts.drawer) && anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-regression-block fan-out returned incomplete results",
+        what = "inid-regression-block"
+      )
 
     prob <- rep.int(1 / n, n)
 
@@ -1024,16 +981,11 @@
       }
     }
 
-    if (anyNA(tmat)) {
-      start <- 1L
-      while (start <= B) {
-        stopi <- min(B, start + chunk.size - 1L)
-        bsz <- stopi - start + 1L
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.chunk)
-        start <- stopi + 1L
-      }
-    }
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-regression fan-out returned incomplete results",
+        what = "inid-regression"
+      )
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
@@ -1321,12 +1273,10 @@
     }
 
     if (anyNA(tmat)) {
-      start <- 1L
-      while (start <= B) {
-        stopi <- min(B, start + chunk.size - 1L)
-        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
-        start <- stopi + 1L
-      }
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-scoef-counts fan-out returned incomplete results",
+        what = "inid-scoef-counts"
+      )
     }
   } else {
     if (!is.null(counts.drawer) &&
@@ -1371,20 +1321,11 @@
       }
     }
 
-    if (!is.null(counts.drawer) && anyNA(tmat)) {
-      start <- 1L
-      while (start <= B) {
-        stopi <- min(B, start + chunk.size - 1L)
-        counts.chunk <- .np_inid_counts_matrix(
-          n = n,
-          B = stopi - start + 1L,
-          counts = counts.drawer(start, stopi)
-        )
-        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.chunk)
-        start <- stopi + 1L
-      }
-      counts.drawer <- NULL
-    }
+    if (!is.null(counts.drawer) && anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-scoef-block fan-out returned incomplete results",
+        what = "inid-scoef-block"
+      )
 
     prob <- rep.int(1 / n, n)
 
@@ -1426,16 +1367,11 @@
       }
     }
 
-    if (anyNA(tmat)) {
-      start <- 1L
-      while (start <= B) {
-        stopi <- min(B, start + chunk.size - 1L)
-        bsz <- stopi - start + 1L
-        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-        tmat[start:stopi, ] <- compute_chunk(counts.chunk = counts.chunk)
-        start <- stopi + 1L
-      }
-    }
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-scoef fan-out returned incomplete results",
+        what = "inid-scoef"
+      )
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
@@ -1887,19 +1823,10 @@
   }
 
   if (!is.null(counts.drawer) && anyNA(tmat)) {
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- .np_inid_counts_matrix(
-        n = n,
-        B = bsz,
-        counts = counts.drawer(start, stopi)
-      )
-      tmat[start:stopi, ] <- crossprod(counts.chunk, kw) / n
-      start <- stopi + 1L
-    }
-    counts.drawer <- NULL
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "inid-ksum-unconditional-block fan-out returned incomplete results",
+      what = "inid-ksum-unconditional-block"
+    )
   }
 
   if (anyNA(tmat) &&
@@ -1940,16 +1867,11 @@
     }
   }
 
-  if (anyNA(tmat)) {
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-      tmat[start:stopi, ] <- crossprod(counts.chunk, kw) / n
-      start <- stopi + 1L
-    }
-  }
+  if (anyNA(tmat))
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "inid-ksum-unconditional fan-out returned incomplete results",
+      what = "inid-ksum-unconditional"
+    )
 
   list(t = tmat, t0 = t0)
 }
@@ -2129,21 +2051,10 @@
   }
 
   if (!is.null(counts.drawer) && anyNA(tmat)) {
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- .np_inid_counts_matrix(
-        n = n,
-        B = bsz,
-        counts = counts.drawer(start, stopi)
-      )
-      den <- crossprod(counts.chunk, den.kw) / n
-      num <- crossprod(counts.chunk, num.kw) / n
-      tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
-      start <- stopi + 1L
-    }
-    counts.drawer <- NULL
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "inid-ksum-conditional-block fan-out returned incomplete results",
+      what = "inid-ksum-conditional-block"
+    )
   }
 
   if (anyNA(tmat) &&
@@ -2186,18 +2097,11 @@
     }
   }
 
-  if (anyNA(tmat)) {
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
-      den <- crossprod(counts.chunk, den.kw) / n
-      num <- crossprod(counts.chunk, num.kw) / n
-      tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
-      start <- stopi + 1L
-    }
-  }
+  if (anyNA(tmat))
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "inid-ksum-conditional fan-out returned incomplete results",
+      what = "inid-ksum-conditional"
+    )
 
   list(t = tmat, t0 = t0)
 }
