@@ -94,7 +94,10 @@
 
   Bootstrap resampling is conducted pairwise on \eqn{(y,X,Z)} (i.e., by
   resampling from rows of the \eqn{(y,X)} data or \eqn{(y,X,Z)} data
-  where appropriate). \code{inid} admits general
+  where appropriate). For regression-class estimators
+  (\code{npreg}/\code{npindex}/\code{npscoef}/\code{npplreg}), the
+  default bootstrap method is \code{wild}. For density/distribution
+  estimators, the default remains \code{inid}. \code{inid} admits general
   heteroskedasticity of unknown form, though it does not allow for
   dependence. \code{fixed} conducts Kunsch's (1988) block bootstrap
   for dependent data, while \code{geom} conducts Politis and
