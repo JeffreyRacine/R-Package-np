@@ -1,6 +1,12 @@
+.npRmpi_bcast_cmd_funref <- getFromNamespace(".npRmpi_bcast_cmd_funref", "npRmpi")
+
 test_that(".npRmpi_bcast_cmd_funref resolves standard command heads", {
-  expect_identical(.npRmpi_bcast_cmd_funref(quote(assign)), "assign")
-  expect_identical(.npRmpi_bcast_cmd_funref("assign"), "assign")
+  ref_quote <- .npRmpi_bcast_cmd_funref(quote(assign))
+  ref_chr <- .npRmpi_bcast_cmd_funref("assign")
+  expect_true(is.function(ref_quote))
+  expect_true(is.function(ref_chr))
+  expect_identical(ref_quote, base::assign)
+  expect_identical(ref_chr, base::assign)
   expect_identical(.npRmpi_bcast_cmd_funref(base::assign), base::assign)
 })
 
@@ -26,5 +32,5 @@ test_that(".npRmpi_bcast_cmd_funref no longer evals full command expressions", {
   fn.body <- paste(deparse(body(.npRmpi_bcast_cmd_funref), width.cutoff = 500L), collapse = " ")
   expect_false(grepl("eval\\(scmd", fn.body))
   expect_false(grepl("eval\\(hd", fn.body))
-  expect_match(fn.body, "\\.npRmpi_eval_scmd\\(hd, envir = eval_env\\)")
+  expect_match(fn.body, "\\.npRmpi_bcast_cmd_lookup_fun\\(")
 })

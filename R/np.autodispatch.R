@@ -320,7 +320,7 @@
   if (!length(tmpnames))
     return(invisible(TRUE))
   .npRmpi_rm_existing(tmpnames, envir = .GlobalEnv)
-  cmd.rm <- substitute(.npRmpi_rm_existing(TMPS, envir = .GlobalEnv),
+  cmd.rm <- substitute(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMPS, envir = .GlobalEnv),
                        list(TMPS = tmpnames))
   .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
   invisible(TRUE)
@@ -516,7 +516,7 @@
     on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
     on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
     if (length(TMP_NAMES))
-      on.exit(.npRmpi_rm_existing(TMP_NAMES, envir = .GlobalEnv), add = TRUE)
+      on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMP_NAMES, envir = .GlobalEnv), add = TRUE)
 
     res <- CALL
     .GlobalEnv[[REMOTE_NAME]] <- res
@@ -606,7 +606,7 @@
   .npRmpi_bcast_robj_by_name(tmp, caller_env = .GlobalEnv)
   on.exit({
     .npRmpi_rm_existing(tmp, envir = .GlobalEnv)
-    cmd.rm <- substitute(.npRmpi_rm_existing(TMP, envir = .GlobalEnv), list(TMP = tmp))
+    cmd.rm <- substitute(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMP, envir = .GlobalEnv), list(TMP = tmp))
     .npRmpi_bcast_cmd_expr(cmd.rm, comm = comm, caller.execute = FALSE)
   }, add = TRUE)
 

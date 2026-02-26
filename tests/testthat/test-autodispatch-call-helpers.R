@@ -66,11 +66,17 @@ test_that("autodispatch uses safe cleanup helper for temporary symbols", {
   boot.body <- paste(deparse(body(.npRmpi_bootstrap_compute_payload), width.cutoff = 500L), collapse = " ")
 
   expect_match(cleanup.body, "\\.npRmpi_rm_existing\\(tmpnames, envir = \\.GlobalEnv\\)")
-  expect_match(cleanup.body, "\\.npRmpi_rm_existing\\(TMPS, envir = \\.GlobalEnv\\)")
+  expect_match(cleanup.body, "get\\(\"\\.npRmpi_rm_existing\"")
+  expect_match(cleanup.body, "asNamespace\\(\"npRmpi\"\\)")
+  expect_match(cleanup.body, "TMPS, envir = \\.GlobalEnv")
   expect_match(impl.body, "\\.npRmpi_autodispatch_cleanup\\(prepared\\$tmpnames, comm = comm\\)")
-  expect_match(impl.body, "\\.npRmpi_rm_existing\\(TMP_NAMES, envir = \\.GlobalEnv\\)")
+  expect_match(impl.body, "get\\(\"\\.npRmpi_rm_existing\"")
+  expect_match(impl.body, "asNamespace\\(\"npRmpi\"\\)")
+  expect_match(impl.body, "TMP_NAMES, envir = \\.GlobalEnv")
   expect_match(boot.body, "\\.npRmpi_rm_existing\\(tmp, envir = \\.GlobalEnv\\)")
-  expect_match(boot.body, "\\.npRmpi_rm_existing\\(TMP, envir = \\.GlobalEnv\\)")
+  expect_match(boot.body, "get\\(\"\\.npRmpi_rm_existing\"")
+  expect_match(boot.body, "asNamespace\\(\"npRmpi\"\\)")
+  expect_match(boot.body, "TMP, envir = \\.GlobalEnv")
 })
 
 test_that("autodispatch return rewriting covers prepublished temporary arguments", {
@@ -106,7 +112,7 @@ test_that("npudist(bws=...) resolves large autodispatch temporary call arguments
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
-  local_options(npRmpi.autodispatch.arg.broadcast.threshold = 1L)
+  withr::local_options(npRmpi.autodispatch.arg.broadcast.threshold = 1L)
 
   data("faithful")
   bw <- npudistbw(dat = faithful, bws = c(0.5, 5), bandwidth.compute = FALSE)

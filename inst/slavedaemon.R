@@ -16,7 +16,17 @@ repeat {
 	tmp.message=npRmpi:::mpi.bcast.cmd(rank=0,comm=.comm, nonblock=.nonblock, sleep=.sleep)
 	if (is.character(tmp.message) && tmp.message =="kaerb")
 		break
-    try(eval(tmp.message,envir=.GlobalEnv),TRUE)
+    res <- try(eval(tmp.message,envir=.GlobalEnv), silent=TRUE)
+    if (inherits(res, "try-error")) {
+        cmd <- paste(utils::capture.output(print(tmp.message)), collapse = " ")
+        msg <- as.character(res)
+        base::cat(sprintf("\n[spawn slave rank %d] CMD: %s\n[spawn slave rank %d] ERROR: %s\n",
+                          npRmpi:::mpi.comm.rank(.comm), cmd, npRmpi:::mpi.comm.rank(.comm),
+                          paste(msg, collapse = " ")),
+                  file = stderr())
+        flush(stderr())
+        base::stop(msg)
+    }
 }
 print("Done")
 if (npRmpi:::mpi.comm.size(.comm) > 0) {
