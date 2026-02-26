@@ -1103,12 +1103,33 @@ genTimingStr <- function(x){
 
     nslaves <- max(as.integer(size) - 1L, 0L)
     autodispatch <- isTRUE(getOption("npRmpi.autodispatch", FALSE))
+
+    rec <- NULL
+    if (is.list(x) && is.list(x$timing.profile) && !is.null(x$timing.profile$where)) {
+      rec <- x$timing.profile
+    } else if (is.list(x) && is.list(x$bws) && is.list(x$bws$timing.profile) &&
+               !is.null(x$bws$timing.profile$where)) {
+      rec <- x$bws$timing.profile
+    } else {
+      last.fun <- tryCatch(get(".npRmpi_profile_last", envir = asNamespace("npRmpi")),
+                           error = function(e) NULL)
+      if (is.function(last.fun))
+        rec <- tryCatch(last.fun(), error = function(e) NULL)
+    }
+    ratio <- suppressWarnings(as.double(rec$comm_ratio)[1L])
+    ratio.str <- if (is.finite(ratio)) {
+      paste0(", overhead_ratio=", format(round(100 * ratio, 2), nsmall = 2), "%")
+    } else {
+      ""
+    }
+
     paste0(
       "\nMPI Session: comm=", as.integer(comm),
       ", rank=", ifelse(is.na(rank), "NA", as.integer(rank)),
       ", size=", as.integer(size),
       ", nslaves=", as.integer(nslaves),
-      ", autodispatch=", ifelse(autodispatch, "on", "off")
+      ", autodispatch=", ifelse(autodispatch, "on", "off"),
+      ratio.str
     )
   }
 
