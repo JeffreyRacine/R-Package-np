@@ -225,16 +225,26 @@ npreg.rbandwidth <-
         eydat <- eydat[keep.eval]
     }
 
+    bernstein.oos <- FALSE
     if (identical(bws$regtype, "lp") &&
         isTRUE(bws$bernstein.basis) &&
         !no.ex &&
         any(bws$icon)) {
+      out.of.support <- character(0)
       for (ii in which(bws$icon)) {
         tr <- range(as.numeric(txdat[[ii]]))
         ex <- as.numeric(exdat[[ii]])
-        if (any(ex < tr[1] | ex > tr[2], na.rm = TRUE)) {
-          stop("bernstein.basis=TRUE requires evaluation continuous predictors to lie within training support; use bernstein.basis=FALSE for extrapolation")
-        }
+        if (any(ex < tr[1] | ex > tr[2], na.rm = TRUE))
+          out.of.support <- c(out.of.support, colnames(txdat)[ii])
+      }
+      if (length(out.of.support)) {
+        bernstein.oos <- TRUE
+        warning(
+          "bernstein.basis=TRUE: evaluation continuous predictor(s) outside training support (",
+          paste(unique(out.of.support), collapse = ", "),
+          "); proceeding, but interpret extrapolated results with care",
+          call. = FALSE
+        )
       }
     }
 
@@ -278,6 +288,72 @@ npreg.rbandwidth <-
       
     if (!no.ex)
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+
+    if (isTRUE(bernstein.oos)) {
+      fit.apply <- npreghat(
+        bws = bws,
+        txdat = txdat,
+        exdat = if (no.ex) NULL else exdat,
+        y = tydat,
+        output = "apply"
+      )
+      mean.fallback <- as.double(fit.apply)
+      merr.fallback <- rep(NA_real_, length(mean.fallback))
+
+      grad.fallback <- NULL
+      gerr.fallback <- NULL
+      if (gradients) {
+        grad.fallback <- matrix(0.0, nrow = enrow, ncol = ncol)
+        gerr.fallback <- matrix(NA_real_, nrow = enrow, ncol = ncol)
+        cont.idx <- which(bws$icon)
+        if (length(cont.idx)) {
+          for (jj in seq_along(cont.idx)) {
+            s.vec <- integer(bws$ncon)
+            s.vec[jj] <- 1L
+            grad.apply <- npreghat(
+              bws = bws,
+              txdat = txdat,
+              exdat = if (no.ex) NULL else exdat,
+              y = tydat,
+              output = "apply",
+              s = s.vec
+            )
+            grad.fallback[, cont.idx[jj]] <- as.double(grad.apply)
+          }
+        }
+      }
+
+      fit.elapsed <- proc.time()[3] - fit.start
+      optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
+      total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
+
+      ev.args <- list(
+        bws = bws,
+        eval = if (no.ex) txdat else exdat,
+        mean = mean.fallback,
+        merr = merr.fallback,
+        ntrain = tnrow,
+        trainiseval = no.ex,
+        gradients = gradients,
+        residuals = residuals,
+        xtra = rep(NA_real_, 6L),
+        rows.omit = rows.omit,
+        timing = bws$timing,
+        total.time = total.time,
+        optim.time = optim.time,
+        fit.time = fit.elapsed
+      )
+      if (gradients) {
+        ev.args$grad <- grad.fallback
+        ev.args$gerr <- gerr.fallback
+      }
+      if (residuals)
+        ev.args$resid <- resid
+      if (identical(bws$regtype, "lp"))
+        ev.args$gradient.order <- glp.gradient.order
+
+      return(do.call(npregression, ev.args))
+    }
 
     if (!no.ex)
       npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
