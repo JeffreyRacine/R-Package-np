@@ -1749,8 +1749,6 @@ compute.bootstrap.errors.rbandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat && gradients) {
       cont.idx <- which(bws$xdati$icon)
@@ -1974,7 +1972,6 @@ compute.bootstrap.errors.scbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
-    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
     boot.out <- NULL

@@ -378,8 +378,6 @@
         return ( list(r1 = r1) )
 
     } else {
-##      stop("not yet supported!")
-      
       if (plot.behavior != "data" && plot.par.mfrow)
         par(mfrow=n2mfrow(bws$xndim + bws$zndim),cex=par()$cex)
 
