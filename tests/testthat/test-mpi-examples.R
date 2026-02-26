@@ -48,8 +48,7 @@ test_that("MPI examples from man pages work correctly", {
     dat <- USArrests[1:20, ]
     y_vars <- c("Murder", "UrbanPop")
     
-    pair_list <- np.pairs(y_vars = y_vars, y_dat = dat,
-                          bandwidth.compute=FALSE, bws=0.5)
+    pair_list <- np.pairs(y_vars = y_vars, y_dat = dat)
     
     expect_type(pair_list, "list")
     expect_equal(length(pair_list$pair_kerns), 4)

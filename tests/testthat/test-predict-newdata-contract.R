@@ -1,6 +1,7 @@
-library(np)
-
 test_that("predict aliases newdata to native eval args for default npreg/npudens/npudist/npindex", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   x <- runif(70)
   y <- rnorm(70)
@@ -64,6 +65,9 @@ test_that("predict aliases newdata to native eval args for default npreg/npudens
 })
 
 test_that("predict aliases newdata to exdat/eydat for default npcdens/npcdist", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   x <- runif(60)
   y <- runif(60)

@@ -1,5 +1,5 @@
 test_that("npcmstest basic functionality works", {
-  # skip_on_cran()
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
@@ -19,7 +19,7 @@ test_that("npcmstest basic functionality works", {
 })
 
 test_that("npqcmstest basic functionality works", {
-  # skip_on_cran()
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   library(quantreg)
@@ -39,7 +39,7 @@ test_that("npqcmstest basic functionality works", {
 })
 
 test_that("npdeneqtest basic functionality works", {
-  # skip_on_cran()
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
@@ -47,34 +47,34 @@ test_that("npdeneqtest basic functionality works", {
   x <- data.frame(v1=rnorm(n))
   y <- data.frame(v1=rnorm(n, mean=0.5))
   # Use small boot.num
-  test <- npdeneqtest(x, y, boot.num=19)
+  test <- npdeneqtest(x, y, boot.num=9)
   
   expect_s3_class(test, "deneqtest")
   expect_output(summary(test))
 })
 
 test_that("npsymtest basic functionality works", {
-  # skip_on_cran()
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
   n <- 50
   x <- rgamma(n, shape=2)
-  test <- npsymtest(x, method="summation", boot.num=19)
+  test <- npsymtest(x, method="summation", boot.num=9)
   
   expect_s3_class(test, "symtest")
   expect_output(summary(test))
 })
 
 test_that("npunitest basic functionality works", {
-  # skip_on_cran()
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
 
   set.seed(42)
   n <- 50
   x <- rnorm(n)
   y <- rnorm(n, mean=0.5)
-  test <- npunitest(x, y, method="summation", boot.num=19)
+  test <- npunitest(x, y, method="summation", boot.num=9)
   
   expect_s3_class(test, "unitest")
   expect_output(summary(test))

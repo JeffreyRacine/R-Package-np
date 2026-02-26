@@ -1,7 +1,7 @@
 test_that("npindex formula newdata path matches explicit data path", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-  old.opts <- options(npRmpi.autodispatch = FALSE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
   on.exit(options(old.opts), add = TRUE)
 
   set.seed(20260223)
@@ -38,7 +38,7 @@ test_that("npindex formula newdata path matches explicit data path", {
 test_that("npscoef formula newdata path matches explicit data path", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-  old.opts <- options(npRmpi.autodispatch = FALSE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
   on.exit(options(old.opts), add = TRUE)
 
   set.seed(20260223)
@@ -76,7 +76,7 @@ test_that("npscoef formula newdata path matches explicit data path", {
 test_that("npplreg formula newdata path matches explicit data path", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
-  old.opts <- options(npRmpi.autodispatch = FALSE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
   on.exit(options(old.opts), add = TRUE)
 
   set.seed(20260223)

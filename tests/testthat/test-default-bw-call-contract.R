@@ -2,19 +2,19 @@ test_that("default estimators build bandwidth calls in caller frame", {
   skip_if_not(spawn_mpi_slaves(1))
   on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
 
-  old.opts <- options(npRmpi.autodispatch = FALSE)
+  old.opts <- options(npRmpi.autodispatch = TRUE)
   on.exit(options(old.opts), add = TRUE)
 
   run_dens <- function() {
     set.seed(101)
     x <- runif(30)
-    npudens(tdat = x, bwmethod = "normal-reference")
+    npudens(~x, data = data.frame(x = x), bwmethod = "normal-reference")
   }
 
   run_dist <- function() {
     set.seed(202)
     x <- runif(35)
-    npudist(tdat = x, bwmethod = "normal-reference")
+    npudist(~x, data = data.frame(x = x), bwmethod = "normal-reference")
   }
 
   run_reg <- function() {

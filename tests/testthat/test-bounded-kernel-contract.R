@@ -1,6 +1,7 @@
-library(np)
-
 test_that("fixed +/-Inf bounds are parity-equivalent to none at fixed bandwidth", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   x <- runif(80)
   dat <- data.frame(x = x)
@@ -28,6 +29,9 @@ test_that("fixed +/-Inf bounds are parity-equivalent to none at fixed bandwidth"
 })
 
 test_that("scalar fixed bounds recycle over multiple continuous variables", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   dat <- data.frame(x1 = runif(64), x2 = runif(64))
 
@@ -56,6 +60,9 @@ test_that("scalar fixed bounds recycle over multiple continuous variables", {
 })
 
 test_that("invalid fixed bounds are rejected with clear diagnostics", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   x <- runif(50)
   dat <- data.frame(x = x)
@@ -86,6 +93,9 @@ test_that("invalid fixed bounds are rejected with clear diagnostics", {
 })
 
 test_that("finite bounds require fixed bwtype", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   x <- runif(70)
 
@@ -102,6 +112,9 @@ test_that("finite bounds require fixed bwtype", {
 })
 
 test_that("evaluation support violations are caught before native execution", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   x <- runif(70)
   dat <- data.frame(x = x)
@@ -124,6 +137,9 @@ test_that("evaluation support violations are caught before native execution", {
 })
 
 test_that("predict paths enforce bounded eval checks with variable diagnostics", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260224)
   x <- runif(80)
   y <- runif(80)

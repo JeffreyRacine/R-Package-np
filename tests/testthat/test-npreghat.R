@@ -1,4 +1,7 @@
 test_that("npreghat reproduces npreg fitted values for mixed-data local constant", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260223)
   n <- 120
   x <- runif(n)
@@ -23,6 +26,9 @@ test_that("npreghat reproduces npreg fitted values for mixed-data local constant
 })
 
 test_that("npreghat supports lp/ll derivatives and matrix apply mode", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(777)
   n <- 150
   x <- sort(runif(n))

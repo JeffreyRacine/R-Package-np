@@ -13,6 +13,8 @@ test_that("plot runtime files avoid forbidden *bw( calls", {
     file.path(root, "R", "np.plot.helpers.R"),
     Sys.glob(file.path(root, "R", "np.plot.engine*.R"))
   )
+  files <- unique(files[file.exists(files)])
+  skip_if(length(files) == 0L, "source R files unavailable in installed test context")
 
   forbidden <- "\\b[A-Za-z0-9._]+bw\\s*\\("
   allowed <- c("\\.np_indexhat_rbw\\s*\\(")
@@ -41,9 +43,11 @@ test_that("npRmpi plot runtime files avoid serial np:: calls", {
     file.path(root, "R", "np.plot.helpers.R"),
     Sys.glob(file.path(root, "R", "np.plot*.R"))
   )
+  files <- unique(files[file.exists(files)])
+  skip_if(length(files) == 0L, "source R files unavailable in installed test context")
 
   offenders <- character()
-  for (f in unique(files)) {
+  for (f in files) {
     raw <- readLines(f, warn = FALSE)
     idx <- which(grepl("np::", sub("#.*$", "", raw), fixed = TRUE))
     if (length(idx)) {

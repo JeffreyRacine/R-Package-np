@@ -1,7 +1,8 @@
 test_that(".mpi_make_replicate_fun captures caller environment semantics", {
   env <- new.env(parent = baseenv())
   env$a <- 5L
-  f <- evalq(.mpi_make_replicate_fun(quote(a), env = environment()), envir = env)
+  helper <- getFromNamespace(".mpi_make_replicate_fun", "npRmpi")
+  f <- helper(quote(a), env = env)
 
   expect_identical(f(), 5L)
   env$a <- 9L

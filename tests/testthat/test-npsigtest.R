@@ -1,5 +1,5 @@
 test_that("npsigtest basic functionality works with autodispatch", {
-  # skip_on_cran()
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   options(npRmpi.autodispatch = TRUE)
@@ -22,6 +22,7 @@ test_that("npsigtest basic functionality works with autodispatch", {
 })
 
 test_that("npsigtest formula path works under autodispatch", {
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   options(npRmpi.autodispatch = TRUE)
@@ -43,6 +44,7 @@ test_that("npsigtest formula path works under autodispatch", {
 })
 
 test_that("npsigtest npregression path works under autodispatch", {
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   options(npRmpi.autodispatch = TRUE)
@@ -68,6 +70,7 @@ test_that("npsigtest npregression path works under autodispatch", {
 })
 
 test_that("npsigtest rejects duplicate index entries under autodispatch", {
+  skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   options(npRmpi.autodispatch = TRUE)

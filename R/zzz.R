@@ -20,7 +20,7 @@
 }
 
 .onAttach <- function (lib, pkg) {
-		packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-0) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
+		packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-1) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
     if (isTRUE(getOption("npRmpi.conflicts.warn", TRUE)) &&
         ("package:np" %in% search()) &&
         !isTRUE(getOption("npRmpi.conflicts.warned", FALSE))) {

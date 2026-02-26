@@ -1,5 +1,7 @@
 test_that("bounded conditional kernels change npcdens on bounded-support DGP", {
-  library(np)
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260216)
 
   n <- 120

@@ -8,11 +8,21 @@
 }
 
 spawn_mpi_slaves <- function(n=1) {
+  # R CMD check environments are not a stable MPI runtime target.
+  if (identical(Sys.getenv("_R_CHECK_PACKAGE_NAME_", ""), "npRmpi")) {
+    return(FALSE)
+  }
+
   if (!requireNamespace("Rmpi", quietly = TRUE)) {
     return(FALSE)
   }
 
   options(npRmpi.autodispatch = TRUE, np.messages = FALSE)
+
+  # Reuse an active pool instead of re-initializing nested MPI sessions.
+  if (.mpi_pool_active()) {
+    return(TRUE)
+  }
 
   # Prefer the higher-level helper if available.
   if (exists("npRmpi.init", mode="function")) {
@@ -43,6 +53,9 @@ close_mpi_slaves <- function(force=TRUE) {
 
   if (exists("npRmpi.quit", mode="function")) {
     try(npRmpi.quit(force=force), silent=TRUE)
+    if (.mpi_pool_active()) {
+      try(mpi.close.Rslaves(force=force), silent=TRUE)
+    }
   } else {
     try(mpi.close.Rslaves(force=force), silent=TRUE)
   }

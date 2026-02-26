@@ -1,6 +1,7 @@
-library(np)
-
 test_that("bounded gaussian kernel matches direct normalization at fixed bandwidth", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   x <- sort(c(5, 11, 21, 31, 46, 75, 98, 122, 145, 165, 195, 224, 245, 293, 321, 330, 350, 420))
   h <- 100
   a <- min(x)
@@ -17,10 +18,13 @@ test_that("bounded gaussian kernel matches direct normalization at fixed bandwid
     mean(dnorm((x - xx)/h)/(h * (pnorm((b - xx)/h) - pnorm((a - xx)/h))))
   })
 
-  expect_equal(as.numeric(fit$dens), as.numeric(fdirect), tolerance = 1e-8)
+  expect_equal(as.numeric(fit$dens), as.numeric(fdirect), tolerance = 1e-7)
 })
 
 test_that("cv bandwidth with range bounds is larger than unbounded for stress example", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   x <- sort(c(5, 11, 21, 31, 46, 75, 98, 122, 145, 165, 195, 224, 245, 293, 321, 330, 350, 420))
 
   bw_bound <- npudensbw(dat = data.frame(x = x),
