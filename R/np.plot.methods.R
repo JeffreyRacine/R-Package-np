@@ -71,7 +71,9 @@
       !is.null(object$mean) &&
       !is.null(object$resid) &&
       NROW(object$eval) == length(object$mean) &&
-      length(object$mean) == length(object$resid)) {
+      length(object$mean) == length(object$resid) &&
+      all(is.finite(object$mean)) &&
+      all(is.finite(object$resid))) {
     dots$xdat <- object$eval
     dots$ydat <- object$mean + object$resid
   }

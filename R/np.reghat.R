@@ -155,12 +155,67 @@ npreghat.rbandwidth <-
            ridge = 1.0e-12,
            ...){
 
+    no.ex <- missing(exdat)
+    if (.npRmpi_autodispatch_active() &&
+        !.npRmpi_autodispatch_in_context() &&
+        !.npRmpi_autodispatch_called_from_bcast()) {
+      expr <- substitute({
+        old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+        old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+        options(npRmpi.autodispatch.context = TRUE)
+        options(npRmpi.autodispatch.disable = TRUE)
+        on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+        on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+        if (NOEX) {
+          npRmpi:::npreghat.rbandwidth(
+            bws = BWS,
+            txdat = TXDAT,
+            y = YDAT,
+            output = OUTPUT,
+            s = SVAL,
+            deriv = DERIV,
+            degree = DEGREE,
+            basis = BASIS,
+            bernstein.basis = BERN,
+            ridge = RIDGE
+          )
+        } else {
+          npRmpi:::npreghat.rbandwidth(
+            bws = BWS,
+            txdat = TXDAT,
+            exdat = EXDAT,
+            y = YDAT,
+            output = OUTPUT,
+            s = SVAL,
+            deriv = DERIV,
+            degree = DEGREE,
+            basis = BASIS,
+            bernstein.basis = BERN,
+            ridge = RIDGE
+          )
+        }
+      }, list(
+        NOEX = no.ex,
+        BWS = bws,
+        TXDAT = txdat,
+        EXDAT = if (no.ex) NULL else exdat,
+        YDAT = y,
+        OUTPUT = output,
+        SVAL = s,
+        DERIV = deriv,
+        DEGREE = degree,
+        BASIS = basis,
+        BERN = bernstein.basis,
+        RIDGE = ridge
+      ))
+      return(.npRmpi_bcast_cmd_expr(expr, comm = 1L, caller.execute = TRUE))
+    }
+
     output <- match.arg(output)
     dots <- list(...)
     npRejectLegacyLpArgs(names(dots), where = "npreghat")
 
     txdat <- toFrame(txdat)
-    no.ex <- missing(exdat)
 
     if (!no.ex) {
       exdat <- toFrame(exdat)
@@ -266,7 +321,7 @@ npreghat.rbandwidth <-
     if (!no.ex)
       kw.args$exdat <- exdat
 
-    kw.obj <- do.call(npksum, kw.args)
+    kw.obj <- do.call(npksum.default, kw.args)
     kw <- kw.obj$kw
 
     if (is.null(kw))

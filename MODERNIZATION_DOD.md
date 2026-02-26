@@ -11,6 +11,11 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 1. Core estimator families first: `npreg*`, `npudens*`, `npcdens*`, `npudist*`, `npcdist*`, `npscoef*`, `npindex*`, `npplreg*`.
 2. `npregiv*` is explicitly lower priority unless blocking core release readiness.
 
+## Runtime Independence Contract
+1. `npRmpi` must be self-supporting at runtime: no runtime `np::` bridge calls in estimator/plot/bootstrap/helper execution paths.
+2. When MPI mode is selected for `npRmpi`, execution must not silently fall back to serial code paths.
+3. Functional/interface compatibility with `np` remains required despite runtime independence.
+
 ## Gate Snapshot (2026-02-23)
 - [x] R-layer `.C(` callsite retirement complete (`0`).
 - [x] Active `<<-` retirement complete in R layer (`0`).

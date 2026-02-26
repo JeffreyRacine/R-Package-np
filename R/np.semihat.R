@@ -23,6 +23,67 @@
   do.call(npregbw, args)
 }
 
+.npscoef_make_regbw <- function(bws, zdat, bw = bws$bw) {
+  regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+  args <- list(
+    xdat = zdat,
+    ydat = rep.int(0.0, nrow(zdat)),
+    bws = as.double(bw),
+    regtype = regtype,
+    bwscaling = isTRUE(bws$scaling),
+    bandwidth.compute = FALSE,
+    bwtype = if (is.null(bws$type)) "fixed" else bws$type,
+    ckertype = if (is.null(bws$ckertype)) "gaussian" else bws$ckertype,
+    ckerorder = if (is.null(bws$ckerorder)) 2L else bws$ckerorder,
+    ckerbound = if (is.null(bws$ckerbound)) "none" else bws$ckerbound,
+    ckerlb = bws$ckerlb,
+    ckerub = bws$ckerub,
+    ukertype = if (is.null(bws$ukertype)) "aitchisonaitken" else bws$ukertype,
+    okertype = if (is.null(bws$okertype)) "liracine" else bws$okertype
+  )
+  if (!is.null(bws$basis))
+    args$basis <- bws$basis
+  if (!is.null(bws$degree))
+    args$degree <- bws$degree
+  if (!is.null(bws$bernstein.basis))
+    args$bernstein.basis <- bws$bernstein.basis
+  do.call(npregbw, args)
+}
+
+.npscoef_weight_matrix <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
+  tzdat <- toFrame(tzdat)
+  ezdat <- toFrame(ezdat)
+  leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
+  regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+
+  if (identical(regtype, "lc")) {
+    kw.obj <- do.call(npksum, list(
+      txdat = tzdat,
+      exdat = ezdat,
+      bws = bws,
+      leave.one.out = leave.one.out,
+      bandwidth.divide = TRUE,
+      return.kernel.weights = TRUE
+    ))
+    kw <- kw.obj$kw
+    if (!is.matrix(kw))
+      kw <- matrix(kw, nrow = nrow(tzdat))
+    return(kw)
+  }
+
+  rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
+  H <- npreghat(
+    bws = rbw,
+    txdat = tzdat,
+    exdat = ezdat,
+    output = "matrix",
+    leave.one.out = leave.one.out
+  )
+  if (!is.matrix(H))
+    H <- matrix(H, nrow = nrow(ezdat))
+  t(H)
+}
+
 npindexhat <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -247,7 +308,7 @@ npscoefhat <-
     if (length(ridge) != 1L || is.na(ridge) || !is.finite(ridge) || ridge <= 0)
       stop("argument 'ridge' must be a positive finite scalar")
     if (iterate)
-      stop("iterate=TRUE is not supported in npscoefhat prototype")
+      stop("iterate=TRUE is not supported in npscoefhat")
 
     miss.z <- missing(tzdat) || is.null(tzdat)
 
@@ -283,17 +344,12 @@ npscoefhat <-
     W.train <- cbind(1.0, X.train)
     W.eval <- cbind(1.0, X.eval)
 
-    kw.obj <- do.call(npksum, list(
-      txdat = tzdat,
-      exdat = ezdat,
+    kw <- .npscoef_weight_matrix(
       bws = bws,
-      leave.one.out = leave.one.out,
-      bandwidth.divide = TRUE,
-      return.kernel.weights = TRUE
-    ))
-    kw <- kw.obj$kw
-    if (!is.matrix(kw))
-      kw <- matrix(kw, nrow = nrow(txdat))
+      tzdat = tzdat,
+      ezdat = ezdat,
+      leave.one.out = leave.one.out
+    )
 
     n <- nrow(W.train)
     m <- ncol(kw)
