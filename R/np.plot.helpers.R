@@ -96,7 +96,7 @@
   if (is.matrix(t.mpi))
     return(t.mpi)
 
-  # MPI-safe master fallback (npRmpi only, no np package fallback)
+  # Local compute fallback is used only in broadcast/manual-dispatch contexts.
   chunk.size <- .np_wild_chunk_size(n = n, B = B)
   out <- matrix(NA_real_, nrow = B, ncol = nrow(H))
   fit.mean <- as.double(fit.mean)
@@ -142,15 +142,7 @@
 }
 
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
-  if (isTRUE(getOption("np.plot.inid.ksum.fastpath.nprmpi", FALSE)) &&
-      !isTRUE(getOption("npRmpi.ksum.fastpath.warned", FALSE))) {
-    warning(
-      "npRmpi ksum return.kernel.weights fastpath is disabled due MPI runtime instability; using MPI-safe bootstrap fallback",
-      call. = FALSE
-    )
-    options(npRmpi.ksum.fastpath.warned = TRUE)
-  }
-  FALSE
+  TRUE
 }
 
 .npRmpi_bootstrap_worker_count <- function(comm = 1L) {
@@ -169,15 +161,19 @@
                                              B = NA_integer_,
                                              chunk.size = NA_integer_,
                                              what = "bootstrap") {
-  if (!isTRUE(getOption("np.plot.bootstrap.mpi.applylb.enable", FALSE)))
-    return(FALSE)
   if (isTRUE(.npRmpi_autodispatch_called_from_bcast()))
     return(FALSE)
   if (!isTRUE(.npRmpi_has_active_slave_pool(comm = comm)))
-    return(FALSE)
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "requires an active MPI slave pool; call npRmpi.init(...) first",
+      what = what
+    )
   workers <- .npRmpi_bootstrap_worker_count(comm = comm)
   if (workers < 1L)
-    return(FALSE)
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = "requires at least one active MPI worker",
+      what = what
+    )
   TRUE
 }
 
@@ -251,9 +247,6 @@
 }
 
 .npRmpi_wild_boot_t_parallel <- function(H, fit.mean, residuals, B, wild, comm = 1L) {
-  if (isTRUE(getOption("np.plot.wild.mpi.parallel.disable", FALSE)))
-    return(NULL)
-
   n <- length(residuals)
   p <- nrow(H)
   chunk.size <- .np_wild_chunk_size(n = n, B = B)
@@ -391,8 +384,8 @@
   if (length(blocklen) != 1L || is.na(blocklen) || blocklen < 1L || blocklen > n)
     stop("invalid block length for block bootstrap")
 
-  ts.array <- getFromNamespace("ts.array", "boot")
-  make.ends <- getFromNamespace("make.ends", "boot")
+  ts.array <- utils::getFromNamespace("ts.array", "boot")
+  make.ends <- utils::getFromNamespace("make.ends", "boot")
   ts.draws <- ts.array(
     n = n,
     n.sim = n.sim,
@@ -434,7 +427,7 @@
   }
 }
 
-.np_inid_lc_boot_from_hat <- function(H, ydat, B, counts = NULL) {
+.np_inid_lc_boot_from_hat <- function(H, ydat, B, counts = NULL, counts.drawer = NULL) {
   H <- as.matrix(H)
   ydat <- as.double(ydat)
   B <- as.integer(B)
@@ -459,8 +452,78 @@
   }
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B)
-  if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
-      .npRmpi_bootstrap_fanout_enabled(
+  if (!is.null(counts.drawer)) {
+    tmat <- matrix(NA_real_, nrow = B, ncol = nrow(H))
+    W.local <- W
+    Wy.local <- Wy
+    counts.drawer.local <- counts.drawer
+    n.local <- n
+
+    if (.npRmpi_bootstrap_fanout_enabled(
+      comm = 1L,
+      n = n,
+      B = B,
+      chunk.size = chunk.size,
+      what = "inid-lc-block"
+    )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- .np_inid_counts_matrix(
+          n = n.local,
+          B = as.integer(task$bsz),
+          counts = counts.drawer.local(start, stopi)
+        )
+        den <- crossprod(counts.chunk, W.local)
+        num <- crossprod(counts.chunk, Wy.local)
+        num / pmax(den, .Machine$double.eps)
+      }
+
+      t.comm <- proc.time()
+      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
+      .npRmpi_profile_add_comm_elapsed(
+        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+        where = "mpi.applyLB:inid-lc-block"
+      )
+      if (!inherits(parts, "error")) {
+        t.mpi <- .npRmpi_bootstrap_collect_chunks(
+          parts = parts,
+          tasks = tasks,
+          ncol.out = nrow(H),
+          what = "inid-lc-block"
+        )
+        if (is.matrix(t.mpi))
+          tmat <- t.mpi
+      } else {
+        .npRmpi_bootstrap_fail_or_fallback(
+          msg = sprintf("inid-lc block fan-out failed (%s)", conditionMessage(parts)),
+          what = "inid-lc-block"
+        )
+      }
+    }
+
+    if (anyNA(tmat)) {
+      start <- 1L
+      while (start <= B) {
+        stopi <- min(B, start + chunk.size - 1L)
+        bsz <- stopi - start + 1L
+        counts.chunk <- .np_inid_counts_matrix(
+          n = n,
+          B = bsz,
+          counts = counts.drawer(start, stopi)
+        )
+        den <- crossprod(counts.chunk, W)
+        num <- crossprod(counts.chunk, Wy)
+        tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+        start <- stopi + 1L
+      }
+    }
+
+    return(list(t = tmat, t0 = t0))
+  }
+
+  if (.npRmpi_bootstrap_fanout_enabled(
         comm = 1L,
         n = n,
         B = B,
@@ -704,9 +767,28 @@
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   ncon <- bws$ncon
 
-  degree <- if (identical(regtype, "lc")) {
-    rep.int(0L, ncon)
-  } else if (identical(regtype, "ll")) {
+  if (identical(regtype, "lc")) {
+    H <- suppressWarnings(
+      npreghat.rbandwidth(
+        bws = bws,
+        txdat = xdat,
+        exdat = exdat,
+        s = 0L,
+        output = "matrix"
+      )
+    )
+    if (!is.matrix(H))
+      H <- matrix(as.double(H), nrow = neval, ncol = n)
+    return(.np_inid_lc_boot_from_hat(
+      H = H,
+      ydat = ydat,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer
+    ))
+  }
+
+  degree <- if (identical(regtype, "ll")) {
     rep.int(1L, ncon)
   } else {
     npValidateGlpDegree(
@@ -725,17 +807,13 @@
     bernstein.basis = isTRUE(bws$bernstein.basis)
   )
 
-  npksum.fun <- .npRmpi_bootstrap_estimator("npksum.default")
-  kw <- npksum.fun(
+  kw <- .np_plot_kernel_weights_direct(
+    bws = bws,
     txdat = xdat,
     exdat = exdat,
-    bws = bws,
-    return.kernel.weights = TRUE,
-    bandwidth.divide = TRUE,
-    leave.one.out = FALSE
-  )$kw
-  if (!is.matrix(kw))
-    kw <- matrix(kw, nrow = n)
+    operator = "normal",
+    where = "direct regression kernel weights"
+  )
   if (nrow(kw) != n || ncol(kw) != neval)
     stop("kernel-weight matrix shape mismatch")
 
@@ -758,69 +836,40 @@
   if (nrow(W) != n || nrow(W.eval) != neval || ncol(W.eval) != ncol(W))
     stop("regression moment design matrix shape mismatch")
 
-  p <- ncol(W)
-  mcols <- p * (p + 1L) / 2L
   rhs <- W.eval
-  ones <- matrix(1.0, nrow = n, ncol = 1L)
+  ones.counts <- rep.int(1.0, n)
 
-  Mfeat <- vector("list", neval)
-  Zfeat <- vector("list", neval)
-  t0 <- numeric(neval)
-
-  for (i in seq_len(neval)) {
-    k <- as.double(kw[, i])
-    WK <- W * k
-    Zfeat[[i]] <- WK * ydat
-
-    mf <- matrix(0.0, nrow = n, ncol = mcols)
-    idx <- 1L
-    for (a in seq_len(p)) {
-      for (b in a:p) {
-        mf[, idx] <- WK[, a] * W[, b]
-        idx <- idx + 1L
-      }
-    }
-    Mfeat[[i]] <- mf
-
-    M0 <- crossprod(ones, mf)
-    Z0 <- crossprod(ones, Zfeat[[i]])
-    t0[i] <- if (p > 3L) {
-      .np_inid_lp_predict_chunk_general(
-        Mvals = M0,
-        Zvals = Z0,
-        rhs = rhs[i, ],
-        ridge.base = ridge
-      )[1L]
-    } else {
-      .np_inid_lp_predict_chunk(
-        Mvals = M0,
-        Zvals = Z0,
-        rhs = rhs[i, ],
-        ridge.base = ridge
-      )[1L]
-    }
+  compute_from_counts <- function(counts.vec, rhs.row, kw.col) {
+    w <- as.double(counts.vec) * as.double(kw.col)
+    A <- crossprod(W, W * w)
+    z <- crossprod(W, ydat * w)
+    .np_inid_lp_predict_row(
+      A = A,
+      z = as.double(z),
+      rhs = as.double(rhs.row),
+      ridge.base = ridge
+    )
   }
+
+  t0 <- numeric(neval)
+  for (i in seq_len(neval))
+    t0[i] <- compute_from_counts(
+      counts.vec = ones.counts,
+      rhs.row = rhs[i, ],
+      kw.col = kw[, i]
+    )
 
   compute_chunk <- function(counts.chunk) {
     counts.chunk <- as.matrix(counts.chunk)
     bsz <- ncol(counts.chunk)
     out <- matrix(NA_real_, nrow = bsz, ncol = neval)
-    for (i in seq_len(neval)) {
-      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
-      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
-      out[, i] <- if (p > 3L) {
-        .np_inid_lp_predict_chunk_general(
-          Mvals = Mvals,
-          Zvals = Zvals,
-          rhs = rhs[i, ],
-          ridge.base = ridge
-        )
-      } else {
-        .np_inid_lp_predict_chunk(
-          Mvals = Mvals,
-          Zvals = Zvals,
-          rhs = rhs[i, ],
-          ridge.base = ridge
+    for (b in seq_len(bsz)) {
+      cvec <- counts.chunk[, b]
+      for (i in seq_len(neval)) {
+        out[b, i] <- compute_from_counts(
+          counts.vec = cvec,
+          rhs.row = rhs[i, ],
+          kw.col = kw[, i]
         )
       }
     }
@@ -833,8 +882,7 @@
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
 
-    if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
-        .npRmpi_bootstrap_fanout_enabled(
+    if (.npRmpi_bootstrap_fanout_enabled(
           comm = 1L,
           n = n,
           B = B,
@@ -880,7 +928,6 @@
     }
   } else {
     if (!is.null(counts.drawer) &&
-        !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
         .npRmpi_bootstrap_fanout_enabled(
           comm = 1L,
           n = n,
@@ -940,7 +987,6 @@
     prob <- rep.int(1 / n, n)
 
     if (anyNA(tmat) &&
-        !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
         .npRmpi_bootstrap_fanout_enabled(
           comm = 1L,
           n = n,
@@ -1151,17 +1197,13 @@
   W.train <- as.matrix(data.frame(1, X.train))
   W.eval <- as.matrix(data.frame(1, X.eval))
 
-  npksum.fun <- .npRmpi_bootstrap_estimator("npksum.default")
-  kw <- npksum.fun(
+  kw <- .np_plot_kernel_weights_direct(
+    bws = bws,
     txdat = tzdat,
     exdat = ezdat,
-    bws = bws,
-    return.kernel.weights = TRUE,
-    bandwidth.divide = TRUE,
-    leave.one.out = leave.one.out
-  )$kw
-  if (!is.matrix(kw))
-    kw <- matrix(kw, nrow = nrow(txdat))
+    operator = "normal",
+    where = "direct smooth-coefficient kernel weights"
+  )
 
   n <- nrow(W.train)
   neval <- nrow(W.eval)
@@ -1242,8 +1284,7 @@
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
 
-    if (!isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
-        .npRmpi_bootstrap_fanout_enabled(
+    if (.npRmpi_bootstrap_fanout_enabled(
           comm = 1L,
           n = n,
           B = B,
@@ -1289,7 +1330,6 @@
     }
   } else {
     if (!is.null(counts.drawer) &&
-        !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
         .npRmpi_bootstrap_fanout_enabled(
           comm = 1L,
           n = n,
@@ -1349,7 +1389,6 @@
     prob <- rep.int(1 / n, n)
 
     if (anyNA(tmat) &&
-        !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
         .npRmpi_bootstrap_fanout_enabled(
           comm = 1L,
           n = n,
@@ -1730,7 +1769,8 @@
     return.kernel.weights = TRUE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,
-    compute.ocg = FALSE
+    compute.ocg = FALSE,
+    suppress.parallel = TRUE
   )
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
@@ -1805,7 +1845,6 @@
   prob.local <- prob
 
   if (!is.null(counts.drawer) &&
-      !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
       .npRmpi_bootstrap_fanout_enabled(
         comm = 1L,
         n = n,
@@ -1864,7 +1903,6 @@
   }
 
   if (anyNA(tmat) &&
-      !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
       .npRmpi_bootstrap_fanout_enabled(
         comm = 1L,
         n = n,
@@ -2047,7 +2085,6 @@
   prob.local <- prob
 
   if (!is.null(counts.drawer) &&
-      !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
       .npRmpi_bootstrap_fanout_enabled(
         comm = 1L,
         n = n,
@@ -2110,7 +2147,6 @@
   }
 
   if (anyNA(tmat) &&
-      !isTRUE(getOption("np.plot.inid.mpi.parallel.disable", FALSE)) &&
       .npRmpi_bootstrap_fanout_enabled(
         comm = 1L,
         n = n,
@@ -2344,12 +2380,6 @@ plotFactor <- function(f, y, ...){
        ydat = ydat[goodrows])
 }
 
-.npRmpi_guard_bootstrap_plot_autodispatch <- function(plot.errors.method,
-                                                      where = "plot()",
-                                                      allow.direct.bootstrap = FALSE) {
-  invisible(TRUE)
-}
-
 .npRmpi_with_local_bootstrap <- function(expr) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
@@ -2366,23 +2396,6 @@ plotFactor <- function(f, y, ...){
     return(get(name, envir = nprmpi.ns, inherits = FALSE))
 
   get(name, mode = "function", envir = parent.frame(), inherits = TRUE)
-}
-
-.npRmpi_bootstrap_uses_local_namespace <- function(fun) {
-  if (!is.function(fun))
-    return(FALSE)
-  env <- environment(fun)
-  if (is.null(env))
-    return(FALSE)
-  environmentName(env) %in% c("np", "namespace:np")
-}
-
-.npRmpi_bootstrap_maybe_local <- function(expr, estimators = list()) {
-  use.local <- length(estimators) > 0L &&
-    all(vapply(estimators, .npRmpi_bootstrap_uses_local_namespace, logical(1)))
-  if (use.local)
-    return(.npRmpi_with_local_bootstrap(expr))
-  force(expr)
 }
 
 .npRmpi_plot_behavior_for_rank <- function(plot.behavior) {
@@ -2814,7 +2827,6 @@ compute.bootstrap.errors.rbandwidth =
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat && gradients) {
       cont.idx <- which(bws$xdati$icon)
@@ -3228,6 +3240,7 @@ compute.bootstrap.errors.plbandwidth =
 
     is.wild.hat <- .np_plot_is_wild_method(plot.errors.boot.method)
     is.inid <- plot.errors.boot.method == "inid"
+    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat) {
       if (length(plot.errors.boot.wild) > 1L)
@@ -3424,6 +3437,11 @@ compute.bootstrap.errors.bandwidth =
       isTRUE(is.block) &&
       isTRUE(identical(bws$type, "fixed"))
 
+    if (is.inid && !isTRUE(fast.inid))
+      stop("inid unconditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+    if (is.block && !isTRUE(fast.block))
+      stop("fixed/geom unconditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+
     boot.out <- NULL
     if (fast.inid || fast.block) {
       op <- if (cdf) "integral" else "normal"
@@ -3457,43 +3475,8 @@ compute.bootstrap.errors.bandwidth =
       })
     }
 
-    if (is.null(boot.out)) {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          fit <- if (cdf) {
-            npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
-          } else {
-            npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
-          }
-          if (cdf) fit$dist else fit$dens
-        }
-      } else {
-        function(tsb) {
-          fit <- if (cdf) {
-            npudist(tdat = tsb, edat = exdat, bws = bws)
-          } else {
-            npudens(tdat = tsb, edat = exdat, bws = bws)
-          }
-          if (cdf) fit$dist else fit$dens
-        }
-      }
-
-      if (is.inid) {
-        boot.out <- boot(
-          data = data.frame(xdat),
-          statistic = boofun,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boot.out <- tsboot(
-          tseries = data.frame(xdat),
-          statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
-    }
+    if (is.null(boot.out))
+      stop("no MPI fast path available for this unconditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -3622,37 +3605,8 @@ compute.bootstrap.errors.dbandwidth =
       })
     }
 
-    if (is.null(boot.out)) {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          npudist(
-            tdat = xdat[indices, , drop = FALSE],
-            edat = exdat,
-            bws = bws
-          )$dist
-        }
-      } else {
-        function(tsb) {
-          npudist(tdat = tsb, edat = exdat, bws = bws)$dist
-        }
-      }
-
-      if (is.inid) {
-        boot.out <- boot(
-          data = data.frame(xdat),
-          statistic = boofun,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boot.out <- tsboot(
-          tseries = data.frame(xdat),
-          statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
-    }
+    if (is.null(boot.out))
+      stop("no MPI fast path available for this unconditional distribution bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -3767,22 +3721,11 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
 
-    fit.cond <- function(tx, ty) {
-      switch(
-        tboo,
-        quant = npqreg.conbandwidth(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens.conbandwidth(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-      )
-    }
-    out.cond <- function(fit) {
-      switch(
-        tboo,
-        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-      )
-    }
+    if (is.inid && !isTRUE(fast.inid))
+      stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+    if (is.block && !isTRUE(fast.block))
+      stop("fixed/geom conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+
     boot.out <- NULL
     if (fast.inid || fast.block) {
       counts.drawer <- if (fast.block) {
@@ -3817,40 +3760,8 @@ compute.bootstrap.errors.conbandwidth =
       })
     }
 
-    if (is.null(boot.out)) {
-      nx <- ncol(xdat)
-      if (is.inid) {
-        boofun.inid <- function(data, indices) {
-          out.cond(
-            fit.cond(
-              tx = data[indices, seq_len(nx), drop = FALSE],
-              ty = data[indices, (nx + 1L):ncol(data), drop = FALSE]
-            )
-          )
-        }
-        boot.out <- boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun.inid,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boofun <- function(tsb) {
-          out.cond(
-            fit.cond(
-              tx = tsb[, seq_len(nx), drop = FALSE],
-              ty = tsb[, (nx + 1L):ncol(tsb), drop = FALSE]
-            )
-          )
-        }
-        boot.out <- tsboot(
-          tseries = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
-    }
+    if (is.null(boot.out))
+      stop("no MPI fast path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -3973,22 +3884,6 @@ compute.bootstrap.errors.condbandwidth =
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
 
-    fit.cond <- function(tx, ty) {
-      switch(
-        tboo,
-        quant = npqreg.condbandwidth(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist.condbandwidth(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-      )
-    }
-    out.cond <- function(fit) {
-      switch(
-        tboo,
-        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-      )
-    }
     boot.out <- NULL
     if (fast.inid || fast.block) {
       counts.drawer <- if (fast.block) {
@@ -4023,40 +3918,8 @@ compute.bootstrap.errors.condbandwidth =
       })
     }
 
-    if (is.null(boot.out)) {
-      nx <- ncol(xdat)
-      if (is.inid) {
-        boofun.inid <- function(data, indices) {
-          out.cond(
-            fit.cond(
-              tx = data[indices, seq_len(nx), drop = FALSE],
-              ty = data[indices, (nx + 1L):ncol(data), drop = FALSE]
-            )
-          )
-        }
-        boot.out <- boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun.inid,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boofun <- function(tsb) {
-          out.cond(
-            fit.cond(
-              tx = tsb[, seq_len(nx), drop = FALSE],
-              ty = tsb[, (nx + 1L):ncol(tsb), drop = FALSE]
-            )
-          )
-        }
-        boot.out <- tsboot(
-          tseries = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
-    }
+    if (is.null(boot.out))
+      stop("no MPI fast path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -4197,7 +4060,7 @@ compute.bootstrap.errors.sibandwidth =
       if (!isTRUE(inid.helper.ok)) {
         stop("inid single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
       } else {
-        boot.out <- .npRmpi_bootstrap_maybe_local({
+        boot.out <- .npRmpi_with_local_bootstrap({
           tryCatch({
             tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
             rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
@@ -4213,7 +4076,7 @@ compute.bootstrap.errors.sibandwidth =
                          conditionMessage(e)),
                  call. = FALSE)
           })
-        }, estimators = list(npindex.sibandwidth, npindexhat))
+        })
       }
     } else if (is.block) {
       block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled()) &&
@@ -4222,7 +4085,7 @@ compute.bootstrap.errors.sibandwidth =
       if (!isTRUE(block.helper.ok)) {
         stop("fixed/geom single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
       } else {
-        boot.out <- .npRmpi_bootstrap_maybe_local({
+        boot.out <- .npRmpi_with_local_bootstrap({
           tryCatch({
             tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
             rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
@@ -4245,7 +4108,7 @@ compute.bootstrap.errors.sibandwidth =
                          conditionMessage(e)),
                  call. = FALSE)
           })
-        }, estimators = list(npindex.sibandwidth, npindexhat))
+        })
       }
     }
 

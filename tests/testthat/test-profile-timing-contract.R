@@ -90,7 +90,7 @@ test_that("npRmpi profiling can be fully disabled via option", {
   expect_false("timing.profile" %in% names(out))
 })
 
-test_that("summary timing formatter includes npRmpi bootstrap profile", {
+test_that("summary timing formatter includes npRmpi bootstrap profile from object record", {
   begin.fun <- getFromNamespace(".npRmpi_profile_bootstrap_begin", "npRmpi")
   add.fun <- getFromNamespace(".npRmpi_profile_add_comm_elapsed", "npRmpi")
   end.fun <- getFromNamespace(".npRmpi_profile_bootstrap_end", "npRmpi")
@@ -112,9 +112,15 @@ test_that("summary timing formatter includes npRmpi bootstrap profile", {
 
   ctx <- begin.fun("compute.bootstrap.errors.rbandwidth", "inid", 9L, 100L, 25L)
   add.fun(0.001, "mpi.applyLB:inid")
-  end.fun(list(), ctx)
+  rec <- end.fun(list(), ctx)$timing.profile
+  expect_true(is.list(rec))
 
-  txt <- timing.fun(list(total.time = 1.0, optim.time = 0.2, fit.time = 0.8))
+  txt <- timing.fun(list(
+    total.time = 1.0,
+    optim.time = 0.2,
+    fit.time = 0.8,
+    timing.profile = rec
+  ))
   expect_true(grepl("MPI Bootstrap Profile:", txt, fixed = TRUE))
   expect_true(grepl("comm_ratio=", txt, fixed = TRUE))
 })

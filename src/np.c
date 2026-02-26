@@ -1640,6 +1640,7 @@ SEXP C_np_kernelsum(SEXP tuno,
   int n_pksum = asInteger(pksum_len);
   int n_kw = asInteger(kw_len);
   int ncon = 0;
+  int * myopti_p = NULL;
   double * ckerlb_p = NULL;
   double * ckerub_p = NULL;
 
@@ -1665,6 +1666,16 @@ SEXP C_np_kernelsum(SEXP tuno,
   PROTECT(ckerub_r = coerceVector(ckerub, REALSXP));
 
   ncon = (int)INTEGER(myopti_i)[KWS_NCONI];
+  myopti_p = INTEGER(myopti_i);
+  if(XLENGTH(myopti_i) <= KWS_SPARI){
+    int i;
+    int * myopti_tmp = (int *)R_alloc((size_t)(KWS_SPARI + 1), sizeof(int));
+    for(i = 0; i <= KWS_SPARI; i++)
+      myopti_tmp[i] = 0;
+    for(i = 0; i < XLENGTH(myopti_i); i++)
+      myopti_tmp[i] = myopti_p[i];
+    myopti_p = myopti_tmp;
+  }
   resolve_bounds_or_default(ckerlb_r, ckerub_r, ncon, &ckerlb_p, &ckerub_p);
 
   PROTECT(out_ksum = allocVector(REALSXP, n_ksum));
@@ -1676,7 +1687,7 @@ SEXP C_np_kernelsum(SEXP tuno,
                REAL(euno_r), REAL(eord_r), REAL(econ_r),
                REAL(bw_r),
                REAL(mcv_r), REAL(padnum_r),
-               INTEGER(op_i), INTEGER(myopti_i), REAL(kpow_r),
+               INTEGER(op_i), myopti_p, REAL(kpow_r),
                REAL(out_ksum), REAL(out_pksum), REAL(out_kw),
                ckerlb_p, ckerub_p);
 
@@ -6738,6 +6749,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   int no_y, leave_one_out, train_is_eval, do_divide_bw;
   int max_lev, no_weights, sum_element_length, return_kernel_weights;
   int p_operator, do_score, do_ocg, p_nvar = 0;
+  int suppress_parallel_ksum = 0;
 
   int use_tree = 0;
   int allocated_X_train = 1, allocated_X_eval = 1;
@@ -6793,6 +6805,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
   p_operator = myopti[KWS_POPI];
   do_score = myopti[KWS_PSCOREI];
   do_ocg = myopti[KWS_POCGI];
+  suppress_parallel_ksum = myopti[KWS_SPARI];
 
   nconfac_extern = ncatfac_extern = 0.0;
 
@@ -7161,7 +7174,7 @@ void np_kernelsum(double * tuno, double * tord, double * tcon,
                                       do_score,
                                       do_ocg, // no ocg (for now)
                                       bpso,
-                                      0, // don't explicity suppress parallel
+                                      suppress_parallel_ksum,
                                       ncol_Y,
                                       ncol_W,
                                       int_TREE_X,

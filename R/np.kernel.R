@@ -334,8 +334,9 @@ npksum.default <-
       int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
       return.kernel.weights = return.kernel.weights,
       permutation.operator = poperator.num,
-	      compute.score = compute.score,
-	      compute.ocg = compute.ocg)
+      compute.score = compute.score,
+      compute.ocg = compute.ocg,
+      suppress.parallel = FALSE)
 
 	    cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
     

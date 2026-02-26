@@ -134,9 +134,6 @@
 
     plot.behavior <- .npRmpi_plot_behavior_for_rank(normalized.opts$plot.behavior)
     plot.errors.method <- normalized.opts$plot.errors.method
-    .npRmpi_guard_bootstrap_plot_autodispatch(plot.errors.method,
-                                              where = "plot(...)",
-                                              allow.direct.bootstrap = TRUE)
     plot.errors.boot.method <- normalized.opts$plot.errors.boot.method
     plot.errors.boot.blocklen <- normalized.opts$plot.errors.boot.blocklen
     plot.errors.center <- normalized.opts$plot.errors.center

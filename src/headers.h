@@ -651,6 +651,7 @@ static const int OP_OFUN_OFFSETS[4] = { 0, 4, 8, 12 };
 #define KWS_POPI 19
 #define KWS_PSCOREI 20
 #define KWS_POCGI 21
+#define KWS_SPARI 22
 
 #define CQ_TNOBSI 0
 #define CQ_ENOBSI   1
