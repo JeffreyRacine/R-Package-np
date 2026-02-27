@@ -183,8 +183,8 @@
   if (length(blocklen) != 1L || is.na(blocklen) || blocklen < 1L || blocklen > n)
     stop("invalid block length for block bootstrap")
 
-  ts.array <- getFromNamespace("ts.array", "boot")
-  make.ends <- getFromNamespace("make.ends", "boot")
+  ts.array <- utils::getFromNamespace("ts.array", "boot")
+  make.ends <- utils::getFromNamespace("make.ends", "boot")
   ts.draws <- ts.array(
     n = n,
     n.sim = n.sim,
@@ -1856,7 +1856,7 @@ compute.bootstrap.errors.rbandwidth =
 
     if (is.null(boot.out)) {
       if (is.inid) {
-        boofun <- function(data, indices) {
+        boofun.inid <- function(data, indices) {
           fit <- suppressWarnings(npreg(
             txdat = data[indices, seq_len(ncol(data) - 1L), drop = FALSE],
             tydat = data[indices, ncol(data), drop = TRUE],
@@ -1870,11 +1870,11 @@ compute.bootstrap.errors.rbandwidth =
 
         boot.out <- boot(
           data = data.frame(xdat, ydat),
-          statistic = boofun,
+          statistic = boofun.inid,
           R = plot.errors.boot.num
         )
       } else {
-        boofun <- function(tsb) {
+        boofun.ts <- function(tsb) {
           fit <- suppressWarnings(npreg(
             txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
             tydat = tsb[, ncol(tsb)],
@@ -1888,7 +1888,7 @@ compute.bootstrap.errors.rbandwidth =
 
         boot.out <- tsboot(
           tseries = data.frame(xdat, ydat),
-          statistic = boofun,
+          statistic = boofun.ts,
           R = plot.errors.boot.num,
           l = plot.errors.boot.blocklen,
           sim = plot.errors.boot.method
@@ -2080,7 +2080,7 @@ compute.bootstrap.errors.scbandwidth =
       ycol <- ncol(xdat) + 1L
       zcols <- if (miss.z) integer(0) else (ycol + 1L):(ycol + ncol(zdat))
 
-      boofun <- function(tsb) {
+      boofun.sc <- function(tsb) {
         npscoef(
           txdat = tsb[, xcols, drop = FALSE],
           tydat = tsb[, ycol],
@@ -2094,7 +2094,7 @@ compute.bootstrap.errors.scbandwidth =
 
       boot.data <- if (miss.z) data.frame(xdat, ydat) else data.frame(xdat, ydat, zdat)
       boot.out <- tsboot(
-        tseries = boot.data, statistic = boofun, R = plot.errors.boot.num,
+        tseries = boot.data, statistic = boofun.sc, R = plot.errors.boot.num,
         l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
       )
     }
@@ -2271,7 +2271,7 @@ compute.bootstrap.errors.plbandwidth =
       }
 
       if (is.null(boot.out)) {
-      boofun <- function(tsb) {
+      boofun.pl <- function(tsb) {
         npplreg(
           txdat = tsb[, seq_len(ncol(xdat)), drop = FALSE],
           tydat = tsb[, ncol(xdat) + 1L],
@@ -2280,7 +2280,7 @@ compute.bootstrap.errors.plbandwidth =
         )$mean
       }
 
-      boot.out = tsboot(tseries = data.frame(xdat,ydat,zdat), statistic = boofun,
+      boot.out = tsboot(tseries = data.frame(xdat,ydat,zdat), statistic = boofun.pl,
         R = plot.errors.boot.num,
         l = plot.errors.boot.blocklen,
         sim = plot.errors.boot.method)

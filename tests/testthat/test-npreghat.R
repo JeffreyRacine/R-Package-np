@@ -70,3 +70,31 @@ test_that("npreghat supports lp/ll derivatives and matrix apply mode", {
     check.attributes = FALSE
   )))
 })
+
+test_that("npreghat leave.one.out is honored and predict reuses it safely", {
+  set.seed(90210)
+  n <- 80
+  x <- runif(n)
+  y <- sin(2 * pi * x) + rnorm(n, sd = 0.02)
+  tx <- data.frame(x = x)
+  bw <- npregbw(
+    xdat = tx,
+    ydat = y,
+    bws = 0.18,
+    regtype = "lc",
+    bandwidth.compute = FALSE
+  )
+
+  H.in <- npreghat(bws = bw, txdat = tx, leave.one.out = FALSE)
+  H.loo <- npreghat(bws = bw, txdat = tx, leave.one.out = TRUE)
+
+  expect_gt(max(abs(H.in - H.loo)), 1e-8)
+  expect_lt(max(abs(diag(H.loo))), 1e-12)
+  expect_error(
+    npreghat(bws = bw, txdat = tx, exdat = tx[1:10, , drop = FALSE], leave.one.out = TRUE),
+    "you may not specify 'leave.one.out = TRUE' and provide evaluation data"
+  )
+
+  hy <- predict(H.loo, y = y, output = "apply")
+  expect_equal(as.vector(hy), as.vector(H.loo %*% y), tolerance = 1e-10)
+})

@@ -55,12 +55,18 @@
   ezdat <- toFrame(ezdat)
   leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
   regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+  same.eval <- isTRUE(all.equal(tzdat, ezdat, check.attributes = FALSE))
+
+  if (leave.one.out && !same.eval) {
+    stop("leave.one.out=TRUE requires evaluation 'z' data to match training 'z' data")
+  }
 
   if (identical(regtype, "lc")) {
+    ez.arg <- if (leave.one.out) NULL else ezdat
     return(.np_kernel_weights_direct(
       bws = bws,
       txdat = tzdat,
-      exdat = ezdat,
+      exdat = ez.arg,
       leave.one.out = leave.one.out,
       bandwidth.divide = TRUE,
       kernel.pow = 1.0
@@ -68,13 +74,15 @@
   }
 
   rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
-  H <- npreghat(
+  nh.args <- list(
     bws = rbw,
     txdat = tzdat,
-    exdat = ezdat,
     output = "matrix",
     leave.one.out = leave.one.out
   )
+  if (!leave.one.out)
+    nh.args$exdat <- ezdat
+  H <- do.call(npreghat, nh.args)
   if (!is.matrix(H))
     H <- matrix(H, nrow = nrow(ezdat))
   t(H)

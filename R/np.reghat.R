@@ -198,7 +198,10 @@ npreghat <-
     PACKAGE = "np"
   )
 
-  matrix(as.double(myout[["kernel.weights"]]), nrow = tnrow, ncol = enrow)
+  kw <- matrix(as.double(myout[["kernel.weights"]]), nrow = tnrow, ncol = enrow)
+  if (leave.one.out && miss.ex && nrow(kw) == ncol(kw))
+    diag(kw) <- 0.0
+  kw
 }
 
 npreghat.formula <-
@@ -271,7 +274,8 @@ npreghat.rbandwidth <-
            degree = NULL,
            basis = NULL,
            bernstein.basis = NULL,
-           ridge = 1.0e-12,
+            ridge = 1.0e-12,
+           leave.one.out = FALSE,
            ...){
 
     output <- match.arg(output)
@@ -280,12 +284,16 @@ npreghat.rbandwidth <-
 
     txdat <- toFrame(txdat)
     no.ex <- missing(exdat)
+    leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
 
     if (!no.ex) {
       exdat <- toFrame(exdat)
       if (!(txdat %~% exdat))
         stop("'txdat' and 'exdat' are not similar data frames!")
     }
+
+    if (!no.ex && leave.one.out)
+      stop("you may not specify 'leave.one.out = TRUE' and provide evaluation data")
 
     if (length(bws$bw) != ncol(txdat))
       stop("length of bandwidth vector does not match number of columns of 'txdat'")
@@ -379,7 +387,7 @@ npreghat.rbandwidth <-
       bws = bws,
       txdat = txdat,
       exdat = if (no.ex) NULL else exdat,
-      leave.one.out = FALSE,
+      leave.one.out = leave.one.out,
       bandwidth.divide = TRUE,
       kernel.pow = 1.0
     )
@@ -457,6 +465,7 @@ npreghat.rbandwidth <-
     attr(H, "basis") <- basis
     attr(H, "bernstein.basis") <- bernstein.basis
     attr(H, "s") <- s
+    attr(H, "leave.one.out") <- leave.one.out
     attr(H, "ridge.used") <- ridge.used
     attr(H, "rows.omit") <- rows.omit
     attr(H, "call") <- match.call(expand.dots = FALSE)
@@ -484,21 +493,21 @@ predict.npreghat <-
            y = NULL,
            output = c("matrix", "apply"),
            s = attr(object, "s"),
+           leave.one.out = attr(object, "leave.one.out"),
            deriv = NULL,
            ...){
     output <- match.arg(output)
     bws <- attr(object, "bws")
     txdat <- attr(object, "txdat")
+    dots <- list(...)
 
     if (is.null(bws) || is.null(txdat))
       stop("object does not carry 'bws' and training data attributes")
 
-    exdat <- if (is.null(newdata)) attr(object, "exdat") else newdata
-
-    npreghat(
+    leave.one.out <- if (is.null(leave.one.out)) FALSE else leave.one.out
+    call.args <- list(
       bws = bws,
       txdat = txdat,
-      exdat = exdat,
       y = y,
       output = output,
       s = s,
@@ -506,8 +515,11 @@ predict.npreghat <-
       degree = attr(object, "degree"),
       basis = attr(object, "basis"),
       bernstein.basis = attr(object, "bernstein.basis"),
-      ...
+      leave.one.out = leave.one.out
     )
+    if (!is.null(newdata) || !isTRUE(leave.one.out))
+      call.args$exdat <- if (is.null(newdata)) attr(object, "exdat") else newdata
+    do.call(npreghat, c(call.args, dots))
   }
 
 print.npreghat <- function(x, ...) {

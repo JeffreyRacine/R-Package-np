@@ -133,6 +133,67 @@ test_that("npscoef and npscoefhat support ll/lp basis variants", {
   }
 })
 
+test_that("npscoefhat leave.one.out honors lc and ll paths", {
+  set.seed(97533)
+  n <- 85
+  x <- runif(n)
+  z <- runif(n)
+  y <- (0.5 + x) * cos(2 * pi * z) + rnorm(n, sd = 0.04)
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+  ex <- data.frame(x = seq(min(x), max(x), length.out = 20))
+  ez <- data.frame(z = seq(min(z), max(z), length.out = 20))
+
+  bw.lc <- npscoefbw(
+    xdat = x, zdat = z, ydat = y,
+    bws = 0.16, regtype = "lc", bandwidth.compute = FALSE
+  )
+  H0.lc <- npscoefhat(
+    bws = bw.lc, txdat = tx, tzdat = tz,
+    output = "matrix", iterate = FALSE, leave.one.out = FALSE
+  )
+  H1.lc <- npscoefhat(
+    bws = bw.lc, txdat = tx, tzdat = tz,
+    output = "matrix", iterate = FALSE, leave.one.out = TRUE
+  )
+  expect_gt(max(abs(H0.lc - H1.lc)), 1e-8)
+
+  bw.ll <- npscoefbw(
+    xdat = x, zdat = z, ydat = y,
+    bws = 0.16, regtype = "ll", bandwidth.compute = FALSE
+  )
+  H0.ll <- npscoefhat(
+    bws = bw.ll, txdat = tx, tzdat = tz,
+    output = "matrix", iterate = FALSE, leave.one.out = FALSE
+  )
+  H1.ll <- npscoefhat(
+    bws = bw.ll, txdat = tx, tzdat = tz,
+    output = "matrix", iterate = FALSE, leave.one.out = TRUE
+  )
+  expect_gt(max(abs(H0.ll - H1.ll)), 1e-8)
+  fit0.ll <- npscoef(
+    bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
+    iterate = FALSE, errors = FALSE, leave.one.out = FALSE
+  )
+  fit1.ll <- npscoef(
+    bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
+    iterate = FALSE, errors = FALSE, leave.one.out = TRUE
+  )
+  expect_gt(max(abs(fit0.ll$mean - fit1.ll$mean)), 1e-8)
+
+  expect_error(
+    npscoefhat(
+      bws = bw.ll,
+      txdat = tx, tzdat = tz,
+      exdat = ex, ezdat = ez,
+      output = "matrix",
+      iterate = FALSE,
+      leave.one.out = TRUE
+    ),
+    "requires evaluation 'z' data to match training 'z' data"
+  )
+})
+
 test_that("npplreghat reproduces npplreg fitted values and supports matrix RHS", {
   set.seed(97531)
   n <- 120
