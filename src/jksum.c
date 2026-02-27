@@ -12664,7 +12664,7 @@ double *SIGN){
     const int allow_estimation_shortcut = 1;
     #endif
 
-    if(all_large_gate && allow_estimation_shortcut && (!do_grad) && (!do_gerr) &&
+    if(all_large_gate && allow_estimation_shortcut &&
        ((int_ll == LL_LL) || (int_ll == LL_GLP))){
       double kconst = 1.0;
       int kconst_ok = 1;
@@ -12765,6 +12765,28 @@ double *SIGN){
               mean[i] = yhat;
               mean_stderr[i] = sefac;
             }
+
+            if(do_grad){
+              const int nvars = num_reg_continuous + num_reg_unordered + num_reg_ordered;
+              for(j = 0; j < num_reg_continuous; j++){
+                const double bj = BETA[j+1][0];
+                for(i = 0; i < num_obs_eval; i++){
+                  gradient[j][i] = bj;
+                  if(do_gerr){
+                    gradient_stderr[j][i] = gfac*mean_stderr[i]/
+                      ((BANDWIDTH_reg == BW_ADAP_NN) ? 1.0 :
+                       ((BANDWIDTH_reg == BW_GEN_NN) ? matrix_bandwidth[j][i] : matrix_bandwidth[j][0]));
+                  }
+                }
+              }
+
+              for(j = num_reg_continuous; j < nvars; j++){
+                for(i = 0; i < num_obs_eval; i++){
+                  gradient[j][i] = 0.0;
+                  if(do_gerr) gradient_stderr[j][i] = 0.0;
+                }
+              }
+            }
             estimation_shortcut_done = 1;
           }
         }
@@ -12780,7 +12802,7 @@ double *SIGN){
         int glp_nterms = 0;
         double **basis = NULL;
         NPGLPBasisCtx *basis_ctx = NULL;
-        double *eval_basis = NULL;
+        double *eval_basis = NULL, *eval_deriv = NULL;
         MATRIX XtX = NULL, XtXINV = NULL, XtY = NULL, BETA = NULL;
         int fast_ok = np_glp_build_terms(num_reg_continuous,
                                          vector_glp_degree_extern,
@@ -12794,10 +12816,13 @@ double *SIGN){
           XtY = mat_creat(glp_nterms, 1, UNDEFINED);
           BETA = mat_creat(glp_nterms, 1, UNDEFINED);
           eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
+          if(do_grad)
+            eval_deriv = (double *)malloc((size_t)glp_nterms*sizeof(double));
           if(use_bernstein)
             basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
           fast_ok = (basis != NULL) && (XtX != NULL) && (XtXINV != NULL) &&
             (XtY != NULL) && (BETA != NULL) && (eval_basis != NULL) &&
+            ((!do_grad) || (eval_deriv != NULL)) &&
             (!use_bernstein || (basis_ctx != NULL));
         } else {
           fast_ok = 0;
@@ -12918,6 +12943,59 @@ double *SIGN){
                 const double mv = sigma2hat*q;
                 mean_stderr[i] = (mv > 0.0 && isfinite(mv)) ? sqrt(mv) : se_default;
               }
+
+              if(do_grad){
+                const int nvars = num_reg_continuous + num_reg_unordered + num_reg_ordered;
+                for(l = 0; l < num_reg_continuous; l++){
+                  const int grad_order =
+                    (vector_glp_gradient_order_extern != NULL) ?
+                    MAX(1, vector_glp_gradient_order_extern[l]) : 1;
+                  double qg = 0.0;
+                  double dg = 0.0;
+
+                  if(use_bernstein){
+                    np_glp_fill_basis_eval_deriv(l,
+                                                 grad_order,
+                                                 num_reg_continuous,
+                                                 glp_terms,
+                                                 glp_nterms,
+                                                 matrix_X_continuous_eval,
+                                                 i,
+                                                 basis_ctx,
+                                                 eval_deriv);
+                  } else {
+                    np_glp_fill_basis_eval_deriv_raw(l,
+                                                     grad_order,
+                                                     num_reg_continuous,
+                                                     glp_terms,
+                                                     glp_nterms,
+                                                     matrix_X_continuous_eval,
+                                                     i,
+                                                     eval_deriv);
+                  }
+
+                  for(j = 0; j < glp_nterms; j++)
+                    dg += eval_deriv[j]*BETA[j][0];
+                  gradient[l][i] = dg;
+
+                  if(do_gerr){
+                    for(j = 0; j < glp_nterms; j++){
+                      const double dj = eval_deriv[j];
+                      for(int b = 0; b < glp_nterms; b++)
+                        qg += dj*XtXINV[j][b]*eval_deriv[b];
+                    }
+                    {
+                      const double gv = sigma2hat*qg;
+                      gradient_stderr[l][i] = (gv > 0.0 && isfinite(gv)) ? sqrt(gv) : 0.0;
+                    }
+                  }
+                }
+
+                for(l = num_reg_continuous; l < nvars; l++){
+                  gradient[l][i] = 0.0;
+                  if(do_gerr) gradient_stderr[l][i] = 0.0;
+                }
+              }
             }
             estimation_shortcut_done = 1;
           }
@@ -12928,6 +13006,7 @@ double *SIGN){
           free(basis_ctx);
         }
         if(eval_basis != NULL) free(eval_basis);
+        if(eval_deriv != NULL) free(eval_deriv);
         if(BETA != NULL) mat_free(BETA);
         if(XtY != NULL) mat_free(XtY);
         if(XtXINV != NULL) mat_free(XtXINV);
