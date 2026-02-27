@@ -231,6 +231,11 @@ npscoef.scbandwidth <-
     .npRmpi_require_active_slave_pool(where = "npscoef()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+    if (!identical(regtype, "lc") && errors) {
+      warning("errors=TRUE currently supports regtype='lc' for npscoef; setting errors=FALSE")
+      errors <- FALSE
+    }
 
     miss.z <- missing(tzdat)
 
@@ -379,18 +384,34 @@ npscoef.scbandwidth <-
         ezdat <- exdat
     }
 
-    ksum.args <- list(txdat = tzdat, tydat = yW, weights = yW, bws = bws, leave.one.out = leave.one.out)
-    if (!miss.ex)
-      ksum.args$exdat <- ezdat
-    tww <- do.call(npksum, ksum.args)$ksum
+    moment_from_kw <- function(kw, W.design, yresp) {
+      m <- ncol(kw)
+      p <- ncol(W.design)
+      tyw.out <- matrix(0.0, nrow = p, ncol = m)
+      tww.out <- array(0.0, dim = c(p, p, m))
+      for (ii in seq_len(m)) {
+        k <- kw[, ii]
+        yk <- yresp * k
+        tyw.out[, ii] <- as.vector(crossprod(W.design, yk))
+        tww.out[, , ii] <- crossprod(W.design, W.design * k)
+      }
+      list(tyw = tyw.out, tww = tww.out)
+    }
 
-    tyw <- tww[-1,1,,drop=FALSE]
-    dim(tyw) <- dim(tyw)[-2]
-    
-    tww <- tww[-1,-1,,drop=FALSE]
+    kw <- .npscoef_weight_matrix(
+      bws = bws,
+      tzdat = tzdat,
+      ezdat = if (miss.ex) tzdat else ezdat,
+      leave.one.out = leave.one.out
+    )
+    moments <- moment_from_kw(kw = kw, W.design = W.train, yresp = tydat)
+    tyw <- moments$tyw
+    tww <- moments$tww
 
     tnrow <- nrow(txdat)
     enrow <- (if (miss.ex) nrow(txdat) else nrow(exdat))
+    if (ncol(kw) != enrow)
+      stop("internal npscoef weight-matrix dimension mismatch")
 
     if (!miss.ex)
       W <- as.matrix(data.frame(1,exdat))
@@ -424,7 +445,9 @@ npscoef.scbandwidth <-
       }
     }
 
-    do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex)
+    if (iterate && !is.null(bws$bw.fitted) && miss.ex && !identical(regtype, "lc"))
+      warning("iterate=TRUE currently supports regtype='lc' for npscoef; using iterate=FALSE")
+    do.iterate <- (iterate && !is.null(bws$bw.fitted) && miss.ex && identical(regtype, "lc"))
     if (do.iterate){
       resid <- tydat - sapply(seq_len(enrow), function(i) { W[i,, drop = FALSE] %*% coef.mat[,i] })
 
@@ -480,44 +503,46 @@ npscoef.scbandwidth <-
     }
 
     if (errors || (residuals && miss.ex)) {
+      if (errors) {
+        tywtm <- npksum(txdat = tzdat,
+                        tydat = yW,
+                        weights = yW,
+                        bws = bws,
+                        leave.one.out = leave.one.out)$ksum
 
-      tywtm <- npksum(txdat = tzdat,
-                      tydat = yW,
-                      weights = yW,
-                      bws = bws,
-                      leave.one.out = leave.one.out)$ksum
+        tyw <- tywtm[-1,1,]
+        tm <- tywtm[-1,-1,]
 
-      tyw <- tywtm[-1,1,]
-      tm <- tywtm[-1,-1,]
+        mean.fit <- rep(maxPenalty,nrow(txdat))
+        epsilon <- 1.0/nrow(txdat)
+        ridge.tm <- double(nrow(txdat))
+        doridge <- !logical(nrow(txdat))
 
-      mean.fit <- rep(maxPenalty,nrow(txdat))
-      epsilon <- 1.0/nrow(txdat)
-      ridge.tm <- double(nrow(txdat))
-      doridge <- !logical(nrow(txdat))
+        nc <- ncol(tm[,,1])
 
-      nc <- ncol(tm[,,1])
-
-      while(any(doridge)){
-        ii <- seq_len(nrow(txdat))[doridge]
-        for (jj in ii) {
-          doridge[jj] <- FALSE
-          ridge.val <- ridge.tm[jj]*tyw[,jj][1]/NZD(tm[,,jj][1,1])
-          beta.jj <- tryCatch(
-            solve(tm[,,jj] + diag(rep(ridge.tm[jj], nc)),
-                  tyw[,jj] + c(ridge.val, rep(0, nc - 1))),
-            error = function(e) e
-          )
-          if (inherits(beta.jj, "error")) {
-            ridge.tm[jj] <- ridge.tm[jj] + epsilon
-            doridge[jj] <- TRUE
-            beta.jj <- rep(maxPenalty, nc)
+        while(any(doridge)){
+          ii <- seq_len(nrow(txdat))[doridge]
+          for (jj in ii) {
+            doridge[jj] <- FALSE
+            ridge.val <- ridge.tm[jj]*tyw[,jj][1]/NZD(tm[,,jj][1,1])
+            beta.jj <- tryCatch(
+              solve(tm[,,jj] + diag(rep(ridge.tm[jj], nc)),
+                    tyw[,jj] + c(ridge.val, rep(0, nc - 1))),
+              error = function(e) e
+            )
+            if (inherits(beta.jj, "error")) {
+              ridge.tm[jj] <- ridge.tm[jj] + epsilon
+              doridge[jj] <- TRUE
+              beta.jj <- rep(maxPenalty, nc)
+            }
+            mean.fit[jj] <- W.train[jj,, drop = FALSE] %*% beta.jj
           }
-          mean.fit[jj] <- W.train[jj,, drop = FALSE] %*% beta.jj
         }
+
+        u2.W <- (resid <- tydat - mean.fit)^2
+      } else if (residuals && miss.ex) {
+        resid <- tydat - mean
       }
-
-      u2.W <- (resid <- tydat - mean.fit)^2
-
     }
 
     if(errors){
