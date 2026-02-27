@@ -68,6 +68,8 @@ test_that("direct kernel-weight helper matches npksum.default leave-one-out", {
     return.kernel.weights = TRUE,
     bandwidth.divide = TRUE
   )$kw
+  if (nrow(kw.ref) == ncol(kw.ref))
+    diag(kw.ref) <- 0
 
   expect_equal(kw.direct, kw.ref, tolerance = 1e-12)
 })
