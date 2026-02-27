@@ -12658,7 +12658,13 @@ double *SIGN){
       }
     }
 
-    if(all_large_gate && (!do_grad) && (!do_gerr) &&
+    #ifdef MPI2
+    const int allow_estimation_shortcut = (iNum_Processors <= 1);
+    #else
+    const int allow_estimation_shortcut = 1;
+    #endif
+
+    if(all_large_gate && allow_estimation_shortcut && (!do_grad) && (!do_gerr) &&
        ((int_ll == LL_LL) || (int_ll == LL_GLP))){
       double kconst = 1.0;
       int kconst_ok = 1;
