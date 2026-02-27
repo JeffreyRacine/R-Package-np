@@ -89,7 +89,26 @@ residuals.smoothcoefficient <- function(object, ...) {
 }
 se.smoothcoefficient <- function(x){ x$merr }
 predict.smoothcoefficient <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npscoef, c(list(bws = object$bws), list(...)))
+  dots <- list(...)
+  has.formula.route <- !is.null(object$bws$formula)
+
+  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+    nd <- toFrame(dots$newdata)
+    if (!is.null(object$bws$znames)) {
+      need <- c(object$bws$xnames, object$bws$znames)
+      if (!all(need %in% names(nd)))
+        stop("'newdata' must include columns: ", paste(need, collapse = ", "))
+      dots$exdat <- nd[, object$bws$xnames, drop = FALSE]
+      dots$ezdat <- nd[, object$bws$znames, drop = FALSE]
+    } else {
+      if (!all(object$bws$xnames %in% names(nd)))
+        stop("'newdata' must include columns: ", paste(object$bws$xnames, collapse = ", "))
+      dots$exdat <- nd[, object$bws$xnames, drop = FALSE]
+    }
+    dots$newdata <- NULL
+  }
+
+  tr <- do.call(npscoef, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))
