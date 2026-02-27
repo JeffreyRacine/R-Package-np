@@ -103,6 +103,10 @@ mpi.universe.size <- function(){
 	out
 }
 
+mpi.get.version <- function(){
+    .Call("mpi_get_version", PACKAGE = "npRmpi")
+}
+
 mpi.get.processor.name <- function(short=TRUE){
     name <- .Call("mpi_get_processor_name",PACKAGE = "npRmpi")
     if (short)

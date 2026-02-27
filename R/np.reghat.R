@@ -167,7 +167,7 @@ npreghat.rbandwidth <-
         on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
         on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
         if (NOEX) {
-          npRmpi:::npreghat.rbandwidth(
+          get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
             bws = BWS,
             txdat = TXDAT,
             y = YDAT,
@@ -180,7 +180,7 @@ npreghat.rbandwidth <-
             ridge = RIDGE
           )
         } else {
-          npRmpi:::npreghat.rbandwidth(
+          get("npreghat.rbandwidth", envir = asNamespace("npRmpi"), inherits = FALSE)(
             bws = BWS,
             txdat = TXDAT,
             exdat = EXDAT,

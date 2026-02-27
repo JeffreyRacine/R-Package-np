@@ -15,6 +15,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 1. `npRmpi` must be self-supporting at runtime: no runtime `np::` bridge calls in estimator/plot/bootstrap/helper execution paths.
 2. When MPI mode is selected for `npRmpi`, execution must not silently fall back to serial code paths.
 3. Functional/interface compatibility with `np` remains required despite runtime independence.
+4. External package `Rmpi` must not be required for `npRmpi` runtime or test helper routing; MPI functionality must resolve through embedded `npRmpi` wrappers.
 
 ## Gate Snapshot (2026-02-23)
 - [x] R-layer `.C(` callsite retirement complete (`0`).
@@ -68,6 +69,31 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
    - bounded convolution/native completion remains in future backlog and is not required for this tranche closure.
 3. Recommended continuing gate:
    - keep session/attach/profile routing contracts plus issue-note repro sweeps in the checkpoint cadence.
+
+## External Rmpi Decoupling Checkpoint (2026-02-27)
+Completed in `np-npRmpi`:
+1. Removed `Rmpi` from `Suggests` in `DESCRIPTION` to enforce package-level independence from external `Rmpi`.
+2. Removed external `Rmpi` namespace/version probes from `npRmpi.session.info()`; session info now uses:
+   - embedded backend lineage option (`npRmpi.embedded.backend.version`), and
+   - internal `mpi.get.version()` for runtime MPI API version.
+3. Added internal MPI version wrapper:
+   - `R/Rmpi.R`: `mpi.get.version()`
+   - `src/Rmpi.c`: `mpi_get_version`
+   - `man/mpi.get.version.Rd`
+   - `NAMESPACE` export for `mpi.get.version`
+4. Tightened coexistence rule:
+   - `npRmpi.init()` now hard-stops when `package:Rmpi` is attached (no bypass option path).
+5. Removed test-helper dependency on external `Rmpi` namespace checks:
+   - `tests/testthat/helper-mpi.R` now gates only on `npRmpi` MPI initialization/pool state.
+6. Validation:
+   - install:
+     - `/tmp/nprmpi_install_strict_20260227_064942.log`
+   - runtime smoke:
+     - `/tmp/nprmpi_strict_runtime_smoke_20260227_065012.out` (`STRICT_RUNTIME_OK`)
+   - targeted arg-contract tests:
+     - `/tmp/nprmpi_strict_session_contract_20260227_065012.log` (`FAIL 0`)
+7. Follow-up expected:
+   - removing `Rmpi` from `Suggests` may surface Rd xref NOTES for `\link[Rmpi]{...}` references; these are handled in documentation cleanup tranches.
 
 ## Native Guard + Harness Timeout Checkpoint (2026-02-24)
 Completed in `np-npRmpi`:

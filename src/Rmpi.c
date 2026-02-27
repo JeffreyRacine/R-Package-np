@@ -128,6 +128,23 @@ SEXP mpi_finalize(void){
 	return AsInt(1);
 }
 
+SEXP mpi_get_version(void){
+	int major = 0;
+	int minor = 0;
+	SEXP out;
+	SEXP out_names;
+	MPI_Get_version(&major, &minor);
+	PROTECT(out = allocVector(INTSXP, 2));
+	INTEGER(out)[0] = major;
+	INTEGER(out)[1] = minor;
+	PROTECT(out_names = allocVector(STRSXP, 2));
+	SET_STRING_ELT(out_names, 0, mkChar("major"));
+	SET_STRING_ELT(out_names, 1, mkChar("minor"));
+	setAttrib(out, R_NamesSymbol, out_names);
+	UNPROTECT(2);
+	return out;
+}
+
 SEXP mpi_get_processor_name (void){
 	int resultlen;
 	char *name;

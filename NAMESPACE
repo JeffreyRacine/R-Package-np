@@ -29,6 +29,7 @@ export(b.star
        ,mpi.comm.free
        ,mpi.comm.rank
        ,mpi.comm.size
+       ,mpi.get.version
        ,mpi.get.processor.name
        ,mpi.hostinfo
        ,mpi.quit

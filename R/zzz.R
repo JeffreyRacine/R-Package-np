@@ -1,3 +1,5 @@
+.npRmpi_embedded_backend_version <- "0.7-3.3"
+
 .npRmpi_try_dynload <- function(lib, pkg) {
   dll <- paste0(pkg, .Platform$dynlib.ext)
   candidates <- unique(c(
@@ -20,7 +22,18 @@
 }
 
 .onAttach <- function (lib, pkg) {
-		packageStartupMessage("Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-1) + Rmpi 0.7-3.3\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]", domain = NULL,  appendLF = TRUE)
+		packageStartupMessage(
+      paste0(
+        "Parallel Nonparametric Kernel Methods for Mixed Datatypes (version 0.70-1)",
+        " + embedded Rmpi backend ",
+        .npRmpi_embedded_backend_version,
+        "\n[vignette(\"np_faq\",package=\"npRmpi\") provides answers to frequently asked questions]",
+        "\n[vignette(\"npRmpi\",package=\"npRmpi\") an overview]",
+        "\n[vignette(\"entropy_np\",package=\"npRmpi\") an overview of entropy-based methods]"
+      ),
+      domain = NULL,
+      appendLF = TRUE
+    )
     if (isTRUE(getOption("npRmpi.conflicts.warn", TRUE)) &&
         ("package:np" %in% search()) &&
         !isTRUE(getOption("npRmpi.conflicts.warned", FALSE))) {
@@ -57,7 +70,7 @@
     options(npRmpi.reuse.slaves = TRUE)
   }
 
-  if (nzchar(Sys.getenv("NP_RMPI_SKIP_INIT"))) {
+	if (nzchar(Sys.getenv("NP_RMPI_SKIP_INIT"))) {
     options(npRmpi.mpi.initialized = FALSE)
     if (is.null(getOption("np.messages")))
       options(np.messages = TRUE)
@@ -84,8 +97,10 @@
       options(npRmpi.conflicts.warn = TRUE)
     if (is.null(getOption("npRmpi.conflicts.warned")))
       options(npRmpi.conflicts.warned = FALSE)
-    if (is.null(getOption("npRmpi.conflicts.warned.rmpi")))
-      options(npRmpi.conflicts.warned.rmpi = FALSE)
+	    if (is.null(getOption("npRmpi.conflicts.warned.rmpi")))
+	      options(npRmpi.conflicts.warned.rmpi = FALSE)
+    if (is.null(getOption("npRmpi.embedded.backend.version")))
+      options(npRmpi.embedded.backend.version = .npRmpi_embedded_backend_version)
 
     setHook(packageEvent("np", "attach"),
             function(...) tryCatch(get(".npRmpi_warn_pkg_conflict_once",
@@ -94,16 +109,8 @@
                                        inherits = FALSE)(),
                                    error = function(e) invisible(e)),
             action = "append")
-    setHook(packageEvent("Rmpi", "attach"),
-            function(...) tryCatch(get(".npRmpi_warn_rmpi_conflict_once",
-                                       envir = asNamespace("npRmpi"),
-                                       mode = "function",
-                                       inherits = FALSE)(),
-                                   error = function(e) invisible(e)),
-            action = "append")
-
-    return(invisible())
-  }
+	    return(invisible())
+	  }
 
   if(.Call("mpidist",PACKAGE="npRmpi") == 2){
     auto.lamboot <- isTRUE(getOption("npRmpi.auto.lamboot", FALSE)) ||
@@ -146,16 +153,11 @@
     options(npRmpi.conflicts.warned = FALSE)
   if (is.null(getOption("npRmpi.conflicts.warned.rmpi")))
     options(npRmpi.conflicts.warned.rmpi = FALSE)
+  if (is.null(getOption("npRmpi.embedded.backend.version")))
+    options(npRmpi.embedded.backend.version = .npRmpi_embedded_backend_version)
 
   setHook(packageEvent("np", "attach"),
           function(...) tryCatch(get(".npRmpi_warn_pkg_conflict_once",
-                                     envir = asNamespace("npRmpi"),
-                                     mode = "function",
-                                     inherits = FALSE)(),
-                                 error = function(e) invisible(e)),
-          action = "append")
-  setHook(packageEvent("Rmpi", "attach"),
-          function(...) tryCatch(get(".npRmpi_warn_rmpi_conflict_once",
                                      envir = asNamespace("npRmpi"),
                                      mode = "function",
                                      inherits = FALSE)(),

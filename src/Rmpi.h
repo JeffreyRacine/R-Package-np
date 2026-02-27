@@ -34,6 +34,7 @@ struct Dblint {
 /* from Rmpi.c */
 SEXP mpi_initialize(void);
 SEXP mpi_finalize(void);
+SEXP mpi_get_version(void);
 SEXP mpi_get_processor_name(void);
 SEXP mpi_universe_size(void);
 SEXP mpi_any_source(void);

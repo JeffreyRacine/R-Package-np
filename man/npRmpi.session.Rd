@@ -136,9 +136,7 @@ on the master process.
 
 For stability, avoid attaching \pkg{Rmpi} directly before calling
 \code{npRmpi.init()}. If \pkg{Rmpi} is attached, \code{npRmpi.init()}
-fails fast with an actionable error message by default. Advanced users may
-explicitly bypass this guard with
-\code{options(npRmpi.allow.attached.Rmpi=TRUE)}.
+fails fast with an actionable error message.
 
 \code{npRmpi.session.info()} prints and returns a list of useful version,
 platform, and MPI/communicator details to aid reproducibility and bug

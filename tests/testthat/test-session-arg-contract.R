@@ -1,8 +1,4 @@
 test_that("npRmpi.init validates scalar control arguments before MPI calls", {
-  old_allow <- getOption("npRmpi.allow.attached.Rmpi")
-  options(npRmpi.allow.attached.Rmpi = TRUE)
-  on.exit(options(npRmpi.allow.attached.Rmpi = old_allow), add = TRUE)
-
   expect_error(npRmpi.init(nslaves = 0, mode = "spawn"), "'nslaves' must be a positive integer")
   expect_error(npRmpi.init(comm = 0, mode = "spawn"), "'comm' must be a positive integer")
   expect_error(npRmpi.init(autodispatch = NA, mode = "spawn"), "'autodispatch' must be TRUE or FALSE")

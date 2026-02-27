@@ -4,7 +4,7 @@
 \title{Exit MPI Environment }
 \description{
 \code{mpi.exit} terminates MPI execution environment and detaches the 
-library Rmpi. After that, you can still work on R.
+package \code{npRmpi}. After that, you can still work in R.
 
 \code{mpi.quit} terminates MPI execution environment and quits R.
 }
@@ -20,9 +20,10 @@ mpi.quit(save = "no")
 }
 \details{
   Normally, MPI finalization is used to clean all MPI states.
-  However, it will not detach the library Rmpi. To be more safe leaving MPI,  
+  However, it will not detach the loaded \code{npRmpi} package. To be safer when leaving MPI,
   \code{mpi.exit} not only calls \code{mpi.finalize} but also detaches the 
-  library Rmpi. This will make reloading of the library Rmpi impossible.
+  \code{npRmpi} package. This will make reloading \code{npRmpi} impossible
+  in the same R session.
 
  If leaving MPI and R altogether, one simply uses \code{mpi.quit}. 
 } 

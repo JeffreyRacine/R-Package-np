@@ -62,11 +62,9 @@ npRmpi.init <- function(...,
                          nonblock = TRUE,
                          sleep = 0.1,
                          quiet = FALSE) {
-  if ("package:Rmpi" %in% search() &&
-      !isTRUE(getOption("npRmpi.allow.attached.Rmpi", FALSE))) {
+  if ("package:Rmpi" %in% search()) {
     stop(
-      "package 'Rmpi' is attached. Detach it and use npRmpi APIs directly, ",
-      "or set options(npRmpi.allow.attached.Rmpi=TRUE) to bypass this guard."
+      "package 'Rmpi' is attached. Detach it and use npRmpi APIs directly."
     )
   }
 
@@ -183,17 +181,11 @@ npRmpi.quit <- function(force = FALSE,
 
 npRmpi.session.info <- function(comm=1){
   np_ver <- .npRmpi_safe(utils::packageVersion("npRmpi"), fallback = NA)
-  rmpi_ver <- .npRmpi_safe(utils::packageVersion("Rmpi"), fallback = NA)
+  rmpi_ver <- getOption("npRmpi.embedded.backend.version", NA_character_)
   reuse <- isTRUE(getOption("npRmpi.reuse.slaves", FALSE))
   env_no_reuse <- Sys.getenv("NP_RMPI_NO_REUSE_SLAVES", unset="")
 
-  mpi_ver <- .npRmpi_safe({
-    if (!requireNamespace("Rmpi", quietly = TRUE))
-      return(NA)
-    rmpi_ns <- asNamespace("Rmpi")
-    mpi_get_version <- get0("mpi.get.version", envir = rmpi_ns, mode = "function", inherits = FALSE)
-    if (is.function(mpi_get_version)) mpi_get_version() else NA
-  }, fallback = NA)
+  mpi_ver <- .npRmpi_safe(mpi.get.version(), fallback = NA)
   mpi_initialized <- isTRUE(getOption("npRmpi.mpi.initialized", FALSE))
   if (mpi_initialized) {
     comm_size <- .npRmpi_safe_int(mpi.comm.size(comm))
@@ -207,7 +199,7 @@ npRmpi.session.info <- function(comm=1){
 
   info <- list(
     npRmpi = if (is.na(np_ver)[1L]) NA_character_ else as.character(np_ver),
-    Rmpi = if (is.na(rmpi_ver)[1L]) NA_character_ else as.character(rmpi_ver),
+    Rmpi = if (is.na(rmpi_ver)[1L]) NA_character_ else as.character(rmpi_ver)[1L],
     platform = R.version$platform,
     sysname = Sys.info()[["sysname"]],
     release = Sys.info()[["release"]],
@@ -229,7 +221,7 @@ npRmpi.session.info <- function(comm=1){
   cat("  comm  :", info$comm, "rank", info$comm_rank, "of", info$comm_size, "(nslaves=", info$nslaves, ")\n", sep=" ")
   if (!is.na(info$processor))
     cat("  host  :", info$processor, "\n")
-  if (!is.na(info$mpi_version))
+  if (!all(is.na(info$mpi_version)))
     cat("  mpi   :", paste(info$mpi_version, collapse=" "), "\n")
 
   invisible(info)
