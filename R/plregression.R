@@ -104,7 +104,20 @@ residuals.plregression <- function(object, ...) {
  if(object$residuals) { return(object$resid) } else { return(npplreg(bws = object$bw, residuals =TRUE)$resid) } 
 }
 predict.plregression <- function(object, se.fit = FALSE, ...) {
-  tr <- do.call(npplreg, c(list(bws = object$bw), list(...)))
+  dots <- list(...)
+  has.formula.route <- !is.null(object$bw$formula)
+
+  if (!has.formula.route && is.null(dots$exdat) && !is.null(dots$newdata)) {
+    nd <- toFrame(dots$newdata)
+    need <- c(object$bw$xnames, object$bw$znames)
+    if (!all(need %in% names(nd)))
+      stop("'newdata' must include columns: ", paste(need, collapse = ", "))
+    dots$exdat <- nd[, object$bw$xnames, drop = FALSE]
+    dots$ezdat <- nd[, object$bw$znames, drop = FALSE]
+    dots$newdata <- NULL
+  }
+
+  tr <- do.call(npplreg, c(list(bws = object$bw), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
                 df = tr$nobs, residual.scale = tr$MSE))

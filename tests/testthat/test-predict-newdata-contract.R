@@ -107,3 +107,58 @@ test_that("predict aliases newdata to exdat/eydat for default npcdens/npcdist", 
     tolerance = 1e-12
   )
 })
+
+test_that("predict aliases newdata to exdat/ezdat for default npscoef/npplreg", {
+  set.seed(20260227)
+  n <- 80
+  x <- runif(n)
+  z <- runif(n)
+  y <- sin(2 * pi * x) + 1.5 * z + rnorm(n, sd = 0.05)
+  nd <- data.frame(x = c(0.2, 0.5, 0.8), z = c(0.1, 0.4, 0.9))
+
+  bw.sc <- npscoefbw(
+    xdat = data.frame(x = x),
+    ydat = y,
+    zdat = data.frame(z = z),
+    bws = 0.25,
+    bandwidth.compute = FALSE
+  )
+  fit.sc <- npscoef(
+    bws = bw.sc,
+    txdat = data.frame(x = x),
+    tydat = y,
+    tzdat = data.frame(z = z)
+  )
+  expect_equal(
+    as.numeric(predict(fit.sc, newdata = nd)),
+    as.numeric(predict(fit.sc, exdat = nd["x"], ezdat = nd["z"])),
+    tolerance = 1e-12
+  )
+  expect_error(
+    predict(fit.sc, newdata = data.frame(x = nd$x)),
+    "must include columns"
+  )
+
+  bw.pl <- npplregbw(
+    xdat = data.frame(z = z),
+    ydat = y,
+    zdat = data.frame(x = x),
+    bws = matrix(c(0.25, 0.25), nrow = 2),
+    bandwidth.compute = FALSE
+  )
+  fit.pl <- npplreg(
+    bws = bw.pl,
+    txdat = data.frame(z = z),
+    tydat = y,
+    tzdat = data.frame(x = x)
+  )
+  expect_equal(
+    as.numeric(predict(fit.pl, newdata = nd)),
+    as.numeric(predict(fit.pl, exdat = nd["z"], ezdat = nd["x"])),
+    tolerance = 1e-12
+  )
+  expect_error(
+    predict(fit.pl, newdata = data.frame(x = nd$x)),
+    "must include columns"
+  )
+})
