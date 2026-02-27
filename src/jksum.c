@@ -12518,6 +12518,13 @@ double *SIGN){
   double ** matrix_bandwidth = NULL;
   double ** matrix_bandwidth_deriv = NULL;
   int * operator = NULL;
+  NP_GateOverrideCtx gate_ctx_local;
+  int gate_override_active = 0;
+  int *ov_cont_ok = NULL, *ov_disc_uno_ok = NULL, *ov_disc_ord_ok = NULL;
+  double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
+  double *ov_disc_uno_const = NULL, *ov_disc_ord_const = NULL;
+  int ov_cont_from_cache = 0;
+  int estimation_shortcut_done = 0;
 
   operator = (int *)malloc(sizeof(int)*(num_reg_continuous+num_reg_unordered+num_reg_ordered));
 
@@ -12534,6 +12541,12 @@ double *SIGN){
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
+  np_gate_ctx_clear(&gate_ctx_local);
+  #ifdef MPI2
+  const NP_GateOverrideCtx * const est_gate_ctx_ptr = NULL;
+  #else
+  const NP_GateOverrideCtx * const est_gate_ctx_ptr = &gate_ctx_local;
+  #endif
 
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
@@ -12653,6 +12666,447 @@ double *SIGN){
     }
   }
 
+  if((num_reg_continuous + num_reg_unordered + num_reg_ordered) > 0){
+    int ok_all = 1;
+
+    if(num_reg_continuous > 0){
+      const double rel_tol = np_cont_largeh_rel_tol();
+      if(np_cont_largeh_cache_get_or_build(num_obs_train,
+                                           num_obs_eval,
+                                           num_reg_continuous,
+                                           kernel_c,
+                                           matrix_X_continuous_train,
+                                           matrix_X_continuous_eval,
+                                           rel_tol,
+                                           &ov_cont_ok,
+                                           &ov_cont_hmin,
+                                           &ov_cont_k0)){
+        ov_cont_from_cache = 1;
+      } else {
+        ov_cont_ok = (int *)calloc((size_t)num_reg_continuous, sizeof(int));
+        ov_cont_hmin = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+        ov_cont_k0 = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+        ok_all = (ov_cont_ok != NULL) && (ov_cont_hmin != NULL) && (ov_cont_k0 != NULL);
+        if(ok_all){
+          for(i = 0; i < num_reg_continuous; i++){
+            const int kern = kernel_c[i];
+            double xmin = DBL_MAX, xmax = -DBL_MAX;
+            ov_cont_ok[i] = 0; ov_cont_hmin[i] = DBL_MAX; ov_cont_k0[i] = 0.0;
+            if(!np_cont_largeh_kernel_supported(kern)) continue;
+            for(j = 0; j < num_obs_train; j++){
+              const double v = matrix_X_continuous_train[i][j];
+              if(!isfinite(v)) continue;
+              xmin = MIN(xmin, v); xmax = MAX(xmax, v);
+            }
+            if(xmax >= xmin){
+              const double utol = np_cont_largeh_utol(kern, rel_tol);
+              if(utol > 0.0 && isfinite(utol)){
+                ov_cont_ok[i] = 1;
+                ov_cont_hmin[i] = (xmax - xmin)/utol;
+                ov_cont_k0[i] = np_cont_largeh_k0(kern);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if(ok_all && num_reg_unordered > 0){
+      ov_disc_uno_ok = (int *)calloc((size_t)num_reg_unordered, sizeof(int));
+      ov_disc_uno_const = (double *)malloc((size_t)num_reg_unordered*sizeof(double));
+      ok_all = (ov_disc_uno_ok != NULL) && (ov_disc_uno_const != NULL);
+      if(ok_all){
+        double (* const ukf[])(int, double, int) = {
+          np_uaa, np_unli_racine, np_econvol_uaa, np_econvol_unli_racine,
+          np_score_uaa, np_score_unli_racine
+        };
+        const int nuk = (int)(sizeof(ukf)/sizeof(ukf[0]));
+        for(i = 0; i < num_reg_unordered; i++){
+          const int ku = kernel_u[i];
+          const int ncat = (num_categories != NULL) ? num_categories[i] : 0;
+          const double lam = lambda[i];
+          ov_disc_uno_ok[i] = 0; ov_disc_uno_const[i] = 0.0;
+          if(ku < 0 || ku >= nuk) continue;
+          if(!np_disc_near_upper(ku, lam, ncat)) continue;
+          {
+            const double ks = ukf[ku](1, lam, ncat);
+            const double kd = ukf[ku](0, lam, ncat);
+            if(np_disc_near_const_kernel(ks, kd)){
+              ov_disc_uno_ok[i] = 1;
+              ov_disc_uno_const[i] = 0.5*(ks + kd);
+            }
+          }
+        }
+      }
+    }
+
+    if(ok_all && num_reg_ordered > 0){
+      ov_disc_ord_ok = (int *)calloc((size_t)num_reg_ordered, sizeof(int));
+      ov_disc_ord_const = (double *)malloc((size_t)num_reg_ordered*sizeof(double));
+      ok_all = (ov_disc_ord_ok != NULL) && (ov_disc_ord_const != NULL);
+      if(ok_all){
+        double (* const okf[])(double, double, double, double, double) = {
+          np_owang_van_ryzin, np_oli_racine, np_onli_racine, np_oracine_li_yan,
+          np_econvol_owang_van_ryzin, np_onull, np_econvol_onli_racine, np_econvol_oracine_li_yan,
+          np_score_owang_van_ryzin, np_score_oli_racine, np_score_onli_racine, np_score_oracine_li_yan,
+          np_cdf_owang_van_ryzin, np_cdf_oli_racine, np_cdf_onli_racine, np_cdf_oracine_li_yan
+        };
+        const int nok = (int)(sizeof(okf)/sizeof(okf[0]));
+        for(i = 0; i < num_reg_ordered; i++){
+          const int oi = i + num_reg_unordered;
+          const int ko = kernel_o[i];
+          const int ncat = (num_categories != NULL) ? num_categories[oi] : 0;
+          const double lam = lambda[oi];
+          ov_disc_ord_ok[i] = 0; ov_disc_ord_const[i] = 0.0;
+          if(ko < 0 || ko >= nok) continue;
+          if(ncat <= 0 || matrix_categorical_vals == NULL) continue;
+          if(!np_disc_ordered_near_upper(ko, lam)) continue;
+          {
+            const double cl = matrix_categorical_vals[oi][0];
+            const double ch = matrix_categorical_vals[oi][ncat - 1];
+            const double k0 = okf[ko](cl, cl, lam, cl, ch);
+            const double k1 = okf[ko](cl, ch, lam, cl, ch);
+            if(np_disc_near_const_kernel(k0, k1)){
+              ov_disc_ord_ok[i] = 1;
+              ov_disc_ord_const[i] = 0.5*(k0 + k1);
+            }
+          }
+        }
+      }
+    }
+
+    if(ok_all){
+      np_gate_ctx_set(&gate_ctx_local,
+                      num_reg_continuous,
+                      num_reg_unordered,
+                      num_reg_ordered,
+                      kernel_c,
+                      kernel_u,
+                      kernel_o,
+                      operator,
+                      ov_cont_ok,
+                      ov_cont_hmin,
+                      ov_cont_k0,
+                      ov_disc_uno_ok,
+                      ov_disc_uno_const,
+                      ov_disc_ord_ok,
+                      ov_disc_ord_const);
+      gate_override_active = 1;
+    }
+  }
+
+  {
+    int all_large_gate = (BANDWIDTH_reg == BW_FIXED) && gate_override_active;
+    if(all_large_gate){
+      for(i = 0; i < num_reg_continuous; i++){
+        const double h = matrix_bandwidth[i][0];
+        if((ov_cont_ok == NULL) || (!ov_cont_ok[i]) || (!isfinite(h)) ||
+           (fabs(h) < ov_cont_hmin[i])){
+          all_large_gate = 0;
+          break;
+        }
+      }
+    }
+    if(all_large_gate){
+      for(i = 0; i < num_reg_unordered; i++){
+        if((ov_disc_uno_ok == NULL) || (!ov_disc_uno_ok[i])){
+          all_large_gate = 0;
+          break;
+        }
+      }
+    }
+    if(all_large_gate){
+      for(i = 0; i < num_reg_ordered; i++){
+        if((ov_disc_ord_ok == NULL) || (!ov_disc_ord_ok[i])){
+          all_large_gate = 0;
+          break;
+        }
+      }
+    }
+
+    #ifdef MPI2
+    const int allow_estimation_shortcut = (iNum_Processors <= 1);
+    #else
+    const int allow_estimation_shortcut = 1;
+    #endif
+
+    if(all_large_gate && allow_estimation_shortcut && (!do_grad) && (!do_gerr) &&
+       ((int_ll == LL_LL) || (int_ll == LL_GLP))){
+      double kconst = 1.0;
+      int kconst_ok = 1;
+      const double ridge_eps = 1.0/(double)MAX(1, num_obs_train);
+      double sigma2hat = 0.0;
+      const double ymean = meand(num_obs_train, vector_Y);
+
+      for(i = 0; i < num_obs_train; i++){
+        const double dy = vector_Y[i] - ymean;
+        sigma2hat += dy*dy;
+      }
+      sigma2hat /= (double)MAX(1, num_obs_train);
+
+      for(i = 0; i < num_reg_continuous; i++){
+        const double h = matrix_bandwidth[i][0];
+        if(!isfinite(h) || (h == 0.0)){
+          kconst_ok = 0;
+          break;
+        }
+        kconst *= ov_cont_k0[i]/h;
+      }
+      if(kconst_ok){
+        for(i = 0; i < num_reg_unordered; i++)
+          kconst *= ov_disc_uno_const[i];
+      }
+      if(kconst_ok){
+        for(i = 0; i < num_reg_ordered; i++)
+          kconst *= ov_disc_ord_const[i];
+      }
+      if(!isfinite(kconst) || (kconst <= 0.0))
+        kconst_ok = 0;
+
+      if(kconst_ok && int_ll == LL_LL){
+        const int k = num_reg_continuous + 1;
+        MATRIX XtX = mat_creat(k, k, UNDEFINED);
+        MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
+        MATRIX XtY = mat_creat(k, 1, UNDEFINED);
+        MATRIX BETA = mat_creat(k, 1, UNDEFINED);
+        int fast_ok = (XtX != NULL) && (XtXINV != NULL) && (XtY != NULL) && (BETA != NULL);
+
+        if(fast_ok){
+          int ridge_it = 0;
+          const double sk = ((double)num_obs_train)*kconst;
+          const double sefac = (sk*hprod > 0.0) ? sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
+
+          for(i = 0; i < k; i++){
+            XtY[i][0] = 0.0;
+            BETA[i][0] = 0.0;
+            for(j = 0; j < k; j++)
+              XtX[i][j] = 0.0;
+          }
+
+          for(i = 0; i < num_obs_train; i++){
+            const double yi = vector_Y[i];
+            XtX[0][0] += 1.0;
+            XtY[0][0] += yi;
+            for(j = 0; j < num_reg_continuous; j++){
+              const double xj = matrix_X_continuous_train[j][i];
+              const int cj = j + 1;
+              XtX[0][cj] += xj;
+              XtX[cj][0] += xj;
+              XtY[cj][0] += xj*yi;
+            }
+            for(int a = 0; a < num_reg_continuous; a++){
+              const double xa = matrix_X_continuous_train[a][i];
+              const int ca = a + 1;
+              for(int b = a; b < num_reg_continuous; b++){
+                const double xb = matrix_X_continuous_train[b][i];
+                const int cb = b + 1;
+                XtX[ca][cb] += xa*xb;
+                if(cb != ca) XtX[cb][ca] += xa*xb;
+              }
+            }
+          }
+
+          while(mat_inv(XtX, XtXINV) == NULL){
+            for(i = 0; i < k; i++)
+              XtX[i][i] += ridge_eps;
+            ridge_it++;
+            if(ridge_it > 64){
+              fast_ok = 0;
+              break;
+            }
+          }
+
+          if(fast_ok){
+            for(i = 0; i < k; i++){
+              double s = 0.0;
+              for(j = 0; j < k; j++)
+                s += XtXINV[i][j]*XtY[j][0];
+              BETA[i][0] = s;
+            }
+
+            for(i = 0; i < num_obs_eval; i++){
+              double yhat = BETA[0][0];
+              for(j = 0; j < num_reg_continuous; j++)
+                yhat += BETA[j+1][0]*matrix_X_continuous_eval[j][i];
+              mean[i] = yhat;
+              mean_stderr[i] = sefac;
+            }
+            estimation_shortcut_done = 1;
+          }
+        }
+
+        if(XtX != NULL) mat_free(XtX);
+        if(XtXINV != NULL) mat_free(XtXINV);
+        if(XtY != NULL) mat_free(XtY);
+        if(BETA != NULL) mat_free(BETA);
+      } else if(kconst_ok && int_ll == LL_GLP &&
+                (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
+        const int use_bernstein = (int_glp_bernstein_extern != 0);
+        int *glp_terms = NULL;
+        int glp_nterms = 0;
+        double **basis = NULL;
+        NPGLPBasisCtx *basis_ctx = NULL;
+        double *eval_basis = NULL;
+        MATRIX XtX = NULL, XtXINV = NULL, XtY = NULL, BETA = NULL;
+        int fast_ok = np_glp_build_terms(num_reg_continuous,
+                                         vector_glp_degree_extern,
+                                         int_glp_basis_extern,
+                                         &glp_terms,
+                                         &glp_nterms);
+        if(fast_ok && (glp_nterms > 0)){
+          basis = alloc_matd(num_obs_train, glp_nterms);
+          XtX = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
+          XtXINV = mat_creat(glp_nterms, glp_nterms, UNDEFINED);
+          XtY = mat_creat(glp_nterms, 1, UNDEFINED);
+          BETA = mat_creat(glp_nterms, 1, UNDEFINED);
+          eval_basis = (double *)malloc((size_t)glp_nterms*sizeof(double));
+          if(use_bernstein)
+            basis_ctx = (NPGLPBasisCtx *)calloc((size_t)num_reg_continuous, sizeof(NPGLPBasisCtx));
+          fast_ok = (basis != NULL) && (XtX != NULL) && (XtXINV != NULL) &&
+            (XtY != NULL) && (BETA != NULL) && (eval_basis != NULL) &&
+            (!use_bernstein || (basis_ctx != NULL));
+        } else {
+          fast_ok = 0;
+        }
+
+        if(fast_ok){
+          for(l = 0; l < num_reg_continuous; l++){
+            if(use_bernstein){
+              double xmin = matrix_X_continuous_train[l][0];
+              double xmax = matrix_X_continuous_train[l][0];
+              for(i = 1; i < num_obs_train; i++){
+                const double xi = matrix_X_continuous_train[l][i];
+                if(xi < xmin) xmin = xi;
+                if(xi > xmax) xmax = xi;
+              }
+              if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax)){
+                fast_ok = 0;
+                break;
+              }
+            }
+          }
+        }
+
+        if(fast_ok){
+          if(use_bernstein){
+            np_glp_fill_basis_train(num_reg_continuous,
+                                    glp_terms,
+                                    glp_nterms,
+                                    matrix_X_continuous_train,
+                                    num_obs_train,
+                                    basis_ctx,
+                                    basis);
+          } else {
+            np_glp_fill_basis_raw_train(num_reg_continuous,
+                                        glp_terms,
+                                        glp_nterms,
+                                        matrix_X_continuous_train,
+                                        num_obs_train,
+                                        basis);
+          }
+        }
+
+        if(fast_ok){
+          int ridge_it = 0;
+          const double sk = ((double)num_obs_train)*kconst;
+          const double se_default = (sk*hprod > 0.0) ?
+            sqrt(MAX(0.0, sigma2hat) * K_INT_KERNEL_P / (sk*hprod)) : 0.0;
+
+          for(i = 0; i < glp_nterms; i++){
+            XtY[i][0] = 0.0;
+            BETA[i][0] = 0.0;
+            for(j = 0; j < glp_nterms; j++)
+              XtX[i][j] = 0.0;
+          }
+
+          for(i = 0; i < num_obs_train; i++){
+            const double yi = vector_Y[i];
+            for(int a = 0; a < glp_nterms; a++){
+              const double za = basis[a][i];
+              XtY[a][0] += za*yi;
+              for(int b = a; b < glp_nterms; b++){
+                const double zb = basis[b][i];
+                XtX[a][b] += za*zb;
+                if(b != a) XtX[b][a] += za*zb;
+              }
+            }
+          }
+
+          while(mat_inv(XtX, XtXINV) == NULL){
+            for(i = 0; i < glp_nterms; i++)
+              XtX[i][i] += ridge_eps;
+            ridge_it++;
+            if(ridge_it > 64){
+              fast_ok = 0;
+              break;
+            }
+          }
+
+          if(fast_ok){
+            for(i = 0; i < glp_nterms; i++){
+              double s = 0.0;
+              for(j = 0; j < glp_nterms; j++)
+                s += XtXINV[i][j]*XtY[j][0];
+              BETA[i][0] = s;
+            }
+
+            for(i = 0; i < num_obs_eval; i++){
+              double yhat = 0.0;
+              double q = 0.0;
+
+              if(use_bernstein){
+                np_glp_fill_basis_eval(num_reg_continuous,
+                                       glp_terms,
+                                       glp_nterms,
+                                       matrix_X_continuous_eval,
+                                       i,
+                                       basis_ctx,
+                                       eval_basis);
+              } else {
+                np_glp_fill_basis_eval_raw(num_reg_continuous,
+                                           glp_terms,
+                                           glp_nterms,
+                                           matrix_X_continuous_eval,
+                                           i,
+                                           eval_basis);
+              }
+
+              for(j = 0; j < glp_nterms; j++)
+                yhat += eval_basis[j]*BETA[j][0];
+              for(j = 0; j < glp_nterms; j++){
+                const double zj = eval_basis[j];
+                for(int b = 0; b < glp_nterms; b++)
+                  q += zj*XtXINV[j][b]*eval_basis[b];
+              }
+
+              mean[i] = yhat;
+              {
+                const double mv = sigma2hat*q;
+                mean_stderr[i] = (mv > 0.0 && isfinite(mv)) ? sqrt(mv) : se_default;
+              }
+            }
+            estimation_shortcut_done = 1;
+          }
+        }
+
+        if(use_bernstein && (basis_ctx != NULL)){
+          for(l = 0; l < num_reg_continuous; l++) np_glp_basis_ctx_free(&basis_ctx[l]);
+          free(basis_ctx);
+        }
+        if(eval_basis != NULL) free(eval_basis);
+        if(BETA != NULL) mat_free(BETA);
+        if(XtY != NULL) mat_free(XtY);
+        if(XtXINV != NULL) mat_free(XtXINV);
+        if(XtX != NULL) mat_free(XtX);
+        if(basis != NULL) free_mat(basis, glp_nterms);
+        if(glp_terms != NULL) free(glp_terms);
+      }
+    }
+  }
+
+  if(estimation_shortcut_done)
+    goto finish_regression_estimation;
+
   // Conduct the estimation 
 
   if(int_ll == LL_LC) { // local constant
@@ -12690,7 +13144,7 @@ double *SIGN){
       lc_Y[2][ii] = vector_Y[ii]*vector_Y[ii];
     }
     
-    kernel_weighted_sum_np(kernel_c,
+    kernel_weighted_sum_np_ctx(kernel_c,
                            kernel_u,
                            kernel_o,
                            BANDWIDTH_reg,
@@ -12739,7 +13193,8 @@ double *SIGN){
                            matrix_ordered_indices, 
                            meany,
                            permy, // permutations used for gradients
-                           NULL); // do not return kernel weights
+                           NULL, // do not return kernel weights
+                           est_gate_ctx_ptr);
 
     for(int ii = 0; ii < num_obs_eval; ii++){
       const int ii3 = NCOL_Y*ii;
@@ -12923,7 +13378,7 @@ double *SIGN){
         Wcols[l] = basis[l];
       }
 
-      kernel_weighted_sum_np(kernel_c,
+      kernel_weighted_sum_np_ctx(kernel_c,
                              kernel_u,
                              kernel_o,
                              BANDWIDTH_reg,
@@ -12972,7 +13427,8 @@ double *SIGN){
                              NULL,
                              out,
                              NULL,
-                             NULL);
+                             NULL,
+                             est_gate_ctx_ptr);
 
       for(i = 0; i < glp_nterms; i++){
         /* np_outer_weighted_sum lays out result as [W x Y], row-major by W term. */
@@ -13025,7 +13481,7 @@ double *SIGN){
         Wcols[l] = basis[l];
       }
 
-      kernel_weighted_sum_np(kernel_c,
+      kernel_weighted_sum_np_ctx(kernel_c,
                              kernel_u,
                              kernel_o,
                              BANDWIDTH_reg,
@@ -13074,7 +13530,8 @@ double *SIGN){
                              NULL,
                              out2,
                              NULL,
-                             NULL);
+                             NULL,
+                             est_gate_ctx_ptr);
 
       for(i = 0; i < glp_nterms; i++){
         const int base = i*glp_nterms;
@@ -13329,7 +13786,7 @@ double *SIGN){
           for(l = 0; l < num_reg_ordered; l++)
             TORD[l][0] = matrix_X_ordered_eval[l][j+my_rank];
 
-          kernel_weighted_sum_np(kernel_c,
+          kernel_weighted_sum_np_ctx(kernel_c,
                                  kernel_u,
                                  kernel_o,
                                  BANDWIDTH_reg,
@@ -13378,7 +13835,8 @@ double *SIGN){
                                  moo,
                                  kwm+(j+my_rank)*nrcc33,  // weighted sum
                                  do_ocg ? (permy+(j+my_rank)*nrcc33*p_nvar) : NULL, // ocg
-                                 NULL); // do not return kernel weights
+                                 NULL, // do not return kernel weights
+                                 est_gate_ctx_ptr);
 
         }
         // synchro step
@@ -13406,7 +13864,7 @@ double *SIGN){
       for(l = 0; l < num_reg_ordered; l++)
         TORD[l][0] = matrix_X_ordered_eval[l][j];
 
-      kernel_weighted_sum_np(kernel_c,
+      kernel_weighted_sum_np_ctx(kernel_c,
                              kernel_u,
                              kernel_o,
                              BANDWIDTH_reg,
@@ -13455,7 +13913,8 @@ double *SIGN){
                              moo,
                              kwm+j*nrcc33,  // weighted sum
                              do_ocg ? (permy+j*nrcc33*p_nvar) : NULL, // no permutations
-                             NULL); // do not return kernel weights
+                             NULL, // do not return kernel weights
+                             est_gate_ctx_ptr);
 
 #endif
       
@@ -13623,6 +14082,7 @@ double *SIGN){
     free_tmat(matrix_bandwidth_eval);
   }
 
+finish_regression_estimation:
   // clean up hash stuff
   if(do_grad && (num_reg_ordered > 0)){
     for(l = 0; l < num_reg_ordered; l++)
@@ -13631,6 +14091,15 @@ double *SIGN){
     free(matrix_ordered_indices[0]);
     free(matrix_ordered_indices);
   }
+
+  if(gate_override_active) np_gate_ctx_clear(&gate_ctx_local);
+  if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
+  if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
+  if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
+  if(ov_disc_uno_ok != NULL) free(ov_disc_uno_ok);
+  if(ov_disc_uno_const != NULL) free(ov_disc_uno_const);
+  if(ov_disc_ord_ok != NULL) free(ov_disc_ord_ok);
+  if(ov_disc_ord_const != NULL) free(ov_disc_ord_const);
 
   free(operator);
   free(kernel_c);
