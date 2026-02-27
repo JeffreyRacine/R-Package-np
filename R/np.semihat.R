@@ -55,30 +55,41 @@
   ezdat <- toFrame(ezdat)
   leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
   regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+  same.eval <- isTRUE(all.equal(tzdat, ezdat, check.attributes = FALSE))
+
+  if (leave.one.out && !same.eval) {
+    stop("leave.one.out=TRUE requires evaluation 'z' data to match training 'z' data")
+  }
 
   if (identical(regtype, "lc")) {
-    kw.obj <- do.call(npksum, list(
+    kw.args <- list(
       txdat = tzdat,
-      exdat = ezdat,
       bws = bws,
       leave.one.out = leave.one.out,
       bandwidth.divide = TRUE,
       return.kernel.weights = TRUE
-    ))
+    )
+    if (!leave.one.out)
+      kw.args$exdat <- ezdat
+    kw.obj <- do.call(npksum, kw.args)
     kw <- kw.obj$kw
     if (!is.matrix(kw))
       kw <- matrix(kw, nrow = nrow(tzdat))
+    if (leave.one.out && nrow(kw) == ncol(kw))
+      diag(kw) <- 0.0
     return(kw)
   }
 
   rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
-  H <- npreghat(
+  nh.args <- list(
     bws = rbw,
     txdat = tzdat,
-    exdat = ezdat,
     output = "matrix",
     leave.one.out = leave.one.out
   )
+  if (!leave.one.out)
+    nh.args$exdat <- ezdat
+  H <- do.call(npreghat, nh.args)
   if (!is.matrix(H))
     H <- matrix(H, nrow = nrow(ezdat))
   t(H)

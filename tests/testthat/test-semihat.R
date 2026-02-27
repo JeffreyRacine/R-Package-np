@@ -78,6 +78,52 @@ test_that("npscoefhat reproduces npscoef fitted values and supports matrix RHS",
     tolerance = 1e-10,
     check.attributes = FALSE
   )))
+  H.loo.lc <- npscoefhat(
+    bws = bw,
+    txdat = tx,
+    tzdat = tz,
+    output = "matrix",
+    iterate = FALSE,
+    leave.one.out = TRUE
+  )
+  expect_gt(max(abs(H.train - H.loo.lc)), 1e-8)
+
+  bw.ll <- npscoefbw(
+    xdat = x, zdat = z, ydat = y,
+    bws = 0.16, regtype = "ll", bandwidth.compute = FALSE
+  )
+  H0.ll <- npscoefhat(
+    bws = bw.ll, txdat = tx, tzdat = tz,
+    output = "matrix", iterate = FALSE, leave.one.out = FALSE
+  )
+  H1.ll <- npscoefhat(
+    bws = bw.ll, txdat = tx, tzdat = tz,
+    output = "matrix", iterate = FALSE, leave.one.out = TRUE
+  )
+  expect_gt(max(abs(H0.ll - H1.ll)), 1e-8)
+  fit0.ll <- npscoef(
+    bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
+    iterate = FALSE, errors = FALSE, leave.one.out = FALSE
+  )
+  fit1.ll <- npscoef(
+    bws = bw.ll, txdat = tx, tydat = y, tzdat = tz,
+    iterate = FALSE, errors = FALSE, leave.one.out = TRUE
+  )
+  expect_gt(max(abs(fit0.ll$mean - fit1.ll$mean)), 1e-8)
+
+  ex2 <- data.frame(x = seq(min(x), max(x), length.out = 20))
+  ez2 <- data.frame(z = seq(min(z), max(z), length.out = 20))
+  expect_error(
+    npscoefhat(
+      bws = bw.ll,
+      txdat = tx, tzdat = tz,
+      exdat = ex2, ezdat = ez2,
+      output = "matrix",
+      iterate = FALSE,
+      leave.one.out = TRUE
+    ),
+    "requires evaluation 'z' data to match training 'z' data"
+  )
 })
 
 test_that("npplreghat reproduces npplreg fitted values and supports matrix RHS", {

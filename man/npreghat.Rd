@@ -26,13 +26,16 @@ npreghat(bws, ...)
   s = NULL, deriv = NULL,
   degree = NULL, basis = NULL,
   bernstein.basis = NULL,
-  ridge = 1.0e-12, ...)
+  ridge = 1.0e-12,
+  leave.one.out = FALSE, ...)
 
 \method{npreghat}{npregression}(bws, txdat, y, ...)
 
 \method{predict}{npreghat}(object, newdata = NULL, y = NULL,
   output = c("matrix", "apply"),
-  s = attr(object, "s"), deriv = NULL, ...)
+  s = attr(object, "s"),
+  leave.one.out = attr(object, "leave.one.out"),
+  deriv = NULL, ...)
 }
 \arguments{
   \item{bws}{An object of class \code{rbandwidth} or \code{npregression}.}
@@ -46,6 +49,7 @@ npreghat(bws, ...)
   \item{basis}{Local polynomial basis: \code{"glp"}, \code{"additive"}, or \code{"tensor"}.}
   \item{bernstein.basis}{Logical; use Bernstein basis for LP terms.}
   \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned.}
+  \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.}
   \item{data}{A data frame used with the formula interface.}
   \item{newdata}{Optional evaluation data for formula and predict methods.}
   \item{object}{An object returned by \code{npreghat}.}

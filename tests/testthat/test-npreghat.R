@@ -23,6 +23,16 @@ test_that("npreghat reproduces npreg fitted values for mixed-data local constant
 
   expect_s3_class(H, "npreghat")
   expect_equal(as.vector(H %*% y), as.vector(fit$mean), tolerance = 1e-8)
+
+  H.loo <- npreghat(bws = bw, txdat = tx, leave.one.out = TRUE)
+  expect_gt(max(abs(H - H.loo)), 1e-8)
+  expect_lt(max(abs(diag(H.loo))), 1e-12)
+  expect_error(
+    npreghat(bws = bw, txdat = tx, exdat = tx[1:10, , drop = FALSE], leave.one.out = TRUE),
+    "you may not specify 'leave.one.out = TRUE' and provide evaluation data"
+  )
+  hy <- predict(H.loo, y = y, output = "apply")
+  expect_equal(as.vector(hy), as.vector(H.loo %*% y), tolerance = 1e-10)
 })
 
 test_that("npreghat supports lp/ll derivatives and matrix apply mode", {

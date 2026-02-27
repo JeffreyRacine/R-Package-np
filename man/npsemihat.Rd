@@ -51,7 +51,7 @@ npscoefhat(bws,
   \item{fd.step}{Finite-difference step used for \code{npindexhat(..., s=1)}; must be a positive finite scalar.}
   \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a positive finite scalar.}
   \item{iterate}{Logical; \code{npscoefhat()} currently supports \code{iterate = FALSE} only.}
-  \item{leave.one.out}{Logical; leave-one-out kernel weights for \code{npscoefhat}.}
+  \item{leave.one.out}{Logical; leave-one-out kernel weights for \code{npscoefhat}. This currently requires evaluation \code{z} data to match training \code{z} data.}
   \item{...}{Reserved for future extensions.}
 }
 \value{
@@ -64,7 +64,9 @@ These operators are intended for fixed-\eqn{X} workflows such as one-shot wild
 bootstrap calculations where many response draws are projected through the same
 operator. The implementation is intentionally conservative: class and scalar
 argument contracts are validated explicitly, and unsupported iterative
-\code{npscoefhat()} paths fail fast.
+\code{npscoefhat()} paths fail fast. \code{npscoefhat()} inherits
+\code{regtype}/LP-basis controls from the supplied \code{scbandwidth}
+object.
 }
 \examples{
 \dontrun{

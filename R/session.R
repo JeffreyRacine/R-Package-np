@@ -62,11 +62,7 @@ npRmpi.init <- function(...,
                          nonblock = TRUE,
                          sleep = 0.1,
                          quiet = FALSE) {
-  if ("package:Rmpi" %in% search()) {
-    stop(
-      "package 'Rmpi' is attached. Detach it and use npRmpi APIs directly."
-    )
-  }
+  .npRmpi_abort_if_rmpi_attached(where = "npRmpi.init()")
 
   nslaves <- npValidatePositiveInteger(nslaves, "nslaves")
   comm <- npValidatePositiveInteger(comm, "comm")

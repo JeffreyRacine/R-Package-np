@@ -48,3 +48,25 @@ Optional explicit log path:
 Pass/fail rule:
 
 - any `FAIL:` line in the run log is a regression candidate and blocks merge until triaged.
+
+Route validation sweep (manual-broadcast + attach + profile)
+
+Run this after MPI routing/runtime changes (or before declaring 4-path pass-muster):
+
+./issue_notes/run_attach_profile_validations.sh
+
+Optional explicit output directory:
+
+./issue_notes/run_attach_profile_validations.sh /Users/jracine/Development/tmp_ll_lc_lp_alignment/nprmpi_route_validation_manual
+
+Scripts used by the runner:
+
+- `issue_notes/validate_route_manual_broadcast.R`
+- `issue_notes/validate_route_attach.R`
+- `issue_notes/validate_route_profile.R`
+
+Current status (2026-02-27):
+
+- manual-broadcast route passes in current tree.
+- attach route passes in current tree.
+- profile route remains environment-/runtime-fragile in current tree (hang on `en0`; `lo0` MPI init failure), so 4-path muster remains partial until profile is stabilized.

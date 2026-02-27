@@ -54,6 +54,15 @@
   invisible(TRUE)
 }
 
+.npRmpi_abort_if_rmpi_attached <- function(where = "this call") {
+  if (!("package:Rmpi" %in% search()))
+    return(invisible(FALSE))
+  stop(
+    sprintf("%s cannot run because package 'Rmpi' is attached. Detach 'Rmpi' and use npRmpi APIs directly.", where),
+    call. = FALSE
+  )
+}
+
 .npRmpi_bcast_cmd_expr <- function(expr, comm = 1L, caller.execute = TRUE) {
   target <- get("mpi.bcast.cmd",
                 envir = parent.frame(),
@@ -160,12 +169,14 @@
 }
 
 .npRmpi_require_active_slave_pool <- function(comm = 1L, where = "this call") {
+  .npRmpi_abort_if_rmpi_attached(where = where)
   if (.npRmpi_has_active_slave_pool(comm = comm))
     return(invisible(TRUE))
   stop(sprintf("%s requires an active MPI slave pool; call npRmpi.init(...) first", where))
 }
 
 .npRmpi_autodispatch_preflight <- function(comm = 1L) {
+  .npRmpi_abort_if_rmpi_attached(where = "npRmpi auto-dispatch")
   strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
   if (!.npRmpi_has_active_slave_pool(comm = comm)) {
     msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.init(...) first"

@@ -42,6 +42,10 @@ npscoefbw(\dots)
           backfit.maxiter,
           backfit.tol,
           bandwidth.compute = TRUE,
+          regtype,
+          basis,
+          degree,
+          bernstein.basis,
           bwmethod,
           bwscaling,
           bwtype,
@@ -156,6 +160,28 @@ npscoefbw(\dots)
     bandwidths or not. If set to \code{FALSE}, a \code{scbandwidth} object
     will be returned with bandwidths set to those specified
     in \code{bws}. Defaults to \code{TRUE}.
+  }
+
+  \item{regtype}{
+    a character string specifying local smoothing type for the \code{z}
+    surface. Options are \code{"lc"} (default), \code{"ll"}, and
+    \code{"lp"}.
+  }
+
+  \item{basis}{
+    for \code{regtype="lp"}, the polynomial basis family used for local
+    polynomial fitting. Options are \code{"glp"} (default),
+    \code{"additive"}, and \code{"tensor"}.
+  }
+
+  \item{degree}{
+    for \code{regtype="lp"}, polynomial degree specification for each
+    continuous \code{z} variable.
+  }
+
+  \item{bernstein.basis}{
+    for \code{regtype="lp"}, logical flag selecting Bernstein-basis
+    representation where supported.
   }
 
   \item{bwmethod}{
