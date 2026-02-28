@@ -38,7 +38,7 @@
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
-           plot.errors.boot.num = 399,
+           plot.errors.boot.num = 1999,
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,

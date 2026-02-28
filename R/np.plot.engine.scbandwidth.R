@@ -36,7 +36,7 @@
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
-           plot.errors.boot.num = 399,
+           plot.errors.boot.num = 1999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
@@ -282,10 +282,16 @@
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tobj$mean - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
+        terr[,1:2] <- .np_plot_asymptotic_error_from_se(
+          se = tobj$merr,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type,
+          m = nrow(x.eval)
+        )$err
+        lerr = matrix(data = tobj$mean - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tobj$mean + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
+        herr = matrix(data = tobj$mean + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
       }
@@ -495,9 +501,16 @@
         temp.mean[seq_len(xi.neval)] = extract_scoef_value(tobj)
 
         if (plot.errors){
-          if (plot.errors.method == "asymptotic")
-            temp.err[seq_len(xi.neval),1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
-          else if (plot.errors.method == "bootstrap"){
+          if (plot.errors.method == "asymptotic") {
+            asym.obj <- .np_plot_asymptotic_error_from_se(
+              se = tobj$merr,
+              alpha = plot.errors.alpha,
+              band.type = plot.errors.type,
+              m = xi.neval
+            )
+            temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+            temp.all.err <- asym.obj$all.err
+          } else if (plot.errors.method == "bootstrap"){
             boot.args <- list(
               xdat = xdat,
               ydat = ydat,
@@ -671,9 +684,16 @@
           temp.mean[seq_len(xi.neval)] = extract_scoef_value(tobj)
 
           if (plot.errors){
-            if (plot.errors.method == "asymptotic")
-              temp.err[seq_len(xi.neval),1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr
-          else if (plot.errors.method == "bootstrap"){
+            if (plot.errors.method == "asymptotic") {
+              asym.obj <- .np_plot_asymptotic_error_from_se(
+                se = tobj$merr,
+                alpha = plot.errors.alpha,
+                band.type = plot.errors.type,
+                m = xi.neval
+              )
+              temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+              temp.all.err <- asym.obj$all.err
+            } else if (plot.errors.method == "bootstrap"){
               temp.boot.raw <- compute.bootstrap.errors(
                                                     xdat = xdat,
                                                     ydat = ydat,

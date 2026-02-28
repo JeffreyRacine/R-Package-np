@@ -36,7 +36,7 @@
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
-           plot.errors.boot.num = 399,
+           plot.errors.boot.num = 1999,
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
@@ -270,12 +270,27 @@
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tcomp - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tcerr,
+        terr.obj <- .np_plot_asymptotic_error_from_se(
+          se = tcerr,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type,
+          m = nrow(tex)
+        )
+        terr[,1:2] <- terr.obj$err
+        terr.all <- terr.obj$all.err
+        center.val <- tcomp
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tcomp + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tcerr,
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
       }
 
       if(is.null(zlim)) {
@@ -566,11 +581,14 @@
           if (plot.errors){
             if (plot.errors.method == "asymptotic") {
               terr.j <- err.extract(tobj, j)
-              temp.err[seq_len(xi.neval),1:2] <- if (all(is.na(terr.j))) {
-                matrix(NA_real_, nrow = xi.neval, ncol = 2)
-              } else {
-                replicate(2, qnorm(plot.errors.alpha/2, lower.tail = FALSE) * terr.j)
-              }
+              asym.obj <- .np_plot_asymptotic_error_from_se(
+                se = terr.j,
+                alpha = plot.errors.alpha,
+                band.type = plot.errors.type,
+                m = xi.neval
+              )
+              temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+              temp.all.err <- asym.obj$all.err
             }
             else if (plot.errors.method == "bootstrap"){
               temp.boot <- compute.bootstrap.errors(
@@ -757,11 +775,14 @@
             if (plot.errors){
               if (plot.errors.method == "asymptotic") {
                 terr.j <- err.extract(tobj, j)
-                temp.err[seq_len(xi.neval),1:2] <- if (all(is.na(terr.j))) {
-                  matrix(NA_real_, nrow = xi.neval, ncol = 2)
-                } else {
-                  replicate(2, qnorm(plot.errors.alpha/2, lower.tail = FALSE) * terr.j)
-                }
+                asym.obj <- .np_plot_asymptotic_error_from_se(
+                  se = terr.j,
+                  alpha = plot.errors.alpha,
+                  band.type = plot.errors.type,
+                  m = xi.neval
+                )
+                temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+                temp.all.err <- asym.obj$all.err
               }
               else if (plot.errors.method == "bootstrap"){
                 temp.boot <- compute.bootstrap.errors(

@@ -31,7 +31,7 @@
            plot.errors.method = c("none","bootstrap","asymptotic"),
            plot.errors.boot.method = c("inid", "fixed", "geom"),
            plot.errors.boot.blocklen = NULL,
-           plot.errors.boot.num = 399,
+           plot.errors.boot.num = 1999,
            plot.errors.center = c("estimate","bias-corrected"),
            plot.errors.type = c("pmzsd","pointwise","bonferroni","simultaneous","all"),
            plot.errors.alpha = 0.05,
@@ -191,12 +191,27 @@
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tobj$dens - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
+        terr.obj <- .np_plot_asymptotic_error_from_se(
+          se = tobj$derr,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type,
+          m = nrow(x.eval)
+        )
+        terr[,1:2] <- terr.obj$err
+        terr.all <- terr.obj$all.err
+        center.val <- tobj$dens
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tobj$dens + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr,
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
       }
 
       if(is.null(zlim)) {
@@ -408,9 +423,16 @@
         temp.dens[seq_len(xi.neval)] <- tobj$dens
 
         if (plot.errors){
-          if (plot.errors.method == "asymptotic")
-            temp.err[seq_len(xi.neval),1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$derr)
-          else if (plot.errors.method == "bootstrap"){
+          if (plot.errors.method == "asymptotic") {
+            asym.obj <- .np_plot_asymptotic_error_from_se(
+              se = tobj$derr,
+              alpha = plot.errors.alpha,
+              band.type = plot.errors.type,
+              m = xi.neval
+            )
+            temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+            temp.all.err <- asym.obj$all.err
+          } else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat,
                       exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
@@ -642,4 +664,3 @@
       }
     }
   }
-
