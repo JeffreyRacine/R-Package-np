@@ -157,7 +157,7 @@ npreghat.rbandwidth <-
            ...){
 
     no.ex <- missing(exdat)
-    if (.npRmpi_autodispatch_active() &&
+    if (.npRmpi_has_active_slave_pool(comm = 1L) &&
         !.npRmpi_autodispatch_in_context() &&
         !.npRmpi_autodispatch_called_from_bcast()) {
       expr <- substitute({
