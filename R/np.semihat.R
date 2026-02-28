@@ -100,14 +100,24 @@
 
   z.train <- adjustLevels(tzdat, rbw$xdati)
   z.eval <- if (leave.one.out) z.train else adjustLevels(ezdat, rbw$xdati, allowNewCells = TRUE)
-  kw <- .np_kernel_weights_direct(
-    bws = rbw,
+  ## In npRmpi runtime, use the route-safe npksum.default path to avoid
+  ## nested/unsafe direct kernel dispatch in active session pools.
+  kw.args <- list(
     txdat = z.train,
-    exdat = if (leave.one.out) NULL else z.eval,
-    leave.one.out = leave.one.out,
+    bws = rbw,
+    return.kernel.weights = TRUE,
     bandwidth.divide = TRUE,
-    kernel.pow = 1.0
+    leave.one.out = leave.one.out
   )
+  if (!leave.one.out)
+    kw.args$exdat <- z.eval
+
+  kw.obj <- do.call(npksum.default, kw.args)
+  kw <- kw.obj$kw
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(z.train))
+  if (leave.one.out && nrow(kw) == ncol(kw))
+    diag(kw) <- 0.0
 
   ntrain <- nrow(z.train)
   neval <- ncol(kw)
@@ -129,7 +139,7 @@
   if (nrow(W.eval) != neval)
     W.eval <- matrix(W.eval, nrow = neval, byrow = FALSE)
 
-  H <- matrix(0.0, nrow = neval, ncol = ntrain)
+  H <- matrix(0.0, nrow = ntrain, ncol = neval)
   for (ii in seq_len(neval)) {
     solve.out <- .npreghat_solve_eval(
       W = W,
@@ -139,9 +149,9 @@
     )
     if (is.null(solve.out))
       stop(sprintf("failed to solve smooth-coefficient hat system at evaluation row %d", ii))
-    H[ii, ] <- kw[, ii] * drop(W %*% solve.out$v)
+    H[, ii] <- kw[, ii] * drop(W %*% solve.out$v)
   }
-  t(H)
+  H
 }
 
 npindexhat <-
