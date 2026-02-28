@@ -288,50 +288,33 @@ npscoefbw.scbandwidth <-
             if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
 
+            tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
+                          leave.one.out = TRUE)$ksum
+
             mean.loo <- rep(maxPenalty,n)
-            if (identical(regtype, "lc")) {
-              tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
-                            leave.one.out = TRUE)$ksum
+            epsilon <- 1.0/n
+            ridge <- double(n)
+            doridge <- !logical(n)
 
-              epsilon <- 1.0/n
-              ridge <- double(n)
-              doridge <- !logical(n)
+            nc <- ncol(tww[-1,-1,1])
 
-              nc <- ncol(tww[-1,-1,1])
-
-              while(any(doridge)){
-                iloo <- seq_len(n)[doridge]
-                for (ii in iloo) {
-                  doridge[ii] <- FALSE
-                  ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
-                  beta.ii <- tryCatch(
-                    solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
-                          tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
-                    error = function(e) e
-                  )
-                  if (inherits(beta.ii, "error")) {
-                    ridge[ii] <- ridge[ii] + epsilon
-                    doridge[ii] <- TRUE
-                    beta.ii <- rep(maxPenalty, nc)
-                  }
-                  mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
+            while(any(doridge)){
+              iloo <- seq_len(n)[doridge]
+              for (ii in iloo) {
+                doridge[ii] <- FALSE
+                ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
+                beta.ii <- tryCatch(
+                  solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
+                        tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
+                  error = function(e) e
+                )
+                if (inherits(beta.ii, "error")) {
+                  ridge[ii] <- ridge[ii] + epsilon
+                  doridge[ii] <- TRUE
+                  beta.ii <- rep(maxPenalty, nc)
                 }
+                mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
               }
-            } else {
-              mean.loo.try <- tryCatch(
-                npscoefhat(
-                  bws = sbw,
-                  txdat = as.data.frame(xdat),
-                  tzdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
-                  y = ydat,
-                  output = "apply",
-                  leave.one.out = TRUE,
-                  iterate = FALSE
-                ),
-                error = function(e) e
-              )
-              if (!inherits(mean.loo.try, "error"))
-                mean.loo <- as.vector(mean.loo.try)
             }
 
             cv_state$console <- printClear(cv_state$console)

@@ -295,14 +295,76 @@ npreg.rbandwidth <-
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
 
     if (isTRUE(bernstein.oos)) {
-      fit.apply <- npreghat(
-        bws = bws,
-        txdat = txdat,
-        exdat = if (no.ex) NULL else exdat,
-        y = tydat,
-        output = "apply"
+      regtype.local <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+      degree.local <- if (identical(regtype.local, "lc")) {
+        rep.int(0L, bws$ncon)
+      } else if (identical(regtype.local, "ll")) {
+        rep.int(1L, bws$ncon)
+      } else {
+        npValidateGlpDegree(regtype = "lp", degree = bws$degree, ncon = bws$ncon)
+      }
+      basis.local <- npValidateLpBasis(
+        regtype = "lp",
+        basis = if (is.null(bws$basis)) "glp" else bws$basis
       )
-      mean.fallback <- as.double(fit.apply)
+      bernstein.local <- npValidateGlpBernstein(
+        regtype = "lp",
+        bernstein.basis = isTRUE(bws$bernstein.basis)
+      )
+      con.names <- names(txdat)[which(bws$icon)]
+
+      W.base <- W.lp(
+        xdat = txdat,
+        degree = degree.local,
+        basis = basis.local,
+        bernstein.basis = bernstein.local
+      )
+
+      apply_direct <- function(s = NULL) {
+        s.local <- .npreghat_resolve_s(s = s, deriv = NULL, ncon = bws$ncon, con.names = con.names)
+        if (any(s.local > degree.local))
+          stop("requested derivative order exceeds local polynomial degree")
+        if (all(degree.local == 0L) && any(s.local > 0L))
+          stop("local-constant derivative fallback is not available")
+
+        W.eval <- W.lp(
+          xdat = txdat,
+          exdat = exdat,
+          degree = degree.local,
+          gradient.vec = if (any(s.local > 0L)) s.local else NULL,
+          basis = basis.local,
+          bernstein.basis = bernstein.local
+        )
+        if (!is.matrix(W.eval))
+          W.eval <- matrix(W.eval, nrow = enrow)
+        if (nrow(W.eval) != enrow)
+          W.eval <- matrix(W.eval, nrow = enrow, byrow = FALSE)
+
+        out <- numeric(enrow)
+        for (ii in seq_len(enrow)) {
+          kw <- .np_kernel_weights_direct(
+            bws = bws,
+            txdat = txdat,
+            exdat = exdat[ii, , drop = FALSE],
+            leave.one.out = FALSE,
+            bandwidth.divide = TRUE,
+            kernel.pow = 1.0
+          )[, 1L]
+          solve.out <- .npreghat_solve_eval(
+            W = W.base,
+            w.eval = W.eval[ii, ],
+            k = kw,
+            ridge.base = 1.0e-12
+          )
+          if (is.null(solve.out))
+            stop(sprintf("failed to solve local system at evaluation row %d", ii))
+          h.row <- kw * drop(W.base %*% solve.out$v)
+          out[ii] <- drop(crossprod(h.row, tydat))
+        }
+        out
+      }
+
+      mean.fallback <- apply_direct()
       merr.fallback <- rep(NA_real_, length(mean.fallback))
 
       grad.fallback <- NULL
@@ -315,15 +377,7 @@ npreg.rbandwidth <-
           for (jj in seq_along(cont.idx)) {
             s.vec <- integer(bws$ncon)
             s.vec[jj] <- 1L
-            grad.apply <- npreghat(
-              bws = bws,
-              txdat = txdat,
-              exdat = if (no.ex) NULL else exdat,
-              y = tydat,
-              output = "apply",
-              s = s.vec
-            )
-            grad.fallback[, cont.idx[jj]] <- as.double(grad.apply)
+            grad.fallback[, cont.idx[jj]] <- apply_direct(s = s.vec)
           }
         }
       }

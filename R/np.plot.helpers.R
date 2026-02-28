@@ -141,6 +141,64 @@
   stop(sprintf("MPI %s %s", what, msg), call. = FALSE)
 }
 
+.npRmpi_bootstrap_phase_mark <- function(what = "bootstrap",
+                                         phase = NA_character_,
+                                         where = NA_character_) {
+  phase <- as.character(phase)[1L]
+  if (is.na(phase) || !nzchar(phase))
+    return(invisible(FALSE))
+
+  label <- paste0("phase:", what, ":", phase)
+  where <- as.character(where)[1L]
+  if (!is.na(where) && nzchar(where))
+    label <- paste0(label, ":", where)
+
+  .npRmpi_profile_add_comm_elapsed(elapsed_sec = 0.0, where = label)
+  invisible(TRUE)
+}
+
+.npRmpi_bootstrap_assert_bindings <- function(required.bindings = NULL,
+                                              what = "bootstrap") {
+  if (is.null(required.bindings))
+    return(invisible(TRUE))
+
+  if (!is.list(required.bindings))
+    stop("required.bindings must be a named list")
+
+  nms <- names(required.bindings)
+  if (is.null(nms) || any(is.na(nms) | !nzchar(nms)))
+    stop("required.bindings must be a named list with non-empty names")
+
+  missing <- nms[vapply(required.bindings, is.null, logical(1))]
+  if (length(missing)) {
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = sprintf("missing required worker bindings (%s)",
+                    paste(missing, collapse = ", ")),
+      what = what
+    )
+  }
+
+  if (isTRUE(getOption("npRmpi.bootstrap.binding.serialize.check", FALSE))) {
+    bad <- nms[!vapply(
+      required.bindings,
+      function(obj) isTRUE(tryCatch({
+        serialize(obj, NULL)
+        TRUE
+      }, error = function(e) FALSE)),
+      logical(1)
+    )]
+    if (length(bad)) {
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = sprintf("non-serializable worker bindings (%s)",
+                      paste(bad, collapse = ", ")),
+        what = what
+      )
+    }
+  }
+
+  invisible(TRUE)
+}
+
 .npRmpi_bootstrap_fanout_enabled <- function(comm = 1L,
                                              n = NA_integer_,
                                              B = NA_integer_,
@@ -234,6 +292,70 @@
   out
 }
 
+.npRmpi_bootstrap_run_fanout <- function(tasks,
+                                         worker,
+                                         ncol.out,
+                                         what = "bootstrap",
+                                         profile.where = NA_character_,
+                                         comm = 1L,
+                                         required.bindings = NULL,
+                                         ...) {
+  .npRmpi_bootstrap_phase_mark(
+    what = what,
+    phase = "preflight",
+    where = profile.where
+  )
+  .npRmpi_bootstrap_assert_bindings(
+    required.bindings = required.bindings,
+    what = what
+  )
+
+  .npRmpi_bootstrap_phase_mark(
+    what = what,
+    phase = "dispatch",
+    where = profile.where
+  )
+  t.comm <- proc.time()
+  parts <- tryCatch(
+    mpi.applyLB(tasks, worker, ..., comm = comm),
+    error = function(e) e
+  )
+  .npRmpi_profile_add_comm_elapsed(
+    elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
+    where = if (!is.na(profile.where) && nzchar(profile.where))
+      profile.where else paste0("mpi.applyLB:", what)
+  )
+  if (inherits(parts, "error")) {
+    .npRmpi_bootstrap_phase_mark(
+      what = what,
+      phase = "dispatch_error",
+      where = profile.where
+    )
+    .npRmpi_bootstrap_fail_or_fallback(
+      msg = sprintf("fan-out failed (%s)", conditionMessage(parts)),
+      what = what
+    )
+  }
+
+  .npRmpi_bootstrap_phase_mark(
+    what = what,
+    phase = "collect",
+    where = profile.where
+  )
+  out <- .npRmpi_bootstrap_collect_chunks(
+    parts = parts,
+    tasks = tasks,
+    ncol.out = ncol.out,
+    what = what
+  )
+  .npRmpi_bootstrap_phase_mark(
+    what = what,
+    phase = "done",
+    where = profile.where
+  )
+  out
+}
+
 .npRmpi_wild_boot_t_parallel <- function(H, fit.mean, residuals, B, wild, comm = 1L) {
   n <- length(residuals)
   p <- nrow(H)
@@ -288,34 +410,20 @@
     t(H %*% ystar)
   }
 
-  t.comm <- proc.time()
-  parts <- tryCatch(
-    mpi.applyLB(
-      tasks,
-      worker,
-      n = n.h,
-      p = p.h,
-      H.vec = H.vec,
-      fit.mean = fit.mean,
-      residuals = residuals,
-      wild.method = wild,
-      comm = comm
-    ),
-    error = function(e) e
+  .npRmpi_bootstrap_run_fanout(
+    tasks = tasks,
+    worker = worker,
+    ncol.out = p,
+    what = "wild",
+    profile.where = "mpi.applyLB:wild",
+    n = n.h,
+    p = p.h,
+    H.vec = H.vec,
+    fit.mean = fit.mean,
+    residuals = residuals,
+    wild.method = wild,
+    comm = comm
   )
-  .npRmpi_profile_add_comm_elapsed(
-    elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-    where = "mpi.applyLB:wild"
-  )
-  if (inherits(parts, "error")) {
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = sprintf("fan-out failed (%s)", conditionMessage(parts)),
-      what = "wild"
-    )
-  }
-
-  .npRmpi_bootstrap_collect_chunks(parts = parts, tasks = tasks,
-                                   ncol.out = p, what = "wild")
 }
 
 .np_inid_chunk_size <- function(n, B) {
@@ -468,27 +576,20 @@
         num / pmax(den, .Machine$double.eps)
       }
 
-      t.comm <- proc.time()
-      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-      .npRmpi_profile_add_comm_elapsed(
-        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-        where = "mpi.applyLB:inid-lc-block"
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nrow(H),
+        what = "inid-lc-block",
+        profile.where = "mpi.applyLB:inid-lc-block",
+        comm = 1L,
+        required.bindings = list(
+          W.local = W.local,
+          Wy.local = Wy.local,
+          counts.drawer.local = counts.drawer.local,
+          n.local = n.local
+        )
       )
-      if (!inherits(parts, "error")) {
-        t.mpi <- .npRmpi_bootstrap_collect_chunks(
-          parts = parts,
-          tasks = tasks,
-          ncol.out = nrow(H),
-          what = "inid-lc-block"
-        )
-        if (is.matrix(t.mpi))
-          tmat <- t.mpi
-      } else {
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = sprintf("inid-lc block fan-out failed (%s)", conditionMessage(parts)),
-          what = "inid-lc-block"
-        )
-      }
     }
 
     if (anyNA(tmat)) {
@@ -520,30 +621,20 @@
     num / pmax(den, .Machine$double.eps)
   }
 
-  t.comm <- proc.time()
-  parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-  .npRmpi_profile_add_comm_elapsed(
-    elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-    where = "mpi.applyLB:inid"
-  )
-  if (inherits(parts, "error")) {
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = sprintf("inid bootstrap fan-out failed (%s)", conditionMessage(parts)),
-      what = "inid"
-    )
-  }
-
-  t.mpi <- .npRmpi_bootstrap_collect_chunks(
-    parts = parts,
+  t.mpi <- .npRmpi_bootstrap_run_fanout(
     tasks = tasks,
+    worker = worker,
     ncol.out = nrow(H),
-    what = "inid"
-  )
-  if (!is.matrix(t.mpi))
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = "inid-lc fan-out did not return matrix output",
-      what = "inid"
+    what = "inid",
+    profile.where = "mpi.applyLB:inid",
+    comm = 1L,
+    required.bindings = list(
+      n = n,
+      prob = prob,
+      W = W,
+      Wy = Wy
     )
+  )
 
   list(t = t.mpi, t0 = t0)
 }
@@ -732,29 +823,34 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
 
-  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-  ncon <- bws$ncon
-
-  if (identical(regtype, "lc")) {
-    H <- suppressWarnings(
+  H <- suppressWarnings(
+    tryCatch(
       npreghat.rbandwidth(
         bws = bws,
         txdat = xdat,
         exdat = exdat,
         s = 0L,
         output = "matrix"
-      )
+      ),
+      error = function(e) NULL
     )
+  )
+  if (!is.null(H)) {
     if (!is.matrix(H))
       H <- matrix(as.double(H), nrow = neval, ncol = n)
-    return(.np_inid_lc_boot_from_hat(
-      H = H,
-      ydat = ydat,
-      B = B,
-      counts = counts,
-      counts.drawer = counts.drawer
-    ))
+    if (nrow(H) == neval && ncol(H) == n) {
+      return(.np_inid_lc_boot_from_hat(
+        H = H,
+        ydat = ydat,
+        B = B,
+        counts = counts,
+        counts.drawer = counts.drawer
+      ))
+    }
   }
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  ncon <- bws$ncon
 
   degree <- if (identical(regtype, "ll")) {
     rep.int(1L, ncon)
@@ -863,27 +959,18 @@
         stopi <- start + as.integer(task$bsz) - 1L
         compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
       }
-      t.comm <- proc.time()
-      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-      .npRmpi_profile_add_comm_elapsed(
-        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-        where = "mpi.applyLB:inid-regression-counts"
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-regression-counts",
+        profile.where = "mpi.applyLB:inid-regression-counts",
+        comm = 1L,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          compute_chunk = compute_chunk
+        )
       )
-      if (!inherits(parts, "error")) {
-        t.mpi <- .npRmpi_bootstrap_collect_chunks(
-          parts = parts,
-          tasks = tasks,
-          ncol.out = neval,
-          what = "inid-regression-counts"
-        )
-        if (is.matrix(t.mpi))
-          tmat <- t.mpi
-      } else {
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = sprintf("inid regression-counts fan-out failed (%s)", conditionMessage(parts)),
-          what = "inid-regression-counts"
-        )
-      }
     }
 
     if (anyNA(tmat)) {
@@ -912,27 +999,19 @@
         )
         compute_chunk(counts.chunk = counts.chunk)
       }
-      t.comm <- proc.time()
-      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-      .npRmpi_profile_add_comm_elapsed(
-        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-        where = "mpi.applyLB:inid-regression-block"
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-regression-block",
+        profile.where = "mpi.applyLB:inid-regression-block",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          counts.drawer = counts.drawer,
+          compute_chunk = compute_chunk
+        )
       )
-      if (!inherits(parts, "error")) {
-        t.mpi <- .npRmpi_bootstrap_collect_chunks(
-          parts = parts,
-          tasks = tasks,
-          ncol.out = neval,
-          what = "inid-regression-block"
-        )
-        if (is.matrix(t.mpi))
-          tmat <- t.mpi
-      } else {
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = sprintf("inid regression-block fan-out failed (%s)", conditionMessage(parts)),
-          what = "inid-regression-block"
-        )
-      }
     }
 
     if (!is.null(counts.drawer) && anyNA(tmat))
@@ -958,27 +1037,19 @@
         counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
-      t.comm <- proc.time()
-      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-      .npRmpi_profile_add_comm_elapsed(
-        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-        where = "mpi.applyLB:inid-regression"
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-regression",
+        profile.where = "mpi.applyLB:inid-regression",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          prob = prob,
+          compute_chunk = compute_chunk
+        )
       )
-      if (!inherits(parts, "error")) {
-        t.mpi <- .npRmpi_bootstrap_collect_chunks(
-          parts = parts,
-          tasks = tasks,
-          ncol.out = neval,
-          what = "inid-regression"
-        )
-        if (is.matrix(t.mpi))
-          tmat <- t.mpi
-      } else {
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = sprintf("inid regression fan-out failed (%s)", conditionMessage(parts)),
-          what = "inid-regression"
-        )
-      }
     }
 
     if (anyNA(tmat))
@@ -1249,27 +1320,18 @@
         stopi <- start + as.integer(task$bsz) - 1L
         compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
       }
-      t.comm <- proc.time()
-      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-      .npRmpi_profile_add_comm_elapsed(
-        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-        where = "mpi.applyLB:inid-scoef-counts"
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-scoef-counts",
+        profile.where = "mpi.applyLB:inid-scoef-counts",
+        comm = 1L,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          compute_chunk = compute_chunk
+        )
       )
-      if (!inherits(parts, "error")) {
-        t.mpi <- .npRmpi_bootstrap_collect_chunks(
-          parts = parts,
-          tasks = tasks,
-          ncol.out = neval,
-          what = "inid-scoef-counts"
-        )
-        if (is.matrix(t.mpi))
-          tmat <- t.mpi
-      } else {
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = sprintf("inid smooth-coefficient-counts fan-out failed (%s)", conditionMessage(parts)),
-          what = "inid-scoef-counts"
-        )
-      }
     }
 
     if (anyNA(tmat)) {
@@ -1298,27 +1360,19 @@
         )
         compute_chunk(counts.chunk = counts.chunk)
       }
-      t.comm <- proc.time()
-      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-      .npRmpi_profile_add_comm_elapsed(
-        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-        where = "mpi.applyLB:inid-scoef-block"
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-scoef-block",
+        profile.where = "mpi.applyLB:inid-scoef-block",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          counts.drawer = counts.drawer,
+          compute_chunk = compute_chunk
+        )
       )
-      if (!inherits(parts, "error")) {
-        t.mpi <- .npRmpi_bootstrap_collect_chunks(
-          parts = parts,
-          tasks = tasks,
-          ncol.out = neval,
-          what = "inid-scoef-block"
-        )
-        if (is.matrix(t.mpi))
-          tmat <- t.mpi
-      } else {
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = sprintf("inid smooth-coefficient-block fan-out failed (%s)", conditionMessage(parts)),
-          what = "inid-scoef-block"
-        )
-      }
     }
 
     if (!is.null(counts.drawer) && anyNA(tmat))
@@ -1344,27 +1398,19 @@
         counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
         compute_chunk(counts.chunk = counts.chunk)
       }
-      t.comm <- proc.time()
-      parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-      .npRmpi_profile_add_comm_elapsed(
-        elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-        where = "mpi.applyLB:inid-scoef"
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = neval,
+        what = "inid-scoef",
+        profile.where = "mpi.applyLB:inid-scoef",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          prob = prob,
+          compute_chunk = compute_chunk
+        )
       )
-      if (!inherits(parts, "error")) {
-        t.mpi <- .npRmpi_bootstrap_collect_chunks(
-          parts = parts,
-          tasks = tasks,
-          ncol.out = neval,
-          what = "inid-scoef"
-        )
-        if (is.matrix(t.mpi))
-          tmat <- t.mpi
-      } else {
-        .npRmpi_bootstrap_fail_or_fallback(
-          msg = sprintf("inid smooth-coefficient fan-out failed (%s)", conditionMessage(parts)),
-          what = "inid-scoef"
-        )
-      }
     }
 
     if (anyNA(tmat))
@@ -1799,27 +1845,19 @@
       )
       crossprod(counts.chunk, kw.local) / n.local
     }
-    t.comm <- proc.time()
-    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-    .npRmpi_profile_add_comm_elapsed(
-      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-      where = "mpi.applyLB:inid-ksum-unconditional-block"
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "inid-ksum-unconditional-block",
+      profile.where = "mpi.applyLB:inid-ksum-unconditional-block",
+      comm = 1L,
+      required.bindings = list(
+        kw.local = kw.local,
+        counts.drawer.local = counts.drawer.local,
+        n.local = n.local
+      )
     )
-    if (!inherits(parts, "error")) {
-      t.mpi <- .npRmpi_bootstrap_collect_chunks(
-        parts = parts,
-        tasks = tasks,
-        ncol.out = neval,
-        what = "inid-ksum-unconditional-block"
-      )
-      if (is.matrix(t.mpi))
-        tmat <- t.mpi
-    } else {
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("inid unconditional ksum-block fan-out failed (%s)", conditionMessage(parts)),
-        what = "inid-ksum-unconditional-block"
-      )
-    }
   }
 
   if (!is.null(counts.drawer) && anyNA(tmat)) {
@@ -1844,27 +1882,19 @@
       counts.chunk <- stats::rmultinom(n = bsz, size = n.local, prob = prob.local)
       crossprod(counts.chunk, kw.local) / n.local
     }
-    t.comm <- proc.time()
-    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-    .npRmpi_profile_add_comm_elapsed(
-      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-      where = "mpi.applyLB:inid-ksum-unconditional"
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "inid-ksum-unconditional",
+      profile.where = "mpi.applyLB:inid-ksum-unconditional",
+      comm = 1L,
+      required.bindings = list(
+        kw.local = kw.local,
+        prob.local = prob.local,
+        n.local = n.local
+      )
     )
-    if (!inherits(parts, "error")) {
-      t.mpi <- .npRmpi_bootstrap_collect_chunks(
-        parts = parts,
-        tasks = tasks,
-        ncol.out = neval,
-        what = "inid-ksum-unconditional"
-      )
-      if (is.matrix(t.mpi))
-        tmat <- t.mpi
-    } else {
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("inid unconditional ksum fan-out failed (%s)", conditionMessage(parts)),
-        what = "inid-ksum-unconditional"
-      )
-    }
   }
 
   if (anyNA(tmat))
@@ -1887,9 +1917,7 @@
 
 .np_con_make_kbandwidth_x <- function(bws, xdat) {
   xdat <- toFrame(xdat)
-  kbandwidth.numeric.fun <- .npRmpi_bootstrap_estimator("kbandwidth.numeric")
-  untangle.fun <- .npRmpi_bootstrap_estimator("untangle")
-  kbandwidth.numeric.fun(
+  kbandwidth.numeric(
     bw = bws$xbw,
     bwscaling = FALSE,
     bwtype = bws$type,
@@ -1901,7 +1929,7 @@
     ukertype = bws$uxkertype,
     okertype = bws$oxkertype,
     nobs = nrow(xdat),
-    xdati = untangle.fun(xdat),
+    xdati = untangle(xdat),
     xnames = names(xdat)
   )
 }
@@ -1910,14 +1938,12 @@
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   xydat <- data.frame(xdat, ydat)
-  kbandwidth.numeric.fun <- .npRmpi_bootstrap_estimator("kbandwidth.numeric")
-  untangle.fun <- .npRmpi_bootstrap_estimator("untangle")
   ckerlb <- c(if (is.null(bws$cxkerlb)) numeric(0) else bws$cxkerlb,
               if (is.null(bws$cykerlb)) numeric(0) else bws$cykerlb)
   ckerub <- c(if (is.null(bws$cxkerub)) numeric(0) else bws$cxkerub,
               if (is.null(bws$cykerub)) numeric(0) else bws$cykerub)
 
-  kbandwidth.numeric.fun(
+  kbandwidth.numeric(
     bw = c(bws$xbw, bws$ybw),
     bwscaling = FALSE,
     bwtype = bws$type,
@@ -1929,7 +1955,7 @@
     ukertype = bws$uxkertype,
     okertype = bws$oxkertype,
     nobs = nrow(xydat),
-    xdati = untangle.fun(xydat),
+    xdati = untangle(xydat),
     xnames = names(xydat)
   )
 }
@@ -2027,27 +2053,20 @@
       num <- crossprod(counts.chunk, num.kw.local) / n.local
       num / pmax(den, .Machine$double.eps)
     }
-    t.comm <- proc.time()
-    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-    .npRmpi_profile_add_comm_elapsed(
-      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-      where = "mpi.applyLB:inid-ksum-conditional-block"
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "inid-ksum-conditional-block",
+      profile.where = "mpi.applyLB:inid-ksum-conditional-block",
+      comm = 1L,
+      required.bindings = list(
+        den.kw.local = den.kw.local,
+        num.kw.local = num.kw.local,
+        counts.drawer.local = counts.drawer.local,
+        n.local = n.local
+      )
     )
-    if (!inherits(parts, "error")) {
-      t.mpi <- .npRmpi_bootstrap_collect_chunks(
-        parts = parts,
-        tasks = tasks,
-        ncol.out = neval,
-        what = "inid-ksum-conditional-block"
-      )
-      if (is.matrix(t.mpi))
-        tmat <- t.mpi
-    } else {
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("inid conditional ksum-block fan-out failed (%s)", conditionMessage(parts)),
-        what = "inid-ksum-conditional-block"
-      )
-    }
   }
 
   if (!is.null(counts.drawer) && anyNA(tmat)) {
@@ -2074,27 +2093,20 @@
       num <- crossprod(counts.chunk, num.kw.local) / n.local
       num / pmax(den, .Machine$double.eps)
     }
-    t.comm <- proc.time()
-    parts <- tryCatch(mpi.applyLB(tasks, worker, comm = 1L), error = function(e) e)
-    .npRmpi_profile_add_comm_elapsed(
-      elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
-      where = "mpi.applyLB:inid-ksum-conditional"
+    tmat <- .npRmpi_bootstrap_run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = neval,
+      what = "inid-ksum-conditional",
+      profile.where = "mpi.applyLB:inid-ksum-conditional",
+      comm = 1L,
+      required.bindings = list(
+        den.kw.local = den.kw.local,
+        num.kw.local = num.kw.local,
+        prob.local = prob.local,
+        n.local = n.local
+      )
     )
-    if (!inherits(parts, "error")) {
-      t.mpi <- .npRmpi_bootstrap_collect_chunks(
-        parts = parts,
-        tasks = tasks,
-        ncol.out = neval,
-        what = "inid-ksum-conditional"
-      )
-      if (is.matrix(t.mpi))
-        tmat <- t.mpi
-    } else {
-      .npRmpi_bootstrap_fail_or_fallback(
-        msg = sprintf("inid conditional ksum fan-out failed (%s)", conditionMessage(parts)),
-        what = "inid-ksum-conditional"
-      )
-    }
   }
 
   if (anyNA(tmat))
@@ -2292,14 +2304,6 @@ plotFactor <- function(f, y, ...){
   on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
   on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
   force(expr)
-}
-
-.npRmpi_bootstrap_estimator <- function(name) {
-  nprmpi.ns <- asNamespace("npRmpi")
-  if (exists(name, envir = nprmpi.ns, mode = "function", inherits = FALSE))
-    return(get(name, envir = nprmpi.ns, inherits = FALSE))
-
-  get(name, mode = "function", envir = parent.frame(), inherits = TRUE)
 }
 
 .npRmpi_plot_behavior_for_rank <- function(plot.behavior) {
@@ -3625,10 +3629,25 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
 
-    if (is.inid && !isTRUE(fast.inid))
-      stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     if (is.block && !isTRUE(fast.block))
       stop("fixed/geom conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+
+    fit.cond <- function(tx, ty) {
+      switch(
+        tboo,
+        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+      )
+    }
+    out.cond <- function(fit) {
+      switch(
+        tboo,
+        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
+        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
+        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
+      )
+    }
 
     boot.out <- NULL
     if (fast.inid || fast.block) {
@@ -3660,6 +3679,20 @@ compute.bootstrap.errors.conbandwidth =
                          conditionMessage(e)),
                  call. = FALSE)
           }
+        )
+      })
+    }
+
+    if (is.null(boot.out) && is.inid) {
+      boot.out <- .npRmpi_with_local_bootstrap({
+        boofun <- function(data, indices) out.cond(fit.cond(
+          tx = xdat[indices, , drop = FALSE],
+          ty = ydat[indices, , drop = FALSE]
+        ))
+        boot(
+          data = data.frame(xdat, ydat),
+          statistic = boofun,
+          R = plot.errors.boot.num
         )
       })
     }
@@ -3788,6 +3821,23 @@ compute.bootstrap.errors.condbandwidth =
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
 
+    fit.cond <- function(tx, ty) {
+      switch(
+        tboo,
+        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
+        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
+        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
+      )
+    }
+    out.cond <- function(fit) {
+      switch(
+        tboo,
+        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
+        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
+        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
+      )
+    }
+
     boot.out <- NULL
     if (fast.inid || fast.block) {
       counts.drawer <- if (fast.block) {
@@ -3818,6 +3868,20 @@ compute.bootstrap.errors.condbandwidth =
                          conditionMessage(e)),
                  call. = FALSE)
           }
+        )
+      })
+    }
+
+    if (is.null(boot.out) && is.inid) {
+      boot.out <- .npRmpi_with_local_bootstrap({
+        boofun <- function(data, indices) out.cond(fit.cond(
+          tx = xdat[indices, , drop = FALSE],
+          ty = ydat[indices, , drop = FALSE]
+        ))
+        boot(
+          data = data.frame(xdat, ydat),
+          statistic = boofun,
+          R = plot.errors.boot.num
         )
       })
     }
