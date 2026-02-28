@@ -227,7 +227,7 @@
   }
 }
 
-.np_inid_lc_boot_from_hat <- function(H, ydat, B, counts = NULL) {
+.np_inid_lc_boot_from_hat <- function(H, ydat, B, counts = NULL, counts.drawer = NULL) {
   H <- as.matrix(H)
   ydat <- as.double(ydat)
   B <- as.integer(B)
@@ -259,7 +259,11 @@
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
-    counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+    counts.chunk <- if (!is.null(counts.drawer)) {
+      .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+    } else {
+      stats::rmultinom(n = bsz, size = n, prob = prob)
+    }
     den <- crossprod(counts.chunk, W)
     num <- crossprod(counts.chunk, Wy)
     tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
@@ -455,6 +459,32 @@
 
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   ncon <- bws$ncon
+
+  H <- suppressWarnings(
+    tryCatch(
+      npreghat.rbandwidth(
+        bws = bws,
+        txdat = xdat,
+        exdat = exdat,
+        s = 0L,
+        output = "matrix"
+      ),
+      error = function(e) NULL
+    )
+  )
+  if (!is.null(H)) {
+    if (!is.matrix(H))
+      H <- matrix(as.double(H), nrow = neval, ncol = n)
+    if (nrow(H) == neval && ncol(H) == n) {
+      return(.np_inid_lc_boot_from_hat(
+        H = H,
+        ydat = ydat,
+        B = B,
+        counts = counts,
+        counts.drawer = counts.drawer
+      ))
+    }
+  }
 
   degree <- if (identical(regtype, "lc")) {
     rep.int(0L, ncon)

@@ -74,17 +74,66 @@
   }
 
   rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
-  nh.args <- list(
-    bws = rbw,
-    txdat = tzdat,
-    output = "matrix",
-    leave.one.out = leave.one.out
+  regtype.rbw <- if (is.null(rbw$regtype)) "lc" else as.character(rbw$regtype)
+  degree.rbw <- if (identical(regtype.rbw, "lc")) {
+    rep.int(0L, rbw$ncon)
+  } else if (identical(regtype.rbw, "ll")) {
+    rep.int(1L, rbw$ncon)
+  } else {
+    npValidateGlpDegree(regtype = "lp", degree = rbw$degree, ncon = rbw$ncon)
+  }
+  basis.rbw <- npValidateLpBasis(
+    regtype = "lp",
+    basis = if (is.null(rbw$basis)) "glp" else rbw$basis
   )
-  if (!leave.one.out)
-    nh.args$exdat <- ezdat
-  H <- do.call(npreghat, nh.args)
-  if (!is.matrix(H))
-    H <- matrix(H, nrow = nrow(ezdat))
+  bernstein.rbw <- npValidateGlpBernstein(
+    regtype = "lp",
+    bernstein.basis = isTRUE(rbw$bernstein.basis)
+  )
+
+  z.train <- adjustLevels(tzdat, rbw$xdati)
+  z.eval <- if (leave.one.out) z.train else adjustLevels(ezdat, rbw$xdati, allowNewCells = TRUE)
+  kw <- .np_kernel_weights_direct(
+    bws = rbw,
+    txdat = z.train,
+    exdat = if (leave.one.out) NULL else z.eval,
+    leave.one.out = leave.one.out,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+
+  ntrain <- nrow(z.train)
+  neval <- ncol(kw)
+  W <- W.lp(
+    xdat = z.train,
+    degree = degree.rbw,
+    basis = basis.rbw,
+    bernstein.basis = bernstein.rbw
+  )
+  W.eval <- W.lp(
+    xdat = z.train,
+    exdat = if (leave.one.out) NULL else z.eval,
+    degree = degree.rbw,
+    basis = basis.rbw,
+    bernstein.basis = bernstein.rbw
+  )
+  if (!is.matrix(W.eval))
+    W.eval <- matrix(W.eval, nrow = neval)
+  if (nrow(W.eval) != neval)
+    W.eval <- matrix(W.eval, nrow = neval, byrow = FALSE)
+
+  H <- matrix(0.0, nrow = neval, ncol = ntrain)
+  for (ii in seq_len(neval)) {
+    solve.out <- .npreghat_solve_eval(
+      W = W,
+      w.eval = W.eval[ii, ],
+      k = kw[, ii],
+      ridge.base = 1.0e-12
+    )
+    if (is.null(solve.out))
+      stop(sprintf("failed to solve smooth-coefficient hat system at evaluation row %d", ii))
+    H[ii, ] <- kw[, ii] * drop(W %*% solve.out$v)
+  }
   t(H)
 }
 
