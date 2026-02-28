@@ -141,7 +141,9 @@ npconmode.conbandwidth <-
       stop("'tydat' must consist of one (1) discrete variable")
 
     mdens = double(enrow)
+    mderr = rep(NA_real_, enrow)
     tdens = double(enrow)
+    tderr = rep(NA_real_, enrow)
     tf = logical(enrow)
     indices = integer(enrow)
 
@@ -152,16 +154,19 @@ npconmode.conbandwidth <-
                      levels = union(bws$ydati$all.lev[[1]], levels(eydat[,1])), ordered = is.ordered(tydat[,1]))
 
     for (i in seq_len(nlevels(efac))) {
-        tdens <- npcdens(
+        dens.obj <- npcdens(
           txdat = txdat,
           tydat = tydat,
           exdat = if (no.ex) txdat else exdat,
           eydat = rep(efac[i], enrow),
           bws = bws
-        )$condens
+        )
+        tdens <- dens.obj$condens
+        tderr <- dens.obj$conderr
         tf = tdens >= mdens
         indices[tf] = i
         mdens[tf] = tdens[tf]
+        mderr[tf] = tderr[tf]
     }
 
     cm.args <- list(
@@ -169,6 +174,7 @@ npconmode.conbandwidth <-
       xeval = if (no.ex) txdat else exdat,
       conmode = efac[indices],
       condens = mdens,
+      conderr = mderr,
       ntrain = nrow(txdat),
       trainiseval = no.ex
     )

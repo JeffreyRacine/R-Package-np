@@ -102,6 +102,8 @@ npconmode(bws, \dots)
     point}
   \item{condens}{ a vector of numeric type containing the modal density
     estimates at each evaluation point}
+  \item{conderr}{ a vector of numeric type containing asymptotic
+    standard errors for the modal density estimates at each evaluation point}
   \item{xeval}{ a data frame of evaluation points }
   \item{yeval}{ a vector of type \code{factor} (or \code{ordered
       factor}) containing the actual outcomes, or \code{NA} if not
