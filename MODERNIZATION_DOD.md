@@ -168,6 +168,10 @@ Completed in `np-npRmpi`:
 - [x] Tarball-first validation is cleanly run:
   - `R CMD build np-npRmpi`
   - `R CMD check --as-cran npRmpi_<ver>.tar.gz`
+- [x] Baseline-aware touched-path `testthat` delta gate script is available for non-MPI-sensitive files, with MPI routes still validated by dedicated route scripts:
+  - script: `/Users/jracine/Development/np-npRmpi/tests/validation/testthat_delta_gate.R`
+  - baseline: `/Users/jracine/Development/np-npRmpi/tests/validation/known_testthat_failures.csv`
+  - MPI-sensitive files are hard-refused in-process by default (requires explicit `NP_RMPI_ALLOW_INPROC_TESTS=TRUE` override).
 - [x] Issue-note regression sweep is run periodically and after core modernization touches:
   - `./issue_notes/run_verified_issue_repros.sh`
 - [x] New warnings/notes are treated as regressions unless explicitly accepted and documented.
