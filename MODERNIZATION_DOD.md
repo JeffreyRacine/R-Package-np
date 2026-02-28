@@ -127,7 +127,9 @@ Completed in `np-master`:
 - [x] Baseline-aware touched-path `testthat` delta gate is available and required for core-path checkpoints:
   - script: `/Users/jracine/Development/np-master/tests/validation/testthat_delta_gate.R`
   - baseline: `/Users/jracine/Development/np-master/tests/validation/known_testthat_failures.csv`
-  - current known allowlist entry: `test-plot-bootstrap-inid-fastpath.R` (8 failures) until retired.
+  - current policy state: allowlist empty on active branch.
+- [x] Installed-package `testthat` gate is required before checkpointing touched core pathways:
+  - `(cd /Users/jracine/Development/np-master && R CMD INSTALL . && cd tests && Rscript --no-save testthat.R)`
 - [x] Issue-note regression sweep is run periodically and after core modernization touches:
   - `./issue_notes/run_verified_issue_repros.sh`
 - [x] New warnings/notes are treated as regressions unless explicitly accepted and documented.

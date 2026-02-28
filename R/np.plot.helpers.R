@@ -460,29 +460,31 @@
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   ncon <- bws$ncon
 
-  H <- suppressWarnings(
-    tryCatch(
-      npreghat.rbandwidth(
-        bws = bws,
-        txdat = xdat,
-        exdat = exdat,
-        s = 0L,
-        output = "matrix"
-      ),
-      error = function(e) NULL
+  if (identical(regtype, "lc")) {
+    H <- suppressWarnings(
+      tryCatch(
+        npreghat.rbandwidth(
+          bws = bws,
+          txdat = xdat,
+          exdat = exdat,
+          s = 0L,
+          output = "matrix"
+        ),
+        error = function(e) NULL
+      )
     )
-  )
-  if (!is.null(H)) {
-    if (!is.matrix(H))
-      H <- matrix(as.double(H), nrow = neval, ncol = n)
-    if (nrow(H) == neval && ncol(H) == n) {
-      return(.np_inid_lc_boot_from_hat(
-        H = H,
-        ydat = ydat,
-        B = B,
-        counts = counts,
-        counts.drawer = counts.drawer
-      ))
+    if (!is.null(H)) {
+      if (!is.matrix(H))
+        H <- matrix(as.double(H), nrow = neval, ncol = n)
+      if (nrow(H) == neval && ncol(H) == n) {
+        return(.np_inid_lc_boot_from_hat(
+          H = H,
+          ydat = ydat,
+          B = B,
+          counts = counts,
+          counts.drawer = counts.drawer
+        ))
+      }
     }
   }
 
