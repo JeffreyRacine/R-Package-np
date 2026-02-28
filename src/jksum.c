@@ -4791,7 +4791,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
   int p_nvar;
 
-  np_refresh_runtime_tolerances();
+  if(!np_runtime_tol_cache_ready)
+    np_refresh_runtime_tolerances();
 
   if(no_bpso){
     bpso = (int *)malloc((num_reg_unordered + num_reg_ordered + num_reg_continuous)*sizeof(int));
