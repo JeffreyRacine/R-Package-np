@@ -79,6 +79,16 @@ startup/teardown behavior:
   used on small \code{n}.
   \item As \code{n} grows, compute usually dominates fixed messaging costs and
   relative penalties commonly shrink.
+  \item Master-only mode (\code{nslaves=0}) is intended for convenience and
+  pathway validation in a single codebase, not as a direct speed substitute for
+  \pkg{np}. It disables auto-dispatch and runs on rank 0 only.
+  \item In session/attach mode with auto-dispatch enabled, lightweight calls
+  (especially post-bandwidth \code{npreg(bws=...)} and \code{predict(...)})
+  can be slower due to command marshalling/serialization overhead. A practical
+  pattern is: keep auto-dispatch enabled for bandwidth selection, then set
+  \code{options(npRmpi.autodispatch=FALSE)} for post-\code{bw} fit/predict.
+  Manual-broadcast/profile mode often behaves closer to this low-overhead
+  pattern.
 }
 
 Template startup profile for manual-broadcast attach workflows is provided at
