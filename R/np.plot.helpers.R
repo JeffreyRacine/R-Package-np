@@ -210,12 +210,13 @@
       what = what
     )
   if (!isTRUE(.npRmpi_has_active_slave_pool(comm = comm)))
-    .npRmpi_bootstrap_fail_or_fallback(
-      msg = "requires an active MPI slave pool; call npRmpi.init(...) first",
-      what = what
-    )
+    if (!isTRUE(.npRmpi_master_only_mode(comm = comm)))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "requires an active MPI slave pool; call npRmpi.init(...) first",
+        what = what
+      )
   workers <- .npRmpi_bootstrap_worker_count(comm = comm)
-  if (workers < 1L)
+  if (!isTRUE(.npRmpi_master_only_mode(comm = comm)) && workers < 1L)
     .npRmpi_bootstrap_fail_or_fallback(
       msg = "requires at least one active MPI worker",
       what = what
@@ -315,15 +316,28 @@
     phase = "dispatch",
     where = profile.where
   )
+  use.master.local <- !isTRUE(.npRmpi_has_active_slave_pool(comm = comm)) &&
+    isTRUE(.npRmpi_master_only_mode(comm = comm))
   t.comm <- proc.time()
-  parts <- tryCatch(
-    mpi.applyLB(tasks, worker, ..., comm = comm),
-    error = function(e) e
-  )
+  parts <- if (isTRUE(use.master.local)) {
+    tryCatch(
+      lapply(tasks, function(task) do.call(worker, c(list(task), list(...)))),
+      error = function(e) e
+    )
+  } else {
+    tryCatch(
+      mpi.applyLB(tasks, worker, ..., comm = comm),
+      error = function(e) e
+    )
+  }
   .npRmpi_profile_add_comm_elapsed(
     elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
     where = if (!is.na(profile.where) && nzchar(profile.where))
-      profile.where else paste0("mpi.applyLB:", what)
+      if (isTRUE(use.master.local)) paste0(profile.where, ":master-local") else profile.where
+    else if (isTRUE(use.master.local))
+      paste0("master.local:", what)
+    else
+      paste0("mpi.applyLB:", what)
   )
   if (inherits(parts, "error")) {
     .npRmpi_bootstrap_phase_mark(

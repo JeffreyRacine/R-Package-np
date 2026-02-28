@@ -25,7 +25,7 @@ npRmpi.session.info(comm = 1)
 }
 \arguments{
   \item{\dots}{Additional arguments passed to \code{mpi.spawn.Rslaves()}.}
-  \item{nslaves}{Number of slaves to spawn for interactive execution (\code{mode="spawn"}).}
+  \item{nslaves}{Number of slaves to spawn for interactive execution (\code{mode="spawn"}). Use \code{nslaves=0} for master-only runtime (no spawned workers).}
   \item{comm}{Communicator used for the master+slaves pool (defaults to \code{1}).}
   \item{mode}{Startup/stop mode. \code{"spawn"} starts slaves from rank 0.
     \code{"attach"} attaches to an already-launched MPI world (e.g. started
@@ -51,10 +51,14 @@ npRmpi.session.info(comm = 1)
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.
 
-\code{npRmpi.init()} now supports two robust execution models:
+\code{npRmpi.init()} now supports three robust execution models:
 \enumerate{
-  \item Interactive/spawn mode (\code{mode="spawn"}): spawns slaves and
+  \item Interactive/spawn mode (\code{mode="spawn"}, \code{nslaves>=1}): spawns slaves and
   initializes all ranks.
+  \item Interactive master-only mode (\code{mode="spawn"}, \code{nslaves=0}):
+  initializes rank 0 without spawning workers. In this mode,
+  \code{npRmpi.autodispatch} is forced \code{FALSE}, and bootstrap fan-out
+  helpers execute chunk tasks locally on master.
   \item Batch/attach mode (\code{mode="attach"}): attaches to a pre-launched
   MPI world and runs worker-loop coordination internally (no external
   bootstrap profile file required).

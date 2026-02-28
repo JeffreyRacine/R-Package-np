@@ -168,9 +168,29 @@
   size >= 2L
 }
 
-.npRmpi_require_active_slave_pool <- function(comm = 1L, where = "this call") {
+.npRmpi_master_only_mode <- function(comm = 1L) {
+  if (!isTRUE(getOption("npRmpi.master.only", FALSE)))
+    return(FALSE)
+  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+    return(FALSE)
+  size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_)
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) NA_integer_)
+  if (is.na(size) || is.na(rank) || size < 1L || rank < 0L) {
+    size <- tryCatch(as.integer(mpi.comm.size(0)), error = function(e) NA_integer_)
+    rank <- tryCatch(as.integer(mpi.comm.rank(0)), error = function(e) NA_integer_)
+  }
+  if (is.null(size) || is.null(rank) || is.na(size) || is.na(rank))
+    return(FALSE)
+  as.integer(size) == 1L && as.integer(rank) == 0L
+}
+
+.npRmpi_require_active_slave_pool <- function(comm = 1L,
+                                              where = "this call",
+                                              allow.master.only = TRUE) {
   .npRmpi_abort_if_rmpi_attached(where = where)
   if (.npRmpi_has_active_slave_pool(comm = comm))
+    return(invisible(TRUE))
+  if (isTRUE(allow.master.only) && .npRmpi_master_only_mode(comm = comm))
     return(invisible(TRUE))
   stop(sprintf("%s requires an active MPI slave pool; call npRmpi.init(...) first", where))
 }
@@ -179,6 +199,10 @@
   .npRmpi_abort_if_rmpi_attached(where = "npRmpi auto-dispatch")
   strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
   if (!.npRmpi_has_active_slave_pool(comm = comm)) {
+    if (.npRmpi_master_only_mode(comm = comm)) {
+      warning("npRmpi auto-dispatch is disabled in master-only mode (nslaves=0); executing call locally")
+      return(FALSE)
+    }
     msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.init(...) first"
     if (strict) stop(msg)
     warning(msg)
@@ -729,7 +753,11 @@
 }
 
 .npRmpi_bootstrap_compute_payload <- function(payload, comm = 1L) {
-  .npRmpi_require_active_slave_pool(comm = comm, where = "bootstrap payload computation")
+  .npRmpi_require_active_slave_pool(
+    comm = comm,
+    where = "bootstrap payload computation",
+    allow.master.only = FALSE
+  )
 
   if (!is.list(payload))
     stop("bootstrap payload must be a list")

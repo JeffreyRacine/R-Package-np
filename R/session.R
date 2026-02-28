@@ -23,7 +23,7 @@
 
 .npRmpi_session_ensure_comm <- function(comm = 1L) {
   size <- .npRmpi_safe_int(mpi.comm.size(comm))
-  if (!is.na(size))
+  if (!is.na(size) && as.integer(size) >= 1L)
     return(invisible(as.integer(size)))
   invisible(mpi.comm.dup(0, comm))
 }
@@ -64,7 +64,7 @@ npRmpi.init <- function(...,
                          quiet = FALSE) {
   .npRmpi_abort_if_rmpi_attached(where = "npRmpi.init()")
 
-  nslaves <- npValidatePositiveInteger(nslaves, "nslaves")
+  nslaves <- npValidateNonNegativeInteger(nslaves, "nslaves")
   comm <- npValidatePositiveInteger(comm, "comm")
   autodispatch <- npValidateScalarLogical(autodispatch, "autodispatch")
   autodispatch.verify.options <- npValidateScalarLogical(autodispatch.verify.options, "autodispatch.verify.options")
@@ -83,8 +83,15 @@ npRmpi.init <- function(...,
     mode <- if (world.size > 1L) "attach" else "spawn"
   }
 
+  effective.autodispatch <- autodispatch
+  if (identical(mode, "spawn") && nslaves == 0L) {
+    if (isTRUE(autodispatch))
+      warning("nslaves=0 enables master-only runtime; forcing npRmpi.autodispatch=FALSE")
+    effective.autodispatch <- FALSE
+  }
+
   .npRmpi_session_apply_options(
-    autodispatch = autodispatch,
+    autodispatch = effective.autodispatch,
     np.messages = np.messages,
     autodispatch.verify.options = autodispatch.verify.options,
     autodispatch.option.sync = autodispatch.option.sync
@@ -100,13 +107,23 @@ npRmpi.init <- function(...,
   }
 
   if (identical(mode, "spawn")) {
+    if (nslaves == 0L) {
+      if (.npRmpi_session_has_active_pool(comm = comm))
+        stop("comm already has active MPI slaves; call npRmpi.quit(...) before requesting nslaves=0")
+      .npRmpi_session_ensure_comm(comm = comm)
+      np.mpi.initialize()
+      options(npRmpi.master.only = TRUE)
+      return(invisible(TRUE))
+    }
     if (.npRmpi_session_has_active_pool(comm = comm)) {
+      options(npRmpi.master.only = FALSE)
       if (!quiet)
         mpi.hostinfo(comm)
       return(invisible(TRUE))
     }
     mpi.spawn.Rslaves(..., nslaves = nslaves, comm = comm, quiet = quiet, nonblock = nonblock, sleep = sleep)
     mpi.bcast.cmd(np.mpi.initialize(), caller.execute = TRUE, comm = comm)
+    options(npRmpi.master.only = FALSE)
     return(invisible(TRUE))
   }
 
@@ -121,6 +138,7 @@ npRmpi.init <- function(...,
   .npRmpi_session_ensure_comm(comm = comm)
   np.mpi.initialize()
   mpi.barrier(0)
+  options(npRmpi.master.only = FALSE)
 
   rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
   rank <- if (is.na(rank)) 0L else as.integer(rank)
@@ -160,7 +178,13 @@ npRmpi.quit <- function(force = FALSE,
   }
 
   if (size.comm < 2L)
-    return(invisible(FALSE))
+  {
+    master.only <- isTRUE(getOption("npRmpi.master.only", FALSE))
+    if (master.only && comm != 0L)
+      .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
+    options(npRmpi.master.only = FALSE)
+    return(invisible(master.only))
+  }
 
   if (identical(mode, "attach")) {
     comm <- 1L
@@ -168,10 +192,12 @@ npRmpi.quit <- function(force = FALSE,
     if (comm != 0L) {
       .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
     }
+    options(npRmpi.master.only = FALSE)
     return(invisible(TRUE))
   }
 
   mpi.close.Rslaves(dellog = dellog, comm = comm, force = force)
+  options(npRmpi.master.only = FALSE)
   invisible(TRUE)
 }
 
@@ -206,6 +232,7 @@ npRmpi.session.info <- function(comm=1){
     comm_rank = comm_rank,
     comm_size = comm_size,
     nslaves = if (is.na(comm_size)) NA_integer_ else max(as.integer(comm_size) - 1L, 0L),
+    master_only = isTRUE(getOption("npRmpi.master.only", FALSE)),
     processor = proc
   )
 
@@ -215,6 +242,7 @@ npRmpi.session.info <- function(comm=1){
   cat("  OS    :", info$sysname, info$release, "|", info$platform, "\n")
   cat("  reuse :", info$reuse_slaves, "(NP_RMPI_NO_REUSE_SLAVES=", info$NP_RMPI_NO_REUSE_SLAVES, ")\n", sep="")
   cat("  comm  :", info$comm, "rank", info$comm_rank, "of", info$comm_size, "(nslaves=", info$nslaves, ")\n", sep=" ")
+  cat("  mode  :", if (isTRUE(info$master_only)) "master-only" else "slave-pool", "\n")
   if (!is.na(info$processor))
     cat("  host  :", info$processor, "\n")
   if (!all(is.na(info$mpi_version)))

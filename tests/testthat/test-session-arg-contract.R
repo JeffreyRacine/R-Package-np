@@ -1,5 +1,5 @@
 test_that("npRmpi.init validates scalar control arguments before MPI calls", {
-  expect_error(npRmpi.init(nslaves = 0, mode = "spawn"), "'nslaves' must be a positive integer")
+  expect_error(npRmpi.init(nslaves = -1, mode = "spawn"), "'nslaves' must be a non-negative integer")
   expect_error(npRmpi.init(comm = 0, mode = "spawn"), "'comm' must be a positive integer")
   expect_error(npRmpi.init(autodispatch = NA, mode = "spawn"), "'autodispatch' must be TRUE or FALSE")
   expect_error(npRmpi.init(autodispatch.verify.options = c(TRUE, FALSE), mode = "spawn"),
