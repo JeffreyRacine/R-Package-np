@@ -122,7 +122,7 @@
   if (nrow(W.eval) != neval)
     W.eval <- matrix(W.eval, nrow = neval, byrow = FALSE)
 
-  H <- matrix(0.0, nrow = neval, ncol = ntrain)
+  H <- matrix(0.0, nrow = ntrain, ncol = neval)
   for (ii in seq_len(neval)) {
     solve.out <- .npreghat_solve_eval(
       W = W,
@@ -132,9 +132,9 @@
     )
     if (is.null(solve.out))
       stop(sprintf("failed to solve smooth-coefficient hat system at evaluation row %d", ii))
-    H[ii, ] <- kw[, ii] * drop(W %*% solve.out$v)
+    H[, ii] <- kw[, ii] * drop(W %*% solve.out$v)
   }
-  t(H)
+  H
 }
 
 npindexhat <-

@@ -55,13 +55,16 @@ npreghat <-
 
 .npreghat_solve_eval <- function(W, w.eval, k, ridge.base) {
   XtWX <- crossprod(W, W * k)
+  p <- nrow(XtWX)
+  diag.loc <- cbind(seq_len(p), seq_len(p))
+  XtWX.diag <- XtWX[diag.loc]
   ridge <- max(0, as.double(ridge.base))
   solved <- FALSE
 
   for (attempt in 0:8) {
     A <- XtWX
     if (ridge > 0)
-      diag(A) <- diag(A) + ridge
+      A[diag.loc] <- XtWX.diag + ridge
 
     v <- tryCatch(
       qr.solve(t(A), w.eval, tol = .Machine$double.eps),

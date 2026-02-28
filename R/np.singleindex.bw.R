@@ -224,6 +224,9 @@ npindexbw.sibandwidth <-
       ydat <- as.double(ydat)
 
     xdat = toMatrix(xdat)
+    p <- ncol(xdat)
+    beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
+    nobs <- nrow(xdat)
 
     total.time <-
       system.time({
@@ -231,7 +234,7 @@ npindexbw.sibandwidth <-
         if(bandwidth.compute){
 
           ## Invariant objects used by objective evaluations.
-          xmat <- as.matrix(xdat)
+          xmat <- xdat
           wmat <- cbind(ydat, 1.0)
 
           ## Note - there are two methods currently implemented, Ichimura's
@@ -250,9 +253,8 @@ npindexbw.sibandwidth <-
             ##Define the leave-one-out objective function, sum (y - \hat
             ## G(X\hat\beta))^2. We let beta denote beta_2...beta_k (first k-1
             ## parameters in `param') and then let h denote the kth column.
-            beta <- param[seq_len(ncol(xdat)-1L)]
-
-            h <- param[ncol(xdat)]
+            beta <- param[beta.idx]
+            h <- param[p]
 
             ## Next we define the sum of squared leave-one-out residuals
 
@@ -260,7 +262,7 @@ npindexbw.sibandwidth <-
 
               ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
 
-              index <- xmat %*% c(1,beta)
+              index <- xmat %*% c(1, beta)
 
               ## One call to npksum to avoid repeated computation of the
               ## product kernel (the expensive part)
@@ -310,9 +312,8 @@ npindexbw.sibandwidth <-
             ## Define the leave-one-out objective function, sum (y - \hat
             ## G(X\hat\beta))^2. We let beta denote beta_2...beta_k (first k-1
             ## parameters in `param') and then let h denote the kth column.
-            beta <- param[seq_len(ncol(xdat)-1L)]
-
-            h <- param[ncol(xdat)]
+            beta <- param[beta.idx]
+            h <- param[p]
 
             ## Next we define the sum of logs
 
@@ -320,7 +321,7 @@ npindexbw.sibandwidth <-
 
               ## Normalize beta_1 = 1 hence multiply X by c(1,beta)
 
-              index <- xmat %*% c(1,beta)
+              index <- xmat %*% c(1, beta)
 
               ## One call to npksum to avoid repeated computation of the
               ## product kernel (the expensive part)
@@ -342,8 +343,8 @@ npindexbw.sibandwidth <-
               ## Avoid taking log of zero (ks.loo = 0 or 1 since we take
               ## the log of ks.loo and the log of 1-ks.loo)
 
-              ks.loo[which(ks.loo < kleinspadyFloor)] <- kleinspadyFloor
-              ks.loo[which(ks.loo > 1- kleinspadyFloor)] <- 1-kleinspadyFloor
+              ks.loo[ks.loo < kleinspadyFloor] <- kleinspadyFloor
+              ks.loo[ks.loo > 1 - kleinspadyFloor] <- 1 - kleinspadyFloor
 
               ## Maximize the log likelihood, therefore minimize minus.
               ## Here ydat is binary (0/1), so this is equivalent to
@@ -391,8 +392,6 @@ npindexbw.sibandwidth <-
             console <- printPush(paste(sep="", "Multistart ", i, " of ", nmulti, "..."), console)
             ##cv.console <- newLineConsole(console)
 
-            n <- nrow(xdat)
-
             ## We use the nlm command to minimize the objective function using
             ## starting values. Note that since we normalize beta_1=1 here beta
             ## is the k-1 vector containing beta_2...beta_k
@@ -404,15 +403,15 @@ npindexbw.sibandwidth <-
               ols.fit <- lm(ydat~xdat,x=TRUE)
               fit <- fitted(ols.fit)
 
-              if (ncol(xdat) != 1){
-                if (setequal(bws$beta[2:ncol(xdat)],c(0)))
+              if (p != 1L){
+                if (setequal(bws$beta[2:p], c(0)))
                   beta <- coef(ols.fit)[3:ncol(ols.fit$x)]
                 else
-                  beta = bws$beta[2:ncol(xdat)]
+                  beta = bws$beta[2:p]
               } else { beta = numeric(0) }
 
               if (bws$bw == 0)
-                h <- 1.059224*EssDee(fit)*n^(-1/5)
+                h <- 1.059224*EssDee(fit)*nobs^(-1/5)
               else
                 h <- bws$bw
             } else {
@@ -421,7 +420,7 @@ npindexbw.sibandwidth <-
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if (!only.optimize.beta)
-                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*n^(-1/5)
+                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*nobs^(-1/5)
             }
 
             optim.parm <- if(only.optimize.beta) beta else c(beta,h)
@@ -445,7 +444,7 @@ npindexbw.sibandwidth <-
               beta.length <- length(coef(ols.fit)[3:ncol(ols.fit$x)])
               beta <- runif(beta.length,min=0.5,max=1.5)*coef(ols.fit)[3:ncol(ols.fit$x)]
               if(!only.optimize.beta)
-                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*n^(-1/5)
+                h <- runif(1,min=0.5,max=1.5)*EssDee(fit)*nobs^(-1/5)
 
               if(optim.return$convergence == 1){
                 if(optim.control$maxit < (2^32/10))
@@ -489,8 +488,8 @@ npindexbw.sibandwidth <-
           }
           console <- printClear(console)
 
-          bws$beta <- c(1.0, param[seq_len(ncol(xdat)-1L)])
-          bws$bw <- param[ncol(xdat)]
+          bws$beta <- c(1.0, param[beta.idx])
+          bws$bw <- param[p]
           bws$fval <- fval.min
           bws$ifval <- best
           bws$num.feval <- num.feval.overall

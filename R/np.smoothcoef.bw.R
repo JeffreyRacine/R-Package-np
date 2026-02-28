@@ -238,8 +238,8 @@ npscoefbw.scbandwidth <-
     ## in the future one will be able to use a switch to npksum
     ## to emulate W
 
-    W <- as.matrix(data.frame(1,xdat))
-    yW <- as.matrix(data.frame(ydat,1,xdat))
+    W <- cbind(1.0, xdat)
+    yW <- cbind(ydat, W)
     
     if (miss.z){
       zdat <- xdat
@@ -247,6 +247,7 @@ npscoefbw.scbandwidth <-
     }
     else
       dati <- bws$zdati
+    zdat.df <- if (is.data.frame(zdat)) zdat else as.data.frame(zdat)
 
     mysd <- EssDee(zdat[, dati$icon, drop = FALSE])
     nconfac <- n^(-1.0/(2.0*bws$ckerorder+bws$ncon))
@@ -289,12 +290,12 @@ npscoefbw.scbandwidth <-
             mean.loo <- rep(maxPenalty,n)
             epsilon <- 1.0/n
             ridge <- double(n)
-            doridge <- !logical(n)
+            doridge <- rep.int(TRUE, n)
 
             nc <- ncol(tww[-1,-1,1])
 
             while(any(doridge)){
-              iloo <- seq_len(n)[doridge]
+              iloo <- which(doridge)
               for (ii in iloo) {
                 doridge[ii] <- FALSE
                 ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
@@ -349,22 +350,22 @@ npscoefbw.scbandwidth <-
               scoef.loo <- do.call(npscoef, scoef.loo.args)
               partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
             } else {
+              wj <- W[,partial.index]
               if (identical(regtype, "lc")) {
                 tww <- npksum(txdat=zdat,
-                              tydat=cbind(partial.orig * W[,partial.index],W[,partial.index]^2),
-                              weights=cbind(partial.orig * W[,partial.index],1),
+                              tydat=cbind(partial.orig * wj, wj * wj),
+                              weights=cbind(partial.orig * wj, 1),
                               bws=sbw,
                               leave.one.out=TRUE)$ksum
 
-                partial.loo <- W[,partial.index]*tww[1,2,]/NZD(tww[2,2,])
+                partial.loo <- wj * tww[1,2,]/NZD(tww[2,2,])
               } else {
                 kw <- .npscoef_weight_matrix(
                   bws = sbw,
-                  tzdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
-                  ezdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
+                  tzdat = zdat.df,
+                  ezdat = zdat.df,
                   leave.one.out = TRUE
                 )
-                wj <- W[,partial.index]
                 num <- as.vector(crossprod(kw, partial.orig * wj))
                 den <- as.vector(crossprod(kw, wj * wj))
                 partial.loo <- wj * num / NZD(den)
@@ -516,19 +517,20 @@ npscoefbw.scbandwidth <-
                   bws <- apply_bw_to_scbw(bws, bws$bw)
 
                   if (identical(regtype, "lc")) {
+                    wj <- W[,j]
                     tww <- npksum(txdat=zdat,
-                                  tydat=cbind(partial.orig * W[,j],W[,j]^2),
-                                  weights=cbind(partial.orig * W[,j],1),
+                                  tydat=cbind(partial.orig * wj, wj * wj),
+                                  weights=cbind(partial.orig * wj, 1),
                                   bws=bws)$ksum
                     scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
                   } else {
+                    wj <- W[,j]
                     kw <- .npscoef_weight_matrix(
                       bws = bws,
-                      tzdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
-                      ezdat = if (is.data.frame(zdat)) zdat else as.data.frame(zdat),
+                      tzdat = zdat.df,
+                      ezdat = zdat.df,
                       leave.one.out = FALSE
                     )
-                    wj <- W[,j]
                     num <- as.vector(crossprod(kw, partial.orig * wj))
                     den <- as.vector(crossprod(kw, wj * wj))
                     scoef$beta[,j] <- num / NZD(den)
