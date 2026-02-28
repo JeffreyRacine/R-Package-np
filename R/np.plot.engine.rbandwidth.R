@@ -32,7 +32,7 @@
            view = c("rotate","fixed"),
            plot.behavior = c("plot","plot-data","data"),
            plot.errors.method = c("none","bootstrap","asymptotic"),
-           plot.errors.boot.num = 399,
+           plot.errors.boot.num = 1999,
            plot.errors.boot.method = c("wild", "inid", "fixed", "geom"),
            plot.errors.boot.wild = c("rademacher", "mammen"),
            plot.errors.boot.blocklen = NULL,
@@ -227,12 +227,27 @@
         }
 
       } else if (plot.errors.method == "asymptotic") {
-        lerr = matrix(data = tobj$mean - qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
+        terr.obj <- .np_plot_asymptotic_error_from_se(
+          se = tobj$merr,
+          alpha = plot.errors.alpha,
+          band.type = plot.errors.type,
+          m = nrow(x.eval)
+        )
+        terr[,1:2] <- terr.obj$err
+        terr.all <- terr.obj$all.err
+        center.val <- tobj$mean
+        lerr = matrix(data = center.val - terr[,1],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
-        herr = matrix(data = tobj$mean + qnorm(plot.errors.alpha/2, lower.tail = FALSE)*tobj$merr,
+        herr = matrix(data = center.val + terr[,2],
           nrow = x1.neval, ncol = x2.neval, byrow = FALSE)
 
+        if (plot.errors.type == "all" && !is.null(terr.all)) {
+          lerr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val - te[,1], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+          herr.all <- lapply(terr.all, function(te)
+            matrix(data = center.val + te[,2], nrow = x1.neval, ncol = x2.neval, byrow = FALSE))
+        }
       }
 
       if(is.null(zlim)) {
@@ -461,9 +476,16 @@
         temp.mean[seq_len(xi.neval)] = if(gradients) tr$grad[,i] else tr$mean
 
         if (plot.errors){
-          if (plot.errors.method == "asymptotic")
-            temp.err[seq_len(xi.neval),1:2] = replicate(2,qnorm(plot.errors.alpha/2, lower.tail = FALSE)*(if(gradients) tr$gerr[,i] else tr$merr))
-          else if (plot.errors.method == "bootstrap"){
+          if (plot.errors.method == "asymptotic") {
+            asym.obj <- .np_plot_asymptotic_error_from_se(
+              se = if (gradients) tr$gerr[,i] else tr$merr,
+              alpha = plot.errors.alpha,
+              band.type = plot.errors.type,
+              m = xi.neval
+            )
+            temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+            temp.all.err <- asym.obj$all.err
+          } else if (plot.errors.method == "bootstrap"){
             temp.boot.raw <- compute.bootstrap.errors(
                       xdat = xdat, ydat = ydat,
                       exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],

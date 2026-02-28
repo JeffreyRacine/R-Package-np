@@ -116,6 +116,14 @@
   error for the bootstrap estimate of the variance of the empirical mean
   is minimized.
 
+  The default bootstrap replication count is \code{plot.errors.boot.num=1999}.
+  For interval types \code{"bonferroni"}, \code{"simultaneous"}, and
+  \code{"all"}, the minimum recommended count is
+  \eqn{B_{\min}=\lceil 2m/\alpha-1 \rceil}{Bmin=ceiling(2*m/alpha-1)},
+  where \eqn{m} is the number of evaluation points used by the plotted
+  curve/surface. For full 2D perspective grids this is typically
+  \eqn{m=\texttt{neval}^2}{m=neval^2}.
+
 }
 
 \value{
