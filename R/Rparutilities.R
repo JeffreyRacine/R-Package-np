@@ -656,10 +656,19 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
     dotarg <- tmpfunarg$dot.arg
     mpi.anytag <- mpi.any.tag()
     repeat {
-        tmpdata.arg <- mpi.recv.Robj(source=0,tag=mpi.anytag, comm=.comm)$data.arg
+        tmpmsg <- mpi.recv.Robj(source=0,tag=mpi.anytag, comm=.comm)
         tag <- mpi.get.sourcetag()[2]
         if (tag > n)
             break
+        tmpdata.arg <- if (is.list(tmpmsg)) tmpmsg$data.arg else NULL
+        if (is.null(tmpdata.arg)) {
+            out <- structure(
+                "mpi.applyLB worker received malformed task payload",
+                class = "try-error"
+            )
+            mpi.send.Robj(out,0,tag,.comm)
+            next
+        }
         out <- tryCatch(do.call(.tmpfun, c(tmpdata.arg, dotarg)),
                         error = function(e)
                           structure(conditionMessage(e),

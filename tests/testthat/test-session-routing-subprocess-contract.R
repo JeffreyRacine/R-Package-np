@@ -275,6 +275,53 @@ test_that("session wild selector plot smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session wild then inid plot sequence keeps worker pool responsive", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "set.seed(27182)",
+      "n <- 120",
+      "x <- runif(n)",
+      "y <- sin(2*pi*x) + rnorm(n, sd=0.1)",
+      "bw <- npregbw(y~x, bws=0.2, bandwidth.compute=FALSE)",
+      "out.w <- suppressWarnings(plot(",
+      "  bw,",
+      "  xdat=data.frame(x=x),",
+      "  ydat=y,",
+      "  plot.behavior='data',",
+      "  plot.errors.method='bootstrap',",
+      "  plot.errors.boot.method='wild',",
+      "  plot.errors.boot.num=40",
+      "))",
+      "out.i <- suppressWarnings(plot(",
+      "  bw,",
+      "  xdat=data.frame(x=x),",
+      "  ydat=y,",
+      "  plot.behavior='data',",
+      "  plot.errors.method='bootstrap',",
+      "  plot.errors.boot.method='inid',",
+      "  plot.errors.boot.num=40",
+      "))",
+      "stopifnot(is.list(out.w), length(out.w) > 0)",
+      "stopifnot(is.list(out.i), length(out.i) > 0)",
+      "r <- npRmpi:::mpi.remote.exec(1+1)",
+      "stopifnot(length(r) >= 1L)",
+      "cat('SESSION_WILD_INID_SEQUENCE_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_WILD_INID_SEQUENCE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session inid plot smoke completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
