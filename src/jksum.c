@@ -4768,7 +4768,7 @@ const NP_GateOverrideCtx * const gate_override_ctx){
   const NP_GateOverrideCtx * const gate_ctx =
     np_gate_ctx_is_sane(gate_ctx_raw) ? gate_ctx_raw : &gate_ctx_empty;
   const int disable_gate_features =
-    (gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE);
+    ((gate_ctx != NULL) && (gate_ctx->active == NP_GATE_CTX_DISABLE));
   assert(np_gate_ctx_is_sane(gate_ctx));
   
   /* This function takes a vector Y and returns a kernel weighted
@@ -4791,7 +4791,8 @@ const NP_GateOverrideCtx * const gate_override_ctx){
 
   int p_nvar;
 
-  np_refresh_runtime_tolerances();
+  if(!np_runtime_tol_cache_ready)
+    np_refresh_runtime_tolerances();
 
   if(no_bpso){
     bpso = (int *)malloc((num_reg_unordered + num_reg_ordered + num_reg_continuous)*sizeof(int));

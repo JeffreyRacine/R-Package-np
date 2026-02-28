@@ -551,11 +551,11 @@ static double bwmfunc_wrapper(double *p)
     const double fast_after = np_fastcv_alllarge_hits_get();
     if (fast_after > fast_before)
       bwm_fast_eval_count += (fast_after - fast_before);
-  }
-  {
-    const double fallback_after = np_fastcv_alllarge_fallbacks_get();
-    if (fallback_after > fallback_before)
-      bwm_fallback_eval_count += (fallback_after - fallback_before);
+    {
+      const double fallback_after = np_fastcv_alllarge_fallbacks_get();
+      if (fallback_after > fallback_before)
+        bwm_fallback_eval_count += (fallback_after - fallback_before);
+    }
   }
 
   if (!R_FINITE(val) || val == DBL_MAX) {
