@@ -1,5 +1,7 @@
 # np-master Modernization Definition of Done
 
+Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
+
 ## Goal
 Ship a release-candidate-quality `np` that is modern, stable, performance-accountable, and aligned with:
 

@@ -1,5 +1,7 @@
 # `R CMD check --as-cran` Warning/Note Ledger (`np-master`)
 
+Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
+
 Last refresh: 2026-02-23 (post compact-vignette + shellcheck-wrapper checkpoint)  
 Tarball: `np_0.70-0.tar.gz`  
 Check log: `/tmp/np_master_check_ascran_compact_shellcheck_20260223.log`
