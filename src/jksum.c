@@ -12542,11 +12542,7 @@ double *SIGN){
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
   np_gate_ctx_clear(&gate_ctx_local);
-  #ifdef MPI2
-  const NP_GateOverrideCtx * const est_gate_ctx_ptr = NULL;
-  #else
   const NP_GateOverrideCtx * const est_gate_ctx_ptr = &gate_ctx_local;
-  #endif
 
   struct th_table * otabs = NULL;
   struct th_entry * ret = NULL;
@@ -12824,13 +12820,7 @@ double *SIGN){
       }
     }
 
-    #ifdef MPI2
-    const int allow_estimation_shortcut = (iNum_Processors <= 1);
-    #else
-    const int allow_estimation_shortcut = 1;
-    #endif
-
-    if(all_large_gate && allow_estimation_shortcut &&
+    if(all_large_gate &&
        ((int_ll == LL_LL) || (int_ll == LL_GLP))){
       double kconst = 1.0;
       int kconst_ok = 1;
