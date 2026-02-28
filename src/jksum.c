@@ -12658,13 +12658,7 @@ double *SIGN){
       }
     }
 
-    #ifdef MPI2
-    const int allow_estimation_shortcut = (iNum_Processors <= 1);
-    #else
-    const int allow_estimation_shortcut = 1;
-    #endif
-
-    if(all_large_gate && allow_estimation_shortcut &&
+    if(all_large_gate &&
        ((int_ll == LL_LL) || (int_ll == LL_GLP))){
       double kconst = 1.0;
       int kconst_ok = 1;
