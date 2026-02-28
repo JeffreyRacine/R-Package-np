@@ -320,7 +320,7 @@ npreg.rbandwidth <-
         bernstein.basis = bernstein.local
       )
 
-      apply_direct <- function(s = NULL) {
+      apply_direct <- function(s = NULL, mean.ref = NULL) {
         s.local <- .npreghat_resolve_s(s = s, deriv = NULL, ncon = bws$ncon, con.names = con.names)
         if (any(s.local > degree.local))
           stop("requested derivative order exceeds local polynomial degree")
@@ -341,6 +341,7 @@ npreg.rbandwidth <-
           W.eval <- matrix(W.eval, nrow = enrow, byrow = FALSE)
 
         out <- numeric(enrow)
+        se <- numeric(enrow)
         for (ii in seq_len(enrow)) {
           kw <- .np_kernel_weights_direct(
             bws = bws,
@@ -360,12 +361,21 @@ npreg.rbandwidth <-
             stop(sprintf("failed to solve local system at evaluation row %d", ii))
           h.row <- kw * drop(W.base %*% solve.out$v)
           out[ii] <- drop(crossprod(h.row, tydat))
+
+          # Robust local-sandwich variance for the current evaluation row.
+          mean.local <- if (is.null(mean.ref)) out[ii] else mean.ref[ii]
+          u2 <- (tydat - mean.local)^2
+          v.mat <- crossprod(W.base, W.base * ((kw * kw) * u2))
+          var.local <- drop(crossprod(solve.out$v, v.mat %*% solve.out$v))
+          se[ii] <- sqrt(max(var.local, 0.0))
         }
-        out
+        list(fit = out, se = se)
       }
 
-      mean.fallback <- apply_direct()
-      merr.fallback <- rep(NA_real_, length(mean.fallback))
+      mean.fallback.out <- apply_direct()
+      mean.fallback <- mean.fallback.out$fit
+      merr.fallback <- mean.fallback.out$se
+      merr.fallback[!is.finite(merr.fallback)] <- NA_real_
 
       grad.fallback <- NULL
       gerr.fallback <- NULL
@@ -377,8 +387,11 @@ npreg.rbandwidth <-
           for (jj in seq_along(cont.idx)) {
             s.vec <- integer(bws$ncon)
             s.vec[jj] <- 1L
-            grad.fallback[, cont.idx[jj]] <- apply_direct(s = s.vec)
+            grad.fallback.out <- apply_direct(s = s.vec, mean.ref = mean.fallback)
+            grad.fallback[, cont.idx[jj]] <- grad.fallback.out$fit
+            gerr.fallback[, cont.idx[jj]] <- grad.fallback.out$se
           }
+          gerr.fallback[!is.finite(gerr.fallback)] <- NA_real_
         }
       }
 

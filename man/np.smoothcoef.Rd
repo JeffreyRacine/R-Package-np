@@ -198,6 +198,11 @@ FALSE, \dots)
   \item{beta}{ if \code{betas = TRUE}, estimates of the coefficients
     \eqn{\gamma}{gamma} at the 
     evaluation points }
+  \item{grad}{ estimated derivatives of the conditional mean with
+    respect to the regressors in \code{xdat}; these correspond to the
+    non-intercept smooth coefficient estimates at each evaluation point}
+  \item{gerr}{ if \code{errors = TRUE}, asymptotic standard errors for
+    \code{grad} }
   \item{resid}{ if \code{residuals = TRUE}, in-sample or out-of-sample
     residuals where appropriate (or possible) }
   \item{R2}{ coefficient of determination (Doksum and Samarov (1995))}

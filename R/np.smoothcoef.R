@@ -232,10 +232,6 @@ npscoef.scbandwidth <-
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
-    if (!identical(regtype, "lc") && errors) {
-      warning("errors=TRUE currently supports regtype='lc' for npscoef; setting errors=FALSE")
-      errors <- FALSE
-    }
 
     miss.z <- missing(tzdat)
 
@@ -545,28 +541,19 @@ npscoef.scbandwidth <-
       }
     }
 
+    beta.se <- NULL
     if(errors){
-      ## kernel^2 integrals
-      k <- (int.kernels[switch(bws$ckertype,
-                               "truncated gaussian" = CKER_TGAUSS,
-                              gaussian = CKER_GAUSS + bws$ckerorder/2 - 1,
-                              epanechnikov = CKER_EPAN + bws$ckerorder/2 - 1,
-                              uniform = CKER_UNI)+1])^length(bws$bw)
-
-      u2.W <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop=FALSE]*u2.W[i] })
-      u2.W <- t(u2.W)
-
-      vhat.args <- list(txdat = tzdat, tydat = W.train, weights = u2.W, bws = bws, leave.one.out = leave.one.out)
-      if (!miss.ex)
-        vhat.args$exdat <- ezdat
-      V.hat <- do.call(npksum, vhat.args)$ksum
-
-      ## asymptotics rely on positive definite nature of tww (ie. M.eval) and V.hat
-      ## so choleski decomposition is used to assure their veracity
-      merr <- sqrt(sapply(seq_len(enrow), function(i){
-        cm <- chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))
-        k*(W[i,,drop=FALSE] %*% cm %*% V.hat[,,i] %*% cm %*% t(W[i,,drop=FALSE]))
-      }))
+      u2 <- as.double(u2.W)
+      merr <- rep(NA_real_, enrow)
+      beta.se <- matrix(NA_real_, nrow = enrow, ncol = nc)
+      for (i in seq_len(enrow)) {
+        cm <- chol2inv(chol(tww[,,i] + diag(rep(ridge[i], nc))))
+        s.mat <- crossprod(W.train, W.train * ((kw[, i]^2) * u2))
+        vcv <- cm %*% s.mat %*% cm
+        w.i <- W[i,,drop=FALSE]
+        merr[i] <- sqrt(max(drop(w.i %*% vcv %*% t(w.i)), 0.0))
+        beta.se[i,] <- sqrt(pmax(diag(vcv), 0.0))
+      }
 
     }
 
@@ -581,6 +568,11 @@ npscoef.scbandwidth <-
     )
     if (errors && !do.iterate)
       sc.obj.args$merr <- merr
+    if (ncol(txdat) > 0L) {
+      sc.obj.args$grad <- t(coef.mat[-1,,drop = FALSE])
+      if (errors && !do.iterate && !is.null(beta.se))
+        sc.obj.args$gerr <- beta.se[, -1, drop = FALSE]
+    }
     if (betas)
       sc.obj.args$beta <- t(coef.mat)
     if (residuals)

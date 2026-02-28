@@ -192,7 +192,9 @@ npqreg(bws, \dots)
   \item{eval}{ evaluation points }
   \item{quantile}{ estimation of the quantile regression function
     (conditional quantile) at the  evaluation points }
-  \item{quanterr}{ standard errors of the quantile regression estimates } 
+  \item{quanterr}{ asymptotic standard errors of the quantile
+    regression estimates, based on the estimated conditional density at
+    the fitted quantile }
   \item{quantgrad}{ gradients at each evaluation point }
   \item{tau}{ the \eqn{\tau}{tau}th quantile computed }
 

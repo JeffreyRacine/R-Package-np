@@ -188,6 +188,10 @@ npqreg.condbandwidth <-
     } else {
       txeval <- exdat
     }
+    txdat.df <- txdat
+    tydat.df <- tydat
+    if (!no.ex)
+      exdat.df <- exdat
 
     ## at this stage, data to be sent to the c routines must be converted to
     ## numeric type.
@@ -282,6 +286,57 @@ npqreg.condbandwidth <-
             as.integer(bws$xndim),
             as.logical(gradients),
             PACKAGE="npRmpi")[c("yq", "yqerr", "yqgrad")]
+
+    if (all(!is.finite(myout$yqerr) | myout$yqerr <= 0.0)) {
+      dens.bw <- tryCatch(
+        conbandwidth(
+          xbw = bws$xbw,
+          ybw = bws$ybw,
+          bwmethod = "manual",
+          bwscaling = bws$scaling,
+          bwtype = bws$type,
+          cxkertype = bws$cxkertype,
+          cxkerorder = bws$cxkerorder,
+          cxkerbound = bws$cxkerbound,
+          cxkerlb = bws$cxkerlb,
+          cxkerub = bws$cxkerub,
+          uxkertype = bws$uxkertype,
+          oxkertype = bws$oxkertype,
+          cykertype = bws$cykertype,
+          cykerorder = bws$cykerorder,
+          cykerbound = bws$cykerbound,
+          cykerlb = bws$cykerlb,
+          cykerub = bws$cykerub,
+          uykertype = bws$uykertype,
+          oykertype = bws$oykertype,
+          nobs = nrow(txdat.df),
+          xdati = bws$xdati,
+          ydati = bws$ydati,
+          xnames = bws$xnames,
+          ynames = bws$ynames,
+          sfactor = bws$sfactor,
+          bandwidth = bws$bw,
+          bandwidth.compute = FALSE
+        ),
+        error = function(e) NULL
+      )
+      dens.obj <- tryCatch(
+        npcdens(
+          txdat = txdat.df,
+          tydat = tydat.df,
+          exdat = if (no.ex) txdat.df else exdat.df,
+          eydat = data.frame(y = as.double(myout$yq)),
+          bws = dens.bw
+        ),
+        error = function(e) NULL
+      )
+      if (!is.null(dens.obj)) {
+        dens.q <- as.double(dens.obj$condens)
+        qvar <- tau * (1.0 - tau) / (tnrow * NZD(dens.q)^2)
+        myout$yqerr <- sqrt(pmax(qvar, 0.0))
+        myout$yqerr[!is.finite(myout$yqerr)] <- NA_real_
+      }
+    }
 
     ##need to untangle yqgrad
 
