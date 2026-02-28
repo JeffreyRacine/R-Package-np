@@ -1,5 +1,7 @@
 # np-npRmpi Modernization Definition of Done
 
+Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
+
 ## Goal
 Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycle behavior, and aligned with:
 

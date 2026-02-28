@@ -164,7 +164,7 @@ Changed files: 62
 - `demo/timing_n_4.tex`: Added in the current codebase (new file). (last change: 2026-02-04 | Align npRmpi docs and remove non-CRAN artifacts)
 - `inst/MacR64slaves.sh`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
 - `inst/legacy-bootstrap-profile`: MPI runtime profile updated for stable slave startup and shutdown. (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
-- `inst/Rslaves.sh`: Rmpi slave launcher updated (adds --vanilla and compatibility tweaks). (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
+- `inst/Rslaves.sh`: Rmpi slave launcher updated (adds --no-save and compatibility tweaks). (last change: 2026-02-05 | Sync partial Rmpi 0.7-3.3 updates)
 - `inst/Rslaves32.cmd`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
 - `inst/Rslaves64.cmd`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)
 - `inst/compile_npRmpi_MS_Windows.txt`: Added in the current codebase (new file). (last change: 2013-03-20 | This is the new npRmpi branch of the np project. It was created to enhance the maintainability of the two projects.)

@@ -93,7 +93,7 @@ run_mpiexec_route() {
       rm -f "${batch_out}"
       cmd=("${mpiexec}" -n 2 "${r_bin}" CMD BATCH --no-save "${route_script}" "${batch_out}")
     else
-      cmd=("${mpiexec}" -n 2 "${rscript_bin}" --vanilla "${route_script}")
+      cmd=("${mpiexec}" -n 2 "${rscript_bin}" --no-save "${route_script}")
     fi
 
     set +e

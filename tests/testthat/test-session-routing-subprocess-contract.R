@@ -5,7 +5,7 @@ run_rscript_subprocess <- function(lines, timeout = 45L, env = character()) {
 
   cmd <- file.path(R.home("bin"), "Rscript")
   out <- suppressWarnings(system2(cmd,
-                                  c("--vanilla", script),
+                                  c("--no-save", script),
                                   stdout = TRUE,
                                   stderr = TRUE,
                                   timeout = timeout,
@@ -526,14 +526,14 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
   skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
   res <- run_cmd_subprocess(
     mpiexec,
-    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--vanilla", script),
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
     timeout = 90L,
     env = c(env_common, "FI_TCP_IFACE=en0", "FI_PROVIDER=tcp", "FI_SOCKETS_IFACE=en0")
   )
   if (res$status != 0L) {
     res <- run_cmd_subprocess(
       mpiexec,
-      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--vanilla", script),
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
       timeout = 90L,
       env = c(env_common, "FI_TCP_IFACE=lo0", "FI_PROVIDER=tcp", "FI_SOCKETS_IFACE=lo0")
     )
@@ -594,7 +594,7 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
 
   res <- run_cmd_subprocess(
     mpiexec,
-    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--vanilla", script),
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
     timeout = 90L,
     env = env_profile
   )
@@ -609,7 +609,7 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     )
     res <- run_cmd_subprocess(
       mpiexec,
-      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--vanilla", script),
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
       timeout = 90L,
       env = env_profile_fallback
     )

@@ -7,7 +7,7 @@ library(npRmpi)
 
 ## Initialize master and slaves.
 ## Batch/cluster usage (attach mode under mpiexec):
-##   mpiexec -n <master+slaves> R CMD BATCH --vanilla <script>.R
+##   mpiexec -n <master+slaves> R CMD BATCH --no-save <script>.R
 ## Inside the script, use attach mode instead of spawning:
 ##   try(mpi.comm.dup(0, 1), silent = TRUE)
 ##   npRmpi.init(mode="attach", comm=1, autodispatch=TRUE, np.messages=FALSE)

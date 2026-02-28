@@ -1,5 +1,7 @@
 # `R CMD check --as-cran` Warning/Note Ledger (`np-npRmpi`)
 
+Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
+
 Last refresh: 2026-02-27 (strict `Rmpi` decoupling refresh)  
 Tarball: `npRmpi_0.70-1.tar.gz`  
 Check log: `/tmp/nprmpi_check_notimeout_20260227_071702.log`

@@ -12,7 +12,7 @@ run: run-$(MODE)
 run-serial:
 	@for d in $(DEMOS); do \
 		echo "[serial] $$d"; \
-		R CMD BATCH --vanilla ../$${d}_serial.R; \
+		R CMD BATCH --no-save ../$${d}_serial.R; \
 	done
 
 run-attach:
