@@ -587,8 +587,8 @@
                   band.type = plot.errors.type,
                   m = xi.neval
                 )
-                temp.err[seq_len(xi.neval),1:2] <- asym.obj
-                temp.all.err <- asym.obj.err
+                temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+                temp.all.err <- asym.obj$all.err
             }
             else if (plot.errors.method == "bootstrap"){
               temp.boot <- compute.bootstrap.errors(
@@ -782,8 +782,8 @@
                   band.type = plot.errors.type,
                   m = xi.neval
                 )
-                temp.err[seq_len(xi.neval),1:2] <- asym.obj
-                temp.all.err <- asym.obj.err
+                temp.err[seq_len(xi.neval),1:2] <- asym.obj$err
+                temp.all.err <- asym.obj$all.err
               }
               else if (plot.errors.method == "bootstrap"){
                 temp.boot <- compute.bootstrap.errors(
