@@ -4,10 +4,6 @@
 #include <R.h>
 #include "headers.h"
 
-#ifdef RCSID
-static char rcsid[] = "$Id: mat_vec.c,v 1.5 2006/11/02 16:56:49 tristen Exp $";
-#endif
-
 /*
  * This function allocates an n by k array of double precision floating  point numbers.
  */

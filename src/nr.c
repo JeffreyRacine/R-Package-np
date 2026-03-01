@@ -5,10 +5,6 @@
 #include <R.h>
 #include "headers.h"
 
-#ifdef RCSID
-static char rcsid[] = "$Id: nr.c,v 1.10 2006/11/02 16:56:49 tristen Exp $";
-#endif
-
 extern int int_VERBOSE;
 
 /* The following routines (sort, powell, nrerror, vector, free_vector,
