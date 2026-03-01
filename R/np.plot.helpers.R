@@ -868,7 +868,9 @@
     }
   }
 
-  degree <- if (identical(regtype, "ll")) {
+  degree <- if (identical(regtype, "lc")) {
+    rep.int(0L, ncon)
+  } else if (identical(regtype, "ll")) {
     rep.int(1L, ncon)
   } else {
     npValidateGlpDegree(
@@ -916,40 +918,69 @@
   if (nrow(W) != n || nrow(W.eval) != neval || ncol(W.eval) != ncol(W))
     stop("regression moment design matrix shape mismatch")
 
+  p <- ncol(W)
+  mcols <- p * (p + 1L) / 2L
   rhs <- W.eval
-  ones.counts <- rep.int(1.0, n)
+  ones <- matrix(1.0, nrow = n, ncol = 1L)
 
-  compute_from_counts <- function(counts.vec, rhs.row, kw.col) {
-    w <- as.double(counts.vec) * as.double(kw.col)
-    A <- crossprod(W, W * w)
-    z <- crossprod(W, ydat * w)
-    .np_inid_lp_predict_row(
-      A = A,
-      z = as.double(z),
-      rhs = as.double(rhs.row),
-      ridge.base = ridge
-    )
-  }
-
+  Mfeat <- vector("list", neval)
+  Zfeat <- vector("list", neval)
   t0 <- numeric(neval)
-  for (i in seq_len(neval))
-    t0[i] <- compute_from_counts(
-      counts.vec = ones.counts,
-      rhs.row = rhs[i, ],
-      kw.col = kw[, i]
-    )
+
+  for (i in seq_len(neval)) {
+    k <- as.double(kw[, i])
+    WK <- W * k
+    Zfeat[[i]] <- WK * ydat
+
+    mf <- matrix(0.0, nrow = n, ncol = mcols)
+    idx <- 1L
+    for (a in seq_len(p)) {
+      for (b in a:p) {
+        mf[, idx] <- WK[, a] * W[, b]
+        idx <- idx + 1L
+      }
+    }
+    Mfeat[[i]] <- mf
+
+    M0 <- crossprod(ones, mf)
+    Z0 <- crossprod(ones, Zfeat[[i]])
+    t0[i] <- if (p > 3L) {
+      .np_inid_lp_predict_chunk_general(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.base = ridge
+      )[1L]
+    } else {
+      .np_inid_lp_predict_chunk(
+        Mvals = M0,
+        Zvals = Z0,
+        rhs = rhs[i, ],
+        ridge.base = ridge
+      )[1L]
+    }
+  }
 
   compute_chunk <- function(counts.chunk) {
     counts.chunk <- as.matrix(counts.chunk)
     bsz <- ncol(counts.chunk)
     out <- matrix(NA_real_, nrow = bsz, ncol = neval)
-    for (b in seq_len(bsz)) {
-      cvec <- counts.chunk[, b]
-      for (i in seq_len(neval)) {
-        out[b, i] <- compute_from_counts(
-          counts.vec = cvec,
-          rhs.row = rhs[i, ],
-          kw.col = kw[, i]
+    for (i in seq_len(neval)) {
+      Mvals <- crossprod(counts.chunk, Mfeat[[i]])
+      Zvals <- crossprod(counts.chunk, Zfeat[[i]])
+      out[, i] <- if (p > 3L) {
+        .np_inid_lp_predict_chunk_general(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.base = ridge
+        )
+      } else {
+        .np_inid_lp_predict_chunk(
+          Mvals = Mvals,
+          Zvals = Zvals,
+          rhs = rhs[i, ],
+          ridge.base = ridge
         )
       }
     }
