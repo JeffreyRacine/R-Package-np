@@ -230,10 +230,10 @@ npplregbw.default =
   function(xdat = stop("invoked without data `xdat'"),
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
-           bws, ...,
            bandwidth.compute = TRUE,
-           nmulti, remin, itmax,
-           ftol, tol, small){
+           bws,
+           ftol, itmax, nmulti, remin, small, tol,
+           ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
     .npRmpi_require_active_slave_pool(where = "npplregbw()")
     if (.npRmpi_autodispatch_active())
