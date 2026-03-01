@@ -8444,7 +8444,8 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
   }
 
-  if((bwm == RBWM_CVLS) && (int_ll == LL_LL)){
+  if((bwm == RBWM_CVLS) && (int_ll == LL_LL) &&
+     (num_reg_unordered == 0) && (num_reg_ordered == 0)){
     cv = np_reg_cv_ls_stable_ll_glp(int_ll,
                                     BANDWIDTH_reg,
                                     num_obs,
