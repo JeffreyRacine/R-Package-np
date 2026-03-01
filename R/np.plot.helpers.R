@@ -126,6 +126,8 @@
   invisible(TRUE)
 }
 
+# Policy hook: fastpath remains default-on; keep as helper so policy can be
+# centralized without touching call sites.
 .npRmpi_plot_inid_ksum_fastpath_enabled <- function() {
   TRUE
 }
@@ -159,6 +161,7 @@
 }
 
 .npRmpi_bootstrap_fail_or_fallback <- function(msg, what = "bootstrap") {
+  # Fail-fast by design: MPI-selected routes must not silently fallback.
   stop(sprintf("MPI %s %s", what, msg), call. = FALSE)
 }
 

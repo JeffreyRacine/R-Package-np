@@ -522,10 +522,13 @@
     dt <- proc.time()[["elapsed"]] - t0
     if (!is.finite(dt) || dt < 0)
       dt <- 0.0
+    # Intentional <<- : closure-level accumulator for communication timing.
     comm.elapsed <<- comm.elapsed + as.double(dt)
+    # Intentional <<- : closure-level counter for communication events.
     comm.calls <<- as.integer(comm.calls) + 1L
     if (!is.na(note) && nzchar(as.character(note)[1L]) &&
         identical(getOption("npRmpi.profile.level", "basic"), "detailed")) {
+      # Intentional <<- : append detailed event notes in parent accumulator.
       note.vec <<- c(note.vec, as.character(note)[1L])
     }
     out
@@ -538,6 +541,7 @@
       dt <- 0.0
     if (!is.na(note) && nzchar(as.character(note)[1L]) &&
         identical(getOption("npRmpi.profile.level", "basic"), "detailed")) {
+      # Intentional <<- : append detailed step notes in parent accumulator.
       note.vec <<- c(note.vec, as.character(note)[1L])
     }
     out

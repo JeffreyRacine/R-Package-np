@@ -2,9 +2,7 @@
 #include <R_ext/Rdynload.h>
 #include <Rinternals.h>
 
-/* FIXME: 
-   Check these declarations against the C/Fortran source code.
-*/
+/* Routine registration for the npRmpi shared library. */
 
 /* .Call calls */
 extern SEXP C_gsl_bspline(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -49,6 +47,9 @@ static const R_CallMethodDef CallEntries[] = {
 void R_init_npRmpi(DllInfo *dll)
 {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
-    /* Keep dynamic lookup enabled for legacy .Call("mpi_*", ...) symbols. */
+    /*
+     * Keep dynamic lookup enabled for legacy .Call("mpi_*", ...) entry points
+     * resolved from embedded MPI runtime symbols.
+     */
     R_useDynamicSymbols(dll, TRUE);
 }

@@ -148,6 +148,12 @@ the slaves. In \code{mode="attach"}, \code{npRmpi.quit()} signals worker
 ranks to exit their loop and returns on rank 0 without forcing an R quit
 on the master process.
 
+Advanced diagnostic option: setting environment variable
+\code{NP_RMPI_SKIP_INIT} to a non-empty value before loading \pkg{npRmpi}
+skips MPI initialization in \code{.onLoad}. This is intended for
+development/debug workflows only, and disables normal MPI session startup
+until a standard initialization path is used.
+
 For stability, avoid attaching \pkg{Rmpi} directly before calling
 \code{npRmpi.init()}. If \pkg{Rmpi} is attached, \code{npRmpi.init()}
 fails fast with an actionable error message.
