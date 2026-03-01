@@ -225,10 +225,10 @@ npplregbw.default =
   function(xdat = stop("invoked without data `xdat'"),
            ydat = stop("invoked without data `ydat'"),
            zdat = stop("invoked without data `zdat'"),
-           bws, ...,
            bandwidth.compute = TRUE,
-           nmulti, remin, itmax,
-           ftol, tol, small){
+           bws,
+           ftol, itmax, nmulti, remin, small, tol,
+           ...){
     bandwidth.compute <- npValidateScalarLogical(bandwidth.compute, "bandwidth.compute")
 
     ## maintain x names and 'toFrame'
@@ -265,7 +265,7 @@ npplregbw.default =
 
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("nmulti", "remin", "itmax", "ftol", "tol", "small")
+    margs <- c("ftol", "itmax", "nmulti", "remin", "small", "tol")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 

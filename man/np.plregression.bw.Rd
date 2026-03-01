@@ -33,15 +33,15 @@ npplregbw(\dots)
 \method{npplregbw}{default}(xdat = stop("invoked without data `xdat'"),
           ydat = stop("invoked without data `ydat'"),
           zdat = stop("invoked without data `zdat'"),
-          bws,
-          \dots,
           bandwidth.compute = TRUE,
+          bws,
+          ftol,
+          itmax,
           nmulti,
           remin,
-          itmax,
-          ftol,
+          small,
           tol,
-          small)
+          \dots)
 
 \method{npplregbw}{plbandwidth}(xdat = stop("invoked without data `xdat'"),
           ydat = stop("invoked without data `ydat'"),
@@ -136,6 +136,17 @@ npplregbw(\dots)
     in \code{bws}. Defaults to \code{TRUE}.
   }
 
+  \item{ftol}{
+    tolerance on the value of the cross-validation function 
+    evaluated at located minima. Defaults to \code{1.19e-07
+      (FLT_EPSILON)}
+  }
+
+  \item{itmax}{
+    integer number of iterations before failure in the numerical
+    optimization routine. Defaults to \code{10000}
+  }
+
   \item{nmulti}{
     integer number of times to restart the process of finding extrema of
     the cross-validation function from different (random) initial
@@ -148,26 +159,15 @@ npplregbw(\dots)
     to \code{TRUE}
   }
 
-  \item{itmax}{
-    integer number of iterations before failure in the numerical
-    optimization routine. Defaults to \code{10000}
-  }
+  \item{small}{ a small number, at about the precision of the data type
+    used. Defaults to \code{2.22e-16 (DBL_EPSILON)}
 
-  \item{ftol}{
-    tolerance on the value of the cross-validation function 
-    evaluated at located minima. Defaults to \code{1.19e-07
-      (FLT_EPSILON)}
   }
 
   \item{tol}{
     tolerance on the position of located minima of the 
     cross-validation function. Defaults to \code{1.49e-08
       (sqrt(DBL_EPSILON))}
-  }
-
-  \item{small}{ a small number, at about the precision of the data type
-    used. Defaults to \code{2.22e-16 (DBL_EPSILON)}
-
   }
 
 }
