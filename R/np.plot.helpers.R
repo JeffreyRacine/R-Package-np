@@ -137,6 +137,27 @@
   size - 1L
 }
 
+.npRmpi_bootstrap_tune_chunk_size <- function(B,
+                                              chunk.size,
+                                              comm = 1L,
+                                              include.master = TRUE) {
+  B <- as.integer(B)
+  chunk.size <- as.integer(chunk.size)
+  if (is.na(B) || B < 1L)
+    return(1L)
+  if (is.na(chunk.size) || chunk.size < 1L)
+    chunk.size <- 1L
+
+  workers <- .npRmpi_bootstrap_worker_count(comm = comm)
+  slots <- workers + if (isTRUE(include.master)) 1L else 0L
+  if (slots > 1L && B >= slots) {
+    max.chunk <- max(1L, as.integer(floor(B / slots)))
+    chunk.size <- min(chunk.size, max.chunk)
+  }
+
+  max(1L, min(B, chunk.size))
+}
+
 .npRmpi_bootstrap_fail_or_fallback <- function(msg, what = "bootstrap") {
   stop(sprintf("MPI %s %s", what, msg), call. = FALSE)
 }
@@ -318,12 +339,96 @@
   )
   use.master.local <- !isTRUE(.npRmpi_has_active_slave_pool(comm = comm)) &&
     isTRUE(.npRmpi_master_only_mode(comm = comm))
+  workers <- .npRmpi_bootstrap_worker_count(comm = comm)
   t.comm <- proc.time()
   parts <- if (isTRUE(use.master.local)) {
     tryCatch(
       lapply(tasks, function(task) do.call(worker, c(list(task), list(...)))),
       error = function(e) e
     )
+  } else if (workers >= 1L && length(tasks) >= 2L) {
+    tryCatch({
+      n.tasks <- length(tasks)
+      local.idx <- seq.int(1L, n.tasks, by = workers + 1L)
+      remote.idx <- setdiff(seq_len(n.tasks), local.idx)
+      parts.out <- vector("list", n.tasks)
+
+      local.eval <- function(task) {
+        tryCatch(
+          do.call(worker, c(list(task), list(...))),
+          error = function(e)
+            structure(conditionMessage(e), class = "try-error", condition = e)
+        )
+      }
+
+      if (length(remote.idx) == 0L) {
+        for (ii in local.idx)
+          parts.out[[ii]] <- local.eval(tasks[[ii]])
+      } else {
+        n.remote <- length(remote.idx)
+        slave.num <- workers
+        mpi.anysource <- mpi.any.source()
+        mpi.anytag <- mpi.any.tag()
+
+        mpi.bcast.cmd(.mpi.worker.applyLB, n = n.remote, comm = comm)
+        mpi.bcast.Robj(list(FUN = worker, dot.arg = list(...)), rank = 0, comm = comm)
+
+        init <- min(slave.num, n.remote)
+        if (init > 0L) {
+          for (i in seq_len(init)) {
+            task.idx <- remote.idx[i]
+            mpi.send.Robj(list(data.arg = list(tasks[[task.idx]])), dest = i, tag = i, comm = comm)
+          }
+        }
+
+        if (init < slave.num) {
+          stop.tag <- as.integer(n.remote + 1L)
+          for (i in seq.int(init + 1L, slave.num)) {
+            mpi.send.Robj(as.integer(0), dest = i, tag = stop.tag, comm = comm)
+          }
+        }
+
+        local.ptr <- 1L
+        local.n <- length(local.idx)
+        sent <- init
+        done <- 0L
+
+        while (done < n.remote || local.ptr <= local.n) {
+          progressed <- FALSE
+
+          if (done < n.remote && isTRUE(mpi.iprobe(mpi.anysource, mpi.anytag, comm))) {
+            srctag <- mpi.get.sourcetag()
+            src <- srctag[1L]
+            tag <- srctag[2L]
+            res <- mpi.recv.Robj(source = src, tag = tag, comm = comm)
+            done <- done + 1L
+            task.idx <- remote.idx[tag]
+            parts.out[[task.idx]] <- res
+
+            sent <- sent + 1L
+            if (sent <= n.remote) {
+              next.idx <- remote.idx[sent]
+              mpi.send.Robj(list(data.arg = list(tasks[[next.idx]])), dest = src, tag = sent, comm = comm)
+            } else {
+              mpi.send.Robj(as.integer(0), dest = src, tag = as.integer(n.remote + 1L), comm = comm)
+            }
+            progressed <- TRUE
+          }
+
+          if (local.ptr <= local.n) {
+            task.idx <- local.idx[local.ptr]
+            parts.out[[task.idx]] <- local.eval(tasks[[task.idx]])
+            local.ptr <- local.ptr + 1L
+            progressed <- TRUE
+          }
+
+          if (!progressed && done < n.remote)
+            Sys.sleep(0.0005)
+        }
+      }
+
+      parts.out
+    }, error = function(e) e)
   } else {
     tryCatch(
       mpi.applyLB(tasks, worker, ..., comm = comm),
@@ -333,9 +438,16 @@
   .npRmpi_profile_add_comm_elapsed(
     elapsed_sec = unname(as.double((proc.time() - t.comm)[["elapsed"]])),
     where = if (!is.na(profile.where) && nzchar(profile.where))
-      if (isTRUE(use.master.local)) paste0(profile.where, ":master-local") else profile.where
+      if (isTRUE(use.master.local))
+        paste0(profile.where, ":master-local")
+      else if (workers >= 1L && length(tasks) >= 2L)
+        paste0(profile.where, ":master-assist")
+      else
+        profile.where
     else if (isTRUE(use.master.local))
       paste0("master.local:", what)
+    else if (workers >= 1L && length(tasks) >= 2L)
+      paste0("master.assist:", what)
     else
       paste0("mpi.applyLB:", what)
   )
@@ -374,14 +486,12 @@
   n <- length(residuals)
   p <- nrow(H)
   chunk.size <- .np_wild_chunk_size(n = n, B = B)
-  workers <- .npRmpi_bootstrap_worker_count(comm = comm)
-  if (workers > 0L) {
-    min.tasks <- workers + 1L
-    if (B >= min.tasks) {
-      max.chunk.for.lb <- max(1L, as.integer(floor(B / min.tasks)))
-      chunk.size <- min(chunk.size, max.chunk.for.lb)
-    }
-  }
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = chunk.size,
+    comm = comm,
+    include.master = TRUE
+  )
   .npRmpi_bootstrap_fanout_enabled(
     comm = comm,
     n = n,
@@ -561,7 +671,12 @@
     ))
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
   if (!is.null(counts.drawer)) {
     tmat <- matrix(NA_real_, nrow = B, ncol = nrow(H))
     W.local <- W
@@ -987,7 +1102,12 @@
     out
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   if (!is.null(counts)) {
@@ -1348,7 +1468,12 @@
     out.chunk
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
 
   if (!is.null(counts)) {
@@ -1864,7 +1989,12 @@
     return(list(t = crossprod(counts.mat, kw) / n, t0 = t0))
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   # Prebind closure inputs for worker serialization across MPI slaves.
@@ -2069,7 +2199,12 @@
     return(list(t = num / pmax(den, .Machine$double.eps), t0 = t0))
   }
 
-  chunk.size <- .np_inid_chunk_size(n = n, B = B)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
   # Prebind closure inputs for worker serialization across MPI slaves.
