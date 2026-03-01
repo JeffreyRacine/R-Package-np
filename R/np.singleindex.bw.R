@@ -98,13 +98,21 @@ npindexbw.NULL <-
 npindexbw.default <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
-           bws, bandwidth.compute = TRUE,
-           regtype = c("lc", "ll", "lp"),
+           bws,
+           bandwidth.compute = TRUE,
            basis = c("glp", "additive", "tensor"),
-           degree = NULL,
            bernstein.basis = FALSE,
-           nmulti, random.seed, optim.method, optim.maxattempts,
-           optim.reltol, optim.abstol, optim.maxit, only.optimize.beta, ...){
+           degree = NULL,
+           nmulti,
+           only.optimize.beta,
+           optim.abstol,
+           optim.maxattempts,
+           optim.maxit,
+           optim.method,
+           optim.reltol,
+           random.seed,
+           regtype = c("lc", "ll", "lp"),
+           ...){
     .npRmpi_require_active_slave_pool(where = "npindexbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
