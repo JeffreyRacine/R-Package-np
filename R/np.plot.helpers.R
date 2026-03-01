@@ -31,6 +31,75 @@
   force(code)
 }
 
+.np_plot_progress_enabled <- function() {
+  isTRUE(getOption("np.messages")) &&
+    isTRUE(getOption("np.plot.progress", TRUE))
+}
+
+.np_plot_progress_interval_sec <- function() {
+  val <- suppressWarnings(as.numeric(getOption("np.plot.progress.interval.sec", 0.5))[1L])
+  if (!is.finite(val) || is.na(val) || val < 0)
+    val <- 0.5
+  val
+}
+
+.np_plot_progress_begin <- function(total, label) {
+  total <- as.integer(total)
+  if (is.na(total) || total < 1L || !.np_plot_progress_enabled())
+    return(NULL)
+
+  list(
+    total = total,
+    label = as.character(label)[1L],
+    started = unname(as.double(proc.time()[["elapsed"]])),
+    last = -Inf,
+    interval = .np_plot_progress_interval_sec(),
+    console = newLineConsole()
+  )
+}
+
+.np_plot_progress_tick <- function(state, done, force = FALSE) {
+  if (is.null(state))
+    return(state)
+
+  done <- as.integer(done)
+  if (is.na(done))
+    done <- 0L
+  done <- max(0L, min(state$total, done))
+
+  now <- unname(as.double(proc.time()[["elapsed"]]))
+  if (!isTRUE(force) &&
+      done < state$total &&
+      (now - state$last) < state$interval) {
+    return(state)
+  }
+
+  elapsed <- max(0, now - state$started)
+  rate <- if (elapsed > 0) done / elapsed else 0
+  remain <- max(0L, state$total - done)
+  eta <- if (rate > 0) remain / rate else Inf
+  eta.txt <- if (is.finite(eta)) sprintf("%.1fs", eta) else "NA"
+  pct <- 100 * done / state$total
+
+  msg <- sprintf(
+    "%s %d/%d (%.1f%%, elapsed %.1fs, eta %s)",
+    state$label, done, state$total, pct, elapsed, eta.txt
+  )
+
+  state$console <- printClear(state$console)
+  state$console <- printPush(msg = msg, console = state$console)
+  state$last <- now
+  state
+}
+
+.np_plot_progress_end <- function(state) {
+  if (is.null(state))
+    return(invisible(NULL))
+  state <- .np_plot_progress_tick(state = state, done = state$total, force = TRUE)
+  state$console <- printClear(state$console)
+  invisible(NULL)
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
@@ -325,6 +394,15 @@
                                          comm = 1L,
                                          required.bindings = NULL,
                                          ...) {
+  total.boot <- sum(vapply(tasks, function(tt) as.integer(tt$bsz), integer(1)))
+  progress <- .np_plot_progress_begin(
+    total = total.boot,
+    label = sprintf("Plot bootstrap %s", what)
+  )
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
+
   .npRmpi_bootstrap_phase_mark(
     what = what,
     phase = "preflight",
@@ -345,10 +423,17 @@
   workers <- .npRmpi_bootstrap_worker_count(comm = comm)
   t.comm <- proc.time()
   parts <- if (isTRUE(use.master.local)) {
-    tryCatch(
-      lapply(tasks, function(task) do.call(worker, c(list(task), list(...)))),
-      error = function(e) e
-    )
+    tryCatch({
+      parts.local <- vector("list", length(tasks))
+      done.boot <- 0L
+      for (ii in seq_along(tasks)) {
+        task <- tasks[[ii]]
+        parts.local[[ii]] <- do.call(worker, c(list(task), list(...)))
+        done.boot <- done.boot + as.integer(task$bsz)
+        progress <- .np_plot_progress_tick(state = progress, done = done.boot)
+      }
+      parts.local
+    }, error = function(e) e)
   } else if (workers >= 1L && length(tasks) >= 2L) {
     tryCatch({
       n.tasks <- length(tasks)
@@ -395,6 +480,7 @@
         local.n <- length(local.idx)
         sent <- init
         done <- 0L
+        done.boot <- 0L
 
         while (done < n.remote || local.ptr <= local.n) {
           progressed <- FALSE
@@ -407,6 +493,8 @@
             done <- done + 1L
             task.idx <- remote.idx[tag]
             parts.out[[task.idx]] <- res
+            done.boot <- done.boot + as.integer(tasks[[task.idx]]$bsz)
+            progress <- .np_plot_progress_tick(state = progress, done = done.boot)
 
             sent <- sent + 1L
             if (sent <= n.remote) {
@@ -422,6 +510,8 @@
             task.idx <- local.idx[local.ptr]
             parts.out[[task.idx]] <- local.eval(tasks[[task.idx]])
             local.ptr <- local.ptr + 1L
+            done.boot <- done.boot + as.integer(tasks[[task.idx]]$bsz)
+            progress <- .np_plot_progress_tick(state = progress, done = done.boot)
             progressed <- TRUE
           }
 
@@ -465,6 +555,8 @@
       what = what
     )
   }
+
+  progress <- .np_plot_progress_tick(state = progress, done = total.boot, force = TRUE)
 
   .npRmpi_bootstrap_phase_mark(
     what = what,
