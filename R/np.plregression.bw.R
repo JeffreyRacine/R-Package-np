@@ -194,6 +194,9 @@ npplregbw.plbandwidth =
     }
     bws <- plbandwidth(bws = bws$bw,
                        regtype = bws$regtype,
+                       basis = bws$basis,
+                       degree = bws$degree,
+                       bernstein.basis = bws$bernstein.basis,
                        bwmethod = bws$method,
                        bwscaling = bws$scaling,
                        bwtype = bws$type,
