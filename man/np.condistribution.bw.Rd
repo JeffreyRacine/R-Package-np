@@ -1,7 +1,6 @@
 
 \name{npcdistbw}
 \alias{npcdistbw}
-\alias{npcdistbw.NULL}
 \alias{npcdistbw.condbandwidth}
 \alias{npcdistbw.default}
 \alias{npcdistbw.formula}
@@ -23,9 +22,6 @@ npcdistbw(\dots)
 
 \method{npcdistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL,\dots)
 
-\method{npcdistbw}{NULL}(xdat = stop("data 'xdat' missing"),
-          ydat = stop("data 'ydat' missing"),
-          bws, \dots)
 
 \method{npcdistbw}{condbandwidth}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),

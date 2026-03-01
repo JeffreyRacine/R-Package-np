@@ -1,7 +1,6 @@
 % $ID$
 \name{npscoefbw}
 \alias{npscoefbw}
-\alias{npscoefbw.NULL}
 \alias{npscoefbw.default}
 \alias{npscoefbw.formula}
 \alias{npscoefbw.scbandwidth}
@@ -24,11 +23,6 @@ npscoefbw(\dots)
 
 \method{npscoefbw}{formula}(formula, data, subset, na.action, call, \dots)
 
-\method{npscoefbw}{NULL}(xdat = stop("invoked without data 'xdat'"),
-          ydat = stop("invoked without data 'ydat'"),
-          zdat = NULL,
-          bws,
-          \dots)
 
 \method{npscoefbw}{default}(xdat = stop("invoked without data 'xdat'"),
           ydat = stop("invoked without data 'ydat'"),

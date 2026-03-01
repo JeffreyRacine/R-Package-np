@@ -1,7 +1,6 @@
 \name{npudistbw}
 \alias{npudistbw}
 \alias{npudistbw.formula}
-\alias{npudistbw.NULL}
 \alias{npudistbw.default}
 \alias{npudistbw.dbandwidth}
 \title{Kernel Distribution Bandwidth Selection with Mixed Data Types}
@@ -20,9 +19,6 @@ npudistbw(\dots)
 
 \method{npudistbw}{formula}(formula, data, subset, na.action, call, gdata = NULL,\dots)
 
-\method{npudistbw}{NULL}(dat = stop("invoked without input data 'dat'"),
-          bws,
-          \dots)
 
 \method{npudistbw}{dbandwidth}(dat = stop("invoked without input data 'dat'"),
           bws,

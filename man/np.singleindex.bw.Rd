@@ -1,7 +1,6 @@
 % $ID$
 \name{npindexbw}
 \alias{npindexbw}
-\alias{npindexbw.NULL}
 \alias{npindexbw.default}
 \alias{npindexbw.formula}
 \alias{npindexbw.sibandwidth}
@@ -25,10 +24,6 @@ npindexbw(\dots)
 
 \method{npindexbw}{formula}(formula, data, subset, na.action, call, \dots)
 
-\method{npindexbw}{NULL}(xdat = stop("training data xdat missing"),
-          ydat = stop("training data ydat missing"),
-          bws,
-          \dots)
 
 \method{npindexbw}{default}(xdat = stop("training data xdat missing"),
           ydat = stop("training data ydat missing"),

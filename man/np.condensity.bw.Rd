@@ -1,7 +1,6 @@
 % $Id: np.condensity.bw.Rd,v 1.52 2006/11/03 21:17:20 tristen Exp $
 \name{npcdensbw}
 \alias{npcdensbw}
-\alias{npcdensbw.NULL}
 \alias{npcdensbw.conbandwidth}
 \alias{npcdensbw.default}
 \alias{npcdensbw.formula}
@@ -20,9 +19,6 @@ npcdensbw(\dots)
 
 \method{npcdensbw}{formula}(formula, data, subset, na.action, call, \dots)
 
-\method{npcdensbw}{NULL}(xdat = stop("data 'xdat' missing"),
-          ydat = stop("data 'ydat' missing"),
-          bws, \dots)
 
 \method{npcdensbw}{conbandwidth}(xdat = stop("data 'xdat' missing"),
           ydat = stop("data 'ydat' missing"),
