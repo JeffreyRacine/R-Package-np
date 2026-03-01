@@ -7624,10 +7624,10 @@ static double np_reg_cv_ls_stable_ll_glp(const int int_ll,
       z[0] = 1.0;
       if(int_ll == LL_LL){
         for(a = 1; a < p; a++)
-          z[a] = matrix_X_continuous[a-1][i] - matrix_X_continuous[a-1][j];
+          z[a] = matrix_X_continuous[a-1][i];
       } else {
         for(a = 1; a < p; a++)
-          z[a] = glp_basis[a][i] - glp_basis[a][j];
+          z[a] = glp_basis[a][i];
       }
 
       for(a = 0; a < p; a++){
@@ -7655,7 +7655,15 @@ static double np_reg_cv_ls_stable_ll_glp(const int int_ll,
     }
 
     {
-      const double dy = vector_Y[j] - DELTA[0][0];
+      double mhat = DELTA[0][0];
+      if(int_ll == LL_LL){
+        for(a = 1; a < p; a++)
+          mhat += DELTA[a][0]*matrix_X_continuous[a-1][j];
+      } else {
+        for(a = 1; a < p; a++)
+          mhat += DELTA[a][0]*glp_basis[a][j];
+      }
+      const double dy = vector_Y[j] - mhat;
       cv += dy*dy;
     }
   }
