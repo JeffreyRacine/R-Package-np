@@ -2,9 +2,7 @@
 #include <R_ext/Rdynload.h>
 #include <Rinternals.h>
 
-/* FIXME: 
-   Check these declarations against the C/Fortran source code.
-*/
+/* Routine registration for the serial np shared library. */
 
 /* .Call calls */
 extern SEXP C_gsl_bspline(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -47,5 +45,6 @@ static const R_CallMethodDef CallEntries[] = {
 void R_init_np(DllInfo *dll)
 {
     R_registerRoutines(dll, NULL, CallEntries, NULL, NULL);
+    /* Serial package uses registered symbols only. */
     R_useDynamicSymbols(dll, FALSE);
 }
