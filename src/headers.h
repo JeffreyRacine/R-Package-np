@@ -278,9 +278,12 @@ double max_unordered_bw(int num_categories,
 #define IO_MIN_TRUE  1
 #define IO_MIN_FALSE 0
 
+/* Regression type codes: lc (0), ll (1), lp (2). */
 #define LL_LC  0
 #define LL_LL  1
-#define LL_GLP 2
+#define LL_LP  2
+/* Legacy alias retained for internal compatibility. */
+#define LL_GLP LL_LP
 
 #define OCG_UNO 0
 #define OCG_ORD 1

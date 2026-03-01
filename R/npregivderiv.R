@@ -23,7 +23,7 @@
 ## convergence: a character string indicating whether/why iteration terminated
 
 ## First, a series of functions for local polynomial kernel regression
-## Functions for generalized local polynomial regression
+## (regtype = "lp", with lc/ll as special degree-restricted cases)
 
 ## This function returns the weight matrix for a local polynomial
 

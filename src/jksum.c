@@ -7078,7 +7078,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
 
   np_glp_cv_cache_clear();
 
-  if(int_ll != LL_GLP) return 1;
+  if(int_ll != LL_LP) return 1;
   if((vector_glp_degree_extern == NULL) || (ncon <= 0) || (num_obs <= 0))
     return 0;
   if(!np_glp_build_terms(ncon, vector_glp_degree_extern, basis_mode, &terms, &nterms))
@@ -7519,7 +7519,7 @@ static double np_reg_cv_ls_stable_ll_glp(const int int_ll,
   int i, j, a, b;
 
   if((p <= 0) ||
-     ((int_ll == LL_GLP) && ((glp_basis == NULL) || (glp_nterms <= 0))))
+     ((int_ll == LL_LP) && ((glp_basis == NULL) || (glp_nterms <= 0))))
     return DBL_MAX;
 
   KWM = mat_creat(p, p, UNDEFINED);
@@ -7674,8 +7674,9 @@ stable_done:
   return cv;
 }
 
-// Regression CV objective for local-constant/local-linear models.
-// The LL branch solves weighted normal equations with ridge fallback if singular.
+// Regression CV objective for local polynomial regression:
+// lc (degree 0), ll (degree 1), and lp (general degree vector).
+// The LL/LP branches solve weighted normal equations with ridge fallback if singular.
 
 double np_kernel_estimate_regression_categorical_ls_aic(
 int int_ll,
@@ -7763,7 +7764,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     return(DBL_MAX);
   }
 
-  if(int_ll == LL_GLP){
+  if(int_ll == LL_LP){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
     const int *glp_terms = NULL;
     int glp_nterms = 0;
@@ -12938,7 +12939,7 @@ double *SIGN){
     }
 
     if(all_large_gate &&
-       ((int_ll == LL_LL) || (int_ll == LL_GLP))){
+       ((int_ll == LL_LL) || (int_ll == LL_LP))){
       double kconst = 1.0;
       int kconst_ok = 1;
       const double ridge_eps = 1.0/(double)MAX(1, num_obs_train);
@@ -13068,7 +13069,7 @@ double *SIGN){
         if(XtXINV != NULL) mat_free(XtXINV);
         if(XtY != NULL) mat_free(XtY);
         if(BETA != NULL) mat_free(BETA);
-      } else if(kconst_ok && int_ll == LL_GLP &&
+      } else if(kconst_ok && int_ll == LL_LP &&
                 (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
         const int use_bernstein = (int_glp_bernstein_extern != 0);
         int *glp_terms = NULL;
@@ -13456,7 +13457,7 @@ double *SIGN){
     free(lc_Y[1]);
     free(lc_Y[2]);
 #undef NCOL_Y
-  } else if(int_ll == LL_GLP) { // Generalized Local Polynomial
+  } else if(int_ll == LL_LP) { // local polynomial (regtype = "lp")
     int *glp_terms = NULL;
     int glp_nterms = 0;
     const int use_bernstein = (int_glp_bernstein_extern != 0);

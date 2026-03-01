@@ -246,7 +246,7 @@ npCheckRegressionDesignCondition <- function(reg.code,
   kappa.warn <- 1e8
   kappa.stop <- 1e12
 
-  if (!(reg.code %in% c(REGTYPE_LL, REGTYPE_GLP)))
+  if (!(reg.code %in% c(REGTYPE_LL, REGTYPE_LP)))
     return(invisible(NULL))
 
   xcon <- as.data.frame(xcon)
@@ -254,7 +254,7 @@ npCheckRegressionDesignCondition <- function(reg.code,
   if (is.null(n) || n <= 0L)
     return(invisible(NULL))
 
-  B <- if (identical(reg.code, REGTYPE_GLP)) {
+  B <- if (identical(reg.code, REGTYPE_LP)) {
     if (is.null(degree))
       stop(sprintf("%s: LP degree vector missing for design-conditioning check", where))
     W.lp(xdat = xcon,
@@ -298,6 +298,9 @@ npCheckRegressionDesignCondition <- function(reg.code,
 }
 
 npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
+  # Internal regression-type codes:
+  # lc -> REGTYPE_LC, ll -> REGTYPE_LL, lp -> REGTYPE_LP.
+  # lp with all degree 0/1 collapses to lc/ll for specialized fast paths.
   if (identical(regtype, "lc"))
     return(list(code = REGTYPE_LC, degree = NULL))
 
@@ -312,7 +315,7 @@ npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
   if (all(degree == 1L))
     return(list(code = REGTYPE_LL, degree = degree))
 
-  list(code = REGTYPE_GLP, degree = degree)
+  list(code = REGTYPE_LP, degree = degree)
 }
 
 npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
@@ -1936,7 +1939,9 @@ BWM_CVAIC = 0
 
 REGTYPE_LC = 0
 REGTYPE_LL = 1
-REGTYPE_GLP = 2
+REGTYPE_LP = 2
+# legacy alias retained for internal/backward compatibility
+REGTYPE_GLP = REGTYPE_LP
 
 ##conditional density/distribution
 CBWM_CVML = 0
