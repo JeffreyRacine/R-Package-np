@@ -7913,7 +7913,13 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
     }
 
-    if(bwm == RBWM_CVLS){
+    #ifdef MPI2
+    const int allow_cvls_stable_helper_lp = (iNum_Processors <= 1);
+    #else
+    const int allow_cvls_stable_helper_lp = 1;
+    #endif
+
+    if((bwm == RBWM_CVLS) && allow_cvls_stable_helper_lp){
       cv = np_reg_cv_ls_stable_ll_glp(int_ll,
                                       BANDWIDTH_reg,
                                       num_obs,
@@ -8606,7 +8612,13 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
   }
 
-  if((bwm == RBWM_CVLS) && (int_ll == LL_LL) &&
+  #ifdef MPI2
+  const int allow_cvls_stable_helper_ll = (iNum_Processors <= 1);
+  #else
+  const int allow_cvls_stable_helper_ll = 1;
+  #endif
+
+  if((bwm == RBWM_CVLS) && allow_cvls_stable_helper_ll && (int_ll == LL_LL) &&
      (num_reg_unordered == 0) && (num_reg_ordered == 0)){
     cv = np_reg_cv_ls_stable_ll_glp(int_ll,
                                     BANDWIDTH_reg,
