@@ -173,13 +173,16 @@ npindexbw.default <-
 npindexbw.sibandwidth <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
-           bws, bandwidth.compute = TRUE, nmulti, random.seed = 42,
-           optim.method = c("Nelder-Mead", "BFGS", "CG"),
-           optim.maxattempts = 10,
-           optim.reltol = sqrt(.Machine$double.eps),
-           optim.abstol = .Machine$double.eps,
-           optim.maxit = 500,
+           bws,
+           bandwidth.compute = TRUE,
+           nmulti,
            only.optimize.beta = FALSE,
+           optim.abstol = .Machine$double.eps,
+           optim.maxattempts = 10,
+           optim.maxit = 500,
+           optim.method = c("Nelder-Mead", "BFGS", "CG"),
+           optim.reltol = sqrt(.Machine$double.eps),
+           random.seed = 42,
            ...){
 
     ## Save seed prior to setting

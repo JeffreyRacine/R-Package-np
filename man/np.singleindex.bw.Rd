@@ -48,13 +48,13 @@ npindexbw(\dots)
           bws,
           bandwidth.compute = TRUE,
           nmulti,
-          random.seed = 42,
-          optim.method = c("Nelder-Mead", "BFGS", "CG"),
-          optim.maxattempts = 10,
-          optim.reltol = sqrt(.Machine$double.eps),
-          optim.abstol = .Machine$double.eps,
-          optim.maxit = 500,
           only.optimize.beta = FALSE,
+          optim.abstol = .Machine$double.eps,
+          optim.maxattempts = 10,
+          optim.maxit = 500,
+          optim.method = c("Nelder-Mead", "BFGS", "CG"),
+          optim.reltol = sqrt(.Machine$double.eps),
+          random.seed = 42,
           \dots)
 
 }

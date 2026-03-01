@@ -61,19 +61,19 @@ npscoefbw(\dots)
           ydat = stop("invoked without data 'ydat'"),
           zdat = NULL,
           bws,
-          nmulti,
-          random.seed = 42,
-          cv.iterate = FALSE,
-          cv.num.iterations = 1,
           backfit.iterate = FALSE,
           backfit.maxiter = 100,
           backfit.tol = .Machine$double.eps,
           bandwidth.compute = TRUE,
-          optim.method = c("Nelder-Mead", "BFGS", "CG"),
-          optim.maxattempts = 10,
-          optim.reltol = sqrt(.Machine$double.eps),
+          cv.iterate = FALSE,
+          cv.num.iterations = 1,
+          nmulti,
           optim.abstol = .Machine$double.eps,
+          optim.maxattempts = 10,
           optim.maxit = 500,
+          optim.method = c("Nelder-Mead", "BFGS", "CG"),
+          optim.reltol = sqrt(.Machine$double.eps),
+          random.seed = 42,
           \dots)
 }
 
@@ -143,11 +143,6 @@ npscoefbw(\dots)
     be left unset.
   }
 
-  \item{\dots}{
-  additional arguments supplied to specify the regression type,
-  bandwidth type, kernel types, selection methods, and so on, detailed
-  below. 
-  }
   
   \item{bandwidth.compute}{
     a logical value which specifies whether to do a numerical search for
@@ -340,6 +335,11 @@ npscoefbw(\dots)
   \item{backfit.tol}{
     tolerance to determine convergence of iterated evaluations of the
     smooth coefficient estimator. Defaults to \code{.Machine$double.eps}.
+  }
+  \item{\dots}{
+  additional arguments supplied to specify the regression type,
+  bandwidth type, kernel types, selection methods, and so on, detailed
+  below. 
   }
 }
 
