@@ -197,7 +197,7 @@ npregbw.rbandwidth <-
                                      bernstein.basis = tbw$bernstein.basis,
                                      where = "npregbw")
     if (identical(tbw$regtype, "lp") &&
-        identical(reg.c$code, REGTYPE_GLP) &&
+        identical(reg.c$code, REGTYPE_LP) &&
         !isTRUE(transform.bounds))
       transform.bounds <- TRUE
     degree.c <- if (tbw$ncon > 0) {

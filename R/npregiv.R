@@ -566,7 +566,7 @@ npregiv <- function(y,
       nc <- ncol(tww[,,1])
       I.nc <- diag(nc)
 
-      ## Test for singularity of the generalized local polynomial
+      ## Test for singularity of the local polynomial (regtype = "lp")
       ## estimator, shrink the mean towards the local constant mean.
 
       while(any(doridge)){
@@ -673,7 +673,7 @@ npregiv <- function(y,
 
         nc <- ncol(tww[,,1])
 
-        ## Test for singularity of the generalized local polynomial
+        ## Test for singularity of the local polynomial (regtype = "lp")
         ## estimator, shrink the mean towards the local constant mean.
 
         while(any(doridge)){
@@ -795,7 +795,7 @@ npregiv <- function(y,
 
         nc <- ncol(tww[,,1])
 
-        ## Test for singularity of the generalized local polynomial
+        ## Test for singularity of the local polynomial (regtype = "lp")
         ## estimator, shrink the mean towards the local constant mean.
 
         while(any(doridge)){

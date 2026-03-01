@@ -5892,12 +5892,12 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                              num_categories_extern,
                              matrix_categorical_vals_extern);
 
-  if((int_ll_extern == LL_GLP) &&
+  if((int_ll_extern == LL_LP) &&
      (!np_glp_cv_prepare_extern(int_ll_extern,
                                 num_obs_train_extern,
                                 num_reg_continuous_extern,
                                 matrix_X_continuous_train_extern))){
-    error("failed to prepare GLP CV basis cache");
+    error("failed to prepare LP CV basis cache");
   }
   if((int_ll_extern == LL_LL) &&
      (!np_ll_cv_prepare_extern(int_ll_extern,
