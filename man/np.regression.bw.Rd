@@ -152,10 +152,6 @@ npregbw(\dots)
     be left unset.
   }
 
-  \item{\dots}{
-    additional arguments supplied to specify the bandwidth type,
-    kernel types, selection methods, and so on, detailed below.
-  }
   
   \item{regtype}{
     a character string specifying which type of kernel regression
@@ -375,6 +371,10 @@ npregbw(\dots)
     baseline penalty when \code{invalid.penalty="baseline"}.
     Defaults to \code{10}.}
 
+  \item{\dots}{
+    additional arguments supplied to specify the bandwidth type,
+    kernel types, selection methods, and so on, detailed below.
+  }
 }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.
