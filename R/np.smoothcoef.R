@@ -530,11 +530,29 @@ npscoef.scbandwidth <-
 
     beta.se <- NULL
     if(errors){
+      safe_chol2inv <- function(a, ridge0, eps, maxiter = 1000L){
+        nc.local <- ncol(a)
+        I.local <- diag(rep(1.0, nc.local))
+        ridge.local <- max(as.double(ridge0), 0.0)
+        for (iter in seq_len(maxiter)) {
+          cm <- tryCatch(
+            chol2inv(chol(a + ridge.local * I.local)),
+            error = function(e) NULL
+          )
+          if (!is.null(cm))
+            return(cm)
+          ridge.local <- ridge.local + eps
+        }
+        NULL
+      }
+
       u2 <- as.double(u2.W)
       merr <- rep(NA_real_, enrow)
       beta.se <- matrix(NA_real_, nrow = enrow, ncol = nc)
       for (i in seq_len(enrow)) {
-        cm <- chol2inv(chol(tww[,,i] + diag(rep(ridge[i], nc))))
+        cm <- safe_chol2inv(tww[,,i], ridge[i], epsilon)
+        if (is.null(cm))
+          next
         s.mat <- crossprod(W.train, W.train * ((kw[, i]^2) * u2))
         vcv <- cm %*% s.mat %*% cm
         w.i <- W[i,,drop=FALSE]
