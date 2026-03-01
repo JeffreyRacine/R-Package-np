@@ -35,10 +35,6 @@ extern int int_MINIMIZE_IO;
 extern int int_TAYLOR;
 extern int int_WEIGHTS;
 
-#ifdef RCSID
-static char rcsid[] = "$Id: kernele.c,v 1.12 2006/11/02 19:50:13 tristen Exp $";
-#endif
-
 /* Some externals for numerical routines */
 
 extern int num_obs_train_extern;

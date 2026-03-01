@@ -855,9 +855,6 @@ npregiv <- function(y,
     seed.state <- .np_seed_enter(random.seed)
     on.exit(.np_seed_exit(seed.state, remove_if_absent = TRUE), add = TRUE)
 
-    debug.file.optim <- "optim.debug"
-    debug.file.bandwidth <- "bandwidth.out"
-    debug.file.summary <- "optim.out"
     if(debug) {
       debug.dir <- tempfile("npregiv_debug_")
       dir.create(debug.dir, showWarnings = FALSE, recursive = TRUE)

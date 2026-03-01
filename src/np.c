@@ -43,10 +43,6 @@ extern MPI_Comm	*comm;
 #include "hash.h"
 
 
-#ifdef RCSID
-static char rcsid[] = "$Id: np.c,v 1.35 2006/11/02 16:56:49 tristen Exp $";
-#endif
-
 int int_DEBUG;
 int int_VERBOSE;
 int int_TAYLOR;
