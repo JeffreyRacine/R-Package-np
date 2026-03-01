@@ -31,6 +31,75 @@
   force(code)
 }
 
+.np_plot_progress_enabled <- function() {
+  isTRUE(getOption("np.messages")) &&
+    isTRUE(getOption("np.plot.progress", TRUE))
+}
+
+.np_plot_progress_interval_sec <- function() {
+  val <- suppressWarnings(as.numeric(getOption("np.plot.progress.interval.sec", 0.5))[1L])
+  if (!is.finite(val) || is.na(val) || val < 0)
+    val <- 0.5
+  val
+}
+
+.np_plot_progress_begin <- function(total, label) {
+  total <- as.integer(total)
+  if (is.na(total) || total < 1L || !.np_plot_progress_enabled())
+    return(NULL)
+
+  list(
+    total = total,
+    label = as.character(label)[1L],
+    started = unname(as.double(proc.time()[["elapsed"]])),
+    last = -Inf,
+    interval = .np_plot_progress_interval_sec(),
+    console = newLineConsole()
+  )
+}
+
+.np_plot_progress_tick <- function(state, done, force = FALSE) {
+  if (is.null(state))
+    return(state)
+
+  done <- as.integer(done)
+  if (is.na(done))
+    done <- 0L
+  done <- max(0L, min(state$total, done))
+
+  now <- unname(as.double(proc.time()[["elapsed"]]))
+  if (!isTRUE(force) &&
+      done < state$total &&
+      (now - state$last) < state$interval) {
+    return(state)
+  }
+
+  elapsed <- max(0, now - state$started)
+  rate <- if (elapsed > 0) done / elapsed else 0
+  remain <- max(0L, state$total - done)
+  eta <- if (rate > 0) remain / rate else Inf
+  eta.txt <- if (is.finite(eta)) sprintf("%.1fs", eta) else "NA"
+  pct <- 100 * done / state$total
+
+  msg <- sprintf(
+    "%s %d/%d (%.1f%%, elapsed %.1fs, eta %s)",
+    state$label, done, state$total, pct, elapsed, eta.txt
+  )
+
+  state$console <- printClear(state$console)
+  state$console <- printPush(msg = msg, console = state$console)
+  state$last <- now
+  state
+}
+
+.np_plot_progress_end <- function(state) {
+  if (is.null(state))
+    return(invisible(NULL))
+  state <- .np_plot_progress_tick(state = state, done = state$total, force = TRUE)
+  state$console <- printClear(state$console)
+  invisible(NULL)
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
@@ -89,6 +158,10 @@
   out <- matrix(NA_real_, nrow = B, ncol = nrow(H))
   fit.mean <- as.double(fit.mean)
   residuals <- as.double(residuals)
+  progress <- .np_plot_progress_begin(total = B, label = "Plot bootstrap wild")
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   start <- 1L
   while (start <= B) {
@@ -98,6 +171,7 @@
     ystar <- matrix(fit.mean, nrow = n, ncol = bsz) +
       matrix(residuals, nrow = n, ncol = bsz) * draws
     out[start:stopi, ] <- t(H %*% ystar)
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
     start <- stopi + 1L
   }
 
@@ -254,6 +328,11 @@
   chunk.size <- .np_inid_chunk_size(n = n, B = B)
   prob <- rep.int(1 / n, n)
   tmat <- matrix(NA_real_, nrow = B, ncol = nrow(H))
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   start <- 1L
   while (start <= B) {
@@ -267,6 +346,7 @@
     den <- crossprod(counts.chunk, W)
     num <- crossprod(counts.chunk, Wy)
     tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
     start <- stopi + 1L
   }
 
@@ -585,6 +665,11 @@
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   fill_chunk <- function(counts.chunk, start, stopi) {
     for (i in seq_len(neval)) {
@@ -611,6 +696,7 @@
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B)
     start <- 1L
@@ -623,6 +709,7 @@
         stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
       }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
       start <- stopi + 1L
     }
   }
@@ -843,6 +930,11 @@
   }
 
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   fill_chunk <- function(counts.chunk, start, stopi) {
     bsz <- ncol(counts.chunk)
@@ -872,6 +964,7 @@
   if (!is.null(counts)) {
     counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
     fill_chunk(counts.chunk = counts.mat, start = 1L, stopi = B)
+    progress <- .np_plot_progress_tick(state = progress, done = B, force = TRUE)
   } else {
     chunk.size <- .np_inid_chunk_size(n = n, B = B)
     start <- 1L
@@ -884,6 +977,7 @@
         stats::rmultinom(n = bsz, size = n, prob = rep.int(1 / n, n))
       }
       fill_chunk(counts.chunk = counts.chunk, start = start, stopi = stopi)
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
       start <- stopi + 1L
     }
   }
@@ -1160,6 +1254,11 @@
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   start <- 1L
   while (start <= B) {
@@ -1182,6 +1281,7 @@
     tmat[start:stopi, ] <- .np_boot_matrix_from_ksum(
       ksum.chunk, B = bsz, nout = neval, where = "npksum unconditional chunk"
     ) / n
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
     start <- stopi + 1L
   }
 
@@ -1334,6 +1434,11 @@
 
   chunk.size <- .np_inid_chunk_size(n = n, B = B)
   tmat <- matrix(NA_real_, nrow = B, ncol = neval)
+  progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+  progress <- .np_plot_progress_begin(total = B, label = progress.label)
+  on.exit({
+    .np_plot_progress_end(progress)
+  }, add = TRUE)
 
   start <- 1L
   while (start <= B) {
@@ -1369,6 +1474,7 @@
     num <- .np_boot_matrix_from_ksum(num, B = bsz, nout = neval,
                                      where = "npksum conditional numerator chunk") / n
     tmat[start:stopi, ] <- num / pmax(den, .Machine$double.eps)
+    progress <- .np_plot_progress_tick(state = progress, done = stopi)
     start <- stopi + 1L
   }
 
