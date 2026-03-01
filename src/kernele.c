@@ -109,6 +109,19 @@ extern double y_max_extern;
 // so that quantile stuff gives a more sensible multistart message
 extern int imstot;
 
+static inline double np_lp_mhat(
+  MATRIX DELTA,
+  double **matrix_X_fit,
+  int num_reg_continuous,
+  int j)
+{
+  double mhat = DELTA[0][0];
+  int ii;
+  for(ii = 0; ii < num_reg_continuous; ii++)
+    mhat += DELTA[ii+1][0]*matrix_X_fit[ii][j];
+  return mhat;
+}
+
 int kernel_estimate_density_categorical(
 int KERNEL_den,
 int KERNEL_unordered_den,
@@ -2454,6 +2467,7 @@ double *SIGN)
 	double DIFF_KER_PPM = 0.0;		 /* Difference between int K(z)^p and int K(z-.5)K(z+.5) */
 
 	int num_reg_cat_cont;
+	double **matrix_X_fit;
 
 	#ifdef MPI2
 	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
@@ -2468,6 +2482,8 @@ double *SIGN)
 	{
 		num_reg_cat_cont = num_reg_continuous;
 	}
+
+	matrix_X_fit = matrix_X_continuous_eval;
 
 	/* Initialize constants for various kernels required for asymptotic standard errors */
 
@@ -2920,7 +2936,7 @@ double *SIGN)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -2949,7 +2965,7 @@ double *SIGN)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -3028,11 +3044,11 @@ double *SIGN)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j] = DELTA[0][0];
+				mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				for(k = 0; k < num_reg_cat_cont; k++)
 				{
-					gradient[k][j] = - DELTA[k+1][0];
+					gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 				}
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
@@ -3124,7 +3140,7 @@ double *SIGN)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -3153,7 +3169,7 @@ double *SIGN)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -3232,11 +3248,11 @@ double *SIGN)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j] = DELTA[0][0];
+				mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				for(k = 0; k < num_reg_cat_cont; k++)
 				{
-					gradient[k][j] = - DELTA[k+1][0];
+					gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 				}
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
@@ -3330,7 +3346,7 @@ double *SIGN)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 								* prod_kernel;
 						}
 						else if(l < num_reg_continuous+num_reg_unordered)
@@ -3359,7 +3375,7 @@ double *SIGN)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -3438,11 +3454,11 @@ double *SIGN)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j] = DELTA[0][0];
+				mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				for(k = 0; k < num_reg_cat_cont; k++)
 				{
-					gradient[k][j] = - DELTA[k+1][0];
+					gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 				}
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
@@ -3866,7 +3882,7 @@ double *SIGN)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -3895,7 +3911,7 @@ double *SIGN)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -3974,11 +3990,11 @@ double *SIGN)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j-my_rank*stride] = DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				for(k = 0; k < num_reg_cat_cont; k++)
 				{
-					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
+					gradient[k][j-my_rank*stride] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 				}
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
@@ -4070,7 +4086,7 @@ double *SIGN)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -4099,7 +4115,7 @@ double *SIGN)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -4178,11 +4194,11 @@ double *SIGN)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j-my_rank*stride] = DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				for(k = 0; k < num_reg_cat_cont; k++)
 				{
-					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
+					gradient[k][j-my_rank*stride] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 				}
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
@@ -4276,7 +4292,7 @@ double *SIGN)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 								* prod_kernel;
 						}
 						else if(l < num_reg_continuous+num_reg_unordered)
@@ -4305,7 +4321,7 @@ double *SIGN)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -4384,11 +4400,11 @@ double *SIGN)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j-my_rank*stride] = DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				for(k = 0; k < num_reg_cat_cont; k++)
 				{
-					gradient[k][j-my_rank*stride] = - DELTA[k+1][0];
+					gradient[k][j-my_rank*stride] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 				}
 
 				temp_var = XTKYSQ[0][0]/XTKX[0][0] - ipow(XTKY[0][0]/XTKX[0][0],2);
@@ -4534,6 +4550,7 @@ double *mean)
 	double *pointer_m;
 #endif
 	int num_reg_cat_cont;
+	double **matrix_X_fit;
 
 	#ifdef MPI2
 	int stride = (int)ceil((double) num_obs / (double) iNum_Processors);
@@ -4548,6 +4565,8 @@ double *mean)
 	{
 		num_reg_cat_cont = num_reg_continuous;
 	}
+
+	matrix_X_fit = matrix_X_continuous;
 
 	/* Allocate memory for objects */
 
@@ -4850,7 +4869,7 @@ double *mean)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 									* prod_kernel;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -4878,7 +4897,7 @@ double *mean)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 										* prod_kernel;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -4958,7 +4977,7 @@ double *mean)
 				}
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
-				*pointer_m++ = DELTA[0][0];
+				*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -5022,7 +5041,7 @@ double *mean)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 									* prod_kernel;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -5050,7 +5069,7 @@ double *mean)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 										* prod_kernel;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -5130,7 +5149,7 @@ double *mean)
 				}
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
-				*pointer_m++ = DELTA[0][0];
+				*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -5194,7 +5213,7 @@ double *mean)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 									* prod_kernel;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -5222,7 +5241,7 @@ double *mean)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 										* prod_kernel;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -5302,7 +5321,7 @@ double *mean)
 				}
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
-				*pointer_m++ = DELTA[0][0];
+				*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -5610,7 +5629,7 @@ double *mean)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 									* prod_kernel;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -5638,7 +5657,7 @@ double *mean)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 										* prod_kernel;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -5720,7 +5739,7 @@ double *mean)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j-my_rank*stride] =  DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -5783,7 +5802,7 @@ double *mean)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 									* prod_kernel;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -5811,7 +5830,7 @@ double *mean)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 										* prod_kernel;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -5892,7 +5911,7 @@ double *mean)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j-my_rank*stride] =  DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -5955,7 +5974,7 @@ double *mean)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 									* prod_kernel;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -5983,7 +6002,7 @@ double *mean)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 										* prod_kernel;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -6064,7 +6083,7 @@ double *mean)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-				mean[j-my_rank*stride] =  DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -6178,6 +6197,7 @@ double **gradient)
 	MATRIX  DELTA;
 
 	int num_reg_cat_cont;
+	double **matrix_X_fit;
 
 	#ifdef MPI2
 	int stride = (int)ceil((double) num_obs_eval / (double) iNum_Processors);
@@ -6192,6 +6212,8 @@ double **gradient)
 	{
 		num_reg_cat_cont = num_reg_continuous;
 	}
+
+	matrix_X_fit = matrix_X_continuous_eval;
 
 	#ifndef MPI2
 
@@ -6629,7 +6651,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -6657,7 +6679,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -6735,11 +6757,11 @@ double **gradient)
 						}
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
-						*pointer_m++ = DELTA[0][0];
+						*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 						for(k = 0; k < num_reg_cat_cont; k++)
 						{
-							gradient[k][j] = - DELTA[k+1][0];
+							gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 						}
 
 					}
@@ -6805,7 +6827,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -6833,7 +6855,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -6910,11 +6932,11 @@ double **gradient)
 						}
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
-						*pointer_m++ = DELTA[0][0];
+						*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 						for(k = 0; k < num_reg_cat_cont; k++)
 						{
-							gradient[k][j] = - DELTA[k+1][0];
+							gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 						}
 
 					}
@@ -6981,7 +7003,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -7009,7 +7031,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -7088,11 +7110,11 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						*pointer_m++ = DELTA[0][0];
+						*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 						for(k = 0; k < num_reg_cat_cont; k++)
 						{
-							gradient[k][j] = - DELTA[k+1][0];
+							gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 						}
 
 					}
@@ -7379,7 +7401,7 @@ double **gradient)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 									* *pointer_matrix_weights_K;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -7407,7 +7429,7 @@ double **gradient)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 										* *pointer_matrix_weights_K;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -7487,11 +7509,11 @@ double **gradient)
 
 					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-					mean[j] = DELTA[0][0];
+					mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					for(k = 0; k < num_reg_cat_cont; k++)
 					{
-						gradient[k][j] = - DELTA[k+1][0];
+						gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 					}
 
 				}
@@ -7742,7 +7764,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -7770,7 +7792,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -7850,7 +7872,7 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						mean[j] = DELTA[0][0];
+						mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					}
 
@@ -7913,7 +7935,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -7941,7 +7963,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -8020,7 +8042,7 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						mean[j] = DELTA[0][0];
+						mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					}
 
@@ -8083,7 +8105,7 @@ double **gradient)
 								/* First lower column of XTKX */
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -8111,7 +8133,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -8190,7 +8212,7 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						mean[j] = DELTA[0][0];
+						mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					}
 
@@ -8281,7 +8303,7 @@ double **gradient)
 							/* First lower column of XTKX */
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 									* *pointer_matrix_weights_K;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -8309,7 +8331,7 @@ double **gradient)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 										* *pointer_matrix_weights_K;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -8392,7 +8414,7 @@ double **gradient)
 
 					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-					mean[j] = DELTA[0][0];
+					mean[j] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				}
 
@@ -8830,7 +8852,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -8858,7 +8880,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -8936,11 +8958,11 @@ double **gradient)
 						}
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
-						mean[j-my_rank*stride] = DELTA[0][0];
+						mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 						for(k = 0; k < num_reg_cat_cont; k++)
 						{
-							gradient[k][j] = - DELTA[k+1][0];
+							gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 						}
 
 					}
@@ -9004,7 +9026,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -9032,7 +9054,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -9110,11 +9132,11 @@ double **gradient)
 						}
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
-						mean[j-my_rank*stride] = DELTA[0][0];
+						mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 						for(k = 0; k < num_reg_cat_cont; k++)
 						{
-							gradient[k][j] = - DELTA[k+1][0];
+							gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 						}
 
 					}
@@ -9179,7 +9201,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -9207,7 +9229,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -9286,11 +9308,11 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						mean[j-my_rank*stride] = DELTA[0][0];
+						mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 						for(k = 0; k < num_reg_cat_cont; k++)
 						{
-							gradient[k][j] = - DELTA[k+1][0];
+							gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 						}
 
 					}
@@ -9556,7 +9578,7 @@ double **gradient)
 
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 									* *pointer_matrix_weights_K;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -9584,7 +9606,7 @@ double **gradient)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 										* *pointer_matrix_weights_K;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -9664,11 +9686,11 @@ double **gradient)
 
 					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-					mean[j-my_rank*stride] = DELTA[0][0];
+					mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					for(k = 0; k < num_reg_cat_cont; k++)
 					{
-						gradient[k][j] = - DELTA[k+1][0];
+						gradient[k][j] = (k < num_reg_continuous) ? DELTA[k+1][0] : -DELTA[k+1][0];
 					}
 
 				}
@@ -9913,7 +9935,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -9941,7 +9963,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -10020,7 +10042,7 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						mean[j-my_rank*stride] = DELTA[0][0];
+						mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					}
 
@@ -10083,7 +10105,7 @@ double **gradient)
 
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -10111,7 +10133,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -10190,7 +10212,7 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						mean[j-my_rank*stride] = DELTA[0][0];
+						mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					}
 
@@ -10253,7 +10275,7 @@ double **gradient)
 								/* First lower column of XTKX */
 								if(k < num_reg_continuous)
 								{
-									XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+									XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 										* prod_kernel;
 								}
 								else if(k < num_reg_continuous+num_reg_unordered)
@@ -10281,7 +10303,7 @@ double **gradient)
 								{
 									if(l < num_reg_continuous)
 									{
-										XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+										XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 											* prod_kernel;
 									}
 									else if(l < num_reg_continuous+num_reg_unordered)
@@ -10360,7 +10382,7 @@ double **gradient)
 
 						if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-						mean[j-my_rank*stride] = DELTA[0][0];
+						mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 					}
 
@@ -10449,7 +10471,7 @@ double **gradient)
 							/* First lower column of XTKX */
 							if(k < num_reg_continuous)
 							{
-								XTKX[k+1][0] += (temp1 = (matrix_X_continuous_eval[k][j] - matrix_X_continuous_train[k][i]))
+								XTKX[k+1][0] += (temp1 = matrix_X_continuous_train[k][i])
 									* *pointer_matrix_weights_K;
 							}
 							else if(k < num_reg_continuous+num_reg_unordered)
@@ -10477,7 +10499,7 @@ double **gradient)
 							{
 								if(l < num_reg_continuous)
 								{
-									XTKX[k+1][l+1] += temp1 * (matrix_X_continuous_eval[l][j] - matrix_X_continuous_train[l][i])
+									XTKX[k+1][l+1] += temp1 * matrix_X_continuous_train[l][i]
 										* *pointer_matrix_weights_K;
 								}
 								else if(l < num_reg_continuous+num_reg_unordered)
@@ -10560,7 +10582,7 @@ double **gradient)
 
 					if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical");
 
-					mean[j-my_rank*stride] = DELTA[0][0];
+					mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 				}
 
@@ -18114,6 +18136,7 @@ int *num_categories)
 #endif
 
 	int num_reg_cat_cont;
+	double **matrix_X_fit;
 
 	double *mean;
 	double prod_kernel_i_eq_j = DBL_MAX;
@@ -18139,6 +18162,8 @@ int *num_categories)
 	{
 		num_reg_cat_cont = num_reg_continuous;
 	}
+
+	matrix_X_fit = matrix_X_continuous;
 
 	/* Allocate memory for objects */
 
@@ -18452,7 +18477,7 @@ int *num_categories)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -18480,7 +18505,7 @@ int *num_categories)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -18559,7 +18584,7 @@ int *num_categories)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
 				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H += inv00*prod_kernel_i_eq_j; }
-				*pointer_m++ = DELTA[0][0];
+				*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -18626,7 +18651,7 @@ int *num_categories)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -18654,7 +18679,7 @@ int *num_categories)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -18733,7 +18758,7 @@ int *num_categories)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
 				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H += inv00*prod_kernel_i_eq_j; }
-				*pointer_m++ = DELTA[0][0];
+				*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -18800,7 +18825,7 @@ int *num_categories)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -18828,7 +18853,7 @@ int *num_categories)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -18907,7 +18932,7 @@ int *num_categories)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
 				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H += inv00*prod_kernel_i_eq_j; }
-				*pointer_m++ = DELTA[0][0];
+				*pointer_m++ = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -19227,7 +19252,7 @@ int *num_categories)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -19255,7 +19280,7 @@ int *num_categories)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -19334,7 +19359,7 @@ int *num_categories)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
 				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H_MPI += inv00*prod_kernel_i_eq_j; }
-				mean[j-my_rank*stride] =  DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -19399,7 +19424,7 @@ int *num_categories)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -19427,7 +19452,7 @@ int *num_categories)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -19506,7 +19531,7 @@ int *num_categories)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
 				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H_MPI += inv00*prod_kernel_i_eq_j; }
-				mean[j-my_rank*stride] =  DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
@@ -19571,7 +19596,7 @@ int *num_categories)
 
 						if(k < num_reg_continuous)
 						{
-							XTKX[k+1][0] += (temp1 = (matrix_X_continuous[k][j] - matrix_X_continuous[k][i]))
+							XTKX[k+1][0] += (temp1 = matrix_X_continuous[k][i])
 								* prod_kernel;
 						}
 						else if(k < num_reg_continuous+num_reg_unordered)
@@ -19599,7 +19624,7 @@ int *num_categories)
 						{
 							if(l < num_reg_continuous)
 							{
-								XTKX[k+1][l+1] += temp1 * (matrix_X_continuous[l][j] - matrix_X_continuous[l][i])
+								XTKX[k+1][l+1] += temp1 * matrix_X_continuous[l][i]
 									* prod_kernel;
 							}
 							else if(l < num_reg_continuous+num_reg_unordered)
@@ -19678,7 +19703,7 @@ int *num_categories)
 
 				if(mat_solve(XTKX, XTKY, DELTA) == NULL) error("mat_solve failed in kernel_estimate_regression_categorical_aic");
 				{ int ok00 = 0; const double inv00 = mat_inv00(XTKX, &ok00); if(!ok00) error("mat_inv00 failed in kernel_estimate_regression_categorical_aic"); trace_H_MPI += inv00*prod_kernel_i_eq_j; }
-				mean[j-my_rank*stride] =  DELTA[0][0];
+				mean[j-my_rank*stride] = np_lp_mhat(DELTA, matrix_X_fit, num_reg_continuous, j);
 
 			}
 
