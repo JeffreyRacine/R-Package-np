@@ -1,7 +1,6 @@
 % $ID$
 \name{npqreg}
 \alias{npqreg}
-\alias{npqreg.call}
 \alias{npqreg.condbandwidth}
 \alias{npqreg.default}
 \alias{npqreg.formula}
@@ -22,7 +21,6 @@ npqreg(bws, \dots)
 
 \method{npqreg}{formula}(bws, data = NULL, newdata = NULL, \dots)
 
-\method{npqreg}{call}(bws, \dots)
 
 \method{npqreg}{condbandwidth}(bws,
        txdat = stop("training data 'txdat' missing"),

@@ -1,7 +1,6 @@
 \name{npudist}
 \alias{npudist}
 \alias{npudist.dbandwidth}
-\alias{npudist.call}
 \alias{npudist.default}
 \alias{npudist.formula}
 
@@ -25,7 +24,6 @@ npudist(bws, \dots)
         edat,
         \dots)
 
-\method{npudist}{call}(bws, \dots)
 
 \method{npudist}{default}(bws, tdat, \dots)
 }

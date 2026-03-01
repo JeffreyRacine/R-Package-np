@@ -2,7 +2,6 @@
 
 \name{npsigtest}
 \alias{npsigtest}
-\alias{npsigtest.call}
 \alias{npsigtest.default}
 \alias{npsigtest.formula}
 \alias{npsigtest.rbandwidth}
@@ -21,7 +20,6 @@ npsigtest(bws, \dots)
 
 \method{npsigtest}{formula}(bws, data = NULL, \dots)
 
-\method{npsigtest}{call}(bws, \dots)
 
 \method{npsigtest}{npregression}(bws, \dots)
 

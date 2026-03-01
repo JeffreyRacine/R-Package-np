@@ -1,7 +1,6 @@
 % $ID$
 \name{npscoef}
 \alias{npscoef}
-\alias{npscoef.call}
 \alias{npscoef.default}
 \alias{npscoef.formula}
 \alias{npscoef.scbandwidth}
@@ -25,7 +24,6 @@ npscoef(bws, \dots)
 \method{npscoef}{formula}(bws, data = NULL, newdata = NULL, y.eval =
 FALSE, \dots)
 
-\method{npscoef}{call}(bws, \dots)
 
 \method{npscoef}{default}(bws, txdat, tydat, tzdat, \dots)
 

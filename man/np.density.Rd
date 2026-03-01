@@ -2,7 +2,6 @@
 \name{npudens}
 \alias{npudens}
 \alias{npudens.bandwidth}
-\alias{npudens.call}
 \alias{npudens.default}
 \alias{npudens.formula}
 
@@ -26,7 +25,6 @@ npudens(bws, \dots)
         edat,
         \dots)
 
-\method{npudens}{call}(bws, \dots)
 
 \method{npudens}{default}(bws, tdat, \dots)
 }

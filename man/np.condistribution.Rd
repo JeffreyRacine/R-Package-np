@@ -1,6 +1,5 @@
 \name{npcdist}
 \alias{npcdist}
-\alias{npcdist.call}
 \alias{npcdist.condbandwidth}
 \alias{npcdist.default}
 \alias{npcdist.formula}
@@ -22,7 +21,6 @@ npcdist(bws, \dots)
 
 \method{npcdist}{formula}(bws, data = NULL, newdata = NULL, \dots)
 
-\method{npcdist}{call}(bws, \dots)
 
 \method{npcdist}{condbandwidth}(bws,
         txdat = stop("invoked without training data 'txdat'"),
