@@ -1,7 +1,6 @@
 % $ID$
 \name{npregbw}
 \alias{npregbw}
-\alias{npregbw.NULL}
 \alias{npregbw.default}
 \alias{npregbw.formula}
 \alias{npregbw.rbandwidth}
@@ -21,10 +20,6 @@ npregbw(\dots)
 
 \method{npregbw}{formula}(formula, data, subset, na.action, call, \dots)
 
-\method{npregbw}{NULL}(xdat = stop("invoked without data 'xdat'"),
-        ydat = stop("invoked without data 'ydat'"),
-        bws,
-        \dots)
 
 \method{npregbw}{default}(xdat = stop("invoked without data 'xdat'"),
         ydat = stop("invoked without data 'ydat'"),

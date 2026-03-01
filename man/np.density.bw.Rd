@@ -2,7 +2,6 @@
 \name{npudensbw}
 \alias{npudensbw}
 \alias{npudensbw.formula}
-\alias{npudensbw.NULL}
 \alias{npudensbw.default}
 \alias{npudensbw.bandwidth}
 \title{Kernel Density Bandwidth Selection with Mixed Data Types}
@@ -23,9 +22,6 @@ npudensbw(\dots)
 
 \method{npudensbw}{formula}(formula, data, subset, na.action, call, \dots)
 
-\method{npudensbw}{NULL}(dat = stop("invoked without input data 'dat'"),
-          bws,
-          \dots)
 
 \method{npudensbw}{bandwidth}(dat = stop("invoked without input data 'dat'"),
           bws,

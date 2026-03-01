@@ -1,7 +1,6 @@
 % $ID$
 \name{npplregbw}
 \alias{npplregbw}
-\alias{npplregbw.NULL}
 \alias{npplregbw.default}
 \alias{npplregbw.formula}
 \alias{npplregbw.plbandwidth}
@@ -24,11 +23,6 @@ npplregbw(\dots)
 
 \method{npplregbw}{formula}(formula, data, subset, na.action, call, \dots)
 
-\method{npplregbw}{NULL}(xdat = stop("invoked without data `xdat'"),
-          ydat = stop("invoked without data `ydat'"),
-          zdat = stop("invoked without data `zdat'"),
-          bws,
-          \dots)
 
 \method{npplregbw}{default}(xdat = stop("invoked without data `xdat'"),
           ydat = stop("invoked without data `ydat'"),
