@@ -1,7 +1,6 @@
 \name{npreghat}
 \alias{npreghat}
 \alias{npreghat.formula}
-\alias{npreghat.call}
 \alias{npreghat.rbandwidth}
 \alias{npreghat.npregression}
 \alias{predict.npreghat}
@@ -17,7 +16,6 @@ npreghat(bws, ...)
 
 \method{npreghat}{formula}(bws, data = NULL, newdata = NULL, ...)
 
-\method{npreghat}{call}(bws, ...)
 
 \method{npreghat}{rbandwidth}(bws,
   txdat = stop("training data 'txdat' missing"),

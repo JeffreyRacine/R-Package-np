@@ -1,7 +1,6 @@
 % $ID$
 \name{npreg}
 \alias{npreg}
-\alias{npreg.call}
 \alias{npreg.default}
 \alias{npreg.formula}
 \alias{npreg.rbandwidth}
@@ -24,7 +23,6 @@ npreg(bws, \dots)
 \method{npreg}{formula}(bws, data = NULL, newdata = NULL, y.eval =
 FALSE, \dots)
 
-\method{npreg}{call}(bws, \dots)
 
 \method{npreg}{default}(bws, txdat, tydat, \dots)
 

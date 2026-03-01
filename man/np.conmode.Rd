@@ -1,7 +1,6 @@
 % $Id: np.conmode.Rd,v 1.38 2006/11/03 21:19:03 tristen Exp $
 \name{npconmode}
 \alias{npconmode}
-\alias{npconmode.call}
 \alias{npconmode.default}
 \alias{npconmode.formula}
 \alias{npconmode.conbandwidth}
@@ -26,7 +25,6 @@ npconmode(bws, \dots)
 
 \method{npconmode}{formula}(bws, data = NULL, newdata = NULL, \dots)
 
-\method{npconmode}{call}(bws, \dots)
 
 \method{npconmode}{default}(bws, txdat, tydat, \dots)
 

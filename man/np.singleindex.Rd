@@ -1,7 +1,6 @@
 % $ID$
 \name{npindex}
 \alias{npindex}
-\alias{npindex.call}
 \alias{npindex.default}
 \alias{npindex.formula}
 \alias{npindex.sibandwidth}
@@ -28,8 +27,6 @@ npindex(bws, \dots)
         y.eval = FALSE,
         \dots)
 
-\method{npindex}{call}(bws,
-        \dots)
 
 \method{npindex}{default}(bws,
         txdat,

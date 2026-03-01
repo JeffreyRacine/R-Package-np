@@ -1,7 +1,6 @@
 % $ID$
 \name{npplreg}
 \alias{npplreg}
-\alias{npplreg.call}
 \alias{npplreg.formula}
 \alias{npplreg.plbandwidth}
 
@@ -23,7 +22,6 @@ npplreg(bws, \dots)
 \method{npplreg}{formula}(bws, data = NULL, newdata = NULL, y.eval =
 FALSE, \dots)
 
-\method{npplreg}{call}(bws, \dots)
 
 \method{npplreg}{plbandwidth}(bws,
         txdat = stop("training data txdat missing"),

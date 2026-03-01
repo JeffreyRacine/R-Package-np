@@ -1,7 +1,6 @@
 % $Id: np.condensity.Rd,v 1.67 2006/11/03 21:19:03 tristen Exp $
 \name{npcdens}
 \alias{npcdens}
-\alias{npcdens.call}
 \alias{npcdens.conbandwidth}
 \alias{npcdens.default}
 \alias{npcdens.formula}
@@ -22,7 +21,6 @@ npcdens(bws, \dots)
 
 \method{npcdens}{formula}(bws, data = NULL, newdata = NULL, \dots)
 
-\method{npcdens}{call}(bws, \dots)
 
 \method{npcdens}{conbandwidth}(bws,
         txdat = stop("invoked without training data 'txdat'"),
