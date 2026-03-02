@@ -1,6 +1,7 @@
 # AGENTS.md
 
 Use `/Users/jracine/Development/AGENTS.md` as the canonical workflow and benchmarking policy.
+Hard default: enforce `Sweep Safety Protocol (Default Across Scope Repos)` from the canonical AGENTS file.
 
 Repo-specific note:
 - Merge (do not overwrite) R-layer and man-page files when porting from `np-master`.
