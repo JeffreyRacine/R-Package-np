@@ -1,4 +1,4 @@
-% $Id: np.sigtest.Rd,v 1.31 2006/10/24 20:43:29 tristen Exp $
+% 
 
 \name{npsigtest}
 \alias{npsigtest}
@@ -52,14 +52,6 @@ npsigtest(bws, \dots)
     methods, and so on.
   }
 
-  \item{data}{
-    an optional data frame, list or environment (or object coercible to
-    a data frame by \code{\link{as.data.frame}}) containing the
-    variables in the model. If not found in data, the variables are
-    taken from \code{environment(bws)}, typically the environment from
-    which \code{\link{npregbw}} was called.
-  }
-
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data)
     used to calculate the regression estimators.
@@ -71,6 +63,19 @@ npsigtest(bws, \dots)
     of \code{xdat}.
   }
 
+  \item{data}{
+    an optional data frame, list or environment (or object coercible to
+    a data frame by \code{\link{as.data.frame}}) containing the
+    variables in the model. If not found in data, the variables are
+    taken from \code{environment(bws)}, typically the environment from
+    which \code{\link{npregbw}} was called.
+  }
+
+  \item{boot.num}{
+    an integer value specifying the number of bootstrap replications to
+    use. Defaults to \code{399}.
+  }
+
   \item{boot.method}{
     a character string used to specify the bootstrap method for
     determining the null distribution. \code{pairwise} resamples
@@ -79,11 +84,6 @@ npsigtest(bws, \dots)
     distributed draws. \code{wild} will use a wild
     bootstrap. \code{wild-rademacher} will use a wild bootstrap with
     Rademacher variables. Defaults to \code{iid}.
-  }
-
-  \item{boot.num}{
-    an integer value specifying the number of bootstrap replications to
-    use. Defaults to \code{399}.
   }
 
   \item{boot.type}{

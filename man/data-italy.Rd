@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{Italy}
 \docType{data}
 \alias{Italy}

@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npscoef}
 \alias{npscoef}
 \alias{npscoef.default}
@@ -34,13 +34,13 @@ FALSE, \dots)
         exdat,
         eydat,
         ezdat,
-        residuals = FALSE,
+        betas = FALSE,
         errors = TRUE,
         iterate = TRUE,
-        maxiter = 100,
-        tol = .Machine$double.eps,
         leave.one.out = FALSE,
-        betas = FALSE,
+        maxiter = 100,
+        residuals = FALSE,
+        tol = .Machine$double.eps,
         \dots)
 }
 
@@ -56,34 +56,6 @@ FALSE, \dots)
 
   }
 
-  \item{\dots}{
-    additional arguments supplied to specify the regression type,
-    bandwidth type, kernel types, selection methods, and so on.
-    To do this, you may specify any of \code{bwscaling}, \code{bwtype},
-    \code{ckertype}, \code{ckerorder}, as described in
-    \code{\link{npscoefbw}}. 
-    
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing
-    the variables 
-    in the model. If not found in data, the variables are taken from
-    \code{environment(bws)}, typically the environment from which
-   \code{\link{npscoefbw}} was called.
-  }
-
-  \item{newdata}{
-    An optional data frame in which to look for evaluation data. If
-    omitted, the training data are used.  
-  }
-
-  \item{y.eval}{
-    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
-    \code{\link{np}} will compute goodness of fit statistics on these
-    data and return them. Defaults to \code{FALSE}.
-  }
 
   \item{txdat}{
     a \eqn{p}-variate data frame of explanatory data (training data),
@@ -112,6 +84,26 @@ FALSE, \dots)
     compute the bandwidth object.
   }
 
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing
+    the variables 
+    in the model. If not found in data, the variables are taken from
+    \code{environment(bws)}, typically the environment from which
+   \code{\link{npscoefbw}} was called.
+  }
+
+  \item{newdata}{
+    An optional data frame in which to look for evaluation data. If
+    omitted, the training data are used.  
+  }
+
+  \item{y.eval}{
+    If \code{newdata} contains dependent data and \code{y.eval = TRUE},
+    \code{\link{np}} will compute goodness of fit statistics on these
+    data and return them. Defaults to \code{FALSE}.
+  }
+
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data).By default,
@@ -132,33 +124,22 @@ FALSE, \dots)
     in the model equation. Defaults to be the same as \code{txdat}.
   }
 
+  \item{betas}{
+    a logical value indicating whether or not estimates of the
+    components of \eqn{\gamma}{gamma} should be returned in the
+    \code{smoothcoefficient} object along with the regression estimates.
+    Defaults to \code{FALSE}.
+  }
+
   \item{errors}{
     a logical value indicating whether or not asymptotic standard errors
     should be computed and returned in the resulting
     \code{smoothcoefficient} object. Defaults to \code{TRUE}.
   }
 
-  \item{residuals}{
-    a logical value indicating that you want residuals computed and
-    returned in the resulting \code{smoothcoefficient} object. Defaults to
-    \code{FALSE}.
-  }
-
-
   \item{iterate}{
     a logical value indicating whether or not backfitted estimates
     should be iterated for self-consistency. Defaults to \code{TRUE}.
-  }
-
-  \item{maxiter}{
-    integer specifying the maximum number of times to iterate the
-    backfitted estimates while attempting to make the backfitted estimates
-    converge to the desired tolerance. Defaults to \code{100}.
-  }
-
-  \item{tol}{
-    desired tolerance on the relative convergence of backfit
-    estimates. Defaults to \code{.Machine$double.eps}.
   }
 
   \item{leave.one.out}{
@@ -167,13 +148,31 @@ FALSE, \dots)
     \code{FALSE}.
   }
 
-  \item{betas}{
-    a logical value indicating whether or not estimates of the
-    components of \eqn{\gamma}{gamma} should be returned in the
-    \code{smoothcoefficient} object along with the regression estimates.
-    Defaults to \code{FALSE}.
+  \item{maxiter}{
+    integer specifying the maximum number of times to iterate the
+    backfitted estimates while attempting to make the backfitted estimates
+    converge to the desired tolerance. Defaults to \code{100}.
+  }
+
+  \item{residuals}{
+    a logical value indicating that you want residuals computed and
+    returned in the resulting \code{smoothcoefficient} object. Defaults to
+    \code{FALSE}.
+  }
+
+  \item{tol}{
+    desired tolerance on the relative convergence of backfit
+    estimates. Defaults to \code{.Machine$double.eps}.
   }
   
+  \item{\dots}{
+    additional arguments supplied to specify the regression type,
+    bandwidth type, kernel types, selection methods, and so on.
+    To do this, you may specify any of \code{bwscaling}, \code{bwtype},
+    \code{ckertype}, \code{ckerorder}, as described in
+    \code{\link{npscoefbw}}. 
+    
+  }
 }
 
 \value{

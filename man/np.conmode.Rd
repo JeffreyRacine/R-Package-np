@@ -1,4 +1,4 @@
-% $Id: np.conmode.Rd,v 1.38 2006/11/03 21:19:03 tristen Exp $
+% 
 \name{npconmode}
 \alias{npconmode}
 \alias{npconmode.default}
@@ -42,11 +42,17 @@ npconmode(bws, \dots)
     object returned from an invocation of \code{\link{npcdensbw}}
   }
 
-  \item{\dots}{
-    additional arguments supplied to specify the bandwidth type,
-    kernel types, and so on, detailed below.
-    This is necessary if you specify bws as a \eqn{p+q}-vector and not
-    a \code{conbandwidth} object, and you do not desire the default behaviours.
+
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (conditioning data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+  \item{tydat}{
+    a one (1) dimensional vector of unordered or ordered factors,
+    containing the dependent data. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
   \item{data}{
@@ -63,18 +69,6 @@ npconmode(bws, \dots)
   }
   
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (conditioning data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional vector of unordered or ordered factors,
-    containing the dependent data. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data). By default,
@@ -89,6 +83,12 @@ npconmode(bws, \dots)
 
 
 
+  \item{\dots}{
+    additional arguments supplied to specify the bandwidth type,
+    kernel types, and so on, detailed below.
+    This is necessary if you specify bws as a \eqn{p+q}-vector and not
+    a \code{conbandwidth} object, and you do not desire the default behaviours.
+  }
 }
 
 \value{

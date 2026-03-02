@@ -21,11 +21,13 @@ npreghat(bws, ...)
   txdat = stop("training data 'txdat' missing"),
   exdat, y = NULL,
   output = c("matrix", "apply"),
-  s = NULL, deriv = NULL,
-  degree = NULL, basis = NULL,
+  basis = NULL,
   bernstein.basis = NULL,
+  degree = NULL,
+  deriv = NULL,
+  leave.one.out = FALSE,
   ridge = 1.0e-12,
-  leave.one.out = FALSE, ...)
+  s = NULL, ...)
 
 \method{npreghat}{npregression}(bws, txdat, y, ...)
 
@@ -37,20 +39,35 @@ npreghat(bws, ...)
 }
 \arguments{
   \item{bws}{An object of class \code{rbandwidth} or \code{npregression}.}
-  \item{txdat}{Training predictors.}
-  \item{exdat}{Optional evaluation predictors.}
-  \item{y}{Optional response vector or matrix for apply mode.}
-  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
-  \item{s}{Derivative multi-index over continuous predictors.}
-  \item{deriv}{Convenience alias for \code{s}.}
-  \item{degree}{Optional local polynomial degree vector override (LP path).}
-  \item{basis}{Local polynomial basis: \code{"glp"}, \code{"additive"}, or \code{"tensor"}.}
-  \item{bernstein.basis}{Logical; use Bernstein basis for LP terms.}
-  \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned.}
-  \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.}
+
   \item{data}{A data frame used with the formula interface.}
+
   \item{newdata}{Optional evaluation data for formula and predict methods.}
+
+  \item{txdat}{Training predictors.}
+
+  \item{exdat}{Optional evaluation predictors.}
+
+  \item{y}{Optional response vector or matrix for apply mode.}
+
+  \item{output}{Either \code{"matrix"} for the hat matrix or \code{"apply"} for direct application to \code{y}.}
+
+  \item{basis}{Local polynomial basis: \code{"glp"}, \code{"additive"}, or \code{"tensor"}.}
+
+  \item{bernstein.basis}{Logical; use Bernstein basis for LP terms.}
+
+  \item{degree}{Optional local polynomial degree vector override (LP path).}
+
+  \item{deriv}{Convenience alias for \code{s}.}
+
+  \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.}
+
+  \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned.}
+
+  \item{s}{Derivative multi-index over continuous predictors.}
+
   \item{object}{An object returned by \code{npreghat}.}
+
   \item{...}{Additional arguments passed to methods.}
 }
 \details{

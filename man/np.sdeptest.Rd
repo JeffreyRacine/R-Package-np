@@ -1,4 +1,4 @@
-% $Id: np.cmstest.Rd,v 1.58 2006/11/03 21:17:20 tristen Exp $
+% 
 \name{npsdeptest}
 \alias{npsdeptest}
 \title{ Kernel Consistent Serial Dependence Test for Univariate Nonlinear Processes }

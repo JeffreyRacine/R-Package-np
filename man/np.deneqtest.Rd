@@ -1,4 +1,4 @@
-% $Id: np.cmstest.Rd,v 1.58 2006/11/03 21:17:20 tristen Exp $
+% 
 \name{npdeneqtest}
 \alias{npdeneqtest}
 \title{ Kernel Consistent Density Equality Test with Mixed Data Types }

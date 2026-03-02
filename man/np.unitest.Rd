@@ -37,6 +37,7 @@ npunitest(data.x = NULL,
     test or not. If set to \code{FALSE}, only the statistic will be
     computed. Defaults to \code{TRUE}.
   }
+
   \item{boot.num}{
     an integer value specifying the number of bootstrap
     replications to use. Defaults to \code{399}.

@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npplregbw}
 \alias{npplregbw}
 \alias{npplregbw.default}
@@ -46,38 +46,6 @@ npplregbw(\dots)
 
 }
 \arguments{
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process. 
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
-    \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
-  }
-  
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{np}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
-  }
-
   \item{xdat}{
   a \eqn{p}-variate data frame of explanatory data (training data),
   corresponding to \eqn{X} in the model equation, whose linear
@@ -94,6 +62,13 @@ npplregbw(\dots)
     a \eqn{q}-variate data frame of explanatory data (training data),
     corresponding to \eqn{Z} in the model equation, whose relationship
     to the dependent variable is unspecified (nonparametric)
+  }
+
+  \item{bandwidth.compute}{
+    a logical value which specifies whether to do a numerical search for
+    bandwidths or not. If set to \code{FALSE}, a \code{plbandwidth} object
+    will be returned with bandwidths set to those specified
+    in \code{bws}. Defaults to \code{TRUE}.
   }
 
   \item{bws}{
@@ -115,13 +90,6 @@ npplregbw(\dots)
   }
 
   
-  \item{bandwidth.compute}{
-    a logical value which specifies whether to do a numerical search for
-    bandwidths or not. If set to \code{FALSE}, a \code{plbandwidth} object
-    will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
-  }
-
   \item{ftol}{
     tolerance on the value of the cross-validation function 
     evaluated at located minima. Defaults to \code{1.19e-07
@@ -154,6 +122,38 @@ npplregbw(\dots)
     tolerance on the position of located minima of the 
     cross-validation function. Defaults to \code{1.49e-08
       (sqrt(DBL_EPSILON))}
+  }
+
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
+  }
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process. 
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
+    \code{\link{na.fail}} if that is unset. The (recommended) default is
+    \code{\link{na.omit}}.  
+  }
+  
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{np}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
   }
 
   \item{\dots}{

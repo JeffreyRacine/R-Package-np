@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npindex}
 \alias{npindex}
 \alias{npindex.default}
@@ -38,15 +38,14 @@ npindex(bws, \dots)
         tydat = stop("training data 'tydat' missing"),
         exdat,
         eydat,
+        boot.num = 399,
+        errors = FALSE,
         gradients = FALSE,
         residuals = FALSE,
-        errors = FALSE,
-        boot.num = 399,
         \dots)
 }
 
 \arguments{
-
   \item{bws}{
     a bandwidth specification. This can be set as a
     \code{sibandwidth}
@@ -57,35 +56,17 @@ npindex(bws, \dots)
     (h). 
   }
 
-  \item{gradients}{
-    a logical value indicating that you want gradients and the
-    asymptotic covariance matrix for beta computed and returned in the
-    resulting \code{singleindex} object. Defaults to \code{FALSE}.
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
-  \item{residuals}{
-    a logical value indicating that you want residuals computed and
-    returned in the resulting \code{singleindex} object. Defaults to
-    \code{FALSE}.
-  }
-
-  \item{errors}{
-    a logical value indicating that you want (bootstrapped)
-    standard errors for the conditional mean, gradients (when
-    \code{gradients=TRUE} is set), and average gradients (when
-    \code{gradients=TRUE} is set), computed and returned in the
-    resulting \code{singleindex} object. Defaults to \code{FALSE}.
-  }
-
-  \item{boot.num}{
-    an integer specifying the number of bootstrap replications to use
-    when performing standard error calculations. Defaults to
-    \code{399}. 
-  }
-
-  \item{\dots}{
-    additional arguments supplied to specify the parameters to the
-    \code{sibandwidth} S3 method, which is called during estimation. 
+  \item{tydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{txdat}. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
   \item{data}{
@@ -107,19 +88,6 @@ npindex(bws, \dots)
     data and return them. Defaults to \code{FALSE}.
   }
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data). By default,
@@ -132,6 +100,37 @@ npindex(bws, \dots)
     true errors. 
   }
   
+  \item{boot.num}{
+    an integer specifying the number of bootstrap replications to use
+    when performing standard error calculations. Defaults to
+    \code{399}. 
+  }
+
+  \item{errors}{
+    a logical value indicating that you want (bootstrapped)
+    standard errors for the conditional mean, gradients (when
+    \code{gradients=TRUE} is set), and average gradients (when
+    \code{gradients=TRUE} is set), computed and returned in the
+    resulting \code{singleindex} object. Defaults to \code{FALSE}.
+  }
+
+  \item{gradients}{
+    a logical value indicating that you want gradients and the
+    asymptotic covariance matrix for beta computed and returned in the
+    resulting \code{singleindex} object. Defaults to \code{FALSE}.
+  }
+
+  \item{residuals}{
+    a logical value indicating that you want residuals computed and
+    returned in the resulting \code{singleindex} object. Defaults to
+    \code{FALSE}.
+  }
+
+
+  \item{\dots}{
+    additional arguments supplied to specify the parameters to the
+    \code{sibandwidth} S3 method, which is called during estimation. 
+  }
 }
 
 \details{

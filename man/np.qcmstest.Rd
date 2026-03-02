@@ -50,12 +50,6 @@ npqcmstest(formula,
     an optional vector specifying a subset of observations to be used. 
   }
 
-  \item{model}{
-    a model object obtained from a call to \code{\link[quantreg]{rq}}. Important: the
-    call to \code{\link[quantreg]{rq}} must have the argument \code{model=TRUE} or
-    \code{npqcmstest} will not work.
-  }
-
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data) used to
     calculate the quantile regression estimators.
@@ -65,6 +59,12 @@ npqcmstest(formula,
     a one (1) dimensional numeric or integer vector of dependent data, each
     element \eqn{i} corresponding to each observation (row) \eqn{i} of
     \code{xdat}. 
+  }
+
+  \item{model}{
+    a model object obtained from a call to \code{\link[quantreg]{rq}}. Important: the
+    call to \code{\link[quantreg]{rq}} must have the argument \code{model=TRUE} or
+    \code{npqcmstest} will not work.
   }
 
   \item{tau}{

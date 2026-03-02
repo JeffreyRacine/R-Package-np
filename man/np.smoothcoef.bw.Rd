@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npscoefbw}
 \alias{npscoefbw}
 \alias{npscoefbw.default}
@@ -78,38 +78,6 @@ npscoefbw(\dots)
 }
 
 \arguments{
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process. 
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
-    \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
-  }
-  
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{np}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
-  }
-
   \item{xdat}{
     a \eqn{p}-variate data frame of explanatory data (training data),
     which, by default, populates the columns \eqn{2} through \eqn{p+1}
@@ -144,6 +112,23 @@ npscoefbw(\dots)
   }
 
   
+  \item{backfit.iterate}{
+    boolean value specifying whether or not to iterate evaluations of
+    the smooth coefficient estimator, for extra accuracy, during the
+    cross-validated backfitting procedure. Defaults to \code{FALSE}.
+  }
+
+  \item{backfit.maxiter}{
+    integer specifying the maximum number of times to iterate the
+    evaluation of the smooth coefficient estimator in the attempt to
+    obtain the desired accuracy. Defaults to \code{100}.
+  }
+
+  \item{backfit.tol}{
+    tolerance to determine convergence of iterated evaluations of the
+    smooth coefficient estimator. Defaults to \code{.Machine$double.eps}.
+  }
+
   \item{bandwidth.compute}{
     a logical value which specifies whether to do a numerical search for
     bandwidths or not. If set to \code{FALSE}, a \code{scbandwidth} object
@@ -151,21 +136,10 @@ npscoefbw(\dots)
     in \code{bws}. Defaults to \code{TRUE}.
   }
 
-  \item{regtype}{
-    a character string specifying local smoothing type for the \code{z}
-    surface. Options are \code{"lc"} (default), \code{"ll"}, and
-    \code{"lp"}.
-  }
-
   \item{basis}{
     for \code{regtype="lp"}, the polynomial basis family used for local
     polynomial fitting. Options are \code{"glp"} (default),
     \code{"additive"}, and \code{"tensor"}.
-  }
-
-  \item{degree}{
-    for \code{regtype="lp"}, polynomial degree specification for each
-    continuous \code{z} variable.
   }
 
   \item{bernstein.basis}{
@@ -206,19 +180,6 @@ npscoefbw(\dots)
     \code{adaptive_nn}:  adaptive nearest neighbors
   }
   
-  \item{ckertype}{
-    character string used to specify the continuous kernel type.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
-  }
-
-  \item{ckerorder}{
-    numeric value specifying kernel order (one of
-    \code{(2,4,6,8)}). Kernel order specified along with a
-  \code{uniform} continuous kernel type will be ignored. Defaults to
-  \code{2}.
-  }
-
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
     Can be set as \code{none} (default kernel on full support),
@@ -233,6 +194,19 @@ npscoefbw(\dots)
     \code{-Inf} for unbounded below.
   }
 
+  \item{ckerorder}{
+    numeric value specifying kernel order (one of
+    \code{(2,4,6,8)}). Kernel order specified along with a
+  \code{uniform} continuous kernel type will be ignored. Defaults to
+  \code{2}.
+  }
+
+  \item{ckertype}{
+    character string used to specify the continuous kernel type.
+    Can be set as \code{gaussian}, \code{epanechnikov}, or
+    \code{uniform}. Defaults to \code{gaussian}.
+  }
+
   \item{ckerub}{
     numeric scalar/vector of upper bounds for continuous variables used
     when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
@@ -240,10 +214,26 @@ npscoefbw(\dots)
     \code{Inf} for unbounded above.
   }
 
-  \item{ukertype}{
-    character string used to specify the unordered categorical kernel type.
-    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
-    \code{aitchisonaitken}.
+  \item{cv.iterate}{
+    boolean value specifying whether or not to perform iterative,
+    cross-validated backfitting on the data. See details for limitations
+    of the backfitting procedure. Defaults to \code{FALSE}.
+  }
+
+  \item{cv.num.iterations}{
+    integer specifying the number of times to iterate the backfitting
+    process over all covariates. Defaults to \code{1}.
+  }
+
+  \item{degree}{
+    for \code{regtype="lp"}, polynomial degree specification for each
+    continuous \code{z} variable.
+  }
+
+  \item{nmulti}{
+    integer number of times to restart the process of finding extrema of
+    the cross-validation function from different (random) initial
+    points. Defaults to \code{min(5,ncol(xdat))}.
   }
 
   \item{okertype}{
@@ -252,16 +242,21 @@ npscoefbw(\dots)
     \code{liracine}.
   }
   
-  \item{nmulti}{
-    integer number of times to restart the process of finding extrema of
-    the cross-validation function from different (random) initial
-    points. Defaults to \code{min(5,ncol(xdat))}.
+  \item{optim.abstol}{
+    the absolute convergence tolerance used by \code{\link{optim}}. Only useful
+    for non-negative functions, as a tolerance for reaching
+    zero. Defaults to \code{.Machine$double.eps}.
   }
 
-  \item{random.seed}{
-    an integer used to seed R's random number generator. This ensures
-    replicability of the numerical search. Defaults to 42.
+  \item{optim.maxattempts}{
+    maximum number of attempts taken trying to achieve successful
+    convergence in \code{\link{optim}}. Defaults to \code{100}.
   }
+
+  \item{optim.maxit}{
+    maximum number of iterations used by \code{\link{optim}}. Defaults
+     to \code{500}.
+   }
 
   \item{optim.method}{ method used by \code{\link{optim}} for minimization of
     the objective function. See \code{?optim} for references. Defaults
@@ -286,17 +281,6 @@ npscoefbw(\dots)
     optimization problems.
   }
 
-  \item{optim.maxattempts}{
-    maximum number of attempts taken trying to achieve successful
-    convergence in \code{\link{optim}}. Defaults to \code{100}.
-  }
-
-  \item{optim.abstol}{
-    the absolute convergence tolerance used by \code{\link{optim}}. Only useful
-    for non-negative functions, as a tolerance for reaching
-    zero. Defaults to \code{.Machine$double.eps}.
-  }
-
   \item{optim.reltol}{
     relative convergence tolerance used by \code{\link{optim}}.  The algorithm
     stops if it is unable to reduce the value by a factor of 'reltol *
@@ -304,38 +288,55 @@ npscoefbw(\dots)
     \code{sqrt(.Machine$double.eps)}, typically about \code{1e-8}.
   }
 
-  \item{optim.maxit}{
-    maximum number of iterations used by \code{\link{optim}}. Defaults
-     to \code{500}.
-   }
-
-  \item{cv.iterate}{
-    boolean value specifying whether or not to perform iterative,
-    cross-validated backfitting on the data. See details for limitations
-    of the backfitting procedure. Defaults to \code{FALSE}.
+  \item{random.seed}{
+    an integer used to seed R's random number generator. This ensures
+    replicability of the numerical search. Defaults to 42.
   }
 
-  \item{cv.num.iterations}{
-    integer specifying the number of times to iterate the backfitting
-    process over all covariates. Defaults to \code{1}.
+  \item{regtype}{
+    a character string specifying local smoothing type for the \code{z}
+    surface. Options are \code{"lc"} (default), \code{"ll"}, and
+    \code{"lp"}.
   }
 
-  \item{backfit.iterate}{
-    boolean value specifying whether or not to iterate evaluations of
-    the smooth coefficient estimator, for extra accuracy, during the
-    cross-validated backfitting procedure. Defaults to \code{FALSE}.
+  \item{ukertype}{
+    character string used to specify the unordered categorical kernel type.
+    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
+    \code{aitchisonaitken}.
   }
 
-  \item{backfit.maxiter}{
-    integer specifying the maximum number of times to iterate the
-    evaluation of the smooth coefficient estimator in the attempt to
-    obtain the desired accuracy. Defaults to \code{100}.
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
   }
 
-  \item{backfit.tol}{
-    tolerance to determine convergence of iterated evaluations of the
-    smooth coefficient estimator. Defaults to \code{.Machine$double.eps}.
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
   }
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process. 
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
+    \code{\link{na.fail}} if that is unset. The (recommended) default is
+    \code{\link{na.omit}}.  
+  }
+  
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{np}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
+  }
+
   \item{\dots}{
   additional arguments supplied to specify the regression type,
   bandwidth type, kernel types, selection methods, and so on, detailed

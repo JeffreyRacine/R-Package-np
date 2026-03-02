@@ -1,4 +1,4 @@
-% $Id: np.cmstest.Rd,v 1.58 2006/11/03 21:17:20 tristen Exp $
+% 
 \name{npcmstest}
 \alias{npcmstest}
 \title{ Kernel Consistent Model Specification Test with Mixed Data Types }
@@ -47,6 +47,17 @@ npcmstest(formula,
     an optional vector specifying a subset of observations to be used. 
   }
 
+  \item{xdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators.
+  }
+
+  \item{ydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{xdat}. 
+  }
+
   \item{model}{
     a model object obtained from a call to \code{\link{lm}} (or
     \code{\link{glm}}). Important: the 
@@ -57,15 +68,6 @@ npcmstest(formula,
     (which rules out Logit, Probit, and Count models).
   }
 
-  \item{xdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators.
-  }
-  \item{ydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
-  }
   \item{distribution}{
     a character string used to specify the method of estimating the
     distribution of the statistic to be calculated. \code{bootstrap}

@@ -1,4 +1,4 @@
-% $Id: np.density.Rd,v 1.75 2006/11/03 21:19:03 tristen Exp $
+% 
 \name{npudens}
 \alias{npudens}
 \alias{npudens.bandwidth}
@@ -40,25 +40,11 @@ npudens(bws, \dots)
     and so on.
   }
 
-  \item{\dots}{
-    additional arguments supplied to specify, the training
-    data, the
-    bandwidth type, kernel types, and so on.
-    This is necessary if you specify bws as a \eqn{p}-vector and not
-    a \code{bandwidth} object, and you do not desire the default
-    behaviours. To do this, you may specify any of \code{bwscaling},
-    \code{bwtype}, \code{ckertype}, \code{ckerorder}, \code{ukertype},
-    \code{okertype}, as described in \code{\link{npudensbw}}.
-  }
 
   \item{tdat}{
     a \eqn{p}-variate data frame of sample realizations (training data)
     used to estimate the density. Defaults to the training data used to
     compute the bandwidth object.
-  }
-  \item{edat}{
-    a \eqn{p}-variate data frame of density evaluation points. By default,
-    evaluation takes place on the data provided by \code{tdat}.
   }
 
   \item{data}{
@@ -74,6 +60,21 @@ npudens(bws, \dots)
     omitted, the training data are used.  
   }
   
+  \item{edat}{
+    a \eqn{p}-variate data frame of density evaluation points. By default,
+    evaluation takes place on the data provided by \code{tdat}.
+  }
+
+  \item{\dots}{
+    additional arguments supplied to specify, the training
+    data, the
+    bandwidth type, kernel types, and so on.
+    This is necessary if you specify bws as a \eqn{p}-vector and not
+    a \code{bandwidth} object, and you do not desire the default
+    behaviours. To do this, you may specify any of \code{bwscaling},
+    \code{bwtype}, \code{ckertype}, \code{ckerorder}, \code{ukertype},
+    \code{okertype}, as described in \code{\link{npudensbw}}.
+  }
 }
 
 \details{
@@ -396,4 +397,3 @@ detach(faithful)
 } % enddontrun
 }
 \keyword{ nonparametric }% at least one, from doc/KEYWORDS
-

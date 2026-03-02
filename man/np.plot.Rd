@@ -1,4 +1,4 @@
-% $Id: np.plot.Rd,v 1.62 2006/11/03 21:17:20 tristen Exp $
+% 
 \name{plot.np}
 
 \alias{plot.bandwidth}

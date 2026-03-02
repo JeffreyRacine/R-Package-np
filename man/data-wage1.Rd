@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{wage1}
 \docType{data}
 \alias{wage1}
