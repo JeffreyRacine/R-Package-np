@@ -238,7 +238,12 @@ npuniden.boundary <- function(X=NULL,
         F
     }
     fhat.loo <- function(X,h,a=0,b=1) {
-        sapply(seq_along(X), function(i){mean(kernel(X[i],X[-i],h,a,b))})
+        n <- length(X)
+        if (n <= 1L) return(rep(NA_real_, n))
+        sapply(seq_along(X), function(i){
+            kv <- kernel(X[i], X, h, a, b)
+            (sum(kv) - kv[i])/(n - 1L)
+        })
     }
     if(bwmethod=="cv.ml") {
         ## Likelihood cross-validation function (maximizing)
