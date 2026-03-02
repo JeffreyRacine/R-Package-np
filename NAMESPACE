@@ -1,4 +1,4 @@
-useDynLib(npRmpi)
+useDynLib(npRmpi, .registration = TRUE)
 import(stats, boot, cubature)
 importFrom("grDevices", "boxplot.stats", "extendrange", "grey", "n2mfrow", "rgb")
 importFrom("graphics", "axis", "legend", "lines", "mtext", "par", "persp", "plot", "plot.new", "plot.window", "points", "polygon", "arrows", "barplot", "bxp")
