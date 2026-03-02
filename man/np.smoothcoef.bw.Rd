@@ -184,14 +184,13 @@ npscoefbw(\dots)
     character string controlling continuous-kernel support handling.
     Can be set as \code{none} (default kernel on full support),
     \code{range} (use sample min/max), or \code{fixed} (use
-    \code{ckerlb}/\code{ckerub}).
+    \code{ckerlb}/\code{ckerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
   }
 
   \item{ckerlb}{
     numeric scalar/vector of lower bounds for continuous variables used
     when \code{ckerbound="fixed"}. Must satisfy lower-bound validity for
-    each continuous variable (e.g., \code{<= min(variable)}). Use
-    \code{-Inf} for unbounded below.
+    each continuous variable (e.g., \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
   \item{ckerorder}{
@@ -210,8 +209,7 @@ npscoefbw(\dots)
   \item{ckerub}{
     numeric scalar/vector of upper bounds for continuous variables used
     when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
-    each continuous variable (e.g., \code{>= max(variable)}). Use
-    \code{Inf} for unbounded above.
+    each continuous variable (e.g., \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
   \item{cv.iterate}{

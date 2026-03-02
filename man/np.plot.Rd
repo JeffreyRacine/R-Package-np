@@ -91,16 +91,51 @@
   distance on the lower limit of the interval. \code{plot} uses an
   analogous procedure to extend the upper limit of the interval.
 
+  Plot interval/error types are:
+  \preformatted{
+  "pmzsd"        : point estimate +/- z_(1-alpha/2) * standard error
+  "pointwise"    : per-point two-sided interval from N(0,1) quantiles
+  "bonferroni"   : pointwise interval with alpha replaced by alpha/m
+  "simultaneous" : joint-band interval (bootstrap route)
+  }
+  where \eqn{m} is the number of evaluation points used in the plotted
+  curve/surface (\eqn{m=\texttt{neval}}{m=neval} for univariate curves,
+  typically \eqn{m=\texttt{neval}^2}{m=neval^2} for full 2D perspective
+  surfaces).
+
+  For asymptotic intervals, let \eqn{T(x)} denote the plotted functional
+  (mean, gradient, density, distribution, etc.) and \eqn{\widehat{se}(x)}
+  its asymptotic standard error:
+  \eqn{T(x)\pm z_{1-\alpha/2}\widehat{se}(x)} for \code{"pmzsd"} and
+  \eqn{[T(x)+z_{\alpha/2}\widehat{se}(x),\ T(x)+z_{1-\alpha/2}\widehat{se}(x)]}
+  for \code{"pointwise"}.
+  \code{"bonferroni"} applies the same pointwise construction with
+  \eqn{\alpha/m} in place of \eqn{\alpha}. For the kernel estimators in
+  this package, asymptotic simultaneous bands are not generally
+  available, so \code{"simultaneous"} with
+  \code{plot.errors.method="asymptotic"} returns \code{NA} bands.
+  Asymptotic standard errors are taken from fitted-object components such as
+  \code{merr}, \code{gerr}, \code{derr}, \code{conderr}, and
+  \code{congerr} where implemented.
+
   Bootstrap resampling is conducted pairwise on \eqn{(y,X,Z)} (i.e., by
-  resampling from rows of the \eqn{(y,X)} data or \eqn{(y,X,Z)} data
-  where appropriate). For regression-class estimators
-  (\code{npreg}/\code{npindex}/\code{npscoef}/\code{npplreg}), the
-  default bootstrap method is \code{wild}. For density/distribution
-  estimators, the default remains \code{inid}. \code{inid} admits general
-  heteroskedasticity of unknown form, though it does not allow for
-  dependence. \code{fixed} conducts Kunsch's (1988) block bootstrap
-  for dependent data, while \code{geom} conducts Politis and
-  Romano's (1994) stationary bootstrap.
+  resampling rows of \eqn{(y,X)} or \eqn{(y,X,Z)} as appropriate).
+  Bootstrap method support differs by estimator family:
+  \preformatted{
+  Regression-family (npreg/npindex/npscoef/npplreg): wild, inid, fixed, geom
+  Density/distribution-family (npudens/npudist/npcdens/npcdist): inid, fixed, geom
+  }
+  hence \code{"wild"} is only available for regression-family plotting.
+
+  Implementation notes for speed:
+  \preformatted{
+  wild            : fast np*hat linear-operator bootstrap path
+  inid/fixed/geom : fast direct helper path (no internal bandwidth search)
+  }
+  \code{inid} admits general heteroskedasticity of unknown form, though
+  it does not allow for dependence. \code{fixed} conducts Kunsch's (1988)
+  block bootstrap for dependent data, while \code{geom} conducts Politis
+  and Romano's (1994) stationary bootstrap.
 
   For consistency of the block and stationary bootstrap, the (mean)
   block length \eqn{b} should grow with the sample size \eqn{n} at an
@@ -115,13 +150,30 @@
   error for the bootstrap estimate of the variance of the empirical mean
   is minimized.
 
-  The default bootstrap replication count is \code{plot.errors.boot.num=1999}.
-  For interval types \code{"bonferroni"}, \code{"simultaneous"}, and
-  \code{"all"}, the minimum recommended count is
+  The default bootstrap replication count is
+  \code{plot.errors.boot.num=1999}. For pointwise tails, ensure
+  \eqn{B \ge \lceil 2/\alpha - 1 \rceil}{B >= ceiling(2/alpha - 1)} so
+  \eqn{\alpha(B+1)} is feasible on the bootstrap rank grid. For interval
+  types \code{"bonferroni"}, \code{"simultaneous"}, and \code{"all"},
+  the minimum recommended count is
   \eqn{B_{\min}=\lceil 2m/\alpha-1 \rceil}{Bmin=ceiling(2*m/alpha-1)},
   where \eqn{m} is the number of evaluation points used by the plotted
   curve/surface. For full 2D perspective grids this is typically
-  \eqn{m=\texttt{neval}^2}{m=neval^2}.
+  \eqn{m=\texttt{neval}^2}{m=neval^2}. When \code{B} is below these
+  thresholds, plotting proceeds but warning guidance is reported.
+
+  Typical plotting calls:
+  \preformatted{
+  ## Asymptotic pointwise/bonferroni intervals
+  plot(bw, plot.errors.method="asymptotic", plot.errors.type="pointwise")
+  plot(bw, plot.errors.method="asymptotic", plot.errors.type="bonferroni")
+
+  ## Regression-family bootstrap (wild available)
+  plot(bw, plot.errors.method="bootstrap", plot.errors.boot.method="wild")
+
+  ## Density/distribution-family bootstrap (use inid/fixed/geom)
+  plot(bw, plot.errors.method="bootstrap", plot.errors.boot.method="inid")
+  }
 
 }
 

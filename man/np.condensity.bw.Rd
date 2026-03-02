@@ -186,14 +186,14 @@ npcdensbw(\dots)
     character string controlling continuous-kernel support handling for
     \code{xdat}. Can be set as \code{none} (default kernel on full support),
     \code{range} (use sample min/max), or \code{fixed} (use
-    \code{cxkerlb}/\code{cxkerub}).
+    \code{cxkerlb}/\code{cxkerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
   }
 
   \item{cxkerlb}{
     numeric scalar/vector of lower bounds for continuous \code{xdat}
     variables used when \code{cxkerbound="fixed"}. Must satisfy
     lower-bound validity for each variable (e.g.,
-    \code{<= min(variable)}). Use \code{-Inf} for unbounded below.
+    \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
   \item{cxkerorder}{
@@ -214,21 +214,21 @@ npcdensbw(\dots)
     numeric scalar/vector of upper bounds for continuous \code{xdat}
     variables used when \code{cxkerbound="fixed"}. Must satisfy
     upper-bound validity for each variable (e.g.,
-    \code{>= max(variable)}). Use \code{Inf} for unbounded above.
+    \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
   \item{cykerbound}{
     character string controlling continuous-kernel support handling for
     \code{ydat}. Can be set as \code{none} (default kernel on full support),
     \code{range} (use sample min/max), or \code{fixed} (use
-    \code{cykerlb}/\code{cykerub}).
+    \code{cykerlb}/\code{cykerub}). The bounded-kernel route reuses the selected continuous kernel and renormalizes it on the chosen support; see \code{\link{np.kernels}}.
   }
 
   \item{cykerlb}{
     numeric scalar/vector of lower bounds for continuous \code{ydat}
     variables used when \code{cykerbound="fixed"}. Must satisfy
     lower-bound validity for each variable (e.g.,
-    \code{<= min(variable)}). Use \code{-Inf} for unbounded below.
+    \code{<= min(variable)}). Use \code{-Inf} for unbounded below. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
   \item{cykerorder}{
@@ -250,7 +250,7 @@ npcdensbw(\dots)
     numeric scalar/vector of upper bounds for continuous \code{ydat}
     variables used when \code{cykerbound="fixed"}. Must satisfy
     upper-bound validity for each variable (e.g.,
-    \code{>= max(variable)}). Use \code{Inf} for unbounded above.
+    \code{>= max(variable)}). Use \code{Inf} for unbounded above. See \code{\link{np.kernels}} for bounded-kernel normalization details.
   }
 
   \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
