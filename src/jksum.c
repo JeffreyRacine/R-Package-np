@@ -12393,41 +12393,67 @@ double *cv){
           const int64_t ie_dwi = MIN(ie,dwi);
           if(BANDWIDTH_den != BW_ADAP_NN){
             for(i = is+wio; i < (wio+ie_dwi); i++){
-              for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
-                tcvk = 0.0;
-                if(j == i){
-                  continue;
-                }
+              const int64_t j_end = wjo + dwj;
+              const int64_t j_stop_before_i = MIN(j_end, i);
+              const int64_t j_start_after_i = MAX(wjo, i + 1);
+              const int64_t k_end = wko + dwk;
+              const int64_t k_stop_before_i = MIN(k_end, i);
+              const int64_t k_start_after_i = MAX(wko, i + 1);
+              tcvj = 0.0;
 
+              for(j = wjo; j < j_stop_before_i; j++){
                 const double tkxij = kx_ij[(i-wio)*dwj + j-wjo];
+                if (tkxij == 0.0) continue;
+                tcvk = 0.0;
+                for(k = wko; k < k_stop_before_i; k++)
+                  tcvk += kx_ik[(i-wio)*dwk + k-wko]*ky_jk[(j-wjo)*dwk + k-wko];
+                for(k = k_start_after_i; k < k_end; k++)
+                  tcvk += kx_ik[(i-wio)*dwk + k-wko]*ky_jk[(j-wjo)*dwk + k-wko];
+                tcvj += tkxij*tcvk;
+              }
 
-                if (tkxij != 0.0) {
-                  for(k = wko; k < (wko + dwk); k++){
-                    if(k == i) continue;
-                    tcvk += kx_ik[(i-wio)*dwk + k-wko]*ky_jk[(j-wjo)*dwk + k-wko];
-                  }               
-                  tcvj += tkxij*tcvk;
-                }
+              for(j = j_start_after_i; j < j_end; j++){
+                const double tkxij = kx_ij[(i-wio)*dwj + j-wjo];
+                if (tkxij == 0.0) continue;
+                tcvk = 0.0;
+                for(k = wko; k < k_stop_before_i; k++)
+                  tcvk += kx_ik[(i-wio)*dwk + k-wko]*ky_jk[(j-wjo)*dwk + k-wko];
+                for(k = k_start_after_i; k < k_end; k++)
+                  tcvk += kx_ik[(i-wio)*dwk + k-wko]*ky_jk[(j-wjo)*dwk + k-wko];
+                tcvj += tkxij*tcvk;
               }
               *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
             }
           } else {
             for(i = is+wio; i < (wio+ie_dwi); i++){
-              for(j = wjo, tcvj = 0.0; j < (wjo + dwj); j++){              
-                tcvk = 0.0;
-                if(j == i){
-                  continue;
-                }
+              const int64_t j_end = wjo + dwj;
+              const int64_t j_stop_before_i = MIN(j_end, i);
+              const int64_t j_start_after_i = MAX(wjo, i + 1);
+              const int64_t k_end = wko + dwk;
+              const int64_t k_stop_before_i = MIN(k_end, i);
+              const int64_t k_start_after_i = MAX(wko, i + 1);
+              tcvj = 0.0;
 
+              for(j = wjo; j < j_stop_before_i; j++){
                 const double tkxij = kx_ij[(j-wjo)*dwi + i-wio];
+                if (tkxij == 0.0) continue;
+                tcvk = 0.0;
+                for(k = wko; k < k_stop_before_i; k++)
+                  tcvk += kx_ik[(k-wko)*dwi + i-wio]*ky_jk[(j-wjo)*dwk + k-wko];
+                for(k = k_start_after_i; k < k_end; k++)
+                  tcvk += kx_ik[(k-wko)*dwi + i-wio]*ky_jk[(j-wjo)*dwk + k-wko];
+                tcvj += tkxij*tcvk;
+              }
 
-                if (tkxij != 0.0) {
-                  for(k = wko; k < (wko + dwk); k++){
-                    if(k == i) continue;
-                    tcvk += kx_ik[(k-wko)*dwi + i-wio]*ky_jk[(j-wjo)*dwk + k-wko];
-                  }               
-                  tcvj += tkxij*tcvk;
-                }
+              for(j = j_start_after_i; j < j_end; j++){
+                const double tkxij = kx_ij[(j-wjo)*dwi + i-wio];
+                if (tkxij == 0.0) continue;
+                tcvk = 0.0;
+                for(k = wko; k < k_stop_before_i; k++)
+                  tcvk += kx_ik[(k-wko)*dwi + i-wio]*ky_jk[(j-wjo)*dwk + k-wko];
+                for(k = k_start_after_i; k < k_end; k++)
+                  tcvk += kx_ik[(k-wko)*dwi + i-wio]*ky_jk[(j-wjo)*dwk + k-wko];
+                tcvj += tkxij*tcvk;
               }
               *cv += tcvj/(mean[i]*mean[i] + DBL_MIN);
               //              Rprintf("i, cv: %d, %3.15g \n",i, *cv);
