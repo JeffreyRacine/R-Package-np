@@ -48,7 +48,8 @@ mpi.bcast.Robj2slave(grid.dat)
 
 t.0 <- system.time(mpi.bcast.cmd(bw <- npudistbw(~x+y,data=mydat),
                                  caller.execute=TRUE))
-t.1 <- system.time(copula <- npcopula(bws=bw, data=mydat, u=grid.dat))
+t.1 <- system.time(mpi.bcast.cmd(copula <- npcopula(bws=bw, data=mydat, u=grid.dat),
+                                 caller.execute=TRUE))
 
 t <- t.0+t.1
 

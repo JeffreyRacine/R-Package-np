@@ -24,5 +24,5 @@ run-attach:
 run-profile:
 	@for d in $(DEMOS); do \
 		echo "[profile][np=$(NP)] $$d"; \
-		R_PROFILE_USER=$(RPROFILE) mpiexec $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R; \
+		mpiexec -env R_PROFILE_USER $(RPROFILE) $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R; \
 	done
