@@ -91,7 +91,10 @@ run_mpiexec_route() {
     if [ "${profile_env}" -eq 1 ]; then
       batch_out="${route_log}.Rout"
       rm -f "${batch_out}"
-      cmd=("${mpiexec}" -n 2 "${r_bin}" CMD BATCH --no-save "${route_script}" "${batch_out}")
+      cmd=("${mpiexec}"
+           -env R_PROFILE_USER "${profile_path}"
+           -n 2
+           "${r_bin}" CMD BATCH --no-save "${route_script}" "${batch_out}")
     else
       cmd=("${mpiexec}" -n 2 "${rscript_bin}" --no-save "${route_script}")
     fi
@@ -103,8 +106,6 @@ run_mpiexec_route() {
       export FI_PROVIDER="tcp"
       export FI_SOCKETS_IFACE="${iface}"
       if [ "${profile_env}" -eq 1 ]; then
-        export R_PROFILE_USER="${profile_path}"
-        export R_PROFILE="${profile_path}"
         export NP_RMPI_PROFILE_N="${NP_RMPI_PROFILE_N:-120}"
       fi
       run_with_timeout "${ROUTE_TIMEOUT_SEC}" \
