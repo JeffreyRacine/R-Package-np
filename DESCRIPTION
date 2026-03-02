@@ -4,6 +4,7 @@ Date: 2026-02-25
 Imports: boot, cubature, methods, quadprog, quantreg, stats, parallel
 Suggests: MASS, logspline, ks, testthat, np, withr
 Config/testthat/edition: 3
+RoxygenNote: 0.0.0
 Title: Parallel Nonparametric Kernel Smoothing Methods for Mixed Data Types Using 'MPI'
 Authors@R: c(
     person(given = "Jeffrey S.", family = "Racine", role = c("aut","cre"),
