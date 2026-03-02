@@ -4,6 +4,7 @@ Date: 2026-02-25
 Imports: boot, cubature, methods, quadprog, quantreg, stats
 Suggests: MASS, logspline, ks, testthat
 Config/testthat/edition: 3
+RoxygenNote: 0.0.0
 Title: Nonparametric Kernel Smoothing Methods for Mixed Data Types
 Authors@R: c(person(given = "Jeffrey S.", family = "Racine", role = c("aut","cre"), email = "racinej@mcmaster.ca"),
              person(given = "Tristen", family = "Hayfield", role = c("aut"), email = "tristen.hayfield@gmail.com"))
