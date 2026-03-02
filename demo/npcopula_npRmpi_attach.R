@@ -41,17 +41,7 @@ grid.dat <- data.frame(x = grid.seq, y = grid.seq)
 ## Estimate the copula
 
 t.0 <- system.time(bw <- npudistbw(~x+y,data=mydat))
-t.1 <- system.time({
-  # npcopula currently fails under attach-mode worker autodispatch; run safely on master.
-  old.autod <- getOption("npRmpi.autodispatch")
-  options(npRmpi.autodispatch = FALSE)
-  on.exit(options(npRmpi.autodispatch = old.autod), add = TRUE)
-  copula <- try(npcopula(bws=bw, data=mydat, u=grid.dat), silent=TRUE)
-  if (inherits(copula, "try-error")) {
-    warning("npcopula fit failed in attach demo; continuing with bandwidth summary only.")
-    copula <- NULL
-  }
-})
+t.1 <- system.time(copula <- npcopula(bws=bw, data=mydat, u=grid.dat))
 
 t <- t.0+t.1
 

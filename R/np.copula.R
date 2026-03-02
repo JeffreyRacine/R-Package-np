@@ -11,8 +11,9 @@ npcopula <- function(bws,
                      n.quasi.inv=1000,
                      er.quasi.inv=1) {
   .npRmpi_require_active_slave_pool(where = "npcopula()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+  # Keep npcopula as a local orchestrator in session mode.
+  # Dispatching the full routine can deadlock because it nests many estimator
+  # calls; those inner calls are already MPI-aware and dispatch independently.
 
   ## Basic error checking
 

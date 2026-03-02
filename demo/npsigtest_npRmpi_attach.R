@@ -12,7 +12,7 @@ library(npRmpi)
 ##   try(mpi.comm.dup(0, 1), silent = TRUE)
 ##   npRmpi.init(mode="attach", comm=1, autodispatch=TRUE, np.messages=FALSE)
 ##
-npRmpi.init(mode="attach", comm=1, autodispatch=FALSE)
+npRmpi.init(mode="attach", comm=1, autodispatch=TRUE)
 
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
@@ -28,18 +28,14 @@ y <- x1 + x2 + rnorm(n)
 mydat <- data.frame(z,x1,x2,y)
 rm(z,x1,x2,y)
 
-mpi.bcast.Robj2slave(mydat)
-
-t <- system.time(mpi.bcast.cmd(model <- npreg(y~z+x1+x2,
-                                              regtype="ll",
-                                              bwmethod="cv.aic",
-                                              data=mydat),
-                               caller.execute=TRUE))
+t <- system.time(model <- npreg(y~z+x1+x2,
+                                regtype="ll",
+                                bwmethod="cv.aic",
+                                data=mydat))
 
 ## An example of the consistent nonparametric significance test
 
-t <- t + system.time(mpi.bcast.cmd(output <- npsigtest(model),
-                                   caller.execute=TRUE))
+t <- t + system.time(output <- npsigtest(model))
 
 output
 

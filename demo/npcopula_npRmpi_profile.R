@@ -48,13 +48,7 @@ mpi.bcast.Robj2slave(grid.dat)
 
 t.0 <- system.time(mpi.bcast.cmd(bw <- npudistbw(~x+y,data=mydat),
                                  caller.execute=TRUE))
-t.1 <- system.time({
-  copula <- try(npcopula(bws=bw, data=mydat, u=grid.dat), silent=TRUE)
-  if (inherits(copula, "try-error")) {
-    warning("npcopula fit failed in profile demo; continuing with bandwidth summary only.")
-    copula <- NULL
-  }
-})
+t.1 <- system.time(copula <- npcopula(bws=bw, data=mydat, u=grid.dat))
 
 t <- t.0+t.1
 
