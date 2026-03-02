@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npreg}
 \alias{npreg}
 \alias{npreg.default}
@@ -31,8 +31,8 @@ FALSE, \dots)
       tydat = stop("training data 'tydat' missing"),
       exdat,
       eydat,
-      gradients = FALSE,
       gradient.order = 1L,
+      gradients = FALSE,
       residuals = FALSE,
       \dots)
 }
@@ -46,10 +46,18 @@ FALSE, \dots)
     a vector, then additional arguments will need to be supplied as
     necessary to specify the bandwidth type, kernel types, and so on.
   }
-  \item{\dots}{
-    additional arguments supplied to specify the regression type,
-    bandwidth type, kernel types, training data, and so on, detailed
-    below. 
+
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
+  }
+
+  \item{tydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{txdat}. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
   \item{data}{
@@ -71,19 +79,6 @@ FALSE, \dots)
     data and return them. Defaults to \code{FALSE}.
   }
   
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data). By default,
@@ -96,6 +91,15 @@ FALSE, \dots)
     true errors. 
   }
 
+  \item{gradient.order}{
+    for \code{regtype="lp"} with \code{gradients=TRUE}, a positive
+    integer (or integer vector with one entry per continuous predictor)
+    specifying derivative order(s). Defaults to \code{1L}. Orders
+    exceeding \code{degree} for a variable are returned as
+    \code{NA}; orders greater than one are currently reserved for
+    future extension and return \code{NA}.
+  }
+
   \item{gradients}{
     a logical value indicating that you want gradients computed and
     returned in the resulting \code{npregression} object. Defaults to
@@ -106,19 +110,16 @@ FALSE, \dots)
     extraction and currently return \code{NA}.
   }
 
-  \item{gradient.order}{
-    for \code{regtype="lp"} with \code{gradients=TRUE}, a positive
-    integer (or integer vector with one entry per continuous predictor)
-    specifying derivative order(s). Defaults to \code{1L}. Orders
-    exceeding \code{degree} for a variable are returned as
-    \code{NA}; orders greater than one are currently reserved for
-    future extension and return \code{NA}.
-  }
-
   \item{residuals}{
     a logical value indicating that you want residuals computed and
     returned in the resulting \code{npregression} object. Defaults to
     \code{FALSE}.
+  }
+
+  \item{\dots}{
+    additional arguments supplied to specify the regression type,
+    bandwidth type, kernel types, training data, and so on, detailed
+    below. 
   }
 }
 

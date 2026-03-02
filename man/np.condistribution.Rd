@@ -48,22 +48,18 @@ npcdist(bws, \dots)
     data, and so on.
   }
 
-  \item{gradients}{
-    a logical value specifying whether to return estimates of the
-    gradients at the evaluation points. Defaults to \code{FALSE}.
+  \item{txdat}{
+    a \eqn{p}-variate data frame of sample realizations of explanatory
+    data (training data). Defaults to the training data used to
+    compute the bandwidth object.
   }
 
-  \item{\dots}{
-    additional arguments supplied to specify the bandwidth type, kernel
-    types, and so on.  This is necessary if you specify bws as a
-    \eqn{p+q}-vector and not a \code{condbandwidth} object, and you do
-    not desire the default behaviours. To do this, you may specify any
-    of \code{bwmethod}, \code{bwscaling}, \code{bwtype},
-    \code{cxkertype}, \code{cxkerorder}, \code{cykertype},
-    \code{cykerorder}, \code{uxkertype}, \code{oxkertype},
-    \code{oykertype}, as described in \code{\link{npcdistbw}}.
+  \item{tydat}{
+    a \eqn{q}-variate data frame of sample realizations of dependent
+    data (training data). Defaults to the training data used to
+    compute the bandwidth object.
   }
-  
+
   \item{data}{
     an optional data frame, list or environment (or object coercible to
     a data frame by \code{\link{as.data.frame}}) containing the
@@ -78,18 +74,6 @@ npcdist(bws, \dots)
   }
 
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of sample realizations of explanatory
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a \eqn{q}-variate data frame of sample realizations of dependent
-    data (training data). Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
   \item{exdat}{
     a \eqn{p}-variate data frame of explanatory data on
     which cumulative conditional distributions will be evaluated. By
@@ -103,6 +87,22 @@ npcdist(bws, \dots)
     evaluation takes place on the data provided by \code{tydat}.
   }
 
+  \item{gradients}{
+    a logical value specifying whether to return estimates of the
+    gradients at the evaluation points. Defaults to \code{FALSE}.
+  }
+
+  
+  \item{\dots}{
+    additional arguments supplied to specify the bandwidth type, kernel
+    types, and so on.  This is necessary if you specify bws as a
+    \eqn{p+q}-vector and not a \code{condbandwidth} object, and you do
+    not desire the default behaviours. To do this, you may specify any
+    of \code{bwmethod}, \code{bwscaling}, \code{bwtype},
+    \code{cxkertype}, \code{cxkerorder}, \code{cykertype},
+    \code{cykerorder}, \code{uxkertype}, \code{oxkertype},
+    \code{oykertype}, as described in \code{\link{npcdistbw}}.
+  }
 }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup. See \code{\link{npRmpi.init}} details for performance tradeoffs (message passing/startup mode) and the \code{inst/Rprofile} manual-broadcast template.

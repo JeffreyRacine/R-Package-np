@@ -24,7 +24,6 @@ npRmpi.quit(force = FALSE, dellog = TRUE, comm = 1,
 npRmpi.session.info(comm = 1)
 }
 \arguments{
-  \item{\dots}{Additional arguments passed to \code{mpi.spawn.Rslaves()}.}
   \item{nslaves}{Number of slaves to spawn for interactive execution (\code{mode="spawn"}). Use \code{nslaves=0} for master-only runtime (no spawned workers).}
   \item{comm}{Communicator used for the master+slaves pool (defaults to \code{1}).}
   \item{mode}{Startup/stop mode. \code{"spawn"} starts slaves from rank 0.
@@ -47,6 +46,7 @@ npRmpi.session.info(comm = 1)
   \item{quiet}{Logical; suppress host-info printing when \code{FALSE}.}
   \item{force}{Logical; when \code{TRUE}, force a hard shutdown of slave daemons.}
   \item{dellog}{Logical; when \code{TRUE}, remove slave log files (if applicable).}
+  \item{\dots}{Additional arguments passed to \code{mpi.spawn.Rslaves()}.}
 }
 \details{
   Documentation guide: see \code{\link{np.kernels}} for kernels, \code{\link{np.options}} for global options, \code{\link{plot}} for plotting options, and \code{\link{npRmpi.init}} for interactive/cluster MPI startup.

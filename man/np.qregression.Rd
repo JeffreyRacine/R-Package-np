@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npqreg}
 \alias{npqreg}
 \alias{npqreg.condbandwidth}
@@ -56,20 +56,17 @@ npqreg(bws, \dots)
     necessary to specify the bandwidth type, kernel types, and so on.
   }
 
-  \item{tau}{
-    a numeric value specifying the \eqn{\tau}{tau}th quantile is
-    desired. Defaults to \code{0.5}.
+  \item{txdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
-  \item{\dots}{
-    additional arguments supplied to specify the regression type,
-    bandwidth type, kernel types, training data, and so on.
-    To do this,
-    you may specify any of \code{bwmethod}, \code{bwscaling},
-    \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
-    \code{cykertype}, \code{cykerorder}, \code{uxkertype},
-    \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
-    in \code{\link{npcdistbw}}. 
+  \item{tydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{txdat}. Defaults to the training data used to
+    compute the bandwidth object.
   }
 
   \item{data}{
@@ -85,34 +82,22 @@ npqreg(bws, \dots)
     omitted, the training data are used.  
   }
 
-  \item{txdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
-  \item{tydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{txdat}. Defaults to the training data used to
-    compute the bandwidth object.
-  }
-
   \item{exdat}{
     a \eqn{p}-variate data frame of points on which the regression will be
     estimated (evaluation data). By default,
     evaluation takes place on the data provided by \code{txdat}.
   }
 
+  \item{tau}{
+    a numeric value specifying the \eqn{\tau}{tau}th quantile is
+    desired. Defaults to \code{0.5}.
+  }
+
+
   \item{gradients}{
     [currently not supported] a logical value indicating that you want
     gradients computed and returned in the resulting \code{npregression}
     object. Defaults to \code{FALSE}.
-  }
-
-  \item{itmax}{
-    integer number of iterations before failure in the numerical
-    optimization routine. Defaults to \code{10000}.
   }
 
   \item{ftol}{
@@ -138,16 +123,37 @@ npqreg(bws, \dots)
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
 
-  \item{lbc.dir,dfc.dir,cfac.dir,initc.dir}{ lower bound, chi-square
-    degrees of freedom, stretch factor, and initial non-random values
-    for direction set search for Powell's algorithm for \code{numeric}
-    variables. See Details}
+  \item{itmax}{
+    integer number of iterations before failure in the numerical
+    optimization routine. Defaults to \code{10000}.
+  }
 
-  \item{lbd.dir,hbd.dir,dfac.dir,initd.dir}{ lower bound, upper bound,
-    stretch factor, and initial non-random values for direction set
-    search for Powell's algorithm for categorical variables. See
-    Details}
+  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
+  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{\dots}{
+    additional arguments supplied to specify the regression type,
+    bandwidth type, kernel types, training data, and so on.
+    To do this,
+    you may specify any of \code{bwmethod}, \code{bwscaling},
+    \code{bwtype}, \code{cxkertype}, \code{cxkerorder},
+    \code{cykertype}, \code{cykerorder}, \code{uxkertype},
+    \code{uykertype}, \code{oxkertype}, \code{oykertype}, as described
+    in \code{\link{npcdistbw}}. 
+  }
 }
 
 \details{

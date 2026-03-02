@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npindexbw}
 \alias{npindexbw}
 \alias{npindexbw.default}
@@ -60,6 +60,122 @@ npindexbw(\dots)
 }
 
 \arguments{
+  \item{xdat}{
+    a \eqn{p}-variate data frame of explanatory data (training data) used to
+    calculate the regression estimators.
+  }
+
+  \item{ydat}{
+    a one (1) dimensional numeric or integer vector of dependent data, each
+    element \eqn{i} corresponding to each observation (row) \eqn{i} of
+    \code{xdat}. 
+  }
+
+  \item{bws}{
+    a bandwidth specification. This can be set as a
+    \code{singleindexbandwidth}
+    object returned from an invocation of \code{npindexbw}, or
+    as a vector of parameters (beta) with each element \eqn{i}
+    corresponding to the coefficient for column \eqn{i} in \code{xdat}
+    where the first element is normalized to 1, and a scalar bandwidth
+    (h). If specified as a vector, then additional arguments will need
+    to be supplied as necessary to specify the bandwidth type, kernel
+    types, and so on.
+  }
+
+  \item{bandwidth.compute}{
+    a logical value which specifies whether to do a numerical search for
+    bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
+    will be returned with bandwidths set to those specified
+    in \code{bws}. Defaults to \code{TRUE}.
+  }
+
+  \item{basis}{
+    local polynomial basis selector used when
+    \code{regtype="lp"}: one of \code{"glp"}, \code{"additive"}, or
+    \code{"tensor"}. Ignored for \code{"lc"} and \code{"ll"}.
+  }
+
+  \item{bernstein.basis}{
+    logical flag used when \code{regtype="lp"}; if \code{TRUE}, use a
+    Bernstein/B-spline basis for local polynomial terms.
+  }
+
+  \item{degree}{
+    optional integer degree vector for continuous predictors when
+    \code{regtype="lp"}. For single-index regression this is typically
+    length one.
+  }
+
+  \item{nmulti}{
+    integer number of times to restart the process of finding extrema of
+    the cross-validation function from different (random) initial
+    points. Defaults to \code{min(5,ncol(xdat))}.
+  }
+
+   \item{only.optimize.beta}{
+     signals the routine to only minimize the objective function with
+     respect to beta
+   }
+
+  \item{optim.abstol}{
+    the absolute convergence tolerance used by \code{\link{optim}}. Only useful
+    for non-negative functions, as a tolerance for reaching
+    zero. Defaults to \code{.Machine$double.eps}.
+  }
+
+  \item{optim.maxattempts}{
+    maximum number of attempts taken trying to achieve successful
+    convergence in \code{\link{optim}}. Defaults to \code{100}.
+  }
+
+  \item{optim.maxit}{
+    maximum number of iterations used by \code{\link{optim}}. Defaults
+     to \code{500}.
+   }
+
+  \item{optim.method}{ method used by \code{\link{optim}} for minimization of
+    the objective function. See \code{?optim} for references. Defaults
+    to \code{"Nelder-Mead"}.
+
+    the default method is an implementation of that of Nelder and Mead
+    (1965), that uses only function values and is robust but relatively
+    slow.  It will work reasonably well for non-differentiable
+    functions.
+
+    method \code{"BFGS"} is a quasi-Newton method (also known as a
+    variable metric algorithm), specifically that published
+    simultaneously in 1970 by Broyden, Fletcher, Goldfarb and Shanno.
+    This uses function values and gradients to build up a picture of the
+    surface to be optimized.
+
+    method \code{"CG"} is a conjugate gradients method based
+    on that by Fletcher and Reeves (1964) (but with the option of
+    Polak-Ribiere or Beale-Sorenson updates).  Conjugate gradient
+    methods will generally be more fragile than the BFGS method, but as
+    they do not store a matrix they may be successful in much larger
+    optimization problems.
+  }
+
+  \item{optim.reltol}{
+    relative convergence tolerance used by \code{\link{optim}}.  The algorithm
+    stops if it is unable to reduce the value by a factor of 'reltol *
+    (abs(val) + reltol)' at a step.  Defaults to
+    \code{sqrt(.Machine$double.eps)}, typically about \code{1e-8}.
+  }
+
+  \item{random.seed}{
+    an integer used to seed R's random number generator. This ensures
+    replicability of the numerical search. Defaults to 42.
+  }
+
+  \item{regtype}{
+    a character string specifying local smoothing type for the
+    nonparametric index regression fit used downstream in
+    \code{npindex}. Supported values are \code{"lc"}, \code{"ll"}, and
+    \code{"lp"}.
+  }
+
   \item{formula}{
     a symbolic description of variables on which bandwidth selection is
     to be performed. The details of constructing a formula are
@@ -94,128 +210,12 @@ npindexbw(\dots)
     another function. It is not recommended that the user set this.
   }
 
-  \item{xdat}{
-    a \eqn{p}-variate data frame of explanatory data (training data) used to
-    calculate the regression estimators.
-  }
-
-  \item{ydat}{
-    a one (1) dimensional numeric or integer vector of dependent data, each
-    element \eqn{i} corresponding to each observation (row) \eqn{i} of
-    \code{xdat}. 
-  }
-
-  \item{bws}{
-    a bandwidth specification. This can be set as a
-    \code{singleindexbandwidth}
-    object returned from an invocation of \code{npindexbw}, or
-    as a vector of parameters (beta) with each element \eqn{i}
-    corresponding to the coefficient for column \eqn{i} in \code{xdat}
-    where the first element is normalized to 1, and a scalar bandwidth
-    (h). If specified as a vector, then additional arguments will need
-    to be supplied as necessary to specify the bandwidth type, kernel
-    types, and so on.
-  }
-
   \item{method}{
     the single index model method, one of either \dQuote{ichimura}
     (Ichimura (1993)) or \dQuote{kleinspady} (Klein and Spady
     (1993)). Defaults to
     \code{ichimura}.
   }
-
-  \item{regtype}{
-    a character string specifying local smoothing type for the
-    nonparametric index regression fit used downstream in
-    \code{npindex}. Supported values are \code{"lc"}, \code{"ll"}, and
-    \code{"lp"}.
-  }
-
-  \item{basis}{
-    local polynomial basis selector used when
-    \code{regtype="lp"}: one of \code{"glp"}, \code{"additive"}, or
-    \code{"tensor"}. Ignored for \code{"lc"} and \code{"ll"}.
-  }
-
-  \item{degree}{
-    optional integer degree vector for continuous predictors when
-    \code{regtype="lp"}. For single-index regression this is typically
-    length one.
-  }
-
-  \item{bernstein.basis}{
-    logical flag used when \code{regtype="lp"}; if \code{TRUE}, use a
-    Bernstein/B-spline basis for local polynomial terms.
-  }
-
-  \item{nmulti}{
-    integer number of times to restart the process of finding extrema of
-    the cross-validation function from different (random) initial
-    points. Defaults to \code{min(5,ncol(xdat))}.
-  }
-
-  \item{random.seed}{
-    an integer used to seed R's random number generator. This ensures
-    replicability of the numerical search. Defaults to 42.
-  }
-
-  \item{bandwidth.compute}{
-    a logical value which specifies whether to do a numerical search for
-    bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
-    will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
-  }
-
-  \item{optim.method}{ method used by \code{\link{optim}} for minimization of
-    the objective function. See \code{?optim} for references. Defaults
-    to \code{"Nelder-Mead"}.
-
-    the default method is an implementation of that of Nelder and Mead
-    (1965), that uses only function values and is robust but relatively
-    slow.  It will work reasonably well for non-differentiable
-    functions.
-
-    method \code{"BFGS"} is a quasi-Newton method (also known as a
-    variable metric algorithm), specifically that published
-    simultaneously in 1970 by Broyden, Fletcher, Goldfarb and Shanno.
-    This uses function values and gradients to build up a picture of the
-    surface to be optimized.
-
-    method \code{"CG"} is a conjugate gradients method based
-    on that by Fletcher and Reeves (1964) (but with the option of
-    Polak-Ribiere or Beale-Sorenson updates).  Conjugate gradient
-    methods will generally be more fragile than the BFGS method, but as
-    they do not store a matrix they may be successful in much larger
-    optimization problems.
-  }
-
-  \item{optim.maxattempts}{
-    maximum number of attempts taken trying to achieve successful
-    convergence in \code{\link{optim}}. Defaults to \code{100}.
-  }
-
-  \item{optim.abstol}{
-    the absolute convergence tolerance used by \code{\link{optim}}. Only useful
-    for non-negative functions, as a tolerance for reaching
-    zero. Defaults to \code{.Machine$double.eps}.
-  }
-
-  \item{optim.reltol}{
-    relative convergence tolerance used by \code{\link{optim}}.  The algorithm
-    stops if it is unable to reduce the value by a factor of 'reltol *
-    (abs(val) + reltol)' at a step.  Defaults to
-    \code{sqrt(.Machine$double.eps)}, typically about \code{1e-8}.
-  }
-
-  \item{optim.maxit}{
-    maximum number of iterations used by \code{\link{optim}}. Defaults
-     to \code{500}.
-   }
-
-   \item{only.optimize.beta}{
-     signals the routine to only minimize the objective function with
-     respect to beta
-   }
 
   \item{\dots}{
     additional arguments supplied to specify the parameters to the

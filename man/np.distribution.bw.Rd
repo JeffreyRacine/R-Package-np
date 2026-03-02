@@ -98,44 +98,6 @@ npudistbw(\dots)
 }
 
 \arguments{
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object coercible to
-    a data frame by \code{\link{as.data.frame}}) containing the
-    variables in the model. If not found in data, the variables are
-    taken from \code{environment(formula)}, typically the environment
-    from which the function is called.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process. 
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting
-   of options, and is \code{\link{na.fail}} if that is unset. The
-   (recommended) default is \code{\link{na.omit}}.
-  }
-  
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
-  }
-    
-  \item{gdata}{
-    a grid of data on which the indicator function for
-    least-squares cross-validation is to be computed (can be the sample
-    or a grid of quantiles).
-  }
-
   \item{dat}{
     a \eqn{p}-variate data frame on which bandwidth selection will be
     performed. The data types may be continuous, discrete (ordered
@@ -160,6 +122,14 @@ npudistbw(\dots)
   }
 
   
+  \item{bandwidth.compute}{
+    a logical value which specifies whether to do a numerical search for
+    bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
+    will be returned with bandwidths set to those specified
+    in \code{bws}. Defaults to \code{TRUE}.
+  }
+  
+
   \item{bwmethod}{ a character string specifying the bandwidth selection
     method.  \code{cv.cdf} specifies least-squares cross-validation for
     cumulative distribution functions (Li, Li and Racine (2017)), and
@@ -202,26 +172,9 @@ npudistbw(\dots)
     
   }
 
-  \item{bandwidth.compute}{
-    a logical value which specifies whether to do a numerical search for
-    bandwidths or not. If set to \code{FALSE}, a \code{bandwidth} object
-    will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
-  }
-  
+  \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{ckertype}{
-    character string used to specify the continuous kernel type.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
-  }
-
-  \item{ckerorder}{
-    numeric value specifying kernel order (one of
-    \code{(2,4,6,8)}). Kernel order specified along with a
-  \code{uniform} continuous kernel type will be ignored. Defaults to
-  \code{2}.
-  }
+  \item{cfac.init}{non-random initial values for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
 
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
@@ -237,6 +190,19 @@ npudistbw(\dots)
     \code{-Inf} for unbounded below.
   }
 
+  \item{ckerorder}{
+    numeric value specifying kernel order (one of
+    \code{(2,4,6,8)}). Kernel order specified along with a
+  \code{uniform} continuous kernel type will be ignored. Defaults to
+  \code{2}.
+  }
+
+  \item{ckertype}{
+    character string used to specify the continuous kernel type.
+    Can be set as \code{gaussian}, \code{epanechnikov}, or
+    \code{uniform}. Defaults to \code{gaussian}.
+  }
+
   \item{ckerub}{
     numeric scalar/vector of upper bounds for continuous variables used
     when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
@@ -244,36 +210,16 @@ npudistbw(\dots)
     \code{Inf} for unbounded above.
   }
 
-  \item{okertype}{
-    character string used to specify the ordered categorical kernel type.
-    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}.
-  }
+  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
 
-  \item{nmulti}{
-    integer number of times to restart the process of finding extrema of
-    the cross-validation function from different (random) initial points.
-  }
+  \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
 
-  \item{remin}{
-    a logical value which when set as \code{TRUE} the search routine
-    restarts from located minima for a minor gain in accuracy. Defaults
-    to \code{TRUE}.
-  }
-
-  \item{itmax}{
-    integer number of iterations before failure in the numerical
-    optimization routine. Defaults to \code{10000}.
-  }
+  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
   \item{do.full.integral}{
     a logical value which when set as \code{TRUE} evaluates the
     moment-based integral on the entire sample. Defaults
     to \code{FALSE}.
-  }
-
-  \item{ngrid}{
-    integer number of grid points to use when computing the moment-based
-    integral. Defaults to \code{100}.
   }
 
   \item{ftol}{
@@ -284,50 +230,15 @@ npudistbw(\dots)
     (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
-  \item{tol}{
-    tolerance on the position of located minima of the cross-validation
-    function (tol should generally be no smaller than the square root of
-    your machine's floating point precision). Defaults to \code{
-      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
-  }
+  \item{hbc.init}{upper bound for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
 
-  \item{small}{
-    a small number used to bracket a minimum (it is hopeless to ask for
-    a bracketing interval of width less than sqrt(epsilon) times its
-    central value, a fractional width of only about 10-04 (single
-    precision) or 3x10-8 (double precision)). Defaults to \code{small
-      = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
-  }
+  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
 
-  \item{lbc.dir,dfc.dir,cfac.dir,initc.dir}{ lower bound, chi-square
-    degrees of freedom, stretch factor, and initial non-random values
-    for direction set search for Powell's algorithm for \code{numeric}
-    variables. See Details}
+  \item{hbd.init}{upper bound for scale factors for categorical variables for Powell's algorithm. See Details}
 
-  \item{lbd.dir,hbd.dir,dfac.dir,initd.dir}{ lower bound, upper bound,
-    stretch factor, and initial non-random values for direction set
-    search for Powell's algorithm for categorical variables. See
-    Details}
+  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-  \item{lbc.init, hbc.init, cfac.init}{ lower bound, upper bound, and
-    non-random initial values for scale factors for \code{numeric}
-    variables for Powell's algorithm. See Details}
-
-  \item{lbd.init, hbd.init, dfac.init}{ lower bound, upper bound, and
-    non-random initial values for scale factors for categorical
-    variables for Powell's algorithm. See Details}
-
-  \item{scale.init.categorical.sample}{ a logical value that when set
-    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
-    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
-    \eqn{n} the number of observations, \eqn{P}{P} the order of the
-    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
-    Details}
-
-  \item{transform.bounds}{ a logical value that when set to \code{TRUE}
-    applies an internal transformation that maps the unconstrained
-    search to the feasible bandwidth domain. Defaults to
-    \code{FALSE}.}
+  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
 
   \item{invalid.penalty}{ a character string specifying the penalty
     used when the optimizer encounters invalid bandwidths.
@@ -335,9 +246,18 @@ npudistbw(\dots)
     objective; \code{"dbmax"} returns \code{DBL\_MAX}. Defaults to
     \code{"baseline"}.}
 
-  \item{penalty.multiplier}{ a numeric multiplier applied to the
-    baseline penalty when \code{invalid.penalty="baseline"}.
-    Defaults to \code{10}.}
+  \item{itmax}{
+    integer number of iterations before failure in the numerical
+    optimization routine. Defaults to \code{10000}.
+  }
+
+  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{lbc.init}{lower bound for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
+
+  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{lbd.init}{lower bound for scale factors for categorical variables for Powell's algorithm. See Details}
 
   \item{memfac}{
     The algorithm to compute the least-squares objective function uses
@@ -350,6 +270,97 @@ npudistbw(\dots)
     large data sets (>100k elements) setting memfac to a lower value may
     fix the problem.
   }
+
+  \item{ngrid}{
+    integer number of grid points to use when computing the moment-based
+    integral. Defaults to \code{100}.
+  }
+
+  \item{nmulti}{
+    integer number of times to restart the process of finding extrema of
+    the cross-validation function from different (random) initial points.
+  }
+
+  \item{okertype}{
+    character string used to specify the ordered categorical kernel type.
+    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}.
+  }
+
+  \item{penalty.multiplier}{ a numeric multiplier applied to the
+    baseline penalty when \code{invalid.penalty="baseline"}.
+    Defaults to \code{10}.}
+
+  \item{remin}{
+    a logical value which when set as \code{TRUE} the search routine
+    restarts from located minima for a minor gain in accuracy. Defaults
+    to \code{TRUE}.
+  }
+
+  \item{scale.init.categorical.sample}{ a logical value that when set
+    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
+    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
+    \eqn{n} the number of observations, \eqn{P}{P} the order of the
+    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
+    Details}
+
+  \item{small}{
+    a small number used to bracket a minimum (it is hopeless to ask for
+    a bracketing interval of width less than sqrt(epsilon) times its
+    central value, a fractional width of only about 10-04 (single
+    precision) or 3x10-8 (double precision)). Defaults to \code{small
+      = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
+  }
+
+  \item{tol}{
+    tolerance on the position of located minima of the cross-validation
+    function (tol should generally be no smaller than the square root of
+    your machine's floating point precision). Defaults to \code{
+      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
+  }
+
+  \item{transform.bounds}{ a logical value that when set to \code{TRUE}
+    applies an internal transformation that maps the unconstrained
+    search to the feasible bandwidth domain. Defaults to
+    \code{FALSE}.}
+
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{data}{
+    an optional data frame, list or environment (or object coercible to
+    a data frame by \code{\link{as.data.frame}}) containing the
+    variables in the model. If not found in data, the variables are
+    taken from \code{environment(formula)}, typically the environment
+    from which the function is called.
+  }
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process. 
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting
+   of options, and is \code{\link{na.fail}} if that is unset. The
+   (recommended) default is \code{\link{na.omit}}.
+  }
+  
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
+  }
+    
+  \item{gdata}{
+    a grid of data on which the indicator function for
+    least-squares cross-validation is to be computed (can be the sample
+    or a grid of quantiles).
+  }
+
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,
     kernel types, selection methods, and so on, detailed below.

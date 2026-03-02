@@ -23,7 +23,6 @@ gradients(x, \dots)
 \arguments{
   \item{x}{an object for which the extraction of gradients is
     meaningful.}
-  \item{\dots}{other arguments.}
   \item{errors}{ a logical value specifying whether or not standard
     errors of gradients are desired. Defaults to \code{FALSE}.}
   \item{gradient.order}{
@@ -33,6 +32,7 @@ gradients(x, \dots)
     (or greater than one, pending future C-level support) are returned
     as \code{NA}.
   }
+  \item{\dots}{other arguments.}
 }
 \value{
   Gradients extracted from the model object \code{x}.

@@ -39,24 +39,11 @@ npudist(bws, \dots)
     and so on.
   }
 
-  \item{\dots}{
-    additional arguments supplied to specify the training data, the
-    bandwidth type, kernel types, and so on.  This is necessary if you
-    specify bws as a \eqn{p}-vector and not a \code{dbandwidth} object,
-    and you do not desire the default behaviours. To do this, you may
-    specify any of \code{bwscaling}, \code{bwtype}, \code{ckertype},
-    \code{ckerorder}, \code{okertype}, as described in
-    \code{\link{npudistbw}}.
-  }
 
   \item{tdat}{
     a \eqn{p}-variate data frame of sample realizations (training data)
     used to estimate the cumulative distribution. Defaults to the training data used to
     compute the bandwidth object.
-  }
-  \item{edat}{
-    a \eqn{p}-variate data frame of cumulative distribution evaluation points. By default,
-    evaluation takes place on the data provided by \code{tdat}.
   }
 
   \item{data}{
@@ -72,6 +59,20 @@ npudist(bws, \dots)
     omitted, the training data are used.  
   }
   
+  \item{edat}{
+    a \eqn{p}-variate data frame of cumulative distribution evaluation points. By default,
+    evaluation takes place on the data provided by \code{tdat}.
+  }
+
+  \item{\dots}{
+    additional arguments supplied to specify the training data, the
+    bandwidth type, kernel types, and so on.  This is necessary if you
+    specify bws as a \eqn{p}-vector and not a \code{dbandwidth} object,
+    and you do not desire the default behaviours. To do this, you may
+    specify any of \code{bwscaling}, \code{bwtype}, \code{ckertype},
+    \code{ckerorder}, \code{okertype}, as described in
+    \code{\link{npudistbw}}.
+  }
 }
 
 \details{

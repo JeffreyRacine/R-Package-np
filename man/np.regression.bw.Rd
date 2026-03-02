@@ -1,4 +1,4 @@
-% $ID$
+% 
 \name{npregbw}
 \alias{npregbw}
 \alias{npregbw.default}
@@ -96,38 +96,6 @@ npregbw(\dots)
         \dots)
 }
 \arguments{
-  \item{formula}{
-    a symbolic description of variables on which bandwidth selection is
-    to be performed. The details of constructing a formula are
-    described below.
-  }
-
-  \item{data}{
-    an optional data frame, list or environment (or object
-    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
-    in the model. If not found in data, the variables are taken from
-    \code{environment(formula)}, typically the environment from which the
-    function is called.
-  }
-
-  \item{subset}{
-    an optional vector specifying a subset of observations to be used in
-    the fitting process. 
-  }
-
-  \item{na.action}{
-    a function which indicates what should happen when the data contain
-   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
-    \code{\link{na.fail}} if that is unset. The (recommended) default is
-    \code{\link{na.omit}}.  
-  }
-  
-  \item{call}{
-    the original function call. This is passed internally by
-    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
-    another function. It is not recommended that the user set this.
-  }
-
   \item{xdat}{
     a \eqn{p}-variate data frame of regressors on which bandwidth selection will
     be performed. The data types may be continuous, discrete (unordered
@@ -153,14 +121,13 @@ npregbw(\dots)
   }
 
   
-  \item{regtype}{
-    a character string specifying which type of kernel regression
-    estimator to use. \code{lc} specifies a local-constant estimator
-    (Nadaraya-Watson) and \code{ll} specifies a local-linear
-    estimator. \code{lp} specifies a local polynomial
-    estimator with polynomial degree(s) given by \code{degree} for
-    continuous predictors. Defaults to \code{lc}.
+  \item{bandwidth.compute}{
+    a logical value which specifies whether to do a numerical search for
+    bandwidths or not. If set to \code{FALSE}, a \code{rbandwidth} object
+    will be returned with bandwidths set to those specified
+    in \code{bws}. Defaults to \code{TRUE}.
   }
+
 
   \item{basis}{
     basis selector relevant only when \code{regtype="lp"}.
@@ -174,15 +141,6 @@ npregbw(\dots)
     \eqn{\prod_{j=1}^q (d_j+1)}{prod(d[j]+1)} for tensor, and
     \eqn{1 + |\{\alpha:\alpha_j \le d_j,\ 0<\sum_j \alpha_j \le \max_j d_j\}|}{1 + number of admissible multi-indices}
     for generalized local-polynomial (GLP) basis construction.
-  }
-
-  \item{degree}{
-    a user-supplied vector of fixed polynomial degrees for the
-    continuous predictors (exactly one degree per continuous predictor),
-    relevant only when \code{regtype="lp"}. If omitted, the default is
-    degree one for each continuous predictor. Entries must be
-    non-negative integers in \code{[0,12]}. Bandwidth optimization
-    treats this vector as fixed input and optimizes only bandwidths.
   }
 
   \item{bernstein.basis}{
@@ -235,26 +193,9 @@ npregbw(\dots)
     
   }
 
-  \item{bandwidth.compute}{
-    a logical value which specifies whether to do a numerical search for
-    bandwidths or not. If set to \code{FALSE}, a \code{rbandwidth} object
-    will be returned with bandwidths set to those specified
-    in \code{bws}. Defaults to \code{TRUE}.
-  }
+  \item{cfac.dir}{stretch factor for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
-
-  \item{ckertype}{
-    character string used to specify the continuous kernel type.
-    Can be set as \code{gaussian}, \code{epanechnikov}, or
-    \code{uniform}. Defaults to \code{gaussian}.
-  }
-
-  \item{ckerorder}{
-    numeric value specifying kernel order (one of
-    \code{(2,4,6,8)}). Kernel order specified along with a
-  \code{uniform} continuous kernel type will be ignored. Defaults to
-  \code{2}.
-  }
+  \item{cfac.init}{non-random initial values for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
 
   \item{ckerbound}{
     character string controlling continuous-kernel support handling.
@@ -270,6 +211,19 @@ npregbw(\dots)
     \code{-Inf} for unbounded below.
   }
 
+  \item{ckerorder}{
+    numeric value specifying kernel order (one of
+    \code{(2,4,6,8)}). Kernel order specified along with a
+  \code{uniform} continuous kernel type will be ignored. Defaults to
+  \code{2}.
+  }
+
+  \item{ckertype}{
+    character string used to specify the continuous kernel type.
+    Can be set as \code{gaussian}, \code{epanechnikov}, or
+    \code{uniform}. Defaults to \code{gaussian}.
+  }
+
   \item{ckerub}{
     numeric scalar/vector of upper bounds for continuous variables used
     when \code{ckerbound="fixed"}. Must satisfy upper-bound validity for
@@ -277,34 +231,20 @@ npregbw(\dots)
     \code{Inf} for unbounded above.
   }
 
-  \item{ukertype}{
-    character string used to specify the unordered categorical kernel type.
-    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
-    \code{aitchisonaitken}.
+  \item{degree}{
+    a user-supplied vector of fixed polynomial degrees for the
+    continuous predictors (exactly one degree per continuous predictor),
+    relevant only when \code{regtype="lp"}. If omitted, the default is
+    degree one for each continuous predictor. Entries must be
+    non-negative integers in \code{[0,12]}. Bandwidth optimization
+    treats this vector as fixed input and optimizes only bandwidths.
   }
 
-  \item{okertype}{
-    character string used to specify the ordered categorical kernel type.
-    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}. Defaults to
-    \code{liracine}.
-  }
+  \item{dfac.dir}{stretch factor for direction set search for Powell's algorithm for categorical variables. See Details}
 
-  \item{nmulti}{
-    integer number of times to restart the process of finding extrema of
-    the cross-validation function from different (random) initial
-    points. Defaults to \code{min(5,ncol(xdat))}.
-  }
+  \item{dfac.init}{non-random initial values for scale factors for categorical variables for Powell's algorithm. See Details}
 
-  \item{remin}{
-    a logical value which when set as \code{TRUE} the search routine
-    restarts from located minima for a minor gain in accuracy. Defaults
-    to \code{TRUE}.
-  }
-
-  \item{itmax}{
-    integer number of iterations before failure in the numerical
-    optimization routine. Defaults to \code{10000}.
-  }
+  \item{dfc.dir}{chi-square degrees of freedom for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
 
   \item{ftol}{
     fractional tolerance on the value of the cross-validation function
@@ -314,12 +254,72 @@ npregbw(\dots)
     (1.0e+01*sqrt(.Machine$double.eps)).
   }
 
-  \item{tol}{
-    tolerance on the position of located minima of the cross-validation
-    function (tol should generally be no smaller than the square root of
-    your machine's floating point precision). Defaults to \code{
-      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
+  \item{hbc.init}{upper bound for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
+
+  \item{hbd.dir}{upper bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{hbd.init}{upper bound for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{initc.dir}{initial non-random values for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{initd.dir}{initial non-random values for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{invalid.penalty}{ a character string specifying the penalty
+    used when the optimizer encounters invalid bandwidths.
+    \code{"baseline"} returns a finite penalty based on a baseline
+    objective; \code{"dbmax"} returns \code{DBL\_MAX}. Defaults to
+    \code{"baseline"}.}
+
+  \item{itmax}{
+    integer number of iterations before failure in the numerical
+    optimization routine. Defaults to \code{10000}.
   }
+
+  \item{lbc.dir}{lower bound for direction set search for Powell's algorithm for \code{numeric} variables. See Details}
+
+  \item{lbc.init}{lower bound for scale factors for \code{numeric} variables for Powell's algorithm. See Details}
+
+  \item{lbd.dir}{lower bound for direction set search for Powell's algorithm for categorical variables. See Details}
+
+  \item{lbd.init}{lower bound for scale factors for categorical variables for Powell's algorithm. See Details}
+
+  \item{nmulti}{
+    integer number of times to restart the process of finding extrema of
+    the cross-validation function from different (random) initial
+    points. Defaults to \code{min(5,ncol(xdat))}.
+  }
+
+  \item{okertype}{
+    character string used to specify the ordered categorical kernel type.
+    Can be set as \code{wangvanryzin}, \code{liracine}, or \code{racineliyan}. Defaults to
+    \code{liracine}.
+  }
+
+  \item{penalty.multiplier}{ a numeric multiplier applied to the
+    baseline penalty when \code{invalid.penalty="baseline"}.
+    Defaults to \code{10}.}
+
+  \item{regtype}{
+    a character string specifying which type of kernel regression
+    estimator to use. \code{lc} specifies a local-constant estimator
+    (Nadaraya-Watson) and \code{ll} specifies a local-linear
+    estimator. \code{lp} specifies a local polynomial
+    estimator with polynomial degree(s) given by \code{degree} for
+    continuous predictors. Defaults to \code{lc}.
+  }
+
+  \item{remin}{
+    a logical value which when set as \code{TRUE} the search routine
+    restarts from located minima for a minor gain in accuracy. Defaults
+    to \code{TRUE}.
+  }
+
+  \item{scale.init.categorical.sample}{ a logical value that when set
+    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
+    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
+    \eqn{n} the number of observations, \eqn{P}{P} the order of the
+    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
+    Details}
 
   \item{small}{
     a small number used to bracket a minimum (it is hopeless to ask for
@@ -329,30 +329,12 @@ npregbw(\dots)
       = 1.490116e-05 (1.0e+03*sqrt(.Machine$double.eps))}.
   }
 
-  \item{lbc.dir,dfc.dir,cfac.dir,initc.dir}{ lower bound, chi-square
-    degrees of freedom, stretch factor, and initial non-random values
-    for direction set search for Powell's algorithm for \code{numeric}
-    variables. See Details}
-
-  \item{lbd.dir,hbd.dir,dfac.dir,initd.dir}{ lower bound, upper bound,
-    stretch factor, and initial non-random values for direction set
-    search for Powell's algorithm for categorical variables. See
-    Details}
-
-  \item{lbc.init, hbc.init, cfac.init}{ lower bound, upper bound, and
-    non-random initial values for scale factors for \code{numeric}
-    variables for Powell's algorithm. See Details}
-
-  \item{lbd.init, hbd.init, dfac.init}{ lower bound, upper bound, and
-    non-random initial values for scale factors for categorical
-    variables for Powell's algorithm. See Details}
-
-  \item{scale.init.categorical.sample}{ a logical value that when set
-    to \code{TRUE} scales \code{lbd.dir}, \code{hbd.dir},
-    \code{dfac.dir}, and \code{initd.dir} by \eqn{n^{-2/(2P+l)}},
-    \eqn{n} the number of observations, \eqn{P}{P} the order of the
-    kernel, and \eqn{l}{l} the number of \code{numeric} variables. See
-    Details}
+  \item{tol}{
+    tolerance on the position of located minima of the cross-validation
+    function (tol should generally be no smaller than the square root of
+    your machine's floating point precision). Defaults to \code{
+      1.490116e-04 (1.0e+04*sqrt(.Machine$double.eps))}.
+  }
 
   \item{transform.bounds}{ a logical value that when set to \code{TRUE}
     applies an internal transformation that maps the unconstrained
@@ -361,15 +343,43 @@ npregbw(\dots)
     (i.e. \code{regtype="lp"} with mixed/higher continuous degrees),
     transformed bounds are enabled internally for stability.}
 
-  \item{invalid.penalty}{ a character string specifying the penalty
-    used when the optimizer encounters invalid bandwidths.
-    \code{"baseline"} returns a finite penalty based on a baseline
-    objective; \code{"dbmax"} returns \code{DBL\_MAX}. Defaults to
-    \code{"baseline"}.}
+  \item{ukertype}{
+    character string used to specify the unordered categorical kernel type.
+    Can be set as \code{aitchisonaitken} or \code{liracine}. Defaults to
+    \code{aitchisonaitken}.
+  }
 
-  \item{penalty.multiplier}{ a numeric multiplier applied to the
-    baseline penalty when \code{invalid.penalty="baseline"}.
-    Defaults to \code{10}.}
+  \item{formula}{
+    a symbolic description of variables on which bandwidth selection is
+    to be performed. The details of constructing a formula are
+    described below.
+  }
+
+  \item{data}{
+    an optional data frame, list or environment (or object
+    coercible to a data frame by \code{\link{as.data.frame}}) containing the variables
+    in the model. If not found in data, the variables are taken from
+    \code{environment(formula)}, typically the environment from which the
+    function is called.
+  }
+
+  \item{subset}{
+    an optional vector specifying a subset of observations to be used in
+    the fitting process. 
+  }
+
+  \item{na.action}{
+    a function which indicates what should happen when the data contain
+   \code{NA}s. The default is set by the \code{\link{na.action}} setting of options, and is
+    \code{\link{na.fail}} if that is unset. The (recommended) default is
+    \code{\link{na.omit}}.  
+  }
+  
+  \item{call}{
+    the original function call. This is passed internally by
+    \code{\link{npRmpi}} when a bandwidth search has been implied by a call to
+    another function. It is not recommended that the user set this.
+  }
 
   \item{\dots}{
     additional arguments supplied to specify the bandwidth type,

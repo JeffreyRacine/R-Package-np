@@ -41,17 +41,29 @@ npscoefhat(bws,
 }
 \arguments{
   \item{bws}{A fitted bandwidth object. \code{npindexhat()} requires class \code{sibandwidth}, \code{npplreghat()} requires class \code{plbandwidth}, and \code{npscoefhat()} requires class \code{scbandwidth}.}
+
   \item{txdat}{Training \code{x} data.}
-  \item{tzdat}{Training \code{z} data for partially linear and smooth-coefficient models.}
+
   \item{exdat}{Evaluation \code{x} data.}
-  \item{ezdat}{Evaluation \code{z} data.}
+
   \item{y}{Optional response vector or matrix for apply mode.}
+
   \item{output}{Either \code{"matrix"} or \code{"apply"}.}
+
   \item{s}{For \code{npindexhat}, \code{s=0} returns fit operator and \code{s=1} returns index-derivative operator.}
+
   \item{fd.step}{Finite-difference step used for \code{npindexhat(..., s=1)}; must be a positive finite scalar.}
+
+  \item{tzdat}{Training \code{z} data for partially linear and smooth-coefficient models.}
+
+  \item{ezdat}{Evaluation \code{z} data.}
+
   \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a positive finite scalar.}
+
   \item{iterate}{Logical; \code{npscoefhat()} currently supports \code{iterate = FALSE} only.}
+
   \item{leave.one.out}{Logical; leave-one-out kernel weights for \code{npscoefhat}. This currently requires evaluation \code{z} data to match training \code{z} data.}
+
   \item{...}{Reserved for future extensions.}
 }
 \value{
@@ -67,6 +79,12 @@ argument contracts are validated explicitly, and unsupported iterative
 \code{npscoefhat()} paths fail fast. \code{npscoefhat()} inherits
 \code{regtype}/LP-basis controls from the supplied \code{scbandwidth}
 object.
+
+Method-specific argument map:
+\code{npindexhat()} uses \code{s} and \code{fd.step};
+\code{npplreghat()} and \code{npscoefhat()} use \code{tzdat}/\code{ezdat};
+\code{npscoefhat()} additionally uses \code{ridge}, \code{iterate}, and
+\code{leave.one.out}.
 }
 \examples{
 \dontrun{

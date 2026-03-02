@@ -1,4 +1,4 @@
-% $Id: np.cmstest.Rd,v 1.58 2006/11/03 21:17:20 tristen Exp $
+% 
 \name{npdeptest}
 \alias{npdeptest}
 \title{ Kernel Consistent Pairwise Nonlinear Dependence Test for Univariate Processes }
@@ -27,7 +27,7 @@ npdeptest(data.x = NULL,
     
   }
   
-  \item{method}{
+\item{method}{
 
     a character string used to specify whether to compute the integral
     version or the summation version of the statistic. Can be set as
@@ -52,7 +52,7 @@ npdeptest(data.x = NULL,
     ensure replicability. Defaults to 42.
   }
 
-}
+  }
             
 \value{
   \code{npdeptest} returns an object of type \code{deptest} with the

@@ -17,17 +17,23 @@ mpi.bcast.cmd(cmd=NULL,
 }
 \arguments{
   \item{cmd}{a command to be sent from master.}
+
+  \item{rank}{the sender}
+
+  \item{comm}{a communicator number}
+
+  \item{nonblock}{logical. If TRUE, a nonblock procedure is used on all receivers so that
+they will consume none or little CPUs while waiting.}
+
+  \item{sleep}{a sleep interval, used when nonblock=TRUE. The smaller sleep is, the more responsive slaves
+are, the more CPUs consume.}
+
+  \item{caller.execute}{a logical value indicating whether the master
+    node is additionally to execute the command}
+
   \item{...}{used as arguments to cmd (function command) for passing their 
   (master) values to R slaves, i.e., if `myfun(x)' will be executed on R slaves 
 with `x' as master variable, use mpi.bcast.cmd(cmd=myfun, x=x).}
-  \item{rank}{the sender}
-  \item{comm}{a communicator number}
-  \item{nonblock}{logical. If TRUE, a nonblock procedure is used on all receivers so that
-they will consume none or little CPUs while waiting.}
-  \item{sleep}{a sleep interval, used when nonblock=TRUE. The smaller sleep is, the more responsive slaves
-are, the more CPUs consume.}
-  \item{caller.execute}{a logical value indicating whether the master
-    node is additionally to execute the command}
 }
 \value{
   \code{mpi.bcast.cmd} returns no value for the sender and an expression of the transmitted command for others.

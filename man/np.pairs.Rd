@@ -15,15 +15,18 @@ np.pairs.plot(pair_list)
     character vector of column names in \code{y_dat}. If \code{y_vars}
     is named, the names are used as plot labels.
   }
+
   \item{y_dat}{
     data frame containing the variables listed in \code{y_vars}.
   }
+
+  \item{pair_list}{
+    list returned by \code{np.pairs}.
+  }
+
   \item{...}{
     additional arguments passed to \code{\link{npudens}} and
     \code{\link{npreg}}.
-  }
-  \item{pair_list}{
-    list returned by \code{np.pairs}.
   }
 }
 \value{
