@@ -31,6 +31,13 @@ The `makefile` is the source of truth for launch semantics:
 - `attach`: timeout + `FI_*` env + `en0` then `lo0` retry
 - `profile`: timeout + explicit `R_PROFILE_USER` + `FI_*` env + `en0` then `lo0` retry
 
+Profile startup contract (required):
+- provide exactly one profile source per profile run:
+  - either local `.Rprofile` in working directory, or
+  - `R_PROFILE_USER=<profile-path>` (used by `makefile`);
+- do not export both `R_PROFILE_USER` and `R_PROFILE` to the same file in one launch;
+- `R CMD BATCH --no-save` is supported for profile mode when this contract is respected.
+
 ## Tiny Fast Smoke
 
 Use `n=100`, `NP=2` (`nslaves=1`) for quick validation.
@@ -124,6 +131,7 @@ make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 DEMOS='npcdensls' -n run-pro
 
 2. Verify the printed command contains `-env R_PROFILE_USER <expected path>`.
 3. Re-run with explicit `RPROFILE=...` absolute path.
+4. Ensure shell/session does not also export `R_PROFILE` to that same path.
 
 ### Attach/profile appears hung
 
