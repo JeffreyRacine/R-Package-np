@@ -20,7 +20,11 @@ library(npRmpi)
 ## vignette("npRmpi",package="npRmpi").
 
 npRmpi.init(nslaves=1)
-on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
+on.exit({
+  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    npRmpi.quit(force=TRUE)
+  }
+}, add=TRUE)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data(Engel95)

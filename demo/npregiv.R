@@ -1,7 +1,11 @@
 suppressPackageStartupMessages(library(npRmpi))
 
 npRmpi.init(nslaves = 1, quiet = TRUE)
-on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)
+on.exit({
+  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    npRmpi.quit(force = TRUE)
+  }
+}, add = TRUE)
 
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
@@ -96,5 +100,4 @@ legend(x="top",inset=c(.01,.01),
        lty=c(1,2,4),
        col=c("black","blue","red"),
        lwd=c(1,2,2))
-
 
