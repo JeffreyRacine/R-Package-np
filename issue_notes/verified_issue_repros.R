@@ -107,8 +107,8 @@ tryCatch({
   df <- data.frame(y=rnorm(10),x1=rnorm(10),x2=rnorm(10),x3=rnorm(10),x4=rnorm(10),x5=rnorm(10))
   f1 <- as.formula(paste0(paste("y ~ ", paste0("x", 1:4, collapse= " + ")), "|x5"))
   f2 <- y ~ x1 + x2 + x3 + x4 | x5
-  npplregbw(formula = f1, data = df)
-  npplregbw(formula = f2, data = df)
+  npplregbw(formula = f1, data = df, nmulti = 1)
+  npplregbw(formula = f2, data = df, nmulti = 1)
   cat("ok\n")
 }, error = function(e) {
   cat("FAIL:", conditionMessage(e), "\n")

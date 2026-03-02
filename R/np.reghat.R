@@ -269,13 +269,13 @@ npreghat.rbandwidth <-
            exdat,
            y = NULL,
            output = c("matrix", "apply"),
-           s = NULL,
-           deriv = NULL,
-           degree = NULL,
            basis = NULL,
            bernstein.basis = NULL,
-           ridge = 1.0e-12,
+           degree = NULL,
+           deriv = NULL,
            leave.one.out = FALSE,
+           ridge = 1.0e-12,
+           s = NULL,
            ...){
 
     no.ex <- missing(exdat)

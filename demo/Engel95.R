@@ -20,6 +20,7 @@ library(npRmpi)
 ## vignette("npRmpi",package="npRmpi").
 
 npRmpi.init(nslaves=1)
+on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
 options(npRmpi.autodispatch=TRUE, np.messages=FALSE)
 
 data(Engel95)
@@ -32,7 +33,7 @@ phi <- model.iv$phi
 
 ## Compute the non-IV regression (i.e. regress y on z)
 
-ghat <- npreg(Engel95$food~Engel95$logexp,regtype="ll")
+ghat <- npreg(food ~ logexp, data = Engel95, regtype = "ll")
 
 ## For the plots, restrict focal attention to the bulk of the data
 ## (i.e. for the plotting area trim out 1/4 of one percent from each

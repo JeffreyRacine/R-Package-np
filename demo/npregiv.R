@@ -1,13 +1,28 @@
-require(np)
+suppressPackageStartupMessages(library(npRmpi))
+
+npRmpi.init(nslaves = 1, quiet = TRUE)
+on.exit(try(npRmpi.quit(force = TRUE), silent = TRUE), add = TRUE)
 
 ## This illustration was made possible by Samuele Centorrino
 ## <samuele.centorrino@univ-tlse1.fr>
 
 set.seed(42)
-n <- as.numeric(readline(prompt="Input the number of observations desired: "))
-method <- as.numeric(readline(prompt="Input the method (0=Landweber-Fridman, 1=Tikhonov): "))
-method <- ifelse(method==0,"Landweber-Fridman","Tikhonov")
-nmulti <- as.numeric(readline(prompt="Input the number of multistarts desired (e.g. 2): "))
+read_numeric_or_default <- function(prompt, default) {
+  val <- suppressWarnings(as.numeric(readline(prompt = prompt)))
+  if (is.na(val)) {
+    if (!interactive()) {
+      val <- default
+    } else {
+      stop("Invalid input for prompt: ", prompt)
+    }
+  }
+  val
+}
+
+n <- read_numeric_or_default("Input the number of observations desired: ", 30)
+method <- read_numeric_or_default("Input the method (0=Landweber-Fridman, 1=Tikhonov): ", 1)
+method <- ifelse(method == 0, "Landweber-Fridman", "Tikhonov")
+nmulti <- read_numeric_or_default("Input the number of multistarts desired (e.g. 2): ", 1)
 
 v  <- rnorm(n,mean=0,sd=.27)
 eps <- rnorm(n,mean=0,sd=0.05)

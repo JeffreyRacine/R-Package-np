@@ -188,10 +188,10 @@ npindex.sibandwidth <-
            tydat = stop("training data 'tydat' missing"),
            exdat,
            eydat,
-           gradients = FALSE,
-           residuals = FALSE,
+           boot.num = 399,
            errors = FALSE,
-           boot.num = 399, ...) {
+           gradients = FALSE,
+           residuals = FALSE, ...) {
 
     fit.start <- proc.time()[3]
     gradients <- npValidateScalarLogical(gradients, "gradients")

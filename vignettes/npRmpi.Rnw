@@ -1,4 +1,4 @@
-%% $Id: entropy_np.Rnw,v 1.43 2010/02/18 14:43:37 jracine Exp jracine $
+%% 
 
 %\VignetteIndexEntry{Parallel np: Using the npRmpi Package}
 %\VignetteDepends{npRmpi,boot,cubature,MASS}

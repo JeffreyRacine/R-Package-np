@@ -53,8 +53,8 @@ npksum.numeric <-
            tydat,
            exdat,
            weights,
-           leave.one.out, kernel.pow, bandwidth.divide,
-           operator, permutation.operator, compute.score, compute.ocg, return.kernel.weights,
+           bandwidth.divide, compute.ocg, compute.score, kernel.pow,
+           leave.one.out, operator, permutation.operator, return.kernel.weights,
            ...){
     .npRmpi_require_active_slave_pool(where = "npksum()")
     if (.npRmpi_autodispatch_active())
@@ -116,13 +116,13 @@ npksum.default <-
            tydat = NULL,
            exdat = NULL,
            weights = NULL,
-           leave.one.out = FALSE,
-           kernel.pow = 1.0,
            bandwidth.divide = FALSE,
+           compute.ocg = FALSE,
+           compute.score = FALSE,
+           kernel.pow = 1.0,
+           leave.one.out = FALSE,
            operator = names(ALL_OPERATORS),
            permutation.operator = names(PERMUTATION_OPERATORS),
-           compute.score = FALSE,
-           compute.ocg = FALSE,
            return.kernel.weights = FALSE,
            ...){
     .npRmpi_require_active_slave_pool(where = "npksum()")

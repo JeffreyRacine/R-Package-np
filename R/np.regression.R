@@ -113,7 +113,7 @@ npreg.rbandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
            tydat = stop("training data 'tydat' missing"),
-           exdat, eydat, gradients = FALSE, gradient.order = 1L,
+           exdat, eydat, gradient.order = 1L, gradients = FALSE,
            residuals = FALSE,
            ...){
     fit.start <- proc.time()[3]
