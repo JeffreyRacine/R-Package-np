@@ -1,4 +1,4 @@
-% $Id: jss_np.Rnw,v 1.69 2008/07/22 19:01:59 jracine Exp jracine $
+% 
 
 %\VignetteIndexEntry{The np Package}
 %\VignetteDepends{np,boot,MASS}

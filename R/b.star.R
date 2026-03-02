@@ -1,4 +1,4 @@
-## $Id: ppw.R,v 1.47 2008/12/12 14:52:17 jracine Exp jracine $
+## 
 
 ## Original code in Matlab by A. Patton, R translation and
 ## modifications by C. Parmeter and J. Racine.

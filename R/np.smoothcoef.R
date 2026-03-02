@@ -196,13 +196,14 @@ npscoef.scbandwidth <-
            exdat,
            eydat,
            ezdat,
-           residuals = FALSE,
+           betas = FALSE,
            errors = TRUE,
            iterate = TRUE,
-           maxiter = 100,
-           tol = .Machine$double.eps,
            leave.one.out = FALSE,
-           betas = FALSE, ...){
+           maxiter = 100,
+           residuals = FALSE,
+           tol = .Machine$double.eps,
+           ...){
 
     fit.start <- proc.time()[3]
     residuals <- npValidateScalarLogical(residuals, "residuals")

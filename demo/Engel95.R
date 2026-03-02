@@ -2,6 +2,8 @@
 ## Landweber-Fridman iteration of Fredholm integral equations of the
 ## first kind.
 
+suppressPackageStartupMessages(library(np))
+
 ## We consider an equation with an endogenous regressor (`z') and an
 ## instrument (`w'). Let y = phi(z) + u where phi(z) is the function of
 ## interest. Here E(u|z) is not zero hence the conditional mean E(y|z)
