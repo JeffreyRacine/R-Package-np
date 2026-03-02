@@ -33,6 +33,7 @@ Description: Nonparametric (and semiparametric) kernel methods that seamlessly
     providing missing functionality for derivatives, and for extending the
     splines beyond their endpoints.
 License: GPL
+Encoding: UTF-8
 URL: https://github.com/JeffreyRacine/R-Package-np
 BugReports: https://github.com/JeffreyRacine/R-Package-np/issues
 Repository: CRAN
