@@ -1,5 +1,6 @@
 % 
 \name{plot.np}
+\alias{plot.np}
 
 \alias{plot.bandwidth}
 \alias{plot.conbandwidth}
