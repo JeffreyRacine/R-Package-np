@@ -2,3 +2,4 @@
 *.so
 *.plist
 .DS_Store
+.Rlib/
