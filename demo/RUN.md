@@ -18,7 +18,7 @@ This directory is the canonical demo harness for `npRmpi` timing/behavior checks
 
 1. Install `np` and `npRmpi` first (matching versions for your run).
 2. MPI launcher available (`mpiexec`/`mpirun`).
-3. Run commands from this directory: `/Users/jracine/Development/np-npRmpi/demo`.
+3. Keep the expected folder layout (`demo/serial`, `demo/n_2_attach`, `demo/n_2_profile`, etc.).
 
 ## Core Files
 
@@ -27,9 +27,9 @@ This directory is the canonical demo harness for `npRmpi` timing/behavior checks
 - `*.R`: demo scripts
 - `../inst/Rprofile`: canonical profile startup (also available as `system.file("Rprofile", package="npRmpi")`)
 
-Note:
-- A local `.Rprofile` in this demo directory is optional.
-- `makefile` profile mode passes `R_PROFILE_USER` through `mpiexec -env` so worker ranks receive the startup profile.
+The `makefile` is the source of truth for launch semantics:
+- `attach`: timeout + `FI_*` env + `en0` then `lo0` retry
+- `profile`: timeout + explicit `R_PROFILE_USER` + `FI_*` env + `en0` then `lo0` retry
 
 ## Tiny Fast Smoke
 
@@ -45,6 +45,7 @@ make -f ../makefile MODE=serial NP_DEMO_N=100
 ### Attach
 
 ```bash
+mkdir -p /Users/jracine/Development/np-npRmpi/demo/n_2_attach
 cd /Users/jracine/Development/np-npRmpi/demo/n_2_attach
 make -f ../makefile MODE=attach NP=2 NP_DEMO_N=100
 ```
@@ -52,6 +53,7 @@ make -f ../makefile MODE=attach NP=2 NP_DEMO_N=100
 ### Profile
 
 ```bash
+mkdir -p /Users/jracine/Development/np-npRmpi/demo/n_2_profile
 cd /Users/jracine/Development/np-npRmpi/demo/n_2_profile
 make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100
 ```
@@ -76,39 +78,68 @@ NP_DEMO_N=100 ./runall
 - Attach outputs: `n_2_attach/*.Rout`, `n_3_attach/*.Rout`, `n_4_attach/*.Rout`
 - Profile outputs: `n_2_profile/*.Rout`, `n_3_profile/*.Rout`, `n_4_profile/*.Rout`
 
-## Running From a Copied Demo Folder
+## Execution Context Rules (Must Follow)
 
-If you copy this demo directory elsewhere, copy all of:
-- `runall`
-- `makefile`
-- all `*.R` scripts
+### A) Running inside the repo
 
-You do not need to copy `.Rprofile` if `npRmpi` is installed, since `makefile` can use:
-- `Rscript -e 'cat(system.file(\"Rprofile\", package=\"npRmpi\"))'`
+Use these paths:
+- root: `/Users/jracine/Development/np-npRmpi/demo`
+- attach/profile working dirs: `n_2_attach`, `n_2_profile`, etc.
+- canonical profile path: `../inst/Rprofile` (resolved by `makefile`)
 
-If needed, override explicitly:
+Recommended:
+
+```bash
+cd /Users/jracine/Development/np-npRmpi/demo
+./runall
+```
+
+### B) Running from a copied demo folder outside the repo
+
+You must preserve relative layout:
+- copied root contains `makefile`, `runall`, and `*.R`
+- run from subdirs (`serial`, `n_2_attach`, `n_2_profile`) with `make -f ../makefile ...`
+
+For profile mode, set `RPROFILE` explicitly (do not rely on accidental relative matches):
 
 ```bash
 RPROFILE=$(Rscript --no-save -e 'cat(system.file("Rprofile", package="npRmpi"))')
 cd /path/to/copied/demo/n_2_profile
-make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 RPROFILE=$RPROFILE
+make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 RPROFILE="$RPROFILE"
 ```
+
+If you also copy a local profile file, point `RPROFILE` to that explicit absolute path.
 
 ## Troubleshooting
 
 ### Profile error: `could not find function "mpi.bcast.cmd"`
 
 This indicates profile startup was not applied to ranks.
-Run profile mode through this `makefile` (which exports `R_PROFILE_USER` via `mpiexec -env`), or set `RPROFILE` explicitly as above.
+1. Confirm effective command:
+
+```bash
+cd /path/to/demo/n_2_profile
+make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 DEMOS='npcdensls' -n run-profile
+```
+
+2. Verify the printed command contains `-env R_PROFILE_USER <expected path>`.
+3. Re-run with explicit `RPROFILE=...` absolute path.
 
 ### Attach/profile appears hung
 
 1. Test with tiny smoke first (`NP_DEMO_N=100`, `NP=2`).
 2. Run one script at a time (`DEMOS=<name>` in `make`).
-3. Clean stale daemons before rerun:
+3. Monitor workers directly:
+
+```bash
+pgrep -f 'npRmpi_attach.R|npRmpi_profile.R' | paste -sd, -
+ps -p '<pid1,pid2>' -o 'pid,stat,etime,%cpu,command'
+```
+
+4. If one worker stays near `0%` while another stays high for an extended period, abort and retry.
+5. Clean stale daemons before rerun:
 
 ```bash
 pkill -f slavedaemon.R || true
 pkill -f Rslaves.sh || true
 ```
-

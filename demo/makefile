@@ -1,8 +1,10 @@
-DEMOS = npcdensls npcdensml npcdistls npcmstest npconmode npcopula npdeneqtest npdeptest npindexich npindexks npplreg npqreg npregiv npreglcaic npreglcls npregllaic npregllls npscoef npsdeptest npsigtest npsymtest npudensls npudensml npudistcdf npunitest
+DEMOS ?= npcdensls npcdensml npcdistls npcmstest npconmode npcopula npdeneqtest npdeptest npindexich npindexks npplreg npqreg npregiv npreglcaic npreglcls npregllaic npregllls npscoef npsdeptest npsigtest npsymtest npudensls npudensml npudistcdf npunitest
 
 MODE ?= attach
 NP ?= 2
-RPROFILE ?= $(if $(wildcard ../.Rprofile),../.Rprofile,$(shell Rscript -e 'cat(system.file("Rprofile", package="npRmpi"))'))
+TIMEOUT_SEC ?= 180
+RPROFILE ?= $(if $(wildcard ../inst/Rprofile),../inst/Rprofile,$(if $(wildcard ../.Rprofile),../.Rprofile,$(shell Rscript -e 'cat(system.file("Rprofile", package="npRmpi"))')))
+RSCRIPT_BIN ?= $(shell R RHOME)/bin/Rscript
 MPI_ENV_NP_DEMO_N = $(if $(NP_DEMO_N),-env NP_DEMO_N $(NP_DEMO_N),)
 
 all: run
@@ -18,11 +20,21 @@ run-serial:
 run-attach:
 	@for d in $(DEMOS); do \
 		echo "[attach][np=$(NP)] $$d"; \
-		mpiexec $(MPI_ENV_NP_DEMO_N) -n $(NP) Rscript ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout; \
+		if /opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env FI_TCP_IFACE en0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE en0 $(MPI_ENV_NP_DEMO_N) -n $(NP) $(RSCRIPT_BIN) --no-save ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout 2>&1; then \
+			: ; \
+		else \
+			echo "[attach][np=$(NP)] $$d retry on lo0"; \
+			/opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env FI_TCP_IFACE lo0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE lo0 $(MPI_ENV_NP_DEMO_N) -n $(NP) $(RSCRIPT_BIN) --no-save ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout 2>&1; \
+		fi; \
 	done
 
 run-profile:
 	@for d in $(DEMOS); do \
 		echo "[profile][np=$(NP)] $$d"; \
-		mpiexec -env R_PROFILE_USER $(RPROFILE) $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R; \
+		if /opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER $(RPROFILE) -env FI_TCP_IFACE en0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE en0 $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R > $${d}_npRmpi_profile.Rout 2>&1; then \
+			: ; \
+		else \
+			echo "[profile][np=$(NP)] $$d retry on lo0"; \
+			/opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER $(RPROFILE) -env FI_TCP_IFACE lo0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE lo0 $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R > $${d}_npRmpi_profile.Rout 2>&1; \
+		fi; \
 	done

@@ -9,3 +9,12 @@ Repo-specific note:
 - Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`, `num.feval.fallback`.
 - Keep `man/np.kernels.Rd` and kernel/options/plot cross-links aligned, while preserving package-specific `npRmpi` docs text.
 - Runtime contract: `npRmpi` must never call serial `np` estimator/plot/bootstrap/helper code paths and must not silently fall back to serial execution when MPI mode is selected.
+- Demo execution contract (`np-npRmpi/demo`):
+  - treat `demo/makefile` as launcher source of truth for attach/profile;
+  - run from `demo` subdirectories (`serial`, `n_*_attach`, `n_*_profile`) using `make -f ../makefile ...`;
+  - in-repo profile path should resolve to `../inst/Rprofile`; for copied demo folders outside repo, set `RPROFILE` explicitly to an absolute profile path (typically `system.file("Rprofile", package="npRmpi")`).
+- Demo failure recovery contract:
+  - reproduce first with `NP_DEMO_N=100`, `NP=2`, and `DEMOS='<single demo>'`;
+  - validate effective profile command with `make -n run-profile` and confirm `R_PROFILE_USER` path;
+  - for suspected hangs, monitor worker split with `ps -p '<pid1,pid2>' -o 'pid,stat,etime,%cpu,command'`;
+  - if one worker remains near idle while another remains busy, abort and clean stale `slavedaemon.R`/`Rslaves.sh` before retry.

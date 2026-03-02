@@ -1,6 +1,16 @@
 #!/bin/bash
 set -euo pipefail
 
+cleanup_slaves() {
+  local pids
+  pids="$(pgrep -f 'slavedaemon\.R|Rslaves\.sh' || true)"
+  if [ -n "${pids}" ]; then
+    printf '%s\n' "${pids}" | xargs kill >/dev/null 2>&1 || true
+  fi
+}
+
+trap cleanup_slaves EXIT INT TERM
+
 mkdir -p serial
 (
   cd serial
