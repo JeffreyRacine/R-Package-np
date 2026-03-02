@@ -57,6 +57,35 @@
   \deqn{K_{TG,2}(u)=\left[\alpha\phi(u)-c_0\right]\mathbf{1}(|u|<b)}
   with defaults \eqn{b=3} and internal constants calibrated in C.
 
+  Bounded continuous-kernel normalization (\code{ckerbound} and, for
+  conditional objects, \code{cxkerbound}/\code{cykerbound}) reuses the
+  selected continuous kernel and renormalizes it on the declared support.
+  For a base kernel \eqn{K} and support \eqn{[a,b]}, the bounded kernel is
+  \deqn{K_{[a,b]}(u;x,h)=\frac{K(u)}{\int_{(a-x)/h}^{(b-x)/h}K(t)dt}}
+  with \eqn{u=(x_i-x)/h}. Option \code{ckerbound="range"} uses
+  sample bounds for \eqn{a,b}; \code{ckerbound="fixed"} uses user-supplied
+  bounds via \code{ckerlb}/\code{ckerub} (or the corresponding
+  \code{cx*}/\code{cy*} arguments). Infinite bounds recover the unbounded
+  kernel. This support-normalization strategy follows the same Racine-Li-Yan
+  finite-support normalization principle and is useful when data exhibit
+  non-negligible probability mass near boundaries.
+
+  Typical bounded-kernel calls:
+  \preformatted{
+  ## Unconditional density on [0,1]
+  bw <- npudensbw(dat=data.frame(x),
+                  ckertype="gaussian",
+                  ckerbound="fixed", ckerlb=0, ckerub=1)
+
+  ## Regression with automatic sample-range bounds
+  bw <- npregbw(xdat=data.frame(x), ydat=y, ckerbound="range")
+
+  ## Conditional density with separate x/y support controls
+  bw <- npcdensbw(xdat=data.frame(x), ydat=data.frame(y),
+                  cxkerbound="fixed", cxkerlb=0, cxkerub=1,
+                  cykerbound="range")
+  }
+
   Unordered-categorical kernels (called via \code{ukertype}; for category
   count \eqn{c}):
   \deqn{L_{AA}(x_i,x;\lambda)=\mathbf{1}(x_i=x)(1-\lambda)+\mathbf{1}(x_i\neq x)\frac{\lambda}{c-1}}
