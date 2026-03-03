@@ -1,5 +1,56 @@
 # npRmpi Remediation Plan (2026-03-03)
 
+## 0) Closeout Status (2026-03-03, end-of-tranche)
+
+This remediation plan is now closed for the current tranche.
+
+Completed checkpoints:
+
+1. `ae9fc08` `autodispatch: tune regression-family large-arg threshold`
+   - `times=100` (session, balanced paired seeds):
+     - `npreg` mean `-52.21%`, median `-53.25%`
+2. `e025386` `autodispatch: raise unconditional density/dist threshold`
+   - `times=100` confirms (session, balanced paired seeds):
+     - `npudens` mean `-34.68%`, median `-35.48%`
+     - `npudist` mean `-48.14%`, median `-49.05%`
+   - unaffected-family equivalence passed (Holm-adjusted TOST, margins `0.05s` and `10%`):
+     - `npcdens`: pass
+     - `npcdist`: pass
+
+Hardening/launcher correction completed:
+
+3. `demo/makefile` now fails fast on per-demo failure in `serial`, `attach`, and `profile` loops (no masked failures).
+
+Route/validation closeout:
+
+1. Pre-flight route sanity passed for touched families:
+   - session (`nslaves=1`)
+   - attach (`mpiexec -n 2`)
+2. Dedicated route validators passed:
+   - `MANUAL_BCAST_ROUTE_OK`
+   - `ATTACH_ROUTE_OK`
+   - `PROFILE_ROUTE_OK`
+3. Full demo smoke (`NP=2`, `NP_DEMO_N=100`) passed after fail-fast launcher fix:
+   - `serial`: `25/25` `.Rout` clean
+   - `n_2_attach`: `25/25` `.Rout` clean
+   - `n_2_profile`: `25/25` `.Rout` clean
+4. Numerical parity checks passed for touched method families (fixed-seed comparisons, strict/tight tolerances).
+
+Primary artifacts:
+
+1. `/tmp/tranche3_confirm_v2_20260303_092718`
+2. `/tmp/tranche3_joint_decision_20260303_103854`
+3. `/tmp/nonreg_udens_udist_confirm100_20260303_104917`
+4. `/tmp/nonreg_unaffected_confirm100_20260303_105535`
+5. `/tmp/nonreg_patch_gate50_20260303_105310`
+6. `/tmp/conditional_threshold_screen_20260303_105832`
+
+Final decision:
+
+1. Keep regression and unconditional-threshold optimizations.
+2. Do not apply additional conditional-family threshold changes in this tranche (mixed/weak signal).
+3. Continue future optimization outside this closed tranche only as one-risk-axis micro-tranches under the same familywise gates.
+
 ## 1) Candid Assessment
 
 You are right: the session/attach speed-equality objective was not met in the latest tranche.  

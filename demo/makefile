@@ -14,7 +14,12 @@ run: run-$(MODE)
 run-serial:
 	@for d in $(DEMOS); do \
 		echo "[serial] $$d"; \
-		R CMD BATCH --no-save ../$${d}_serial.R; \
+		if R CMD BATCH --no-save ../$${d}_serial.R; then \
+			: ; \
+		else \
+			echo "[serial] $$d FAILED"; \
+			exit 1; \
+		fi; \
 	done
 
 run-attach:
@@ -24,7 +29,12 @@ run-attach:
 			: ; \
 		else \
 			echo "[attach][np=$(NP)] $$d retry on lo0"; \
-			/opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER '' -env R_PROFILE '' -env FI_TCP_IFACE lo0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE lo0 $(MPI_ENV_NP_DEMO_N) -n $(NP) $(RSCRIPT_BIN) --no-save ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout 2>&1; \
+			if /opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER '' -env R_PROFILE '' -env FI_TCP_IFACE lo0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE lo0 $(MPI_ENV_NP_DEMO_N) -n $(NP) $(RSCRIPT_BIN) --no-save ../$${d}_npRmpi_attach.R > $${d}_npRmpi_attach.Rout 2>&1; then \
+				: ; \
+			else \
+				echo "[attach][np=$(NP)] $$d FAILED"; \
+				exit 1; \
+			fi; \
 		fi; \
 	done
 
@@ -35,6 +45,11 @@ run-profile:
 			: ; \
 		else \
 			echo "[profile][np=$(NP)] $$d retry on lo0"; \
-			/opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER $(RPROFILE) -env R_PROFILE '' -env NP_RMPI_PROFILE_RECV_TIMEOUT_SEC $(TIMEOUT_SEC) -env FI_TCP_IFACE lo0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE lo0 $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R > $${d}_npRmpi_profile.Rout 2>&1; \
+			if /opt/local/bin/timeout $(TIMEOUT_SEC) mpiexec -env R_PROFILE_USER $(RPROFILE) -env R_PROFILE '' -env NP_RMPI_PROFILE_RECV_TIMEOUT_SEC $(TIMEOUT_SEC) -env FI_TCP_IFACE lo0 -env FI_PROVIDER tcp -env FI_SOCKETS_IFACE lo0 $(MPI_ENV_NP_DEMO_N) -n $(NP) R CMD BATCH --no-save ../$${d}_npRmpi_profile.R > $${d}_npRmpi_profile.Rout 2>&1; then \
+				: ; \
+			else \
+				echo "[profile][np=$(NP)] $$d FAILED"; \
+				exit 1; \
+			fi; \
 		fi; \
 	done

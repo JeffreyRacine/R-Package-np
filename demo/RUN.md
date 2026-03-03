@@ -30,6 +30,7 @@ This directory is the canonical demo harness for `npRmpi` timing/behavior checks
 The `makefile` is the source of truth for launch semantics:
 - `attach`: timeout + `FI_*` env + `en0` then `lo0` retry
 - `profile`: timeout + explicit `R_PROFILE_USER` + cleared `R_PROFILE` + `FI_*` env + `en0` then `lo0` retry
+- all mode loops (`serial`, `attach`, `profile`) are fail-fast per demo; any failed demo exits non-zero immediately (no masked failures).
 
 Profile startup contract (required):
 - provide exactly one profile source per profile run:
