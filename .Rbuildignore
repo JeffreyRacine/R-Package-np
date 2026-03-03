@@ -24,12 +24,16 @@
 ^demo/n_.*/$
 ^demo/npreglcls_serial\.Rout
 ^demo/Readme
+^demo/RUN\.md$
+^demo/cleanup$
 ^demo/runall
 ^demo/runall_npRmpi
 ^demo/runall_serial
 ^demo/serial/.*$
 ^demo/timing
 ^issue_notes
+^archive$
+^archive/
 ^man/dontrun
 ^man/run
 ^man/sed_dontrun\.scr
@@ -50,3 +54,6 @@ npver
 ^benchmarks/validation
 ^benchmarks/common
 ^benchmarks$
+^build$
+^build/
+^cran-comments\.md$
