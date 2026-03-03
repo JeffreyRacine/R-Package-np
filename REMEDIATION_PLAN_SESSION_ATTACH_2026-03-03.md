@@ -1,5 +1,7 @@
 # npRmpi Remediation Plan (2026-03-03)
 
+> Superseded for active execution by `/Users/jracine/Development/np-npRmpi/REMEDIATION_PLAN_SPMD_CANONICAL_2026-03-03.md`.
+
 ## 0) Closeout Status (2026-03-03, end-of-tranche)
 
 This remediation plan is now closed for the current tranche.
