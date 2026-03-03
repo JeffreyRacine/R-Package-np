@@ -1312,27 +1312,34 @@ resolved by someone with familiarity of the local installation.
     one of the demo parallel jobs I get the error \texttt{Error: could
       not find function ``mpi.bcast.cmd''}}
 
-When your demo program stops at the following point in your file
+Two common failure signatures are
 \begin{verbatim}
-> mpi.bcast.cmd(np.mpi.initialize(),
-+               caller.execute=TRUE)
+Error: npRmpi auto-dispatch requires an active MPI slave pool; call npRmpi.init(...) first
+\end{verbatim}
+and
+\begin{verbatim}
 Error: could not find function "mpi.bcast.cmd"
 \end{verbatim}
-this likely means that either you have failed to place the
-\texttt{.Rprofile} file in the current or root directory as directed,
-or the \texttt{.Rprofile} initialization code is not being loaded as
-expected.
+The first means no active MPI session; the second usually means a
+manual-broadcast/profile script started without loading the required
+\texttt{.Rprofile}.
 
 \begin{enumerate}
 
-\item Make sure a copy of the initialization file \texttt{Rprofile}
-  exists in your working or root directory and is named
-  \texttt{.Rprofile}
+\item For interactive sessions, call
+  \texttt{npRmpi.init(mode="spawn", nslaves=...)} first.
 
-\item Make sure you did not run \texttt{R} with either the
-  \texttt{--no-init-file} or \texttt{--vanilla} option (this combines
-  a number of options including \texttt{--no-init-file} which will
-  disable reading of \texttt{.Rprofile})
+\item For batch jobs launched with \texttt{mpiexec -n ...} and
+  auto-dispatch scripts, call \texttt{npRmpi.init(mode="attach")} near
+  the top of your script and launch with
+  \texttt{Rscript --no-save} (or \texttt{R CMD BATCH --no-save}).
+
+\item For manual-broadcast/profile scripts (explicit
+  \texttt{mpi.bcast.cmd(...)} calls), set
+  \texttt{R\_PROFILE\_USER=<path-to-.Rprofile>} and clear
+  \texttt{R\_PROFILE}. Launch with
+  \texttt{R CMD BATCH --no-save} and do not use
+  \texttt{R CMD BATCH --vanilla}.
 
 \end{enumerate}
 
