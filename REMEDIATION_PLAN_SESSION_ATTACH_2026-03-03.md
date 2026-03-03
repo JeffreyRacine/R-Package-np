@@ -51,6 +51,15 @@ Final decision:
 2. Do not apply additional conditional-family threshold changes in this tranche (mixed/weak signal).
 3. Continue future optimization outside this closed tranche only as one-risk-axis micro-tranches under the same familywise gates.
 
+Post-closeout instrumentation note (2026-03-03):
+
+1. Profiling artifact: `/tmp/autodispatch_hotspot_profile_20260303_112621`.
+2. Dominant remaining session cost is MPI command broadcast/evaluation path (`.npRmpi_bcast_cmd_expr` + remote eval), not `object.size` bookkeeping.
+3. Observed `object.size` contribution is effectively negligible in this retained code state.
+4. Conclusion for next tranche selection:
+   - prioritize lower-level MPI command/broadcast overhead investigation or method-specific compute kernels;
+   - avoid further threshold-only tuning in `np.autodispatch.R` unless new evidence shows method-family-specific wins under familywise gates.
+
 ## 1) Candid Assessment
 
 You are right: the session/attach speed-equality objective was not met in the latest tranche.  
