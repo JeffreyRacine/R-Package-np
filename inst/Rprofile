@@ -2,7 +2,7 @@
 #
 # Usage (batch/cluster):
 #   1) copy this file to your working directory as .Rprofile, or set
-#      R_PROFILE to this file path.
+#      R_PROFILE_USER to this file path.
 #   2) launch with mpiexec/mpirun, e.g.
 #      mpiexec -n 6 R CMD BATCH --no-save script.R
 #
@@ -12,6 +12,37 @@
 .nonblock <- TRUE
 .sleep <- 0.1
 quiet <- FALSE
+.recv.timeout <- suppressWarnings(as.numeric(Sys.getenv(
+  "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC", "0"
+)))
+if (!is.finite(.recv.timeout) || .recv.timeout <= 0)
+  .recv.timeout <- 0
+
+.profile_canon <- function(path) {
+  if (!nzchar(path))
+    return("")
+  tryCatch(
+    normalizePath(path.expand(path), winslash = "/", mustWork = FALSE),
+    error = function(e) path.expand(path)
+  )
+}
+
+.profile_user <- .profile_canon(Sys.getenv("R_PROFILE_USER", unset = ""))
+.profile_site <- .profile_canon(Sys.getenv("R_PROFILE", unset = ""))
+
+if (nzchar(.profile_user) && nzchar(.profile_site) &&
+    identical(.profile_user, .profile_site)) {
+  msg <- paste(
+    "npRmpi profile startup misconfiguration:",
+    "R_PROFILE_USER and R_PROFILE point to the same file.",
+    "This can deadlock MPI profile/manual-broadcast startup.",
+    "Remediation: keep only one profile source (prefer R_PROFILE_USER)",
+    "and unset R_PROFILE for this launch."
+  )
+  base::cat(sprintf("\n[npRmpi profile guard] %s\n", msg), file = stderr())
+  flush(stderr())
+  stop(msg, call. = FALSE)
+}
 
 if (!invisible(library(npRmpi, logical.return = TRUE))) {
   warning("npRmpi cannot be loaded")
@@ -36,8 +67,30 @@ if (mpi.comm.rank(0) > 0) {
   .comm <- 1
   mpi.barrier(0)
   repeat {
-    tmp.message <- mpi.bcast.cmd(rank = 0, comm = .comm,
-                                 nonblock = .nonblock, sleep = .sleep)
+    if (.recv.timeout > 0)
+      base::setTimeLimit(elapsed = .recv.timeout, transient = TRUE)
+    tmp.message <- try(
+      mpi.bcast.cmd(rank = 0, comm = .comm,
+                    nonblock = .nonblock, sleep = .sleep),
+      silent = TRUE
+    )
+    if (.recv.timeout > 0)
+      base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+    if (inherits(tmp.message, "try-error")) {
+      msg <- as.character(tmp.message)
+      if (any(grepl("reached elapsed time limit", msg, fixed = TRUE))) {
+        base::stop(
+          paste(
+            "npRmpi profile receive timeout waiting for master command.",
+            "Possible blocked startup or transport deadlock.",
+            "Check profile env wiring (avoid dual R_PROFILE_USER/R_PROFILE),",
+            "verify FI_* interface settings, and retry with a fresh MPI launch."
+          ),
+          call. = FALSE
+        )
+      }
+      base::stop(msg, call. = FALSE)
+    }
     if (is.character(tmp.message) && identical(tmp.message, "kaerb"))
       break
     # Normalize older/ambiguous do.call payloads sent by Rmpi internals

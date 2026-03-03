@@ -29,7 +29,7 @@ This directory is the canonical demo harness for `npRmpi` timing/behavior checks
 
 The `makefile` is the source of truth for launch semantics:
 - `attach`: timeout + `FI_*` env + `en0` then `lo0` retry
-- `profile`: timeout + explicit `R_PROFILE_USER` + `FI_*` env + `en0` then `lo0` retry
+- `profile`: timeout + explicit `R_PROFILE_USER` + cleared `R_PROFILE` + `FI_*` env + `en0` then `lo0` retry
 
 Profile startup contract (required):
 - provide exactly one profile source per profile run:
@@ -37,6 +37,8 @@ Profile startup contract (required):
   - `R_PROFILE_USER=<profile-path>` (used by `makefile`);
 - do not export both `R_PROFILE_USER` and `R_PROFILE` to the same file in one launch;
 - `R CMD BATCH --no-save` is supported for profile mode when this contract is respected.
+- package-level guard (`inst/Rprofile`) now hard-fails on dual-source profile startup with a remediation message.
+- launchers export `NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=$(TIMEOUT_SEC)` so blocked profile receives fail-fast.
 
 ## Tiny Fast Smoke
 
@@ -132,6 +134,7 @@ make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 DEMOS='npcdensls' -n run-pro
 2. Verify the printed command contains `-env R_PROFILE_USER <expected path>`.
 3. Re-run with explicit `RPROFILE=...` absolute path.
 4. Ensure shell/session does not also export `R_PROFILE` to that same path.
+5. Optional: set `NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=<seconds>` to fail-fast if workers block waiting for broadcast commands.
 
 ### Attach/profile appears hung
 

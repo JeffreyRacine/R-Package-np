@@ -587,14 +587,28 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
     mpiexec,
     args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
     timeout = 90L,
-    env = c(env_common, "FI_TCP_IFACE=en0", "FI_PROVIDER=tcp", "FI_SOCKETS_IFACE=en0")
+    env = c(
+      env_common,
+      "R_PROFILE_USER=",
+      "R_PROFILE=",
+      "FI_TCP_IFACE=en0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=en0"
+    )
   )
   if (res$status != 0L) {
     res <- run_cmd_subprocess(
       mpiexec,
       args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
       timeout = 90L,
-      env = c(env_common, "FI_TCP_IFACE=lo0", "FI_PROVIDER=tcp", "FI_SOCKETS_IFACE=lo0")
+      env = c(
+        env_common,
+        "R_PROFILE_USER=",
+        "R_PROFILE=",
+        "FI_TCP_IFACE=lo0",
+        "FI_PROVIDER=tcp",
+        "FI_SOCKETS_IFACE=lo0"
+      )
     )
   }
 
@@ -645,7 +659,8 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
   env_profile <- c(
     env_common,
     sprintf("R_PROFILE_USER=%s", profile.path),
-    sprintf("R_PROFILE=%s", profile.path),
+    "R_PROFILE=",
+    "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
     "FI_TCP_IFACE=en0",
     "FI_PROVIDER=tcp",
     "FI_SOCKETS_IFACE=en0"
@@ -661,7 +676,8 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     env_profile_fallback <- c(
       env_common,
       sprintf("R_PROFILE_USER=%s", profile.path),
-      sprintf("R_PROFILE=%s", profile.path),
+      "R_PROFILE=",
+      "NP_RMPI_PROFILE_RECV_TIMEOUT_SEC=90",
       "FI_TCP_IFACE=lo0",
       "FI_PROVIDER=tcp",
       "FI_SOCKETS_IFACE=lo0"

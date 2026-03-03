@@ -93,10 +93,15 @@ run_mpiexec_route() {
       rm -f "${batch_out}"
       cmd=("${mpiexec}"
            -env R_PROFILE_USER "${profile_path}"
+           -env R_PROFILE ""
+           -env NP_RMPI_PROFILE_RECV_TIMEOUT_SEC "${ROUTE_TIMEOUT_SEC}"
            -n 2
            "${r_bin}" CMD BATCH --no-save "${route_script}" "${batch_out}")
     else
-      cmd=("${mpiexec}" -n 2 "${rscript_bin}" --no-save "${route_script}")
+      cmd=("${mpiexec}"
+           -env R_PROFILE_USER ""
+           -env R_PROFILE ""
+           -n 2 "${rscript_bin}" --no-save "${route_script}")
     fi
 
     set +e

@@ -15,6 +15,7 @@ Repo-specific note:
   - in-repo profile path should resolve to `../inst/Rprofile`; for copied demo folders outside repo, set `RPROFILE` explicitly to an absolute profile path (typically `system.file("Rprofile", package="npRmpi")`).
   - for profile/manual-broadcast launch, provide exactly one profile source (`.Rprofile` in cwd or `R_PROFILE_USER`); never set both `R_PROFILE_USER` and `R_PROFILE` to the same file in a single `mpiexec` launch.
   - `R CMD BATCH --no-save` is valid for profile mode when the single-source profile rule is followed.
+  - profile startup guard in `inst/Rprofile` is expected to fail-fast on dual-source profile wiring with a remediation message.
 - Demo failure recovery contract:
   - reproduce first with `NP_DEMO_N=100`, `NP=2`, and `DEMOS='<single demo>'`;
   - validate effective profile command with `make -n run-profile` and confirm `R_PROFILE_USER` path;

@@ -16,12 +16,14 @@ Use one of these options before running profile mode:
 
 1. Copy to the job working directory as `.Rprofile`.
 2. Or set `R_PROFILE_USER` to that file path.
+3. Do not set `R_PROFILE` to the same file as `R_PROFILE_USER` in the same launch.
 
 Example:
 
 ```bash
 R_PROFILE_USER="$(Rscript -e 'cat(system.file("Rprofile", package="npRmpi"))')"
 export R_PROFILE_USER
+unset R_PROFILE
 ```
 
 ## Run everything
