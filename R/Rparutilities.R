@@ -338,7 +338,30 @@ mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
     # Tell slaves to exit their daemon loop cleanly.
     # The spawned slave daemon (`inst/slavedaemon.R`) treats the character
     # token "kaerb" as a shutdown signal.
-    mpi.bcast.cmd(cmd="kaerb", rank=0, comm=comm)
+    recv.timeout <- tryCatch({
+      fn <- get0(".npRmpi_session_recv_timeout", envir = asNamespace("npRmpi"), inherits = FALSE)
+      if (is.function(fn)) as.numeric(fn()) else 0
+    }, error = function(e) 0)
+    if (!is.finite(recv.timeout) || recv.timeout <= 0)
+      recv.timeout <- 0
+
+    if (recv.timeout > 0)
+      base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
+    shut <- try(mpi.bcast.cmd(cmd="kaerb", rank=0, comm=comm), silent=TRUE)
+    if (recv.timeout > 0)
+      base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+    if (inherits(shut, "try-error")) {
+      msg <- as.character(shut)
+      warning(
+        paste(
+          "timed out or failed while broadcasting slave shutdown token.",
+          "Proceeding with communicator teardown;",
+          "ensure stale mpiexec/slave daemons are cleaned if this recurs.",
+          paste(msg, collapse = " ")
+        ),
+        call. = FALSE
+      )
+    }
     if (.Platform$OS!="windows"){
         if (dellog && mpi.comm.size(0) < mpi.comm.size(comm)){
         tmp <- paste(Sys.getpid(),"+",comm,sep="")  

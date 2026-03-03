@@ -15,3 +15,19 @@ test_that("npRmpi.quit validates scalar control arguments before MPI calls", {
   expect_error(npRmpi.quit(dellog = NA), "'dellog' must be TRUE or FALSE")
   expect_error(npRmpi.quit(comm = 0), "'comm' must be a positive integer")
 })
+
+test_that("session receive-timeout resolver honors option/env precedence", {
+  recv_timeout <- getFromNamespace(".npRmpi_session_recv_timeout", "npRmpi")
+
+  withr::local_options(npRmpi.session.recv.timeout = 12)
+  withr::local_envvar(NP_RMPI_SESSION_RECV_TIMEOUT_SEC = "999")
+  expect_equal(recv_timeout(), 12)
+
+  withr::local_options(npRmpi.session.recv.timeout = NULL)
+  withr::local_envvar(NP_RMPI_SESSION_RECV_TIMEOUT_SEC = "7.5")
+  expect_equal(recv_timeout(), 7.5)
+
+  withr::local_options(npRmpi.session.recv.timeout = NULL)
+  withr::local_envvar(NP_RMPI_SESSION_RECV_TIMEOUT_SEC = "bad")
+  expect_equal(recv_timeout(), 0)
+})

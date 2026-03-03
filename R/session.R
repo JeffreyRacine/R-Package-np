@@ -36,15 +36,79 @@
   as.integer(size) >= 2L
 }
 
+.npRmpi_autodispatch_prime_options <- function() {
+  keys <- tryCatch(.npRmpi_autodispatch_option_keys(), error = function(e) character(0))
+  if (!length(keys))
+    return(invisible(FALSE))
+
+  snap <- tryCatch(.npRmpi_autodispatch_option_snapshot(keys), error = function(e) NULL)
+  if (!is.list(snap))
+    return(invisible(FALSE))
+
+  options(npRmpi.autodispatch.option.snapshot = snap)
+
+  invisible(TRUE)
+}
+
+.npRmpi_session_recv_timeout <- function() {
+  opt <- getOption("npRmpi.session.recv.timeout", NULL)
+  if (!is.null(opt)) {
+    if (is.numeric(opt) && length(opt) == 1L && is.finite(opt) && opt > 0)
+      return(as.numeric(opt))
+    return(0)
+  }
+
+  envv <- suppressWarnings(as.numeric(Sys.getenv("NP_RMPI_SESSION_RECV_TIMEOUT_SEC", "0")))
+  if (!is.finite(envv) || envv <= 0)
+    return(0)
+  as.numeric(envv)
+}
+
 .npRmpi_session_attach_worker_loop <- function(comm = 1L,
                                                nonblock = TRUE,
                                                sleep = 0.1) {
   options(echo = FALSE)
+  recv.timeout <- .npRmpi_session_recv_timeout()
   repeat {
-    msg <- mpi.bcast.cmd(rank = 0, comm = comm, nonblock = nonblock, sleep = sleep)
+    if (recv.timeout > 0)
+      base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
+    msg <- try(mpi.bcast.cmd(rank = 0, comm = comm, nonblock = nonblock, sleep = sleep),
+               silent = TRUE)
+    if (recv.timeout > 0)
+      base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+    if (inherits(msg, "try-error")) {
+      msg.text <- as.character(msg)
+      if (any(grepl("reached elapsed time limit", msg.text, fixed = TRUE))) {
+        stop(
+          paste(
+            "npRmpi attach worker receive timeout waiting for master command.",
+            "Possible blocked MPI route or transport deadlock.",
+            "Remediation: verify attach launch wiring (mpiexec -n <master+slaves>,",
+            "clear R_PROFILE_USER/R_PROFILE for attach), confirm FI_TCP_IFACE,",
+            "and relaunch with a fresh MPI world."
+          ),
+          call. = FALSE
+        )
+      }
+      stop(msg.text, call. = FALSE)
+    }
     if (is.character(msg) && identical(msg, "kaerb"))
       break
-    tryCatch(.npRmpi_eval_scmd(msg, envir = .GlobalEnv), error = function(e) invisible(e))
+    res <- try(.npRmpi_eval_scmd(msg, envir = .GlobalEnv), silent = TRUE)
+    if (inherits(res, "try-error")) {
+      cmd <- paste(utils::capture.output(print(msg)), collapse = " ")
+      err <- as.character(res)
+      base::cat(
+        sprintf("\n[attach slave rank %d] CMD: %s\n[attach slave rank %d] ERROR: %s\n",
+                .npRmpi_safe_int(mpi.comm.rank(comm)),
+                cmd,
+                .npRmpi_safe_int(mpi.comm.rank(comm)),
+                paste(err, collapse = " ")),
+        file = stderr()
+      )
+      flush(stderr())
+      stop(err, call. = FALSE)
+    }
   }
   .npRmpi_safe(if (comm != 0L) mpi.comm.free(comm), fallback = NULL)
   mpi.quit()
@@ -96,6 +160,10 @@ npRmpi.init <- function(...,
     autodispatch.verify.options = autodispatch.verify.options,
     autodispatch.option.sync = autodispatch.option.sync
   )
+  if (isTRUE(effective.autodispatch))
+    .npRmpi_autodispatch_prime_options()
+  else
+    options(npRmpi.autodispatch.option.snapshot = NULL)
 
   {
     clear.fun <- tryCatch(
@@ -176,6 +244,7 @@ npRmpi.quit <- function(force = FALSE,
     if (is.function(clear.fun))
       tryCatch(clear.fun(), error = function(e) NULL)
   }
+  options(npRmpi.autodispatch.option.snapshot = NULL)
 
   if (size.comm < 2L)
   {
@@ -188,7 +257,24 @@ npRmpi.quit <- function(force = FALSE,
 
   if (identical(mode, "attach")) {
     comm <- 1L
-    mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm, caller.execute = FALSE)
+    recv.timeout <- .npRmpi_session_recv_timeout()
+    if (recv.timeout > 0)
+      base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
+    shut <- try(mpi.bcast.cmd(cmd = "kaerb", rank = 0, comm = comm, caller.execute = FALSE),
+                silent = TRUE)
+    if (recv.timeout > 0)
+      base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+    if (inherits(shut, "try-error")) {
+      msg <- as.character(shut)
+      warning(
+        paste(
+          "attach-mode worker shutdown broadcast failed or timed out;",
+          "continuing communicator teardown.",
+          paste(msg, collapse = " ")
+        ),
+        call. = FALSE
+      )
+    }
     if (comm != 0L) {
       .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
     }

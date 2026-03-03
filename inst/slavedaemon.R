@@ -12,8 +12,31 @@ npRmpi:::mpi.hostinfo(.comm)
 invisible(npRmpi:::mpi.comm.disconnect(.intercomm))
 .nonblock <- as.logical(npRmpi:::mpi.bcast(integer(1),type=1,rank=0,comm=.comm))
 .sleep <- npRmpi:::mpi.bcast(double(1),type=2,rank=0,comm=.comm)
+.recv.timeout <- suppressWarnings(as.numeric(Sys.getenv(
+  "NP_RMPI_SESSION_RECV_TIMEOUT_SEC", "0"
+)))
+if (!is.finite(.recv.timeout) || .recv.timeout <= 0)
+  .recv.timeout <- 0
 repeat {
-	tmp.message=npRmpi:::mpi.bcast.cmd(rank=0,comm=.comm, nonblock=.nonblock, sleep=.sleep)
+  if (.recv.timeout > 0)
+    base::setTimeLimit(elapsed = .recv.timeout, transient = TRUE)
+	tmp.message=try(npRmpi:::mpi.bcast.cmd(rank=0,comm=.comm, nonblock=.nonblock, sleep=.sleep), silent=TRUE)
+  if (.recv.timeout > 0)
+    base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
+  if (inherits(tmp.message, "try-error")) {
+    .msg <- as.character(tmp.message)
+    if (any(grepl("reached elapsed time limit", .msg, fixed = TRUE))) {
+      base::stop(
+        paste(
+          "npRmpi spawn worker receive timeout waiting for master command.",
+          "Possible blocked MPI route or transport deadlock.",
+          "Remediation: verify FI_TCP_IFACE and relaunch with a fresh spawn session."
+        ),
+        call. = FALSE
+      )
+    }
+    base::stop(.msg, call. = FALSE)
+  }
 	if (is.character(tmp.message) && tmp.message =="kaerb")
 		break
     res <- try(eval(tmp.message,envir=.GlobalEnv), silent=TRUE)
