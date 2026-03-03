@@ -136,16 +136,21 @@ Artifacts root:
 2. Collect per family/mode elapsed for baseline and candidate.
 3. Compute mean/median deltas; enforce Section 2 gates.
 4. Repetition policy (required for accept/reject):
-   - minimum decision run is `times=25` (no keep/drop decisions from `times=5` or `times=10`);
-   - if `times=25` is not clearly favorable, reject as a performance-improvement claim;
-   - if `times=25` is favorable, required confirmation is interleaved paired-seed `times=100`;
-   - performance-claim acceptance requires paired mean and paired median agreement with claimed direction.
+   - `times=5` is smoke only (no keep/drop decisions).
+   - decision screening uses interleaved paired-seed `times=25`.
+   - predeclare MEI (absolute seconds + relative percent) for each gated method/mode.
+   - compute paired deltas and 95% CI for mean delta.
+   - allow early accept at `times=25` only for obvious wins (mean+median favorable, CI excludes zero, effect exceeds MEI across all gated methods/modes).
+   - otherwise escalate to interleaved paired-seed `times>=100`; if pilot-implied required sample is above `100`, run higher `times` or mark inconclusive for that MEI.
+   - performance-claim acceptance requires paired mean and paired median agreement with claimed direction at decision tier.
 5. Cross-method agreement policy:
    - all gated methods/modes must align in direction for a performance-claim commit;
-   - anomalies must be explicitly rationalized and bounded (typically within noise, about `<=1%` absolute), otherwise reject/revert.
+   - anomalies must be explicitly rationalized and bounded relative to MEI, otherwise reject/revert.
 6. MPI performance mode default:
    - use `nslaves=1` as primary performance gate;
    - run `nslaves=0` only for explicit master-only overhead diagnostics.
+7. Reasoning:
+   - large effects are detectable at low `times`, while small effects require larger `times` since uncertainty contracts at about `1/sqrt(n)`.
 
 ### Phase 5: Report + checkpoint
 

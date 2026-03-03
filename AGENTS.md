@@ -7,10 +7,11 @@ Repo-specific note:
 - Merge (do not overwrite) R-layer and man-page files when porting from `np-master`.
 - Any new or ported benchmark/function must follow MPI protocol from `/Users/jracine/Development/AGENTS.md`: start/stop slaves, broadcast commands/options/data explicitly, support passable `nslaves`/`rslaves`, and keep parity with serial seed/DGP/options.
 - Performance evidence policy for this repo follows canonical AGENTS exactly:
-  - minimum decision run is `times=25` (no keep/drop from `times=5` or `times=10`);
-  - if `times=25` is promising, required confirmation is interleaved paired-seed `times=100`;
+  - `times=5` is smoke only; decision screening starts at interleaved paired-seed `times=25`;
+  - predeclare MEI (absolute seconds + relative percent), use paired deltas + CI, and allow early accept at `times=25` only for obvious wins;
+  - otherwise confirm with interleaved paired-seed `times>=100` (or higher when pilot variance implies it);
   - accept on performance grounds only when paired mean and paired median agree;
-  - all gated methods/modes must agree in direction, otherwise anomaly rationalization is mandatory;
+  - all gated methods/modes must agree in direction, otherwise anomaly rationalization versus MEI is mandatory;
   - default MPI performance gates to `nslaves=1`; run `nslaves=0` only for concrete master-only diagnostics.
 - Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`, `num.feval.fallback`.
 - Keep `man/np.kernels.Rd` and kernel/options/plot cross-links aligned, while preserving package-specific `npRmpi` docs text.
