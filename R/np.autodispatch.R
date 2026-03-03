@@ -103,6 +103,24 @@
   as.integer(thr)
 }
 
+.npRmpi_autodispatch_large_arg_threshold_for_call <- function(mc) {
+  thr <- .npRmpi_autodispatch_large_arg_threshold()
+  call.name <- .npRmpi_autodispatch_call_name(mc)
+  call.name <- sub("\\..*$", "", call.name)
+  regression.calls <- c(
+    "npreg", "npregbw", "npplreg", "npplregbw",
+    "npqreg", "npqregbw", "npscoef", "npscoefbw",
+    "npindex", "npindexbw"
+  )
+  if (!call.name %in% regression.calls)
+    return(thr)
+
+  rthr <- getOption("npRmpi.autodispatch.arg.broadcast.threshold.regression", 32768L)
+  if (!is.numeric(rthr) || length(rthr) != 1L || is.na(rthr) || rthr < 0)
+    return(thr)
+  as.integer(rthr)
+}
+
 .npRmpi_autodispatch_as_generic_call <- function(generic, mc) {
   args <- as.list(mc)[-1L]
   as.call(c(list(as.name(generic)), args))
@@ -269,6 +287,7 @@
   tmpvals <- list()
   prepublish <- list()
   idx <- 0L
+  large.arg.threshold <- .npRmpi_autodispatch_large_arg_threshold_for_call(mc)
 
   has_data_inputs <- !is.null(nms) && any(nms %in% c("data", "xdat", "ydat", "txdat", "tydat", "zdat"))
 
@@ -341,7 +360,7 @@
       names(out) <- out.nms
     }
     tmpnames <- c(tmpnames, tmp)
-    if (as.numeric(object.size(val)) >= .npRmpi_autodispatch_large_arg_threshold()) {
+    if (as.numeric(object.size(val)) >= large.arg.threshold) {
       prepublish[[tmp]] <- val
     } else {
       tmpvals[[tmp]] <- val
