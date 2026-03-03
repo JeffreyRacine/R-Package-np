@@ -138,9 +138,10 @@ Artifacts root:
 4. Repetition policy (required for accept/reject):
    - `times=5` is smoke only (no keep/drop decisions).
    - decision screening uses interleaved paired-seed `times=25`.
-   - predeclare MEI (absolute seconds + relative percent) for each gated method/mode.
-   - compute paired deltas and 95% CI for mean delta.
-   - allow early accept at `times=25` only for obvious wins (mean+median favorable, CI excludes zero, effect exceeds MEI across all gated methods/modes).
+   - predeclare MEI (absolute seconds + relative percent) for each gated method/mode, including center and tail limits plus spread tolerance.
+   - compute paired deltas for mean, median, `p90`, `p95`, and spread (`sd`/`IQR`/`MAD`).
+   - estimate uncertainty with 95% CI for paired mean delta and bootstrap 95% CI for paired median delta.
+   - allow early accept at `times=25` only for obvious wins (center favorable with favorable CIs, tails non-regressing vs MEI, and spread not inflated beyond tolerance across all gated methods/modes).
    - otherwise escalate to interleaved paired-seed `times>=100`; if pilot-implied required sample is above `100`, run higher `times` or mark inconclusive for that MEI.
    - performance-claim acceptance requires paired mean and paired median agreement with claimed direction at decision tier.
 5. Cross-method agreement policy:

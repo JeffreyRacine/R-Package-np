@@ -8,9 +8,10 @@ Repo-specific note:
 - Any new or ported benchmark/function must follow MPI protocol from `/Users/jracine/Development/AGENTS.md`: start/stop slaves, broadcast commands/options/data explicitly, support passable `nslaves`/`rslaves`, and keep parity with serial seed/DGP/options.
 - Performance evidence policy for this repo follows canonical AGENTS exactly:
   - `times=5` is smoke only; decision screening starts at interleaved paired-seed `times=25`;
-  - predeclare MEI (absolute seconds + relative percent), use paired deltas + CI, and allow early accept at `times=25` only for obvious wins;
+  - predeclare MEI (absolute seconds + relative percent, center + tail), use paired deltas + CI (mean + bootstrap median), and allow early accept at `times=25` only for obvious wins;
   - otherwise confirm with interleaved paired-seed `times>=100` (or higher when pilot variance implies it);
   - accept on performance grounds only when paired mean and paired median agree;
+  - tail/spread checks (`p90`/`p95`, `sd`/`IQR`/`MAD`) must also be non-regressing versus MEI/tolerance;
   - all gated methods/modes must agree in direction, otherwise anomaly rationalization versus MEI is mandatory;
   - default MPI performance gates to `nslaves=1`; run `nslaves=0` only for concrete master-only diagnostics.
 - Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`, `num.feval.fallback`.
