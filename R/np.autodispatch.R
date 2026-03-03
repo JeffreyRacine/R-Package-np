@@ -218,6 +218,185 @@
   stop(sprintf("%s requires an active MPI slave pool; call npRmpi.init(...) first", where))
 }
 
+.npRmpi_spmd_seq_get <- function() {
+  seq.id <- getOption("npRmpi.spmd.seq_id", 0L)
+  if (!is.numeric(seq.id) || length(seq.id) != 1L || is.na(seq.id) || seq.id < 0)
+    return(0L)
+  as.integer(seq.id)
+}
+
+.npRmpi_spmd_seq_set <- function(seq.id) {
+  if (!is.numeric(seq.id) || length(seq.id) != 1L || is.na(seq.id) ||
+      !is.finite(seq.id) || seq.id < 0 || seq.id != floor(seq.id))
+    stop("'seq.id' must be a non-negative integer", call. = FALSE)
+  options(npRmpi.spmd.seq_id = as.integer(seq.id))
+  invisible(as.integer(seq.id))
+}
+
+.npRmpi_spmd_next_seq <- function() {
+  next.seq <- .npRmpi_spmd_seq_get() + 1L
+  .npRmpi_spmd_seq_set(next.seq)
+}
+
+.npRmpi_spmd_make_envelope <- function(opcode,
+                                       args_ref = NULL,
+                                       timeout_class = "default",
+                                       seq_id = NULL) {
+  if (!is.character(opcode) || length(opcode) != 1L || is.na(opcode) || !nzchar(opcode))
+    stop("'opcode' must be a non-empty character scalar", call. = FALSE)
+  if (!is.character(timeout_class) || length(timeout_class) != 1L ||
+      is.na(timeout_class) || !nzchar(timeout_class))
+    stop("'timeout_class' must be a non-empty character scalar", call. = FALSE)
+
+  if (is.null(seq_id)) {
+    seq_id <- .npRmpi_spmd_seq_get() + 1L
+  } else {
+    if (!is.numeric(seq_id) || length(seq_id) != 1L || is.na(seq_id) ||
+        !is.finite(seq_id) || seq_id < 1 || seq_id != floor(seq_id))
+      stop("'seq_id' must be a positive integer", call. = FALSE)
+    seq_id <- as.integer(seq_id)
+  }
+
+  list(
+    seq_id = as.integer(seq_id),
+    opcode = opcode,
+    args_ref = args_ref,
+    timeout_class = timeout_class
+  )
+}
+
+.npRmpi_spmd_validate_envelope <- function(envelope) {
+  if (!is.list(envelope))
+    stop("SPMD envelope must be a list", call. = FALSE)
+  req <- c("seq_id", "opcode", "args_ref", "timeout_class")
+  miss <- setdiff(req, names(envelope))
+  if (length(miss))
+    stop(sprintf("SPMD envelope missing required fields: %s", paste(miss, collapse = ", ")), call. = FALSE)
+
+  seq.id <- envelope$seq_id
+  if (!is.numeric(seq.id) || length(seq.id) != 1L || is.na(seq.id) ||
+      !is.finite(seq.id) || seq.id < 1 || seq.id != floor(seq.id))
+    stop("SPMD envelope has invalid 'seq_id'", call. = FALSE)
+  if (!is.character(envelope$opcode) || length(envelope$opcode) != 1L ||
+      is.na(envelope$opcode) || !nzchar(envelope$opcode))
+    stop("SPMD envelope has invalid 'opcode'", call. = FALSE)
+  if (!is.character(envelope$timeout_class) || length(envelope$timeout_class) != 1L ||
+      is.na(envelope$timeout_class) || !nzchar(envelope$timeout_class))
+    stop("SPMD envelope has invalid 'timeout_class'", call. = FALSE)
+
+  invisible(TRUE)
+}
+
+.npRmpi_spmd_assert_sequence <- function(envelope,
+                                         last_seq = .npRmpi_spmd_seq_get(),
+                                         where = "SPMD step") {
+  .npRmpi_spmd_validate_envelope(envelope)
+  expected <- as.integer(last_seq) + 1L
+  got <- as.integer(envelope$seq_id)
+  if (!identical(got, expected)) {
+    stop(
+      sprintf("%s sequence mismatch: expected seq_id=%d but received seq_id=%d [opcode=%s]",
+              where, expected, got, envelope$opcode),
+      call. = FALSE
+    )
+  }
+  invisible(TRUE)
+}
+
+.npRmpi_spmd_registry <- new.env(parent = emptyenv())
+
+.npRmpi_spmd_register_opcode <- function(opcode, handler) {
+  if (!is.character(opcode) || length(opcode) != 1L || is.na(opcode) || !nzchar(opcode))
+    stop("'opcode' must be a non-empty character scalar", call. = FALSE)
+  if (!is.function(handler))
+    stop("'handler' must be a function", call. = FALSE)
+  assign(opcode, handler, envir = .npRmpi_spmd_registry)
+  invisible(TRUE)
+}
+
+.npRmpi_spmd_get_opcode <- function(opcode) {
+  if (!exists(opcode, envir = .npRmpi_spmd_registry, inherits = FALSE))
+    stop(sprintf("SPMD opcode '%s' is not registered", opcode), call. = FALSE)
+  get(opcode, envir = .npRmpi_spmd_registry, inherits = FALSE)
+}
+
+.npRmpi_spmd_register_defaults <- function() {
+  if (!exists("spmd.ping", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode("spmd.ping", function(payload, envelope) {
+      rank <- tryCatch(as.integer(mpi.comm.rank(1L)), error = function(e) 0L)
+      list(
+        opcode = envelope$opcode,
+        seq_id = as.integer(envelope$seq_id),
+        rank = as.integer(rank),
+        payload = payload
+      )
+    })
+  }
+  invisible(TRUE)
+}
+
+.npRmpi_spmd_execute_local <- function(envelope,
+                                       payload = NULL,
+                                       where = "SPMD step local execute") {
+  .npRmpi_spmd_register_defaults()
+  last.seq <- .npRmpi_spmd_seq_get()
+  .npRmpi_spmd_assert_sequence(envelope, last_seq = last.seq, where = where)
+  .npRmpi_spmd_seq_set(envelope$seq_id)
+
+  handler <- .npRmpi_spmd_get_opcode(envelope$opcode)
+  out <- tryCatch(
+    handler(payload, envelope),
+    error = function(e) {
+      stop(
+        sprintf("%s opcode failure [opcode=%s seq_id=%d]: %s",
+                where, envelope$opcode, envelope$seq_id, conditionMessage(e)),
+        call. = FALSE
+      )
+    }
+  )
+
+  list(
+    ok = TRUE,
+    ack = list(
+      seq_id = as.integer(envelope$seq_id),
+      opcode = envelope$opcode,
+      status = "ACK"
+    ),
+    result = out
+  )
+}
+
+.npRmpi_spmd_try_execute_local <- function(envelope,
+                                           payload = NULL,
+                                           where = "SPMD step local execute") {
+  tryCatch(
+    .npRmpi_spmd_execute_local(envelope = envelope, payload = payload, where = where),
+    error = function(e) list(
+      ok = FALSE,
+      ack = list(
+        seq_id = if (is.list(envelope) && !is.null(envelope$seq_id)) as.integer(envelope$seq_id) else NA_integer_,
+        opcode = if (is.list(envelope) && !is.null(envelope$opcode)) as.character(envelope$opcode)[1L] else NA_character_,
+        status = "ERR",
+        error = conditionMessage(e)
+      ),
+      error = conditionMessage(e)
+    )
+  )
+}
+
+.npRmpi_spmd_tiny_smoke <- function(label = "spmd-smoke", comm = 1L) {
+  .npRmpi_require_active_slave_pool(comm = comm, where = "SPMD tiny smoke")
+  envelope <- .npRmpi_spmd_make_envelope(
+    opcode = "spmd.ping",
+    timeout_class = "smoke"
+  )
+  .npRmpi_spmd_execute_local(
+    envelope = envelope,
+    payload = list(label = as.character(label)[1L], comm = as.integer(comm)),
+    where = "SPMD tiny smoke"
+  )
+}
+
 .npRmpi_autodispatch_preflight <- function(comm = 1L) {
   .npRmpi_abort_if_rmpi_attached(where = "npRmpi auto-dispatch")
   strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
