@@ -211,12 +211,9 @@
 }
 
 .npRmpi_require_active_slave_pool <- function(comm = 1L,
-                                              where = "this call",
-                                              allow.master.only = TRUE) {
+                                              where = "this call") {
   .npRmpi_abort_if_rmpi_attached(where = where)
   if (.npRmpi_has_active_slave_pool(comm = comm))
-    return(invisible(TRUE))
-  if (isTRUE(allow.master.only) && .npRmpi_master_only_mode(comm = comm))
     return(invisible(TRUE))
   stop(sprintf("%s requires an active MPI slave pool; call npRmpi.init(...) first", where))
 }
@@ -225,10 +222,6 @@
   .npRmpi_abort_if_rmpi_attached(where = "npRmpi auto-dispatch")
   strict <- isTRUE(getOption("npRmpi.autodispatch.strict", TRUE))
   if (!.npRmpi_has_active_slave_pool(comm = comm)) {
-    if (.npRmpi_master_only_mode(comm = comm)) {
-      warning("npRmpi auto-dispatch is disabled in master-only mode (nslaves=0); executing call locally")
-      return(FALSE)
-    }
     msg <- "npRmpi auto-dispatch requires an active slave pool; call npRmpi.init(...) first"
     if (strict) stop(msg)
     warning(msg)
@@ -783,8 +776,7 @@
 .npRmpi_bootstrap_compute_payload <- function(payload, comm = 1L) {
   .npRmpi_require_active_slave_pool(
     comm = comm,
-    where = "bootstrap payload computation",
-    allow.master.only = FALSE
+    where = "bootstrap payload computation"
   )
 
   if (!is.list(payload))

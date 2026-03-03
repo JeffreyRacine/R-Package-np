@@ -129,6 +129,12 @@ npRmpi.init <- function(...,
   .npRmpi_abort_if_rmpi_attached(where = "npRmpi.init()")
 
   nslaves <- npValidateNonNegativeInteger(nslaves, "nslaves")
+  if (nslaves < 1L) {
+    stop(
+      "'nslaves' must be >= 1 for npRmpi; use package 'np' for serial workflows",
+      call. = FALSE
+    )
+  }
   comm <- npValidatePositiveInteger(comm, "comm")
   autodispatch <- npValidateScalarLogical(autodispatch, "autodispatch")
   autodispatch.verify.options <- npValidateScalarLogical(autodispatch.verify.options, "autodispatch.verify.options")
@@ -148,11 +154,6 @@ npRmpi.init <- function(...,
   }
 
   effective.autodispatch <- autodispatch
-  if (identical(mode, "spawn") && nslaves == 0L) {
-    if (isTRUE(autodispatch))
-      warning("nslaves=0 enables master-only runtime; forcing npRmpi.autodispatch=FALSE")
-    effective.autodispatch <- FALSE
-  }
 
   .npRmpi_session_apply_options(
     autodispatch = effective.autodispatch,
@@ -175,14 +176,6 @@ npRmpi.init <- function(...,
   }
 
   if (identical(mode, "spawn")) {
-    if (nslaves == 0L) {
-      if (.npRmpi_session_has_active_pool(comm = comm))
-        stop("comm already has active MPI slaves; call npRmpi.quit(...) before requesting nslaves=0")
-      .npRmpi_session_ensure_comm(comm = comm)
-      np.mpi.initialize()
-      options(npRmpi.master.only = TRUE)
-      return(invisible(TRUE))
-    }
     if (.npRmpi_session_has_active_pool(comm = comm)) {
       options(npRmpi.master.only = FALSE)
       if (!quiet)
@@ -248,11 +241,8 @@ npRmpi.quit <- function(force = FALSE,
 
   if (size.comm < 2L)
   {
-    master.only <- isTRUE(getOption("npRmpi.master.only", FALSE))
-    if (master.only && comm != 0L)
-      .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
     options(npRmpi.master.only = FALSE)
-    return(invisible(master.only))
+    return(invisible(FALSE))
   }
 
   if (identical(mode, "attach")) {

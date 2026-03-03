@@ -1,10 +1,10 @@
 library(npRmpi)
 
-with_master_only <- function(expr) {
+with_session_slave_pool <- function(expr) {
   if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
     try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE)
   }
-  suppressWarnings(npRmpi.init(nslaves = 0, quiet = TRUE))
+  suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
   on.exit(try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE), add = TRUE)
   force(expr)
 }
@@ -52,7 +52,7 @@ test_that("jksum regression CV parity is deterministic for mixed data", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  with_master_only({
+  with_session_slave_pool({
     dat <- make_jksum_mixed_data(n = 220L, seed = 100L)
     combos <- expand.grid(
       regtype = c("ll", "lc"),
@@ -88,7 +88,7 @@ test_that("jksum regression CV smoke performance remains bounded", {
   )
   on.exit(options(old_opts), add = TRUE)
 
-  with_master_only({
+  with_session_slave_pool({
     dat <- make_jksum_mixed_data(n = 220L, seed = 101L)
 
     set.seed(321)

@@ -1,17 +1,17 @@
 library(npRmpi)
 
-with_master_only <- function(expr) {
+with_session_slave_pool <- function(expr) {
   if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
     try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE)
   }
-  suppressWarnings(npRmpi.init(nslaves = 0, quiet = TRUE))
+  suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
   on.exit(try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE), add = TRUE)
   force(expr)
 }
 
 test_that("direct kernel-weight helper matches npksum.default with evaluation data", {
   skip_on_cran()
-  with_master_only({
+  with_session_slave_pool({
     kw.fun <- getFromNamespace(".np_kernel_weights_direct", "npRmpi")
     ksum.fun <- getFromNamespace("npksum.default", "npRmpi")
     set.seed(4021)
@@ -55,7 +55,7 @@ test_that("direct kernel-weight helper matches npksum.default with evaluation da
 
 test_that("direct kernel-weight helper matches npksum.default leave-one-out", {
   skip_on_cran()
-  with_master_only({
+  with_session_slave_pool({
     kw.fun <- getFromNamespace(".np_kernel_weights_direct", "npRmpi")
     ksum.fun <- getFromNamespace("npksum.default", "npRmpi")
     set.seed(4022)

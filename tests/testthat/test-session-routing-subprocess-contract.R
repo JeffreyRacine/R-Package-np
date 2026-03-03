@@ -112,62 +112,28 @@ test_that("session routing smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
-test_that("session master-only mode (nslaves=0) runs estimator workflow", {
+test_that("session rejects nslaves=0 with serial-workflow remediation", {
   skip_on_cran()
   env <- subprocess_env()
   skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
   res <- run_rscript_subprocess(
     lines = c(
       "suppressPackageStartupMessages(library(npRmpi))",
-      "npRmpi.init(nslaves=0, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(mode='spawn', force=TRUE), silent=TRUE), add=TRUE)",
-      "stopifnot(isTRUE(getOption('npRmpi.master.only')))",
-      "stopifnot(identical(getOption('npRmpi.autodispatch'), FALSE))",
-      "set.seed(42)",
-      "n <- 250",
-      "x <- runif(n)",
-      "y <- rnorm(n)",
-      "bw <- npregbw(y~x, regtype='lc', bwmethod='cv.ls', nmulti=1)",
-      "fit <- npreg(bws=bw)",
-      "pred <- predict(fit, newdata=data.frame(x=seq(0,1,length.out=60)))",
-      "stopifnot(inherits(fit, 'npregression'), length(pred)==60, all(is.finite(pred)))",
-      "cat('SESSION_MASTER_ONLY_OK\\n')"
-    ),
-    timeout = 60L,
-    env = env
-  )
-
-  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("SESSION_MASTER_ONLY_OK", res$output, fixed = TRUE)),
-              info = paste(res$output, collapse = "\n"))
-})
-
-test_that("session master-only mode disables autodispatch to local fallback", {
-  skip_on_cran()
-  env <- subprocess_env()
-  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
-  res <- run_rscript_subprocess(
-    lines = c(
-      "suppressPackageStartupMessages(library(npRmpi))",
-      "npRmpi.init(nslaves=0, quiet=TRUE)",
-      "on.exit(try(npRmpi.quit(mode='spawn', force=TRUE), silent=TRUE), add=TRUE)",
-      "options(npRmpi.autodispatch=TRUE)",
-      "set.seed(7)",
-      "x <- runif(80)",
-      "y <- rnorm(80)",
-      "bw <- npregbw(xdat=data.frame(x=x), ydat=y, bws=0.2, bandwidth.compute=FALSE, regtype='ll', bwtype='fixed', ckertype='gaussian')",
-      "fit <- npreg(bws=bw, exdat=data.frame(x=seq(0,1,length.out=20)))",
-      "stopifnot(inherits(fit, 'npregression'))",
-      "cat('SESSION_MASTER_ONLY_AUTOD_FALLBACK_OK\\n')"
+      "err <- try(npRmpi.init(nslaves=0, quiet=TRUE), silent=TRUE)",
+      "stopifnot(inherits(err, 'try-error'))",
+      "cat(as.character(err), '\\n')",
+      "cat('SESSION_NSLAVES0_REJECT_OK\\n')"
     ),
     timeout = 45L,
     env = env
   )
 
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("SESSION_MASTER_ONLY_AUTOD_FALLBACK_OK", res$output, fixed = TRUE)),
+  expect_true(any(grepl("SESSION_NSLAVES0_REJECT_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
-  expect_true(any(grepl("master-only mode", res$output, ignore.case = TRUE)),
+  expect_true(any(grepl("must be >= 1", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("use package 'np' for serial workflows", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
 
