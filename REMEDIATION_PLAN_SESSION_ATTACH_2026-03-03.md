@@ -81,6 +81,57 @@ Post-closeout micro-tranche: cleanup roundtrip removal (2026-03-03):
 5. Regression-test note:
    - focused routing/autodispatch tests passed except `test-bcast-sync-contract.R` failure that reproduces on baseline (non-regression).
 
+Post-closeout micro-tranche: CVLS helper MPI guard removal (2026-03-03):
+
+1. Runtime patch (single risk axis):
+   - `src/jksum.c`
+   - removed MPI master-only guard around CVLS stable-helper routing for LP/LL paths.
+   - commit: `a6da4e2` (`cvls: remove MPI master-only guard on stable LL/LP helper`).
+2. Route/pre-flight gates passed (`nslaves=1` focus):
+   - session tiny smoke: `SESSION_LL_PREFLIGHT_OK`
+   - attach tiny smoke: `ATTACH_LL_PREFLIGHT_OK`
+   - route validators:
+     - `MANUAL_BCAST_ROUTE_OK`
+     - `ATTACH_ROUTE_OK`
+     - `PROFILE_ROUTE_OK`
+3. Seedwise stability/parity check passed:
+   - artifact: `/tmp/trackA_seedwise_cleanmsg_20260303_142450`
+   - 5 rounds x seeds `1..8`, all `ok`, zero timeouts.
+   - restored `np`-matching fast/feval pattern for LL CVLS (`n=200`).
+4. Paired timing screen (`times=25`, matched seeds, baseline guarded vs candidate):
+   - artifact: `/tmp/tranche_next_trackA_vs_guarded_20260303_145004`
+   - `session`: mean `-30.57%`, median `-48.05%`; fast-hit rate `0/25 -> 16/25`.
+   - `attach`: mean `-30.97%`, median `-68.44%`; fast-hit rate `0/25 -> 16/25`.
+   - `profile`: mean `-57.01%`, median `-86.41%`; fast-hit rate `0/25 -> 16/25`.
+   - one-sided paired tests (Holm-adjusted) favored candidate across all three modes.
+5. Design note:
+   - attempted helper-internal MPI parallelization was rejected for this tranche due to collective mismatch risk.
+   - retained fix is route-level guard removal only (parity-first, low-risk).
+6. Full demo smoke (`n=100`, `NP=2`) passed via direct fail-fast launcher:
+   - artifact: `/tmp/trackA_demo_direct_sweep_20260303_145350`
+   - `serial`: `25/25`
+   - `attach`: `25/25`
+   - `profile`: `25/25`
+
+Post-closeout gate completion (remaining issues) (2026-03-03):
+
+1. Targeted regression-suite completion for touched pathways:
+   - artifact: `/tmp/trackA_targeted_tests_20260303_151137`
+   - per-file timeout execution, all passing (`7/7`):
+     - `test-ll-lp-degree1-parity.R`
+     - `test-jksum-gating-smoke.R`
+     - `test-session-routing-subprocess-contract.R`
+     - `test-profile-timing-contract.R`
+     - `test-plot-bootstrap-inid-fastpath-contract.R`
+     - `test-plot-mpi-only-bootstrap-contract.R`
+     - `test-bcast-sync-contract.R`
+2. Blocking issues in this remediation plan are closed for current scope:
+   - no remaining route failures,
+   - no remaining demo failures at `n=100`,
+   - no remaining touched-path performance regressions against guarded baseline for the CVLS LL path.
+3. Non-blocking deferred item (explicit):
+   - helper-internal MPI parallelization remains deferred/rejected pending a safe collective design; current accepted fix is guard removal only.
+
 ## 1) Candid Assessment
 
 You are right: the session/attach speed-equality objective was not met in the latest tranche.  
