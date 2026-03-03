@@ -6,6 +6,10 @@ Hard default: enforce `Sweep Safety Protocol (Default Across Scope Repos)` from 
 Repo-specific note:
 - Merge (do not overwrite) R-layer and man-page files when porting from `np-master`.
 - Any new or ported benchmark/function must follow MPI protocol from `/Users/jracine/Development/AGENTS.md`: start/stop slaves, broadcast commands/options/data explicitly, support passable `nslaves`/`rslaves`, and keep parity with serial seed/DGP/options.
+- Performance evidence policy for this repo follows canonical AGENTS exactly:
+  - do not accept/reject from `times=5` alone;
+  - use `times=5 -> 10 -> 25` ladder, escalate to `50` if mean/median are not stable;
+  - default MPI performance gates to `nslaves=1`; run `nslaves=0` only for concrete master-only diagnostics.
 - Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`, `num.feval.fallback`.
 - Keep `man/np.kernels.Rd` and kernel/options/plot cross-links aligned, while preserving package-specific `npRmpi` docs text.
 - Runtime contract: `npRmpi` must never call serial `np` estimator/plot/bootstrap/helper code paths and must not silently fall back to serial execution when MPI mode is selected.

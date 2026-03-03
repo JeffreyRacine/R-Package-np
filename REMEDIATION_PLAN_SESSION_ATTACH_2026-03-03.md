@@ -135,6 +135,14 @@ Artifacts root:
 1. Run identical matrix harness used in current timing snapshot.
 2. Collect per family/mode elapsed for baseline and candidate.
 3. Compute mean/median deltas; enforce Section 2 gates.
+4. Repetition policy (required for accept/reject):
+   - use `times=5 -> 10 -> 25` ladder for fast direction checks;
+   - do not make keep/drop decisions from `times=5` alone;
+   - if mean/median direction disagrees at `25`, or absolute delta remains around `>1%`, escalate to `times=50`;
+   - for near-release certainty, prefer `times=50` minimum and `times=100` when runtime allows.
+5. MPI performance mode default:
+   - use `nslaves=1` as primary performance gate;
+   - run `nslaves=0` only for explicit master-only overhead diagnostics.
 
 ### Phase 5: Report + checkpoint
 
