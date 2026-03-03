@@ -79,7 +79,7 @@
             mode = "function",
             inherits = FALSE)
   call <- as.call(list(fn, as.name(name)))
-  .npRmpi_eval_scmd(call, envir = caller_env)
+  eval(call, envir = caller_env)
 }
 
 .npRmpi_autodispatch_next_remote_name <- function() {
