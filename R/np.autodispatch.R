@@ -107,6 +107,14 @@
   thr <- .npRmpi_autodispatch_large_arg_threshold()
   call.name <- .npRmpi_autodispatch_call_name(mc)
   call.name <- sub("\\..*$", "", call.name)
+  ud.calls <- c("npudens", "npudensbw", "npudist", "npudistbw")
+  if (call.name %in% ud.calls) {
+    uthr <- getOption("npRmpi.autodispatch.arg.broadcast.threshold.unconditional", 32768L)
+    if (!is.numeric(uthr) || length(uthr) != 1L || is.na(uthr) || uthr < 0)
+      return(thr)
+    return(as.integer(uthr))
+  }
+
   regression.calls <- c(
     "npreg", "npregbw", "npplreg", "npplregbw",
     "npqreg", "npqregbw", "npscoef", "npscoefbw",
