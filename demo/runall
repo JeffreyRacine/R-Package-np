@@ -11,6 +11,10 @@ cleanup_slaves() {
 
 trap cleanup_slaves EXIT INT TERM
 
+if [ "${1:-}" = "--cleanup" ] || [ "${1:-}" = "cleanup" ]; then
+  exec ./cleanup
+fi
+
 mkdir -p serial
 (
   cd serial

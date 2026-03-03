@@ -65,8 +65,9 @@ Scripts used by the runner:
 - `issue_notes/validate_route_attach.R`
 - `issue_notes/validate_route_profile.R`
 
-Current status (2026-02-27):
+Current status (2026-03-02):
 
 - manual-broadcast route passes in current tree.
 - attach route passes in current tree.
-- profile route remains environment-/runtime-fragile in current tree (hang on `en0`; `lo0` MPI init failure), so 4-path muster remains partial until profile is stabilized.
+- profile route passes in current tree when launched with the documented profile contract:
+  `R_PROFILE_USER=<.../Rprofile>`, `R_PROFILE=""`, and `R CMD BATCH --no-save` (no `--vanilla`).

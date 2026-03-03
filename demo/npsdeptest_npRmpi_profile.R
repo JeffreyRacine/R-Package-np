@@ -1,11 +1,9 @@
-## Make sure you have the Rprofile file from npRmpi/inst/ in your
-## current directory or home directory. It is necessary.
-
-## To run this on systems with OPENMPI installed and working, try
-## mpirun -np 2 R CMD BATCH npsdeptest_npRmpi. Check the time in the
-## output file foo.Rout (the name of this file with extension .Rout),
-## then try with, say, 4 processors and compare run time.
-
+## Profile/manual-broadcast demo (mpiexec + .Rprofile + mpi.bcast.*).
+## Run with two ranks (master + one worker), e.g.
+##   mpiexec -env R_PROFILE_USER ../.Rprofile -env R_PROFILE "" \\
+##           -n 2 R CMD BATCH --no-save <script>.R
+## Do not use R CMD BATCH --vanilla for profile mode.
+##
 ## Initialize master and slaves.
 
 mpi.bcast.cmd(np.mpi.initialize(),

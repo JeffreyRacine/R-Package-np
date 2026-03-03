@@ -1,0 +1,64 @@
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "${SCRIPT_DIR}"
+
+cleanup_slaves() {
+  local pids
+  pids="$(pgrep -f 'slavedaemon\.R|Rslaves\.sh' || true)"
+  if [ -n "${pids}" ]; then
+    printf '%s\n' "${pids}" | xargs kill >/dev/null 2>&1 || true
+  fi
+}
+
+cleanup_run_dirs() {
+  shopt -s nullglob
+  rm -rf -- serial n_*_attach n_*_profile
+  shopt -u nullglob
+}
+
+cleanup_local_transients() {
+  rm -f -- ./*.tmp ./*.Rout ./.RData ./.Rhistory ./Rplots.pdf
+}
+
+restore_tracked_timing_outputs() {
+  if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local files=(
+    timing.aux
+    timing.fdb_latexmk
+    timing.fls
+    timing.log
+    timing.pdf
+    timing_all.dat
+    timing_all.tex
+    timing_n_2.dat
+    timing_n_2.tex
+    timing_n_3.dat
+    timing_n_3.tex
+    timing_n_4.dat
+    timing_n_4.tex
+  )
+  local tracked=()
+  local f
+
+  for f in "${files[@]}"; do
+    if git ls-files --error-unmatch -- "${f}" >/dev/null 2>&1; then
+      tracked+=("${f}")
+    fi
+  done
+
+  if [ "${#tracked[@]}" -gt 0 ]; then
+    git restore --worktree -- "${tracked[@]}"
+  fi
+}
+
+cleanup_slaves
+cleanup_run_dirs
+cleanup_local_transients
+restore_tracked_timing_outputs
+
+echo "demo cleanup complete"

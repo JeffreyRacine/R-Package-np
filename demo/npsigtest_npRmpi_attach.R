@@ -1,17 +1,15 @@
 library(npRmpi)
 
-## To run this on systems with OPENMPI installed and working, try
-## mpirun -np 2 R CMD BATCH npsigtest_npRmpi. Check the time in the
-## output file foo.Rout (the name of this file with extension .Rout),
-## then try with, say, 4 processors and compare run time.
-
-## Initialize master and slaves.
-## Batch/cluster usage (attach mode under mpiexec):
-##   mpiexec -n <master+slaves> R CMD BATCH --no-save <script>.R
-## Inside the script, use attach mode instead of spawning:
-##   try(mpi.comm.dup(0, 1), silent = TRUE)
-##   npRmpi.init(mode="attach", comm=1, autodispatch=TRUE, np.messages=FALSE)
+## Attach mode demo (session routing under mpiexec).
+## Run with two ranks (master + one worker), e.g.
+##   mpiexec -n 2 Rscript --no-save <script>.R
+## or
+##   mpiexec -n 2 R CMD BATCH --no-save <script>.R
 ##
+## If running under mpiexec, keep profile env vars cleared for attach mode:
+##   -env R_PROFILE_USER "" -env R_PROFILE ""
+##
+## Initialize master and slaves.
 npRmpi.init(mode="attach", comm=1, autodispatch=TRUE)
 
 ## Turn off progress i/o as this clutters the output file (if you want

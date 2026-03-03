@@ -179,7 +179,7 @@ processors on an
 \proglang{MPI} system you will enter something like
 
 \begin{verbatim}
-mpiexec -n 2 Rscript npudensml_npRmpi.R
+mpiexec -n 2 Rscript --no-save npudensml_npRmpi.R
 \end{verbatim}
 
 You can compare run times and any other differences by examining the
@@ -193,12 +193,18 @@ If you have a batch scheduler installed on your cluster you might
 instead enter something like
 
 \begin{verbatim}
-sqsub -q mpi -n 2 R CMD BATCH npudensml_npRmpi.R
+sqsub -q mpi -n 2 R CMD BATCH --no-save npudensml_npRmpi.R
 \end{verbatim}
 
 Again, kindly consult local tech support personnel for issues
 concerning the use of batch queueing systems and using compute
 clusters.
+
+For manual-broadcast/profile workflows (scripts that call
+\code{mpi.bcast.cmd(...)} directly), use the \code{inst/Rprofile}
+template via \code{R_PROFILE_USER} and launch with
+\code{R CMD BATCH --no-save}. Do not use \code{--vanilla} for this
+route because startup profiles are disabled.
 
 \subsection{Parallel Execution in an Interactive R Session}
 
@@ -273,6 +279,8 @@ Below is the same code modified to run in parallel using the
     \code{npRmpi.init(mode="attach")} and \code{npRmpi.quit(mode="attach")}
     when running under \code{mpiexec}, or
     \code{npRmpi.init(mode="spawn", nslaves=...)} in interactive sessions.
+    For manual-broadcast/profile scripts, use \code{inst/Rprofile}
+    (\code{R_PROFILE_USER=...}) and explicit \code{mpi.bcast.*} calls.
 
   \item Enable auto-dispatch with
     \code{options(npRmpi.autodispatch=TRUE, np.messages=FALSE)} so
@@ -300,7 +308,9 @@ Below is the same code modified to run in parallel using the
 \begin{verbatim}
 ## To run this on systems with an MPI implementation (e.g. MPICH)
 ## installed and working, try
-## mpiexec -n 2 Rscript npudensml_npRmpi.R. Check the time in the
+## mpiexec -n 2 Rscript --no-save npudensml_npRmpi.R
+## (or mpiexec -n 2 R CMD BATCH --no-save npudensml_npRmpi.R).
+## Check the time in the
 ## output file npudensml_npRmpi.Rout (the name of this file with extension
 ## .Rout), then try with, say, 4 processors and compare run time.
 

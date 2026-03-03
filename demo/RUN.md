@@ -81,11 +81,26 @@ cd /Users/jracine/Development/np-npRmpi/demo
 NP_DEMO_N=100 ./runall
 ```
 
+Reset demo folder to baseline state after a run:
+
+```bash
+cd /Users/jracine/Development/np-npRmpi/demo
+./cleanup
+```
+
+Shortcut:
+
+```bash
+cd /Users/jracine/Development/np-npRmpi/demo
+./runall --cleanup
+```
+
 ## Output Locations
 
 - Serial outputs: `serial/*.Rout`
 - Attach outputs: `n_2_attach/*.Rout`, `n_3_attach/*.Rout`, `n_4_attach/*.Rout`
 - Profile outputs: `n_2_profile/*.Rout`, `n_3_profile/*.Rout`, `n_4_profile/*.Rout`
+- Cleanup helper: `./cleanup` removes run-generated folders/files and restores tracked timing outputs when run inside the repo
 
 ## Execution Context Rules (Must Follow)
 

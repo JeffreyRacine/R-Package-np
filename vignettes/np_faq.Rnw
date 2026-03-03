@@ -1312,21 +1312,34 @@ resolved by someone with familiarity of the local installation.
     one of the demo parallel jobs I get the error \texttt{Error: could
       not find function ``mpi.bcast.cmd''}}
 
-When your demo program stops at the following point in your file
+Two common failure signatures are
 \begin{verbatim}
-> npregbw(y~x)
 Error: npRmpi auto-dispatch requires an active MPI slave pool; call npRmpi.init(...) first
 \end{verbatim}
-this typically means the MPI session has not been started.
+and
+\begin{verbatim}
+Error: could not find function "mpi.bcast.cmd"
+\end{verbatim}
+The first means no active MPI session; the second usually means a
+manual-broadcast/profile script started without loading the required
+\texttt{.Rprofile}.
 
 \begin{enumerate}
 
 \item For interactive sessions, call
   \texttt{npRmpi.init(mode="spawn", nslaves=...)} first.
 
-\item For batch jobs launched with \texttt{mpiexec -n ...},
-  call \texttt{npRmpi.init(mode="attach")} near the top of your script.
-  This replaces the legacy external profile bootstrap workflow.
+\item For batch jobs launched with \texttt{mpiexec -n ...} and
+  auto-dispatch scripts, call \texttt{npRmpi.init(mode="attach")} near
+  the top of your script and launch with
+  \texttt{Rscript --no-save} (or \texttt{R CMD BATCH --no-save}).
+
+\item For manual-broadcast/profile scripts (explicit
+  \texttt{mpi.bcast.cmd(...)} calls), set
+  \texttt{R\_PROFILE\_USER=<path-to-.Rprofile>} and clear
+  \texttt{R\_PROFILE}. Launch with
+  \texttt{R CMD BATCH --no-save} and do not use
+  \texttt{R CMD BATCH --vanilla}.
 
 \item Enable auto-dispatch if desired with
   \texttt{options(npRmpi.autodispatch=TRUE, np.messages=FALSE)}.

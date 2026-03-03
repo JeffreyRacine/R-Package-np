@@ -64,9 +64,21 @@ npRmpi.session.info(comm = 1)
   bootstrap profile file required).
 }
 
-For cluster/batch jobs, run scripts directly under MPI, e.g.
-\code{mpiexec -n 128 Rscript foo.R}, and call
-\code{npRmpi.init(mode="attach")} inside \code{foo.R}.
+Mode quick-start guidance:
+\enumerate{
+  \item \strong{Session mode (\code{mode="spawn"})}: single R process
+  spawns workers. Typical launch: \code{Rscript foo.R} or
+  \code{R CMD BATCH --no-save foo.R}. Call \code{npRmpi.init(nslaves=...)}
+  in the script.
+  \item \strong{Attach mode (\code{mode="attach"})}: launch under
+  \code{mpiexec} and call \code{npRmpi.init(mode="attach")} inside the
+  script. Typical launch: \code{mpiexec -n <ranks> Rscript --no-save foo.R}
+  (or \code{R CMD BATCH --no-save}).
+  \item \strong{Profile/manual-broadcast mode}: launch under
+  \code{mpiexec} with \code{inst/Rprofile} and explicit
+  \code{mpi.bcast.*} calls. Use
+  \code{R CMD BATCH --no-save} (not \code{--vanilla}).
+}
 
 \strong{Performance note.} Wall-clock can differ across workflows even for
 identical statistical output. The main drivers are MPI message passing and
@@ -74,7 +86,8 @@ startup/teardown behavior:
 \enumerate{
   \item \code{mpiexec + attach + manual mpi.bcast.*} often has the lowest
   messaging overhead for small/moderate jobs.
-  \item \code{R CMD BATCH + npRmpi.init(mode="spawn")} is simpler to use but
+  \item Using \code{R CMD BATCH --no-save} with
+  \code{npRmpi.init(mode="spawn")} is simpler to use but
   may pay additional broadcast/setup overhead, especially when many slaves are
   used on small \code{n}.
   \item As \code{n} grows, compute usually dominates fixed messaging costs and
@@ -93,8 +106,14 @@ startup/teardown behavior:
 
 Template startup profile for manual-broadcast attach workflows is provided at
 \code{inst/Rprofile}. Copy it to the job working directory (or set
-\code{R_PROFILE} to that file) when using \code{mpiexec -n ... R CMD BATCH ...}
+\code{R_PROFILE_USER} to that file) when using
+\code{mpiexec -n ... R CMD BATCH --no-save ...}
 with explicit \code{mpi.bcast.cmd()} and \code{mpi.bcast.Robj2slave()} calls.
+Do not use \code{R CMD BATCH --vanilla} for this route, because \code{--vanilla}
+disables reading startup profiles and the manual-broadcast worker loop will not
+be initialized from \code{.Rprofile}. Also avoid setting both \code{R_PROFILE}
+and \code{R_PROFILE_USER} to the same file; this is treated as a startup
+misconfiguration and fails fast.
 
 Minimal comparison script (three patterns) follows:
 \preformatted{
@@ -124,8 +143,10 @@ if (is.master) {
 }
 
 ## CASE 3: performance-oriented attach mode with manual broadcast (.Rprofile)
-## run: mpiexec -n 6 R CMD BATCH --no-save script_attach_manual.R
-## requires: .Rprofile from inst/Rprofile in working dir (or R_PROFILE set)
+## run: mpiexec -env R_PROFILE_USER ../.Rprofile -env R_PROFILE '' \
+##              -n 6 R CMD BATCH --no-save script_attach_manual.R
+## requires: .Rprofile from inst/Rprofile in working dir (or R_PROFILE_USER set)
+## do not use: R CMD BATCH --vanilla (skips .Rprofile)
 mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)
 mpi.bcast.cmd(library(MASS), caller.execute=TRUE)
 mpi.bcast.cmd(set.seed(42), caller.execute=TRUE)
