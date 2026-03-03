@@ -60,6 +60,27 @@ Post-closeout instrumentation note (2026-03-03):
    - prioritize lower-level MPI command/broadcast overhead investigation or method-specific compute kernels;
    - avoid further threshold-only tuning in `np.autodispatch.R` unless new evidence shows method-family-specific wins under familywise gates.
 
+Post-closeout micro-tranche: cleanup roundtrip removal (2026-03-03):
+
+1. Runtime patch (single risk axis):
+   - `R/np.autodispatch.R`
+   - removed redundant success-path `.npRmpi_autodispatch_cleanup(...)` broadcast call;
+   - retained existing `on.exit` cleanup guard for error paths.
+2. Session `times=100` confirm (`/tmp/nocleanuproundtrip_confirm100_ext_20260303_120235`):
+   - all 8 methods improved with favorable Bonferroni-adjusted paired tests.
+   - mean speedups (`%`): `npreg_lp +13.67`, `npreg_ll +12.10`, `npudens +11.47`, `npudist +22.08`,
+     `npcdens +22.68`, `npcdist +21.53`, `npplreg +2.43`, `plot_boot +16.38`.
+3. Attach `times=100` confirm (`/tmp/nocleanuproundtrip_attach_confirm100_ext_20260303_125746`):
+   - all 8 methods improved with favorable Bonferroni-adjusted paired tests.
+   - mean speedups (`%`): `npreg_lp +15.98`, `npreg_ll +15.18`, `npudens +18.01`, `npudist +27.98`,
+     `npcdens +23.96`, `npcdist +25.25`, `npplreg +3.40`, `plot_boot +15.84`.
+4. Route/numerical gates:
+   - route validators passed (`MANUAL_BCAST_ROUTE_OK`, `ATTACH_ROUTE_OK`, `PROFILE_ROUTE_OK`);
+   - metric parity snapshot passed (no drift on checked outputs; timing fields excluded where expected);
+   - full demo sweep passed (`NP=2`, `n=100`): serial `25/25`, attach `25/25`, profile `25/25`.
+5. Regression-test note:
+   - focused routing/autodispatch tests passed except `test-bcast-sync-contract.R` failure that reproduces on baseline (non-regression).
+
 ## 1) Candid Assessment
 
 You are right: the session/attach speed-equality objective was not met in the latest tranche.  

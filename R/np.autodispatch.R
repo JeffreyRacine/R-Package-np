@@ -703,11 +703,8 @@
 
   result <- rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
                      note = "mpi.bcast.cmd.execute")
-  if (length(prepared$tmpnames)) {
-    rec.comm(.npRmpi_autodispatch_cleanup(prepared$tmpnames, comm = comm),
-             note = "autodispatch.cleanup")
+  if (length(prepared$tmpnames))
     cleaned <- TRUE
-  }
   tmpreplace <- c(prepared$tmpvals, prepared$prepublish)
   rec <- make.rec()
 
