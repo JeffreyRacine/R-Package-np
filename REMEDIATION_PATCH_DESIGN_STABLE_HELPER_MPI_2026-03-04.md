@@ -1,5 +1,13 @@
 # Remediation Patch Design: Parallelize Stable CVLS Helper Under SPMD (2026-03-04)
 
+## Status update (2026-03-04, superseding helper-parallelization intent)
+1. `np_reg_cv_ls_stable_ll_glp` is currently absent in both repos (`np-master`, `np-npRmpi`).
+2. No active call sites route through a stable-helper CVLS path in current `src/jksum.c`.
+3. Therefore, a helper-parallelization code tranche is not currently actionable.
+4. This document now serves as:
+   - historical rationale for why helper-parallelization had been considered,
+   - active guidance for adjacent low-risk remediation (dead-scaffold cull + modernization checks + route gates).
+
 ## Scope
 Target only the CVLS stable-helper path used by LL/LC/LP in `npRmpi`:
 - `src/jksum.c`: `np_reg_cv_ls_stable_ll_glp(...)`
@@ -16,15 +24,10 @@ Session mode is now SPMD-orchestrated, so rank-symmetric collective entry is enf
 The helper remains active and currently runs as per-rank serial work (with inner kernel call using `suppress_parallel=1`).
 
 ## Current state (verified)
-1. Stable helper exists in both repos:
-   - `npRmpi`: `src/jksum.c:7484`
-   - `np`: `src/jksum.c:7484`
-2. `npRmpi` call sites still route to stable helper for CVLS LL/LC/LP:
-   - `src/jksum.c:7922`
-   - `src/jksum.c:8616`
-3. Helper currently calls `kernel_weighted_sum_np_ctx(..., suppress_parallel=1, ...)` (no inner collectives).
-4. `finish_cv_path` in the regression CV function does **not** apply MPI reduction; helper return is consumed directly then normalized.
-5. Large-memory kernel-weight path:
+1. Stable helper symbol/call path is absent in current heads of both repos.
+2. Dead scaffolding cull completed for unused `.npRmpi_spmd_next_seq` in `np-npRmpi/R/np.autodispatch.R`.
+3. Runtime `nslaves=0` remains rejected in `npRmpi.init` (active contract); only legacy positive-integer guard remains in `R/Rcomm.R::mpi.comm.spawn`.
+4. Large-memory kernel-weight path:
    - `return.kernel.weights=TRUE` allocates `n.train * n.eval` storage.
    - In dominant plot/bootstrap usage, `n.eval` is typically fixed/small (often ~100), so growth is effectively linear in `n.train` for fixed evaluation grids.
    - This path is not the same class of risk as unrestricted `O(n^2)` over `n.train * n.train`.
@@ -139,8 +142,8 @@ If introducing a second symbol (e.g., `_spmd` variant), route both current call 
 1. Add explicit comments/tests around `return.kernel.weights=TRUE` memory shape (`n.train * n.eval`) so behavior is intentional and discoverable.
 2. Add targeted memory-smoke scripts for representative plot/bootstrap sizes to catch accidental shape explosions.
 
-### Medium ROI / medium risk (separate tranche, gated)
-1. Parallelize stable helper outer `j` loop under MPI (`Allreduce` contract), keeping inner kernel call `suppress_parallel=1`.
+### Medium ROI / medium risk (separate tranche, gated; currently N/A)
+1. Helper outer-loop parallelization is deferred unless a stable-helper path is intentionally reintroduced.
 
 ### Lower ROI / higher risk (defer)
 1. Broad helper rewrites or redesign of plot/bootstrap allocation behavior in this same patch.
@@ -211,12 +214,12 @@ Recommended order:
 ## Execution intent (no-breakage sequence)
 1. First tranche: dead-code cull only (`.npRmpi_spmd_next_seq`, residual `nslaves==0` scaffolding), no behavior changes.
 2. Validate with full gate pack (serial + session + attach + profile/manual, plus existing smoke/tests).
-3. Second tranche: stable-helper MPI outer-loop patch only (no math/API changes).
-4. Re-run parity + performance + route gates; rollback immediately on any regression/hang.
-5. Third tranche: documentation/modernization closure updates and artifact capture.
+3. Second tranche: modernization micro-sweep on touched files only (no estimator/CV algorithm changes).
+4. Re-run parity + route gates; rollback immediately on any regression/hang.
+5. Third tranche: documentation closure updates and artifact capture.
 
 ## Intended next actions (explicit)
-1. Start with static proof and removal patch for `.npRmpi_spmd_next_seq` and any residual `nslaves==0` branches in `np-npRmpi`.
-2. Run route-smoke + contract tests immediately after that cull before touching `src/jksum.c`.
-3. Apply the helper outer-loop MPI tranche in isolation, with strict collective-order assertions and no inner-kernel parallel changes.
-4. Run full gate pack and only then perform Wickham micro-cleanups on touched files.
+1. Preserve helper-absence invariant unless explicitly requested to reintroduce a helper path.
+2. Keep route-smoke + contract tests mandatory after any runtime/lifecycle cull.
+3. Continue Wickham micro-cleanups in isolated tranches with no behavior/default drift.
+4. Use full gate-pack evidence before marking the remediation stream complete.
