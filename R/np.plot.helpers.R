@@ -202,11 +202,11 @@
 }
 
 .np_plot_inid_fastpath_enabled <- function() {
-  !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
+  TRUE
 }
 
 .np_plot_block_fastpath_enabled <- function() {
-  !isTRUE(getOption("np.plot.block.fastpath.disable", FALSE))
+  TRUE
 }
 
 .np_plot_require_bws <- function(bws, where) {
@@ -1995,9 +1995,9 @@ compute.bootstrap.errors.rbandwidth =
       identical(bws$type, "fixed")
 
     if (is.inid && !isTRUE(inid.helper.ok))
-      stop("inid bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", call. = FALSE)
+      stop("inid bootstrap requires helper mode with gradients=FALSE and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", call. = FALSE)
     if (is.block && !isTRUE(block.helper.ok))
-      stop(sprintf("%s bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
+      stop(sprintf("%s bootstrap requires helper mode with gradients=FALSE and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
 
     if ((is.inid && isTRUE(inid.helper.ok)) || (is.block && isTRUE(block.helper.ok))) {
       counts.drawer <- if (is.block) {
@@ -2157,7 +2157,7 @@ compute.bootstrap.errors.scbandwidth =
 
     if (is.inid) {
       if (!isTRUE(.np_plot_inid_fastpath_enabled()))
-        stop("inid bootstrap requires fastpath-enabled helper for smooth coefficient plots", call. = FALSE)
+        stop("inid bootstrap requires helper mode for smooth coefficient plots", call. = FALSE)
       if (isTRUE(gradients))
         stop("inid bootstrap for smooth coefficient gradients is not supported in helper mode", call. = FALSE)
       boot.out <- tryCatch(
@@ -2180,7 +2180,7 @@ compute.bootstrap.errors.scbandwidth =
     }
     if (is.null(boot.out) && is.block) {
       if (!isTRUE(.np_plot_block_fastpath_enabled()))
-        stop("fixed/geom bootstrap requires fastpath-enabled helper for smooth coefficient plots", call. = FALSE)
+        stop("fixed/geom bootstrap requires helper mode for smooth coefficient plots", call. = FALSE)
       if (isTRUE(gradients))
         stop("fixed/geom bootstrap for smooth coefficient gradients is not supported in helper mode", call. = FALSE)
       counts.drawer <- .np_block_counts_drawer(
@@ -2363,7 +2363,7 @@ compute.bootstrap.errors.plbandwidth =
       boot.out <- NULL
       if (is.inid) {
         if (!isTRUE(.np_plot_inid_fastpath_enabled()))
-          stop("inid bootstrap requires fastpath-enabled helper for partially linear plots", call. = FALSE)
+          stop("inid bootstrap requires helper mode for partially linear plots", call. = FALSE)
         boot.out <- tryCatch(
           .np_inid_boot_from_plreg(
             txdat = xdat,
@@ -2382,7 +2382,7 @@ compute.bootstrap.errors.plbandwidth =
         )
       } else if (is.block) {
         if (!isTRUE(.np_plot_block_fastpath_enabled()))
-          stop("fixed/geom bootstrap requires fastpath-enabled helper for partially linear plots", call. = FALSE)
+          stop("fixed/geom bootstrap requires helper mode for partially linear plots", call. = FALSE)
         counts.drawer <- .np_block_counts_drawer(
           n = nrow(xdat),
           B = plot.errors.boot.num,
@@ -3165,7 +3165,7 @@ compute.bootstrap.errors.sibandwidth =
         !isTRUE(gradients) &&
         identical(bws$type, "fixed")
       if (!isTRUE(inid.helper.ok)) {
-        stop("inid bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.sibandwidth", call. = FALSE)
+        stop("inid bootstrap requires helper mode with gradients=FALSE and bws$type='fixed' in compute.bootstrap.errors.sibandwidth", call. = FALSE)
       } else {
       boot.out <- tryCatch({
         tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
@@ -3188,7 +3188,7 @@ compute.bootstrap.errors.sibandwidth =
         !isTRUE(gradients) &&
         identical(bws$type, "fixed")
       if (!isTRUE(block.helper.ok)) {
-        stop(sprintf("%s bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.sibandwidth", plot.errors.boot.method), call. = FALSE)
+        stop(sprintf("%s bootstrap requires helper mode with gradients=FALSE and bws$type='fixed' in compute.bootstrap.errors.sibandwidth", plot.errors.boot.method), call. = FALSE)
       } else {
         boot.out <- tryCatch({
           tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))

@@ -161,7 +161,7 @@ test_that("npplreg inid fast path matches explicit resample refits", {
   expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-7)
 })
 
-test_that("inid lc plot bootstrap requires fast path enabled", {
+test_that("inid lc plot bootstrap fails fast for unsupported gradients", {
   skip_if_not_installed("np")
 
   set.seed(322)
@@ -170,16 +170,13 @@ test_that("inid lc plot bootstrap requires fast path enabled", {
   y <- sin(2 * pi * x) + rnorm(n, sd = 0.15)
   bw <- npregbw(y ~ x, regtype = "lc", nmulti = 1)
 
-  run_plot <- function(disable) {
-    old <- getOption("np.plot.inid.fastpath.disable")
-    on.exit(options(np.plot.inid.fastpath.disable = old), add = TRUE)
-    options(np.plot.inid.fastpath.disable = disable)
-
+  run_plot <- function(gradients) {
     suppressWarnings(
       plot(
         bw,
         plot.behavior = "data",
         perspective = FALSE,
+        gradients = gradients,
         plot.errors.method = "bootstrap",
         plot.errors.boot.method = "inid",
         plot.errors.boot.num = 9
@@ -188,14 +185,15 @@ test_that("inid lc plot bootstrap requires fast path enabled", {
   }
 
   set.seed(9322)
-  out.fast <- run_plot(disable = FALSE)
+  out.fast <- run_plot(gradients = FALSE)
 
   expect_type(out.fast, "list")
   expect_true(length(out.fast) > 0)
 
   expect_error(
-    run_plot(disable = TRUE),
-    "inid bootstrap requires helper mode with fastpath enabled"
+    run_plot(gradients = TRUE),
+    "inid bootstrap requires helper mode with gradients=FALSE and bws$type='fixed'",
+    fixed = TRUE
   )
 })
 
@@ -375,7 +373,7 @@ test_that("npindex plot bootstrap inid supports ll/lp basis variants", {
   }
 })
 
-test_that("npindex plot bootstrap inid requires fast path enabled", {
+test_that("npindex plot bootstrap inid fails fast for unsupported gradients", {
   skip_if_not_installed("np")
 
   set.seed(32321)
@@ -386,10 +384,6 @@ test_that("npindex plot bootstrap inid requires fast path enabled", {
   tx <- data.frame(x1 = x1, x2 = x2)
   bw <- npindexbw(xdat = tx, ydat = y, bws = c(1, 1, 0.25), bandwidth.compute = FALSE)
 
-  old <- getOption("np.plot.inid.fastpath.disable")
-  on.exit(options(np.plot.inid.fastpath.disable = old), add = TRUE)
-  options(np.plot.inid.fastpath.disable = TRUE)
-
   expect_error(
     suppressWarnings(
       plot(
@@ -398,12 +392,14 @@ test_that("npindex plot bootstrap inid requires fast path enabled", {
         ydat = y,
         plot.behavior = "data",
         perspective = FALSE,
+        gradients = TRUE,
         plot.errors.method = "bootstrap",
         plot.errors.boot.method = "inid",
         plot.errors.boot.num = 7
       )
     ),
-    "inid bootstrap requires helper mode with fastpath enabled"
+    "inid bootstrap requires helper mode with gradients=FALSE and bws$type='fixed'",
+    fixed = TRUE
   )
 })
 
