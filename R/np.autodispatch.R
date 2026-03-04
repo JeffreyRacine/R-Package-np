@@ -1046,6 +1046,28 @@
   stop(conditionMessage(val), call. = FALSE)
 }
 
+.npRmpi_autodispatch_lookup_named_arg <- function(argname, caller_env) {
+  if (!is.character(argname) || length(argname) != 1L || is.na(argname) || !nzchar(argname))
+    return(NULL)
+
+  not_found <- new.env(parent = emptyenv())
+  val <- tryCatch(get0(argname, envir = caller_env, inherits = FALSE, ifnotfound = not_found),
+                  error = function(e) not_found)
+  if (!identical(val, not_found))
+    return(val)
+
+  frames <- sys.frames()
+  for (i in rev(seq_along(frames))) {
+    env_i <- frames[[i]]
+    val_i <- tryCatch(get0(argname, envir = env_i, inherits = FALSE, ifnotfound = not_found),
+                      error = function(e) not_found)
+    if (!identical(val_i, not_found))
+      return(val_i)
+  }
+
+  NULL
+}
+
 .npRmpi_autodispatch_materialize_call <- function(mc, caller_env, comm = 1L) {
   arg.list <- as.list(mc)
   nms <- names(arg.list)
@@ -1118,8 +1140,19 @@
     not_found <- new.env(parent = emptyenv())
     val <- tryCatch(get0(nm, envir = caller_env, inherits = FALSE, ifnotfound = not_found),
                     error = function(e) not_found)
-    if (identical(val, not_found))
-      val <- .npRmpi_autodispatch_eval_arg(arg.list[[i]], caller_env = caller_env)
+    if (identical(val, not_found)) {
+      expr_i <- arg.list[[i]]
+      # Nested S3/generic forwarding can emit placeholders like `..1` in
+      # match.call() output. Resolve these using the named formal from dynamic
+      # frames before falling back to raw expression evaluation.
+      if (is.symbol(expr_i) && grepl("^\\.\\.[0-9]+$", as.character(expr_i))) {
+        val <- .npRmpi_autodispatch_lookup_named_arg(nm, caller_env = caller_env)
+        if (is.null(val))
+          val <- .npRmpi_autodispatch_eval_arg(expr_i, caller_env = caller_env)
+      } else {
+        val <- .npRmpi_autodispatch_eval_arg(expr_i, caller_env = caller_env)
+      }
+    }
     ref <- .npRmpi_autodispatch_remote_ref(val)
     # `bws` objects can be post-processed locally (e.g. formula methods
     # rewriting call/formula metadata). Reusing a stale remote reference can
