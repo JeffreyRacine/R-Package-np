@@ -240,3 +240,9 @@ Recommended order:
 5. Tranche-2 validation artifact root:
    - `/tmp/spmd_tranche2_modsweep_20260304_103653`
    - tokens: `SESSION_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `RCOMM_FAILNZ=0`, `NPSIGTEST_FAILNZ=0`, `ORPHAN_PRE_EMPTY=1`, `ORPHAN_POST_EMPTY=1`.
+6. Completed modernization-tooling tranche:
+   - added scan harness `issue_notes/run_modernization_micro_scan.sh` (shellcheck-clean),
+   - generates Wickham-aligned static inventory for R-layer hygiene, stale-branch checks, and helper-symbol presence.
+7. Tranche-3 scan artifact root:
+   - `/tmp/spmd_tranche3_modscan_20260304_104115`
+   - summary highlights: `scan_demo_masking=0`, `scan_dotC=0`, `scan_manual_distributed_call=0`, `scan_stable_helper_symbol=0`, `scan_nslaves_zero_runtime=1` (expected guard in `R/Rcomm.R`), `scan_nslaves_zero_tests=2` (expected rejection coverage).

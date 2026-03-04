@@ -58,6 +58,7 @@ Completed checkpoint tranches:
 48. Final-anchor closure reruns complete with explicit final-tag verification: `/tmp/spmd_canonical_20260304_0001/phase59_manifest_verify_finalanchor_20260304_020248` (`CLOSURE_MANIFEST_VERIFY_OK`) and `/tmp/spmd_canonical_20260304_0001/phase60_full_audit_finalanchor_20260304_020249` (`SPMD_CLOSURE_FULL_AUDIT_OK`).
 49. Post-closeout maintenance tranche-1 completed: unreachable `.npRmpi_spmd_next_seq` removed; route-gated validation recorded in `/tmp/spmd_tranche1_deadscaffold_20260304_103024`.
 50. Post-closeout maintenance tranche-2 completed: `mpi.comm.spawn` scalar positive-integer `nslaves` hardening plus new contract test (`test-rcomm-arg-contract.R`), with route-gated validation in `/tmp/spmd_tranche2_modsweep_20260304_103653`.
+51. Post-closeout maintenance tranche-3 completed: modernization micro-scan harness added (`issue_notes/run_modernization_micro_scan.sh`, shellcheck-clean) with inventory artifact `/tmp/spmd_tranche3_modscan_20260304_104115`.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -84,6 +85,7 @@ Latest checkpoint commits:
 22. `795f34a` (add deterministic local as-cran harness script and record phase-30 closeout)
 23. `635ddbb` (post-closeout maintenance tranche-1 dead-scaffold cull + remediation-doc refinement)
 24. `bc6cbe9` (post-closeout maintenance tranche-2 `mpi.comm.spawn` contract hardening + tests)
+25. post-closeout maintenance tranche-3 (modernization micro-scan harness + doc ledger update)
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
@@ -131,6 +133,7 @@ Latest artifact roots:
 43. `/tmp/spmd_canonical_20260304_0001/phase60_full_audit_finalanchor_20260304_020249`
 44. `/tmp/spmd_tranche1_deadscaffold_20260304_103024`
 45. `/tmp/spmd_tranche2_modsweep_20260304_103653`
+46. `/tmp/spmd_tranche3_modscan_20260304_104115`
 
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:
