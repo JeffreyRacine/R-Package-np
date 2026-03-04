@@ -67,7 +67,7 @@ mpi.comm.spawn <- function(slave,
             info=0,
             root=0, 
             intercomm=2,
-			quiet=FALSE){
+				quiet=FALSE){
         if (!is.loaded("mpi_comm_spawn"))
             stop("MPI_Comm_spawn is not supported.")
 
@@ -78,7 +78,8 @@ mpi.comm.spawn <- function(slave,
     #                    mpi.universe.size(),": maximum CPUs.")
     #            warning(tmp)
     #    }
-    else if (nslaves <= 0)
+    if (!is.numeric(nslaves) || length(nslaves) != 1L || is.na(nslaves) ||
+        !is.finite(nslaves) || nslaves != floor(nslaves) || nslaves <= 0)
         stop("Choose a positive number of slaves.")
     .Call("mpi_comm_spawn",
                 as.character(slave),

@@ -234,3 +234,9 @@ Recommended order:
 3. Checkpoint commits:
    - `635ddbb` (dead-scaffold cull + remediation-doc updates),
    - `c950f14` (status correction: helper-parallelization tranche marked N/A on current heads).
+4. Completed modernization micro-sweep tranche:
+   - hardened `R/Rcomm.R::mpi.comm.spawn` `nslaves` validation to require scalar positive integer while preserving existing error text (`\"Choose a positive number of slaves.\"`),
+   - added coverage in `tests/testthat/test-rcomm-arg-contract.R` for invalid `nslaves` forms (`0`, `NA`, vector length > 1, non-integer).
+5. Tranche-2 validation artifact root:
+   - `/tmp/spmd_tranche2_modsweep_20260304_103653`
+   - tokens: `SESSION_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `RCOMM_FAILNZ=0`, `NPSIGTEST_FAILNZ=0`, `ORPHAN_PRE_EMPTY=1`, `ORPHAN_POST_EMPTY=1`.
