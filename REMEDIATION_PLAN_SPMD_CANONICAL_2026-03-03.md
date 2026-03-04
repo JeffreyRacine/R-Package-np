@@ -42,6 +42,11 @@ Core family coverage for this plan:
 7. `npindex*`
 8. `npplreg*`
 
+Important scope clarification:
+1. The core-family list is a migration priority list, not an allowlist.
+2. All exported `npRmpi` functions (including non-core families such as `npsigtest`, `npsymtest`, `npcopula`) are expected to run.
+3. Non-core families are currently supported under the same runtime contract and are migrated to typed locked opcodes in Phase 6.
+
 ## Non-Negotiable Invariants
 1. No silent serial fallback when MPI route is selected.
 2. No runtime `np::` bridge from `npRmpi`.
