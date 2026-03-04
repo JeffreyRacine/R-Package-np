@@ -65,3 +65,34 @@ test_that("SPMD tiny smoke opcode runs in session mode subprocess", {
   expect_true(any(grepl("SPMD_TINY_SESSION_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
+
+test_that("SPMD opcode selection tags npregbw LL/LP CV routes", {
+  opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
+
+  mc.cv <- quote(npregbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ls"))
+  op.cv <- opcode.fun(mc = mc.cv, caller_env = environment())
+  expect_identical(op.cv, "autodispatch.npregbw.cv_lllp")
+
+  mc.noncv <- quote(npregbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls"))
+  op.noncv <- opcode.fun(mc = mc.noncv, caller_env = environment())
+  expect_identical(op.noncv, "autodispatch.npregbw")
+})
+
+test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
+  make.env <- getFromNamespace(".npRmpi_spmd_make_envelope", "npRmpi")
+  try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")
+  set.seq <- getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")
+
+  old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
+  on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
+  set.seq(0L)
+
+  env <- make.env(opcode = "autodispatch.unit_test", timeout_class = "unit")
+  payload <- list(call = quote(1 + 1))
+  ans <- try.exec(envelope = env, payload = payload, where = "unit test")
+
+  expect_true(is.list(ans) && isTRUE(ans$ok))
+  expect_identical(ans$ack$status, "ACK")
+  expect_identical(ans$ack$opcode, "autodispatch.unit_test")
+  expect_identical(ans$result, 2)
+})

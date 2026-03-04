@@ -314,9 +314,65 @@
   invisible(TRUE)
 }
 
+.npRmpi_spmd_eval_payload <- function(payload, envelope) {
+  if (!is.list(payload))
+    stop("SPMD payload must be a list", call. = FALSE)
+
+  call.obj <- payload$call
+  if (!(is.call(call.obj) || is.expression(call.obj)))
+    stop("SPMD payload missing executable call object", call. = FALSE)
+
+  opt.keys <- payload$opt.keys
+  opt.vals <- payload$opt.vals
+  opt.verify <- isTRUE(payload$opt.verify)
+  tmpvals <- payload$tmpvals
+  tmpnames <- payload$tmpnames
+  remote.name <- payload$remote.name
+
+  if (!is.null(opt.keys) && length(opt.keys)) {
+    for (i in seq_along(opt.keys))
+      options(structure(list(opt.vals[[i]]), names = opt.keys[[i]]))
+    if (opt.verify) {
+      for (i in seq_along(opt.keys)) {
+        lval <- getOption(opt.keys[[i]])
+        if (!identical(lval, opt.vals[[i]]))
+          stop(sprintf("failed to synchronize option '%s' across MPI ranks", opt.keys[[i]]), call. = FALSE)
+      }
+    }
+  }
+
+  if (!is.null(tmpvals) && length(tmpvals)) {
+    for (nm in names(tmpvals))
+      .GlobalEnv[[nm]] <- tmpvals[[nm]]
+  }
+
+  old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  options(npRmpi.autodispatch.context = TRUE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  if (!is.null(tmpnames) && length(tmpnames))
+    on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(tmpnames, envir = .GlobalEnv), add = TRUE)
+
+  res <- .npRmpi_eval_scmd(call.obj, envir = .GlobalEnv)
+  if (is.character(remote.name) && length(remote.name) == 1L && nzchar(remote.name))
+    .GlobalEnv[[remote.name]] <- res
+  res
+}
+
 .npRmpi_spmd_get_opcode <- function(opcode) {
-  if (!exists(opcode, envir = .npRmpi_spmd_registry, inherits = FALSE))
-    stop(sprintf("SPMD opcode '%s' is not registered", opcode), call. = FALSE)
+  if (!exists(opcode, envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    if (is.character(opcode) && length(opcode) == 1L &&
+        startsWith(opcode, "autodispatch.")) {
+      .npRmpi_spmd_register_opcode(
+        opcode,
+        function(payload, envelope) .npRmpi_spmd_eval_payload(payload = payload, envelope = envelope)
+      )
+    } else {
+      stop(sprintf("SPMD opcode '%s' is not registered", opcode), call. = FALSE)
+    }
+  }
   get(opcode, envir = .npRmpi_spmd_registry, inherits = FALSE)
 }
 
@@ -395,6 +451,43 @@
     payload = list(label = as.character(label)[1L], comm = as.integer(comm)),
     where = "SPMD tiny smoke"
   )
+}
+
+.npRmpi_autodispatch_eval_char_arg <- function(mc, caller_env, argname) {
+  arg.list <- as.list(mc)
+  nms <- names(arg.list)
+  if (is.null(nms) || !any(nms == argname))
+    return(NULL)
+  idx <- which(nms == argname)[1L]
+  val <- tryCatch(.npRmpi_autodispatch_eval_arg(arg.list[[idx]], caller_env = caller_env),
+                  error = function(e) NULL)
+  if (is.null(val))
+    return(NULL)
+  val <- as.character(val)
+  if (!length(val) || is.na(val[[1L]]) || !nzchar(val[[1L]]))
+    return(NULL)
+  tolower(val[[1L]])
+}
+
+.npRmpi_autodispatch_is_npregbw_lllp_cv <- function(mc, caller_env) {
+  call.name <- .npRmpi_autodispatch_call_name(mc)
+  if (!identical(call.name, "npregbw"))
+    return(FALSE)
+
+  regtype <- .npRmpi_autodispatch_eval_char_arg(mc, caller_env, "regtype")
+  bwmethod <- .npRmpi_autodispatch_eval_char_arg(mc, caller_env, "bwmethod")
+  if (is.null(regtype) || is.null(bwmethod))
+    return(FALSE)
+
+  regtype %in% c("ll", "lp") && bwmethod %in% c("cv.ls", "cv.aic")
+}
+
+.npRmpi_spmd_opcode_from_call <- function(mc, caller_env) {
+  if (.npRmpi_autodispatch_is_npregbw_lllp_cv(mc = mc, caller_env = caller_env))
+    return("autodispatch.npregbw.cv_lllp")
+
+  call.name <- .npRmpi_autodispatch_call_name(mc)
+  paste0("autodispatch.", gsub("[^A-Za-z0-9_]+", "_", call.name))
 }
 
 .npRmpi_autodispatch_preflight <- function(comm = 1L) {
@@ -834,44 +927,44 @@
   }
   opt.verify <- opt.sync && isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))
   remote.name <- .npRmpi_autodispatch_next_remote_name()
+  opcode <- .npRmpi_spmd_opcode_from_call(mc = mc, caller_env = caller_env)
+  timeout.class <- if (identical(opcode, "autodispatch.npregbw.cv_lllp")) "cv-regression" else "default"
+  envelope <- .npRmpi_spmd_make_envelope(
+    opcode = opcode,
+    args_ref = prepared$tmpnames,
+    timeout_class = timeout.class
+  )
+  payload <- list(
+    call = prepared$call,
+    tmpvals = prepared$tmpvals,
+    tmpnames = prepared$tmpnames,
+    opt.keys = opt.keys,
+    opt.vals = opt.vals,
+    opt.verify = opt.verify,
+    remote.name = remote.name
+  )
 
   cmd <- substitute({
-    for (i in seq_along(OPT_KEYS))
-      options(structure(list(OPT_VALS[[i]]), names = OPT_KEYS[[i]]))
-
-    if (OPT_VERIFY) {
-      for (i in seq_along(OPT_KEYS)) {
-        lval <- getOption(OPT_KEYS[[i]])
-        if (!identical(lval, OPT_VALS[[i]]))
-          stop(sprintf("failed to synchronize option '%s' across MPI ranks", OPT_KEYS[[i]]))
-      }
+    exec.try <- get(".npRmpi_spmd_try_execute_local", envir = asNamespace("npRmpi"), inherits = FALSE)
+    ans <- exec.try(
+      envelope = ENVELOPE,
+      payload = PAYLOAD,
+      where = WHERE
+    )
+    if (!isTRUE(ans$ok)) {
+      ack <- ans$ack
+      stop(
+        sprintf("SPMD dispatch failed [opcode=%s seq_id=%s]: %s",
+                as.character(ack$opcode)[1L],
+                as.integer(ack$seq_id),
+                as.character(ans$error)[1L]),
+        call. = FALSE
+      )
     }
-
-    tmpvals <- TMPVALS
-    if (length(tmpvals)) {
-      for (nm in names(tmpvals))
-        .GlobalEnv[[nm]] <- tmpvals[[nm]]
-    }
-
-    old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
-    old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
-    options(npRmpi.autodispatch.context = TRUE)
-    options(npRmpi.autodispatch.disable = TRUE)
-    on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
-    on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
-    if (length(TMP_NAMES))
-      on.exit(get(".npRmpi_rm_existing", envir = asNamespace("npRmpi"), inherits = FALSE)(TMP_NAMES, envir = .GlobalEnv), add = TRUE)
-
-    res <- CALL
-    .GlobalEnv[[REMOTE_NAME]] <- res
-    res
-  }, list(CALL = prepared$call,
-          TMPVALS = prepared$tmpvals,
-          TMP_NAMES = prepared$tmpnames,
-          OPT_KEYS = opt.keys,
-          OPT_VALS = opt.vals,
-          OPT_VERIFY = opt.verify,
-          REMOTE_NAME = remote.name))
+    ans$result
+  }, list(ENVELOPE = envelope,
+          PAYLOAD = payload,
+          WHERE = .npRmpi_autodispatch_call_name(mc)))
 
   result <- rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),
                      note = "mpi.bcast.cmd.execute")
