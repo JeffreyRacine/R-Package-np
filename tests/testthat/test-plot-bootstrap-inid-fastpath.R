@@ -650,13 +650,15 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
 
   ubw <- npudensbw(dat = data.frame(x = x), bws = 0.5, bandwidth.compute = FALSE)
   expect_error(
-    plot(
-      ubw,
-      plot.behavior = "data",
-      perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 9
+    suppressWarnings(
+      plot(
+        ubw,
+        plot.behavior = "data",
+        perspective = FALSE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "wild",
+        plot.errors.boot.num = 9
+      )
     ),
     "not supported for unconditional density/distribution estimators"
   )
@@ -668,13 +670,15 @@ test_that("density/distribution plot bootstrap rejects wild selector", {
     bandwidth.compute = FALSE
   )
   expect_error(
-    plot(
-      cbw,
-      plot.behavior = "data",
-      perspective = FALSE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "wild",
-      plot.errors.boot.num = 9
+    suppressWarnings(
+      plot(
+        cbw,
+        plot.behavior = "data",
+        perspective = FALSE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "wild",
+        plot.errors.boot.num = 9
+      )
     ),
     "not supported for conditional density/distribution estimators"
   )
