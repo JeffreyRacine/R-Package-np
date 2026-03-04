@@ -284,3 +284,16 @@ Recommended order:
 19. Tranche-8 tooling validation artifact root:
    - `/tmp/spmd_tranche8_scanio_20260304_105725`
    - `shellcheck` clean; scan run confirms `out_dir=/tmp/spmd_tranche8_scanio_20260304_105725/scan` and `TRANCHE8_OK=1`.
+20. Completed plot-engine factor-classifier tranche:
+   - replaced `all.isFactor` builders from `sapply(..., is.factor)` to typed `vapply(..., logical(1))` in:
+     - `R/np.plot.engine.plbandwidth.R`
+     - `R/np.plot.engine.scbandwidth.R`
+     - `R/np.plot.engine.condbandwidth.R`
+     - `R/np.plot.engine.conbandwidth.R`
+   - includes removal of legacy `unlist(sapply(zdat, is.factor))` shape coercion in favor of direct typed vector output.
+21. Tranche-9 validation artifact root:
+   - `/tmp/spmd_tranche9_plot_vapply_20260304_110304`
+   - tokens: `ORPHAN_PRE_EMPTY=1`, `PLOT_AUTODISPATCH_FAILNZ=0`, `PLOT_GUARDRAILS_FAILNZ=0`, `PLOT_COEF_FAILNZ=0`, `PLOT_MPI_BOOT_FAILNZ=0`, `SESSION_PLOT_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `ORPHAN_POST_EMPTY=1`.
+22. Tranche-9 modernization scan:
+   - `/tmp/spmd_tranche9_plot_vapply_20260304_110304/modscan/summary.log`
+   - key delta: `scan_sapply=62` (down from `66`).
