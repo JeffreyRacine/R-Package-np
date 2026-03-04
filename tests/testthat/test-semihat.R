@@ -431,6 +431,183 @@ test_that("npindex and npindexhat support ll/lp basis variants", {
   }
 })
 
+test_that("semihat helper routes preserve LP and kernel-bound option contracts", {
+  set.seed(314161)
+  n <- 75
+  x1 <- runif(n)
+  x2 <- runif(n)
+  z <- runif(n)
+  y <- sin(2 * pi * z) + 0.8 * x1 - 0.3 * x2 + rnorm(n, sd = 0.04)
+
+  tx <- data.frame(x1 = x1, x2 = x2)
+  tz <- data.frame(z = z)
+  ex <- tx[seq_len(25), , drop = FALSE]
+  ez <- tz[seq_len(25), , drop = FALSE]
+
+  sibw <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    bws = c(1, 1, 0.22),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "tensor",
+    degree = 2L,
+    bernstein.basis = TRUE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerorder = 2L,
+    ckerbound = "none"
+  )
+  expect_identical(sibw$regtype, "lp")
+  expect_identical(sibw$basis, "tensor")
+  expect_true(isTRUE(sibw$bernstein.basis))
+  expect_identical(sibw$ckerbound, "none")
+
+  si.fit <- npindex(
+    bws = sibw,
+    txdat = tx,
+    tydat = y,
+    exdat = ex,
+    gradients = FALSE
+  )
+  expect_true(all(is.finite(si.fit$mean)))
+  si.H <- npindexhat(
+    bws = sibw,
+    txdat = tx,
+    exdat = ex,
+    s = 0L,
+    output = "matrix"
+  )
+  si.apply <- npindexhat(
+    bws = sibw,
+    txdat = tx,
+    exdat = ex,
+    y = y,
+    s = 0L,
+    output = "apply"
+  )
+  expect_equal(as.vector(si.H %*% y), as.vector(si.apply), tolerance = 1e-10)
+
+  sibw.bad.bounds <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    bws = c(1, 1, 0.22),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "tensor",
+    degree = 2L,
+    bernstein.basis = TRUE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerorder = 2L,
+    ckerbound = "fixed",
+    ckerlb = 0.0,
+    ckerub = 1.0
+  )
+  expect_error(
+    npindexhat(
+      bws = sibw.bad.bounds,
+      txdat = tx,
+      exdat = ex,
+      s = 0L,
+      output = "matrix"
+    ),
+    "Invalid bounds for 'ckerbound'"
+  )
+
+  scbw <- npscoefbw(
+    xdat = tx[, 1, drop = FALSE],
+    zdat = tz,
+    ydat = y,
+    bws = 0.20,
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "tensor",
+    degree = 2L,
+    bernstein.basis = TRUE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerorder = 2L,
+    ckerbound = "fixed",
+    ckerlb = 0.0,
+    ckerub = 1.0
+  )
+  expect_identical(scbw$regtype, "lp")
+  expect_identical(scbw$basis, "tensor")
+  expect_true(isTRUE(scbw$bernstein.basis))
+  expect_identical(scbw$ckerbound, "fixed")
+
+  sc.fit <- npscoef(
+    bws = scbw,
+    txdat = tx[, 1, drop = FALSE],
+    tydat = y,
+    tzdat = tz,
+    exdat = ex[, 1, drop = FALSE],
+    ezdat = ez,
+    iterate = FALSE
+  )
+  sc.H <- npscoefhat(
+    bws = scbw,
+    txdat = tx[, 1, drop = FALSE],
+    tzdat = tz,
+    exdat = ex[, 1, drop = FALSE],
+    ezdat = ez,
+    output = "matrix",
+    iterate = FALSE
+  )
+  expect_equal(as.vector(sc.H %*% y), as.vector(sc.fit$mean), tolerance = 1e-8)
+
+  plbw <- npplregbw(
+    xdat = tx[, 1, drop = FALSE],
+    zdat = tz,
+    ydat = y,
+    bws = matrix(c(0.20, 0.20), nrow = 2, ncol = 1),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "tensor",
+    degree = 2L,
+    bernstein.basis = TRUE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerorder = 2L,
+    ckerbound = "fixed",
+    ckerlb = 0.0,
+    ckerub = 1.0
+  )
+  expect_identical(plbw$regtype, "lp")
+  expect_identical(plbw$basis, "tensor")
+  expect_true(isTRUE(plbw$bernstein.basis))
+  expect_identical(plbw$ckerbound, "fixed")
+
+  pl.fit <- npplreg(
+    bws = plbw,
+    txdat = tx[, 1, drop = FALSE],
+    tydat = y,
+    tzdat = tz,
+    exdat = ex[, 1, drop = FALSE],
+    ezdat = ez
+  )
+  pl.H <- npplreghat(
+    bws = plbw,
+    txdat = tx[, 1, drop = FALSE],
+    tzdat = tz,
+    exdat = ex[, 1, drop = FALSE],
+    ezdat = ez,
+    output = "matrix"
+  )
+  expect_true(all(is.finite(pl.fit$mean)))
+  pl.apply <- npplreghat(
+    bws = plbw,
+    txdat = tx[, 1, drop = FALSE],
+    tzdat = tz,
+    exdat = ex[, 1, drop = FALSE],
+    ezdat = ez,
+    y = y,
+    output = "apply"
+  )
+  expect_equal(as.vector(pl.H %*% y), as.vector(pl.apply), tolerance = 1e-10)
+})
+
 test_that("semihat validates class and scalar controls", {
   set.seed(27182)
   n <- 40

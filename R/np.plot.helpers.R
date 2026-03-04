@@ -2066,13 +2066,13 @@ compute.bootstrap.errors.rbandwidth =
     if (is.null(boot.out) && is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
-      fit.train <- suppressWarnings(npreg(
-        txdat = xdat,
-        tydat = ydat,
+      fit.mean <- as.vector(suppressWarnings(npreghat(
         bws = bws,
-        gradients = FALSE,
-        warn.glp.gradient = FALSE
-      ))
+        txdat = xdat,
+        exdat = xdat,
+        y = ydat,
+        output = "apply"
+      )))
 
       s.vec <- NULL
       if (gradients) {
@@ -2100,7 +2100,7 @@ compute.bootstrap.errors.rbandwidth =
       boot.out <- .np_plot_boot_from_hat_wild(
         H = H,
         ydat = ydat,
-        fit.mean = fit.train$mean,
+        fit.mean = fit.mean,
         B = plot.errors.boot.num,
         wild = plot.errors.boot.wild
       )
@@ -2226,32 +2226,35 @@ compute.bootstrap.errors.scbandwidth =
     if (is.null(boot.out) && is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
-      fit.args <- list(
-        txdat = xdat,
-        tydat = ydat,
-        bws = bws,
-        iterate = FALSE
-      )
-      hat.args <- list(
+      hat.eval.args <- list(
         bws = bws,
         txdat = xdat,
         exdat = exdat,
         output = "matrix",
         iterate = FALSE
       )
+      hat.train.args <- list(
+        bws = bws,
+        txdat = xdat,
+        exdat = xdat,
+        y = ydat,
+        output = "apply",
+        iterate = FALSE
+      )
       if (!miss.z) {
-        fit.args$tzdat <- zdat
-        hat.args$tzdat <- zdat
-        hat.args$ezdat <- ezdat
+        hat.eval.args$tzdat <- zdat
+        hat.eval.args$ezdat <- ezdat
+        hat.train.args$tzdat <- zdat
+        hat.train.args$ezdat <- zdat
       }
 
-      fit.train <- do.call(npscoef, fit.args)
-      H <- do.call(npscoefhat, hat.args)
+      fit.mean <- as.vector(do.call(npscoefhat, hat.train.args))
+      H <- do.call(npscoefhat, hat.eval.args)
 
       boot.out <- .np_plot_boot_from_hat_wild(
         H = H,
         ydat = ydat,
-        fit.mean = fit.train$mean,
+        fit.mean = fit.mean,
         B = plot.errors.boot.num,
         wild = plot.errors.boot.wild
       )
@@ -2325,12 +2328,15 @@ compute.bootstrap.errors.plbandwidth =
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
-      fit.train <- npplreg(
+      fit.mean <- as.vector(npplreghat(
+        bws = bws,
         txdat = xdat,
-        tydat = ydat,
         tzdat = zdat,
-        bws = bws
-      )
+        exdat = xdat,
+        ezdat = zdat,
+        y = ydat,
+        output = "apply"
+      ))
       H <- npplreghat(
         bws = bws,
         txdat = xdat,
@@ -2343,7 +2349,7 @@ compute.bootstrap.errors.plbandwidth =
       boot.out <- .np_plot_boot_from_hat_wild(
         H = H,
         ydat = ydat,
-        fit.mean = fit.train$mean,
+        fit.mean = fit.mean,
         B = plot.errors.boot.num,
         wild = plot.errors.boot.wild
       )
@@ -2807,12 +2813,14 @@ compute.bootstrap.errors.sibandwidth =
     if (is.wild.hat) {
       plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
-      fit.train <- npindex(
-        txdat = xdat,
-        tydat = ydat,
+      fit.mean <- as.vector(npindexhat(
         bws = bws,
-        gradients = FALSE
-      )
+        txdat = xdat,
+        exdat = xdat,
+        y = ydat,
+        output = "apply",
+        s = 0L
+      ))
       H <- npindexhat(
         bws = bws,
         txdat = xdat,
@@ -2824,7 +2832,7 @@ compute.bootstrap.errors.sibandwidth =
       boot.out <- .np_plot_boot_from_hat_wild(
         H = H,
         ydat = ydat,
-        fit.mean = fit.train$mean,
+        fit.mean = fit.mean,
         B = plot.errors.boot.num,
         wild = plot.errors.boot.wild
       )

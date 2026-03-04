@@ -603,6 +603,141 @@ test_that("inid ksum fast path matches explicit resample refits for npcdens/npcd
   expect_equal(dist.fast$t0, npcdist(txdat = tx, tydat = ty, exdat = ex, eydat = ey, bws = dist.bw)$condist, tolerance = 1e-12)
 })
 
+test_that("ksum fast paths honor non-default kernel/bound options for density/distribution families", {
+  skip_if_not_installed("np")
+
+  set.seed(3261)
+  n <- 60
+  x <- runif(n)
+  y <- runif(n)
+  tx <- data.frame(x = x)
+  ty <- data.frame(y = y)
+  ex <- data.frame(x = seq(0.02, 0.98, length.out = 13))
+  ey <- data.frame(y = seq(0.03, 0.97, length.out = 13))
+  B <- 6L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  u.dens.bw <- npudensbw(
+    dat = tx,
+    bws = 0.20,
+    bandwidth.compute = FALSE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerbound = "fixed",
+    ckerlb = 0.0,
+    ckerub = 1.0
+  )
+  u.dist.bw <- npudistbw(
+    dat = tx,
+    bws = 0.20,
+    bandwidth.compute = FALSE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerbound = "fixed",
+    ckerlb = 0.0,
+    ckerub = 1.0
+  )
+  c.dens.bw <- npcdensbw(
+    xdat = tx,
+    ydat = ty,
+    bws = c(0.25, 0.25),
+    bandwidth.compute = FALSE,
+    bwtype = "fixed",
+    cxkertype = "epanechnikov",
+    cykertype = "epanechnikov",
+    cxkerbound = "fixed",
+    cykerbound = "fixed",
+    cxkerlb = 0.0,
+    cykerlb = 0.0,
+    cxkerub = 1.0,
+    cykerub = 1.0
+  )
+  c.dist.bw <- npcdistbw(
+    xdat = tx,
+    ydat = ty,
+    bws = c(0.25, 0.25),
+    bandwidth.compute = FALSE,
+    bwtype = "fixed",
+    cxkertype = "epanechnikov",
+    cykertype = "epanechnikov",
+    cxkerbound = "fixed",
+    cykerbound = "fixed",
+    cxkerlb = 0.0,
+    cykerlb = 0.0,
+    cxkerub = 1.0,
+    cykerub = 1.0
+  )
+
+  fast.u <- getFromNamespace(".np_inid_boot_from_ksum_unconditional", "np")
+  fast.c <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "np")
+
+  u.dens.fast <- fast.u(
+    xdat = tx,
+    exdat = ex,
+    bws = u.dens.bw,
+    B = B,
+    operator = "normal",
+    counts = counts
+  )
+  u.dist.fast <- fast.u(
+    xdat = tx,
+    exdat = ex,
+    bws = u.dist.bw,
+    B = B,
+    operator = "integral",
+    counts = counts
+  )
+  c.dens.fast <- fast.c(
+    xdat = tx,
+    ydat = ty,
+    exdat = ex,
+    eydat = ey,
+    bws = c.dens.bw,
+    B = B,
+    cdf = FALSE,
+    counts = counts
+  )
+  c.dist.fast <- fast.c(
+    xdat = tx,
+    ydat = ty,
+    exdat = ex,
+    eydat = ey,
+    bws = c.dist.bw,
+    B = B,
+    cdf = TRUE,
+    counts = counts
+  )
+
+  u.dens.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+  u.dist.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+  c.dens.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+  c.dist.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+  for (b in seq_len(B)) {
+    idx <- rep.int(seq_len(n), counts[, b])
+    u.dens.explicit[b, ] <- npudens(tdat = tx[idx, , drop = FALSE], edat = ex, bws = u.dens.bw)$dens
+    u.dist.explicit[b, ] <- npudist(tdat = tx[idx, , drop = FALSE], edat = ex, bws = u.dist.bw)$dist
+    c.dens.explicit[b, ] <- npcdens(
+      txdat = tx[idx, , drop = FALSE],
+      tydat = ty[idx, , drop = FALSE],
+      exdat = ex,
+      eydat = ey,
+      bws = c.dens.bw
+    )$condens
+    c.dist.explicit[b, ] <- npcdist(
+      txdat = tx[idx, , drop = FALSE],
+      tydat = ty[idx, , drop = FALSE],
+      exdat = ex,
+      eydat = ey,
+      bws = c.dist.bw
+    )$condist
+  }
+
+  expect_equal(u.dens.fast$t, u.dens.explicit, tolerance = 1e-10)
+  expect_equal(u.dist.fast$t, u.dist.explicit, tolerance = 1e-10)
+  expect_equal(c.dens.fast$t, c.dens.explicit, tolerance = 1e-10)
+  expect_equal(c.dist.fast$t, c.dist.explicit, tolerance = 1e-10)
+})
+
 test_that("npreg plot bootstrap inid supports lp basis variants", {
   skip_if_not_installed("np")
 
