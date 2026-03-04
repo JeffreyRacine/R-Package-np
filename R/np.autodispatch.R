@@ -613,11 +613,9 @@
   tolower(val[[1L]])
 }
 
-.npRmpi_autodispatch_is_npregbw_lllp_cv <- function(mc, caller_env) {
-  call.name <- .npRmpi_autodispatch_call_name(mc)
-  if (!identical(call.name, "npregbw"))
+.npRmpi_autodispatch_is_bw_lllp_cv <- function(mc, caller_env, call_name) {
+  if (!identical(.npRmpi_autodispatch_call_name(mc), call_name))
     return(FALSE)
-
   regtype <- .npRmpi_autodispatch_eval_char_arg(mc, caller_env, "regtype")
   bwmethod <- .npRmpi_autodispatch_eval_char_arg(mc, caller_env, "bwmethod")
   if (is.null(regtype) || is.null(bwmethod))
@@ -626,12 +624,37 @@
   regtype %in% c("ll", "lp") && bwmethod %in% c("cv.ls", "cv.aic")
 }
 
+.npRmpi_autodispatch_is_npregbw_lllp_cv <- function(mc, caller_env) {
+  .npRmpi_autodispatch_is_bw_lllp_cv(mc = mc, caller_env = caller_env, call_name = "npregbw")
+}
+
+.npRmpi_autodispatch_is_npscoefbw_lllp_cv <- function(mc, caller_env) {
+  .npRmpi_autodispatch_is_bw_lllp_cv(mc = mc, caller_env = caller_env, call_name = "npscoefbw")
+}
+
+.npRmpi_autodispatch_is_npplregbw_lllp_cv <- function(mc, caller_env) {
+  .npRmpi_autodispatch_is_bw_lllp_cv(mc = mc, caller_env = caller_env, call_name = "npplregbw")
+}
+
 .npRmpi_spmd_opcode_from_call <- function(mc, caller_env) {
   if (.npRmpi_autodispatch_is_npregbw_lllp_cv(mc = mc, caller_env = caller_env))
     return("autodispatch.npregbw.cv_lllp")
+  if (.npRmpi_autodispatch_is_npscoefbw_lllp_cv(mc = mc, caller_env = caller_env))
+    return("autodispatch.npscoefbw.cv_lllp")
+  if (.npRmpi_autodispatch_is_npplregbw_lllp_cv(mc = mc, caller_env = caller_env))
+    return("autodispatch.npplregbw.cv_lllp")
 
   call.name <- .npRmpi_autodispatch_call_name(mc)
   paste0("autodispatch.", gsub("[^A-Za-z0-9_]+", "_", call.name))
+}
+
+.npRmpi_spmd_timeout_class_from_opcode <- function(opcode) {
+  if (identical(opcode, "autodispatch.npregbw.cv_lllp") ||
+      identical(opcode, "autodispatch.npscoefbw.cv_lllp") ||
+      identical(opcode, "autodispatch.npplregbw.cv_lllp")) {
+    return("cv-regression")
+  }
+  "default"
 }
 
 .npRmpi_autodispatch_preflight <- function(comm = 1L) {
@@ -1072,7 +1095,7 @@
   opt.verify <- opt.sync && isTRUE(getOption("npRmpi.autodispatch.verify.options", FALSE))
   remote.name <- .npRmpi_autodispatch_next_remote_name()
   opcode <- .npRmpi_spmd_opcode_from_call(mc = mc, caller_env = caller_env)
-  timeout.class <- if (identical(opcode, "autodispatch.npregbw.cv_lllp")) "cv-regression" else "default"
+  timeout.class <- .npRmpi_spmd_timeout_class_from_opcode(opcode)
   envelope <- .npRmpi_spmd_make_envelope(
     opcode = opcode,
     args_ref = prepared$tmpnames,

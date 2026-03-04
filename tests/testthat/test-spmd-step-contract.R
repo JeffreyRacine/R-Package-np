@@ -113,16 +113,32 @@ test_that("SPMD step diverged sequence fails fast with ACK mismatch diagnostics"
               info = paste(res$output, collapse = "\n"))
 })
 
-test_that("SPMD opcode selection tags npregbw LL/LP CV routes", {
+test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
 
-  mc.cv <- quote(npregbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ls"))
-  op.cv <- opcode.fun(mc = mc.cv, caller_env = environment())
-  expect_identical(op.cv, "autodispatch.npregbw.cv_lllp")
+  mc.reg <- quote(npregbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ls"))
+  op.reg <- opcode.fun(mc = mc.reg, caller_env = environment())
+  expect_identical(op.reg, "autodispatch.npregbw.cv_lllp")
+
+  mc.sc <- quote(npscoefbw(xdat = x, ydat = y, zdat = z, regtype = "lp", bwmethod = "cv.aic"))
+  op.sc <- opcode.fun(mc = mc.sc, caller_env = environment())
+  expect_identical(op.sc, "autodispatch.npscoefbw.cv_lllp")
+
+  mc.pl <- quote(npplregbw(xdat = x, ydat = y, zdat = z, regtype = "ll", bwmethod = "cv.ls"))
+  op.pl <- opcode.fun(mc = mc.pl, caller_env = environment())
+  expect_identical(op.pl, "autodispatch.npplregbw.cv_lllp")
 
   mc.noncv <- quote(npregbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls"))
   op.noncv <- opcode.fun(mc = mc.noncv, caller_env = environment())
   expect_identical(op.noncv, "autodispatch.npregbw")
+})
+
+test_that("SPMD timeout class marks LL/LP CV bw opcodes as cv-regression", {
+  timeout.class <- getFromNamespace(".npRmpi_spmd_timeout_class_from_opcode", "npRmpi")
+  expect_identical(timeout.class("autodispatch.npregbw.cv_lllp"), "cv-regression")
+  expect_identical(timeout.class("autodispatch.npscoefbw.cv_lllp"), "cv-regression")
+  expect_identical(timeout.class("autodispatch.npplregbw.cv_lllp"), "cv-regression")
+  expect_identical(timeout.class("autodispatch.npindexbw"), "default")
 })
 
 test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
