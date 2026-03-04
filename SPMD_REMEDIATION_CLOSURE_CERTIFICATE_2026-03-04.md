@@ -4,7 +4,7 @@
 Certificate for completion of REMEDIATION_PLAN_SPMD in np-npRmpi.
 
 ## Repository Anchors
-1. Current head commit: fa50d22
+1. Current head commit: d05ab02
 2. Local closure tag: spmd-remediation-complete-2026-03-04 -> abde3bf
 3. Local post-certificate tag: spmd-remediation-post-cert-closeout-2026-03-04 -> 6e86ce5
 4. Local final-freeze tag: spmd-remediation-final-freeze-2026-03-04 -> 870762c
