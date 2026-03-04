@@ -222,6 +222,36 @@
   )
 }
 
+.np_plot_boot_factor_boxplots <- function(boot.t, tdati, ti, B) {
+  all.bp <- list()
+  ti <- as.integer(ti)[1L]
+  if (is.na(ti) || ti < 1L)
+    return(all.bp)
+  if (ti > length(tdati$iord) || ti > length(tdati$iuno))
+    return(all.bp)
+  if (!(isTRUE(tdati$iord[ti]) || isTRUE(tdati$iuno[ti])))
+    return(all.bp)
+
+  boot.frame <- as.data.frame(boot.t)
+  u.lev <- tdati$all.ulev[[ti]]
+  stopifnot(length(u.lev) == ncol(boot.frame))
+
+  all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
+  all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
+
+  for (i in seq_along(u.lev)) {
+    t.bp <- boxplot.stats(boot.frame[, i])
+    all.bp$stats[, i] <- t.bp$stats
+    all.bp$conf[, i] <- t.bp$conf
+    all.bp$out <- c(all.bp$out, t.bp$out)
+    all.bp$group <- c(all.bp$group, rep.int(i, length(t.bp$out)))
+  }
+
+  all.bp$n <- rep.int(as.integer(B), length(u.lev))
+  all.bp$names <- tdati$all.lev[[ti]]
+  all.bp
+}
+
 .np_inid_chunk_size <- function(n, B) {
   chunk.opt <- getOption("np.plot.inid.chunk.size")
   if (!is.null(chunk.opt)) {
@@ -2079,30 +2109,12 @@ compute.bootstrap.errors.rbandwidth =
     if (is.null(boot.out))
       stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
 
-    all.bp <- list()
-
-    if (slice.index > 0 && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- bws$xdati$all.ulev[[slice.index]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- bws$xdati$all.lev[[slice.index]]
-      rm(boot.frame)
-    }
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = bws$xdati,
+      ti = slice.index,
+      B = plot.errors.boot.num
+    )
     
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
@@ -2248,39 +2260,14 @@ compute.bootstrap.errors.scbandwidth =
     if (is.null(boot.out))
       stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.scbandwidth", plot.errors.boot.method), call. = FALSE)
 
-    all.bp <- list()
-
-    if ((slice.index > 0) && (((slice.index <= ncol(xdat)) && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])) ||
-                              ((slice.index > ncol(xdat)) && (bws$zdati$iord[slice.index-ncol(xdat)] || bws$zdati$iuno[slice.index-ncol(xdat)])))) {
-      boot.frame <- as.data.frame(boot.out$t)
-
-      if(slice.index <= ncol(xdat))
-          u.lev <- bws$xdati$all.ulev[[slice.index]]
-      else
-          u.lev <- bws$zdati$all.ulev[[slice.index-ncol(xdat)]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-
-      if(slice.index <= ncol(xdat))
-          all.bp$names <- bws$xdati$all.lev[[slice.index]]
-      else
-          all.bp$names <- bws$zdati$all.lev[[slice.index-ncol(xdat)]]
-      rm(boot.frame)
-    }
+    tdati <- if (slice.index <= ncol(xdat)) bws$xdati else bws$zdati
+    ti <- if (slice.index <= ncol(xdat)) slice.index else slice.index - ncol(xdat)
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = tdati,
+      ti = ti,
+      B = plot.errors.boot.num
+    )
     
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
@@ -2410,8 +2397,6 @@ compute.bootstrap.errors.plbandwidth =
         stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.plbandwidth", plot.errors.boot.method), call. = FALSE)
     }
 
-    all.bp <- list()
-
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati
       ti <- slice.index
@@ -2419,29 +2404,12 @@ compute.bootstrap.errors.plbandwidth =
       tdati <- bws$zdati
       ti <- slice.index - bws$xndim
     }
-    
-    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- tdati$all.ulev[[ti]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- tdati$all.lev[[ti]]
-      rm(boot.frame)
-    }
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = tdati,
+      ti = ti,
+      B = plot.errors.boot.num
+    )
 
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
@@ -2557,30 +2525,12 @@ compute.bootstrap.errors.bandwidth =
       )
     }
 
-    all.bp <- list()
-
-    if (slice.index > 0 && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- bws$xdati$all.ulev[[slice.index]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- bws$xdati$all.lev[[slice.index]]
-      rm(boot.frame)
-    }
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = bws$xdati,
+      ti = slice.index,
+      B = plot.errors.boot.num
+    )
 
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
@@ -2684,30 +2634,12 @@ compute.bootstrap.errors.dbandwidth =
       )
     }
 
-    all.bp <- list()
-
-    if (slice.index > 0 && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- bws$xdati$all.ulev[[slice.index]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- bws$xdati$all.lev[[slice.index]]
-      rm(boot.frame)
-    }
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = bws$xdati,
+      ti = slice.index,
+      B = plot.errors.boot.num
+    )
 
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
@@ -2848,8 +2780,6 @@ compute.bootstrap.errors.conbandwidth =
       )
     }
 
-    all.bp <- list()
-
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati
       ti <- slice.index
@@ -2857,29 +2787,12 @@ compute.bootstrap.errors.conbandwidth =
       tdati <- bws$ydati
       ti <- slice.index - bws$xndim
     }
-    
-    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- tdati$all.ulev[[ti]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- tdati$all.lev[[ti]]
-      rm(boot.frame)
-    }
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = tdati,
+      ti = ti,
+      B = plot.errors.boot.num
+    )
 
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
@@ -3020,8 +2933,6 @@ compute.bootstrap.errors.condbandwidth =
       )
     }
 
-    all.bp <- list()
-
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati
       ti <- slice.index
@@ -3029,29 +2940,12 @@ compute.bootstrap.errors.condbandwidth =
       tdati <- bws$ydati
       ti <- slice.index - bws$xndim
     }
-    
-    if (slice.index > 0 && (tdati$iord[ti] || tdati$iuno[ti])){
-      boot.frame <- as.data.frame(boot.out$t)
-      u.lev <- tdati$all.ulev[[ti]]
-
-      ## if we are bootstrapping a factor, there should be one
-      ## set of replications for each level
-      stopifnot(length(u.lev)==ncol(boot.frame))
-      
-      all.bp$stats <- matrix(data = NA, nrow = 5, ncol = length(u.lev))
-      all.bp$conf <- matrix(data = NA, nrow = 2, ncol = length(u.lev))
-
-      for (i in seq_along(u.lev)){
-        t.bp <- boxplot.stats(boot.frame[,i])
-        all.bp$stats[,i] <- t.bp$stats
-        all.bp$conf[,i] <- t.bp$conf
-        all.bp$out <- c(all.bp$out,t.bp$out)
-        all.bp$group <- c(all.bp$group, rep.int(i,length(t.bp$out)))
-      }
-      all.bp$n <- rep.int(plot.errors.boot.num, length(u.lev))
-      all.bp$names <- tdati$all.lev[[ti]]
-      rm(boot.frame)
-    }
+    all.bp <- .np_plot_boot_factor_boxplots(
+      boot.t = boot.out$t,
+      tdati = tdati,
+      ti = ti,
+      B = plot.errors.boot.num
+    )
 
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
