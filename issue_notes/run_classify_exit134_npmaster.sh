@@ -9,7 +9,7 @@ OUT="/tmp/exit134_classify_${TS}"
 mkdir -p "$OUT"
 
 CSV="${OUT}/runs.csv"
-echo "n,seed,exit_code,max_rss_kb,elapsed_sec,nonfinite,warn_count,status" > "$CSV"
+echo "n,seed,exit_code,max_rss_kb,elapsed_sec,nan_inf,warn_count,status" > "$CSV"
 
 NS=(100 500 1000)
 SEEDS=(42 42 42 42 42 1 2 3 4 5)
@@ -28,19 +28,19 @@ for n in "${NS[@]}"; do
     rss=$(awk '/maximum resident set size/{print $1}' "${run_dir}/stderr.log" | tail -1)
     [ -z "${rss}" ] && rss="NA"
 
-    elapsed=$(awk -F= '/^elapsed_sec=/{print $2}' "${run_dir}/stdout.log" | tail -1)
+    elapsed=$(grep -Eo 'elapsed_sec=[0-9]+(\.[0-9]+)?' "${run_dir}/stdout.log" | tail -1 | cut -d= -f2)
     [ -z "${elapsed}" ] && elapsed="NA"
 
-    nonfinite=$(awk -F= '/^nonfinite=/{print $2}' "${run_dir}/stdout.log" | tail -1)
-    [ -z "${nonfinite}" ] && nonfinite="NA"
+    nan_inf=$(grep -Eo 'nan_inf=(TRUE|FALSE)' "${run_dir}/stdout.log" | tail -1 | cut -d= -f2)
+    [ -z "${nan_inf}" ] && nan_inf="NA"
 
-    warn_count=$(awk -F= '/^warn_count=/{print $2}' "${run_dir}/stdout.log" | tail -1)
+    warn_count=$(grep -Eo 'warn_count=[0-9]+' "${run_dir}/stdout.log" | tail -1 | cut -d= -f2)
     [ -z "${warn_count}" ] && warn_count="NA"
 
-    status=$(awk -F= '/^status=/{print $2}' "${run_dir}/stdout.log" | tail -1)
+    status=$(grep -Eo 'status=[A-Za-z_]+' "${run_dir}/stdout.log" | tail -1 | cut -d= -f2)
     [ -z "${status}" ] && status="ABORT"
 
-    echo "${n},${seed},${ec},${rss},${elapsed},${nonfinite},${warn_count},${status}" >> "$CSV"
+    echo "${n},${seed},${ec},${rss},${elapsed},${nan_inf},${warn_count},${status}" >> "$CSV"
   done
 done
 

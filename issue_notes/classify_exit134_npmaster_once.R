@@ -45,23 +45,28 @@ xdat <- cs$xdat
 ydat <- cs$ydat
 bws <- cs$bws
 
-has_nonfinite <- function(x) {
-  if (is.numeric(x)) return(any(!is.finite(x)))
+has_nan_inf_core <- function(x) {
+  if (is.numeric(x))
+    return(any(is.nan(x) | is.infinite(x)))
+
   if (is.list(x)) {
-    vals <- vapply(x, has_nonfinite, logical(1))
-    if (any(vals)) return(TRUE)
+    nms <- names(x)
+    for (i in seq_along(x)) {
+      nm <- if (!is.null(nms) && nzchar(nms[i])) nms[i] else ""
+      # Skip embedded bandwidth metadata (contains intentional +/-Inf kernel bounds).
+      if (identical(nm, "bws"))
+        next
+      if (has_nan_inf_core(x[[i]]))
+        return(TRUE)
+    }
   }
-  attrs <- attributes(x)
-  if (!is.null(attrs) && length(attrs)) {
-    avals <- vapply(attrs, has_nonfinite, logical(1))
-    if (any(avals)) return(TRUE)
-  }
+
   FALSE
 }
 
 status <- "ok"
 err <- ""
-nonfinite <- FALSE
+nan_inf <- FALSE
 elapsed <- NA_real_
 warn_log <- character()
 
@@ -99,7 +104,7 @@ if (identical(status, "ok") && is.null(res))
   status <- "null_return"
 
 if (!is.null(res))
-  nonfinite <- isTRUE(has_nonfinite(res))
+  nan_inf <- isTRUE(has_nan_inf_core(res))
 
 warn_file <- file.path(out_dir, "warnings.log")
 if (length(warn_log)) writeLines(warn_log, warn_file)
@@ -109,11 +114,11 @@ cat(sprintf("n=%d\n", n))
 cat(sprintf("seed=%d\n", seed))
 cat(sprintf("boot_num=%d\n", boot_num))
 cat(sprintf("elapsed_sec=%.6f\n", elapsed))
-cat(sprintf("nonfinite=%s\n", if (isTRUE(nonfinite)) "TRUE" else "FALSE"))
+cat(sprintf("nan_inf=%s\n", if (isTRUE(nan_inf)) "TRUE" else "FALSE"))
 cat(sprintf("warn_count=%d\n", length(warn_log)))
 if (nzchar(err)) cat(sprintf("error=%s\n", err))
 
-if (!identical(status, "ok") || isTRUE(nonfinite))
+if (!identical(status, "ok") || isTRUE(nan_inf))
   quit(save = "no", status = 10)
 
 quit(save = "no", status = 0)
