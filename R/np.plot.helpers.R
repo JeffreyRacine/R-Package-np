@@ -457,24 +457,6 @@
   worker.prepared
 }
 
-.npRmpi_warn_wild_master_local_guard_once <- local({
-  warned <- FALSE
-  function() {
-    if (warned)
-      return(invisible(FALSE))
-    warned <<- TRUE
-    warning(
-      paste(
-        "MPI wild bootstrap fan-out is currently unstable on some MPI stacks;",
-        "running wild bootstrap on master only to preserve method semantics",
-        "and avoid process aborts while transport hardening is completed."
-      ),
-      call. = FALSE
-    )
-    invisible(TRUE)
-  }
-})
-
 .npRmpi_bootstrap_fanout_enabled <- function(comm = 1L,
                                              n = NA_integer_,
                                              B = NA_integer_,
@@ -608,12 +590,6 @@
   workers <- .npRmpi_bootstrap_worker_count(comm = comm)
   use.master.local <- !isTRUE(.npRmpi_has_active_slave_pool(comm = comm)) &&
     isTRUE(.npRmpi_master_only_mode(comm = comm))
-  if (identical(what, "wild") &&
-      isTRUE(getOption("npRmpi.plot.wild.master_local.guard", TRUE)) &&
-      workers >= 1L) {
-    .npRmpi_warn_wild_master_local_guard_once()
-    use.master.local <- TRUE
-  }
   .npRmpi_bootstrap_transport_trace(
     what = what,
     event = "fanout.start",
