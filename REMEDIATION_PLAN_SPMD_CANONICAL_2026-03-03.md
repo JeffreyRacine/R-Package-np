@@ -14,6 +14,7 @@ Completed checkpoint tranches:
 5. Phase 5 (hot-path legacy asymmetry decommission): complete for core estimator/CV hot paths via typed locked opcode handlers and guard-validated route parity.
 6. Phase 6 (non-core migration): tranche A complete for `npqreg*`, `npconmode*`, `npksum*`, `npregiv*`, `npregivderiv*`, `npcmstest`, `npqcmstest`, `npdeneqtest`, `npdeptest`, `npsdeptest`, `npsymtest`, and `npunitest` via typed locked opcodes.
 7. Phase 6 (non-core migration): tranche B complete for `npsigtest*` typed locked opcode routing plus session/attach/profile fast-fail contract coverage.
+8. Phase 6 closeout audit: complete for active autodispatch call heads; no remaining `manual_distributed_call` usage in estimator/test paths.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -24,7 +25,7 @@ Latest checkpoint commits:
 6. `c34ff68` (lock typed opcodes for remaining core estimators)
 7. `138401a` (fix forwarded-dot argument resolution in autodispatch)
 8. `519955b` (lock non-core autodispatch families to typed SPMD opcodes)
-9. `(pending current checkpoint)` `npsigtest` locked opcode migration + contract and route coverage
+9. `55226a0` (`npsigtest` locked opcode migration + contract and route coverage)
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
@@ -267,6 +268,5 @@ Acceptance:
    - condition-message regression not explicitly accepted.
 
 ## Immediate Next Action
-1. Close remaining Phase 6 residuals by auditing uncategorized dynamic call heads (if any) and locking them opcode-by-opcode.
-2. Add dedicated installed-build subprocess coverage for each newly locked non-core opcode family.
-3. Keep route gate (`session`, `attach`, `profile/manual`) and orphan-cleanup checks mandatory on every tranche.
+1. Run full release-grade gate pack (`R CMD build/check`, win-builder, complete `testthat`) once MPI environment stability for long-running smoke tests is confirmed.
+2. Keep route gate (`session`, `attach`, `profile/manual`) and orphan-cleanup checks mandatory for any post-remediation patch.
