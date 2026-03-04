@@ -56,6 +56,8 @@ Completed checkpoint tranches:
 46. Post-tag closure reruns complete: `/tmp/spmd_canonical_20260304_0001/phase57_manifest_verify_tagged_20260304_020048` (`CLOSURE_MANIFEST_VERIFY_OK`) and `/tmp/spmd_canonical_20260304_0001/phase58_full_audit_tagged_20260304_020052` (`SPMD_CLOSURE_FULL_AUDIT_OK`).
 47. Closure manifest updated to include `final_closure` tag metadata (`spmd-remediation-final-closure-2026-03-04` -> `006127a`).
 48. Final-anchor closure reruns complete with explicit final-tag verification: `/tmp/spmd_canonical_20260304_0001/phase59_manifest_verify_finalanchor_20260304_020248` (`CLOSURE_MANIFEST_VERIFY_OK`) and `/tmp/spmd_canonical_20260304_0001/phase60_full_audit_finalanchor_20260304_020249` (`SPMD_CLOSURE_FULL_AUDIT_OK`).
+49. Post-closeout maintenance tranche-1 completed: unreachable `.npRmpi_spmd_next_seq` removed; route-gated validation recorded in `/tmp/spmd_tranche1_deadscaffold_20260304_103024`.
+50. Post-closeout maintenance tranche-2 completed: `mpi.comm.spawn` scalar positive-integer `nslaves` hardening plus new contract test (`test-rcomm-arg-contract.R`), with route-gated validation in `/tmp/spmd_tranche2_modsweep_20260304_103653`.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -80,6 +82,8 @@ Latest checkpoint commits:
 20. `6b3b522` (broadcast-safe step-contract subprocess tests + phase-28 canonical closeout record)
 21. `c2dce64` (record phase-29 terminal reconfirmation artifacts)
 22. `795f34a` (add deterministic local as-cran harness script and record phase-30 closeout)
+23. `635ddbb` (post-closeout maintenance tranche-1 dead-scaffold cull + remediation-doc refinement)
+24. `bc6cbe9` (post-closeout maintenance tranche-2 `mpi.comm.spawn` contract hardening + tests)
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
@@ -125,6 +129,8 @@ Latest artifact roots:
 41. `/tmp/spmd_canonical_20260304_0001/phase58_full_audit_tagged_20260304_020052`
 42. `/tmp/spmd_canonical_20260304_0001/phase59_manifest_verify_finalanchor_20260304_020248`
 43. `/tmp/spmd_canonical_20260304_0001/phase60_full_audit_finalanchor_20260304_020249`
+44. `/tmp/spmd_tranche1_deadscaffold_20260304_103024`
+45. `/tmp/spmd_tranche2_modsweep_20260304_103653`
 
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:
