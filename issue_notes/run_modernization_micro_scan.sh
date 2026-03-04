@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="/Users/jracine/Development/np-npRmpi"
-OUT_DIR="${1:-/tmp/nprmpi_modernization_micro_scan_$(date +%Y%m%d_%H%M%S)}"
+ROOT_DIR="${1:-/Users/jracine/Development/np-npRmpi}"
+OUT_DIR="${2:-/tmp/nprmpi_modernization_micro_scan_$(date +%Y%m%d_%H%M%S)}"
+
+if [ ! -d "$ROOT_DIR/R" ]; then
+  echo "ERROR: ROOT_DIR must be a package repo root containing R/ (got: $ROOT_DIR)" >&2
+  exit 2
+fi
 
 mkdir -p "$OUT_DIR"
 echo "OUT_DIR=$OUT_DIR"

@@ -63,6 +63,7 @@ Completed checkpoint tranches:
 53. Post-closeout maintenance tranche-5 completed: stale commented `parse(...)` fragments removed from `R/Rcoll.R`, route-gated validation recorded in `/tmp/spmd_tranche5_gate_20260304_104321`, and refreshed micro-scan artifact `/tmp/spmd_tranche5_modscan_cleanup_20260304_104312` (`scan_parse=0`).
 54. Post-closeout maintenance tranche-6 completed: IV-family type-stability hardening replaced classifier `sapply(..., is.numeric)` with typed `vapply(..., logical(1))` in `R/npregiv.R` and `R/npregivderiv.R`, with route-gated validation and refreshed modernization scan (`scan_sapply=67`) in dedicated tranche artifacts.
 55. Post-closeout maintenance tranche-7 completed: `W.lp` classifier hardening in `R/util.R` (`xdat.col.numeric`: `sapply` -> typed `vapply(logical(1))`) with route-gated validation (`session`/`attach`/`profile`/`manual` pass tokens), installed-package `npreg`/`npsigtest` tests passing, and refreshed scan summary (`scan_sapply=66`).
+56. Post-closeout maintenance tranche-8 completed: modernization scan harness I/O hardening in `issue_notes/run_modernization_micro_scan.sh` (explicit `ROOT_DIR`/`OUT_DIR` arg support and fail-fast root guard), validated by `shellcheck` and explicit out-dir scan smoke.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -94,6 +95,7 @@ Latest checkpoint commits:
 27. post-closeout maintenance tranche-5 (Rcoll parse-comment cleanup + route/scans ledger update)
 28. post-closeout maintenance tranche-6 (npregiv/npregivderiv classifier `vapply` hardening + route/scans ledger update)
 29. post-closeout maintenance tranche-7 (`W.lp` classifier `vapply` hardening + route/scans ledger update)
+30. post-closeout maintenance tranche-8 (modernization scan harness arg/IO hardening + validation ledger update)
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
@@ -148,6 +150,7 @@ Latest artifact roots:
 50. `/tmp/spmd_tranche6_iv_vapply_20260304_104740`
 51. `/tmp/spmd_tranche6_modscan_postvapply_20260304_104841`
 52. `/tmp/spmd_tranche7_wlp_vapply_20260304_105424`
+53. `/tmp/spmd_tranche8_scanio_20260304_105725`
 
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:

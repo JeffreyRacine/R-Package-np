@@ -278,3 +278,9 @@ Recommended order:
 17. Tranche-7 modernization scan:
    - `run_modernization_micro_scan.sh` summary recorded in `/tmp/spmd_tranche7_wlp_vapply_20260304_105424/modscan_run.log`.
    - key delta: `scan_sapply=66` (down from `67`).
+18. Completed modernization-tooling I/O hardening tranche:
+   - `issue_notes/run_modernization_micro_scan.sh` now accepts explicit positional args `ROOT_DIR` and `OUT_DIR` (`$1`, `$2`) while preserving defaults.
+   - added fail-fast root guard (`ROOT_DIR/R` must exist).
+19. Tranche-8 tooling validation artifact root:
+   - `/tmp/spmd_tranche8_scanio_20260304_105725`
+   - `shellcheck` clean; scan run confirms `out_dir=/tmp/spmd_tranche8_scanio_20260304_105725/scan` and `TRANCHE8_OK=1`.
