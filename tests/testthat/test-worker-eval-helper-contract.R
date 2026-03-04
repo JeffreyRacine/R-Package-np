@@ -19,9 +19,10 @@ test_that(".npRmpi_eval_scmd evaluates through shared strict helper", {
   expect_match(fn.body, "\\.np_try_eval_in_frames\\(scmd, eval_env = envir, search_frames = FALSE\\)")
 })
 
-test_that("session attach loop executes messages through helper", {
+test_that("session attach loop delegates to shared worker loop helper", {
   fn.body <- paste(deparse(body(.npRmpi_session_attach_worker_loop), width.cutoff = 500L), collapse = " ")
-  expect_match(fn.body, "\\.npRmpi_eval_scmd\\(msg, envir = \\.GlobalEnv\\)")
+  expect_match(fn.body, "\\.npRmpi_worker_loop\\(")
+  expect_match(fn.body, "loop\\.label = \"attach slave\"")
 })
 
 test_that("mpi.bcast.cmd caller path executes no-arg commands through helper", {
