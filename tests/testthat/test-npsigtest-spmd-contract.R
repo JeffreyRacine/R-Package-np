@@ -1,3 +1,17 @@
+with_mpi_pool <- function(code) {
+  init_err <- tryCatch({
+    suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
+    NULL
+  }, error = identity)
+
+  if (inherits(init_err, "error")) {
+    skip(sprintf("MPI init unavailable for npsigtest contract test: %s", conditionMessage(init_err)))
+  }
+
+  on.exit(try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE), add = TRUE)
+  force(code)
+}
+
 test_that("npsigtest maps to locked SPMD opcode", {
   opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
 
@@ -15,14 +29,16 @@ test_that("npsigtest locked opcode rejects mismatched call heads", {
   try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")
   set.seq <- getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")
 
-  old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
-  on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
-  set.seq(0L)
+  with_mpi_pool({
+    old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
+    on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
+    set.seq(0L)
 
-  env <- make.env(opcode = "autodispatch.npsigtest.core", timeout_class = "default")
-  bad <- try.exec(env, payload = list(call = quote(npsymtest(data = y))), where = "unit locked opcode")
-  expect_true(is.list(bad) && !isTRUE(bad$ok))
-  expect_match(bad$error, "restricted to")
+    env <- make.env(opcode = "autodispatch.npsigtest.core", timeout_class = "default")
+    bad <- try.exec(env, payload = list(call = quote(npsymtest(data = y))), where = "unit locked opcode")
+    expect_true(is.list(bad) && !isTRUE(bad$ok))
+    expect_match(bad$error, "restricted to")
+  })
 })
 
 test_that("npsigtest entrypoint no longer uses manual distributed call helper", {
@@ -34,20 +50,21 @@ test_that("npsigtest entrypoint no longer uses manual distributed call helper", 
 
 test_that("npsigtest bandwidth extractor materializes xdat/ydat for formula bws", {
   ext <- getFromNamespace(".npRmpi_npsig_extract_xy_from_bws", "npRmpi")
+  with_mpi_pool({
+    set.seed(7)
+    n <- 20L
+    d <- data.frame(
+      y = rnorm(n),
+      x1 = runif(n),
+      x2 = runif(n)
+    )
+    bw <- npregbw(y ~ x1 + x2, data = d, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
 
-  set.seed(7)
-  n <- 20L
-  d <- data.frame(
-    y = rnorm(n),
-    x1 = runif(n),
-    x2 = runif(n)
-  )
-  bw <- npregbw(y ~ x1 + x2, data = d, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
-
-  xy <- ext(bw)
-  expect_true(is.list(xy))
-  expect_true(is.data.frame(xy$xdat))
-  expect_true(is.numeric(xy$ydat))
-  expect_identical(nrow(xy$xdat), n)
-  expect_identical(length(xy$ydat), n)
+    xy <- ext(bw)
+    expect_true(is.list(xy))
+    expect_true(is.data.frame(xy$xdat))
+    expect_true(is.numeric(xy$ydat))
+    expect_identical(nrow(xy$xdat), n)
+    expect_identical(length(xy$ydat), n)
+  })
 })
