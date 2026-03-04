@@ -7856,21 +7856,18 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         }
 
 #ifdef MPI2
-        const int cvls_serial_mpi = (bwm == RBWM_CVLS);
-        const int mpi_stride = cvls_serial_mpi ? 1 : iNum_Processors;
-        const int mpi_rank = cvls_serial_mpi ? 0 : my_rank;
-        if((bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
-          if((j % mpi_stride) == 0){
-            if((j+mpi_rank) < (num_obs)){
+        if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+          if((j % iNum_Processors) == 0){
+            if((j+my_rank) < (num_obs)){
               for(l = 0; l < num_reg_continuous; l++){
-                TCON[l][0] = matrix_X_continuous[l][j+mpi_rank];
+                TCON[l][0] = matrix_X_continuous[l][j+my_rank];
                 if(BANDWIDTH_reg == BW_GEN_NN)
-                  matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+mpi_rank];
+                  matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank];
               }
               for(l = 0; l < num_reg_unordered; l++)
-                TUNO[l][0] = matrix_X_unordered[l][j+mpi_rank];
+                TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
               for(l = 0; l < num_reg_ordered; l++)
-                TORD[l][0] = matrix_X_ordered[l][j+mpi_rank];
+                TORD[l][0] = matrix_X_ordered[l][j+my_rank];
 
               kernel_weighted_sum_np_ctx(kernel_c,
                                          kernel_u,
@@ -7889,7 +7886,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          1,
                                          0,
                                          1,
-                                         j+mpi_rank,
+                                         j+my_rank,
                                          operator,
                                          OP_NOOP,
                                          0,
@@ -7919,13 +7916,12 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                          num_categories,
                                          NULL,
                                          NULL,
-                                         kwm+(j+mpi_rank)*nrcc22,
+                                         kwm+(j+my_rank)*nrcc22,
                                          NULL,
                                          NULL,
                                          NULL);
             }
-            if(!cvls_serial_mpi)
-              MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
+            MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
           }
         } else {
           if((j % iNum_Processors) == 0){
@@ -8019,7 +8015,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           }
         }
 #else
-        if((bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+        if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
           for(l = 0; l < num_reg_continuous; l++){
             TCON[l][0] = matrix_X_continuous[l][j];
             if(BANDWIDTH_reg == BW_GEN_NN)
@@ -8665,25 +8661,22 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
 
 #ifdef MPI2
-      const int cvls_serial_mpi = (bwm == RBWM_CVLS);
-      const int mpi_stride = cvls_serial_mpi ? 1 : iNum_Processors;
-      const int mpi_rank = cvls_serial_mpi ? 0 : my_rank;
-      if((bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
-        if((j % mpi_stride) == 0){
-          if((j+mpi_rank) < (num_obs)){
+      if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+        if((j % iNum_Processors) == 0){
+          if((j+my_rank) < (num_obs)){
             for(l = 0; l < num_reg_continuous; l++){
-              TCON[l][0] = matrix_X_continuous[l][j+mpi_rank]; // temporary storage
+              TCON[l][0] = matrix_X_continuous[l][j+my_rank]; // temporary storage
 
               if(BANDWIDTH_reg == BW_GEN_NN)
-                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+mpi_rank]; // temporary storage
+                matrix_bandwidth_eval[l][0] = matrix_bandwidth[l][j+my_rank]; // temporary storage
             }
 
 
             for(l = 0; l < num_reg_unordered; l++)
-              TUNO[l][0] = matrix_X_unordered[l][j+mpi_rank];
+              TUNO[l][0] = matrix_X_unordered[l][j+my_rank];
 
             for(l = 0; l < num_reg_ordered; l++)
-              TORD[l][0] = matrix_X_ordered[l][j+mpi_rank];
+              TORD[l][0] = matrix_X_ordered[l][j+my_rank];
 
             kernel_weighted_sum_np_ctx(kernel_c,
                                    kernel_u,
@@ -8702,7 +8695,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    1, // symmetric
                                    0, // NO gather-scatter sum
                                    1, // drop train
-                                   j+mpi_rank, // drop this training datum
+                                   j+my_rank, // drop this training datum
                                    operator, // no convolution
                                    OP_NOOP, // no permutations
                                    0, // no score
@@ -8734,15 +8727,14 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    num_categories,
                                    NULL,
                                    NULL,
-                                   kwm+(j+mpi_rank)*nrcc22,  // weighted sum
+                                   kwm+(j+my_rank)*nrcc22,  // weighted sum
                                    NULL, // no permutations
                                    NULL, // do not return kernel weights
                                    NULL);
 
           }
           // synchro step
-          if(!cvls_serial_mpi)
-            MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
+          MPI_Allgather(MPI_IN_PLACE, nrcc22, MPI_DOUBLE, kwm+j*nrcc22, nrcc22, MPI_DOUBLE, comm[1]);
         }
       } else {
         if((j % iNum_Processors) == 0){
@@ -8854,7 +8846,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
 
 #else
-      if((bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+      if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
 
         for(l = 0; l < num_reg_continuous; l++){
           TCON[l][0] = matrix_X_continuous[l][j]; // temporary storage
