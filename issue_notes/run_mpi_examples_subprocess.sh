@@ -11,6 +11,7 @@ R_LIBS_VALUE="${R_LIBS_VALUE:-}"
 KILL_ORPHANS_ON_FAIL="${KILL_ORPHANS_ON_FAIL:-0}"
 PRE_CLEAN_ORPHANS="${PRE_CLEAN_ORPHANS:-1}"
 WILD_MASTER_LOCAL_GUARD="${WILD_MASTER_LOCAL_GUARD:-}"
+BOOTSTRAP_PHASE_TRACE="${BOOTSTRAP_PHASE_TRACE:-0}"
 
 mkdir -p "${OUT_DIR}/jobs"
 SUMMARY="${OUT_DIR}/summary.tsv"
@@ -30,16 +31,22 @@ echo "TIMEOUT_SEC=${TIMEOUT_SEC}"
 if [ -n "${WILD_MASTER_LOCAL_GUARD}" ]; then
   echo "WILD_MASTER_LOCAL_GUARD=${WILD_MASTER_LOCAL_GUARD}"
 fi
+echo "BOOTSTRAP_PHASE_TRACE=${BOOTSTRAP_PHASE_TRACE}"
 
 write_job_script() {
   job="$1"
+  phase_file="$2"
   script="${OUT_DIR}/jobs/${job}.R"
 
   case "${job}" in
     npreg)
       cat > "${script}" <<EOF
 options(np.messages=FALSE)
+options(npRmpi.bootstrap.phase.file="${phase_file}")
+stage <- function(label) { cat(sprintf("STAGE %s\\n", label)); flush.console() }
+stage("library")
 suppressPackageStartupMessages(library(npRmpi))
+stage("init")
 npRmpi.init(nslaves=${NSLAVES}, quiet=TRUE)
 on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
 set.seed(42)
@@ -47,6 +54,7 @@ n <- 120
 x <- runif(n)
 y <- x + rnorm(n, sd=0.3*sd(x))
 bw <- npregbw(y ~ x, regtype="ll", bwmethod="cv.ls", nmulti=1)
+stage("fit")
 fit <- npreg(bws=bw)
 stopifnot(inherits(fit, "npregression"))
 cat("JOB_OK npreg\\n")
@@ -55,6 +63,7 @@ EOF
     npplot)
       cat > "${script}" <<EOF
 options(np.messages=FALSE)
+options(npRmpi.bootstrap.phase.file="${phase_file}")
 EOF
       if [ -n "${WILD_MASTER_LOCAL_GUARD}" ]; then
         cat >> "${script}" <<EOF
@@ -62,7 +71,10 @@ options(npRmpi.plot.wild.master_local.guard = ${WILD_MASTER_LOCAL_GUARD})
 EOF
       fi
       cat >> "${script}" <<EOF
+stage <- function(label) { cat(sprintf("STAGE %s\\n", label)); flush.console() }
+stage("library")
 suppressPackageStartupMessages(library(npRmpi))
+stage("init")
 npRmpi.init(nslaves=${NSLAVES}, quiet=TRUE)
 on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
 set.seed(123)
@@ -71,6 +83,7 @@ x1 <- runif(n); x2 <- runif(n); x3 <- runif(n); x4 <- rbinom(n, 2, .3)
 y <- 1 + x1 + x2 + x3 + x4 + rnorm(n)
 X <- data.frame(x1, x2, x3, ordered(x4))
 bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic", nmulti=1)
+stage("plot")
 out <- plot(
   bw,
   perspective=FALSE,
@@ -87,6 +100,7 @@ EOF
     npplot_wild_stress)
       cat > "${script}" <<EOF
 options(np.messages=FALSE)
+options(npRmpi.bootstrap.phase.file="${phase_file}")
 EOF
       if [ -n "${WILD_MASTER_LOCAL_GUARD}" ]; then
         cat >> "${script}" <<EOF
@@ -94,7 +108,10 @@ options(npRmpi.plot.wild.master_local.guard = ${WILD_MASTER_LOCAL_GUARD})
 EOF
       fi
       cat >> "${script}" <<EOF
+stage <- function(label) { cat(sprintf("STAGE %s\\n", label)); flush.console() }
+stage("library")
 suppressPackageStartupMessages(library(npRmpi))
+stage("init")
 npRmpi.init(nslaves=${NSLAVES}, quiet=TRUE)
 on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
 set.seed(123)
@@ -103,6 +120,7 @@ x1 <- runif(n); x2 <- runif(n); x3 <- runif(n); x4 <- rbinom(n, 2, .3)
 y <- 1 + x1 + x2 + x3 + x4 + rnorm(n)
 X <- data.frame(x1, x2, x3, ordered(x4))
 bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic", nmulti=1)
+stage("plot")
 out <- plot(
   bw,
   perspective=FALSE,
@@ -120,7 +138,11 @@ EOF
     npcondensitybw)
       cat > "${script}" <<EOF
 options(np.messages=FALSE)
+options(npRmpi.bootstrap.phase.file="${phase_file}")
+stage <- function(label) { cat(sprintf("STAGE %s\\n", label)); flush.console() }
+stage("library")
 suppressPackageStartupMessages(library(npRmpi))
+stage("init")
 npRmpi.init(nslaves=${NSLAVES}, quiet=TRUE)
 on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
 set.seed(99)
@@ -128,6 +150,7 @@ n <- 100
 x <- runif(n)
 y <- x + rnorm(n, sd=0.25)
 bw <- npcdensbw(xdat=data.frame(x=x), ydat=y, bwmethod="cv.ls", nmulti=1)
+stage("fit")
 fit <- npcdens(bws=bw)
 stopifnot(inherits(fit, "condensity"))
 cat("JOB_OK npcondensitybw\\n")
@@ -176,7 +199,12 @@ for job in "${JOB_ARR[@]}"; do
   if [ "${PRE_CLEAN_ORPHANS}" = "1" ]; then
     kill_orphans
   fi
-  write_job_script "${job}"
+  phase_file=""
+  if [ "${BOOTSTRAP_PHASE_TRACE}" = "1" ]; then
+    phase_file="${OUT_DIR}/${job}.phase.tsv"
+    : > "${phase_file}"
+  fi
+  write_job_script "${job}" "${phase_file}"
   log="${OUT_DIR}/${job}.log"
   rc=0
 
@@ -212,6 +240,14 @@ for job in "${JOB_ARR[@]}"; do
     echo "JOB_${job}_STATUS=${status}"
     echo "JOB_${job}_EXIT=${rc}"
     echo "JOB_${job}_ORPHANS=${orphan_flag}"
+    if [ -n "${phase_file}" ]; then
+      echo "JOB_${job}_PHASE_FILE=${phase_file}"
+      if [ -s "${phase_file}" ]; then
+        echo "JOB_${job}_PHASE_LINES=$(wc -l < "${phase_file}" | tr -d ' ')"
+      else
+        echo "JOB_${job}_PHASE_LINES=0"
+      fi
+    fi
   } >> "${TOKENS}"
 done
 

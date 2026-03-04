@@ -137,3 +137,35 @@ Priority update:
    - no material runtime regression vs intended parallel fan-out baseline.
 3. Use `npplot_wild_stress` as a mandatory gate for any wild-path transport or guard change; do not relax guard policy until this job is stable with `EXIT=0`.
 4. Add phase-level diagnostics in worker return transport (`mpi.remote.exec` / `.mpi.worker.exec`) and bootstrap fanout (`.npRmpi_bootstrap_run_fanout`) to pinpoint `EXIT=134` origin under stress.
+
+## Phase B.2 Forensic Breadcrumb Hardening (2026-03-04)
+Implemented:
+1. Added opt-in persistent bootstrap phase breadcrumbs in `R/np.plot.helpers.R`:
+   - new trace path resolver (`option npRmpi.bootstrap.phase.file` or env `NP_RMPI_BOOTSTRAP_PHASE_FILE`),
+   - phase append hook wired into `.npRmpi_bootstrap_phase_mark(...)`.
+2. Extended subprocess harness `issue_notes/run_mpi_examples_subprocess.sh`:
+   - `BOOTSTRAP_PHASE_TRACE=1` emits per-job phase files (`*.phase.tsv`),
+   - stage breadcrumbs (`STAGE library/init/plot`) added to generated R jobs for coarse crash localization.
+3. Extended static sweep `issue_notes/run_mpi_efficiency_sweep.sh`:
+   - added non-plot scan for `suppress.parallel = TRUE` to catch accidental off-MPI drift outside plot helpers.
+
+Validation:
+1. Static sweep rerun:
+   - `/tmp/mpi_efficiency_sweep_20260304_2`
+   - confirms `SUPPRESS_TRUE_NONPLOT_R_LINES=0` and `CVLS_FORCED_GATE_LINES=0`.
+2. Traced subprocess pass (`npplot`):
+   - `/tmp/build_stage_hardening_phaseB2_npplot_src_20260304_2` (`PASS`, `PHASE_LINES=16`).
+3. Traced stress repro (`npplot_wild_stress`) still fails guard on/off:
+   - guard on: `/tmp/build_stage_hardening_phaseB2_wildstress_guardtrue_src_20260304_2` (`EXIT=134`, `PHASE_LINES=12`)
+   - guard off: `/tmp/build_stage_hardening_phaseB2_wildstress_guardfalse_src_20260304_2` (`EXIT=134`, `PHASE_LINES=12`)
+4. Phase tails in both failing stress runs end at repeated `phase=done` records, indicating fanout dispatch/collect completed for multiple chunks before abort.
+5. Route validation on patched build:
+   - manual validator pass,
+   - attach validator pass,
+   - profile validator pass,
+   - attach plot smoke pass (`ATTACH_PLOT_OK`).
+
+Interpretation:
+1. The new breadcrumbs narrow failure location: aborts are not occurring at fanout entry/dispatch/collect mismatch; they occur after multiple completed fanout cycles.
+2. Guard state does not change failure class at stress scale (`EXIT=134` both modes).
+3. Next highest-value hardening remains transport/lifecycle diagnostics in legacy return paths, now with stronger phase evidence.

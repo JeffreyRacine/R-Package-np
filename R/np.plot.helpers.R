@@ -257,6 +257,45 @@
   stop(sprintf("MPI %s %s", what, msg), call. = FALSE)
 }
 
+.npRmpi_bootstrap_phase_trace_path <- function() {
+  path.opt <- getOption("npRmpi.bootstrap.phase.file", "")
+  path.env <- Sys.getenv("NP_RMPI_BOOTSTRAP_PHASE_FILE", unset = "")
+  path <- if (nzchar(path.env)) path.env else path.opt
+  path <- as.character(path)[1L]
+  if (is.na(path) || !nzchar(path))
+    return("")
+  path
+}
+
+.npRmpi_bootstrap_phase_trace_append <- function(what, phase, where) {
+  path <- .npRmpi_bootstrap_phase_trace_path()
+  if (!nzchar(path))
+    return(invisible(FALSE))
+
+  dirpath <- dirname(path)
+  if (!identical(dirpath, ".") && !dir.exists(dirpath)) {
+    ok <- tryCatch({
+      dir.create(dirpath, recursive = TRUE, showWarnings = FALSE)
+    }, error = function(e) FALSE)
+    if (!isTRUE(ok) && !dir.exists(dirpath))
+      return(invisible(FALSE))
+  }
+
+  line <- sprintf(
+    "%s\tpid=%d\twhat=%s\tphase=%s\twhere=%s\n",
+    format(Sys.time(), "%Y-%m-%dT%H:%M:%OS6%z"),
+    Sys.getpid(),
+    as.character(what)[1L],
+    as.character(phase)[1L],
+    if (is.na(where) || !nzchar(where)) "" else as.character(where)[1L]
+  )
+
+  tryCatch({
+    cat(line, file = path, append = TRUE)
+    TRUE
+  }, error = function(e) FALSE)
+}
+
 .npRmpi_bootstrap_phase_mark <- function(what = "bootstrap",
                                          phase = NA_character_,
                                          where = NA_character_) {
@@ -270,6 +309,7 @@
     label <- paste0(label, ":", where)
 
   .npRmpi_profile_add_comm_elapsed(elapsed_sec = 0.0, where = label)
+  .npRmpi_bootstrap_phase_trace_append(what = what, phase = phase, where = where)
   invisible(TRUE)
 }
 

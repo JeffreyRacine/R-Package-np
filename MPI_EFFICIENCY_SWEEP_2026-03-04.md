@@ -20,6 +20,11 @@ Identify any remaining paths that pull expensive work off MPI or off efficient h
 5. Dedicated stress harness roots (`npplot_wild_stress`):
 - `/tmp/mpi_efficiency_stress_guard_true_20260304_1`
 - `/tmp/mpi_efficiency_stress_guard_false_20260304_1`
+6. Phase-breadcrumb hardening artifacts:
+- `/tmp/mpi_efficiency_sweep_20260304_2`
+- `/tmp/build_stage_hardening_phaseB2_npplot_src_20260304_2`
+- `/tmp/build_stage_hardening_phaseB2_wildstress_guardtrue_src_20260304_2`
+- `/tmp/build_stage_hardening_phaseB2_wildstress_guardfalse_src_20260304_2`
 
 ## Static Findings
 1. `CVLS_FORCED_GATE_LINES=0` for pattern
@@ -29,17 +34,21 @@ Identify any remaining paths that pull expensive work off MPI or off efficient h
 3. Remaining explicit off-MPI controls are concentrated in plot/bootstrap helpers:
    - `R/np.plot.helpers.R`: `npRmpi.plot.wild.master_local.guard` forces master-local wild bootstrap dispatch when enabled.
    - `R/np.plot.helpers.R`: `.np_plot_kernel_weights_direct()` sets `suppress.parallel = TRUE` for direct `C_np_kernelsum` kernel-weight extraction.
+4. Non-plot regression guard:
+   - `SUPPRESS_TRUE_NONPLOT_R_LINES=0` in `/tmp/mpi_efficiency_sweep_20260304_2`.
 
 ## Runtime Probe Findings
 1. Subprocess harness `npplot` job passed with guard both on and off for the small diagnostic job (`plot.errors.boot.num=29`).
 2. Medium stress (`n=250/300`, `B=799`) passed with guard on/off; guard-off was slower on this host/config.
 3. Larger stress (`n=1000`, `B=799`) aborted (`Abort trap: 6`) with guard both on and off; log files remained empty.
 4. Dedicated subprocess stress job (`npplot_wild_stress`) failed with `EXIT=134` for guard both on and off, confirming guard state is not the primary root cause of this failure class.
+5. New phase breadcrumbs (`npRmpi.bootstrap.phase.file`) show repeated successful `wild` cycles (`preflight -> dispatch -> collect -> done`) before abort in both guard modes, narrowing failure beyond fanout collective cadence.
 
 ## Interpretation
 1. Core estimator/CV MPI routing is not currently showing additional static evidence of forced serial detours beyond the already-fixed CVLS gate issue.
 2. The dominant remaining MPI-efficiency debt is in plot/bootstrap infrastructure, not estimator/CV kernels.
 3. The large-`n` abort is not explained solely by the wild master-local guard; there is a deeper plot/bootstrap runtime fragility at higher workload.
+4. With phase breadcrumbs active, failure signature indicates abort occurs after multiple completed fanout slices, suggesting downstream lifecycle/transport memory fragility rather than immediate dispatch contract divergence.
 
 ## Priority Decision
 Highest priority now is **build-stage/runtime hardening**, not core SPMD remediation:
@@ -48,7 +57,7 @@ Highest priority now is **build-stage/runtime hardening**, not core SPMD remedia
 3. Defer guard removal until transport/runtime stability is proven under stress workloads.
 
 ## Immediate Next Tranche (Recommended)
-1. Add targeted diagnostics around bootstrap phases (`dispatch`, `collect`, `done`) and worker return transport for large-`n` wild path.
+1. Bootstrap phase diagnostics are now in place; next add targeted legacy return-transport diagnostics (`mpi.remote.exec` / `.mpi.worker.exec`) to pair with phase breadcrumbs.
 2. Add dedicated stress job to subprocess harness (`npplot_wild_stress`) with reproducible parameters and timeout.
 3. Gate any guard relaxation on:
    - no abort/hang in stress jobs,

@@ -23,6 +23,7 @@ cd "${REPO}"
 # Raw scans
 rg -n "npRmpi\.plot\.wild\.master_local\.guard|master-local|master\.local" R/np.plot.helpers.R > "${OUT_DIR}/scan_master_local_guard.txt" || true
 rg -n "suppress\.parallel\s*=\s*TRUE" R/*.R > "${OUT_DIR}/scan_suppress_parallel_true_R.txt" || true
+rg -n "suppress\.parallel\s*=\s*TRUE" R/*.R | rg -v "R/np\\.plot\\.helpers\\.R" > "${OUT_DIR}/scan_suppress_parallel_true_nonplot_R.txt" || true
 rg -n "if\(\(bwm == RBWM_CVLS\) \|\| ks_tree_use \|\| \(BANDWIDTH_reg == BW_ADAP_NN\)\)" src/jksum.c > "${OUT_DIR}/scan_cvls_forced_gate.txt" || true
 rg -n "kernel_bandwidth_mean\(" src/jksum.c src/kernele.c src/np.c > "${OUT_DIR}/scan_kernel_bandwidth_calls.txt" || true
 rg -n "do not suppress_parallel|suppress_parallel, // suppress_parallel if requested" src/jksum.c src/kernele.c src/np.c > "${OUT_DIR}/scan_suppress_parallel_c.txt" || true
@@ -36,6 +37,7 @@ count_lines() {
 
 MASTER_LOCAL_LINES=$(count_lines "${OUT_DIR}/scan_master_local_guard.txt")
 SUPPRESS_TRUE_R_LINES=$(count_lines "${OUT_DIR}/scan_suppress_parallel_true_R.txt")
+SUPPRESS_TRUE_NONPLOT_R_LINES=$(count_lines "${OUT_DIR}/scan_suppress_parallel_true_nonplot_R.txt")
 CVLS_FORCED_GATE_LINES=$(count_lines "${OUT_DIR}/scan_cvls_forced_gate.txt")
 KERNEL_BW_CALL_LINES=$(count_lines "${OUT_DIR}/scan_kernel_bandwidth_calls.txt")
 SUPPRESS_C_LINES=$(count_lines "${OUT_DIR}/scan_suppress_parallel_c.txt")
@@ -44,6 +46,7 @@ COLLECTIVE_CORE_LINES=$(count_lines "${OUT_DIR}/scan_collectives_core.txt")
 {
   echo "MASTER_LOCAL_LINES=${MASTER_LOCAL_LINES}"
   echo "SUPPRESS_TRUE_R_LINES=${SUPPRESS_TRUE_R_LINES}"
+  echo "SUPPRESS_TRUE_NONPLOT_R_LINES=${SUPPRESS_TRUE_NONPLOT_R_LINES}"
   echo "CVLS_FORCED_GATE_LINES=${CVLS_FORCED_GATE_LINES}"
   echo "KERNEL_BW_CALL_LINES=${KERNEL_BW_CALL_LINES}"
   echo "SUPPRESS_C_LINES=${SUPPRESS_C_LINES}"
@@ -59,6 +62,7 @@ Repo: \
 Artifacts:
 - \`${OUT_DIR}/scan_master_local_guard.txt\`
 - \`${OUT_DIR}/scan_suppress_parallel_true_R.txt\`
+- \`${OUT_DIR}/scan_suppress_parallel_true_nonplot_R.txt\`
 - \`${OUT_DIR}/scan_cvls_forced_gate.txt\`
 - \`${OUT_DIR}/scan_kernel_bandwidth_calls.txt\`
 - \`${OUT_DIR}/scan_suppress_parallel_c.txt\`
@@ -68,6 +72,7 @@ Artifacts:
 ## Headline Counts
 - master-local guard hits in plot helpers: **${MASTER_LOCAL_LINES}**
 - R-layer \`suppress.parallel = TRUE\` hits: **${SUPPRESS_TRUE_R_LINES}**
+- non-plot R-layer \`suppress.parallel = TRUE\` hits: **${SUPPRESS_TRUE_NONPLOT_R_LINES}**
 - forced CVLS expensive-gate pattern hits in \`src/jksum.c\`: **${CVLS_FORCED_GATE_LINES}**
 - kernel_bandwidth_mean callsites scanned: **${KERNEL_BW_CALL_LINES}**
 - C-layer suppress-parallel annotation hits: **${SUPPRESS_C_LINES}**
