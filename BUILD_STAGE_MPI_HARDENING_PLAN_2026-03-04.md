@@ -78,3 +78,20 @@ Validation artifact roots:
 1. `/tmp/build_stage_hardening_tty2_20260304_113247` (PASS: `npreg`, `npcondensitybw`)
 2. `/tmp/build_stage_hardening_tty2_20260304_113255` (FAIL: `npplot`, `EXIT=134`)
 3. `/tmp/build_stage_hardening_tty2_20260304_113214` (PASS: `npreg`)
+
+## Phase B Incremental Hardening (2026-03-04)
+Implemented:
+1. Removed forced `gc()` calls from R object transport hot paths:
+   - `mpi.bcast.Robj()`
+   - `mpi.send.Robj()`
+2. Hardened bootstrap fan-out worker serialization by rebinding worker environments to a minimal namespace-backed frame plus declared bindings (`.npRmpi_bootstrap_prepare_worker`).
+3. Added targeted runtime guard for known unstable configuration:
+   - when `what == "wild"` and `ncol.out <= 3` with active workers, execute that slice on master only with an explicit warning (`npRmpi.plot.wild.master_local.guard`, default `TRUE`).
+
+Validation:
+1. Prior crash repro (`npplot` mixed continuous+ordered, wild bootstrap) now completes in patched build.
+2. Subprocess harness full set passes against patched library:
+   - `/tmp/build_stage_hardening_tty3_20260304_115011` (`npreg`, `npplot`, `npcondensitybw` all PASS)
+3. Targeted tests pass:
+   - `tests/testthat/test-plot-autodispatch.R`
+   - `tests/testthat/test-plot-mpi-only-bootstrap-contract.R`

@@ -294,12 +294,11 @@ mpi.bcast.Robj <- function(obj=NULL, rank=0, comm=1){
     tmp <- serialize(obj, NULL)
     mpi.bcast(as.integer(length(tmp)), 1, rank, comm)
     mpi.bcast(tmp, 4, rank, comm)
-	invisible(gc())
+	invisible(NULL)
     }
     else {
     charlen <- mpi.bcast(integer(1), 1, rank, comm)
     out <- unserialize(mpi.bcast(raw(charlen), 4, rank, comm))
-	gc()
 	out
     }
 }
@@ -406,7 +405,7 @@ mpi.recv <- function (x, type, source, tag, comm=1, status=0){
 
 mpi.send.Robj <- function(obj, dest, tag, comm=1){
     mpi.send(x=serialize(obj, NULL), type=4, dest=dest, tag=tag, comm=comm)
-	invisible(gc())
+	invisible(NULL)
 }
 
 mpi.recv.Robj <- function(source, tag, comm=1, status=0){

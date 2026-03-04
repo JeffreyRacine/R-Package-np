@@ -294,6 +294,43 @@
   invisible(TRUE)
 }
 
+.npRmpi_bootstrap_prepare_worker <- function(worker,
+                                             required.bindings = NULL) {
+  if (!is.function(worker))
+    stop("worker must be a function")
+
+  bind.env <- new.env(parent = asNamespace("npRmpi"))
+  if (!is.null(required.bindings)) {
+    nms <- names(required.bindings)
+    if (is.null(nms))
+      stop("required.bindings must be named when provided")
+    for (nm in nms)
+      assign(nm, required.bindings[[nm]], envir = bind.env)
+  }
+
+  worker.prepared <- worker
+  environment(worker.prepared) <- bind.env
+  worker.prepared
+}
+
+.npRmpi_warn_wild_master_local_guard_once <- local({
+  warned <- FALSE
+  function() {
+    if (warned)
+      return(invisible(FALSE))
+    warned <<- TRUE
+    warning(
+      paste(
+        "MPI wild bootstrap fan-out for low-dimension slices (ncol.out <= 3)",
+        "is unstable on some MPI stacks; running this slice on master only",
+        "to preserve wild-bootstrap semantics and avoid process abort."
+      ),
+      call. = FALSE
+    )
+    invisible(TRUE)
+  }
+})
+
 .npRmpi_bootstrap_fanout_enabled <- function(comm = 1L,
                                              n = NA_integer_,
                                              B = NA_integer_,
@@ -414,15 +451,26 @@
     required.bindings = required.bindings,
     what = what
   )
+  worker.exec <- .npRmpi_bootstrap_prepare_worker(
+    worker = worker,
+    required.bindings = required.bindings
+  )
 
   .npRmpi_bootstrap_phase_mark(
     what = what,
     phase = "dispatch",
     where = profile.where
   )
+  workers <- .npRmpi_bootstrap_worker_count(comm = comm)
   use.master.local <- !isTRUE(.npRmpi_has_active_slave_pool(comm = comm)) &&
     isTRUE(.npRmpi_master_only_mode(comm = comm))
-  workers <- .npRmpi_bootstrap_worker_count(comm = comm)
+  if (identical(what, "wild") &&
+      isTRUE(getOption("npRmpi.plot.wild.master_local.guard", TRUE)) &&
+      workers >= 1L &&
+      as.integer(ncol.out) <= 3L) {
+    .npRmpi_warn_wild_master_local_guard_once()
+    use.master.local <- TRUE
+  }
   t.comm <- proc.time()
   parts <- if (isTRUE(use.master.local)) {
     tryCatch({
@@ -430,7 +478,7 @@
       done.boot <- 0L
       for (ii in seq_along(tasks)) {
         task <- tasks[[ii]]
-        parts.local[[ii]] <- do.call(worker, c(list(task), list(...)))
+        parts.local[[ii]] <- do.call(worker.exec, c(list(task), list(...)))
         done.boot <- done.boot + as.integer(task$bsz)
         progress <- .np_plot_progress_tick(state = progress, done = done.boot)
       }
@@ -445,7 +493,7 @@
 
       local.eval <- function(task) {
         tryCatch(
-          do.call(worker, c(list(task), list(...))),
+          do.call(worker.exec, c(list(task), list(...))),
           error = function(e)
             structure(conditionMessage(e), class = "try-error", condition = e)
         )
@@ -461,7 +509,7 @@
         mpi.anytag <- mpi.any.tag()
 
         mpi.bcast.cmd(.mpi.worker.applyLB, n = n.remote, comm = comm)
-        mpi.bcast.Robj(list(FUN = worker, dot.arg = list(...)), rank = 0, comm = comm)
+        mpi.bcast.Robj(list(FUN = worker.exec, dot.arg = list(...)), rank = 0, comm = comm)
 
         init <- min(slave.num, n.remote)
         if (init > 0L) {
@@ -526,7 +574,7 @@
     }, error = function(e) e)
   } else {
     tryCatch(
-      mpi.applyLB(tasks, worker, ..., comm = comm),
+      mpi.applyLB(tasks, worker.exec, ..., comm = comm),
       error = function(e) e
     )
   }
