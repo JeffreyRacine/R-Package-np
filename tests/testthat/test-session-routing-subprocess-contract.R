@@ -225,6 +225,40 @@ test_that("session quit/init cycle resets SPMD sequence for LL CV calls", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session soft close/reopen keeps reused slave pool SPMD-synchronized", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE, npRmpi.reuse.slaves=TRUE)",
+      "run_lp <- function(seed) {",
+      "  set.seed(seed)",
+      "  n <- 200L",
+      "  x <- runif(n)",
+      "  y <- rnorm(n, sd=0.5*sd(x))",
+      "  fit <- npreg(y~x, regtype='lp', degree=2L)",
+      "  stopifnot(is.finite(as.numeric(fit$bws$fval)))",
+      "  invisible(fit)",
+      "}",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "run_lp(42)",
+      "npRmpi.quit(mode='spawn', force=FALSE)",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "run_lp(43)",
+      "npRmpi.quit(mode='spawn', force=TRUE)",
+      "cat('SESSION_SOFT_REOPEN_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_SOFT_REOPEN_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session rejects nslaves=0 with serial-workflow remediation", {
   skip_on_cran()
   env <- subprocess_env()

@@ -335,7 +335,19 @@ mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
         # Soft-close: keep the slave daemons alive for reuse in this session.
         # This avoids repeated spawn/merge/teardown cycles that can hang/crash
         # on some MPI stacks (notably MPICH on macOS).
-        return(invisible(0L))
+        reset.ok <- tryCatch({
+          fn <- get(".npRmpi_session_reset_spmd_state_allranks",
+                    envir = asNamespace("npRmpi"),
+                    mode = "function",
+                    inherits = FALSE)
+          isTRUE(fn(comm = comm, strict = FALSE, where = "mpi.close.Rslaves() soft-close reset"))
+        }, error = function(e) FALSE)
+        if (isTRUE(reset.ok))
+            return(invisible(0L))
+        warning(
+            "soft-close SPMD reset failed; falling back to hard-close to avoid stale sequence state",
+            call. = FALSE
+        )
     }
     # Tell slaves to exit their daemon loop cleanly.
     # The spawned slave daemon (`inst/slavedaemon.R`) treats the character

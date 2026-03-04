@@ -20,6 +20,27 @@
   invisible(TRUE)
 }
 
+.npRmpi_session_reset_spmd_state_allranks <- function(comm = 1L,
+                                                      strict = TRUE,
+                                                      where = "npRmpi session state reset") {
+  cmd <- quote({
+    fn <- get(".npRmpi_session_reset_spmd_state", envir = asNamespace("npRmpi"), inherits = FALSE)
+    fn()
+    invisible(TRUE)
+  })
+  out <- try(
+    .npRmpi_bcast_cmd_expr(expr = cmd, comm = comm, caller.execute = TRUE),
+    silent = TRUE
+  )
+  if (inherits(out, "try-error")) {
+    msg <- paste(as.character(out), collapse = " ")
+    if (isTRUE(strict))
+      stop(sprintf("%s failed across ranks: %s", where, msg), call. = FALSE)
+    return(invisible(FALSE))
+  }
+  invisible(TRUE)
+}
+
 .npRmpi_safe_int <- function(expr) {
   tryCatch(as.integer(expr), error = function(e) NA_integer_)
 }
@@ -222,6 +243,11 @@ npRmpi.init <- function(...,
 
   if (identical(mode, "spawn")) {
     if (.npRmpi_session_has_active_pool(comm = comm)) {
+      .npRmpi_session_reset_spmd_state_allranks(
+        comm = comm,
+        strict = TRUE,
+        where = "npRmpi.init() reused-slave SPMD reset"
+      )
       options(npRmpi.master.only = FALSE)
       if (!quiet)
         mpi.hostinfo(comm)
