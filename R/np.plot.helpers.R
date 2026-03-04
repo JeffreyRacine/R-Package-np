@@ -189,6 +189,26 @@
   invisible(NULL)
 }
 
+.np_plot_normalize_wild <- function(wild = c("rademacher", "mammen")) {
+  if (length(wild) > 1L)
+    wild <- wild[1L]
+  match.arg(wild, c("mammen", "rademacher"))
+}
+
+.np_plot_boot_from_hat_wild <- function(H, ydat, fit.mean, B, wild) {
+  fit.mean <- as.vector(fit.mean)
+  list(
+    t = .np_wild_boot_t(
+      H = H,
+      fit.mean = fit.mean,
+      residuals = as.double(ydat - fit.mean),
+      B = as.integer(B),
+      wild = wild
+    ),
+    t0 = as.vector(H %*% as.double(ydat))
+  )
+}
+
 .np_plot_inid_fastpath_enabled <- function() {
   !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
 }
@@ -2020,9 +2040,7 @@ compute.bootstrap.errors.rbandwidth =
     }
 
     if (is.null(boot.out) && is.wild.hat) {
-      if (length(plot.errors.boot.wild) > 1L)
-        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
-      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
+      plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
       fit.train <- suppressWarnings(npreg(
         txdat = xdat,
@@ -2055,20 +2073,12 @@ compute.bootstrap.errors.rbandwidth =
         output = "matrix"
       ))
 
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - fit.train$mean)
-      n <- length(eps)
-      B <- plot.errors.boot.num
-
-      boot.out <- list(
-        t = .np_wild_boot_t(
-          H = H,
-          fit.mean = fit.train$mean,
-          residuals = eps,
-          B = B,
-          wild = plot.errors.boot.wild
-        ),
-        t0 = t0
+      boot.out <- .np_plot_boot_from_hat_wild(
+        H = H,
+        ydat = ydat,
+        fit.mean = fit.train$mean,
+        B = plot.errors.boot.num,
+        wild = plot.errors.boot.wild
       )
     }
 
@@ -2251,9 +2261,7 @@ compute.bootstrap.errors.scbandwidth =
     }
 
     if (is.null(boot.out) && is.wild.hat) {
-      if (length(plot.errors.boot.wild) > 1L)
-        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
-      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
+      plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
       fit.args <- list(
         txdat = xdat,
@@ -2277,20 +2285,12 @@ compute.bootstrap.errors.scbandwidth =
       fit.train <- do.call(npscoef, fit.args)
       H <- do.call(npscoefhat, hat.args)
 
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - as.vector(fit.train$mean))
-      n <- length(eps)
-      B <- plot.errors.boot.num
-
-      boot.out <- list(
-        t = .np_wild_boot_t(
-          H = H,
-          fit.mean = as.vector(fit.train$mean),
-          residuals = eps,
-          B = B,
-          wild = plot.errors.boot.wild
-        ),
-        t0 = t0
+      boot.out <- .np_plot_boot_from_hat_wild(
+        H = H,
+        ydat = ydat,
+        fit.mean = fit.train$mean,
+        B = plot.errors.boot.num,
+        wild = plot.errors.boot.wild
       )
     }
 
@@ -2406,9 +2406,7 @@ compute.bootstrap.errors.plbandwidth =
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat) {
-      if (length(plot.errors.boot.wild) > 1L)
-        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
-      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
+      plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
       fit.train <- npplreg(
         txdat = xdat,
@@ -2425,20 +2423,12 @@ compute.bootstrap.errors.plbandwidth =
         output = "matrix"
       )
 
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - as.vector(fit.train$mean))
-      n <- length(eps)
-      B <- plot.errors.boot.num
-
-      boot.out <- list(
-        t = .np_wild_boot_t(
-          H = H,
-          fit.mean = as.vector(fit.train$mean),
-          residuals = eps,
-          B = B,
-          wild = plot.errors.boot.wild
-        ),
-        t0 = t0
+      boot.out <- .np_plot_boot_from_hat_wild(
+        H = H,
+        ydat = ydat,
+        fit.mean = fit.train$mean,
+        B = plot.errors.boot.num,
+        wild = plot.errors.boot.wild
       )
     } else {
       boot.out <- NULL
@@ -3231,9 +3221,7 @@ compute.bootstrap.errors.sibandwidth =
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
     if (is.wild.hat) {
-      if (length(plot.errors.boot.wild) > 1L)
-        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
-      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
+      plot.errors.boot.wild <- .np_plot_normalize_wild(plot.errors.boot.wild)
 
       fit.train <- npindex(
         txdat = xdat,
@@ -3249,20 +3237,12 @@ compute.bootstrap.errors.sibandwidth =
         s = if (gradients) 1L else 0L
       )
 
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - as.vector(fit.train$mean))
-      n <- length(eps)
-      B <- plot.errors.boot.num
-
-      boot.out <- list(
-        t = .np_wild_boot_t(
-          H = H,
-          fit.mean = as.vector(fit.train$mean),
-          residuals = eps,
-          B = B,
-          wild = plot.errors.boot.wild
-        ),
-        t0 = t0
+      boot.out <- .np_plot_boot_from_hat_wild(
+        H = H,
+        ydat = ydat,
+        fit.mean = fit.train$mean,
+        B = plot.errors.boot.num,
+        wild = plot.errors.boot.wild
       )
     } else if (is.inid) {
       inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
