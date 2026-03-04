@@ -168,8 +168,8 @@
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
     draws <- .np_wild_draws(n = n, B = bsz, wild = wild)
-    ystar <- matrix(fit.mean, nrow = n, ncol = bsz) +
-      matrix(residuals, nrow = n, ncol = bsz) * draws
+    ystar <- residuals * draws
+    ystar <- ystar + fit.mean
     out[start:stopi, ] <- t(H %*% ystar)
     progress <- .np_plot_progress_tick(state = progress, done = stopi)
     start <- stopi + 1L
