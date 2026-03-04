@@ -202,6 +202,8 @@
 }
 
 .npRmpi_bootstrap_worker_count <- function(comm = 1L) {
+  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+    return(0L)
   size <- tryCatch(as.integer(mpi.comm.size(comm = comm)), error = function(e) NA_integer_)
   if (is.na(size) || size <= 1L)
     return(0L)

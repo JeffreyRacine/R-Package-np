@@ -1,4 +1,8 @@
 with_mpi_pool <- function(code) {
+  if (identical(Sys.getenv("_R_CHECK_PACKAGE_NAME_", ""), "npRmpi")) {
+    skip("MPI pool contract tests are skipped under R CMD check")
+  }
+
   init_err <- tryCatch({
     suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
     NULL

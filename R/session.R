@@ -209,6 +209,17 @@ npRmpi.init <- function(...,
   quiet <- npValidateScalarLogical(quiet, "quiet")
   sleep <- npValidatePositiveFiniteNumeric(sleep, "sleep")
 
+  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    stop(
+      paste(
+        "MPI runtime is not initialized in this R session.",
+        "Restart R and load npRmpi without NP_RMPI_SKIP_INIT,",
+        "or call this only in an MPI-initialized subprocess."
+      ),
+      call. = FALSE
+    )
+  }
+
   mode <- match.arg(mode)
   autodispatch.option.sync <- match.arg(autodispatch.option.sync)
   world.size <- .npRmpi_safe_int(mpi.comm.size(0))
