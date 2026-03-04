@@ -2575,101 +2575,20 @@ compute.bootstrap.errors.dbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.dbandwidth")
-    .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "unconditional density/distribution estimators")
-    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
-    boot.all.err <- NULL
-
-    is.inid = plot.errors.boot.method=="inid"
-    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    fast.inid <- isTRUE(is.inid) &&
-      isTRUE(identical(bws$type, "fixed"))
-    fast.block <- isTRUE(is.block) &&
-      isTRUE(identical(bws$type, "fixed"))
-
-    boot.out <- if (fast.inid || fast.block) {
-      counts.drawer <- if (fast.block) {
-        .np_block_counts_drawer(
-          n = nrow(xdat),
-          B = plot.errors.boot.num,
-          blocklen = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      } else {
-        NULL
-      }
-      boot.out <- tryCatch(
-        .np_inid_boot_from_ksum_unconditional(
-          xdat = xdat,
-          exdat = exdat,
-          bws = bws,
-          B = plot.errors.boot.num,
-          operator = "integral",
-          counts.drawer = counts.drawer
-        ),
-        error = function(e) {
-          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.dbandwidth (%s)",
-                       if (fast.block) plot.errors.boot.method else "inid",
-                       conditionMessage(e)),
-               call. = FALSE)
-        }
-      )
-    } else {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
-        }
-      } else {
-        function(tsb) {
-          npudist(tdat = tsb, edat = exdat, bws = bws)$dist
-        }
-      }
-
-      boot.out <- .np_plot_boot_dispatch(
-        boofun = boofun,
-        data = data.frame(xdat),
-        method = plot.errors.boot.method,
-        B = plot.errors.boot.num,
-        blocklen = plot.errors.boot.blocklen
-      )
-    }
-
-    all.bp <- .np_plot_boot_factor_boxplots(
-      boot.t = boot.out$t,
-      tdati = bws$xdati,
-      ti = slice.index,
-      B = plot.errors.boot.num
+    compute.bootstrap.errors.bandwidth(
+      xdat = xdat,
+      exdat = exdat,
+      cdf = TRUE,
+      slice.index = slice.index,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.boot.num = plot.errors.boot.num,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      ...,
+      bws = bws
     )
-
-    if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
-    }
-    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
-    }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.conbandwidth =
@@ -2842,140 +2761,26 @@ compute.bootstrap.errors.condbandwidth =
            plot.errors.alpha,
            ...,
            bws){
-    .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.condbandwidth")
-    exdat = toFrame(exdat)
-    boot.err = matrix(data = NA, nrow = dim(exdat)[1], ncol = 3)
-    boot.all.err <- NULL
-
-    tboo =
-      if(quantreg) "quant"
-      else if (cdf) "dist"
-      else "dens"
-
-    if (!identical(tboo, "quant")) {
-      .np_plot_reject_wild_unsupervised(plot.errors.boot.method, "conditional density/distribution estimators")
-    }
-
-    is.inid = plot.errors.boot.method=="inid"
-    is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    fast.inid <- isTRUE(is.inid) &&
-      isTRUE(!quantreg) &&
-      isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
-    fast.block <- isTRUE(is.block) &&
-      isTRUE(!quantreg) &&
-      isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
-
-    fit.cond <- function(tx, ty) {
-      switch(
-        tboo,
-        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-      )
-    }
-    out.cond <- function(fit) {
-      switch(
-        tboo,
-        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-      )
-    }
-    boot.out <- if (fast.inid || fast.block) {
-      counts.drawer <- if (fast.block) {
-        .np_block_counts_drawer(
-          n = nrow(xdat),
-          B = plot.errors.boot.num,
-          blocklen = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      } else {
-        NULL
-      }
-      boot.out <- tryCatch(
-        .np_inid_boot_from_ksum_conditional(
-          xdat = xdat,
-          ydat = ydat,
-          exdat = exdat,
-          eydat = eydat,
-          bws = bws,
-          B = plot.errors.boot.num,
-          cdf = cdf,
-          counts.drawer = counts.drawer
-        ),
-        error = function(e) {
-          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.condbandwidth (%s)",
-                       if (fast.block) plot.errors.boot.method else "inid",
-                       conditionMessage(e)),
-               call. = FALSE)
-        }
-      )
-    } else {
-      boofun <- if (is.inid) {
-        function(data, indices) out.cond(fit.cond(
-          tx = xdat[indices, , drop = FALSE],
-          ty = ydat[indices, , drop = FALSE]
-        ))
-      } else {
-        function(tsb) out.cond(fit.cond(
-          tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
-          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
-        ))
-      }
-      boot.out <- .np_plot_boot_dispatch(
-        boofun = boofun,
-        data = data.frame(xdat, ydat),
-        method = plot.errors.boot.method,
-        B = plot.errors.boot.num,
-        blocklen = plot.errors.boot.blocklen
-      )
-    }
-
-    if (slice.index <= bws$xndim){
-      tdati <- bws$xdati
-      ti <- slice.index
-    } else {
-      tdati <- bws$ydati
-      ti <- slice.index - bws$xndim
-    }
-    all.bp <- .np_plot_boot_factor_boxplots(
-      boot.t = boot.out$t,
-      tdati = tdati,
-      ti = ti,
-      B = plot.errors.boot.num
+    compute.bootstrap.errors.conbandwidth(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      cdf = cdf,
+      quantreg = quantreg,
+      tau = tau,
+      gradients = gradients,
+      gradient.index = gradient.index,
+      slice.index = slice.index,
+      plot.errors.boot.method = plot.errors.boot.method,
+      plot.errors.boot.blocklen = plot.errors.boot.blocklen,
+      plot.errors.boot.num = plot.errors.boot.num,
+      plot.errors.center = plot.errors.center,
+      plot.errors.type = plot.errors.type,
+      plot.errors.alpha = plot.errors.alpha,
+      ...,
+      bws = bws
     )
-
-    if (plot.errors.type == "pmzsd") {
-      boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
-    }
-    else if (plot.errors.type %in% c("pointwise", "bonferroni", "simultaneous", "all")) {
-      if (plot.errors.type == "all") {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "pointwise",
-          warn.coverage = FALSE)
-        boot.all.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = "all")
-        boot.all.err <- lapply(boot.all.bounds, function(bb) {
-          cbind(boot.out$t0 - bb[,1], bb[,2] - boot.out$t0)
-        })
-      } else {
-        boot.bounds <- compute.bootstrap.quantile.bounds(
-          boot.t = boot.out$t,
-          alpha = plot.errors.alpha,
-          band.type = plot.errors.type)
-      }
-      boot.err[,1] <- boot.out$t0 - boot.bounds[,1]
-      boot.err[,2] <- boot.bounds[,2] - boot.out$t0
-    }
-    if (plot.errors.center == "bias-corrected")
-      boot.err[,3] <- 2*boot.out$t0-colMeans(boot.out$t)
-    list(boot.err = boot.err, bxp = all.bp, boot.all.err = boot.all.err)
   }
 
 compute.bootstrap.errors.sibandwidth =
