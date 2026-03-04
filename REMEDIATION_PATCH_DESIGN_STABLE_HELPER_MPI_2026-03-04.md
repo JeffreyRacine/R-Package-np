@@ -268,3 +268,13 @@ Recommended order:
 14. Tranche-6 modernization-scan artifact root:
    - `/tmp/spmd_tranche6_modscan_postvapply_20260304_104841`
    - summary highlights: `scan_sapply=67` (inventory reduced), `scan_eval=4`, `scan_parse=0`, `scan_runtime_library_require=0`, `scan_demo_masking=0`, `scan_dotC=0`, `scan_manual_distributed_call=0`, `scan_stable_helper_symbol=0`.
+15. Completed `W.lp` type-stability tranche:
+   - replaced `xdat.col.numeric` classifier in `R/util.R` from `sapply(..., is.numeric)` to typed `vapply(..., logical(1))`.
+   - no API/default/condition-message changes.
+16. Tranche-7 validation artifact root:
+   - `/tmp/spmd_tranche7_wlp_vapply_20260304_105424`
+   - gate tokens (`summary_tokens_gate.log`): `ORPHAN_PRE_EMPTY=1`, `NPREG_GLP_FAILNZ=0`, `NPREG_CORE_FAILNZ=0`, `NPSIGTEST_FAILNZ=0`, `SESSION_WLP_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `ORPHAN_POST_EMPTY=1`.
+   - note: `test-npreg-arg-contract.R` is not a valid installed-package gate file because it references unexported symbol `npreg.rbandwidth` by bare name; recorded as `NPREG_ARG_INSTALLED_MODE_NA=1`.
+17. Tranche-7 modernization scan:
+   - `run_modernization_micro_scan.sh` summary recorded in `/tmp/spmd_tranche7_wlp_vapply_20260304_105424/modscan_run.log`.
+   - key delta: `scan_sapply=66` (down from `67`).

@@ -1797,7 +1797,7 @@ W.lp <- function(xdat = NULL,
 
   xdat <- as.data.frame(xdat)
 
-  xdat.col.numeric <- sapply(seq_len(ncol(xdat)), function(i){is.numeric(xdat[,i])})
+  xdat.col.numeric <- vapply(seq_len(ncol(xdat)), function(i) is.numeric(xdat[,i]), logical(1))
   k <- ncol(as.data.frame(xdat[,xdat.col.numeric]))
 
   xdat.numeric <- NULL
