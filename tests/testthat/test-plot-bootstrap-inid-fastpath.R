@@ -267,6 +267,49 @@ test_that("rbandwidth bootstrap non-gradient path avoids npreg refits", {
   expect_identical(ctr$n, 0L)
 })
 
+test_that("scbandwidth bootstrap non-coef path avoids npscoef refits", {
+  skip_if_not_installed("np")
+
+  set.seed(3240)
+  n <- 65
+  x <- runif(n)
+  z <- runif(n)
+  y <- sin(2 * pi * z) + x * (1 + z) + rnorm(n, sd = 0.1)
+  xdat <- data.frame(x = x)
+  zdat <- data.frame(z = z)
+  bw <- npscoefbw(xdat = xdat, ydat = y, zdat = zdat, regtype = "lc", nmulti = 1)
+
+  np.ns <- asNamespace("np")
+  ctr <- new.env(parent = emptyenv())
+  ctr$n <- 0L
+  trace(
+    what = "npscoef",
+    where = np.ns,
+    tracer = bquote(.(ctr)$n <- .(ctr)$n + 1L),
+    print = FALSE
+  )
+  on.exit(untrace("npscoef", where = np.ns), add = TRUE)
+
+  out <- suppressWarnings(
+    plot(
+      bw,
+      xdat = xdat,
+      ydat = y,
+      zdat = zdat,
+      coef = FALSE,
+      perspective = FALSE,
+      plot.behavior = "data",
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 7
+    )
+  )
+
+  expect_type(out, "list")
+  expect_true(length(out) > 0)
+  expect_identical(ctr$n, 0L)
+})
+
 test_that("npindex inid fast path matches explicit resample refits", {
   skip_if_not_installed("np")
 
