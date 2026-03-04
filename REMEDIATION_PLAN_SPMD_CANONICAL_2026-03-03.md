@@ -13,6 +13,7 @@ Completed checkpoint tranches:
 4. Phase 4 (core-family migration progress): complete for `npudens*`, `npudist*`, `npcdens*`, `npcdist*`, `npscoef*`, `npindex*`, `npplreg*`.
 5. Phase 5 (hot-path legacy asymmetry decommission): complete for core estimator/CV hot paths via typed locked opcode handlers and guard-validated route parity.
 6. Phase 6 (non-core migration): tranche A complete for `npqreg*`, `npconmode*`, `npksum*`, `npregiv*`, `npregivderiv*`, `npcmstest`, `npqcmstest`, `npdeneqtest`, `npdeptest`, `npsdeptest`, `npsymtest`, and `npunitest` via typed locked opcodes.
+7. Phase 6 (non-core migration): tranche B complete for `npsigtest*` typed locked opcode routing plus session/attach/profile fast-fail contract coverage.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -23,6 +24,7 @@ Latest checkpoint commits:
 6. `c34ff68` (lock typed opcodes for remaining core estimators)
 7. `138401a` (fix forwarded-dot argument resolution in autodispatch)
 8. `519955b` (lock non-core autodispatch families to typed SPMD opcodes)
+9. `(pending current checkpoint)` `npsigtest` locked opcode migration + contract and route coverage
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
@@ -30,6 +32,7 @@ Latest artifact roots:
 3. `/tmp/spmd_canonical_20260304_0001/phase12_individual_tests_20260303_204052`
 4. `/tmp/spmd_canonical_20260304_0001/phase19_preflight_20260303_210733`
 5. `/tmp/spmd_canonical_20260304_0001/phase20_noncore_opcode_locks_20260303_211050`
+6. `/tmp/spmd_canonical_20260304_0001/phase21_npsigtest_trancheB_20260303_222056`
 
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:
@@ -264,6 +267,6 @@ Acceptance:
    - condition-message regression not explicitly accepted.
 
 ## Immediate Next Action
-1. Continue Phase 6 non-core migration tranche-by-tranche for remaining autodispatch/manual-dispatch paths (notably `npsigtest` and any uncategorized call heads found by static scan).
-2. Add dedicated source-loaded subprocess coverage for new non-core locked opcodes to complement skip-on-CRAN unit guards.
+1. Close remaining Phase 6 residuals by auditing uncategorized dynamic call heads (if any) and locking them opcode-by-opcode.
+2. Add dedicated installed-build subprocess coverage for each newly locked non-core opcode family.
 3. Keep route gate (`session`, `attach`, `profile/manual`) and orphan-cleanup checks mandatory on every tranche.

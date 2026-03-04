@@ -149,6 +149,40 @@ test_that("session core trio smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session npsigtest fast-fail contract completes in installed-build subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "options(npRmpi.spmd.timeout.default=2)",
+      "set.seed(19)",
+      "n <- 20",
+      "x1 <- runif(n)",
+      "x2 <- runif(n)",
+      "y <- rnorm(n)",
+      "d <- data.frame(y=y, x1=x1, x2=x2)",
+      "bw <- npregbw(y~x1+x2, data=d, bws=c(0.2, 0.4), bandwidth.compute=FALSE)",
+      "err <- try(npsigtest(bws=bw, boot.num=9, random.seed=13, index=0), silent=TRUE)",
+      "stopifnot(inherits(err, 'try-error'))",
+      "msg <- as.character(err)",
+      "stopifnot(any(grepl('invalid index provided', msg, fixed=TRUE)))",
+      "stopifnot(!any(grepl(\"object 'd' not found\", msg, fixed=TRUE)))",
+      "cat('SESSION_NPSIGTEST_SUBPROCESS_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPSIGTEST_SUBPROCESS_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session rejects nslaves=0 with serial-workflow remediation", {
   skip_on_cran()
   env <- subprocess_env()

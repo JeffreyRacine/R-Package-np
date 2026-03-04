@@ -23,19 +23,57 @@
   list(xdat = xdat, ydat = ydat)
 }
 
+.npRmpi_npsig_extract_xy_from_bws <- function(obj) {
+  if (!is.null(obj$call)) {
+    call.names <- names(obj$call)
+    if (!is.null(call.names) &&
+        any(call.names == "xdat") &&
+        any(call.names == "ydat")) {
+      xdat <- .np_eval_bws_call_arg(obj, "xdat")
+      ydat <- .np_eval_bws_call_arg(obj, "ydat")
+      return(list(xdat = xdat, ydat = ydat))
+    }
+  }
+
+  if (!is.null(obj$formula) && !is.null(obj$call)) {
+    tt <- terms(obj$formula)
+    m <- match(c("formula", "data", "subset", "na.action"),
+               names(obj$call), nomatch = 0)
+    tmf <- obj$call[c(1, m)]
+    tmf[[1]] <- as.name("model.frame")
+    tmf[["formula"]] <- tt
+    mf.args <- as.list(tmf)[-1L]
+    tmf <- do.call(stats::model.frame, mf.args, envir = environment(tt))
+
+    ydat <- model.response(tmf)
+    xdat <- tmf[, attr(attr(tmf, "terms"), "term.labels"), drop = FALSE]
+    return(list(xdat = xdat, ydat = ydat))
+  }
+
+  stop("unable to extract xdat/ydat from bandwidth object")
+}
+
 npsigtest <-
   function(bws, ...){
     if (.npRmpi_autodispatch_active() &&
         !.npRmpi_autodispatch_in_context() &&
         !.npRmpi_autodispatch_called_from_bcast()) {
       mc <- match.call()
+      nms <- names(mc)
+      has.xdat <- !is.null(nms) && any(nms == "xdat")
+      has.ydat <- !is.null(nms) && any(nms == "ydat")
       if (!missing(bws) && isa(bws, "npregression")) {
         xy <- .npRmpi_npsig_extract_xy_from_npreg(bws)
         mc$bws <- bws$bws
         mc$xdat <- xy$xdat
         mc$ydat <- xy$ydat
+      } else if (!missing(bws) && isa(bws, "rbandwidth") &&
+                 (!has.xdat || !has.ydat)) {
+        xy <- .npRmpi_npsig_extract_xy_from_bws(bws)
+        mc$xdat <- xy$xdat
+        mc$ydat <- xy$ydat
       }
-      return(.npRmpi_manual_distributed_call(mc, parent.frame()))
+      return(.npRmpi_autodispatch_call(mc, parent.frame()))
     }
 
     args <- list(...)

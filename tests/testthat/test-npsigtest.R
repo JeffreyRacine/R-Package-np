@@ -1,3 +1,10 @@
+test_that("npsigtest routes through shared autodispatch entrypoint", {
+  fn <- getFromNamespace("npsigtest", "npRmpi")
+  body.txt <- paste(deparse(body(fn), width.cutoff = 500L), collapse = " ")
+  expect_match(body.txt, "\\.npRmpi_autodispatch_call\\(")
+  expect_false(grepl("\\.npRmpi_manual_distributed_call\\(", body.txt))
+})
+
 test_that("npsigtest basic functionality works with autodispatch", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")

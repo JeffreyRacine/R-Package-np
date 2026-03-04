@@ -389,6 +389,7 @@
     "autodispatch.npdeneqtest.core",
     "autodispatch.npdeptest.core",
     "autodispatch.npsdeptest.core",
+    "autodispatch.npsigtest.core",
     "autodispatch.npsymtest.core",
     "autodispatch.npunitest.core"
   )
@@ -736,6 +737,17 @@
         payload = payload,
         envelope = envelope,
         allowed_calls = "npsdeptest",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npsigtest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npsigtest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npsigtest", "npsigtest.formula", "npsigtest.call", "npsigtest.npregression", "npsigtest.rbandwidth"),
         where = "SPMD non-core opcode guard"
       )
     )
@@ -1128,6 +1140,10 @@
   .npRmpi_autodispatch_call_name_in(mc, "npsdeptest")
 }
 
+.npRmpi_autodispatch_is_npsigtest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npsigtest", "npsigtest.formula", "npsigtest.call", "npsigtest.npregression", "npsigtest.rbandwidth"))
+}
+
 .npRmpi_autodispatch_is_npsymtest_core <- function(mc) {
   .npRmpi_autodispatch_call_name_in(mc, "npsymtest")
 }
@@ -1181,6 +1197,8 @@
     return("autodispatch.npdeptest.core")
   if (.npRmpi_autodispatch_is_npsdeptest_core(mc = mc))
     return("autodispatch.npsdeptest.core")
+  if (.npRmpi_autodispatch_is_npsigtest_core(mc = mc))
+    return("autodispatch.npsigtest.core")
   if (.npRmpi_autodispatch_is_npsymtest_core(mc = mc))
     return("autodispatch.npsymtest.core")
   if (.npRmpi_autodispatch_is_npunitest_core(mc = mc))
@@ -1298,6 +1316,7 @@
   arg.list <- as.list(mc)
   nms <- names(arg.list)
   targets <- .npRmpi_autodispatch_target_args()
+  call.base <- sub("\\..*$", "", .npRmpi_autodispatch_call_name(mc))
 
   out <- mc
   if (is.call(out) && length(out) >= 1L && is.symbol(out[[1L]])) {
@@ -1400,7 +1419,10 @@
       names(out) <- out.nms
     }
     tmpnames <- c(tmpnames, tmp)
-    if (as.numeric(object.size(val)) >= large.arg.threshold) {
+    # npsigtest formulas store master-only symbols in bws$call; forcing the
+    # bws object through inline payload avoids worker-side prepublish divergence.
+    force.inline <- identical(call.base, "npsigtest") && identical(nm, "bws")
+    if (!force.inline && as.numeric(object.size(val)) >= large.arg.threshold) {
       prepublish[[tmp]] <- val
     } else {
       tmpvals[[tmp]] <- val
