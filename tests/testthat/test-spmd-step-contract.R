@@ -191,6 +191,27 @@ test_that("SPMD timeout class marks density/distribution bw CV opcodes as cv-den
   expect_identical(timeout.class("autodispatch.npcdistbw.cv"), "cv-density")
 })
 
+test_that("SPMD locked core opcodes reject mismatched call heads", {
+  make.env <- getFromNamespace(".npRmpi_spmd_make_envelope", "npRmpi")
+  try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")
+  set.seq <- getFromNamespace(".npRmpi_spmd_seq_set", "npRmpi")
+
+  old.seq <- getOption("npRmpi.spmd.seq_id", 0L)
+  on.exit(options(npRmpi.spmd.seq_id = old.seq), add = TRUE)
+  set.seq(0L)
+
+  env.reg <- make.env(opcode = "autodispatch.npregbw.cv_lllp", timeout_class = "cv-regression")
+  bad.reg <- try.exec(env.reg, payload = list(call = quote(npudensbw(dat = d))), where = "unit locked opcode")
+  expect_true(is.list(bad.reg) && !isTRUE(bad.reg$ok))
+  expect_match(bad.reg$error, "restricted to")
+
+  env.den <- make.env(opcode = "autodispatch.npudensbw.cv", timeout_class = "cv-density")
+  bad.den <- try.exec(env.den, payload = list(call = quote(npregbw(y ~ x, regtype = "ll", bwmethod = "cv.ls"))),
+                      where = "unit locked opcode")
+  expect_true(is.list(bad.den) && !isTRUE(bad.den$ok))
+  expect_match(bad.den$error, "restricted to")
+})
+
 test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
   make.env <- getFromNamespace(".npRmpi_spmd_make_envelope", "npRmpi")
   try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")

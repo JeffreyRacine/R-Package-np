@@ -361,8 +361,53 @@
   res
 }
 
+.npRmpi_spmd_locked_opcodes <- function() {
+  c(
+    "autodispatch.npregbw.cv_lllp",
+    "autodispatch.npscoefbw.cv_lllp",
+    "autodispatch.npplregbw.cv_lllp",
+    "autodispatch.npudensbw.cv",
+    "autodispatch.npudistbw.cv",
+    "autodispatch.npcdensbw.cv",
+    "autodispatch.npcdistbw.cv"
+  )
+}
+
+.npRmpi_spmd_eval_payload_call_guard <- function(payload,
+                                                 envelope,
+                                                 allowed_calls,
+                                                 where = "SPMD call guard") {
+  call.obj <- payload$call
+  if (is.expression(call.obj)) {
+    if (length(call.obj) != 1L)
+      stop(sprintf("%s expected single expression call", where), call. = FALSE)
+    call.obj <- call.obj[[1L]]
+  }
+  if (!is.call(call.obj))
+    stop(sprintf("%s missing call payload", where), call. = FALSE)
+
+  call.name <- .npRmpi_autodispatch_call_name(call.obj)
+  if (!length(call.name) || !nzchar(call.name) || !(call.name %in% allowed_calls)) {
+    stop(
+      sprintf("%s opcode '%s' restricted to {%s}; received '%s'",
+              where,
+              as.character(envelope$opcode)[1L],
+              paste(allowed_calls, collapse = ", "),
+              if (length(call.name) && nzchar(call.name)) call.name else "<unknown>"),
+      call. = FALSE
+    )
+  }
+
+  payload$call <- call.obj
+  .npRmpi_spmd_eval_payload(payload = payload, envelope = envelope)
+}
+
 .npRmpi_spmd_get_opcode <- function(opcode) {
   if (!exists(opcode, envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    locked <- .npRmpi_spmd_locked_opcodes()
+    if (is.character(opcode) && length(opcode) == 1L && opcode %in% locked) {
+      stop(sprintf("SPMD locked opcode '%s' is not registered", opcode), call. = FALSE)
+    }
     if (is.character(opcode) && length(opcode) == 1L &&
         startsWith(opcode, "autodispatch.")) {
       .npRmpi_spmd_register_opcode(
@@ -387,6 +432,83 @@
         payload = payload
       )
     })
+  }
+  if (!exists("autodispatch.npregbw.cv_lllp", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npregbw.cv_lllp",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npregbw",
+        where = "SPMD regression opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npscoefbw.cv_lllp", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npscoefbw.cv_lllp",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npscoefbw",
+        where = "SPMD regression opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npplregbw.cv_lllp", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npplregbw.cv_lllp",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npplregbw",
+        where = "SPMD regression opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npudensbw.cv", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npudensbw.cv",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npudensbw",
+        where = "SPMD density opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npudistbw.cv", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npudistbw.cv",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npudistbw",
+        where = "SPMD density opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npcdensbw.cv", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npcdensbw.cv",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npcdensbw",
+        where = "SPMD density opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npcdistbw.cv", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npcdistbw.cv",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npcdistbw",
+        where = "SPMD density opcode guard"
+      )
+    )
   }
   invisible(TRUE)
 }
