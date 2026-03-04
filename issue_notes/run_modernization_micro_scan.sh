@@ -16,11 +16,13 @@ run_scan() {
 }
 
 # Wickham-aligned static scans (R layer + selected C/runtime guardrails)
-run_scan "scan_eval" 'eval\(' "$ROOT_DIR/R"
-run_scan "scan_parse" 'parse\(' "$ROOT_DIR/R"
+# Use token-boundary patterns to avoid false positives such as deparse()/tikh.eval().
+run_scan "scan_eval" '(^|[^[:alnum:]_.])eval[[:space:]]*\(' "$ROOT_DIR/R"
+run_scan "scan_parse" '(^|[^[:alnum:]_.])parse[[:space:]]*\(' "$ROOT_DIR/R"
 run_scan "scan_sapply" '\bsapply\(' "$ROOT_DIR/R"
 run_scan "scan_range_one_length" '1:length\(' "$ROOT_DIR/R"
-run_scan "scan_runtime_library_require" '\blibrary\(|\brequire\(' "$ROOT_DIR/R"
+# Runtime attachment calls should be top-level active calls, not comments/examples.
+run_scan "scan_runtime_library_require" '^[[:space:]]*(library|require)[[:space:]]*\(' "$ROOT_DIR/R"
 run_scan "scan_dotC" '\.C\(' "$ROOT_DIR/R"
 run_scan "scan_nslaves_zero_runtime" 'nslaves\s*==\s*0|nslaves\s*<=\s*0|npRmpi\.init\(.*nslaves\s*=\s*0' "$ROOT_DIR/R"
 run_scan "scan_nslaves_zero_tests" 'nslaves\s*==\s*0|nslaves\s*<=\s*0|npRmpi\.init\(.*nslaves\s*=\s*0' "$ROOT_DIR/tests"
@@ -44,4 +46,3 @@ git -C "$ROOT_DIR" status --short > "$OUT_DIR/git_status_np_nprmpi.log" || true
 
 cat "$OUT_DIR/summary.log"
 echo "MODERNIZATION_MICRO_SCAN_OK"
-

@@ -246,3 +246,8 @@ Recommended order:
 7. Tranche-3 scan artifact root:
    - `/tmp/spmd_tranche3_modscan_20260304_104115`
    - summary highlights: `scan_demo_masking=0`, `scan_dotC=0`, `scan_manual_distributed_call=0`, `scan_stable_helper_symbol=0`, `scan_nslaves_zero_runtime=1` (expected guard in `R/Rcomm.R`), `scan_nslaves_zero_tests=2` (expected rejection coverage).
+8. Completed scan-harness refinement tranche:
+   - tightened regexes in `issue_notes/run_modernization_micro_scan.sh` to reduce false positives (`deparse`, `tikh.eval`, commented `library/require`).
+9. Tranche-4 scan artifact root:
+   - `/tmp/spmd_tranche4_modscan_refine_20260304_104220`
+   - summary highlights: `scan_eval=4`, `scan_parse=3`, `scan_runtime_library_require=0`, `scan_demo_masking=0`, `scan_dotC=0`, `scan_manual_distributed_call=0`, `scan_stable_helper_symbol=0`.
