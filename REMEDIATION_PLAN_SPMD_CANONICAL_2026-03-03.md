@@ -5,6 +5,23 @@
 2. `nslaves=0` is removed permanently from `npRmpi`.
 3. `npRmpi` runtime contract is MPI-only (`nslaves>=1`).
 
+## Execution Status (Updated 2026-03-03/04)
+Completed checkpoint tranches:
+1. Phase 1 (`nslaves=0` removal): complete (`2fc9317`).
+2. Phase 2 (SPMD control-plane scaffolding): complete (`905ffd9`, `6b6be81`, `1fece7e`, `3bf4914`).
+3. Phase 3 (`npregbw` LL/LP CV migration + `O(n^2)` helper excision): complete (`24dbd4b` and subsequent route/contract gates).
+4. Phase 4 (core-family migration progress): complete for `npudens*`, `npudist*`, `npcdens*`, `npcdist*`, `npscoef*`, `npindex*`, `npplreg*`.
+
+Latest checkpoint commits:
+1. `8f5e959` (density/distribution opcode classification)
+2. `47bbc49` (locked typed handlers for migrated core opcodes)
+3. `388d643` (contract test realignment)
+
+Latest artifact roots:
+1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
+2. `/tmp/spmd_canonical_20260304_0001/phase11_locked_opcode_handlers_20260303_202742`
+3. `/tmp/spmd_canonical_20260304_0001/phase12_individual_tests_20260303_204052`
+
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:
 1. `session/spawn`

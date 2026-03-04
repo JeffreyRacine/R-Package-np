@@ -366,6 +366,7 @@
     "autodispatch.npregbw.cv_lllp",
     "autodispatch.npscoefbw.cv_lllp",
     "autodispatch.npplregbw.cv_lllp",
+    "autodispatch.npindexbw.core",
     "autodispatch.npudensbw.cv",
     "autodispatch.npudistbw.cv",
     "autodispatch.npcdensbw.cv",
@@ -462,6 +463,17 @@
         payload = payload,
         envelope = envelope,
         allowed_calls = "npplregbw",
+        where = "SPMD regression opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npindexbw.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npindexbw.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npindexbw", "npindexbw.default", "npindexbw.formula", "npindexbw.sibandwidth"),
         where = "SPMD regression opcode guard"
       )
     )
@@ -786,6 +798,19 @@
   .npRmpi_autodispatch_is_bw_lllp_cv(mc = mc, caller_env = caller_env, call_name = "npplregbw")
 }
 
+.npRmpi_autodispatch_is_npindexbw_core <- function(mc, caller_env) {
+  call.name <- .npRmpi_autodispatch_call_name(mc)
+  if (!(call.name %in% c("npindexbw", "npindexbw.default", "npindexbw.formula", "npindexbw.sibandwidth")))
+    return(FALSE)
+  bw.compute <- .npRmpi_autodispatch_eval_logical_arg(
+    mc = mc,
+    caller_env = caller_env,
+    argname = "bandwidth.compute",
+    default = TRUE
+  )
+  isTRUE(bw.compute)
+}
+
 .npRmpi_spmd_opcode_from_call <- function(mc, caller_env) {
   if (.npRmpi_autodispatch_is_npregbw_lllp_cv(mc = mc, caller_env = caller_env))
     return("autodispatch.npregbw.cv_lllp")
@@ -793,6 +818,8 @@
     return("autodispatch.npscoefbw.cv_lllp")
   if (.npRmpi_autodispatch_is_npplregbw_lllp_cv(mc = mc, caller_env = caller_env))
     return("autodispatch.npplregbw.cv_lllp")
+  if (.npRmpi_autodispatch_is_npindexbw_core(mc = mc, caller_env = caller_env))
+    return("autodispatch.npindexbw.core")
   if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudensbw"))
     return("autodispatch.npudensbw.cv")
   if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudistbw"))
@@ -809,7 +836,8 @@
 .npRmpi_spmd_timeout_class_from_opcode <- function(opcode) {
   if (identical(opcode, "autodispatch.npregbw.cv_lllp") ||
       identical(opcode, "autodispatch.npscoefbw.cv_lllp") ||
-      identical(opcode, "autodispatch.npplregbw.cv_lllp")) {
+      identical(opcode, "autodispatch.npplregbw.cv_lllp") ||
+      identical(opcode, "autodispatch.npindexbw.core")) {
     return("cv-regression")
   }
   if (identical(opcode, "autodispatch.npudensbw.cv") ||

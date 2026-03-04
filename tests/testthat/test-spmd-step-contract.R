@@ -128,6 +128,10 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   op.pl <- opcode.fun(mc = mc.pl, caller_env = environment())
   expect_identical(op.pl, "autodispatch.npplregbw.cv_lllp")
 
+  mc.si <- quote(npindexbw(xdat = x, ydat = y))
+  op.si <- opcode.fun(mc = mc.si, caller_env = environment())
+  expect_identical(op.si, "autodispatch.npindexbw.core")
+
   mc.noncv <- quote(npregbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls"))
   op.noncv <- opcode.fun(mc = mc.noncv, caller_env = environment())
   expect_identical(op.noncv, "autodispatch.npregbw")
@@ -138,7 +142,15 @@ test_that("SPMD timeout class marks LL/LP CV bw opcodes as cv-regression", {
   expect_identical(timeout.class("autodispatch.npregbw.cv_lllp"), "cv-regression")
   expect_identical(timeout.class("autodispatch.npscoefbw.cv_lllp"), "cv-regression")
   expect_identical(timeout.class("autodispatch.npplregbw.cv_lllp"), "cv-regression")
+  expect_identical(timeout.class("autodispatch.npindexbw.core"), "cv-regression")
   expect_identical(timeout.class("autodispatch.npindexbw"), "default")
+})
+
+test_that("SPMD npindexbw core opcode falls back when bandwidth.compute is FALSE", {
+  opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
+  mc.si <- quote(npindexbw(xdat = x, ydat = y, bandwidth.compute = FALSE))
+  op.si <- opcode.fun(mc = mc.si, caller_env = environment())
+  expect_identical(op.si, "autodispatch.npindexbw")
 })
 
 test_that("SPMD opcode selection tags density/distribution bw CV routes", {
@@ -210,6 +222,12 @@ test_that("SPMD locked core opcodes reject mismatched call heads", {
                       where = "unit locked opcode")
   expect_true(is.list(bad.den) && !isTRUE(bad.den$ok))
   expect_match(bad.den$error, "restricted to")
+
+  env.si <- make.env(opcode = "autodispatch.npindexbw.core", timeout_class = "cv-regression")
+  bad.si <- try.exec(env.si, payload = list(call = quote(npplregbw(xdat = x, ydat = y, zdat = z))),
+                     where = "unit locked opcode")
+  expect_true(is.list(bad.si) && !isTRUE(bad.si$ok))
+  expect_match(bad.si$error, "restricted to")
 })
 
 test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
