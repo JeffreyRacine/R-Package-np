@@ -141,6 +141,56 @@ test_that("SPMD timeout class marks LL/LP CV bw opcodes as cv-regression", {
   expect_identical(timeout.class("autodispatch.npindexbw"), "default")
 })
 
+test_that("SPMD opcode selection tags density/distribution bw CV routes", {
+  opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
+  bw.flag <- TRUE
+
+  mc.ud <- quote(npudensbw(dat = d, bandwidth.compute = TRUE))
+  op.ud <- opcode.fun(mc = mc.ud, caller_env = environment())
+  expect_identical(op.ud, "autodispatch.npudensbw.cv")
+
+  mc.ui <- quote(npudistbw(dat = d))
+  op.ui <- opcode.fun(mc = mc.ui, caller_env = environment())
+  expect_identical(op.ui, "autodispatch.npudistbw.cv")
+
+  mc.cd <- quote(npcdensbw(xdat = x, ydat = y, bandwidth.compute = bw.flag))
+  op.cd <- opcode.fun(mc = mc.cd, caller_env = environment())
+  expect_identical(op.cd, "autodispatch.npcdensbw.cv")
+
+  mc.ci <- quote(npcdistbw(xdat = x, ydat = y, bandwidth.compute = TRUE))
+  op.ci <- opcode.fun(mc = mc.ci, caller_env = environment())
+  expect_identical(op.ci, "autodispatch.npcdistbw.cv")
+})
+
+test_that("SPMD density/distribution bw opcode falls back when bandwidth.compute is FALSE", {
+  opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
+  bw.flag <- FALSE
+
+  mc.ud <- quote(npudensbw(dat = d, bandwidth.compute = FALSE))
+  op.ud <- opcode.fun(mc = mc.ud, caller_env = environment())
+  expect_identical(op.ud, "autodispatch.npudensbw")
+
+  mc.ui <- quote(npudistbw(dat = d, bandwidth.compute = bw.flag))
+  op.ui <- opcode.fun(mc = mc.ui, caller_env = environment())
+  expect_identical(op.ui, "autodispatch.npudistbw")
+
+  mc.cd <- quote(npcdensbw(xdat = x, ydat = y, bandwidth.compute = FALSE))
+  op.cd <- opcode.fun(mc = mc.cd, caller_env = environment())
+  expect_identical(op.cd, "autodispatch.npcdensbw")
+
+  mc.ci <- quote(npcdistbw(xdat = x, ydat = y, bandwidth.compute = FALSE))
+  op.ci <- opcode.fun(mc = mc.ci, caller_env = environment())
+  expect_identical(op.ci, "autodispatch.npcdistbw")
+})
+
+test_that("SPMD timeout class marks density/distribution bw CV opcodes as cv-density", {
+  timeout.class <- getFromNamespace(".npRmpi_spmd_timeout_class_from_opcode", "npRmpi")
+  expect_identical(timeout.class("autodispatch.npudensbw.cv"), "cv-density")
+  expect_identical(timeout.class("autodispatch.npudistbw.cv"), "cv-density")
+  expect_identical(timeout.class("autodispatch.npcdensbw.cv"), "cv-density")
+  expect_identical(timeout.class("autodispatch.npcdistbw.cv"), "cv-density")
+})
+
 test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
   make.env <- getFromNamespace(".npRmpi_spmd_make_envelope", "npRmpi")
   try.exec <- getFromNamespace(".npRmpi_spmd_try_execute_local", "npRmpi")

@@ -613,6 +613,22 @@
   tolower(val[[1L]])
 }
 
+.npRmpi_autodispatch_eval_logical_arg <- function(mc, caller_env, argname, default = NULL) {
+  arg.list <- as.list(mc)
+  nms <- names(arg.list)
+  if (is.null(nms) || !any(nms == argname))
+    return(default)
+  idx <- which(nms == argname)[1L]
+  val <- tryCatch(.npRmpi_autodispatch_eval_arg(arg.list[[idx]], caller_env = caller_env),
+                  error = function(e) NULL)
+  if (is.null(val) || length(val) != 1L)
+    return(default)
+  val <- as.logical(val[[1L]])
+  if (is.na(val))
+    return(default)
+  isTRUE(val)
+}
+
 .npRmpi_autodispatch_is_bw_lllp_cv <- function(mc, caller_env, call_name) {
   if (!identical(.npRmpi_autodispatch_call_name(mc), call_name))
     return(FALSE)
@@ -622,6 +638,18 @@
     return(FALSE)
 
   regtype %in% c("ll", "lp") && bwmethod %in% c("cv.ls", "cv.aic")
+}
+
+.npRmpi_autodispatch_is_density_bw_cv <- function(mc, caller_env, call_name) {
+  if (!identical(.npRmpi_autodispatch_call_name(mc), call_name))
+    return(FALSE)
+  bw.compute <- .npRmpi_autodispatch_eval_logical_arg(
+    mc = mc,
+    caller_env = caller_env,
+    argname = "bandwidth.compute",
+    default = TRUE
+  )
+  isTRUE(bw.compute)
 }
 
 .npRmpi_autodispatch_is_npregbw_lllp_cv <- function(mc, caller_env) {
@@ -643,6 +671,14 @@
     return("autodispatch.npscoefbw.cv_lllp")
   if (.npRmpi_autodispatch_is_npplregbw_lllp_cv(mc = mc, caller_env = caller_env))
     return("autodispatch.npplregbw.cv_lllp")
+  if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudensbw"))
+    return("autodispatch.npudensbw.cv")
+  if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudistbw"))
+    return("autodispatch.npudistbw.cv")
+  if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npcdensbw"))
+    return("autodispatch.npcdensbw.cv")
+  if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npcdistbw"))
+    return("autodispatch.npcdistbw.cv")
 
   call.name <- .npRmpi_autodispatch_call_name(mc)
   paste0("autodispatch.", gsub("[^A-Za-z0-9_]+", "_", call.name))
@@ -653,6 +689,12 @@
       identical(opcode, "autodispatch.npscoefbw.cv_lllp") ||
       identical(opcode, "autodispatch.npplregbw.cv_lllp")) {
     return("cv-regression")
+  }
+  if (identical(opcode, "autodispatch.npudensbw.cv") ||
+      identical(opcode, "autodispatch.npudistbw.cv") ||
+      identical(opcode, "autodispatch.npcdensbw.cv") ||
+      identical(opcode, "autodispatch.npcdistbw.cv")) {
+    return("cv-density")
   }
   "default"
 }
