@@ -164,6 +164,54 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   op.ci.est <- opcode.fun(mc = mc.ci.est, caller_env = environment())
   expect_identical(op.ci.est, "autodispatch.npcdist.core")
 
+  mc.qreg <- quote(npqreg(bws = bw, tau = 0.5))
+  op.qreg <- opcode.fun(mc = mc.qreg, caller_env = environment())
+  expect_identical(op.qreg, "autodispatch.npqreg.core")
+
+  mc.conmode <- quote(npconmode(bws = bw))
+  op.conmode <- opcode.fun(mc = mc.conmode, caller_env = environment())
+  expect_identical(op.conmode, "autodispatch.npconmode.core")
+
+  mc.ksum <- quote(npksum(txdat = x, bws = 0.5))
+  op.ksum <- opcode.fun(mc = mc.ksum, caller_env = environment())
+  expect_identical(op.ksum, "autodispatch.npksum.core")
+
+  mc.iv <- quote(npregiv(y = y, z = z, w = w))
+  op.iv <- opcode.fun(mc = mc.iv, caller_env = environment())
+  expect_identical(op.iv, "autodispatch.npregiv.core")
+
+  mc.ivd <- quote(npregivderiv(y = y, z = z, w = w))
+  op.ivd <- opcode.fun(mc = mc.ivd, caller_env = environment())
+  expect_identical(op.ivd, "autodispatch.npregivderiv.core")
+
+  mc.cmt <- quote(npcmstest(model = m, xdat = x, ydat = y))
+  op.cmt <- opcode.fun(mc = mc.cmt, caller_env = environment())
+  expect_identical(op.cmt, "autodispatch.npcmstest.core")
+
+  mc.qcmt <- quote(npqcmstest(model = m, xdat = x, ydat = y))
+  op.qcmt <- opcode.fun(mc = mc.qcmt, caller_env = environment())
+  expect_identical(op.qcmt, "autodispatch.npqcmstest.core")
+
+  mc.deq <- quote(npdeneqtest(x = xdf, y = ydf))
+  op.deq <- opcode.fun(mc = mc.deq, caller_env = environment())
+  expect_identical(op.deq, "autodispatch.npdeneqtest.core")
+
+  mc.dep <- quote(npdeptest(data.x = x, data.y = y))
+  op.dep <- opcode.fun(mc = mc.dep, caller_env = environment())
+  expect_identical(op.dep, "autodispatch.npdeptest.core")
+
+  mc.sdep <- quote(npsdeptest(data = y))
+  op.sdep <- opcode.fun(mc = mc.sdep, caller_env = environment())
+  expect_identical(op.sdep, "autodispatch.npsdeptest.core")
+
+  mc.sym <- quote(npsymtest(data = y))
+  op.sym <- opcode.fun(mc = mc.sym, caller_env = environment())
+  expect_identical(op.sym, "autodispatch.npsymtest.core")
+
+  mc.uni <- quote(npunitest(data.x = x, data.y = y))
+  op.uni <- opcode.fun(mc = mc.uni, caller_env = environment())
+  expect_identical(op.uni, "autodispatch.npunitest.core")
+
   mc.noncv <- quote(npregbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls"))
   op.noncv <- opcode.fun(mc = mc.noncv, caller_env = environment())
   expect_identical(op.noncv, "autodispatch.npregbw")
@@ -183,6 +231,9 @@ test_that("SPMD timeout class marks LL/LP CV bw opcodes as cv-regression", {
   expect_identical(timeout.class("autodispatch.npudist.core"), "default")
   expect_identical(timeout.class("autodispatch.npcdens.core"), "default")
   expect_identical(timeout.class("autodispatch.npcdist.core"), "default")
+  expect_identical(timeout.class("autodispatch.npksum.core"), "default")
+  expect_identical(timeout.class("autodispatch.npregiv.core"), "default")
+  expect_identical(timeout.class("autodispatch.npcmstest.core"), "default")
   expect_identical(timeout.class("autodispatch.npindexbw"), "default")
 })
 
@@ -286,6 +337,18 @@ test_that("SPMD locked core opcodes reject mismatched call heads", {
                           where = "unit locked opcode")
   expect_true(is.list(bad.den.est) && !isTRUE(bad.den.est$ok))
   expect_match(bad.den.est$error, "restricted to")
+
+  env.qreg <- make.env(opcode = "autodispatch.npqreg.core", timeout_class = "default")
+  bad.qreg <- try.exec(env.qreg, payload = list(call = quote(npconmode(bws = bw))),
+                       where = "unit locked opcode")
+  expect_true(is.list(bad.qreg) && !isTRUE(bad.qreg$ok))
+  expect_match(bad.qreg$error, "restricted to")
+
+  env.iv <- make.env(opcode = "autodispatch.npregiv.core", timeout_class = "default")
+  bad.iv <- try.exec(env.iv, payload = list(call = quote(npregivderiv(y = y, z = z, w = w))),
+                     where = "unit locked opcode")
+  expect_true(is.list(bad.iv) && !isTRUE(bad.iv$ok))
+  expect_match(bad.iv$error, "restricted to")
 })
 
 test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {

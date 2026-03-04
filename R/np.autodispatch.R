@@ -378,7 +378,19 @@
     "autodispatch.npudensbw.cv",
     "autodispatch.npudistbw.cv",
     "autodispatch.npcdensbw.cv",
-    "autodispatch.npcdistbw.cv"
+    "autodispatch.npcdistbw.cv",
+    "autodispatch.npqreg.core",
+    "autodispatch.npconmode.core",
+    "autodispatch.npksum.core",
+    "autodispatch.npregiv.core",
+    "autodispatch.npregivderiv.core",
+    "autodispatch.npcmstest.core",
+    "autodispatch.npqcmstest.core",
+    "autodispatch.npdeneqtest.core",
+    "autodispatch.npdeptest.core",
+    "autodispatch.npsdeptest.core",
+    "autodispatch.npsymtest.core",
+    "autodispatch.npunitest.core"
   )
 }
 
@@ -615,6 +627,138 @@
         envelope = envelope,
         allowed_calls = "npcdistbw",
         where = "SPMD density opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npqreg.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npqreg.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npqreg", "npqreg.default", "npqreg.formula", "npqreg.call", "npqreg.condbandwidth", "npqreg.conbandwidth"),
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npconmode.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npconmode.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npconmode", "npconmode.default", "npconmode.formula", "npconmode.call", "npconmode.conbandwidth"),
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npksum.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npksum.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npksum", "npksum.formula", "npksum.default", "npksum.numeric", "npksum.integer"),
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npregiv.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npregiv.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npregiv",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npregivderiv.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npregivderiv.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npregivderiv",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npcmstest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npcmstest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npcmstest",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npqcmstest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npqcmstest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npqcmstest",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npdeneqtest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npdeneqtest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npdeneqtest",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npdeptest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npdeptest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npdeptest",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npsdeptest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npsdeptest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npsdeptest",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npsymtest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npsymtest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npsymtest",
+        where = "SPMD non-core opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npunitest.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npunitest.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = "npunitest",
+        where = "SPMD non-core opcode guard"
       )
     )
   }
@@ -944,6 +1088,54 @@
   .npRmpi_autodispatch_call_name_in(mc, c("npcdist", "npcdist.default", "npcdist.formula", "npcdist.call", "npcdist.condbandwidth"))
 }
 
+.npRmpi_autodispatch_is_npqreg_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npqreg", "npqreg.default", "npqreg.formula", "npqreg.call", "npqreg.condbandwidth", "npqreg.conbandwidth"))
+}
+
+.npRmpi_autodispatch_is_npconmode_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npconmode", "npconmode.default", "npconmode.formula", "npconmode.call", "npconmode.conbandwidth"))
+}
+
+.npRmpi_autodispatch_is_npksum_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npksum", "npksum.formula", "npksum.default", "npksum.numeric", "npksum.integer"))
+}
+
+.npRmpi_autodispatch_is_npregiv_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npregiv")
+}
+
+.npRmpi_autodispatch_is_npregivderiv_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npregivderiv")
+}
+
+.npRmpi_autodispatch_is_npcmstest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npcmstest")
+}
+
+.npRmpi_autodispatch_is_npqcmstest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npqcmstest")
+}
+
+.npRmpi_autodispatch_is_npdeneqtest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npdeneqtest")
+}
+
+.npRmpi_autodispatch_is_npdeptest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npdeptest")
+}
+
+.npRmpi_autodispatch_is_npsdeptest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npsdeptest")
+}
+
+.npRmpi_autodispatch_is_npsymtest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npsymtest")
+}
+
+.npRmpi_autodispatch_is_npunitest_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, "npunitest")
+}
+
 .npRmpi_spmd_opcode_from_call <- function(mc, caller_env) {
   if (.npRmpi_autodispatch_is_npregbw_lllp_cv(mc = mc, caller_env = caller_env))
     return("autodispatch.npregbw.cv_lllp")
@@ -969,6 +1161,30 @@
     return("autodispatch.npcdens.core")
   if (.npRmpi_autodispatch_is_npcdist_core(mc = mc))
     return("autodispatch.npcdist.core")
+  if (.npRmpi_autodispatch_is_npqreg_core(mc = mc))
+    return("autodispatch.npqreg.core")
+  if (.npRmpi_autodispatch_is_npconmode_core(mc = mc))
+    return("autodispatch.npconmode.core")
+  if (.npRmpi_autodispatch_is_npksum_core(mc = mc))
+    return("autodispatch.npksum.core")
+  if (.npRmpi_autodispatch_is_npregiv_core(mc = mc))
+    return("autodispatch.npregiv.core")
+  if (.npRmpi_autodispatch_is_npregivderiv_core(mc = mc))
+    return("autodispatch.npregivderiv.core")
+  if (.npRmpi_autodispatch_is_npcmstest_core(mc = mc))
+    return("autodispatch.npcmstest.core")
+  if (.npRmpi_autodispatch_is_npqcmstest_core(mc = mc))
+    return("autodispatch.npqcmstest.core")
+  if (.npRmpi_autodispatch_is_npdeneqtest_core(mc = mc))
+    return("autodispatch.npdeneqtest.core")
+  if (.npRmpi_autodispatch_is_npdeptest_core(mc = mc))
+    return("autodispatch.npdeptest.core")
+  if (.npRmpi_autodispatch_is_npsdeptest_core(mc = mc))
+    return("autodispatch.npsdeptest.core")
+  if (.npRmpi_autodispatch_is_npsymtest_core(mc = mc))
+    return("autodispatch.npsymtest.core")
+  if (.npRmpi_autodispatch_is_npunitest_core(mc = mc))
+    return("autodispatch.npunitest.core")
   if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudensbw"))
     return("autodispatch.npudensbw.cv")
   if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudistbw"))
@@ -1019,9 +1235,19 @@
      "gydat", "gdat", "wdat", "gdata",
      "data.x", "data.y", "model",
      "y", "z", "w", "x", "zeval", "weval", "xeval", "bw",
+     "method", "distribution", "boot.method", "bootstrap", "boot.num", "random.seed",
+     "tau", "bwydat", "joint", "lag.num", "index",
+     "weights", "bandwidth.divide", "compute.ocg", "compute.score", "kernel.pow",
+     "leave.one.out", "operator", "permutation.operator", "return.kernel.weights",
      "regtype", "basis", "degree", "bernstein.basis",
      "nmulti", "bandwidth.compute", "remin", "itmax", "ftol", "tol", "small",
-     "gradients", "residuals", "errors", "gradient.order")
+     "gradients", "residuals", "errors", "gradient.order",
+     "alpha", "alpha.iter", "alpha.max", "alpha.min", "alpha.tol",
+     "constant", "iterate.diff.tol", "iterate.max", "iterate.Tikhonov", "iterate.Tikhonov.num",
+     "optim.abstol", "optim.maxattempts", "optim.maxit", "optim.method", "optim.reltol",
+     "p", "penalize.iteration", "return.weights.phi", "return.weights.phi.deriv.1",
+     "return.weights.phi.deriv.2", "smooth.residuals", "start.from", "starting.values",
+     "stop.on.increase", "iterate.break", "n.quasi.inv", "er.quasi.inv")
 }
 
 .npRmpi_autodispatch_failfast_formula_data <- function(mc, caller_env) {
