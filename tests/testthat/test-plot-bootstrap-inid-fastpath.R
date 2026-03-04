@@ -223,6 +223,50 @@ test_that("plot bootstrap accepts wild selector", {
   expect_true(length(out) > 0)
 })
 
+test_that("rbandwidth bootstrap non-gradient path avoids npreg refits", {
+  skip_if_not_installed("np")
+
+  set.seed(3239)
+  n <- 70
+  x <- runif(n)
+  y <- sin(2 * pi * x) + rnorm(n, sd = 0.1)
+  bw <- npregbw(
+    y ~ x,
+    regtype = "lc",
+    bws = 0.25,
+    bandwidth.compute = FALSE
+  )
+
+  np.ns <- asNamespace("np")
+  ctr <- new.env(parent = emptyenv())
+  ctr$n <- 0L
+  trace(
+    what = "npreg",
+    where = np.ns,
+    tracer = bquote(.(ctr)$n <- .(ctr)$n + 1L),
+    print = FALSE
+  )
+  on.exit(untrace("npreg", where = np.ns), add = TRUE)
+
+  out <- suppressWarnings(
+    plot(
+      bw,
+      xdat = data.frame(x = x),
+      ydat = y,
+      plot.behavior = "data",
+      perspective = FALSE,
+      gradients = FALSE,
+      plot.errors.method = "bootstrap",
+      plot.errors.boot.method = "inid",
+      plot.errors.boot.num = 7
+    )
+  )
+
+  expect_type(out, "list")
+  expect_true(length(out) > 0)
+  expect_identical(ctr$n, 0L)
+})
+
 test_that("npindex inid fast path matches explicit resample refits", {
   skip_if_not_installed("np")
 
