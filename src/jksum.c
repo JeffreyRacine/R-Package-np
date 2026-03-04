@@ -7501,7 +7501,8 @@ static double np_reg_cv_ls_stable_ll_glp(const int int_ll,
                                          int *num_categories,
                                          double **glp_basis,
                                          const int glp_nterms){
-  const int p = (int_ll == LL_LL) ? (num_reg_continuous + 1) : glp_nterms;
+  const int p = (int_ll == LL_LL) ? (num_reg_continuous + 1) :
+    ((int_ll == LL_LC) ? 1 : glp_nterms);
   const int do_loo = 0;
   double cv = 0.0;
 
@@ -7621,7 +7622,7 @@ static double np_reg_cv_ls_stable_ll_glp(const int int_ll,
       if(int_ll == LL_LL){
         for(a = 1; a < p; a++)
           z[a] = matrix_X_continuous[a-1][i];
-      } else {
+      } else if(int_ll == LL_LP) {
         for(a = 1; a < p; a++)
           z[a] = glp_basis[a][i];
       }
@@ -7655,7 +7656,7 @@ static double np_reg_cv_ls_stable_ll_glp(const int int_ll,
       if(int_ll == LL_LL){
         for(a = 1; a < p; a++)
           mhat += DELTA[a][0]*matrix_X_continuous[a-1][j];
-      } else {
+      } else if(int_ll == LL_LP) {
         for(a = 1; a < p; a++)
           mhat += DELTA[a][0]*glp_basis[a][j];
       }
@@ -8610,7 +8611,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
   }
 
-  if((bwm == RBWM_CVLS) && (int_ll == LL_LL) &&
+  if((bwm == RBWM_CVLS) && ((int_ll == LL_LL) || (int_ll == LL_LC)) &&
      (num_reg_unordered == 0) && (num_reg_ordered == 0)){
     cv = np_reg_cv_ls_stable_ll_glp(int_ll,
                                     BANDWIDTH_reg,

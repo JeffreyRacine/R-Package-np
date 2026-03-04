@@ -183,6 +183,48 @@ test_that("session npsigtest fast-fail contract completes in installed-build sub
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session quit/init cycle resets SPMD sequence for LL CV calls", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "mkdat <- function(seed) {",
+      "  set.seed(seed)",
+      "  n <- 220L",
+      "  x1 <- runif(n); x2 <- runif(n)",
+      "  z1 <- factor(rbinom(n, 1L, 0.5))",
+      "  z2 <- ordered(rbinom(n, 1L, 0.5))",
+      "  y <- cos(2*pi*x1) + 0.5*sin(2*pi*x2) + as.numeric(z1) + rnorm(n, sd=0.2)",
+      "  data.frame(y=y, x1=x1, x2=x2, z1=z1, z2=z2)",
+      "}",
+      "runll <- function(seed) {",
+      "  d <- mkdat(seed)",
+      "  set.seed(321)",
+      "  bw <- npregbw(y~x1+x2+z1+z2, regtype='ll', bwmethod='cv.ls', nmulti=1, data=d)",
+      "  stopifnot(is.finite(as.numeric(bw$fval)))",
+      "  invisible(bw)",
+      "}",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "runll(100)",
+      "npRmpi.quit(mode='spawn', force=TRUE)",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "runll(101)",
+      "stopifnot(identical(as.integer(getOption('npRmpi.spmd.seq_id')), 1L))",
+      "npRmpi.quit(mode='spawn', force=TRUE)",
+      "cat('SESSION_SEQ_RESET_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_SEQ_RESET_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session rejects nslaves=0 with serial-workflow remediation", {
   skip_on_cran()
   env <- subprocess_env()

@@ -1,13 +1,28 @@
 library(npRmpi)
 
-with_session_slave_pool <- function(expr) {
-  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
-    try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE)
+session_pool_active <- function(comm = 1L) {
+  if (!isTRUE(getOption("npRmpi.mpi.initialized", FALSE)))
+    return(FALSE)
+  size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) NA_integer_)
+  !is.na(size) && size >= 2L
+}
+
+ensure_session_slave_pool <- function() {
+  if (!session_pool_active()) {
+    suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
   }
-  suppressWarnings(npRmpi.init(nslaves = 1, quiet = TRUE))
-  on.exit(try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE), add = TRUE)
+  invisible(TRUE)
+}
+
+with_session_slave_pool <- function(expr) {
+  ensure_session_slave_pool()
   force(expr)
 }
+
+teardown({
+  if (session_pool_active())
+    try(npRmpi.quit(mode = "spawn", force = TRUE), silent = TRUE)
+})
 
 make_jksum_mixed_data <- function(n = 220L, seed = 42L) {
   set.seed(seed)

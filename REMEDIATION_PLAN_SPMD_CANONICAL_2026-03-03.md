@@ -15,6 +15,7 @@ Completed checkpoint tranches:
 6. Phase 6 (non-core migration): tranche A complete for `npqreg*`, `npconmode*`, `npksum*`, `npregiv*`, `npregivderiv*`, `npcmstest`, `npqcmstest`, `npdeneqtest`, `npdeptest`, `npsdeptest`, `npsymtest`, and `npunitest` via typed locked opcodes.
 7. Phase 6 (non-core migration): tranche B complete for `npsigtest*` typed locked opcode routing plus session/attach/profile fast-fail contract coverage.
 8. Phase 6 closeout audit: complete for active autodispatch call heads; no remaining `manual_distributed_call` usage in estimator/test paths.
+9. Phase 6 closeout reliability hardening: complete for session lifecycle reseed/sequence reset, fixed-length worker type packets, LC CVLS stable fast-path routing, and `npsigtest` invalid-index fast-fail pre-dispatch validation.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -34,6 +35,7 @@ Latest artifact roots:
 4. `/tmp/spmd_canonical_20260304_0001/phase19_preflight_20260303_210733`
 5. `/tmp/spmd_canonical_20260304_0001/phase20_noncore_opcode_locks_20260303_211050`
 6. `/tmp/spmd_canonical_20260304_0001/phase21_npsigtest_trancheB_20260303_222056`
+7. `/tmp/spmd_canonical_20260304_0001/phase22_closeout_20260303_223604`
 
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:

@@ -13,6 +13,13 @@
   invisible(TRUE)
 }
 
+.npRmpi_session_reset_spmd_state <- function() {
+  # SPMD sequencing must restart for each fresh session world.
+  options(npRmpi.spmd.seq_id = 0L)
+  options(npRmpi.autodispatch.remote.counter = 0L)
+  invisible(TRUE)
+}
+
 .npRmpi_safe_int <- function(expr) {
   tryCatch(as.integer(expr), error = function(e) NA_integer_)
 }
@@ -202,6 +209,7 @@ npRmpi.init <- function(...,
     .npRmpi_autodispatch_prime_options()
   else
     options(npRmpi.autodispatch.option.snapshot = NULL)
+  .npRmpi_session_reset_spmd_state()
 
   {
     clear.fun <- tryCatch(
@@ -278,6 +286,7 @@ npRmpi.quit <- function(force = FALSE,
 
   if (size.comm < 2L)
   {
+    .npRmpi_session_reset_spmd_state()
     options(npRmpi.master.only = FALSE)
     return(invisible(FALSE))
   }
@@ -305,11 +314,13 @@ npRmpi.quit <- function(force = FALSE,
     if (comm != 0L) {
       .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
     }
+    .npRmpi_session_reset_spmd_state()
     options(npRmpi.master.only = FALSE)
     return(invisible(TRUE))
   }
 
   mpi.close.Rslaves(dellog = dellog, comm = comm, force = force)
+  .npRmpi_session_reset_spmd_state()
   options(npRmpi.master.only = FALSE)
   invisible(TRUE)
 }

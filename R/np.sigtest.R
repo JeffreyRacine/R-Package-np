@@ -53,6 +53,13 @@
   stop("unable to extract xdat/ydat from bandwidth object")
 }
 
+.npRmpi_npsig_validate_index <- function(index, xdat) {
+  if(anyNA(index)) stop("index must not contain missing values")
+  if(any(index < 1 | index > NCOL(xdat), na.rm = TRUE)) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
+  if(length(unique(index)) < length(index)) stop("index contains repeated values (must be unique)")
+  invisible(TRUE)
+}
+
 npsigtest <-
   function(bws, ...){
     if (.npRmpi_autodispatch_active() &&
@@ -62,16 +69,28 @@ npsigtest <-
       nms <- names(mc)
       has.xdat <- !is.null(nms) && any(nms == "xdat")
       has.ydat <- !is.null(nms) && any(nms == "ydat")
+      xdat.auto <- NULL
       if (!missing(bws) && isa(bws, "npregression")) {
         xy <- .npRmpi_npsig_extract_xy_from_npreg(bws)
         mc$bws <- bws$bws
         mc$xdat <- xy$xdat
         mc$ydat <- xy$ydat
+        xdat.auto <- xy$xdat
       } else if (!missing(bws) && isa(bws, "rbandwidth") &&
                  (!has.xdat || !has.ydat)) {
         xy <- .npRmpi_npsig_extract_xy_from_bws(bws)
         mc$xdat <- xy$xdat
         mc$ydat <- xy$ydat
+        xdat.auto <- xy$xdat
+      } else if (has.xdat) {
+        xdat.auto <- tryCatch(eval(mc$xdat, envir = parent.frame()), error = function(e) NULL)
+      }
+
+      if (!is.null(xdat.auto) && !is.null(nms) && any(nms == "index")) {
+        idx.expr <- mc[[which(nms == "index")[1L]]]
+        idx.val <- tryCatch(eval(idx.expr, envir = parent.frame()), error = function(e) NULL)
+        if (!is.null(idx.val))
+          .npRmpi_npsig_validate_index(index = idx.val, xdat = toFrame(xdat.auto))
       }
       return(.npRmpi_autodispatch_call(mc, parent.frame()))
     }
@@ -165,6 +184,11 @@ npsigtest.rbandwidth <- function(bws,
 
   xdat <- xdat[goodrows,,drop = FALSE]
   ydat <- ydat[goodrows]
+
+  ## Fast-fail contract for invalid index values must run before any
+  ## expensive/distributed bandwidth/regression work.
+  .npRmpi_npsig_validate_index(index = index, xdat = xdat)
+
   bws <- npregbw(xdat = xdat, ydat = ydat, bws = bws, bandwidth.compute = FALSE)
 
   if (is.factor(ydat))
@@ -184,12 +208,6 @@ npsigtest.rbandwidth <- function(bws,
   }
 
   num.obs <- nrow(xdat)
-
-  ## Test for valid entries in index
-
-  if(anyNA(index)) stop("index must not contain missing values")
-  if(any(index < 1 | index > NCOL(xdat), na.rm = TRUE)) stop(paste("invalid index provided: index entries must lie between 1 and ",NCOL(xdat),sep=""))
-  if(length(unique(index)) < length(index)) stop("index contains repeated values (must be unique)")
 
   if(!joint) {
 

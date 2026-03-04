@@ -249,7 +249,9 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
             as.integer(c(4,length(x)))
 
     else
-            as.integer(-1)
+            # Keep a fixed-length control packet across ranks; a scalar -1 can
+            # truncate MPI_Allgather when another rank reports c(type, len).
+            as.integer(c(-1L, 0L))
 }
 
 .npRmpi_eval_scmd <- function(scmd, arg = list(), envir = parent.frame()) {
