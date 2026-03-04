@@ -367,7 +367,14 @@
     "autodispatch.npscoefbw.cv_lllp",
     "autodispatch.npplregbw.cv_lllp",
     "autodispatch.npindexbw.core",
+    "autodispatch.npreg.core",
+    "autodispatch.npscoef.core",
+    "autodispatch.npplreg.core",
     "autodispatch.npindex.core",
+    "autodispatch.npudens.core",
+    "autodispatch.npudist.core",
+    "autodispatch.npcdens.core",
+    "autodispatch.npcdist.core",
     "autodispatch.npudensbw.cv",
     "autodispatch.npudistbw.cv",
     "autodispatch.npcdensbw.cv",
@@ -479,6 +486,39 @@
       )
     )
   }
+  if (!exists("autodispatch.npreg.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npreg.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npreg", "npreg.default", "npreg.formula", "npreg.call", "npreg.rbandwidth"),
+        where = "SPMD estimator opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npscoef.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npscoef.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npscoef", "npscoef.default", "npscoef.formula", "npscoef.call", "npscoef.scbandwidth"),
+        where = "SPMD estimator opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npplreg.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npplreg.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npplreg", "npplreg.default", "npplreg.formula", "npplreg.call", "npplreg.plbandwidth"),
+        where = "SPMD estimator opcode guard"
+      )
+    )
+  }
   if (!exists("autodispatch.npindex.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
     .npRmpi_spmd_register_opcode(
       "autodispatch.npindex.core",
@@ -486,6 +526,50 @@
         payload = payload,
         envelope = envelope,
         allowed_calls = c("npindex", "npindex.default", "npindex.formula", "npindex.call", "npindex.sibandwidth"),
+        where = "SPMD estimator opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npudens.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npudens.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npudens", "npudens.default", "npudens.formula", "npudens.call", "npudens.bandwidth"),
+        where = "SPMD estimator opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npudist.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npudist.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npudist", "npudist.default", "npudist.formula", "npudist.call", "npudist.dbandwidth"),
+        where = "SPMD estimator opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npcdens.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npcdens.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npcdens", "npcdens.default", "npcdens.formula", "npcdens.call", "npcdens.conbandwidth"),
+        where = "SPMD estimator opcode guard"
+      )
+    )
+  }
+  if (!exists("autodispatch.npcdist.core", envir = .npRmpi_spmd_registry, inherits = FALSE)) {
+    .npRmpi_spmd_register_opcode(
+      "autodispatch.npcdist.core",
+      function(payload, envelope) .npRmpi_spmd_eval_payload_call_guard(
+        payload = payload,
+        envelope = envelope,
+        allowed_calls = c("npcdist", "npcdist.default", "npcdist.formula", "npcdist.call", "npcdist.condbandwidth"),
         where = "SPMD estimator opcode guard"
       )
     )
@@ -823,9 +907,41 @@
   isTRUE(bw.compute)
 }
 
-.npRmpi_autodispatch_is_npindex_core <- function(mc) {
+.npRmpi_autodispatch_call_name_in <- function(mc, valid_names) {
   call.name <- .npRmpi_autodispatch_call_name(mc)
-  call.name %in% c("npindex", "npindex.default", "npindex.formula", "npindex.call", "npindex.sibandwidth")
+  call.name %in% valid_names
+}
+
+.npRmpi_autodispatch_is_npreg_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npreg", "npreg.default", "npreg.formula", "npreg.call", "npreg.rbandwidth"))
+}
+
+.npRmpi_autodispatch_is_npscoef_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npscoef", "npscoef.default", "npscoef.formula", "npscoef.call", "npscoef.scbandwidth"))
+}
+
+.npRmpi_autodispatch_is_npplreg_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npplreg", "npplreg.default", "npplreg.formula", "npplreg.call", "npplreg.plbandwidth"))
+}
+
+.npRmpi_autodispatch_is_npindex_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npindex", "npindex.default", "npindex.formula", "npindex.call", "npindex.sibandwidth"))
+}
+
+.npRmpi_autodispatch_is_npudens_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npudens", "npudens.default", "npudens.formula", "npudens.call", "npudens.bandwidth"))
+}
+
+.npRmpi_autodispatch_is_npudist_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npudist", "npudist.default", "npudist.formula", "npudist.call", "npudist.dbandwidth"))
+}
+
+.npRmpi_autodispatch_is_npcdens_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npcdens", "npcdens.default", "npcdens.formula", "npcdens.call", "npcdens.conbandwidth"))
+}
+
+.npRmpi_autodispatch_is_npcdist_core <- function(mc) {
+  .npRmpi_autodispatch_call_name_in(mc, c("npcdist", "npcdist.default", "npcdist.formula", "npcdist.call", "npcdist.condbandwidth"))
 }
 
 .npRmpi_spmd_opcode_from_call <- function(mc, caller_env) {
@@ -837,8 +953,22 @@
     return("autodispatch.npplregbw.cv_lllp")
   if (.npRmpi_autodispatch_is_npindexbw_core(mc = mc, caller_env = caller_env))
     return("autodispatch.npindexbw.core")
+  if (.npRmpi_autodispatch_is_npreg_core(mc = mc))
+    return("autodispatch.npreg.core")
+  if (.npRmpi_autodispatch_is_npscoef_core(mc = mc))
+    return("autodispatch.npscoef.core")
+  if (.npRmpi_autodispatch_is_npplreg_core(mc = mc))
+    return("autodispatch.npplreg.core")
   if (.npRmpi_autodispatch_is_npindex_core(mc = mc))
     return("autodispatch.npindex.core")
+  if (.npRmpi_autodispatch_is_npudens_core(mc = mc))
+    return("autodispatch.npudens.core")
+  if (.npRmpi_autodispatch_is_npudist_core(mc = mc))
+    return("autodispatch.npudist.core")
+  if (.npRmpi_autodispatch_is_npcdens_core(mc = mc))
+    return("autodispatch.npcdens.core")
+  if (.npRmpi_autodispatch_is_npcdist_core(mc = mc))
+    return("autodispatch.npcdist.core")
   if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudensbw"))
     return("autodispatch.npudensbw.cv")
   if (.npRmpi_autodispatch_is_density_bw_cv(mc = mc, caller_env = caller_env, call_name = "npudistbw"))

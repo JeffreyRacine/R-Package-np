@@ -136,6 +136,34 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   op.si.est <- opcode.fun(mc = mc.si.est, caller_env = environment())
   expect_identical(op.si.est, "autodispatch.npindex.core")
 
+  mc.reg.est <- quote(npreg(bws = bw, gradients = FALSE))
+  op.reg.est <- opcode.fun(mc = mc.reg.est, caller_env = environment())
+  expect_identical(op.reg.est, "autodispatch.npreg.core")
+
+  mc.sc.est <- quote(npscoef(bws = bw, gradients = FALSE))
+  op.sc.est <- opcode.fun(mc = mc.sc.est, caller_env = environment())
+  expect_identical(op.sc.est, "autodispatch.npscoef.core")
+
+  mc.pl.est <- quote(npplreg(bws = bw, gradients = FALSE))
+  op.pl.est <- opcode.fun(mc = mc.pl.est, caller_env = environment())
+  expect_identical(op.pl.est, "autodispatch.npplreg.core")
+
+  mc.ud.est <- quote(npudens(tdat = x, bws = bw))
+  op.ud.est <- opcode.fun(mc = mc.ud.est, caller_env = environment())
+  expect_identical(op.ud.est, "autodispatch.npudens.core")
+
+  mc.ui.est <- quote(npudist(tdat = x, bws = bw))
+  op.ui.est <- opcode.fun(mc = mc.ui.est, caller_env = environment())
+  expect_identical(op.ui.est, "autodispatch.npudist.core")
+
+  mc.cd.est <- quote(npcdens(txdat = x, tydat = y, bws = bw))
+  op.cd.est <- opcode.fun(mc = mc.cd.est, caller_env = environment())
+  expect_identical(op.cd.est, "autodispatch.npcdens.core")
+
+  mc.ci.est <- quote(npcdist(txdat = x, tydat = y, bws = bw))
+  op.ci.est <- opcode.fun(mc = mc.ci.est, caller_env = environment())
+  expect_identical(op.ci.est, "autodispatch.npcdist.core")
+
   mc.noncv <- quote(npregbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls"))
   op.noncv <- opcode.fun(mc = mc.noncv, caller_env = environment())
   expect_identical(op.noncv, "autodispatch.npregbw")
@@ -147,7 +175,14 @@ test_that("SPMD timeout class marks LL/LP CV bw opcodes as cv-regression", {
   expect_identical(timeout.class("autodispatch.npscoefbw.cv_lllp"), "cv-regression")
   expect_identical(timeout.class("autodispatch.npplregbw.cv_lllp"), "cv-regression")
   expect_identical(timeout.class("autodispatch.npindexbw.core"), "cv-regression")
+  expect_identical(timeout.class("autodispatch.npreg.core"), "default")
+  expect_identical(timeout.class("autodispatch.npscoef.core"), "default")
+  expect_identical(timeout.class("autodispatch.npplreg.core"), "default")
   expect_identical(timeout.class("autodispatch.npindex.core"), "default")
+  expect_identical(timeout.class("autodispatch.npudens.core"), "default")
+  expect_identical(timeout.class("autodispatch.npudist.core"), "default")
+  expect_identical(timeout.class("autodispatch.npcdens.core"), "default")
+  expect_identical(timeout.class("autodispatch.npcdist.core"), "default")
   expect_identical(timeout.class("autodispatch.npindexbw"), "default")
 })
 
@@ -239,6 +274,18 @@ test_that("SPMD locked core opcodes reject mismatched call heads", {
                          where = "unit locked opcode")
   expect_true(is.list(bad.si.est) && !isTRUE(bad.si.est$ok))
   expect_match(bad.si.est$error, "restricted to")
+
+  env.reg.est <- make.env(opcode = "autodispatch.npreg.core", timeout_class = "default")
+  bad.reg.est <- try.exec(env.reg.est, payload = list(call = quote(npudens(tdat = x, bws = bw))),
+                          where = "unit locked opcode")
+  expect_true(is.list(bad.reg.est) && !isTRUE(bad.reg.est$ok))
+  expect_match(bad.reg.est$error, "restricted to")
+
+  env.den.est <- make.env(opcode = "autodispatch.npcdens.core", timeout_class = "default")
+  bad.den.est <- try.exec(env.den.est, payload = list(call = quote(npreg(bws = bw, gradients = FALSE))),
+                          where = "unit locked opcode")
+  expect_true(is.list(bad.den.est) && !isTRUE(bad.den.est$ok))
+  expect_match(bad.den.est$error, "restricted to")
 })
 
 test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
