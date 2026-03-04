@@ -132,6 +132,10 @@ test_that("SPMD opcode selection tags LL/LP CV routes for core bw families", {
   op.si <- opcode.fun(mc = mc.si, caller_env = environment())
   expect_identical(op.si, "autodispatch.npindexbw.core")
 
+  mc.si.est <- quote(npindex(bws = bw, gradients = FALSE))
+  op.si.est <- opcode.fun(mc = mc.si.est, caller_env = environment())
+  expect_identical(op.si.est, "autodispatch.npindex.core")
+
   mc.noncv <- quote(npregbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ls"))
   op.noncv <- opcode.fun(mc = mc.noncv, caller_env = environment())
   expect_identical(op.noncv, "autodispatch.npregbw")
@@ -143,6 +147,7 @@ test_that("SPMD timeout class marks LL/LP CV bw opcodes as cv-regression", {
   expect_identical(timeout.class("autodispatch.npscoefbw.cv_lllp"), "cv-regression")
   expect_identical(timeout.class("autodispatch.npplregbw.cv_lllp"), "cv-regression")
   expect_identical(timeout.class("autodispatch.npindexbw.core"), "cv-regression")
+  expect_identical(timeout.class("autodispatch.npindex.core"), "default")
   expect_identical(timeout.class("autodispatch.npindexbw"), "default")
 })
 
@@ -228,6 +233,12 @@ test_that("SPMD locked core opcodes reject mismatched call heads", {
                      where = "unit locked opcode")
   expect_true(is.list(bad.si) && !isTRUE(bad.si$ok))
   expect_match(bad.si$error, "restricted to")
+
+  env.si.est <- make.env(opcode = "autodispatch.npindex.core", timeout_class = "default")
+  bad.si.est <- try.exec(env.si.est, payload = list(call = quote(npscoef(bws = bw))),
+                         where = "unit locked opcode")
+  expect_true(is.list(bad.si.est) && !isTRUE(bad.si.est$ok))
+  expect_match(bad.si.est$error, "restricted to")
 })
 
 test_that("SPMD dynamic autodispatch opcode executes payload with ACK", {
