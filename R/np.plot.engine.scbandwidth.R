@@ -404,7 +404,7 @@
         par(mfrow=n2mfrow(tot.dim),cex=par()$cex)
 
       maxneval = max(c(sapply(xdat,nlevels), unlist(sapply(zdat,nlevels)), neval))
-      all.isFactor = c(sapply(xdat, is.factor), unlist(sapply(zdat, is.factor)))
+      all.isFactor = c(vapply(xdat, is.factor, logical(1)), vapply(zdat, is.factor, logical(1)))
       
       x.ev = xdat[1,,drop = FALSE]
 

@@ -417,7 +417,7 @@
         all.bxp = list()
       }
 
-      all.isFactor = c(sapply(xdat, is.factor), sapply(zdat, is.factor))
+      all.isFactor = c(vapply(xdat, is.factor, logical(1)), vapply(zdat, is.factor, logical(1)))
 
       plot.out = list()
 
