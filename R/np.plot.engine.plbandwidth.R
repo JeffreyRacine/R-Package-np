@@ -202,6 +202,24 @@
       return(list(coefficients = cf, coefficient.stderr = se, fit = fit.coef))
     }
 
+    plreg.base <- if (plot.behavior != "plot") {
+      npplreg(txdat = xdat, tydat = ydat, tzdat = zdat, bws = bws)
+    } else {
+      NULL
+    }
+
+    plreg_hat_apply <- function(ex.slice, ez.slice) {
+      as.vector(npplreghat(
+        bws = bws,
+        txdat = xdat,
+        tzdat = zdat,
+        exdat = ex.slice,
+        ezdat = ez.slice,
+        y = ydat,
+        output = "apply"
+      ))
+    }
+
     if ((nxcon + nxord == 1) && (nzcon + nzord == 1) && (nxuno + nzuno == 0) &&
         perspective & !gradients & !any(xor(bws$xdati$iord, bws$xdati$inumord)) &
         !any(xor(bws$zdati$iord, bws$zdati$inumord))){
@@ -235,12 +253,14 @@
       if (bws$zdati$iord[1])
         z1.eval <- (bws$zdati$all.dlev[[1]])[as.integer(z1.eval)]
 
-      tobj = npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-        exdat = x.eval[,1, drop = FALSE], ezdat = x.eval[,2, drop = FALSE], bws = bws)
+      tmean <- plreg_hat_apply(
+        ex.slice = x.eval[,1, drop = FALSE],
+        ez.slice = x.eval[,2, drop = FALSE]
+      )
 
       terr = matrix(data = NA, nrow = nrow(x.eval), ncol = 3)
       
-      treg = matrix(data = tobj$mean,
+      treg = matrix(data = tmean,
         nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
 
       if (plot.errors.method == "bootstrap"){
@@ -260,11 +280,11 @@
 
         pc = (plot.errors.center == "bias-corrected")
 
-        lerr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
+        lerr = matrix(data = if(pc) {terr[,3]} else {tmean}
           -terr[,1],
           nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
 
-        herr = matrix(data = if(pc) {terr[,3]} else {tobj$mean}
+        herr = matrix(data = if(pc) {terr[,3]} else {tmean}
           +terr[,2],
           nrow = x1.neval, ncol = z1.neval, byrow = FALSE)
 
@@ -275,19 +295,19 @@
               if (plot.errors)
                   c(min(lerr),max(herr))
               else
-                  c(min(tobj$mean),max(tobj$mean))
+                  c(min(tmean),max(tmean))
       }
         
       if (plot.behavior != "plot"){
-        r1 = plregression(bws = bws, xcoef = tobj$xcoef,
-          xcoefvcov = vcov(tobj),
-          xcoeferr = tobj$xcoeferr,
+        r1 = plregression(bws = bws, xcoef = plreg.base$xcoef,
+          xcoefvcov = vcov(plreg.base),
+          xcoeferr = plreg.base$xcoeferr,
           evalx =  x.eval[,1],
           evalz =  x.eval[,2],
-          mean = tobj$mean,
+          mean = tmean,
           ntrain = dim(xdat)[1],
           trainiseval = FALSE,
-          xtra=c(tobj$RSQ,tobj$MSE,0,0,0,0))
+          xtra=c(plreg.base$RSQ,plreg.base$MSE,0,0,0,0))
 
         r1$merr = NA
         r1$bias = NA
@@ -457,12 +477,12 @@
         }
 
 
-        tobj <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-          exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-          ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
-          bws = bws)
-
-        temp.mean[seq_len(xi.neval)] = tobj$mean
+        ex.slice <- subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+        ez.slice <- ezdat[seq_len(xi.neval),, drop = FALSE]
+        temp.mean[seq_len(xi.neval)] <- plreg_hat_apply(
+          ex.slice = ex.slice,
+          ez.slice = ez.slice
+        )
 
         if (plot.errors){
           if (plot.errors.method == "bootstrap"){
@@ -470,8 +490,8 @@
                       xdat = xdat,
                       ydat = ydat,
                       zdat = zdat,
-                      exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-                      ezdat = ezdat[seq_len(xi.neval),, drop = FALSE],
+                      exdat = ex.slice,
+                      ezdat = ez.slice,
                       gradients = gradients,
                       slice.index = plot.index,
                       plot.errors.boot.method = plot.errors.boot.method,
@@ -573,14 +593,14 @@
           if (gradients){
           } else {
             plot.out[[plot.index]] =
-              plregression(bws = bws, xcoef = tobj$xcoef, xcoefvcov = vcov(tobj),
-                           xcoeferr = tobj$xcoeferr,
-                           evalx = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-                           evalz = ezdat[seq_len(xi.neval),, drop = FALSE],
+              plregression(bws = bws, xcoef = plreg.base$xcoef, xcoefvcov = vcov(plreg.base),
+                           xcoeferr = plreg.base$xcoeferr,
+                           evalx = ex.slice,
+                           evalz = ez.slice,
                            mean = na.omit(temp.mean),
                            ntrain = dim(xdat)[1],
                            trainiseval = FALSE,
-                           xtra = c(tobj$RSQ, tobj$MSE, 0, 0, 0, 0))
+                           xtra = c(plreg.base$RSQ, plreg.base$MSE, 0, 0, 0, 0))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
 
@@ -618,12 +638,12 @@
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj <- npplreg(txdat = xdat, tydat = ydat, tzdat = zdat,
-          exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-          ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-          bws = bws)
-
-        temp.mean[seq_len(xi.neval)] = tobj$mean
+        ex.slice <- exdat[seq_len(xi.neval),, drop = FALSE]
+        ez.slice <- subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+        temp.mean[seq_len(xi.neval)] <- plreg_hat_apply(
+          ex.slice = ex.slice,
+          ez.slice = ez.slice
+        )
 
         if (plot.errors){
           if (plot.errors.method == "bootstrap"){
@@ -631,8 +651,8 @@
                       xdat = xdat,
                       ydat = ydat,
                       zdat = zdat,
-                      exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-                      ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                      exdat = ex.slice,
+                      ezdat = ez.slice,
                       gradients = gradients,
                       slice.index = plot.index,
                       plot.errors.boot.method = plot.errors.boot.method,
@@ -735,15 +755,15 @@
           if (gradients){
           } else {
             plot.out[[plot.index]] =
-              plregression(bws = bws, xcoef = tobj$xcoef,
-                           xcoeferr = tobj$xcoeferr,
-                           xcoefvcov = vcov(tobj),
-                           evalx = exdat[seq_len(xi.neval),, drop = FALSE],
-                           evalz = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+              plregression(bws = bws, xcoef = plreg.base$xcoef,
+                           xcoeferr = plreg.base$xcoeferr,
+                           xcoefvcov = vcov(plreg.base),
+                           evalx = ex.slice,
+                           evalz = ez.slice,
                            mean = na.omit(temp.mean),
                            ntrain = dim(zdat)[1],
                            trainiseval = FALSE,
-                           xtra = c(tobj$RSQ, tobj$MSE, 0, 0, 0, 0))
+                           xtra = c(plreg.base$RSQ, plreg.base$MSE, 0, 0, 0, 0))
             plot.out[[plot.index]]$merr = NA
             plot.out[[plot.index]]$bias = NA
 
