@@ -69,3 +69,39 @@ test_that("wild fanout does not switch to master-local when workers are active",
   expect_true(length(start.lines) >= 1L)
   expect_true(any(grepl("master_local=FALSE", start.lines, fixed = TRUE)))
 })
+
+test_that("wild fanout fails fast on dispatch timeout when worker replies stall", {
+  run_fanout <- getFromNamespace(".npRmpi_bootstrap_run_fanout", "npRmpi")
+  withr::local_options(npRmpi.bootstrap.dispatch.timeout.sec = 0.02)
+
+  local_mocked_bindings(
+    .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
+    .npRmpi_master_only_mode = function(comm = 1L) FALSE,
+    .npRmpi_bootstrap_worker_count = function(comm = 1L) 1L,
+    mpi.any.source = function() 0L,
+    mpi.any.tag = function() 0L,
+    mpi.bcast.cmd = function(...) invisible(NULL),
+    mpi.bcast.Robj = function(...) invisible(NULL),
+    mpi.iprobe = function(source, tag, comm = 1L) FALSE,
+    .package = "npRmpi"
+  )
+
+  tasks <- list(
+    list(start = 1L, bsz = 2L, seed = 100L),
+    list(start = 3L, bsz = 2L, seed = 200L)
+  )
+  worker <- function(task) {
+    matrix(seq_len(as.integer(task$bsz)), nrow = as.integer(task$bsz), ncol = 1L)
+  }
+
+  expect_error(
+    run_fanout(
+      tasks = tasks,
+      worker = worker,
+      ncol.out = 1L,
+      what = "wild",
+      profile.where = "unit.test:dispatch-timeout"
+    ),
+    "dispatch timeout waiting on worker results"
+  )
+})

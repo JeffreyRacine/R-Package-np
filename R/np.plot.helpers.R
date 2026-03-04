@@ -276,6 +276,16 @@
   stop(sprintf("MPI %s %s", what, msg), call. = FALSE)
 }
 
+.npRmpi_bootstrap_dispatch_timeout_sec <- function() {
+  val.env <- Sys.getenv("NP_RMPI_BOOTSTRAP_DISPATCH_TIMEOUT_SEC", unset = "")
+  val.opt <- getOption("npRmpi.bootstrap.dispatch.timeout.sec", NA_real_)
+  val <- if (nzchar(val.env)) val.env else val.opt
+  val <- suppressWarnings(as.numeric(val)[1L])
+  if (!is.finite(val) || is.na(val) || val <= 0)
+    return(0.0)
+  val
+}
+
 .npRmpi_bootstrap_phase_trace_path <- function() {
   path.opt <- getOption("npRmpi.bootstrap.phase.file", "")
   path.env <- Sys.getenv("NP_RMPI_BOOTSTRAP_PHASE_FILE", unset = "")
@@ -646,6 +656,8 @@
         slave.num <- workers
         mpi.anysource <- mpi.any.source()
         mpi.anytag <- mpi.any.tag()
+        dispatch.timeout <- .npRmpi_bootstrap_dispatch_timeout_sec()
+        dispatch.started <- unname(as.double(proc.time()[["elapsed"]]))
 
         mpi.bcast.cmd(.mpi.worker.applyLB, n = n.remote, comm = comm)
         mpi.bcast.Robj(list(FUN = worker.exec, dot.arg = list(...)), rank = 0, comm = comm)
@@ -734,8 +746,23 @@
             progressed <- TRUE
           }
 
-          if (!progressed && done < n.remote)
+          if (!progressed && done < n.remote) {
+            if (dispatch.timeout > 0) {
+              elapsed.wait <- unname(as.double(proc.time()[["elapsed"]])) - dispatch.started
+              if (is.finite(elapsed.wait) && elapsed.wait > dispatch.timeout) {
+                .npRmpi_bootstrap_fail_or_fallback(
+                  msg = sprintf(
+                    "dispatch timeout waiting on worker results (done=%d/%d, timeout=%.3fs)",
+                    done,
+                    n.remote,
+                    dispatch.timeout
+                  ),
+                  what = what
+                )
+              }
+            }
             Sys.sleep(0.0005)
+          }
         }
         .npRmpi_bootstrap_transport_trace(
           what = what,
