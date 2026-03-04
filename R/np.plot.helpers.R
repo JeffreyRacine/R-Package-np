@@ -207,6 +207,21 @@
   invisible(TRUE)
 }
 
+.np_plot_boot_dispatch <- function(boofun, data, method, B, blocklen = NULL) {
+  method <- match.arg(as.character(method)[1L], c("inid", "fixed", "geom"))
+  B <- as.integer(B)
+  if (method == "inid") {
+    return(boot(data = data, statistic = boofun, R = B))
+  }
+  tsboot(
+    tseries = data,
+    statistic = boofun,
+    R = B,
+    l = blocklen,
+    sim = method
+  )
+}
+
 .np_inid_chunk_size <- function(n, B) {
   chunk.opt <- getOption("np.plot.inid.chunk.size")
   if (!is.null(chunk.opt)) {
@@ -2533,15 +2548,13 @@ compute.bootstrap.errors.bandwidth =
         }
       }
 
-      if (is.inid) {
-        boot.out = boot(data = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      boot.out <- .np_plot_boot_dispatch(
+        boofun = boofun,
+        data = data.frame(xdat),
+        method = plot.errors.boot.method,
+        B = plot.errors.boot.num,
+        blocklen = plot.errors.boot.blocklen
+      )
     }
 
     all.bp <- list()
@@ -2662,15 +2675,13 @@ compute.bootstrap.errors.dbandwidth =
         }
       }
 
-      if (is.inid) {
-        boot.out = boot(data = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      boot.out <- .np_plot_boot_dispatch(
+        boofun = boofun,
+        data = data.frame(xdat),
+        method = plot.errors.boot.method,
+        B = plot.errors.boot.num,
+        blocklen = plot.errors.boot.blocklen
+      )
     }
 
     all.bp <- list()
@@ -2828,15 +2839,13 @@ compute.bootstrap.errors.conbandwidth =
           ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
         ))
       }
-      if (is.inid){
-        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      boot.out <- .np_plot_boot_dispatch(
+        boofun = boofun,
+        data = data.frame(xdat, ydat),
+        method = plot.errors.boot.method,
+        B = plot.errors.boot.num,
+        blocklen = plot.errors.boot.blocklen
+      )
     }
 
     all.bp <- list()
@@ -3002,15 +3011,13 @@ compute.bootstrap.errors.condbandwidth =
           ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
         ))
       }
-      if (is.inid){
-        boot.out = boot(data = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num)
-      } else {
-        boot.out = tsboot(tseries = data.frame(xdat,ydat), statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method)
-      }
+      boot.out <- .np_plot_boot_dispatch(
+        boofun = boofun,
+        data = data.frame(xdat, ydat),
+        method = plot.errors.boot.method,
+        B = plot.errors.boot.num,
+        blocklen = plot.errors.boot.blocklen
+      )
     }
 
     all.bp <- list()
