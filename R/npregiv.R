@@ -235,7 +235,7 @@ npregiv <- function(y,
       if(ncol(X.train)!=ncol(X.eval))
           stop("Error: training and evaluation data have unequal number of columns\n")
 
-      X.col.numeric <- sapply(seq_len(ncol(X.train)),function(i){is.numeric(X.train[,i])})
+      X.col.numeric <- vapply(seq_len(ncol(X.train)), function(i) is.numeric(X.train[,i]), logical(1))
 
       ## k represents the number of numeric regressors, this will return
       ## zero if there are none
@@ -887,7 +887,7 @@ npregiv <- function(y,
 
     ## Which variables are categorical, which are discrete...
 
-    xdat.numeric <- sapply(seq_len(ncol(xdat)),function(i){is.numeric(xdat[,i])})
+    xdat.numeric <- vapply(seq_len(ncol(xdat)), function(i) is.numeric(xdat[,i]), logical(1))
 
     ## First initialize initial search values of the vector of
     ## bandwidths to lie in [0,1]
@@ -1106,10 +1106,10 @@ npregiv <- function(y,
       if(!is.null(zeval)&&!is.null(xeval)) zeval <- data.frame(zeval,xeval)
   }
 
-  z.numeric <- sapply(seq_len(NCOL(z)),function(i){is.numeric(z[,i])})
+  z.numeric <- vapply(seq_len(NCOL(z)), function(i) is.numeric(z[,i]), logical(1))
   num.z.numeric <- NCOL(as.data.frame(z[,z.numeric]))
 
-  w.numeric <- sapply(seq_len(NCOL(w)),function(i){is.numeric(w[,i])})
+  w.numeric <- vapply(seq_len(NCOL(w)), function(i) is.numeric(w[,i]), logical(1))
   num.w.numeric <- NCOL(as.data.frame(w[,w.numeric]))
 
   if(method=="Tikhonov") {

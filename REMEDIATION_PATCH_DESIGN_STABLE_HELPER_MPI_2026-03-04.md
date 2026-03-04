@@ -257,3 +257,14 @@ Recommended order:
    - route gate root: `/tmp/spmd_tranche5_gate_20260304_104321`
    - gate tokens: `SESSION_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `NPSIGTEST_FAILNZ=0`, `ORPHAN_PRE_EMPTY=1`, `ORPHAN_POST_EMPTY=1`.
    - refreshed scan root: `/tmp/spmd_tranche5_modscan_cleanup_20260304_104312` (`scan_parse=0`).
+12. Completed IV-family type-stability tranche:
+   - replaced classifier `sapply(..., is.numeric)` calls with fixed-type `vapply(..., logical(1))` in:
+     - `R/npregiv.R` (`X.col.numeric`, `xdat.numeric`, `z.numeric`, `w.numeric`)
+     - `R/npregivderiv.R` (`z.numeric`, `w.numeric`)
+   - no API/default/condition-message changes; classification semantics preserved.
+13. Tranche-6 validation artifact root:
+   - `/tmp/spmd_tranche6_iv_vapply_20260304_104740`
+   - tokens: `SESSION_IV_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `NPREGIV_FAILNZ=0`, `NPREGIV_STATE_FAILNZ=0`, `NPSIGTEST_FAILNZ=0`, `ORPHAN_PRE_EMPTY=1`, `ORPHAN_POST_EMPTY=1`.
+14. Tranche-6 modernization-scan artifact root:
+   - `/tmp/spmd_tranche6_modscan_postvapply_20260304_104841`
+   - summary highlights: `scan_sapply=67` (inventory reduced), `scan_eval=4`, `scan_parse=0`, `scan_runtime_library_require=0`, `scan_demo_masking=0`, `scan_dotC=0`, `scan_manual_distributed_call=0`, `scan_stable_helper_symbol=0`.
