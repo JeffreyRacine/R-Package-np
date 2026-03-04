@@ -2244,29 +2244,8 @@ compute.bootstrap.errors.scbandwidth =
       )
     }
 
-    if (is.null(boot.out)) {
-      xcols <- seq_len(ncol(xdat))
-      ycol <- ncol(xdat) + 1L
-      zcols <- if (miss.z) integer(0) else (ycol + 1L):(ycol + ncol(zdat))
-
-      boofun.sc <- function(tsb) {
-        npscoef(
-          txdat = tsb[, xcols, drop = FALSE],
-          tydat = tsb[, ycol],
-          tzdat = if (miss.z) NULL else tsb[, zcols, drop = FALSE],
-          exdat = exdat,
-          ezdat = if (miss.z) NULL else ezdat,
-          bws = bws,
-          iterate = FALSE
-        )$mean
-      }
-
-      boot.data <- if (miss.z) data.frame(xdat, ydat) else data.frame(xdat, ydat, zdat)
-      boot.out <- tsboot(
-        tseries = boot.data, statistic = boofun.sc, R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen, sim = plot.errors.boot.method
-      )
-    }
+    if (is.null(boot.out))
+      stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.scbandwidth", plot.errors.boot.method), call. = FALSE)
 
     all.bp <- list()
 
@@ -2430,21 +2409,8 @@ compute.bootstrap.errors.plbandwidth =
         )
       }
 
-      if (is.null(boot.out)) {
-      boofun.pl <- function(tsb) {
-        npplreg(
-          txdat = tsb[, seq_len(ncol(xdat)), drop = FALSE],
-          tydat = tsb[, ncol(xdat) + 1L],
-          tzdat = tsb[, (ncol(xdat) + 2L):ncol(tsb), drop = FALSE],
-          exdat = exdat, ezdat = ezdat, bws = bws
-        )$mean
-      }
-
-      boot.out = tsboot(tseries = data.frame(xdat,ydat,zdat), statistic = boofun.pl,
-        R = plot.errors.boot.num,
-        l = plot.errors.boot.blocklen,
-        sim = plot.errors.boot.method)
-      }
+      if (is.null(boot.out))
+        stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.plbandwidth", plot.errors.boot.method), call. = FALSE)
     }
 
     all.bp <- list()
