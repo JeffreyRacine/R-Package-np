@@ -25,20 +25,22 @@ make_jksum_mixed_data <- function(n = 220L, seed = 42L) {
   )
 }
 
-run_reg_cv_once <- function(dat, regtype, bwmethod) {
+run_reg_cv_once <- function(dat, regtype, bwmethod, ...) {
   t_bw <- system.time(
     bw <- npregbw(
       y ~ x1 + x2 + z1 + z2,
       regtype = regtype,
       bwmethod = bwmethod,
       nmulti = 1,
-      data = dat
+      data = dat,
+      ...
     )
   )
 
   list(
     fval = as.numeric(bw$fval),
     nfe = as.integer(bw$num.feval),
+    nfe_fast = as.integer(bw$num.feval.fast),
     elapsed = as.numeric(t_bw[["elapsed"]])
   )
 }
@@ -101,5 +103,47 @@ test_that("jksum regression CV smoke performance remains bounded", {
     expect_true(is.finite(r_ll$fval))
     expect_true(is.finite(r_lc$fval))
     expect_lt(r_ll$elapsed + r_lc$elapsed, 20)
+  })
+})
+
+test_that("large-h fast gateway is active again for lc/ll/lp under canonical DGPs", {
+  skip_on_cran()
+  old_opts <- options(
+    np.messages = FALSE,
+    np.largeh.rel.tol = 0.05,
+    np.disc.upper.rel.tol = 0.05
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  with_session_slave_pool({
+    set.seed(42)
+    n <- 200L
+    x <- runif(n)
+    y_lc <- rnorm(n, sd = 0.5 * sd(x))
+    y_ll <- x + rnorm(n, sd = 0.5 * sd(x))
+    dat_lc <- data.frame(y = y_lc, x = x, z1 = factor(0L), z2 = ordered(0L))
+    dat_ll <- data.frame(y = y_ll, x = x, z1 = factor(0L), z2 = ordered(0L))
+
+    set.seed(42)
+    bw_ll <- npregbw(y ~ x, data = dat_ll, regtype = "ll", bwmethod = "cv.ls", nmulti = 1)
+    set.seed(42)
+    bw_lc <- npregbw(y ~ x, data = dat_lc, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
+    set.seed(42)
+    bw_lp <- npregbw(
+      y ~ x,
+      data = dat_ll,
+      regtype = "lp",
+      ckerorder = 4,
+      bwmethod = "cv.ls",
+      nmulti = 1
+    )
+
+    expect_true(is.finite(as.numeric(bw_ll$fval)))
+    expect_true(is.finite(as.numeric(bw_lc$fval)))
+    expect_true(is.finite(as.numeric(bw_lp$fval)))
+
+    expect_gt(as.integer(bw_ll$num.feval.fast), 0L)
+    expect_gt(as.integer(bw_lp$num.feval.fast), 0L)
+    expect_gt(as.integer(bw_lc$num.feval.fast), 0L)
   })
 })
