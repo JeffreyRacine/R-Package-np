@@ -1218,7 +1218,8 @@ Completed in `np-master`:
    - issue-note regression sweep:
      - `/tmp/np_issue_notes_repros_fastinid_20260224_080637.log` (`all verified repros passed`)
 5. Notes:
-   - fast path is feature-flagged via option `np.plot.inid.fastpath.disable` for safe rollback/testing.
+   - historical note: this slice was initially feature-flagged for rollback/testing.
+   - update (2026-03-04): fastpath-disable feature flags were removed and supervised plot-bootstrap routes now enforce helper-contract fail-fast behavior (no legacy fallback branch).
    - this slice is limited to test-locked fixed-bandwidth `lc` semantics.
 
 ## Plot Bootstrap Modernization: `wild` Clean Break + Chunked `inid` Fast Path (2026-02-24)
