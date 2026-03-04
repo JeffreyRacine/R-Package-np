@@ -161,7 +161,7 @@ test_that("npplreg inid fast path matches explicit resample refits", {
   expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-7)
 })
 
-test_that("inid lc fast path toggle preserves plot bootstrap contract", {
+test_that("inid lc plot bootstrap requires fast path enabled", {
   skip_if_not_installed("np")
 
   set.seed(322)
@@ -189,14 +189,14 @@ test_that("inid lc fast path toggle preserves plot bootstrap contract", {
 
   set.seed(9322)
   out.fast <- run_plot(disable = FALSE)
-  set.seed(9322)
-  out.slow <- run_plot(disable = TRUE)
 
   expect_type(out.fast, "list")
   expect_true(length(out.fast) > 0)
-  expect_type(out.slow, "list")
-  expect_true(length(out.slow) > 0)
-  expect_equal(names(out.fast), names(out.slow))
+
+  expect_error(
+    run_plot(disable = TRUE),
+    "inid bootstrap requires helper mode with fastpath enabled"
+  )
 })
 
 test_that("plot bootstrap accepts wild selector", {
@@ -373,6 +373,38 @@ test_that("npindex plot bootstrap inid supports ll/lp basis variants", {
     expect_type(out, "list")
     expect_true(length(out) > 0, info = cfg$label)
   }
+})
+
+test_that("npindex plot bootstrap inid requires fast path enabled", {
+  skip_if_not_installed("np")
+
+  set.seed(32321)
+  n <- 60
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(x1 + x2) + rnorm(n, sd = 0.1)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  bw <- npindexbw(xdat = tx, ydat = y, bws = c(1, 1, 0.25), bandwidth.compute = FALSE)
+
+  old <- getOption("np.plot.inid.fastpath.disable")
+  on.exit(options(np.plot.inid.fastpath.disable = old), add = TRUE)
+  options(np.plot.inid.fastpath.disable = TRUE)
+
+  expect_error(
+    suppressWarnings(
+      plot(
+        bw,
+        xdat = tx,
+        ydat = y,
+        plot.behavior = "data",
+        perspective = FALSE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "inid",
+        plot.errors.boot.num = 7
+      )
+    ),
+    "inid bootstrap requires helper mode with fastpath enabled"
+  )
 })
 
 test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {

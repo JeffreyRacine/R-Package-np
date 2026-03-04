@@ -1983,8 +1983,7 @@ compute.bootstrap.errors.rbandwidth =
     if (is.wild.hat && gradients) {
       cont.idx <- which(bws$xdati$icon)
       if (is.na(match(slice.index, cont.idx))) {
-        warning("plot.errors.boot.method='wild' supports gradients only for continuous slices; using requested bootstrap method fallback")
-        is.wild.hat <- FALSE
+        stop("plot.errors.boot.method='wild' supports gradients only for continuous slices in compute.bootstrap.errors.rbandwidth", call. = FALSE)
       }
     }
 
@@ -1995,12 +1994,10 @@ compute.bootstrap.errors.rbandwidth =
       !isTRUE(gradients) &&
       identical(bws$type, "fixed")
 
-    if (is.inid && !isTRUE(inid.helper.ok)) {
-      warning("inid regression helper unavailable for this configuration; using explicit bootstrap fallback")
-    }
-    if (is.block && !isTRUE(block.helper.ok)) {
-      warning("fixed/geom regression helper unavailable for this configuration; using explicit bootstrap fallback")
-    }
+    if (is.inid && !isTRUE(inid.helper.ok))
+      stop("inid bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", call. = FALSE)
+    if (is.block && !isTRUE(block.helper.ok))
+      stop(sprintf("%s bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
 
     if ((is.inid && isTRUE(inid.helper.ok)) || (is.block && isTRUE(block.helper.ok))) {
       counts.drawer <- if (is.block) {
@@ -2074,47 +2071,8 @@ compute.bootstrap.errors.rbandwidth =
       )
     }
 
-    if (is.null(boot.out)) {
-      if (is.inid) {
-        boofun.inid <- function(data, indices) {
-          fit <- suppressWarnings(npreg(
-            txdat = data[indices, seq_len(ncol(data) - 1L), drop = FALSE],
-            tydat = data[indices, ncol(data), drop = TRUE],
-            exdat = exdat, bws = bws,
-            gradients = gradients,
-            gradient.order = gradient.order,
-            warn.glp.gradient = FALSE
-          ))
-          if (gradients) fit$grad[, slice.index] else fit$mean
-        }
-
-        boot.out <- boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun.inid,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boofun.ts <- function(tsb) {
-          fit <- suppressWarnings(npreg(
-            txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
-            tydat = tsb[, ncol(tsb)],
-            exdat = exdat, bws = bws,
-            gradients = gradients,
-            gradient.order = gradient.order,
-            warn.glp.gradient = FALSE
-          ))
-          if (gradients) fit$grad[, slice.index] else fit$mean
-        }
-
-        boot.out <- tsboot(
-          tseries = data.frame(xdat, ydat),
-          statistic = boofun.ts,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
-    }
+    if (is.null(boot.out))
+      stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
 
     all.bp <- list()
 
@@ -3241,8 +3199,7 @@ compute.bootstrap.errors.sibandwidth =
         !isTRUE(gradients) &&
         identical(bws$type, "fixed")
       if (!isTRUE(inid.helper.ok)) {
-        warning("inid single-index helper unavailable for this configuration; using explicit bootstrap fallback")
-        boot.out <- NULL
+        stop("inid bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.sibandwidth", call. = FALSE)
       } else {
       boot.out <- tryCatch({
         tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
@@ -3265,8 +3222,7 @@ compute.bootstrap.errors.sibandwidth =
         !isTRUE(gradients) &&
         identical(bws$type, "fixed")
       if (!isTRUE(block.helper.ok)) {
-        warning("fixed/geom single-index helper unavailable for this configuration; using explicit bootstrap fallback")
-        boot.out <- NULL
+        stop(sprintf("%s bootstrap requires helper mode with fastpath enabled, gradients=FALSE, and bws$type='fixed' in compute.bootstrap.errors.sibandwidth", plot.errors.boot.method), call. = FALSE)
       } else {
         boot.out <- tryCatch({
           tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
@@ -3293,42 +3249,8 @@ compute.bootstrap.errors.sibandwidth =
       }
     }
 
-    if (is.null(boot.out)) {
-      ## beta[1] is always 1.0, so use first column of gradients matrix ...
-      if (is.inid) {
-        boofun.inid <- function(data, indices) {
-          fit <- npindex(
-            txdat = data[indices, seq_len(ncol(data) - 1L), drop = FALSE],
-            tydat = data[indices, ncol(data), drop = TRUE],
-            exdat = xdat, bws = bws,
-            gradients = gradients
-          )
-          if (gradients) fit$grad[,1] else fit$mean
-        }
-        boot.out <- boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun.inid,
-          R = plot.errors.boot.num
-        )
-      } else {
-        boofun <- function(tsb) {
-          fit <- npindex(
-            txdat = tsb[, seq_len(ncol(tsb) - 1L), drop = FALSE],
-            tydat = tsb[, ncol(tsb)],
-            exdat = xdat, bws = bws,
-            gradients = gradients
-          )
-          if (gradients) fit$grad[,1] else fit$mean
-        }
-        boot.out <- tsboot(
-          tseries = data.frame(xdat,ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num,
-          l = plot.errors.boot.blocklen,
-          sim = plot.errors.boot.method
-        )
-      }
-    }
+    if (is.null(boot.out))
+      stop(sprintf("unresolved bootstrap execution path for method '%s' in compute.bootstrap.errors.sibandwidth", plot.errors.boot.method), call. = FALSE)
     
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
