@@ -66,6 +66,53 @@ test_that("SPMD tiny smoke opcode runs in session mode subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("SPMD step execution uses collective ACK in session subprocess", {
+  skip_on_cran()
+  res <- run_spmd_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "mk <- getFromNamespace('.npRmpi_spmd_make_envelope', 'npRmpi')",
+      "run <- getFromNamespace('.npRmpi_spmd_execute_step', 'npRmpi')",
+      "env <- mk(opcode='spmd.ping', timeout_class='smoke')",
+      "ans <- run(envelope=env, payload=list(label='collective-ack'), comm=1L, where='spmd-collective')",
+      "stopifnot(is.list(ans), isTRUE(ans$ok), identical(ans$ack$status, 'ACK'))",
+      "cat('SPMD_COLLECTIVE_ACK_OK\\n')"
+    ),
+    timeout = 90L
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SPMD_COLLECTIVE_ACK_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("SPMD step diverged sequence fails fast with ACK mismatch diagnostics", {
+  skip_on_cran()
+  res <- run_spmd_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "mk <- getFromNamespace('.npRmpi_spmd_make_envelope', 'npRmpi')",
+      "run <- getFromNamespace('.npRmpi_spmd_execute_step', 'npRmpi')",
+      "mpi.bcast.cmd(if (mpi.comm.rank(1L) == 1L) options(npRmpi.spmd.seq_id = 5L), caller.execute=TRUE)",
+      "env <- mk(opcode='spmd.ping', timeout_class='smoke')",
+      "err <- try(run(envelope=env, payload=list(label='diverge'), comm=1L, where='spmd-diverge'), silent=TRUE)",
+      "if (!inherits(err, 'try-error')) stop('expected divergence failure')",
+      "msg <- as.character(err)",
+      "if (!any(grepl('ACK mismatch', msg, fixed=TRUE))) stop('missing ACK mismatch diagnostic')",
+      "cat('SPMD_DIVERGENCE_FAILFAST_OK\\n')"
+    ),
+    timeout = 90L
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SPMD_DIVERGENCE_FAILFAST_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("SPMD opcode selection tags npregbw LL/LP CV routes", {
   opcode.fun <- getFromNamespace(".npRmpi_spmd_opcode_from_call", "npRmpi")
 

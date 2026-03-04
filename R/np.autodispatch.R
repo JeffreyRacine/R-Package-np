@@ -440,15 +440,153 @@
   )
 }
 
+.npRmpi_spmd_timeout_seconds <- function(timeout_class = "default") {
+  cls <- as.character(timeout_class)[1L]
+  if (!is.character(cls) || length(cls) != 1L || is.na(cls) || !nzchar(cls))
+    cls <- "default"
+  opt.key <- paste0("npRmpi.spmd.timeout.", gsub("[^A-Za-z0-9_.-]+", "_", cls))
+  timeout <- getOption(opt.key, NULL)
+  if (is.null(timeout))
+    timeout <- getOption("npRmpi.spmd.timeout.default", 0)
+  if (!is.numeric(timeout) || length(timeout) != 1L || is.na(timeout) ||
+      !is.finite(timeout) || timeout <= 0)
+    return(0)
+  as.numeric(timeout)
+}
+
+.npRmpi_spmd_with_timeout <- function(timeout_sec, thunk) {
+  if (!is.function(thunk))
+    stop("'thunk' must be a function", call. = FALSE)
+  if (!is.numeric(timeout_sec) || length(timeout_sec) != 1L || is.na(timeout_sec) ||
+      !is.finite(timeout_sec) || timeout_sec <= 0)
+    return(thunk())
+
+  base::setTimeLimit(elapsed = as.numeric(timeout_sec), transient = TRUE)
+  on.exit(base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE), add = TRUE)
+  thunk()
+}
+
+.npRmpi_spmd_collective_ack <- function(local,
+                                        envelope,
+                                        comm = 1L,
+                                        where = "SPMD step") {
+  .npRmpi_spmd_validate_envelope(envelope)
+  if (!is.list(local) || is.null(local$ack))
+    stop(sprintf("%s local ACK payload is malformed", where), call. = FALSE)
+
+  size <- tryCatch(as.integer(mpi.comm.size(comm)), error = function(e) 1L)
+  if (is.na(size) || size < 2L) {
+    if (!isTRUE(local$ok)) {
+      stop(
+        sprintf("%s local failure [opcode=%s seq_id=%d]: %s",
+                where, envelope$opcode, as.integer(envelope$seq_id),
+                as.character(local$error)[1L]),
+        call. = FALSE
+      )
+    }
+    return(local)
+  }
+
+  rank <- tryCatch(as.integer(mpi.comm.rank(comm)), error = function(e) NA_integer_)
+  local.seq <- if (is.list(local$ack) && !is.null(local$ack$seq_id)) as.integer(local$ack$seq_id) else NA_integer_
+  local.op <- if (is.list(local$ack) && !is.null(local$ack$opcode)) as.character(local$ack$opcode)[1L] else as.character(envelope$opcode)[1L]
+  local.status <- if (isTRUE(local$ok)) "ACK" else "ERR"
+  local.error <- if (isTRUE(local$ok)) "" else as.character(local$error)[1L]
+  ack.local <- c(
+    rank = as.character(rank),
+    seq_id = as.character(local.seq),
+    opcode = local.op,
+    status = local.status,
+    error = local.error
+  )
+
+  timeout.sec <- .npRmpi_spmd_timeout_seconds(timeout_class = envelope$timeout_class)
+  ack.gather <- tryCatch(
+    .npRmpi_spmd_with_timeout(
+      timeout_sec = timeout.sec,
+      thunk = function() mpi.allgather.Robj(ack.local, comm = comm)
+    ),
+    error = function(e) {
+      stop(
+        sprintf("%s ACK gather failed [opcode=%s seq_id=%d]: %s",
+                where, envelope$opcode, as.integer(envelope$seq_id), conditionMessage(e)),
+        call. = FALSE
+      )
+    }
+  )
+
+  flat <- as.character(ack.gather)
+  expected <- 5L * size
+  if (length(flat) != expected) {
+    stop(
+      sprintf("%s ACK gather shape mismatch [opcode=%s seq_id=%d]: expected %d fields, received %d",
+              where, envelope$opcode, as.integer(envelope$seq_id), expected, length(flat)),
+      call. = FALSE
+    )
+  }
+
+  ack.mat <- matrix(flat, nrow = 5L, byrow = FALSE,
+                    dimnames = list(c("rank", "seq_id", "opcode", "status", "error"), NULL))
+  seq.vec <- suppressWarnings(as.integer(ack.mat["seq_id", ]))
+  rank.vec <- suppressWarnings(as.integer(ack.mat["rank", ]))
+  status.vec <- ack.mat["status", ]
+  opcode.vec <- ack.mat["opcode", ]
+  bad <- which(is.na(seq.vec) |
+                 (seq.vec != as.integer(envelope$seq_id)) |
+                 (status.vec != "ACK") |
+                 (opcode.vec != as.character(envelope$opcode)[1L]))
+
+  if (length(bad)) {
+    details <- vapply(
+      bad,
+      function(i) {
+        sprintf("rank=%s status=%s seq_id=%s opcode=%s err=%s",
+                if (is.na(rank.vec[[i]])) "NA" else as.character(rank.vec[[i]]),
+                as.character(status.vec[[i]]),
+                as.character(ack.mat["seq_id", i]),
+                as.character(opcode.vec[[i]]),
+                as.character(ack.mat["error", i]))
+      },
+      character(1)
+    )
+    stop(
+      sprintf("%s ACK mismatch [opcode=%s seq_id=%d]: %s",
+              where, envelope$opcode, as.integer(envelope$seq_id),
+              paste(details, collapse = "; ")),
+      call. = FALSE
+    )
+  }
+
+  local
+}
+
+.npRmpi_spmd_execute_step <- function(envelope,
+                                      payload = NULL,
+                                      comm = 1L,
+                                      where = "SPMD step") {
+  local <- .npRmpi_spmd_try_execute_local(
+    envelope = envelope,
+    payload = payload,
+    where = where
+  )
+  .npRmpi_spmd_collective_ack(
+    local = local,
+    envelope = envelope,
+    comm = comm,
+    where = where
+  )
+}
+
 .npRmpi_spmd_tiny_smoke <- function(label = "spmd-smoke", comm = 1L) {
   .npRmpi_require_active_slave_pool(comm = comm, where = "SPMD tiny smoke")
   envelope <- .npRmpi_spmd_make_envelope(
     opcode = "spmd.ping",
     timeout_class = "smoke"
   )
-  .npRmpi_spmd_execute_local(
+  .npRmpi_spmd_execute_step(
     envelope = envelope,
     payload = list(label = as.character(label)[1L], comm = as.integer(comm)),
+    comm = comm,
     where = "SPMD tiny smoke"
   )
 }
@@ -945,10 +1083,11 @@
   )
 
   cmd <- substitute({
-    exec.try <- get(".npRmpi_spmd_try_execute_local", envir = asNamespace("npRmpi"), inherits = FALSE)
-    ans <- exec.try(
+    exec.step <- get(".npRmpi_spmd_execute_step", envir = asNamespace("npRmpi"), inherits = FALSE)
+    ans <- exec.step(
       envelope = ENVELOPE,
       payload = PAYLOAD,
+      comm = COMM,
       where = WHERE
     )
     if (!isTRUE(ans$ok)) {
@@ -964,6 +1103,7 @@
     ans$result
   }, list(ENVELOPE = envelope,
           PAYLOAD = payload,
+          COMM = comm,
           WHERE = .npRmpi_autodispatch_call_name(mc)))
 
   result <- rec.step(.npRmpi_bcast_cmd_expr(cmd, comm = comm, caller.execute = TRUE),

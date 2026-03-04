@@ -107,7 +107,7 @@ if (mpi.comm.rank(0) > 0) {
         envir = tmp.message[[4L]]
       ))
     }
-    res <- try(eval(tmp.message, envir = .GlobalEnv), silent = TRUE)
+    res <- try(npRmpi:::.npRmpi_eval_scmd(tmp.message, envir = .GlobalEnv), silent = TRUE)
     if (inherits(res, "try-error")) {
       cmd <- paste(utils::capture.output(print(tmp.message)), collapse = " ")
       msg <- as.character(res)

@@ -39,7 +39,7 @@ repeat {
   }
 	if (is.character(tmp.message) && tmp.message =="kaerb")
 		break
-    res <- try(eval(tmp.message,envir=.GlobalEnv), silent=TRUE)
+    res <- try(npRmpi:::.npRmpi_eval_scmd(tmp.message, envir = .GlobalEnv), silent=TRUE)
     if (inherits(res, "try-error")) {
         cmd <- paste(utils::capture.output(print(tmp.message)), collapse = " ")
         msg <- as.character(res)
