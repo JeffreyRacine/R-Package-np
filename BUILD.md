@@ -18,13 +18,13 @@ cd /Users/jracine/Development
 R CMD build np-npRmpi
 ```
 
-This produces `npRmpi_0.70-0.tar.gz` in `/Users/jracine/Development`.
+This produces `npRmpi_0.70-1.tar.gz` in `/Users/jracine/Development`.
 
 ## Install
 
 ```bash
 cd /Users/jracine/Development
-R CMD INSTALL npRmpi_0.70-0.tar.gz
+R CMD INSTALL npRmpi_0.70-1.tar.gz
 ```
 
 ## Quick Load Check
@@ -37,7 +37,7 @@ R -q -e 'library(npRmpi); sessionInfo()'
 
 ```bash
 cd /Users/jracine/Development
-R CMD check --as-cran npRmpi_0.70-0.tar.gz
+R CMD check --as-cran npRmpi_0.70-1.tar.gz
 ```
 
 ### MPI Example Modes During Check
@@ -45,14 +45,19 @@ R CMD check --as-cran npRmpi_0.70-0.tar.gz
 - Default `R CMD check --as-cran` behavior:
   - MPI spawn examples are skipped in check context to avoid MPICH teardown
     killing the parent check process on some systems.
-- To force MPI spawn examples to run during check:
+- To force MPI spawn examples to run during check, use the exact sequence below.
+
+### Forced MPI Example Check (Exact Sequence)
 
 ```bash
 cd /Users/jracine/Development/np-npRmpi/man
 ./run
 
 cd /Users/jracine/Development
-NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1 R CMD check --as-cran npRmpi_0.70-0.tar.gz
+R CMD build np-npRmpi
+
+cd /Users/jracine/Development
+NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1 R CMD check --as-cran npRmpi_0.70-1.tar.gz
 
 cd /Users/jracine/Development/np-npRmpi/man
 ./dontrun
