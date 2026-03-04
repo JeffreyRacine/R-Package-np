@@ -11,11 +11,15 @@ Completed checkpoint tranches:
 2. Phase 2 (SPMD control-plane scaffolding): complete (`905ffd9`, `6b6be81`, `1fece7e`, `3bf4914`).
 3. Phase 3 (`npregbw` LL/LP CV migration + `O(n^2)` helper excision): complete (`24dbd4b` and subsequent route/contract gates).
 4. Phase 4 (core-family migration progress): complete for `npudens*`, `npudist*`, `npcdens*`, `npcdist*`, `npscoef*`, `npindex*`, `npplreg*`.
+5. Phase 5 (hot-path legacy asymmetry decommission): complete for core estimator/CV hot paths via typed locked opcode handlers and guard-validated route parity.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
 2. `47bbc49` (locked typed handlers for migrated core opcodes)
 3. `388d643` (contract test realignment)
+4. `9d163f6` (lock typed opcode for `npindexbw`)
+5. `f4c83f0` (lock typed opcode for `npindex`)
+6. `c34ff68` (lock typed opcodes for remaining core estimators)
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
