@@ -10,6 +10,7 @@ R_BIN="${R_BIN:-Rscript}"
 R_LIBS_VALUE="${R_LIBS_VALUE:-}"
 KILL_ORPHANS_ON_FAIL="${KILL_ORPHANS_ON_FAIL:-0}"
 PRE_CLEAN_ORPHANS="${PRE_CLEAN_ORPHANS:-1}"
+WILD_MASTER_LOCAL_GUARD="${WILD_MASTER_LOCAL_GUARD:-}"
 
 mkdir -p "${OUT_DIR}/jobs"
 SUMMARY="${OUT_DIR}/summary.tsv"
@@ -26,6 +27,9 @@ echo "REPO=${REPO}"
 echo "OUT_DIR=${OUT_DIR}"
 echo "JOBS=${JOBS}"
 echo "TIMEOUT_SEC=${TIMEOUT_SEC}"
+if [ -n "${WILD_MASTER_LOCAL_GUARD}" ]; then
+  echo "WILD_MASTER_LOCAL_GUARD=${WILD_MASTER_LOCAL_GUARD}"
+fi
 
 write_job_script() {
   job="$1"
@@ -51,6 +55,13 @@ EOF
     npplot)
       cat > "${script}" <<EOF
 options(np.messages=FALSE)
+EOF
+      if [ -n "${WILD_MASTER_LOCAL_GUARD}" ]; then
+        cat >> "${script}" <<EOF
+options(npRmpi.plot.wild.master_local.guard = ${WILD_MASTER_LOCAL_GUARD})
+EOF
+      fi
+      cat >> "${script}" <<EOF
 suppressPackageStartupMessages(library(npRmpi))
 npRmpi.init(nslaves=${NSLAVES}, quiet=TRUE)
 on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
@@ -71,6 +82,39 @@ out <- plot(
 )
 stopifnot(is.list(out))
 cat("JOB_OK npplot\\n")
+EOF
+      ;;
+    npplot_wild_stress)
+      cat > "${script}" <<EOF
+options(np.messages=FALSE)
+EOF
+      if [ -n "${WILD_MASTER_LOCAL_GUARD}" ]; then
+        cat >> "${script}" <<EOF
+options(npRmpi.plot.wild.master_local.guard = ${WILD_MASTER_LOCAL_GUARD})
+EOF
+      fi
+      cat >> "${script}" <<EOF
+suppressPackageStartupMessages(library(npRmpi))
+npRmpi.init(nslaves=${NSLAVES}, quiet=TRUE)
+on.exit(try(npRmpi.quit(force=TRUE), silent=TRUE), add=TRUE)
+set.seed(123)
+n <- 1000
+x1 <- runif(n); x2 <- runif(n); x3 <- runif(n); x4 <- rbinom(n, 2, .3)
+y <- 1 + x1 + x2 + x3 + x4 + rnorm(n)
+X <- data.frame(x1, x2, x3, ordered(x4))
+bw <- npregbw(xdat=X, ydat=y, regtype="ll", bwmethod="cv.aic", nmulti=1)
+out <- plot(
+  bw,
+  perspective=FALSE,
+  plot.behavior="data",
+  plot.errors.method="bootstrap",
+  plot.errors.boot.method="wild",
+  plot.errors.center="bias-corrected",
+  plot.errors.type="simultaneous",
+  plot.errors.boot.num=799
+)
+stopifnot(is.list(out))
+cat("JOB_OK npplot_wild_stress\\n")
 EOF
       ;;
     npcondensitybw)

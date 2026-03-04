@@ -5,6 +5,7 @@
 2. `nslaves=0` is removed permanently from `npRmpi`.
 3. `npRmpi` runtime contract is MPI-only (`nslaves>=1`).
 4. Remediation implementation phases are complete; follow-on work is maintenance/performance tuning under the same gate policy.
+5. Current highest-priority active risk is build-stage/plot-bootstrap runtime hardening (see `BUILD_STAGE_MPI_HARDENING_PLAN_2026-03-04.md` and `MPI_EFFICIENCY_SWEEP_2026-03-04.md`).
 
 ## Execution Status (Updated 2026-03-03/04)
 Completed checkpoint tranches:

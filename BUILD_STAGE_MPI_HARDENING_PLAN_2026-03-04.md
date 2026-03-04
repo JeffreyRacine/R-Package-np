@@ -105,3 +105,35 @@ Residual blocker:
 1. Full forced all-examples `R CMD check` can still abort/hang under strict check internals; current stop-point is in the `np.pairs` example stream (intermittent `MPI_Allgather` truncation / `npudens` ACK mismatch signatures), not the earlier wild-bootstrap `np.plot` crash.
 2. Fresh-install subprocess harness remains green for the targeted runtime jobs (`npreg`, `npplot`, `npcondensitybw`), confirming runtime hardening gains while the long monolithic check-stream fragility remains isolated.
 3. Next tranche should be docs/example-structure focused for check mode (keep examples lightweight/deterministic in `R CMD check`; keep full MPI lifecycle stress in subprocess integration harnesses).
+
+## Phase B.1 Efficiency Sweep Addendum (2026-03-04)
+Static + runtime sweep artifacts:
+1. Static sweep: `/tmp/mpi_efficiency_sweep_20260304_1`
+2. Guard-on subprocess `npplot`: `/tmp/mpi_efficiency_guard_true_20260304_1`
+3. Guard-off subprocess `npplot`: `/tmp/mpi_efficiency_guard_false_20260304_1`
+4. Stress probes documented in:
+   - `/Users/jracine/Development/np-npRmpi/MPI_EFFICIENCY_SWEEP_2026-03-04.md`
+
+Findings:
+1. No reintroduced forced CVLS gate pattern in `src/jksum.c` (`CVLS_FORCED_GATE_LINES=0`).
+2. Remaining explicit off-MPI controls are concentrated in plot/bootstrap:
+   - `npRmpi.plot.wild.master_local.guard`,
+   - `.np_plot_kernel_weights_direct()` with `suppress.parallel = TRUE`.
+3. Larger stress (`n=1000`, `plot.errors.boot.num=799`) aborted with guard both on and off (`Abort trap: 6`), indicating a deeper large-workload plot/bootstrap fragility beyond the guard itself.
+4. Dedicated subprocess stress job `npplot_wild_stress` is now available in `run_mpi_examples_subprocess.sh` and currently fails in both modes:
+   - guard on: `/tmp/mpi_efficiency_stress_guard_true_20260304_1` (`EXIT=134`)
+   - guard off: `/tmp/mpi_efficiency_stress_guard_false_20260304_1` (`EXIT=134`)
+
+Priority update:
+1. Build-stage/runtime hardening remains the highest-priority active track.
+2. Core estimator/CV SPMD remediation remains closed unless new core-family evidence appears.
+
+## Explicit TODO (Deferred Until Current Regression Is Fixed)
+1. Restore distributed MPI wild-bootstrap fan-out for `np.plot` paths (remove temporary master-local guard once transport stability is proven).
+2. Required acceptance before re-enabling:
+   - no crash/hang in targeted wild-bootstrap subprocess soak runs,
+   - route sanity pass in session and attach modes,
+   - no numerical drift relative to current guarded behavior (within declared tolerance),
+   - no material runtime regression vs intended parallel fan-out baseline.
+3. Use `npplot_wild_stress` as a mandatory gate for any wild-path transport or guard change; do not relax guard policy until this job is stable with `EXIT=0`.
+4. Add phase-level diagnostics in worker return transport (`mpi.remote.exec` / `.mpi.worker.exec`) and bootstrap fanout (`.npRmpi_bootstrap_run_fanout`) to pinpoint `EXIT=134` origin under stress.

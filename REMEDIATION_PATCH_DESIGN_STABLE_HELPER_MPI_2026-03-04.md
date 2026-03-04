@@ -7,6 +7,7 @@
 4. This document now serves as:
    - historical rationale for why helper-parallelization had been considered,
    - active guidance for adjacent low-risk remediation (dead-scaffold cull + modernization checks + route gates).
+5. MPI efficiency sweep follow-up (`MPI_EFFICIENCY_SWEEP_2026-03-04.md`) confirms no new core CVLS forced-gate regression and points to plot/bootstrap hardening as the current high-priority track.
 
 ## Scope
 Target only the CVLS stable-helper path used by LL/LC/LP in `npRmpi`:
