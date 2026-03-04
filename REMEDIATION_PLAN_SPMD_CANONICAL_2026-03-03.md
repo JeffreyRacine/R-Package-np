@@ -65,6 +65,7 @@ Completed checkpoint tranches:
 55. Post-closeout maintenance tranche-7 completed: `W.lp` classifier hardening in `R/util.R` (`xdat.col.numeric`: `sapply` -> typed `vapply(logical(1))`) with route-gated validation (`session`/`attach`/`profile`/`manual` pass tokens), installed-package `npreg`/`npsigtest` tests passing, and refreshed scan summary (`scan_sapply=66`).
 56. Post-closeout maintenance tranche-8 completed: modernization scan harness I/O hardening in `issue_notes/run_modernization_micro_scan.sh` (explicit `ROOT_DIR`/`OUT_DIR` arg support and fail-fast root guard), validated by `shellcheck` and explicit out-dir scan smoke.
 57. Post-closeout maintenance tranche-9 completed: plot-engine factor-classifier type-stability hardening in `R/np.plot.engine.{pl,sc,cond,con}bandwidth.R` (`all.isFactor`: `sapply`/`unlist(sapply)` -> typed `vapply(logical(1))`), with plot contract tests, session plot smoke, attach/profile/manual route validators, and refreshed scan summary (`scan_sapply=62`).
+58. Post-closeout maintenance tranche-10 completed: installed-package test-hygiene hardening for `test-npreg-arg-contract.R` using namespace-safe lookup (`getFromNamespace(\"npreg.rbandwidth\", \"npRmpi\")`), with installed test pass and full route validator pass.
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -98,6 +99,7 @@ Latest checkpoint commits:
 29. post-closeout maintenance tranche-7 (`W.lp` classifier `vapply` hardening + route/scans ledger update)
 30. post-closeout maintenance tranche-8 (modernization scan harness arg/IO hardening + validation ledger update)
 31. post-closeout maintenance tranche-9 (plot-engine `all.isFactor` classifier `vapply` hardening + route/scans ledger update)
+32. post-closeout maintenance tranche-10 (installed test namespace-lookup hardening for `npreg` arg-contract + route/scans ledger update)
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
@@ -154,6 +156,7 @@ Latest artifact roots:
 52. `/tmp/spmd_tranche7_wlp_vapply_20260304_105424`
 53. `/tmp/spmd_tranche8_scanio_20260304_105725`
 54. `/tmp/spmd_tranche9_plot_vapply_20260304_110304`
+55. `/tmp/spmd_tranche10_npreg_arg_contract_20260304_111022`
 
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:

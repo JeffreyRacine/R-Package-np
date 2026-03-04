@@ -297,3 +297,14 @@ Recommended order:
 22. Tranche-9 modernization scan:
    - `/tmp/spmd_tranche9_plot_vapply_20260304_110304/modscan/summary.log`
    - key delta: `scan_sapply=62` (down from `66`).
+23. Completed installed-test hygiene tranche for `npreg` argument-contract checks:
+   - updated `tests/testthat/test-npreg-arg-contract.R` to resolve internal function via namespace:
+     - `getFromNamespace("npreg.rbandwidth", "npRmpi")`
+   - removes installed-package fragility from bare symbol lookup while preserving the same contract assertions.
+24. Tranche-10 validation artifact root:
+   - `/tmp/spmd_tranche10_npreg_arg_contract_20260304_111022`
+   - tokens: `ORPHAN_PRE_EMPTY=1`, `NPREG_ARG_FAILNZ=0`, `NPREG_FAILNZ=0`, `SESSION_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `ORPHAN_POST_EMPTY=1`.
+   - modernization scan snapshot: `/tmp/spmd_tranche10_npreg_arg_contract_20260304_111022/modscan/summary.log` (`scan_sapply=62` unchanged).
+25. Cross-repo parity check for the same test-hygiene fix:
+   - mirrored `getFromNamespace("npreg.rbandwidth", "np")` in `np-master/tests/testthat/test-npreg-arg-contract.R`.
+   - validation artifact: `/tmp/npmaster_tranche_npreg_arg_contract_20260304_111248` (`NPMASTER_NPREG_ARG_FAILNZ=0`).
