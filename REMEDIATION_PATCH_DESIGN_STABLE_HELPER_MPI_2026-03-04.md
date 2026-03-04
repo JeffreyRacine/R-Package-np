@@ -223,3 +223,14 @@ Recommended order:
 2. Keep route-smoke + contract tests mandatory after any runtime/lifecycle cull.
 3. Continue Wickham micro-cleanups in isolated tranches with no behavior/default drift.
 4. Use full gate-pack evidence before marking the remediation stream complete.
+
+## Execution log (2026-03-04)
+1. Completed dead-scaffold cull tranche:
+   - removed unreachable `.npRmpi_spmd_next_seq` from `R/np.autodispatch.R`,
+   - retained active runtime `nslaves<1` rejection guard in `npRmpi.init`.
+2. Validation artifact root:
+   - `/tmp/spmd_tranche1_deadscaffold_20260304_103024`
+   - tokens: `SESSION_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `NPSIGTEST_FAILNZ=0`, orphan pre/post empty.
+3. Checkpoint commits:
+   - `635ddbb` (dead-scaffold cull + remediation-doc updates),
+   - `c950f14` (status correction: helper-parallelization tranche marked N/A on current heads).
