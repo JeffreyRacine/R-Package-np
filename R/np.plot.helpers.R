@@ -2504,8 +2504,7 @@ compute.bootstrap.errors.bandwidth =
       isTRUE(is.block) &&
       isTRUE(identical(bws$type, "fixed"))
 
-    boot.out <- NULL
-    if (fast.inid || fast.block) {
+    boot.out <- if (fast.inid || fast.block) {
       op <- if (cdf) "integral" else "normal"
       counts.drawer <- if (fast.block) {
         .np_block_counts_drawer(
@@ -2533,9 +2532,7 @@ compute.bootstrap.errors.bandwidth =
                call. = FALSE)
         }
       )
-    }
-
-    if (is.null(boot.out)) {
+    } else {
       boofun <- if (is.inid) {
         function(data, indices) {
           fit <- if (cdf) {
@@ -2649,8 +2646,7 @@ compute.bootstrap.errors.dbandwidth =
       isTRUE(is.block) &&
       isTRUE(identical(bws$type, "fixed"))
 
-    boot.out <- NULL
-    if (fast.inid || fast.block) {
+    boot.out <- if (fast.inid || fast.block) {
       counts.drawer <- if (fast.block) {
         .np_block_counts_drawer(
           n = nrow(xdat),
@@ -2677,9 +2673,7 @@ compute.bootstrap.errors.dbandwidth =
                call. = FALSE)
         }
       )
-    }
-
-    if (is.null(boot.out)) {
+    } else {
       boofun <- if (is.inid) {
         function(data, indices) {
           npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)$dist
@@ -2817,8 +2811,7 @@ compute.bootstrap.errors.conbandwidth =
         dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
       )
     }
-    boot.out <- NULL
-    if (fast.inid || fast.block) {
+    boot.out <- if (fast.inid || fast.block) {
       counts.drawer <- if (fast.block) {
         .np_block_counts_drawer(
           n = nrow(xdat),
@@ -2847,9 +2840,7 @@ compute.bootstrap.errors.conbandwidth =
                call. = FALSE)
         }
       )
-    }
-
-    if (is.null(boot.out)) {
+    } else {
       boofun <- if (is.inid) {
         function(data, indices) out.cond(fit.cond(
           tx = xdat[indices, , drop = FALSE],
@@ -2996,8 +2987,7 @@ compute.bootstrap.errors.condbandwidth =
         dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
       )
     }
-    boot.out <- NULL
-    if (fast.inid || fast.block) {
+    boot.out <- if (fast.inid || fast.block) {
       counts.drawer <- if (fast.block) {
         .np_block_counts_drawer(
           n = nrow(xdat),
@@ -3026,9 +3016,7 @@ compute.bootstrap.errors.condbandwidth =
                call. = FALSE)
         }
       )
-    }
-
-    if (is.null(boot.out)) {
+    } else {
       boofun <- if (is.inid) {
         function(data, indices) out.cond(fit.cond(
           tx = xdat[indices, , drop = FALSE],
