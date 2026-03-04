@@ -17,40 +17,14 @@ invisible(npRmpi:::mpi.comm.disconnect(.intercomm))
 )))
 if (!is.finite(.recv.timeout) || .recv.timeout <= 0)
   .recv.timeout <- 0
-repeat {
-  if (.recv.timeout > 0)
-    base::setTimeLimit(elapsed = .recv.timeout, transient = TRUE)
-	tmp.message=try(npRmpi:::mpi.bcast.cmd(rank=0,comm=.comm, nonblock=.nonblock, sleep=.sleep), silent=TRUE)
-  if (.recv.timeout > 0)
-    base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
-  if (inherits(tmp.message, "try-error")) {
-    .msg <- as.character(tmp.message)
-    if (any(grepl("reached elapsed time limit", .msg, fixed = TRUE))) {
-      base::stop(
-        paste(
-          "npRmpi spawn worker receive timeout waiting for master command.",
-          "Possible blocked MPI route or transport deadlock.",
-          "Remediation: verify FI_TCP_IFACE and relaunch with a fresh spawn session."
-        ),
-        call. = FALSE
-      )
-    }
-    base::stop(.msg, call. = FALSE)
-  }
-	if (is.character(tmp.message) && tmp.message =="kaerb")
-		break
-    res <- try(npRmpi:::.npRmpi_eval_scmd(tmp.message, envir = .GlobalEnv), silent=TRUE)
-    if (inherits(res, "try-error")) {
-        cmd <- paste(utils::capture.output(print(tmp.message)), collapse = " ")
-        msg <- as.character(res)
-        base::cat(sprintf("\n[spawn slave rank %d] CMD: %s\n[spawn slave rank %d] ERROR: %s\n",
-                          npRmpi:::mpi.comm.rank(.comm), cmd, npRmpi:::mpi.comm.rank(.comm),
-                          paste(msg, collapse = " ")),
-                  file = stderr())
-        flush(stderr())
-        base::stop(msg)
-    }
-}
+npRmpi:::.npRmpi_worker_loop(
+  comm = .comm,
+  nonblock = .nonblock,
+  sleep = .sleep,
+  recv.timeout = .recv.timeout,
+  loop.label = "spawn slave",
+  timeout.remediation = "verify FI_TCP_IFACE and relaunch with a fresh spawn session."
+)
 print("Done")
 if (npRmpi:::mpi.comm.size(.comm) > 0) {
     # `.comm` is an intracommunicator (created via `MPI_Intercomm_merge()`).

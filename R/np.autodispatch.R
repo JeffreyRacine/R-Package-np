@@ -583,12 +583,18 @@
     opcode = "spmd.ping",
     timeout_class = "smoke"
   )
-  .npRmpi_spmd_execute_step(
-    envelope = envelope,
-    payload = list(label = as.character(label)[1L], comm = as.integer(comm)),
-    comm = comm,
-    where = "SPMD tiny smoke"
-  )
+  payload <- list(label = as.character(label)[1L], comm = as.integer(comm))
+  cmd <- substitute({
+    exec.step <- get(".npRmpi_spmd_execute_step", envir = asNamespace("npRmpi"), inherits = FALSE)
+    exec.step(
+      envelope = ENVELOPE,
+      payload = PAYLOAD,
+      comm = COMM,
+      where = "SPMD tiny smoke"
+    )
+  }, list(ENVELOPE = envelope, PAYLOAD = payload, COMM = comm))
+
+  .npRmpi_bcast_cmd_expr(expr = cmd, comm = comm, caller.execute = TRUE)
 }
 
 .npRmpi_autodispatch_eval_char_arg <- function(mc, caller_env, argname) {

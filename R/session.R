@@ -64,11 +64,28 @@
   as.numeric(envv)
 }
 
-.npRmpi_session_attach_worker_loop <- function(comm = 1L,
-                                               nonblock = TRUE,
-                                               sleep = 0.1) {
-  options(echo = FALSE)
-  recv.timeout <- .npRmpi_session_recv_timeout()
+.npRmpi_worker_normalize_message <- function(msg) {
+  if (!is.call(msg) || length(msg) < 4L)
+    return(msg)
+  if (!identical(msg[[1L]], as.name("do.call")))
+    return(msg)
+  if (!is.environment(msg[[4L]]))
+    return(msg)
+  as.call(list(
+    as.name("do.call"),
+    msg[[2L]],
+    msg[[3L]],
+    quote = FALSE,
+    envir = msg[[4L]]
+  ))
+}
+
+.npRmpi_worker_loop <- function(comm = 1L,
+                                nonblock = TRUE,
+                                sleep = 0.1,
+                                recv.timeout = 0,
+                                loop.label = "worker",
+                                timeout.remediation = "") {
   repeat {
     if (recv.timeout > 0)
       base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
@@ -79,13 +96,13 @@
     if (inherits(msg, "try-error")) {
       msg.text <- as.character(msg)
       if (any(grepl("reached elapsed time limit", msg.text, fixed = TRUE))) {
+        rem <- if (is.character(timeout.remediation) && nzchar(timeout.remediation))
+          paste("Remediation:", timeout.remediation) else ""
         stop(
           paste(
-            "npRmpi attach worker receive timeout waiting for master command.",
+            sprintf("npRmpi %s receive timeout waiting for master command.", loop.label),
             "Possible blocked MPI route or transport deadlock.",
-            "Remediation: verify attach launch wiring (mpiexec -n <master+slaves>,",
-            "clear R_PROFILE_USER/R_PROFILE for attach), confirm FI_TCP_IFACE,",
-            "and relaunch with a fresh MPI world."
+            rem
           ),
           call. = FALSE
         )
@@ -94,22 +111,42 @@
     }
     if (is.character(msg) && identical(msg, "kaerb"))
       break
+
+    msg <- .npRmpi_worker_normalize_message(msg)
     res <- try(.npRmpi_eval_scmd(msg, envir = .GlobalEnv), silent = TRUE)
     if (inherits(res, "try-error")) {
       cmd <- paste(utils::capture.output(print(msg)), collapse = " ")
       err <- as.character(res)
+      rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
       base::cat(
-        sprintf("\n[attach slave rank %d] CMD: %s\n[attach slave rank %d] ERROR: %s\n",
-                .npRmpi_safe_int(mpi.comm.rank(comm)),
-                cmd,
-                .npRmpi_safe_int(mpi.comm.rank(comm)),
-                paste(err, collapse = " ")),
+        sprintf("\n[%s rank %d] CMD: %s\n[%s rank %d] ERROR: %s\n",
+                loop.label, rank, cmd, loop.label, rank, paste(err, collapse = " ")),
         file = stderr()
       )
       flush(stderr())
       stop(err, call. = FALSE)
     }
   }
+  invisible(TRUE)
+}
+
+.npRmpi_session_attach_worker_loop <- function(comm = 1L,
+                                               nonblock = TRUE,
+                                               sleep = 0.1) {
+  options(echo = FALSE)
+  recv.timeout <- .npRmpi_session_recv_timeout()
+  .npRmpi_worker_loop(
+    comm = comm,
+    nonblock = nonblock,
+    sleep = sleep,
+    recv.timeout = recv.timeout,
+    loop.label = "attach slave",
+    timeout.remediation = paste(
+      "verify attach launch wiring (mpiexec -n <master+slaves>,",
+      "clear R_PROFILE_USER/R_PROFILE for attach), confirm FI_TCP_IFACE,",
+      "and relaunch with a fresh MPI world."
+    )
+  )
   .npRmpi_safe(if (comm != 0L) mpi.comm.free(comm), fallback = NULL)
   mpi.quit()
   invisible(FALSE)

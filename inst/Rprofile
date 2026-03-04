@@ -66,59 +66,17 @@ if (mpi.comm.rank(0) > 0) {
   options(echo = FALSE)
   .comm <- 1
   mpi.barrier(0)
-  repeat {
-    if (.recv.timeout > 0)
-      base::setTimeLimit(elapsed = .recv.timeout, transient = TRUE)
-    tmp.message <- try(
-      mpi.bcast.cmd(rank = 0, comm = .comm,
-                    nonblock = .nonblock, sleep = .sleep),
-      silent = TRUE
+  npRmpi:::.npRmpi_worker_loop(
+    comm = .comm,
+    nonblock = .nonblock,
+    sleep = .sleep,
+    recv.timeout = .recv.timeout,
+    loop.label = "profile slave",
+    timeout.remediation = paste(
+      "check profile env wiring (avoid dual R_PROFILE_USER/R_PROFILE),",
+      "verify FI_* interface settings, and retry with a fresh MPI launch."
     )
-    if (.recv.timeout > 0)
-      base::setTimeLimit(cpu = Inf, elapsed = Inf, transient = FALSE)
-    if (inherits(tmp.message, "try-error")) {
-      msg <- as.character(tmp.message)
-      if (any(grepl("reached elapsed time limit", msg, fixed = TRUE))) {
-        base::stop(
-          paste(
-            "npRmpi profile receive timeout waiting for master command.",
-            "Possible blocked startup or transport deadlock.",
-            "Check profile env wiring (avoid dual R_PROFILE_USER/R_PROFILE),",
-            "verify FI_* interface settings, and retry with a fresh MPI launch."
-          ),
-          call. = FALSE
-        )
-      }
-      base::stop(msg, call. = FALSE)
-    }
-    if (is.character(tmp.message) && identical(tmp.message, "kaerb"))
-      break
-    # Normalize older/ambiguous do.call payloads sent by Rmpi internals
-    # that pass an unnamed environment as positional arg 3.
-    if (is.call(tmp.message) &&
-        length(tmp.message) >= 4L &&
-        identical(tmp.message[[1L]], as.name("do.call")) &&
-        is.environment(tmp.message[[4L]])) {
-      tmp.message <- as.call(list(
-        as.name("do.call"),
-        tmp.message[[2L]],
-        tmp.message[[3L]],
-        quote = FALSE,
-        envir = tmp.message[[4L]]
-      ))
-    }
-    res <- try(npRmpi:::.npRmpi_eval_scmd(tmp.message, envir = .GlobalEnv), silent = TRUE)
-    if (inherits(res, "try-error")) {
-      cmd <- paste(utils::capture.output(print(tmp.message)), collapse = " ")
-      msg <- as.character(res)
-      base::cat(sprintf("\n[slave rank %d] CMD: %s\n[slave rank %d] ERROR: %s\n",
-                        mpi.comm.rank(0), cmd, mpi.comm.rank(0),
-                        paste(msg, collapse = " ")),
-                file = stderr())
-      flush(stderr())
-      base::stop(msg)
-    }
-  }
+  )
   mpi.comm.free(.comm)
   mpi.quit()
 }
