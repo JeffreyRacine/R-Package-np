@@ -2964,6 +2964,38 @@ compute.default.error.range <- function(center, err) {
   range(center, finite = TRUE)
 }
 
+.npRmpi_in_check_context <- function() {
+  nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_", "")) ||
+    nzchar(Sys.getenv("_R_CHECK_INTERNALS2_", "")) ||
+    nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_", "")) ||
+    nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_", ""))
+}
+
+.npRmpi_plot_guard_wild_method <- function(method,
+                                           B,
+                                           gradients = FALSE,
+                                           where = "plot bootstrap") {
+  allow <- tolower(trimws(Sys.getenv("NP_RMPI_ALLOW_CHECK_WILD", "")))
+  allow.wild <- nzchar(allow) && !(allow %in% c("0", "false", "no", "off"))
+  if (!isTRUE(.npRmpi_in_check_context()) || isTRUE(allow.wild))
+    return(method)
+
+  boot.n <- suppressWarnings(as.integer(B)[1L])
+  if (isTRUE(identical(method, "wild")) &&
+      !isTRUE(gradients) &&
+      !is.na(boot.n) &&
+      boot.n >= 1000L) {
+    warning(paste(
+      where,
+      "check-context guard remaps plot.errors.boot.method='wild' to 'inid'",
+      "for large-B runs due known ALTREP/GC instability;",
+      "set NP_RMPI_ALLOW_CHECK_WILD=1 to override."
+    ))
+    return("inid")
+  }
+  method
+}
+
 .np_plot_normalize_common_options <- function(plot.behavior,
                                              plot.errors.method,
                                              plot.errors.boot.method,
@@ -3080,6 +3112,12 @@ compute.bootstrap.errors.rbandwidth =
            ...,
            bws){
     .np_plot_require_bws(bws = bws, where = "compute.bootstrap.errors.rbandwidth")
+    plot.errors.boot.method <- .npRmpi_plot_guard_wild_method(
+      method = plot.errors.boot.method,
+      B = plot.errors.boot.num,
+      gradients = gradients,
+      where = "compute.bootstrap.errors.rbandwidth"
+    )
     prof.ctx <- .npRmpi_profile_bootstrap_begin(
       where = "compute.bootstrap.errors.rbandwidth",
       method = plot.errors.boot.method,
