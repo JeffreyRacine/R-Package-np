@@ -248,6 +248,13 @@
 
 \examples{
 \dontrun{
+
+in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
+            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
+            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+
+if (!in.check) {
 npRmpi.init(nslaves=1)
 
 # EXAMPLE 1: For this example, we load Giovanni Baiocchi's Italian GDP
@@ -429,6 +436,9 @@ lines(age.eval,grad.upper.ci,lty=3)
 
 detach(cps71)
 npRmpi.quit()
+} else {
+  message("Skipping MPI spawn in check context.")
+}
 } % enddontrun
 }
 

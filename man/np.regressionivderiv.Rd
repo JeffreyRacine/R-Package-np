@@ -251,6 +251,13 @@ npregivderiv(y,
 ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+
+in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
+            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
+            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+
+if (!in.check) {
 npRmpi.init(nslaves=1)
 
 # ## This illustration was made possible by Samuele Centorrino
@@ -337,6 +344,9 @@ npRmpi.init(nslaves=1)
 
 npRmpi.quit()               ## soft close (may keep slaves alive)
 ## npRmpi.quit(force=TRUE)  ## hard close
+} else {
+  message("Skipping MPI spawn in check context.")
+}
 } % enddontrun
 }
 \keyword{ instrument }

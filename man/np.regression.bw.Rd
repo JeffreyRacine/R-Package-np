@@ -585,6 +585,13 @@ npregbw(\dots)
 ## vignette for further details on running parallel np programs via
 ## vignette("npRmpi",package="npRmpi").
 
+
+in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
+            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
+            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+
+if (!in.check) {
 npRmpi.init(nslaves=1)
 
 set.seed(42)
@@ -607,6 +614,9 @@ summary(bw)
 
 npRmpi.quit()
 ## npRmpi.quit(force=TRUE)
+} else {
+  message("Skipping MPI spawn in check context.")
+}
 } % enddontrun     
 }
 \keyword{nonparametric}

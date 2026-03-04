@@ -229,21 +229,23 @@ model.b2 <- npuniden.boundary(X,kertype="beta2")
 model.fb <- npuniden.boundary(X,kertype="fb")
 model.unadjusted <- npuniden.boundary(X,a=-Inf,b=Inf)
 ylim <- c(0,max(c(dgp,model.g1$f,model.g2$f,model.b1$f,model.b2$f,model.fb$f)))
-if (interactive()) plot(X,dgp,ylab="Density",ylim=ylim,type="l")
-lines(X,model.g1$f,lty=2,col=2)
-lines(X,model.g2$f,lty=3,col=3)
-lines(X,model.b1$f,lty=4,col=4)
-lines(X,model.b2$f,lty=5,col=5)
-lines(X,model.fb$f,lty=6,col=6)
-lines(X,model.unadjusted$f,lty=7,col=7)
-rug(X)
-legend("topleft",c("DGP",
-                   "Boundary Kernel (gaussian1)",
-                   "Boundary Kernel (gaussian2)",
-                   "Boundary Kernel (beta1)",
-                   "Boundary Kernel (beta2)",
-                   "Boundary Kernel (floating boundary)",
-                   "Unadjusted"),col=1:7,lty=1:7,bty="n")
+if (interactive()) {
+  plot(X,dgp,ylab="Density",ylim=ylim,type="l")
+  lines(X,model.g1$f,lty=2,col=2)
+  lines(X,model.g2$f,lty=3,col=3)
+  lines(X,model.b1$f,lty=4,col=4)
+  lines(X,model.b2$f,lty=5,col=5)
+  lines(X,model.fb$f,lty=6,col=6)
+  lines(X,model.unadjusted$f,lty=7,col=7)
+  rug(X)
+  legend("topleft",c("DGP",
+                     "Boundary Kernel (gaussian1)",
+                     "Boundary Kernel (gaussian2)",
+                     "Boundary Kernel (beta1)",
+                     "Boundary Kernel (beta2)",
+                     "Boundary Kernel (floating boundary)",
+                     "Unadjusted"),col=1:7,lty=1:7,bty="n")
+}
 
 ## Example 2: f(0)=0, f(1)=0, plot density, distribution, DGP, and
 ## asymptotic point-wise confidence intervals
@@ -254,19 +256,23 @@ oldpar <- par(no.readonly = TRUE)
 on.exit(par(oldpar), add = TRUE)
 par(mfrow=c(1,2))
 ylim=range(c(model$f,model$f+1.96*model$sd.f,model$f-1.96*model$sd.f,dbeta(X,5,3)))
-if (interactive()) plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
-lines(X,model$f+1.96*model$sd.f,lty=2)
-lines(X,model$f-1.96*model$sd.f,lty=2)
-lines(X,dbeta(X,5,3),col=2)
-rug(X)
-legend("topleft",c("Density","DGP"),lty=c(1,1),col=1:2,bty="n")
+if (interactive()) {
+  plot(X,model$f,ylim=ylim,ylab="Density",type="l",)
+  lines(X,model$f+1.96*model$sd.f,lty=2)
+  lines(X,model$f-1.96*model$sd.f,lty=2)
+  lines(X,dbeta(X,5,3),col=2)
+  rug(X)
+  legend("topleft",c("Density","DGP"),lty=c(1,1),col=1:2,bty="n")
+}
 
-if (interactive()) plot(X,model$F,ylab="Distribution",type="l")
-lines(X,model$F+1.96*model$sd.F,lty=2)
-lines(X,model$F-1.96*model$sd.F,lty=2)
-lines(X,pbeta(X,5,3),col=2)
-rug(X)
-legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
+if (interactive()) {
+  plot(X,model$F,ylab="Distribution",type="l")
+  lines(X,model$F+1.96*model$sd.F,lty=2)
+  lines(X,model$F-1.96*model$sd.F,lty=2)
+  lines(X,pbeta(X,5,3),col=2)
+  rug(X)
+  legend("topleft",c("Distribution","DGP"),lty=c(1,1),col=1:2,bty="n")
+}
 
 ## Example 3: Age for working age males in the cps71 data set bounded
 ## below by 21 and above by 65

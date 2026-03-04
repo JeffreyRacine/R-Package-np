@@ -67,6 +67,13 @@ gradients(x, \dots)
 \examples{
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 \dontrun{
+
+in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
+            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
+            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+
+if (!in.check) {
 npRmpi.init(nslaves=1)
 
 x <- runif(10)
@@ -75,6 +82,9 @@ model <- npreg(y~x, gradients=TRUE)
 gradients(model)
 
 npRmpi.quit()
+} else {
+  message("Skipping MPI spawn in check context.")
+}
 } % enddontrun     
 }
 \keyword{nonparametric}

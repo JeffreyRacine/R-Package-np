@@ -109,6 +109,13 @@ The \pkg{Ake}, \pkg{bde}, and \pkg{Conake} packages and the function \code{\link
 ## `options(npRmpi.reuse.slaves=TRUE)` (default on some systems), this will
 ## reuse the existing pool instead of respawning. To change the number of
 ## slaves, call `npRmpi.quit(force=TRUE)` then restart.
+
+in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
+            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
+            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+
+if (!in.check) {
 npRmpi.init(nslaves=1)
 
 ## Example 1: f(0)=0, f(1)=1, plot boundary corrected density,
@@ -187,6 +194,9 @@ legend("topright",c("Data-Reflection","Unadjusted"),lty=c(1,1),col=1:2,bty="n")
 
 npRmpi.quit()               ## soft close (may keep slaves alive)
 ## npRmpi.quit(force=TRUE)  ## hard close
+} else {
+  message("Skipping MPI spawn in check context.")
+}
 } % enddontrun
 }
 \keyword{ nonparametric }

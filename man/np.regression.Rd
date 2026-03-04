@@ -316,7 +316,6 @@ FALSE, \dots)
 }
 \examples{
 \dontrun{
-## Not run in checks: excluded to keep MPI examples stable and check times short.
 ## The following example is adapted for interactive parallel execution
 ## in R. Here we spawn 1 slave so that there will be two compute nodes
 ## (master and slave).  Kindly see the batch examples in the demos
@@ -324,34 +323,46 @@ FALSE, \dots)
 ## the more extensive examples in the np package itself. See the npRmpi
 ## vignette for further details on running parallel np programs via
 ## vignette("npRmpi",package="npRmpi").
+##
+## R CMD check can set up a process environment where spawn-mode MPI
+## teardown may terminate the check parent process. Keep this example
+## fully runnable for users while skipping MPI spawn only in check.
+in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+            nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
+            nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
+            nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
 
-npRmpi.init(nslaves=1)
+if (!in.check) {
+  npRmpi.init(nslaves=1)
 
-set.seed(42)
+  set.seed(42)
 
-n <- 250
+  n <- 250
 
-x <- runif(n)
-z1 <- rbinom(n,1,.5)
-z2 <- rbinom(n,1,.5)
-y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
-z1 <- factor(z1)
-z2 <- factor(z2)
+  x <- runif(n)
+  z1 <- rbinom(n,1,.5)
+  z2 <- rbinom(n,1,.5)
+  y <- cos(2*pi*x) + z1 + rnorm(n,sd=.25)
+  z1 <- factor(z1)
+  z2 <- factor(z2)
 
-bw <- npregbw(y~x+z1+z2,
-              regtype="lc",
-              bwmethod="cv.ls",
-              nmulti=1)
+  bw <- npregbw(y~x+z1+z2,
+                regtype="lc",
+                bwmethod="cv.ls",
+                nmulti=1)
 
-summary(bw)
+  summary(bw)
 
-model <- npreg(bws=bw,
-               gradients=FALSE)
+  model <- npreg(bws=bw,
+                 gradients=FALSE)
 
-summary(model)
+  summary(model)
 
-npRmpi.quit()
-## npRmpi.quit(force=TRUE)
+  npRmpi.quit()
+  ## npRmpi.quit(force=TRUE)
+} else {
+  message("Skipping MPI spawn in check context.")
+}
 } % enddontrun     
 }
 \keyword{nonparametric}
