@@ -2561,10 +2561,10 @@ compute.bootstrap.errors.bandwidth =
           counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.bandwidth (%s); using bootstrap fallback",
-                          if (fast.block) plot.errors.boot.method else "inid",
-                          conditionMessage(e)))
-          NULL
+          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.bandwidth (%s)",
+                       if (fast.block) plot.errors.boot.method else "inid",
+                       conditionMessage(e)),
+               call. = FALSE)
         }
       )
     }
@@ -2705,10 +2705,10 @@ compute.bootstrap.errors.dbandwidth =
           counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.dbandwidth (%s); using bootstrap fallback",
-                          if (fast.block) plot.errors.boot.method else "inid",
-                          conditionMessage(e)))
-          NULL
+          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.dbandwidth (%s)",
+                       if (fast.block) plot.errors.boot.method else "inid",
+                       conditionMessage(e)),
+               call. = FALSE)
         }
       )
     }
@@ -2875,10 +2875,10 @@ compute.bootstrap.errors.conbandwidth =
           counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.conbandwidth (%s); using bootstrap fallback",
-                          if (fast.block) plot.errors.boot.method else "inid",
-                          conditionMessage(e)))
-          NULL
+          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.conbandwidth (%s)",
+                       if (fast.block) plot.errors.boot.method else "inid",
+                       conditionMessage(e)),
+               call. = FALSE)
         }
       )
     }
@@ -3054,10 +3054,10 @@ compute.bootstrap.errors.condbandwidth =
           counts.drawer = counts.drawer
         ),
         error = function(e) {
-          warning(sprintf("%s ksum fast path failed in compute.bootstrap.errors.condbandwidth (%s); using bootstrap fallback",
-                          if (fast.block) plot.errors.boot.method else "inid",
-                          conditionMessage(e)))
-          NULL
+          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.condbandwidth (%s)",
+                       if (fast.block) plot.errors.boot.method else "inid",
+                       conditionMessage(e)),
+               call. = FALSE)
         }
       )
     }
