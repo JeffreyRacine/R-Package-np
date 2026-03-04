@@ -4,6 +4,7 @@
 1. This is the active remediation plan for session/attach/profile unification.
 2. `nslaves=0` is removed permanently from `npRmpi`.
 3. `npRmpi` runtime contract is MPI-only (`nslaves>=1`).
+4. Remediation implementation phases are complete; follow-on work is maintenance/performance tuning under the same gate policy.
 
 ## Execution Status (Updated 2026-03-03/04)
 Completed checkpoint tranches:
@@ -16,6 +17,45 @@ Completed checkpoint tranches:
 7. Phase 6 (non-core migration): tranche B complete for `npsigtest*` typed locked opcode routing plus session/attach/profile fast-fail contract coverage.
 8. Phase 6 closeout audit: complete for active autodispatch call heads; no remaining `manual_distributed_call` usage in estimator/test paths.
 9. Phase 6 closeout reliability hardening: complete for session lifecycle reseed/sequence reset, fixed-length worker type packets, LC CVLS stable fast-path routing, and `npsigtest` invalid-index fast-fail pre-dispatch validation.
+10. Phase 6 final gate closeout: complete (all-flags session route subprocess contract, session/attach/profile/manual validators, serial `np` anchor, phase-23 paired-seed performance/equivalence evidence, and tarball-first `R CMD build/check --as-cran` with expected legacy NOTE/WARNING only).
+11. Phase 6 post-closeout revalidation: complete (phase-24 rerun of session/attach/profile/manual route validators with clean orphan-process scans).
+12. Phase 6 terminal confirmation: complete (phase-25 rerun of preflight scans, full route matrix, all-flags subprocess contract tests, serial `np-master` anchor smoke, and tarball-first `R CMD build/check --as-cran` with expected legacy NOTE/WARNING only and no check errors).
+13. Post-closeout packaging hygiene: complete (`.Rbuildignore` now excludes top-level remediation markdown files from source tarball; `R CMD check --as-cran` no longer reports non-standard top-level files warning; remaining warning is environment-side `checkbashisms` availability only).
+14. Local as-cran tooling closure: complete for this machine using a shellcheck-backed `checkbashisms` compatibility shim on `PATH` (scoped to real shell scripts), yielding `R CMD check --as-cran` status `1 NOTE` only (CRAN incoming version-jump note).
+15. Phase-26 assurance rerun: complete (fresh preflight scans, session/attach/profile/manual route validators, all-flags subprocess contract pass, serial `np-master` anchor pass, plain `--as-cran` status `1 WARNING, 1 NOTE`, shimmed `--as-cran` status `1 NOTE`, and clean orphan scans).
+16. Phase-27 full assurance rerun: complete in a fresh artifact root with repeated route matrix pass (`session`/`attach`/`profile`/`manual`), subprocess contract pass (`PASS 38`), serial `np-master` anchor pass, plain vs shimmed `--as-cran` status confirmation (`1 WARNING, 1 NOTE` vs `1 NOTE`), and clean orphan scans.
+17. Phase-28 invariant and non-core contract closeout: complete (static scans for `nslaves=0`, `manual_distributed_call`, and `O(n^2)` helper references; patched `test-spmd-step-contract.R` collective-step subprocess tests to run through broadcasted SPMD entry; non-core contract tests pass with zero nonzero-fail markers; full route matrix pass; plain vs shimmed `--as-cran` status confirmation; clean orphan scans).
+18. Phase-29 terminal reconfirmation: complete (fresh invariant scans, patched non-core contract tests with zero nonzero-fail markers, route matrix pass, subprocess contract `PASS 38`, serial `np-master` anchor pass, shimmed `--as-cran` status `1 NOTE`, plain `--as-cran` status in expected warning+note band, and clean orphan scans).
+19. Phase-30 deterministic local check harness: complete (`issue_notes/run_as_cran_local_clean.sh` added; shellcheck-clean; produces reproducible local tarball-first `--as-cran` status `1 NOTE` with `future file timestamps ... OK` and `top-level files ... OK` on this machine).
+20. Phase-31 final gate pack: complete (hardened `issue_notes/run_spmd_final_gate_pack.sh` with heartbeat-safe step execution, fresh full gate matrix pass, `FINAL_GATE_PACK_OK` token, and clean orphan scans in a new artifact root).
+21. Phase-32 terminal rerun: complete (fresh preflight, full route matrix and contract pass markers, serial anchor pass, shimmed note-only as-cran status, and `FINAL_GATE_PACK_OK` token in a new artifact root).
+22. Phase-33 archival rerun: complete (fresh archival gate-pack rerun with full route/contract/anchor/as-cran checks and `FINAL_GATE_PACK_OK` token).
+23. Final evidence index generated: `/tmp/spmd_canonical_20260304_0001/FINAL_EVIDENCE_INDEX_20260304.md` (aggregated artifact existence + terminal closure tokens).
+24. Permanent handoff record added: `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_FINAL_HANDOFF_2026-03-04.md`.
+25. Local closure milestone tag created: `spmd-remediation-complete-2026-03-04` -> `abde3bf`.
+26. Closure certificate added: `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_CLOSURE_CERTIFICATE_2026-03-04.md`.
+27. Machine-readable closure manifest added: `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_CLOSURE_MANIFEST_2026-03-04.json`.
+28. Post-certificate local tag created: `spmd-remediation-post-cert-closeout-2026-03-04` -> `6e86ce5`.
+29. Manifest verifier script added and executed: `/Users/jracine/Development/np-npRmpi/issue_notes/verify_spmd_closure_manifest.sh` -> `/tmp/spmd_canonical_20260304_0001/phase34_manifest_verify_20260304_013133` with `CLOSURE_MANIFEST_VERIFY_OK`.
+30. Portable closure bundle exporter added and executed: `/Users/jracine/Development/np-npRmpi/issue_notes/export_spmd_closure_bundle.sh` -> `/tmp/spmd_canonical_20260304_0001/phase35_closure_bundle_20260304_013242` with `CLOSURE_BUNDLE_EXPORT_OK`.
+31. Full closure audit runner added and executed: `/Users/jracine/Development/np-npRmpi/issue_notes/run_spmd_closure_full_audit.sh` -> `/tmp/spmd_canonical_20260304_0001/phase36_full_audit_20260304_013355` with `SPMD_CLOSURE_FULL_AUDIT_OK`.
+32. Compressed closure archive packager added and executed: `/Users/jracine/Development/np-npRmpi/issue_notes/package_spmd_closure_archive.sh` -> `/tmp/spmd_canonical_20260304_0001/phase37_closure_archive_20260304_013513` with `CLOSURE_ARCHIVE_PACKAGE_OK`.
+33. Final no-code reproducibility rerun complete: full audit rerun at `/tmp/spmd_canonical_20260304_0001/phase38_full_audit_20260304_013613` with `SPMD_CLOSURE_FULL_AUDIT_OK` and downstream token chain confirmation.
+34. Repo-local closeout workflow note added: `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_CLOSEOUT_WORKFLOW_2026-03-04.md`.
+35. Final-freeze local tag created: `spmd-remediation-final-freeze-2026-03-04` -> `870762c`.
+36. Closure manifest/certificate refreshed to current head and tag map.
+37. Manifest verification rerun complete: `/tmp/spmd_canonical_20260304_0001/phase40_manifest_verify_20260304_013945` with `CLOSURE_MANIFEST_VERIFY_OK`.
+38. Full-audit rerun complete after refresh: `/tmp/spmd_canonical_20260304_0001/phase41_full_audit_20260304_013952` with `SPMD_CLOSURE_FULL_AUDIT_OK`.
+39. Phase-47 stagewise terminal gate-pack rerun complete in a fresh artifact root with `FINAL_GATE_PACK_OK`: `/tmp/spmd_canonical_20260304_0001/phase47_stagewise_gatepack_20260304_014609`.
+40. Packaging-hygiene follow-up complete: `.Rbuildignore` updated to exclude top-level `SPMD_REMEDIATION_*` closure files from source tarball; local deterministic as-cran harness returned `Status: 1 NOTE` (CRAN incoming/version note only).
+41. Manifest verification rerun complete after phase-47 updates: `/tmp/spmd_canonical_20260304_0001/phase48_manifest_verify_20260304_015705` with `CLOSURE_MANIFEST_VERIFY_OK`.
+42. Full-audit rerun complete after phase-47 updates: `/tmp/spmd_canonical_20260304_0001/phase49_full_audit_20260304_015705` with `SPMD_CLOSURE_FULL_AUDIT_OK`.
+43. Closure-manifest verifier hardened to validate all manifest-declared phases (including phase47 with configurable as-cran log relative path), plus robust `FAILNZ_*` whitespace-tolerant zero checks.
+44. Dynamic verifier/fullaudit reruns complete after verifier hardening: `/tmp/spmd_canonical_20260304_0001/phase53_manifest_verify_dynamic_20260304_015851` (`CLOSURE_MANIFEST_VERIFY_OK`) and `/tmp/spmd_canonical_20260304_0001/phase54_full_audit_dynamic_20260304_015854` (`SPMD_CLOSURE_FULL_AUDIT_OK`).
+45. Final local closure anchor tag created: `spmd-remediation-final-closure-2026-03-04` -> `006127a`.
+46. Post-tag closure reruns complete: `/tmp/spmd_canonical_20260304_0001/phase57_manifest_verify_tagged_20260304_020048` (`CLOSURE_MANIFEST_VERIFY_OK`) and `/tmp/spmd_canonical_20260304_0001/phase58_full_audit_tagged_20260304_020052` (`SPMD_CLOSURE_FULL_AUDIT_OK`).
+47. Closure manifest updated to include `final_closure` tag metadata (`spmd-remediation-final-closure-2026-03-04` -> `006127a`).
+48. Final-anchor closure reruns complete with explicit final-tag verification: `/tmp/spmd_canonical_20260304_0001/phase59_manifest_verify_finalanchor_20260304_020248` (`CLOSURE_MANIFEST_VERIFY_OK`) and `/tmp/spmd_canonical_20260304_0001/phase60_full_audit_finalanchor_20260304_020249` (`SPMD_CLOSURE_FULL_AUDIT_OK`).
 
 Latest checkpoint commits:
 1. `8f5e959` (density/distribution opcode classification)
@@ -27,6 +67,19 @@ Latest checkpoint commits:
 7. `138401a` (fix forwarded-dot argument resolution in autodispatch)
 8. `519955b` (lock non-core autodispatch families to typed SPMD opcodes)
 9. `55226a0` (`npsigtest` locked opcode migration + contract and route coverage)
+10. `13ddf0a` (phase-22 closeout hardening: session seq reset, fixed worker type packets, LC CVLS stable path, and `npsigtest` fast-fail pre-dispatch validation)
+11. `3f307f7` (test contract hardening: initialize/cleanup MPI pool in `test-npsigtest-spmd-contract.R` for tarball-check reliability)
+12. `a6ce628` (canonical plan checkpoint update for phase-22/23 closeout)
+13. `0e161a4` (canonical status update marking remediation implementation complete and phase-23 baseline artifact root)
+14. `965b44e` (append final canonical checkpoint hash for completed remediation record)
+15. `cdde2a2` (phase-24 canonical closeout artifact update)
+16. `ca987f7` (phase-25 terminal confirmation artifacts)
+17. `c6a968c` (record local note-only as-cran closeout with compatibility shim evidence)
+18. `7d571b7` (record phase-26 assurance rerun artifacts)
+19. `4b120b4` (record phase-27 full assurance rerun artifacts)
+20. `6b3b522` (broadcast-safe step-contract subprocess tests + phase-28 canonical closeout record)
+21. `c2dce64` (record phase-29 terminal reconfirmation artifacts)
+22. `795f34a` (add deterministic local as-cran harness script and record phase-30 closeout)
 
 Latest artifact roots:
 1. `/tmp/spmd_canonical_20260304_0001/phase10_density_opcode_timeout_20260303_201934`
@@ -36,6 +89,42 @@ Latest artifact roots:
 5. `/tmp/spmd_canonical_20260304_0001/phase20_noncore_opcode_locks_20260303_211050`
 6. `/tmp/spmd_canonical_20260304_0001/phase21_npsigtest_trancheB_20260303_222056`
 7. `/tmp/spmd_canonical_20260304_0001/phase22_closeout_20260303_223604`
+8. `/tmp/spmd_canonical_20260304_0001/phase23_finalize_20260303_2330`
+9. `/tmp/spmd_canonical_20260304_0001/phase24_finalclose_20260303_233544`
+10. `/tmp/spmd_canonical_20260304_0001/phase25_terminal_20260303_233815`
+11. `/tmp/spmd_canonical_20260304_0001/phase26_assurance_20260303_235554`
+12. `/tmp/spmd_canonical_20260304_0001/phase27_fullsuite_20260304_000422`
+13. `/tmp/spmd_canonical_20260304_0001/phase28_invariants_20260304_001450`
+14. `/tmp/spmd_canonical_20260304_0001/phase29_terminal_20260304_003554`
+15. `/tmp/spmd_canonical_20260304_0001/phase30_clean_harness_20260304_004703`
+16. `/tmp/spmd_canonical_20260304_0001/phase31_manual_gatepack_20260304_005852`
+17. `/tmp/spmd_canonical_20260304_0001/phase32_final_gatepack_20260304_010940`
+18. `/tmp/spmd_canonical_20260304_0001/phase33_archival_gatepack_20260304_011716`
+19. `/tmp/spmd_canonical_20260304_0001/FINAL_EVIDENCE_INDEX_20260304.md`
+20. `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_FINAL_HANDOFF_2026-03-04.md`
+21. `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_CLOSURE_CERTIFICATE_2026-03-04.md`
+22. `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_CLOSURE_MANIFEST_2026-03-04.json`
+23. `/Users/jracine/Development/np-npRmpi/issue_notes/verify_spmd_closure_manifest.sh`
+24. `/tmp/spmd_canonical_20260304_0001/phase34_manifest_verify_20260304_013133`
+25. `/Users/jracine/Development/np-npRmpi/issue_notes/export_spmd_closure_bundle.sh`
+26. `/tmp/spmd_canonical_20260304_0001/phase35_closure_bundle_20260304_013242`
+27. `/Users/jracine/Development/np-npRmpi/issue_notes/run_spmd_closure_full_audit.sh`
+28. `/tmp/spmd_canonical_20260304_0001/phase36_full_audit_20260304_013355`
+29. `/Users/jracine/Development/np-npRmpi/issue_notes/package_spmd_closure_archive.sh`
+30. `/tmp/spmd_canonical_20260304_0001/phase37_closure_archive_20260304_013513`
+31. `/tmp/spmd_canonical_20260304_0001/phase38_full_audit_20260304_013613`
+32. `/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_CLOSEOUT_WORKFLOW_2026-03-04.md`
+33. `/tmp/spmd_canonical_20260304_0001/phase40_manifest_verify_20260304_013945`
+34. `/tmp/spmd_canonical_20260304_0001/phase41_full_audit_20260304_013952`
+35. `/tmp/spmd_canonical_20260304_0001/phase47_stagewise_gatepack_20260304_014609`
+36. `/tmp/spmd_canonical_20260304_0001/phase48_manifest_verify_20260304_015705`
+37. `/tmp/spmd_canonical_20260304_0001/phase49_full_audit_20260304_015705`
+38. `/tmp/spmd_canonical_20260304_0001/phase53_manifest_verify_dynamic_20260304_015851`
+39. `/tmp/spmd_canonical_20260304_0001/phase54_full_audit_dynamic_20260304_015854`
+40. `/tmp/spmd_canonical_20260304_0001/phase57_manifest_verify_tagged_20260304_020048`
+41. `/tmp/spmd_canonical_20260304_0001/phase58_full_audit_tagged_20260304_020052`
+42. `/tmp/spmd_canonical_20260304_0001/phase59_manifest_verify_finalanchor_20260304_020248`
+43. `/tmp/spmd_canonical_20260304_0001/phase60_full_audit_finalanchor_20260304_020249`
 
 ## Objective
 Keep user-facing workflow unchanged (`npreg(...)`, `npregbw(...)`, etc.) while making internal execution rank-symmetric SPMD for MPI-sensitive paths in all modes:
@@ -270,5 +359,5 @@ Acceptance:
    - condition-message regression not explicitly accepted.
 
 ## Immediate Next Action
-1. Run full release-grade gate pack (`R CMD build/check`, win-builder, complete `testthat`) once MPI environment stability for long-running smoke tests is confirmed.
-2. Keep route gate (`session`, `attach`, `profile/manual`) and orphan-cleanup checks mandatory for any post-remediation patch.
+1. Keep route gate (`session`, `attach`, `profile/manual`) and orphan-cleanup checks mandatory for any post-remediation patch.
+2. Use `/tmp/spmd_canonical_20260304_0001/phase23_finalize_20260303_2330` as the post-remediation baseline for any future tranche.

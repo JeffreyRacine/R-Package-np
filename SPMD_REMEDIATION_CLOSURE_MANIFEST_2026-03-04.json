@@ -1,0 +1,55 @@
+{
+  "generated_at": "2026-03-04T02:03:50-0500",
+  "repo": "np-npRmpi",
+  "head": "fa50d22",
+  "tags": {
+    "closure": {"name": "spmd-remediation-complete-2026-03-04", "target": "abde3bf"},
+    "post_certificate": {"name": "spmd-remediation-post-cert-closeout-2026-03-04", "target": "6e86ce5"},
+    "final_freeze": {"name": "spmd-remediation-final-freeze-2026-03-04", "target": "870762c"},
+    "final_closure": {"name": "spmd-remediation-final-closure-2026-03-04", "target": "006127a"}
+  },
+  "artifacts": {
+    "base": "/tmp/spmd_canonical_20260304_0001",
+    "phase31": {
+      "path": "/tmp/spmd_canonical_20260304_0001/phase31_manual_gatepack_20260304_005852",
+      "token": "FINAL_GATE_PACK_OK",
+      "gate_matrix_sha256": "7fd26ea84a70cc5afffd3408990666c25d9d304e1ab6696d0536fccbaa824dee",
+      "ascran_log_relpath": "ascran_clean/rcmd_check_as_cran.log",
+      "ascran_log_sha256": "41a961ff660b0d67b6e7c95a979c52c9898da8414651b1a27cd5275a37406c92"
+    },
+    "phase32": {
+      "path": "/tmp/spmd_canonical_20260304_0001/phase32_final_gatepack_20260304_010940",
+      "token": "FINAL_GATE_PACK_OK",
+      "gate_matrix_sha256": "7fd26ea84a70cc5afffd3408990666c25d9d304e1ab6696d0536fccbaa824dee",
+      "ascran_log_relpath": "ascran_clean/rcmd_check_as_cran.log",
+      "ascran_log_sha256": "41a961ff660b0d67b6e7c95a979c52c9898da8414651b1a27cd5275a37406c92"
+    },
+    "phase33": {
+      "path": "/tmp/spmd_canonical_20260304_0001/phase33_archival_gatepack_20260304_011716",
+      "token": "FINAL_GATE_PACK_OK",
+      "gate_matrix_sha256": "7fd26ea84a70cc5afffd3408990666c25d9d304e1ab6696d0536fccbaa824dee",
+      "ascran_log_relpath": "ascran_clean/rcmd_check_as_cran.log",
+      "ascran_log_sha256": "a50acac5512d0246bb38f65a1453a4947b047f919e5726b4a3e0c6a6f4c80ded"
+    },
+    "phase47": {
+      "path": "/tmp/spmd_canonical_20260304_0001/phase47_stagewise_gatepack_20260304_014609",
+      "token": "FINAL_GATE_PACK_OK",
+      "gate_matrix_sha256": "260991ac9ef0d9971803884721015b50894072894b0bb92f24080b821507bffe",
+      "ascran_log_relpath": "ascran_clean_rerun/rcmd_check_as_cran.log",
+      "ascran_log_sha256": "4a25b154a077c1dac38861e31631c1f363148c48f59bc4b022389494d930b4c1"
+    }
+  },
+  "assertions": {
+    "all_tokens_final_gate_pack_ok": true,
+    "closure_gate_matrix_all_zero_tokens": true,
+    "session_contract_pass38_present": true,
+    "ascran_status_note": true,
+    "orphan_worker_clean": true
+  },
+  "references": {
+    "canonical_plan": "/Users/jracine/Development/np-npRmpi/REMEDIATION_PLAN_SPMD_CANONICAL_2026-03-03.md",
+    "final_handoff": "/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_FINAL_HANDOFF_2026-03-04.md",
+    "closure_certificate": "/Users/jracine/Development/np-npRmpi/SPMD_REMEDIATION_CLOSURE_CERTIFICATE_2026-03-04.md",
+    "evidence_index": "/tmp/spmd_canonical_20260304_0001/FINAL_EVIDENCE_INDEX_20260304.md"
+  }
+}
