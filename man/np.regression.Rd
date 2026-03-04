@@ -327,10 +327,14 @@ FALSE, \dots)
 ## R CMD check can set up a process environment where spawn-mode MPI
 ## teardown may terminate the check parent process. Keep this example
 ## fully runnable for users while skipping MPI spawn only in check.
-in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+force.run <- nzchar(Sys.getenv("NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK"))
+
+in.check <- !force.run && (
+            nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
             nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
             nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
             nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+          )
 
 if (!in.check) {
   npRmpi.init(nslaves=1)
@@ -361,7 +365,7 @@ if (!in.check) {
   npRmpi.quit()
   ## npRmpi.quit(force=TRUE)
 } else {
-  message("Skipping MPI spawn in check context.")
+  message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
 } % enddontrun     
 }

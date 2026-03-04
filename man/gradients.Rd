@@ -68,10 +68,14 @@ gradients(x, \dots)
 ## Not run in checks: excluded to keep MPI examples stable and check times short.
 \dontrun{
 
-in.check <- nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
+force.run <- nzchar(Sys.getenv("NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK"))
+
+in.check <- !force.run && (
+            nzchar(Sys.getenv("_R_CHECK_PACKAGE_NAME_")) ||
             nzchar(Sys.getenv("_R_CHECK_INTERNALS2_")) ||
             nzchar(Sys.getenv("_R_CHECK_CRAN_INCOMING_")) ||
             nzchar(Sys.getenv("_R_CHECK_EXAMPLE_TIMING_THRESHOLD_"))
+          )
 
 if (!in.check) {
 npRmpi.init(nslaves=1)
@@ -83,7 +87,7 @@ gradients(model)
 
 npRmpi.quit()
 } else {
-  message("Skipping MPI spawn in check context.")
+  message("Skipping MPI spawn in check context (set NP_RMPI_RUN_MPI_EXAMPLES_IN_CHECK=1).")
 }
 } % enddontrun     
 }
