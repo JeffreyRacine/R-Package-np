@@ -158,6 +158,8 @@
   out <- matrix(NA_real_, nrow = B, ncol = nrow(H))
   fit.mean <- as.double(fit.mean)
   residuals <- as.double(residuals)
+  wild <- .np_plot_normalize_wild(wild)
+  draw.fun <- if (identical(wild, "mammen")) .np_mammen_draws else .np_rademacher_draws
   progress <- .np_plot_progress_begin(total = B, label = "Plot bootstrap wild")
   on.exit({
     .np_plot_progress_end(progress)
@@ -167,7 +169,7 @@
   while (start <= B) {
     stopi <- min(B, start + chunk.size - 1L)
     bsz <- stopi - start + 1L
-    draws <- .np_wild_draws(n = n, B = bsz, wild = wild)
+    draws <- draw.fun(n = n, B = bsz)
     ystar <- residuals * draws
     ystar <- ystar + fit.mean
     out[start:stopi, ] <- t(H %*% ystar)
