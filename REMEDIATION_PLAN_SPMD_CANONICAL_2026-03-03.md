@@ -361,3 +361,9 @@ Acceptance:
 ## Immediate Next Action
 1. Keep route gate (`session`, `attach`, `profile/manual`) and orphan-cleanup checks mandatory for any post-remediation patch.
 2. Use `/tmp/spmd_canonical_20260304_0001/phase23_finalize_20260303_2330` as the post-remediation baseline for any future tranche.
+
+## Deferred Backlog (Not In Current Tranche)
+1. Enable `coef=TRUE` smooth-coefficient plot error bands in `np` and `npRmpi` without method remapping.
+2. Phase A (low risk): support asymptotic coefficient bands by wiring `gerr[, coef.index]` into `np.plot.engine.scbandwidth.R` (both repos), with fail-fast for unsupported combinations.
+3. Phase B (separate tranche): implement coefficient-specific bootstrap targets for `scbandwidth` plots (current bootstrap helper centers on mean-path targets).
+4. Keep the current `coef` + plot-errors disable guard until Phase A tests pass across `np` serial and `npRmpi` session/attach/profile routes.

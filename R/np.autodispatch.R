@@ -233,11 +233,6 @@
   invisible(as.integer(seq.id))
 }
 
-.npRmpi_spmd_next_seq <- function() {
-  next.seq <- .npRmpi_spmd_seq_get() + 1L
-  .npRmpi_spmd_seq_set(next.seq)
-}
-
 .npRmpi_spmd_make_envelope <- function(opcode,
                                        args_ref = NULL,
                                        timeout_class = "default",

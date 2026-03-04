@@ -1,0 +1,222 @@
+# Remediation Patch Design: Parallelize Stable CVLS Helper Under SPMD (2026-03-04)
+
+## Scope
+Target only the CVLS stable-helper path used by LL/LC/LP in `npRmpi`:
+- `src/jksum.c`: `np_reg_cv_ls_stable_ll_glp(...)`
+- caller sites in `np_kernel_estimate_regression_categorical_ls_aic(...)`
+
+Out of scope for this patch:
+- `zzz.R` check-mode lifecycle changes (`npRmpi.reuse.slaves` / unload hard teardown)
+- non-regression families (`npudens*`, `npcdens*`, etc.)
+- algorithmic/statistical changes
+
+## Why this patch now
+Session mode is now SPMD-orchestrated, so rank-symmetric collective entry is enforced at the dispatch layer. That removes the original blocker for parallelizing this helper's outer loop.
+
+The helper remains active and currently runs as per-rank serial work (with inner kernel call using `suppress_parallel=1`).
+
+## Current state (verified)
+1. Stable helper exists in both repos:
+   - `npRmpi`: `src/jksum.c:7484`
+   - `np`: `src/jksum.c:7484`
+2. `npRmpi` call sites still route to stable helper for CVLS LL/LC/LP:
+   - `src/jksum.c:7922`
+   - `src/jksum.c:8616`
+3. Helper currently calls `kernel_weighted_sum_np_ctx(..., suppress_parallel=1, ...)` (no inner collectives).
+4. `finish_cv_path` in the regression CV function does **not** apply MPI reduction; helper return is consumed directly then normalized.
+5. Large-memory kernel-weight path:
+   - `return.kernel.weights=TRUE` allocates `n.train * n.eval` storage.
+   - In dominant plot/bootstrap usage, `n.eval` is typically fixed/small (often ~100), so growth is effectively linear in `n.train` for fixed evaluation grids.
+   - This path is not the same class of risk as unrestricted `O(n^2)` over `n.train * n.train`.
+
+## Design goals
+1. Preserve estimator semantics and API.
+2. Keep strict collective symmetry under MPI.
+3. Avoid nested/asymmetric collective patterns.
+4. Improve wall-time for large `n` under `iNum_Processors > 1`.
+5. Keep serial behavior identical when MPI is absent.
+
+## Core design
+
+### A) Keep inner kernel call serial-safe
+Do **not** change helper's inner `kernel_weighted_sum_np_ctx` call contract:
+- retain `suppress_parallel=1`
+
+Rationale: the helper owns outer-loop parallelization; inner parallelization would reintroduce nested collective risk and cadence complexity.
+
+### B) Parallelize only outer `j` loop
+Use strided ownership in MPI builds:
+- rank `r` computes `j = r, r + iNum_Processors, ...`
+- each rank accumulates `cv_local`
+- reduce once at end:
+  - `MPI_Allreduce(&cv_local, &cv, 1, MPI_DOUBLE, MPI_SUM, comm[1])`
+
+Serial build behavior:
+- existing `for (j=0; j<num_obs; j++)` path unchanged.
+
+### C) Failure contract
+Introduce rank-local failure flag for singular/solver abort paths inside helper loop:
+1. `local_fail` set on irrecoverable per-`j` failure.
+2. `MPI_Allreduce(..., MPI_MAX, ...)` to compute `any_fail`.
+3. if `any_fail`: return `DBL_MAX` (uniform across ranks), skipping value reduce.
+
+This preserves identical collective order across ranks (fail-check reduce always called in MPI branch).
+
+### D) Maintain parity with `np-master`
+- Keep math/formula logic aligned with `np-master` helper body.
+- `npRmpi`-specific delta should be limited to MPI loop partition + reductions.
+- If desired for textual parity, add the same structural refactor in `np-master` guarded by non-MPI path only.
+
+## Candidate implementation shape
+
+Option preferred (minimal duplication):
+1. Extract per-`j` contribution logic into a static helper:
+   - computes one `j` SSE contribution
+   - returns status (ok/fail) + contribution
+2. Existing stable helper becomes orchestration wrapper:
+   - serial loop in non-MPI
+   - strided loop + allreduce in MPI
+
+Alternative (faster edit, less clean):
+- Keep single function and add `#ifdef MPI2` loop partition in place.
+
+## Call-site behavior
+No call-site API changes required if orchestration remains internal to `np_reg_cv_ls_stable_ll_glp(...)`.
+
+If introducing a second symbol (e.g., `_spmd` variant), route both current call sites to it:
+- `src/jksum.c:7922`
+- `src/jksum.c:8616`
+
+## Collective safety checklist (non-negotiable)
+1. Exactly one helper-level `MPI_Allreduce` for fail flag (MPI builds).
+2. Conditional second `MPI_Allreduce` for `cv` only when `any_fail == 0` (branch is rank-symmetric).
+3. No new collectives inside per-`j` worker body.
+4. No rank-conditional early returns before helper-level reduction points.
+
+## Validation gates
+
+### Numerical parity
+1. Fixed-seed parity for LL/LC/LP CVLS:
+   - `np-master` serial vs `npRmpi` session `nslaves=1`
+   - compare `fval`, `num.feval`, selected bandwidths
+2. Varying-seed smoke for stability (no divergence, no hang).
+
+### Route matrix
+1. `np` serial (`np-master`)
+2. `npRmpi` session (`npRmpi.init(nslaves=1)`)
+3. `npRmpi` attach (`mpiexec -n 2`)
+4. `npRmpi` profile/manual-broadcast (`mpiexec -n 2` + profile)
+
+### Performance
+1. Screening `times=25` paired interleaved seeds on LL/LC/LP CVLS workloads.
+2. Escalate `times>=100` if signal ambiguous.
+3. Require non-regression in unaffected families.
+
+### Safety
+1. Historical session hang repro passes.
+2. No orphan `slavedaemon.R`/`Rslaves.sh` after failures/timeouts.
+3. `R CMD check --as-cran` unchanged or improved for this path.
+
+## Risks and mitigations
+1. Floating-point reduction-order drift:
+   - Mitigation: tolerance-based parity for `fval`, document expected ulp-scale differences.
+2. Hidden inner collectives from future edits:
+   - Mitigation: comment + test asserting helper calls kernel with `suppress_parallel=1`.
+3. Regression masked by session-only tests:
+   - Mitigation: enforce attach/profile route gates.
+4. Memory pressure in kernel-weight path:
+   - Mitigation: keep current path (needed for plotting/bootstrap workflows), but add explicit telemetry/doc notes and avoid broad shape changes in this tranche.
+
+## Updated critique (ROI / risk)
+### High ROI / low risk (do now)
+1. Remove dead/near-dead legacy scaffolding tied to retired semantics:
+   - remove unused `.npRmpi_spmd_next_seq` if confirmed unreachable,
+   - remove stale `nslaves==0` scaffolding where still present.
+2. Keep stable-helper patch narrow (outer-loop MPI orchestration only), with no API or estimator-math changes.
+3. Add static modernization checks on touched files (Wickham-aligned hygiene: scalar safety, eval surface, namespace hygiene, lifecycle cleanup checks).
+
+### Medium ROI / low risk (do in same stream with gates)
+1. Add explicit comments/tests around `return.kernel.weights=TRUE` memory shape (`n.train * n.eval`) so behavior is intentional and discoverable.
+2. Add targeted memory-smoke scripts for representative plot/bootstrap sizes to catch accidental shape explosions.
+
+### Medium ROI / medium risk (separate tranche, gated)
+1. Parallelize stable helper outer `j` loop under MPI (`Allreduce` contract), keeping inner kernel call `suppress_parallel=1`.
+
+### Lower ROI / higher risk (defer)
+1. Broad helper rewrites or redesign of plot/bootstrap allocation behavior in this same patch.
+2. Any refactor that mixes algorithmic changes with orchestration changes.
+
+## Clarification-Driven Decision Matrix (Pro / Con)
+### Item A: `return.kernel.weights=TRUE` (`n.train * n.eval`) gateway
+1. Pro:
+   - required by plot/bootstrap workflows,
+   - for common plotting defaults (`n.eval` bounded/small), effective growth is linear in `n.train`,
+   - not the same failure class as unrestricted `n.train * n.train` estimator/CV storage.
+2. Con:
+   - still quadratic in the general two-axis shape and can spike memory if `n.eval` is user-expanded,
+   - can be misread as a core-path anti-pattern without explicit documentation.
+3. Decision:
+   - retain as intentional,
+   - add explicit documentation + telemetry checks,
+   - do not refactor shape in this tranche.
+
+### Item B: Remove dead/near-dead legacy scaffolding (`.npRmpi_spmd_next_seq`, retired `nslaves==0`)
+1. Pro:
+   - immediate maintainability gain with near-zero algorithm risk,
+   - reduces route ambiguity and stale-contract hazards.
+2. Con:
+   - tiny risk of deleting a latent callsite if reachability is not verified first.
+3. Decision:
+   - do in a dedicated first tranche with static reachability proof + targeted lifecycle tests.
+
+### Item C: Wickham-guided modernization sweep integrated into this remediation stream
+1. Pro:
+   - reduces future technical debt while code context is fresh,
+   - catches fragile patterns early (`eval` surface, scalar controls, condition-contract drift).
+2. Con:
+   - scope creep risk if mixed with behavior-changing patches.
+3. Decision:
+   - run as gated micro-tranches only, separated from algorithm/orchestration deltas.
+
+## Modernization sweep integration (Wickham-guided)
+Treat this remediation as a dual track: correctness + modernization hygiene.
+
+References:
+1. `/Users/jracine/Development/WICKHAM_FINAL_MODERNIZATION_SWEEP_PLAN_20260302.md`
+2. `/Users/jracine/Development/archive/R_AUDIT_WICKHAM_2026-02-22_20260226.md`
+3. `/Users/jracine/Development/VALIDATION_GATES_CANONICAL_2026-02-28.md`
+4. `/Users/jracine/Development/archive/MODERNIZATION_REMEDIATION_2026-03-01.md`
+5. `/Users/jracine/Development/archive/R_LAYER_MODERNIZATION_BACKLOG_20260226.md`
+6. `/Users/jracine/Development/archive/SESSION_CONSOLIDATION_MODERNIZATION_2026-02-24_20260226.md`
+
+Embedded modernization checks for each tranche:
+1. R-layer hygiene scan on touched files (`eval(`, `do.call(`, `sapply(`, scalar-control guards, `on.exit(..., add=TRUE)` in lifecycle mutations).
+2. Condition-contract stability (errors/warnings/messages unchanged unless explicitly documented).
+3. Tarball-first validation and MPI route matrix evidence before checkpoint acceptance.
+4. No performance-claim acceptance without paired-seed gate evidence.
+
+## Interaction with current check-mode work
+This patch is independent of the check-mode lifecycle patch in `zzz.R`.
+Recommended order:
+1. Land/validate check-mode lifecycle fix first (to stabilize check harness).
+2. Land stable-helper MPI patch as a separate tranche.
+
+## Acceptance criteria
+1. No deadlocks across session/attach/profile.
+2. LL/LC/LP CVLS stable-helper route numerically matches baseline within declared tolerance.
+3. Large-`n` wall-time improves or is neutral under MPI.
+4. Parity contract with `np-master` is preserved at estimator-output level.
+5. Modernization checks for touched files pass with no condition-contract regressions.
+
+## Execution intent (no-breakage sequence)
+1. First tranche: dead-code cull only (`.npRmpi_spmd_next_seq`, residual `nslaves==0` scaffolding), no behavior changes.
+2. Validate with full gate pack (serial + session + attach + profile/manual, plus existing smoke/tests).
+3. Second tranche: stable-helper MPI outer-loop patch only (no math/API changes).
+4. Re-run parity + performance + route gates; rollback immediately on any regression/hang.
+5. Third tranche: documentation/modernization closure updates and artifact capture.
+
+## Intended next actions (explicit)
+1. Start with static proof and removal patch for `.npRmpi_spmd_next_seq` and any residual `nslaves==0` branches in `np-npRmpi`.
+2. Run route-smoke + contract tests immediately after that cull before touching `src/jksum.c`.
+3. Apply the helper outer-loop MPI tranche in isolation, with strict collective-order assertions and no inner-kernel parallel changes.
+4. Run full gate pack and only then perform Wickham micro-cleanups on touched files.
