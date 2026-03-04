@@ -69,7 +69,7 @@ cat("RUN_OK\\n")
 RSCRIPT
 
 SUMMARY="${OUT_DIR}/summary.tsv"
-echo -e "run\trc\trun_ok\tlast_stage\tlog" > "${SUMMARY}"
+echo -e "run\tstatus\trc\trun_ok\tlast_stage\tlog" > "${SUMMARY}"
 
 for i in $(seq 1 "${REPEATS}"); do
   LOG="${OUT_DIR}/run_${i}.log"
@@ -94,11 +94,16 @@ for i in $(seq 1 "${REPEATS}"); do
     last_stage="$(rg '^STAGE ' "${LOG}" | tail -n 1 | sed 's/^STAGE //')"
   fi
 
-  echo -e "${i}\t${rc}\t${run_ok}\t${last_stage}\t${LOG}" >> "${SUMMARY}"
+  status="FAIL"
+  if [ "${rc}" -eq 0 ] && [ "${run_ok}" -eq 1 ]; then
+    status="PASS"
+  fi
+
+  echo -e "${i}\t${status}\t${rc}\t${run_ok}\t${last_stage}\t${LOG}" >> "${SUMMARY}"
   pkill -f 'slavedaemon\.R|Rslaves\.sh' || true
 done
 
-pass_count="$(awk -F'\t' 'NR>1 && $3==1 {c++} END{print c+0}' "${SUMMARY}")"
+pass_count="$(awk -F'\t' 'NR>1 && $2=="PASS" {c++} END{print c+0}' "${SUMMARY}")"
 fail_count="$((REPEATS - pass_count))"
 
 echo "OUT_DIR=${OUT_DIR}"

@@ -174,6 +174,16 @@
     stop("length mismatch between fitted means and residuals for wild bootstrap")
   if (B < 1L)
     stop("argument 'plot.errors.boot.num' must be a positive integer")
+  .npRmpi_bootstrap_transport_trace(
+    what = "wild",
+    event = "wild.entry",
+    fields = list(
+      n = n,
+      h_rows = nrow(H),
+      h_cols = ncol(H),
+      B = B
+    )
+  )
 
   t.mpi <- .npRmpi_wild_boot_t_parallel(
     H = H,
@@ -183,8 +193,17 @@
     wild = wild,
     comm = 1L
   )
-  if (is.matrix(t.mpi))
+  if (is.matrix(t.mpi)) {
+    .npRmpi_bootstrap_transport_trace(
+      what = "wild",
+      event = "wild.return",
+      fields = list(
+        t_rows = nrow(t.mpi),
+        t_cols = ncol(t.mpi)
+      )
+    )
     return(t.mpi)
+  }
   .npRmpi_bootstrap_fail_or_fallback(
     msg = "wild bootstrap fan-out did not return matrix output",
     what = "wild"
@@ -3389,6 +3408,15 @@ compute.bootstrap.errors.rbandwidth =
       if (length(plot.errors.boot.wild) > 1L)
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
+      .npRmpi_bootstrap_transport_trace(
+        what = "rbandwidth.wild",
+        event = "wild.fit.start",
+        fields = list(
+          slice = slice.index,
+          factor_slice = isTRUE(slice.index > 0L && (bws$xdati$iord[slice.index] || bws$xdati$iuno[slice.index])),
+          n_eval = nrow(exdat)
+        )
+      )
 
       fit.train <- suppressWarnings(npreg.rbandwidth(
         txdat = xdat,
@@ -3397,6 +3425,14 @@ compute.bootstrap.errors.rbandwidth =
         gradients = FALSE,
         warn.glp.gradient = FALSE
       ))
+      .npRmpi_bootstrap_transport_trace(
+        what = "rbandwidth.wild",
+        event = "wild.fit.done",
+        fields = list(
+          slice = slice.index,
+          n_train = length(fit.train$mean)
+        )
+      )
 
       s.vec <- NULL
       if (gradients) {
@@ -3412,6 +3448,14 @@ compute.bootstrap.errors.rbandwidth =
         s.vec <- integer(length(cont.idx))
         s.vec[cpos] <- gorder[cpos]
       }
+      .npRmpi_bootstrap_transport_trace(
+        what = "rbandwidth.wild",
+        event = "wild.hat.start",
+        fields = list(
+          slice = slice.index,
+          gradients = gradients
+        )
+      )
 
       H <- suppressWarnings(npreghat.rbandwidth(
         bws = bws,
@@ -3420,11 +3464,29 @@ compute.bootstrap.errors.rbandwidth =
         s = s.vec,
         output = "matrix"
       ))
+      .npRmpi_bootstrap_transport_trace(
+        what = "rbandwidth.wild",
+        event = "wild.hat.done",
+        fields = list(
+          slice = slice.index,
+          h_rows = nrow(H),
+          h_cols = ncol(H)
+        )
+      )
 
       t0 <- as.vector(H %*% as.double(ydat))
       eps <- as.double(ydat - fit.train$mean)
       n <- length(eps)
       B <- plot.errors.boot.num
+      .npRmpi_bootstrap_transport_trace(
+        what = "rbandwidth.wild",
+        event = "wild.boot.start",
+        fields = list(
+          slice = slice.index,
+          n = n,
+          B = B
+        )
+      )
 
       boot.out <- .npRmpi_with_local_bootstrap({
         list(
@@ -3438,6 +3500,15 @@ compute.bootstrap.errors.rbandwidth =
           t0 = t0
         )
       })
+      .npRmpi_bootstrap_transport_trace(
+        what = "rbandwidth.wild",
+        event = "wild.boot.done",
+        fields = list(
+          slice = slice.index,
+          t_rows = nrow(boot.out$t),
+          t_cols = ncol(boot.out$t)
+        )
+      )
     }
 
     if (is.null(boot.out))

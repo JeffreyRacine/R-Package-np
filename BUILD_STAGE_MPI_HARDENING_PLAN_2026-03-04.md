@@ -249,3 +249,26 @@ Next safe tranche:
    - sample artifact: `/tmp/npplot_wild_gate_20260304_1` (`PASS=1 FAIL=2`, failed runs stop at `STAGE plot`).
 3. Make this gate mandatory for wild-path changes.
 4. Investigate low-risk observability in wild slice internals (without behavior change) to localize abort source before transport/protocol refactor.
+
+## Phase B.5 Wild Slice Localization (Trace-Only, 2026-03-04)
+Implemented (no runtime semantic change):
+1. Added additional transport breadcrumbs in `R/np.plot.helpers.R` for wild path:
+   - `wild.entry`, `wild.return` around `.np_wild_boot_t(...)`,
+   - `rbandwidth.wild` milestones: `wild.fit.start/done`, `wild.hat.start/done`, `wild.boot.start/done`.
+2. Tightened deterministic gate accounting:
+   - `issue_notes/run_npplot_wild_stress_repeat.sh` now marks `PASS` only when `rc==0` and `RUN_OK` token is present.
+
+Validation:
+1. Targeted tests pass:
+   - `tests/testthat/test-plot-bootstrap-phase-trace.R`
+   - `tests/testthat/test-transport-trace-hook.R`
+2. Traced stress loop (fresh temp install) artifacts:
+   - `/tmp/npplot_wild_trace_repeat_20260304_144935`
+   - summary shows failing runs end at `rbandwidth.wild event=wild.hat.start slice=4` (factor slice), with no `wild.hat.done`.
+3. Updated deterministic gate sample:
+   - `/tmp/npplot_wild_gate_20260304_3`
+   - status now correctly reflects exit code + completion token (`PASS=1 FAIL=2` in sample run).
+
+Conclusion from B.5:
+1. Current large-workload instability localizes inside `npreghat.rbandwidth(...)` for the factor slice in wild bootstrap, not in fanout dispatch/collect orchestration.
+2. Keep runtime behavior unchanged until a narrowly-scoped fix for factor-slice hat-matrix construction is proven by the mandatory stress gate.
