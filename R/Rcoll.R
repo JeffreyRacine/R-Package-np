@@ -257,12 +257,6 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
     } 
     else {
        # charlen <- mpi.bcast(x=integer(1), type=1, rank=rank, comm=comm)
-        #if (is.character(charlen))   #error
-         #   parse(text="break")
-        #else {
-        #out <- unserialize(mpi.bcast(x=raw(charlen), type=4, rank=rank, comm=comm))
-        #parse(text=out) 
-        #}
 		if (!nonblock){
 			mpi.probe(mpi.any.source(), tag=50000+myrank, comm)
 			srctag <- mpi.get.sourcetag(0)
@@ -282,8 +276,7 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 				Sys.sleep(sleep)
 			}
 		}
-		#parse(text=out)
-			if (length(scmd.arg$arg)>0) {
+				if (length(scmd.arg$arg)>0) {
 				as.call(list(
 				  as.name("do.call"),
 				  .npRmpi_bcast_cmd_funref(scmd.arg$scmd),

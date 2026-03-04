@@ -251,3 +251,9 @@ Recommended order:
 9. Tranche-4 scan artifact root:
    - `/tmp/spmd_tranche4_modscan_refine_20260304_104220`
    - summary highlights: `scan_eval=4`, `scan_parse=3`, `scan_runtime_library_require=0`, `scan_demo_masking=0`, `scan_dotC=0`, `scan_manual_distributed_call=0`, `scan_stable_helper_symbol=0`.
+10. Completed low-risk comment cleanup tranche:
+   - removed stale commented `parse(...)` fragments in `R/Rcoll.R` that were no longer part of active execution paths.
+11. Tranche-5 validation + scan artifacts:
+   - route gate root: `/tmp/spmd_tranche5_gate_20260304_104321`
+   - gate tokens: `SESSION_OK=1`, `ATTACH_OK=1`, `PROFILE_OK=1`, `MANUAL_OK=1`, `NPSIGTEST_FAILNZ=0`, `ORPHAN_PRE_EMPTY=1`, `ORPHAN_POST_EMPTY=1`.
+   - refreshed scan root: `/tmp/spmd_tranche5_modscan_cleanup_20260304_104312` (`scan_parse=0`).
