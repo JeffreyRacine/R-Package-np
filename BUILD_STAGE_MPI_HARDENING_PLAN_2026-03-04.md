@@ -169,3 +169,41 @@ Interpretation:
 1. The new breadcrumbs narrow failure location: aborts are not occurring at fanout entry/dispatch/collect mismatch; they occur after multiple completed fanout cycles.
 2. Guard state does not change failure class at stress scale (`EXIT=134` both modes).
 3. Next highest-value hardening remains transport/lifecycle diagnostics in legacy return paths, now with stronger phase evidence.
+
+## Phase B.3 Transport Trace Deepening (2026-03-04)
+Implemented:
+1. Added opt-in transport trace hooks in legacy transport paths (`R/Rparutilities.R`):
+   - `mpi.remote.exec` master-side start/type/path/done breadcrumbs,
+   - `.mpi.worker.exec` worker-side start/type/send/done breadcrumbs,
+   - `mpi.applyLB` master start/done breadcrumbs,
+   - `.mpi.worker.applyLB` worker start/malformed/done breadcrumbs.
+2. Added plot-bootstrap transport breadcrumbs in `R/np.plot.helpers.R` fanout loop:
+   - `fanout.start`, `fanout.master_local.start/done`,
+   - `fanout.master_assist.start`, per-message `send/recv`, `fanout.master_assist.done`,
+   - terminal `fanout.done` and `fanout.error`.
+3. Extended subprocess harness to emit optional per-job transport logs:
+   - `TRANSPORT_TRACE=1` writes `*.transport.tsv`,
+   - existing phase logs (`*.phase.tsv`) retained.
+4. Added trace-hook coverage tests:
+   - `tests/testthat/test-transport-trace-hook.R`,
+   - extended `tests/testthat/test-plot-bootstrap-phase-trace.R` for bootstrap transport trace.
+
+Validation:
+1. Targeted tests pass on patched install:
+   - `test-plot-bootstrap-phase-trace.R`,
+   - `test-transport-trace-hook.R`,
+   - `test-plot-mpi-only-bootstrap-contract.R`.
+2. Route validators pass on patched install:
+   - `MANUAL_BCAST_ROUTE_OK`,
+   - `ATTACH_ROUTE_OK`,
+   - `PROFILE_ROUTE_OK`,
+   - attach plot smoke `ATTACH_PLOT_OK`.
+3. Traced subprocess runs:
+   - `/tmp/build_stage_hardening_phaseB3_npplot_src_20260304_2` (`PASS`, `PHASE_LINES=16`, `TRANSPORT_LINES=16`)
+   - `/tmp/build_stage_hardening_phaseB3_wildstress_guardtrue_src_20260304_2` (`PASS`, `PHASE_LINES=16`, `TRANSPORT_LINES=16`)
+   - `/tmp/build_stage_hardening_phaseB3_wildstress_guardfalse_src_20260304_2` (`FAIL EXIT=134`, `PHASE_LINES=12`, `TRANSPORT_LINES=57`)
+
+Interpretation:
+1. New transport logs show complete master-assist send/recv cycles (`fanout.master_assist.done` + `fanout.done`) before the abort in failing runs.
+2. Current failure signature remains post-cycle/intermittent (not a direct collectives-cadence divergence).
+3. Immediate next hardening should target post-cycle memory/lifecycle pressure points in repeated wild slices (allocation churn, object lifetime, and worker loop teardown timing), using new transport+phase traces as gates.

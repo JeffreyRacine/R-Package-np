@@ -12,6 +12,7 @@ KILL_ORPHANS_ON_FAIL="${KILL_ORPHANS_ON_FAIL:-0}"
 PRE_CLEAN_ORPHANS="${PRE_CLEAN_ORPHANS:-1}"
 WILD_MASTER_LOCAL_GUARD="${WILD_MASTER_LOCAL_GUARD:-}"
 BOOTSTRAP_PHASE_TRACE="${BOOTSTRAP_PHASE_TRACE:-0}"
+TRANSPORT_TRACE="${TRANSPORT_TRACE:-0}"
 
 mkdir -p "${OUT_DIR}/jobs"
 SUMMARY="${OUT_DIR}/summary.tsv"
@@ -32,6 +33,7 @@ if [ -n "${WILD_MASTER_LOCAL_GUARD}" ]; then
   echo "WILD_MASTER_LOCAL_GUARD=${WILD_MASTER_LOCAL_GUARD}"
 fi
 echo "BOOTSTRAP_PHASE_TRACE=${BOOTSTRAP_PHASE_TRACE}"
+echo "TRANSPORT_TRACE=${TRANSPORT_TRACE}"
 
 write_job_script() {
   job="$1"
@@ -204,13 +206,24 @@ for job in "${JOB_ARR[@]}"; do
     phase_file="${OUT_DIR}/${job}.phase.tsv"
     : > "${phase_file}"
   fi
+  transport_file=""
+  if [ "${TRANSPORT_TRACE}" = "1" ]; then
+    transport_file="${OUT_DIR}/${job}.transport.tsv"
+    : > "${transport_file}"
+  fi
   write_job_script "${job}" "${phase_file}"
   log="${OUT_DIR}/${job}.log"
   rc=0
 
   set +e
-  if [ -n "${R_LIBS_VALUE}" ]; then
+  if [ -n "${R_LIBS_VALUE}" ] && [ -n "${transport_file}" ]; then
+    R_LIBS="${R_LIBS_VALUE}" NP_RMPI_TRANSPORT_TRACE_FILE="${transport_file}" run_with_timeout "${TIMEOUT_SEC}" "${R_BIN}" --no-save "${OUT_DIR}/jobs/${job}.R" > "${log}" 2>&1
+    rc=$?
+  elif [ -n "${R_LIBS_VALUE}" ]; then
     R_LIBS="${R_LIBS_VALUE}" run_with_timeout "${TIMEOUT_SEC}" "${R_BIN}" --no-save "${OUT_DIR}/jobs/${job}.R" > "${log}" 2>&1
+    rc=$?
+  elif [ -n "${transport_file}" ]; then
+    NP_RMPI_TRANSPORT_TRACE_FILE="${transport_file}" run_with_timeout "${TIMEOUT_SEC}" "${R_BIN}" --no-save "${OUT_DIR}/jobs/${job}.R" > "${log}" 2>&1
     rc=$?
   else
     run_with_timeout "${TIMEOUT_SEC}" "${R_BIN}" --no-save "${OUT_DIR}/jobs/${job}.R" > "${log}" 2>&1
@@ -246,6 +259,14 @@ for job in "${JOB_ARR[@]}"; do
         echo "JOB_${job}_PHASE_LINES=$(wc -l < "${phase_file}" | tr -d ' ')"
       else
         echo "JOB_${job}_PHASE_LINES=0"
+      fi
+    fi
+    if [ -n "${transport_file}" ]; then
+      echo "JOB_${job}_TRANSPORT_FILE=${transport_file}"
+      if [ -s "${transport_file}" ]; then
+        echo "JOB_${job}_TRANSPORT_LINES=$(wc -l < "${transport_file}" | tr -d ' ')"
+      else
+        echo "JOB_${job}_TRANSPORT_LINES=0"
       fi
     fi
   } >> "${TOKENS}"

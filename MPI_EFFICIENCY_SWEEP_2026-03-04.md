@@ -25,6 +25,10 @@ Identify any remaining paths that pull expensive work off MPI or off efficient h
 - `/tmp/build_stage_hardening_phaseB2_npplot_src_20260304_2`
 - `/tmp/build_stage_hardening_phaseB2_wildstress_guardtrue_src_20260304_2`
 - `/tmp/build_stage_hardening_phaseB2_wildstress_guardfalse_src_20260304_2`
+7. Phase+transport breadcrumb artifacts:
+- `/tmp/build_stage_hardening_phaseB3_npplot_src_20260304_2`
+- `/tmp/build_stage_hardening_phaseB3_wildstress_guardtrue_src_20260304_2`
+- `/tmp/build_stage_hardening_phaseB3_wildstress_guardfalse_src_20260304_2`
 
 ## Static Findings
 1. `CVLS_FORCED_GATE_LINES=0` for pattern
@@ -43,12 +47,15 @@ Identify any remaining paths that pull expensive work off MPI or off efficient h
 3. Larger stress (`n=1000`, `B=799`) aborted (`Abort trap: 6`) with guard both on and off; log files remained empty.
 4. Dedicated subprocess stress job (`npplot_wild_stress`) failed with `EXIT=134` for guard both on and off, confirming guard state is not the primary root cause of this failure class.
 5. New phase breadcrumbs (`npRmpi.bootstrap.phase.file`) show repeated successful `wild` cycles (`preflight -> dispatch -> collect -> done`) before abort in both guard modes, narrowing failure beyond fanout collective cadence.
+6. New transport breadcrumbs in `R/np.plot.helpers.R` and `R/Rparutilities.R` capture detailed fanout message flow; failing runs still show complete `send/recv` cycles and terminal `fanout.done` before abort.
+7. Stress behavior remains intermittent: one guard-on run completed, while guard-off still reproduced `EXIT=134` with full phase+transport traces.
 
 ## Interpretation
 1. Core estimator/CV MPI routing is not currently showing additional static evidence of forced serial detours beyond the already-fixed CVLS gate issue.
 2. The dominant remaining MPI-efficiency debt is in plot/bootstrap infrastructure, not estimator/CV kernels.
 3. The large-`n` abort is not explained solely by the wild master-local guard; there is a deeper plot/bootstrap runtime fragility at higher workload.
 4. With phase breadcrumbs active, failure signature indicates abort occurs after multiple completed fanout slices, suggesting downstream lifecycle/transport memory fragility rather than immediate dispatch contract divergence.
+5. With transport breadcrumbs active, failure remains post-cycle: message flow completes for each chunk and abort happens after successful fanout completion, pointing to later-stage runtime pressure (not a direct message-order mismatch).
 
 ## Priority Decision
 Highest priority now is **build-stage/runtime hardening**, not core SPMD remediation:
@@ -57,7 +64,7 @@ Highest priority now is **build-stage/runtime hardening**, not core SPMD remedia
 3. Defer guard removal until transport/runtime stability is proven under stress workloads.
 
 ## Immediate Next Tranche (Recommended)
-1. Bootstrap phase diagnostics are now in place; next add targeted legacy return-transport diagnostics (`mpi.remote.exec` / `.mpi.worker.exec`) to pair with phase breadcrumbs.
+1. Phase+transport diagnostics are now in place; next target post-cycle memory/lifecycle pressure points in repeated wild slices and gate by stress reruns.
 2. Add dedicated stress job to subprocess harness (`npplot_wild_stress`) with reproducible parameters and timeout.
 3. Gate any guard relaxation on:
    - no abort/hang in stress jobs,

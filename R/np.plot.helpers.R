@@ -296,6 +296,70 @@
   }, error = function(e) FALSE)
 }
 
+.npRmpi_bootstrap_transport_trace_path <- function() {
+  path.opt <- getOption("npRmpi.bootstrap.transport.trace.file", "")
+  path.env <- Sys.getenv("NP_RMPI_BOOTSTRAP_TRANSPORT_TRACE_FILE", unset = "")
+  path.fallback <- Sys.getenv("NP_RMPI_TRANSPORT_TRACE_FILE", unset = "")
+  path <- if (nzchar(path.env)) {
+    path.env
+  } else if (nzchar(path.fallback)) {
+    path.fallback
+  } else {
+    path.opt
+  }
+  path <- as.character(path)[1L]
+  if (is.na(path) || !nzchar(path))
+    return("")
+  path
+}
+
+.npRmpi_bootstrap_transport_trace <- function(what, event, fields = list()) {
+  path <- .npRmpi_bootstrap_transport_trace_path()
+  if (!nzchar(path))
+    return(invisible(FALSE))
+
+  dirpath <- dirname(path)
+  if (!identical(dirpath, ".") && !dir.exists(dirpath)) {
+    ok <- tryCatch({
+      dir.create(dirpath, recursive = TRUE, showWarnings = FALSE)
+    }, error = function(e) FALSE)
+    if (!isTRUE(ok) && !dir.exists(dirpath))
+      return(invisible(FALSE))
+  }
+
+  if (is.null(names(fields)))
+    names(fields) <- paste0("f", seq_along(fields))
+  if (length(fields) > 0)
+    fields <- fields[!is.na(names(fields)) & nzchar(names(fields))]
+  kv <- if (length(fields) > 0) {
+    paste(
+      paste0(
+        names(fields),
+        "=",
+        vapply(fields, function(v) {
+          vv <- as.character(v)[1L]
+          if (is.na(vv)) "NA" else vv
+        }, character(1))
+      ),
+      collapse = "\t"
+    )
+  } else ""
+
+  line <- paste(
+    format(Sys.time(), "%Y-%m-%dT%H:%M:%OS6%z"),
+    paste0("pid=", Sys.getpid()),
+    paste0("what=", as.character(what)[1L]),
+    paste0("event=", as.character(event)[1L]),
+    kv,
+    sep = "\t"
+  )
+
+  tryCatch({
+    cat(paste0(line, "\n"), file = path, append = TRUE)
+    TRUE
+  }, error = function(e) FALSE)
+}
+
 .npRmpi_bootstrap_phase_mark <- function(what = "bootstrap",
                                          phase = NA_character_,
                                          where = NA_character_) {
@@ -531,17 +595,37 @@
     .npRmpi_warn_wild_master_local_guard_once()
     use.master.local <- TRUE
   }
+  .npRmpi_bootstrap_transport_trace(
+    what = what,
+    event = "fanout.start",
+    fields = list(
+      workers = workers,
+      tasks = length(tasks),
+      master_local = isTRUE(use.master.local),
+      comm = comm
+    )
+  )
   t.comm <- proc.time()
   parts <- if (isTRUE(use.master.local)) {
     tryCatch({
       parts.local <- vector("list", length(tasks))
       done.boot <- 0L
+      .npRmpi_bootstrap_transport_trace(
+        what = what,
+        event = "fanout.master_local.start",
+        fields = list(tasks = length(tasks))
+      )
       for (ii in seq_along(tasks)) {
         task <- tasks[[ii]]
         parts.local[[ii]] <- do.call(worker.exec, c(list(task), list(...)))
         done.boot <- done.boot + as.integer(task$bsz)
         progress <- .np_plot_progress_tick(state = progress, done = done.boot)
       }
+      .npRmpi_bootstrap_transport_trace(
+        what = what,
+        event = "fanout.master_local.done",
+        fields = list(tasks = length(tasks))
+      )
       parts.local
     }, error = function(e) e)
   } else if (workers >= 1L && length(tasks) >= 2L) {
@@ -570,12 +654,22 @@
 
         mpi.bcast.cmd(.mpi.worker.applyLB, n = n.remote, comm = comm)
         mpi.bcast.Robj(list(FUN = worker.exec, dot.arg = list(...)), rank = 0, comm = comm)
+        .npRmpi_bootstrap_transport_trace(
+          what = what,
+          event = "fanout.master_assist.start",
+          fields = list(n_remote = n.remote, slave_num = slave.num, local_n = length(local.idx))
+        )
 
         init <- min(slave.num, n.remote)
         if (init > 0L) {
           for (i in seq_len(init)) {
             task.idx <- remote.idx[i]
             mpi.send.Robj(list(data.arg = list(tasks[[task.idx]])), dest = i, tag = i, comm = comm)
+            .npRmpi_bootstrap_transport_trace(
+              what = what,
+              event = "fanout.send.initial",
+              fields = list(dest = i, tag = i, task_idx = task.idx)
+            )
           }
         }
 
@@ -583,6 +677,11 @@
           stop.tag <- as.integer(n.remote + 1L)
           for (i in seq.int(init + 1L, slave.num)) {
             mpi.send.Robj(as.integer(0), dest = i, tag = stop.tag, comm = comm)
+            .npRmpi_bootstrap_transport_trace(
+              what = what,
+              event = "fanout.send.stop.initial",
+              fields = list(dest = i, tag = stop.tag)
+            )
           }
         }
 
@@ -600,6 +699,11 @@
             src <- srctag[1L]
             tag <- srctag[2L]
             res <- mpi.recv.Robj(source = src, tag = tag, comm = comm)
+            .npRmpi_bootstrap_transport_trace(
+              what = what,
+              event = "fanout.recv",
+              fields = list(src = src, tag = tag, done_next = done + 1L, n_remote = n.remote)
+            )
             done <- done + 1L
             task.idx <- remote.idx[tag]
             parts.out[[task.idx]] <- res
@@ -610,8 +714,18 @@
             if (sent <= n.remote) {
               next.idx <- remote.idx[sent]
               mpi.send.Robj(list(data.arg = list(tasks[[next.idx]])), dest = src, tag = sent, comm = comm)
+              .npRmpi_bootstrap_transport_trace(
+                what = what,
+                event = "fanout.send.next",
+                fields = list(dest = src, tag = sent, task_idx = next.idx)
+              )
             } else {
               mpi.send.Robj(as.integer(0), dest = src, tag = as.integer(n.remote + 1L), comm = comm)
+              .npRmpi_bootstrap_transport_trace(
+                what = what,
+                event = "fanout.send.stop",
+                fields = list(dest = src, tag = as.integer(n.remote + 1L))
+              )
             }
             progressed <- TRUE
           }
@@ -628,11 +742,21 @@
           if (!progressed && done < n.remote)
             Sys.sleep(0.0005)
         }
+        .npRmpi_bootstrap_transport_trace(
+          what = what,
+          event = "fanout.master_assist.done",
+          fields = list(done = done, n_remote = n.remote, local_done = local.ptr - 1L)
+        )
       }
 
       parts.out
     }, error = function(e) e)
   } else {
+    .npRmpi_bootstrap_transport_trace(
+      what = what,
+      event = "fanout.applylb.fallback",
+      fields = list(tasks = length(tasks), workers = workers)
+    )
     tryCatch(
       mpi.applyLB(tasks, worker.exec, ..., comm = comm),
       error = function(e) e
@@ -655,6 +779,11 @@
       paste0("mpi.applyLB:", what)
   )
   if (inherits(parts, "error")) {
+    .npRmpi_bootstrap_transport_trace(
+      what = what,
+      event = "fanout.error",
+      fields = list(message = conditionMessage(parts))
+    )
     .npRmpi_bootstrap_phase_mark(
       what = what,
       phase = "dispatch_error",
@@ -683,6 +812,11 @@
     what = what,
     phase = "done",
     where = profile.where
+  )
+  .npRmpi_bootstrap_transport_trace(
+    what = what,
+    event = "fanout.done",
+    fields = list(parts = length(parts), total_boot = total.boot)
   )
   out
 }

@@ -26,3 +26,21 @@ test_that("bootstrap phase mark is no-op for empty phase", {
   expect_false(isTRUE(ok))
   expect_false(file.exists(tf))
 })
+
+test_that("bootstrap transport trace writes optional breadcrumbs", {
+  trace_fun <- getFromNamespace(".npRmpi_bootstrap_transport_trace", "npRmpi")
+  tf <- tempfile("npRmpi-boot-transport-", fileext = ".tsv")
+  old <- getOption("npRmpi.bootstrap.transport.trace.file")
+  options(npRmpi.bootstrap.transport.trace.file = tf)
+  on.exit(options(npRmpi.bootstrap.transport.trace.file = old), add = TRUE)
+
+  ok <- trace_fun(
+    what = "wild",
+    event = "fanout.start",
+    fields = list(workers = 1L, tasks = 4L, master_local = TRUE)
+  )
+  expect_true(isTRUE(ok))
+  expect_true(file.exists(tf))
+  lines <- readLines(tf, warn = FALSE)
+  expect_true(any(grepl("event=fanout.start", lines, fixed = TRUE)))
+})

@@ -162,6 +162,11 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     tag <- floor(runif(1,20000,30000))
     scmd <- substitute(cmd)
     arg <-list(...)
+    .npRmpi_transport_trace(
+        role = "master",
+        event = "remote.exec.start",
+        fields = list(tag = tag, ret = ret, simplify = simplify, comm = comm)
+    )
     #if (length(arg) > 0) 
     #    deparse(arg)
     #tag.ret <- c(tag, ret, simplify)
@@ -172,10 +177,20 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     if (ret){
         size <- mpi.comm.size(comm) 
         allcode <- mpi.allgather(integer(2), 1, integer(2*size), comm)
+    .npRmpi_transport_trace(
+        role = "master",
+        event = "remote.exec.typecodes",
+        fields = list(tag = tag, size = size)
+    )
     type <- allcode[seq(3,2*size,2)]
     len <- allcode[seq(4,2*size,2)]
     eqlen <- all(len==len[1])
     if (all(type==1)){
+        .npRmpi_transport_trace(
+            role = "master",
+            event = "remote.exec.path.int",
+            fields = list(tag = tag, eqlen = eqlen, len = if (length(len)) len[1] else NA_integer_)
+        )
         if (eqlen && simplify){
             out <- mpi.gather(integer(len[1]),1,integer(size*len[1]),0,comm)
             out <- out[(len[1]+1):(size*len[1])]
@@ -193,6 +208,11 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
         }
     }
     else if (all(type==2)){
+        .npRmpi_transport_trace(
+            role = "master",
+            event = "remote.exec.path.dbl",
+            fields = list(tag = tag, eqlen = eqlen, len = if (length(len)) len[1] else NA_integer_)
+        )
         if (eqlen && simplify){
                 out <- mpi.gather(double(len[1]),2,double(size*len[1]),0,comm)
                 out <- out[(len[1]+1):(size*len[1])]
@@ -210,6 +230,11 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
         }
     }
  else if (all(type==4)){
+        .npRmpi_transport_trace(
+            role = "master",
+            event = "remote.exec.path.raw",
+            fields = list(tag = tag, eqlen = eqlen, len = if (length(len)) len[1] else NA_integer_)
+        )
         if (eqlen && simplify){
                 out <- mpi.gather(raw(len[1]),4,raw(size*len[1]),0,comm)
                 out <- out[(len[1]+1):(size*len[1])]
@@ -228,6 +253,11 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
     }
 
     else {
+            .npRmpi_transport_trace(
+                role = "master",
+                event = "remote.exec.path.robj",
+                fields = list(tag = tag)
+            )
             out <- as.list(integer(size-1))
             names(out) <- paste("slave", seq_len(size - 1L), sep="")
             for (i in seq_len(size - 1L)){
@@ -235,8 +265,19 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
         src <- mpi.get.sourcetag()[1] 
         out[[src]]<- tmp 
         }
-    }
+        }
+        .npRmpi_transport_trace(
+            role = "master",
+            event = "remote.exec.done",
+            fields = list(tag = tag, ret = ret)
+        )
         out
+    } else {
+        .npRmpi_transport_trace(
+            role = "master",
+            event = "remote.exec.done",
+            fields = list(tag = tag, ret = ret)
+        )
     }
 }
 
@@ -252,6 +293,64 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
             # Keep a fixed-length control packet across ranks; a scalar -1 can
             # truncate MPI_Allgather when another rank reports c(type, len).
             as.integer(c(-1L, 0L))
+}
+
+.npRmpi_transport_trace_path <- function() {
+    path.opt <- getOption("npRmpi.transport.trace.file", "")
+    path.env <- Sys.getenv("NP_RMPI_TRANSPORT_TRACE_FILE", unset = "")
+    path <- if (nzchar(path.env)) path.env else path.opt
+    path <- as.character(path)[1L]
+    if (is.na(path) || !nzchar(path))
+        return("")
+    path
+}
+
+.npRmpi_transport_trace <- function(role, event, fields = list()) {
+    path <- .npRmpi_transport_trace_path()
+    if (!nzchar(path))
+        return(invisible(FALSE))
+
+    dirpath <- dirname(path)
+    if (!identical(dirpath, ".") && !dir.exists(dirpath)) {
+        ok <- tryCatch({
+            dir.create(dirpath, recursive = TRUE, showWarnings = FALSE)
+        }, error = function(e) FALSE)
+        if (!isTRUE(ok) && !dir.exists(dirpath))
+            return(invisible(FALSE))
+    }
+
+    if (is.null(names(fields)))
+        names(fields) <- paste0("f", seq_along(fields))
+    if (length(fields) > 0) {
+        fields <- fields[!is.na(names(fields)) & nzchar(names(fields))]
+    }
+    kv <- if (length(fields) > 0) {
+        paste(
+            paste0(
+                names(fields),
+                "=",
+                vapply(fields, function(v) {
+                    vv <- as.character(v)[1L]
+                    if (is.na(vv)) "NA" else vv
+                }, character(1))
+            ),
+            collapse = "\t"
+        )
+    } else ""
+
+    line <- paste(
+        format(Sys.time(), "%Y-%m-%dT%H:%M:%OS6%z"),
+        paste0("pid=", Sys.getpid()),
+        paste0("role=", as.character(role)[1L]),
+        paste0("event=", as.character(event)[1L]),
+        kv,
+        sep = "\t"
+    )
+
+    tryCatch({
+        cat(paste0(line, "\n"), file = path, append = TRUE)
+        TRUE
+    }, error = function(e) FALSE)
 }
 
 .npRmpi_eval_scmd <- function(scmd, arg = list(), envir = parent.frame()) {
@@ -279,6 +378,11 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 
 .mpi.worker.exec <- function(tag, ret, simplify){
 	.comm <- 1
+    .npRmpi_transport_trace(
+        role = "worker",
+        event = "worker.exec.start",
+        fields = list(tag = tag, ret = ret, simplify = simplify, comm = .comm)
+    )
     #tag.ret <- mpi.bcast(integer(3), type=1, comm=.comm)
     #tag <- tag.ret[1]
     #ret <- as.logical(tag.ret[2])
@@ -293,6 +397,11 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
 	    type <- .typeindex(out)
 	    if (is.na(type[2]))
 	        type[2] <- as.integer(0)
+        .npRmpi_transport_trace(
+            role = "worker",
+            event = "worker.exec.type",
+            fields = list(tag = tag, type = type[1], len = type[2], size = size)
+        )
 	    allcode <- mpi.allgather(type, 1, integer(2*size), .comm)
     type <- allcode[seq(3,2*size,2)]
         len <- allcode[seq(4,2*size,2)]
@@ -316,14 +425,24 @@ mpi.remote.exec <- function(cmd, ...,  simplify=TRUE, comm=1, ret=TRUE){
                 mpi.gatherv(out, 4, raw(1), integer(1), 0, .comm)
         }
 
+	    else {
+            .npRmpi_transport_trace(
+                role = "worker",
+                event = "worker.exec.send.robj",
+                fields = list(tag = tag)
+            )
+	        mpi.send.Robj(out,0,tag,.comm)
+	    }       
+	    }
     else {
-        mpi.send.Robj(out,0,tag,.comm)
-    }       
-    }
-    else {
-        out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = parent.frame()),
-                        error = function(e) e)
-    }
+	        out <- tryCatch(.npRmpi_eval_scmd(scmd.arg$scmd, scmd.arg$arg, envir = parent.frame()),
+	                        error = function(e) e)
+	    }
+    .npRmpi_transport_trace(
+        role = "worker",
+        event = "worker.exec.done",
+        fields = list(tag = tag, ret = ret)
+    )
 }
 
 mpi.close.Rslaves <- function(dellog=TRUE, comm=1, force=FALSE){
@@ -629,6 +748,11 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
 	apply.seq=NULL
     n <- length(X)
     slave.num <- mpi.comm.size(comm)-1
+    .npRmpi_transport_trace(
+        role = "master",
+        event = "applylb.start",
+        fields = list(n = n, slave_num = slave.num, comm = comm)
+    )
     if (slave.num < 1)
         stop("There are no slaves running")
     if (n <= slave.num) {
@@ -665,6 +789,11 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
             else
                 mpi.send.Robj(as.integer(0),dest=apply.seq[i],tag=j,comm=comm)
         }
+        .npRmpi_transport_trace(
+            role = "master",
+            event = "applylb.done",
+            fields = list(n = n, slave_num = slave.num, comm = comm, apply_seq = TRUE)
+        )
         return(out)
     }
     # .mpi.applyLB <- integer(n)
@@ -681,12 +810,22 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
             mpi.send.Robj(as.integer(0),dest=srctag[1],tag=j,comm=comm)
     }
  	#assign(".mpi.applyLB",mpi.seq.tmp, envir = .GlobalEnv)
+    .npRmpi_transport_trace(
+        role = "master",
+        event = "applylb.done",
+        fields = list(n = n, slave_num = slave.num, comm = comm, apply_seq = FALSE)
+    )
 	out
 }
 
 .mpi.worker.applyLB <- function(n){
     #assign(".mpi.err", FALSE,  envir = .GlobalEnv)
 	.comm <- 1
+    .npRmpi_transport_trace(
+        role = "worker",
+        event = "worker.applylb.start",
+        fields = list(n = n, comm = .comm)
+    )
     #n <- mpi.bcast(integer(1), type=1, comm=.comm)
     tmpfunarg <- mpi.bcast.Robj(rank=0, comm=.comm)
     .tmpfun <- tmpfunarg$FUN
@@ -699,6 +838,11 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
             break
         tmpdata.arg <- if (is.list(tmpmsg)) tmpmsg$data.arg else NULL
         if (is.null(tmpdata.arg)) {
+            .npRmpi_transport_trace(
+                role = "worker",
+                event = "worker.applylb.malformed_task",
+                fields = list(tag = tag)
+            )
             out <- structure(
                 "mpi.applyLB worker received malformed task payload",
                 class = "try-error"
@@ -715,6 +859,11 @@ mpi.applyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1){
         #    print(geterrmessage())
         mpi.send.Robj(out,0,tag,.comm)
     }
+    .npRmpi_transport_trace(
+        role = "worker",
+        event = "worker.applylb.done",
+        fields = list(n = n, comm = .comm)
+    )
 }
 
 mpi.iapplyLB <- function(X, FUN, ...,  apply.seq=NULL, comm=1, sleep=0.01){
