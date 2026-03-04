@@ -116,16 +116,6 @@
   out
 }
 
-.np_wild_draws <- function(n, B, wild = c("mammen", "rademacher")) {
-  if (length(wild) > 1L)
-    wild <- wild[1L]
-  wild <- match.arg(wild, c("mammen", "rademacher"))
-  if (identical(wild, "mammen")) {
-    return(.np_mammen_draws(n = n, B = B))
-  }
-  .np_rademacher_draws(n = n, B = B)
-}
-
 .np_wild_chunk_size <- function(n, B) {
   chunk.opt <- getOption("np.plot.wild.chunk.size")
   if (!is.null(chunk.opt)) {
