@@ -207,3 +207,45 @@ Interpretation:
 1. New transport logs show complete master-assist send/recv cycles (`fanout.master_assist.done` + `fanout.done`) before the abort in failing runs.
 2. Current failure signature remains post-cycle/intermittent (not a direct collectives-cadence divergence).
 3. Immediate next hardening should target post-cycle memory/lifecycle pressure points in repeated wild slices (allocation churn, object lifetime, and worker loop teardown timing), using new transport+phase traces as gates.
+
+## Phase B.4 Wild Stress Isolation + Rejected Fixes (2026-03-04)
+Repro matrix updates (clean `HEAD`, fresh temp install):
+1. Harness stress (`npplot_wild_stress`, `n=1000`) with trace:
+   - guard on: `FAIL`, `EXIT=134` (3/3)
+   - guard off: `FAIL`, `EXIT=134` (3/3)
+   - artifacts: `/tmp/phaseD1_eval_head_20260304_143245`
+2. Direct repeated runs (`Rscript`, session mode, `n=1000`, wild):
+   - unstable, failing at `STAGE plot` (mixed `rc=6/137/0`)
+   - artifacts:
+     - `/tmp/direct_repeat_stage_matrix_20260304_143654.tsv`
+     - logs: `/tmp/direct_repeat_stage_*.log`
+3. Direct repeated runs (`Rscript`, session mode, `n=1000`, inid):
+   - stable (`5/5` success)
+   - artifacts:
+     - `/tmp/direct_repeat_inid_stage_matrix_20260304_143759.tsv`
+4. Direct repeated runs (`Rscript`, session mode, `n=100`, wild):
+   - stable (`5/5` success)
+   - artifact:
+     - `/tmp/direct_repeat_wildn100_stage_matrix_20260304_144003.tsv`
+
+Interpretation:
+1. The active instability is wild-bootstrap specific at larger workload (`n=1000`) and not a general `plot(..., plot.errors.method="bootstrap")` failure.
+2. Guard on/off does not resolve the failure class under stress on current `HEAD`.
+3. Failure boundary remains inside wild plot path (`STAGE plot`), consistent with prior post-cycle abort signatures.
+
+Attempted fixes (rejected; not merged):
+1. Factor-slice local-hat forcing in wild path:
+   - changed failure class from abort to deterministic timeout/hang (`EXIT=142`), therefore rejected.
+2. Wild worker prebinding of `H`/inputs:
+   - no robust stability gain in repeated stress; rejected as inconclusive.
+3. Wild worker GEMM-to-GEMV loop rewrite:
+   - no stability gain (worse in sampled run); rejected.
+4. All above runtime edits were reverted; branch runtime remains at clean `HEAD` behavior.
+
+Next safe tranche:
+1. Keep runtime unchanged until a deterministic keep-worthy fix is proven.
+2. Added dedicated deterministic stress gate script for wild (`n=1000`, ordered-factor slice, repeated subprocess runs):
+   - script: `issue_notes/run_npplot_wild_stress_repeat.sh`
+   - sample artifact: `/tmp/npplot_wild_gate_20260304_1` (`PASS=1 FAIL=2`, failed runs stop at `STAGE plot`).
+3. Make this gate mandatory for wild-path changes.
+4. Investigate low-risk observability in wild slice internals (without behavior change) to localize abort source before transport/protocol refactor.
