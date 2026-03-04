@@ -48,6 +48,10 @@ npver
 ^AS_CRAN_WARNING_LEDGER\.md$
 ^MPI_CALLABLE_INVENTORY\.md$
 ^REVISION_SUMMARY_.*\.md$
+^REMEDIATION_PLAN_.*\.md$
+^LARGE_H_REGRESSION_REMEDIATION_npRmpi\.md$
+^SPMD_REMEDIATION_.*\.md$
+^SPMD_REMEDIATION_.*\.json$
 
 ^benchmarks/oneoff
 ^benchmarks/perf
