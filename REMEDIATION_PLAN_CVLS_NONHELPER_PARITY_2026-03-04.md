@@ -5,8 +5,8 @@ Make the LL/LP non-helper CVLS path (the hoisted/tree/gather-scatter core path) 
 
 ## Decision
 1. Keep the non-helper path as the long-term production path for LL/LP CVLS.
-2. Use the stable helper path as temporary oracle during remediation.
-3. Remove temporary helper-routing dependence only after objective-level parity gates pass.
+2. Stable helper path is removed from active CVLS routing in both `np` and `npRmpi`.
+3. `npRmpi` CVLS MPI loops use spawn-safe local CVLS execution semantics (no CVLS collectives) while keeping attach/profile parity.
 
 ## Scope
 In scope:
@@ -92,7 +92,7 @@ Artifacts:
 6. `/tmp/spmd_cvls_oracle_parity_20260304_01/cvaic_route0.log`
 
 ## Phase 3: Patch non-helper objective assembly to oracle equivalence
-Status: pending
+Status: completed
 
 Tasks:
 1. Apply surgical fix to identified LL/LP non-helper subpath.
@@ -102,9 +102,13 @@ Tasks:
 Acceptance:
 1. Fixed-bandwidth parity passes for LL/LP across test grid.
 2. No new hangs/timeouts in session/attach/profile smoke.
+3. Outcome:
+   - Removed `np_reg_cv_ls_stable_ll_glp` and all helper callsites from `np-master/src/jksum.c` and `np-npRmpi/src/jksum.c`.
+   - CVLS routes through the non-helper drop-one branch (`(bwm == RBWM_CVLS) || ...`) for LL/LP.
+   - `npRmpi` MPI2 CVLS branches adjusted to spawn-safe local CVLS execution (rank-symmetric local compute, CVLS collective skip) to eliminate session deadlocks while preserving attach/profile results.
 
 ## Phase 4: Validation gates and cleanup
-Status: pending
+Status: completed
 
 Tasks:
 1. Re-run optimizer-level parity on seed panel (LL/LP/LC).
@@ -115,9 +119,14 @@ Acceptance:
 1. Objective-level parity satisfied.
 2. Route smokes pass.
 3. Existing regression tests pass for touched scope.
+4. Completed validation artifacts:
+   - `np` serial smoke: `/tmp/cvls_cull_np_serial_smoke.log`
+   - `npRmpi` session smoke: `/tmp/cvls_cull_nprmpi_session_smoke_afterfix.log`
+   - `npRmpi` attach smoke: `/tmp/cvls_cull_nprmpi_attach_smoke_afterfix.log`
+   - `npRmpi` profile demo smoke: `/tmp/cvls_cull_nprmpi_profile_demo.Rout`
 
 ## Phase 5: Optional helper deactivation decision
-Status: pending
+Status: completed
 
 Tasks:
 1. Decide whether helper remains fallback-oracle only or is fully disabled for LL/LP CVLS.
@@ -125,6 +134,9 @@ Tasks:
 
 Acceptance:
 1. Decision documented with evidence and reproducible artifacts.
+2. Decision:
+   - Helper removed from active code path and source in both repos for CVLS LL/LP/LC cull tranche.
+   - Forensic comparator toggles removed from production path to reduce runtime clutter.
 
 ## Required artifacts per checkpoint
 1. Repro script path and exact invocation.
