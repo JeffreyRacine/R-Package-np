@@ -49,6 +49,10 @@ if (!invisible(library(npRmpi, logical.return = TRUE))) {
   q(save = "no")
 }
 
+# Profile/manual-broadcast launches should preserve the same direct-call
+# behavior as session/attach master contexts.
+options(npRmpi.autodispatch = TRUE)
+
 # Ensure core base/recommended packages are attached for worker-side eval
 # when launched via Rscript + .Rprofile.
 for (pkg in c("utils", "stats", "datasets", "grDevices", "graphics", "methods")) {
