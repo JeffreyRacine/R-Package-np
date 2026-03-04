@@ -95,3 +95,13 @@ Validation:
 3. Targeted tests pass:
    - `tests/testthat/test-plot-autodispatch.R`
    - `tests/testthat/test-plot-mpi-only-bootstrap-contract.R`
+
+Follow-up hardening:
+1. Added non-interactive progress default-off (`np.plot.progress.noninteractive` opt-in) to avoid check-run console churn.
+2. Added robust graphics parameter restore helper (`.np_plot_restore_par`) and wired plot engines to use it.
+3. Added conservative MPI-session wild chunk cap (`np.plot.wild.chunk.max.mpi`, default `64`) for stability under repeated bootstrap slices.
+
+Residual blocker:
+1. Full forced all-examples `R CMD check` can still abort/hang under strict check internals; current stop-point is in the `np.pairs` example stream (intermittent `MPI_Allgather` truncation / `npudens` ACK mismatch signatures), not the earlier wild-bootstrap `np.plot` crash.
+2. Fresh-install subprocess harness remains green for the targeted runtime jobs (`npreg`, `npplot`, `npcondensitybw`), confirming runtime hardening gains while the long monolithic check-stream fragility remains isolated.
+3. Next tranche should be docs/example-structure focused for check mode (keep examples lightweight/deterministic in `R CMD check`; keep full MPI lifecycle stress in subprocess integration harnesses).

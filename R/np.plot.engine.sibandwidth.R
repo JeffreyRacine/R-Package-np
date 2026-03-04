@@ -36,7 +36,7 @@
            random.seed){
 
     oldpar <- par(no.readonly = TRUE)
-    on.exit(par(oldpar), add = TRUE)
+    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
 
     miss.xy = c(missing(xdat),missing(ydat))
     xy <- .np_plot_resolve_xydat(bws = bws, xdat = xdat, ydat = ydat, miss.xy = miss.xy)

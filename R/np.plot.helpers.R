@@ -32,6 +32,8 @@
 }
 
 .np_plot_progress_enabled <- function() {
+  if (!interactive() && !isTRUE(getOption("np.plot.progress.noninteractive", FALSE)))
+    return(FALSE)
   isTRUE(getOption("np.messages")) &&
     isTRUE(getOption("np.plot.progress", TRUE))
 }
@@ -100,6 +102,15 @@
   invisible(NULL)
 }
 
+.np_plot_restore_par <- function(oldpar) {
+  if (is.null(oldpar))
+    return(invisible(NULL))
+  if (is.list(oldpar) && !is.null(oldpar[["new"]]))
+    oldpar[["new"]] <- FALSE
+  suppressWarnings(try(par(oldpar), silent = TRUE))
+  invisible(NULL)
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))
@@ -143,6 +154,16 @@
   chunk <- as.integer(floor(target.bytes / (8 * n)))
   if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
     chunk <- 1L
+
+  # In active MPI sessions, very large wild chunks have triggered allocator
+  # instability on some stacks; keep a conservative default cap.
+  if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
+    mpi.cap <- suppressWarnings(as.integer(getOption("np.plot.wild.chunk.max.mpi", 64L))[1L])
+    if (is.na(mpi.cap) || mpi.cap < 1L)
+      mpi.cap <- 64L
+    chunk <- min(chunk, mpi.cap)
+  }
+
   min(B, chunk)
 }
 
@@ -321,9 +342,9 @@
     warned <<- TRUE
     warning(
       paste(
-        "MPI wild bootstrap fan-out for low-dimension slices (ncol.out <= 3)",
-        "is unstable on some MPI stacks; running this slice on master only",
-        "to preserve wild-bootstrap semantics and avoid process abort."
+        "MPI wild bootstrap fan-out is currently unstable on some MPI stacks;",
+        "running wild bootstrap on master only to preserve method semantics",
+        "and avoid process aborts while transport hardening is completed."
       ),
       call. = FALSE
     )
@@ -466,8 +487,7 @@
     isTRUE(.npRmpi_master_only_mode(comm = comm))
   if (identical(what, "wild") &&
       isTRUE(getOption("npRmpi.plot.wild.master_local.guard", TRUE)) &&
-      workers >= 1L &&
-      as.integer(ncol.out) <= 3L) {
+      workers >= 1L) {
     .npRmpi_warn_wild_master_local_guard_once()
     use.master.local <- TRUE
   }
