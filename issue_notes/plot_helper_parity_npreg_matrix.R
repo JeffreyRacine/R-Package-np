@@ -1,4 +1,22 @@
-suppressPackageStartupMessages(library(np))
+np_parity_load_package <- function() {
+  use.installed <- tolower(Sys.getenv("NP_PLOT_PARITY_USE_INSTALLED", "0")) %in% c("1", "true", "yes")
+  if (use.installed) {
+    suppressPackageStartupMessages(library(np))
+    return(invisible(NULL))
+  }
+
+  file.arg <- grep("^--file=", commandArgs(trailingOnly = FALSE), value = TRUE)
+  script.dir <- if (length(file.arg)) {
+    dirname(normalizePath(sub("^--file=", "", file.arg[1L]), mustWork = FALSE))
+  } else {
+    getwd()
+  }
+  repo.root <- normalizePath(file.path(script.dir, ".."), mustWork = FALSE)
+  suppressPackageStartupMessages(library(devtools))
+  load_all(repo.root, quiet = TRUE)
+}
+
+np_parity_load_package()
 
 set.seed(20260305)
 n <- 320L
@@ -51,7 +69,7 @@ for (i in seq_len(nrow(cases))) {
   if (identical(cs$regtype, 'lp')) {
     bw.args$basis <- cs$basis
     bw.args$degree <- as.integer(cs$degree)
-    bw.args$bernstein <- isTRUE(cs$bernstein)
+    bw.args$bernstein.basis <- isTRUE(cs$bernstein)
   }
 
   bw <- do.call(npregbw, bw.args)
