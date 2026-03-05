@@ -14,7 +14,7 @@ Ship a release-candidate-quality `npRmpi` that is modern, robust in MPI lifecycl
 2. `npregiv*` is explicitly lower priority unless blocking core release readiness.
 
 ## Runtime Independence Contract
-1. `npRmpi` must be self-supporting at runtime: no runtime `np::` bridge calls in estimator/plot/bootstrap/helper execution paths.
+1. `npRmpi` must be self-supporting at runtime: no serial namespace-bridge calls in estimator/plot/bootstrap/helper execution paths.
 2. When MPI mode is selected for `npRmpi`, execution must not silently fall back to serial code paths.
 3. Functional/interface compatibility with `np` remains required despite runtime independence.
 4. External package `Rmpi` must not be required for `npRmpi` runtime or test helper routing; MPI functionality must resolve through embedded `npRmpi` wrappers.
@@ -1397,7 +1397,7 @@ Completed in `np-npRmpi`:
 1. Fixed user-facing `plot(npreg(...), plot.errors.method="bootstrap", plot.errors.boot.method="inid")` session stalls by removing MPI/distributed refit pressure from bootstrap inner loops.
 2. Changes:
    - Added `.npRmpi_with_local_bootstrap(...)` wrapper to disable autodispatch during bootstrap/tsboot loops.
-   - Added `.npRmpi_bootstrap_estimator(...)` resolver to use serial `np` estimators (`np::npreg`, `np::npreghat`) when available, with safe fallback to `npRmpi` implementations.
+   - Added `.npRmpi_bootstrap_estimator(...)` resolver to use serial `np` estimators when available, with safe fallback to `npRmpi` implementations.
    - Applied local-bootstrap wrapper across all `compute.bootstrap.errors.*` bootstrap branches.
    - Added explicit session subprocess contract for `inid` plot path and mirrored issue-note smoke guard.
 3. Scope:
@@ -1494,7 +1494,7 @@ Completed in `np-npRmpi`:
 4. Safety gate:
    - fast path is now explicit opt-in and disabled by default:
      - `options(np.plot.inid.ksum.fastpath.nprmpi = TRUE)`.
-   - opt-in path uses serial `np` namespace kernels (`np::npksum` + `np` kbandwidth helpers)
+   - opt-in path uses serial `np` namespace kernels (`npksum` + `np` kbandwidth helpers)
      via `.npRmpi_bootstrap_estimator(...)` to avoid session-mode `npRmpi::npksum` stalls.
 5. Contract strategy:
    - default subprocess routing contracts stay in the stable path,

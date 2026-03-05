@@ -1693,7 +1693,7 @@ cv.ls.uniquecombs <- function(lambda,y,z,z.unique,ind,ind.vals,num.z,c) {
         L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
                                                       z.unique[ind.vals[i],j],
                                                       lambda[j])}),1,prod)
-        g[zz] <- (sum(y*L)-(y*L)[zz])/np:::NZD(sum(L)-L[zz])
+        g[zz] <- (sum(y*L)-(y*L)[zz])/NZD(sum(L)-L[zz])
     }
     return(mean((y-g)^2))
 }
@@ -1730,7 +1730,7 @@ for(i in 1:c) {
     L <- apply(sapply(1:num.z, function(j){kernel(z[,j],
                                                   z.unique[ind.vals[i],j],
                                                   lambda.opt[j])}),1,prod)
-    g[zz] <- sum(y*L)/np:::NZD(sum(L))
+    g[zz] <- sum(y*L)/NZD(sum(L))
 }
 
 ## Save execution time for optimization and estimation

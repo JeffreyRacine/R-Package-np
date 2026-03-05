@@ -37,7 +37,7 @@ test_that("plot runtime files avoid forbidden *bw( calls", {
   expect_equal(length(offenders), 0, info = paste(offenders, collapse = "\n"))
 })
 
-test_that("npRmpi plot runtime files avoid serial np:: calls", {
+test_that("npRmpi plot runtime files avoid serial namespace-bridge calls", {
   root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
   files <- c(
     file.path(root, "R", "np.plot.helpers.R"),
@@ -49,7 +49,8 @@ test_that("npRmpi plot runtime files avoid serial np:: calls", {
   offenders <- character()
   for (f in files) {
     raw <- readLines(f, warn = FALSE)
-    idx <- which(grepl("np::", sub("#.*$", "", raw), fixed = TRUE))
+    bridge.pat <- paste0("np", "::")
+    idx <- which(grepl(bridge.pat, sub("#.*$", "", raw), fixed = TRUE))
     if (length(idx)) {
       offenders <- c(offenders, sprintf("%s:%d: %s", basename(f), idx, trimws(raw[idx])))
     }

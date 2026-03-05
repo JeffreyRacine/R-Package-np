@@ -1,5 +1,4 @@
 test_that("plot contract: asymptotic mode fails fast for plbandwidth and sibandwidth (npRmpi)", {
-  skip_if_not_installed("np")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -13,14 +12,14 @@ test_that("plot contract: asymptotic mode fails fast for plbandwidth and sibandw
   x2 <- runif(n)
   y <- sin(2 * pi * z) + 0.4 * x + rnorm(n, sd = 0.08)
 
-  pbw <- np::npplregbw(
+  pbw <- npplregbw(
     xdat = data.frame(x = x),
     zdat = data.frame(z = z),
     ydat = y,
     bws = matrix(c(0.30, 0.30), nrow = 2),
     bandwidth.compute = FALSE
   )
-  sbw <- np::npindexbw(
+  sbw <- npindexbw(
     y ~ x + x2,
     data = data.frame(y = y, x = x, x2 = x2),
     bws = c(1, 0.30, 0.30),

@@ -1,5 +1,4 @@
 test_that("plot contract: bootstrap args require explicit bootstrap mode across engine families (npRmpi)", {
-  skip_if_not_installed("np")
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
   on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
@@ -19,27 +18,26 @@ test_that("plot contract: bootstrap args require explicit bootstrap mode across 
   ydat <- data.frame(y = y)
   idxdat <- data.frame(y = y, x = x, x2 = x2)
 
-  # Construct manual-bws objects in serial np, then validate npRmpi plot S3 contracts.
-  rbw <- np::npregbw(xdat = xdat, ydat = y, bws = 0.25, bandwidth.compute = FALSE)
-  ubw <- np::npudensbw(dat = xdat, bws = 0.25, bandwidth.compute = FALSE)
-  dbw <- np::npudistbw(dat = xdat, bws = 0.25, bandwidth.compute = FALSE)
-  cbw <- np::npcdensbw(xdat = xdat, ydat = ydat, bws = c(0.30, 0.30), bandwidth.compute = FALSE)
-  cdbw <- np::npcdistbw(xdat = xdat, ydat = ydat, bws = c(0.30, 0.30), bandwidth.compute = FALSE)
-  pbw <- np::npplregbw(
+  rbw <- npregbw(xdat = xdat, ydat = y, bws = 0.25, bandwidth.compute = FALSE)
+  ubw <- npudensbw(dat = xdat, bws = 0.25, bandwidth.compute = FALSE)
+  dbw <- npudistbw(dat = xdat, bws = 0.25, bandwidth.compute = FALSE)
+  cbw <- npcdensbw(xdat = xdat, ydat = ydat, bws = c(0.30, 0.30), bandwidth.compute = FALSE)
+  cdbw <- npcdistbw(xdat = xdat, ydat = ydat, bws = c(0.30, 0.30), bandwidth.compute = FALSE)
+  pbw <- npplregbw(
     xdat = data.frame(x = z),
     zdat = data.frame(z = x),
     ydat = y,
     bws = matrix(c(0.30, 0.30), nrow = 2),
     bandwidth.compute = FALSE
   )
-  sbw <- np::npindexbw(
+  sbw <- npindexbw(
     y ~ x + x2,
     data = idxdat,
     bws = c(1, 0.30, 0.30),
     bandwidth.compute = FALSE,
     method = "ichimura"
   )
-  scbw <- np::npscoefbw(
+  scbw <- npscoefbw(
     xdat = data.frame(x = x),
     zdat = data.frame(z = z),
     ydat = y,

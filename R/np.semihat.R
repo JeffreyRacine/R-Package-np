@@ -3,51 +3,86 @@
     stop(sprintf("argument 'bws' must inherit from class '%s' in %s()", class.name, fn.name))
 }
 
-.np_indexhat_rbw <- function(bws, idx.train) {
-  regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+.np_semihat_make_regbw_args <- function(source, xdat, ydat, bw) {
+  regtype <- if (is.null(source$regtype)) "lc" else as.character(source$regtype)
+  xdat <- toFrame(xdat)
+  ncon.target <- sum(untangle(xdat)$icon)
+
+  collapse_bound <- function(v, nm) {
+    if (is.null(v))
+      return(NULL)
+    vv <- as.double(v)
+    if (ncon.target <= 0L)
+      return(NULL)
+    if (length(vv) <= 1L || length(vv) == ncon.target)
+      return(vv)
+    if (ncon.target == 1L) {
+      uu <- unique(vv)
+      if (length(uu) == 1L)
+        return(uu)
+      stop(sprintf("cannot collapse %s with %d distinct values to scalar helper bound", nm, length(uu)),
+           call. = FALSE)
+    }
+    stop(sprintf("%s length (%d) is incompatible with helper continuous dimension (%d)",
+                 nm, length(vv), ncon.target),
+         call. = FALSE)
+  }
+
   args <- list(
+    xdat = xdat,
+    ydat = ydat,
+    bws = as.double(bw),
+    regtype = regtype,
+    bandwidth.compute = FALSE
+  )
+
+  # Forward the full compatible estimator/bandwidth option contract.
+  if (!is.null(source$basis))
+    args$basis <- source$basis
+  if (!is.null(source$degree))
+    args$degree <- source$degree
+  if (!is.null(source$bernstein.basis))
+    args$bernstein.basis <- source$bernstein.basis
+  if (!is.null(source$method) && source$method %in% c("cv.ls", "cv.aic"))
+    args$bwmethod <- source$method
+  if (!is.null(source$scaling))
+    args$bwscaling <- isTRUE(source$scaling)
+  if (!is.null(source$type))
+    args$bwtype <- source$type
+  if (!is.null(source$ckertype))
+    args$ckertype <- source$ckertype
+  if (!is.null(source$ckerorder))
+    args$ckerorder <- source$ckerorder
+  if (!is.null(source$ckerbound))
+    args$ckerbound <- source$ckerbound
+  if (!is.null(source$ckerlb))
+    args$ckerlb <- collapse_bound(source$ckerlb, "ckerlb")
+  if (!is.null(source$ckerub))
+    args$ckerub <- collapse_bound(source$ckerub, "ckerub")
+  if (!is.null(source$ukertype))
+    args$ukertype <- source$ukertype
+  if (!is.null(source$okertype))
+    args$okertype <- source$okertype
+
+  args
+}
+
+.np_indexhat_rbw <- function(bws, idx.train) {
+  do.call(npregbw, .np_semihat_make_regbw_args(
+    source = bws,
     xdat = idx.train,
     ydat = rep.int(0.0, nrow(idx.train)),
-    bws = as.double(bws$bw),
-    regtype = regtype,
-    bandwidth.compute = FALSE,
-    ckertype = bws$ckertype,
-    ckerorder = bws$ckerorder
-  )
-  if (!is.null(bws$basis))
-    args$basis <- bws$basis
-  if (!is.null(bws$degree))
-    args$degree <- bws$degree
-  if (!is.null(bws$bernstein.basis))
-    args$bernstein.basis <- bws$bernstein.basis
-  do.call(npregbw, args)
+    bw = bws$bw
+  ))
 }
 
 .npscoef_make_regbw <- function(bws, zdat, bw = bws$bw) {
-  regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
-  args <- list(
+  do.call(npregbw, .np_semihat_make_regbw_args(
+    source = bws,
     xdat = zdat,
     ydat = rep.int(0.0, nrow(zdat)),
-    bws = as.double(bw),
-    regtype = regtype,
-    bwscaling = isTRUE(bws$scaling),
-    bandwidth.compute = FALSE,
-    bwtype = if (is.null(bws$type)) "fixed" else bws$type,
-    ckertype = if (is.null(bws$ckertype)) "gaussian" else bws$ckertype,
-    ckerorder = if (is.null(bws$ckerorder)) 2L else bws$ckerorder,
-    ckerbound = if (is.null(bws$ckerbound)) "none" else bws$ckerbound,
-    ckerlb = bws$ckerlb,
-    ckerub = bws$ckerub,
-    ukertype = if (is.null(bws$ukertype)) "aitchisonaitken" else bws$ukertype,
-    okertype = if (is.null(bws$okertype)) "liracine" else bws$okertype
-  )
-  if (!is.null(bws$basis))
-    args$basis <- bws$basis
-  if (!is.null(bws$degree))
-    args$degree <- bws$degree
-  if (!is.null(bws$bernstein.basis))
-    args$bernstein.basis <- bws$bernstein.basis
-  do.call(npregbw, args)
+    bw = bw
+  ))
 }
 
 .npscoef_weight_matrix <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
