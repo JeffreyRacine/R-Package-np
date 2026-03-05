@@ -28,7 +28,7 @@ echo "filter,fail,warn,skip,pass,log" > "$TEST_SUMMARY"
 
 for f in "${TEST_FILTERS[@]}"; do
   log="$OUT/tests/test_${f}.log"
-  Rscript -e "devtools::test(filter='${f}')" > "$log" 2>&1
+  Rscript -e "devtools::test(pkg='${REPO}', filter='${f}')" > "$log" 2>&1
   line="$(rg -n "\\[ FAIL [0-9]+ \\| WARN [0-9]+ \\| SKIP [0-9]+ \\| PASS [0-9]+ \\]" "$log" | tail -1 | sed -E 's/^[^\\[]*//')"
   if [[ -z "$line" ]]; then
     echo "missing test summary line for filter=${f}" >&2
