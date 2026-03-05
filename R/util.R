@@ -101,6 +101,21 @@ NZD_pos <- function(a) {
   a
 }
 
+npRidgeSequenceAdditive <- function(n.train, cap = 1.0) {
+  if (!is.numeric(n.train) || length(n.train) != 1L || is.na(n.train) ||
+      !is.finite(n.train) || n.train < 1 || n.train != floor(n.train))
+    stop("'n.train' must be a positive integer")
+  if (!is.numeric(cap) || length(cap) != 1L || is.na(cap) ||
+      !is.finite(cap) || cap <= 0)
+    stop("'cap' must be a positive finite numeric scalar")
+
+  step <- 1.0 / as.double(n.train)
+  seq.out <- seq.int(from = 0.0, to = as.double(cap), by = step)
+  if (tail(seq.out, 1L) < cap)
+    seq.out <- c(seq.out, as.double(cap))
+  unique(as.double(seq.out))
+}
+
 npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
   degree.max <- 12L
 
