@@ -52,6 +52,33 @@ if (!invisible(library(npRmpi, logical.return = TRUE))) {
 # Profile/manual-broadcast launches should preserve the same direct-call
 # behavior as session/attach master contexts.
 options(npRmpi.autodispatch = TRUE)
+options(npRmpi.profile.active = TRUE)
+
+# Guard against explicit Rmpi attachment inside profile scripts. Under the
+# embedded npRmpi backend, attaching Rmpi then calling mpi.comm.rank() in this
+# mode can crash the process; fail fast with remediation instead.
+.npRmpi_profile_rmpi_attach_guard <- function(...) {
+  if (!isTRUE(getOption("npRmpi.profile.active", FALSE)))
+    return(invisible(NULL))
+  msg <- paste(
+    "npRmpi profile mode does not support attaching package 'Rmpi' in script body.",
+    "Use npRmpi profile/manual-broadcast helpers (mpi.bcast.*) without library(Rmpi),",
+    "or switch to attach/session mode if direct Rmpi APIs are required."
+  )
+  .stub <- function(...) stop(msg, call. = FALSE)
+  assign("mpi.comm.rank", .stub, envir = .GlobalEnv)
+  assign("mpi.comm.size", .stub, envir = .GlobalEnv)
+  base::cat(sprintf("\n[npRmpi profile guard] %s\n", msg), file = stderr())
+  flush(stderr())
+  if (interactive()) {
+    stop(msg, call. = FALSE)
+  } else {
+    quit(save = "no", status = 1, runLast = FALSE)
+  }
+}
+setHook(packageEvent("Rmpi", "attach"), .npRmpi_profile_rmpi_attach_guard, action = "append")
+if ("package:Rmpi" %in% search())
+  .npRmpi_profile_rmpi_attach_guard()
 
 # Ensure core base/recommended packages are attached for worker-side eval
 # when launched via Rscript + .Rprofile.

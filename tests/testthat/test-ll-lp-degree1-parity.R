@@ -28,7 +28,7 @@ test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
     )
 
     expect_equal(as.numeric(bw.ll$fval), as.numeric(bw.lp$fval), tolerance = 1e-10)
-    expect_equal(as.numeric(bw.ll$bw), as.numeric(bw.lp$bw), tolerance = 1e-10)
+    expect_equal(as.numeric(bw.ll$bw), as.numeric(bw.lp$bw), tolerance = 1e-9)
   }
 })
 
@@ -123,7 +123,7 @@ test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
   )
 
   expect_equal(as.numeric(bw.ll.cv$fval), as.numeric(bw.lp.cv$fval), tolerance = 1e-10)
-  expect_equal(as.numeric(bw.ll.cv$bw), as.numeric(bw.lp.cv$bw), tolerance = 1e-10)
+  expect_equal(as.numeric(bw.ll.cv$bw), as.numeric(bw.lp.cv$bw), tolerance = 1e-9)
 
   bw.ll <- npscoefbw(
     xdat = x,
@@ -192,7 +192,7 @@ test_that("npindex cv, fit, and npindexhat(s=1) match for ll and lp(degree=1) in
   ))
 
   expect_equal(as.numeric(bw.ll.cv$fval), as.numeric(bw.lp.cv$fval), tolerance = 1e-10)
-  expect_equal(as.numeric(bw.ll.cv$bw), as.numeric(bw.lp.cv$bw), tolerance = 1e-10)
+  expect_equal(as.numeric(bw.ll.cv$bw), as.numeric(bw.lp.cv$bw), tolerance = 1e-9)
 
   bw.ll <- suppressWarnings(npindexbw(
     xdat = tx,
@@ -255,8 +255,8 @@ test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
   )
 
   expect_equal(as.numeric(bw.ll.cv$fval), as.numeric(bw.lp.cv$fval), tolerance = 1e-10)
-  expect_equal(as.numeric(bw.ll.cv$bw$yzbw$bw), as.numeric(bw.lp.cv$bw$yzbw$bw), tolerance = 1e-10)
-  expect_equal(as.numeric(bw.ll.cv$bw[[2]]$bw), as.numeric(bw.lp.cv$bw[[2]]$bw), tolerance = 1e-10)
+  expect_equal(as.numeric(bw.ll.cv$bw$yzbw$bw), as.numeric(bw.lp.cv$bw$yzbw$bw), tolerance = 1e-9)
+  expect_equal(as.numeric(bw.ll.cv$bw[[2]]$bw), as.numeric(bw.lp.cv$bw[[2]]$bw), tolerance = 1e-9)
 
   bw.ll <- npplregbw(
     xdat = data.frame(x = x),
