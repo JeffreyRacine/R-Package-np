@@ -403,10 +403,11 @@ npscoef.scbandwidth <-
     ## ridging jracine Jan 28 2009
 
     maxPenalty <- sqrt(.Machine$double.xmax)
-    coef.mat <- matrix(maxPenalty,ncol(W),enrow)
-    epsilon <- 1.0/enrow
-    ridge <- double(enrow)
-    doridge <- !logical(enrow)
+    coef.mat <- matrix(maxPenalty, ncol(W), enrow)
+    ridge.grid <- npRidgeSequenceAdditive(n.train = tnrow, cap = 1.0)
+    ridge <- rep.int(ridge.grid[1L], enrow)
+    ridge.idx <- rep.int(1L, enrow)
+    doridge <- rep.int(TRUE, enrow)
 
     nc <- ncol(tww[,,1])
 
@@ -421,8 +422,11 @@ npscoef.scbandwidth <-
           error = function(e) e
         )
         if (inherits(coef.ii, "error")) {
-          ridge[ii] <- ridge[ii] + epsilon
-          doridge[ii] <- TRUE
+          ridge.idx[ii] <- ridge.idx[ii] + 1L
+          if (ridge.idx[ii] <= length(ridge.grid)) {
+            ridge[ii] <- ridge.grid[ridge.idx[ii]]
+            doridge[ii] <- TRUE
+          }
           coef.ii <- rep(maxPenalty, nc)
         }
         coef.mat[,ii] <- coef.ii
@@ -498,9 +502,10 @@ npscoef.scbandwidth <-
         tm <- tywtm[-1,-1,]
 
         mean.fit <- rep(maxPenalty,nrow(txdat))
-        epsilon <- 1.0/nrow(txdat)
-        ridge.tm <- double(nrow(txdat))
-        doridge <- !logical(nrow(txdat))
+        ridge.grid.tm <- npRidgeSequenceAdditive(n.train = nrow(txdat), cap = 1.0)
+        ridge.tm <- rep.int(ridge.grid.tm[1L], nrow(txdat))
+        ridge.idx.tm <- rep.int(1L, nrow(txdat))
+        doridge <- rep.int(TRUE, nrow(txdat))
 
         nc <- ncol(tm[,,1])
 
@@ -515,8 +520,11 @@ npscoef.scbandwidth <-
               error = function(e) e
             )
             if (inherits(beta.jj, "error")) {
-              ridge.tm[jj] <- ridge.tm[jj] + epsilon
-              doridge[jj] <- TRUE
+              ridge.idx.tm[jj] <- ridge.idx.tm[jj] + 1L
+              if (ridge.idx.tm[jj] <= length(ridge.grid.tm)) {
+                ridge.tm[jj] <- ridge.grid.tm[ridge.idx.tm[jj]]
+                doridge[jj] <- TRUE
+              }
               beta.jj <- rep(maxPenalty, nc)
             }
             mean.fit[jj] <- W.train[jj,, drop = FALSE] %*% beta.jj
@@ -551,7 +559,7 @@ npscoef.scbandwidth <-
       merr <- rep(NA_real_, enrow)
       beta.se <- matrix(NA_real_, nrow = enrow, ncol = nc)
       for (i in seq_len(enrow)) {
-        cm <- safe_chol2inv(tww[,,i], ridge[i], epsilon)
+        cm <- safe_chol2inv(tww[,,i], ridge[i], 1.0 / nrow(txdat))
         if (is.null(cm))
           next
         s.mat <- crossprod(W.train, W.train * ((kw[, i]^2) * u2))

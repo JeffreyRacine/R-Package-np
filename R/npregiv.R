@@ -557,11 +557,12 @@ npregiv <- function(y,
       tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n.eval))[1,,]
       tww <- array(tww,dim = c(ncol(W)+1,ncol(W),n.eval))[-1,,]
 
-      coef.mat <- matrix(maxPenalty,ncol(W),n.eval)
-      epsilon <- 1.0/n.eval
-      ridge <- double(n.eval)
-      ridge.lc <- double(n.eval)
-      doridge <- !logical(n.eval)
+      coef.mat <- matrix(maxPenalty, ncol(W), n.eval)
+      ridge.grid <- npRidgeSequenceAdditive(n.train = n.eval, cap = 1.0)
+      ridge <- rep.int(ridge.grid[1L], n.eval)
+      ridge.idx <- rep.int(1L, n.eval)
+      ridge.lc.mean <- double(n.eval)
+      doridge <- rep.int(TRUE, n.eval)
 
       nc <- ncol(tww[,,1])
       I.nc <- diag(nc)
@@ -573,18 +574,23 @@ npregiv <- function(y,
         iloo <- seq_len(n.eval)[doridge]
         for(i in iloo) {
           doridge[i] <- FALSE
-          ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+          ridge.lc.mean[i] <- tyw[1,i][1]/NZD(tww[,,i][1,1])
           coef.mat[,i] <- tryCatch(chol2inv(chol(tww[,,i] + ridge[i]*I.nc))%*%tyw[,i],
                                    error = function(e){
-                                     ridge[i] <- ridge[i]+epsilon
-                                     doridge[i] <- TRUE
+                                     ridge.idx[i] <- ridge.idx[i] + 1L
+                                     if (ridge.idx[i] <= length(ridge.grid)) {
+                                       ridge[i] <- ridge.grid[ridge.idx[i]]
+                                       doridge[i] <- TRUE
+                                     }
                                      return(rep(maxPenalty,nc))
                                    })
         }
       }
 
+      ridge.alpha <- pmin(1.0, ridge)
       mhat <- sapply(seq_len(n.eval), function(i) {
-        (1-ridge[i])*W.eval[i,, drop = FALSE] %*% coef.mat[,i] + ridge.lc[i]
+        (1 - ridge.alpha[i]) * W.eval[i,, drop = FALSE] %*% coef.mat[,i] +
+          ridge.alpha[i] * ridge.lc.mean[i]
       })
 
       grad <- sapply(seq_len(n.eval), function(i) {W.eval.deriv[i,-1, drop = FALSE] %*% coef.mat[-1,i]})
@@ -665,11 +671,12 @@ npregiv <- function(y,
         tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[1,,]
         tww <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[-1,,]
 
-        mean.loo <- rep(maxPenalty,n)
-        epsilon <- 1.0/n
-        ridge <- double(n)
-        ridge.lc <- double(n)
-        doridge <- !logical(n)
+        mean.loo <- rep(maxPenalty, n)
+        ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+        ridge <- rep.int(ridge.grid[1L], n)
+        ridge.idx <- rep.int(1L, n)
+        ridge.lc.mean <- double(n)
+        doridge <- rep.int(TRUE, n)
 
         nc <- ncol(tww[,,1])
 
@@ -680,14 +687,18 @@ npregiv <- function(y,
           iloo <- seq_len(n)[doridge]
           for(i in iloo) {
             doridge[i] <- FALSE
-            ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+            ridge.lc.mean[i] <- tyw[1,i][1]/NZD(tww[,,i][1,1])
             mean.i <- W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
                                                        error = function(e){
-                                                         ridge[i] <- ridge[i]+epsilon
-                                                         doridge[i] <- TRUE
+                                                         ridge.idx[i] <- ridge.idx[i] + 1L
+                                                         if (ridge.idx[i] <= length(ridge.grid)) {
+                                                           ridge[i] <- ridge.grid[ridge.idx[i]]
+                                                           doridge[i] <- TRUE
+                                                         }
                                                          return(rep(maxPenalty,nc))
                                                        })
-            mean.loo[i] <- (1-ridge[i])*mean.i + ridge.lc[i]
+            alpha.i <- min(1.0, ridge[i])
+            mean.loo[i] <- (1 - alpha.i) * mean.i + alpha.i * ridge.lc.mean[i]
           }
         }
 
@@ -787,11 +798,12 @@ npregiv <- function(y,
         tyw <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[1,,]
         tww <- array(tww,dim = c(ncol(W)+1,ncol(W),n))[-1,,]
 
-        ghat <- rep(maxPenalty,n)
-        epsilon <- 1.0/n
-        ridge <- double(n)
-        ridge.lc <- double(n)
-        doridge <- !logical(n)
+        ghat <- rep(maxPenalty, n)
+        ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+        ridge <- rep.int(ridge.grid[1L], n)
+        ridge.idx <- rep.int(1L, n)
+        ridge.lc.mean <- double(n)
+        doridge <- rep.int(TRUE, n)
 
         nc <- ncol(tww[,,1])
 
@@ -802,20 +814,37 @@ npregiv <- function(y,
           ii <- seq_len(n)[doridge]
           for(i in ii) {
             doridge[i] <- FALSE
-            ridge.lc[i] <- ridge[i]*tyw[1,i][1]/NZD(tww[,,i][1,1])
+            ridge.lc.mean[i] <- tyw[1,i][1]/NZD(tww[,,i][1,1])
             ghat.i <- W[i,, drop = FALSE] %*% tryCatch(chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc))))%*%tyw[,i],
                                                        error = function(e){
-                                                         ridge[i] <- ridge[i]+epsilon
-                                                         doridge[i] <- TRUE
+                                                         ridge.idx[i] <- ridge.idx[i] + 1L
+                                                         if (ridge.idx[i] <= length(ridge.grid)) {
+                                                           ridge[i] <- ridge.grid[ridge.idx[i]]
+                                                           doridge[i] <- TRUE
+                                                         }
                                                          return(rep(maxPenalty,nc))
                                                        })
-            ghat[i] <- (1-ridge[i])*ghat.i + ridge.lc[i]
+            alpha.i <- min(1.0, ridge[i])
+            ghat[i] <- (1 - alpha.i) * ghat.i + alpha.i * ridge.lc.mean[i]
           }
         }
 
-        trH <- kernel.i.eq.j*sum(sapply(seq_len(n),function(i){
-          (1-ridge[i])*W[i,, drop = FALSE] %*% chol2inv(chol(tww[,,i]+diag(rep(ridge[i],nc)))) %*% t(W[i,, drop = FALSE]) + ridge[i]/NZD(tww[,,i][1,1])
-        }))
+        if (any(ghat == maxPenalty))
+          return(maxPenalty)
+
+        ridge.alpha <- pmin(1.0, ridge)
+        trH.comp <- sapply(seq_len(n), function(i) {
+          tryCatch(
+            (1 - ridge.alpha[i]) * W[i,, drop = FALSE] %*%
+              chol2inv(chol(tww[,,i] + diag(rep(ridge[i], nc)))) %*%
+              t(W[i,, drop = FALSE]) +
+              ridge.alpha[i] / NZD(tww[,,i][1,1]),
+            error = function(e) maxPenalty
+          )
+        })
+        if (any(trH.comp == maxPenalty))
+          return(maxPenalty)
+        trH <- kernel.i.eq.j * sum(trH.comp)
 
         aic.penalty <- (1+trH/n)/(1-(trH+2)/n)
 
