@@ -1253,7 +1253,7 @@
                                           B,
                                           counts = NULL,
                                           counts.drawer = NULL,
-                                          ridge = 0.0) {
+                                          ridge = 1.0e-12) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -1937,7 +1937,7 @@
   list(train = x.train.num, eval = x.eval.num)
 }
 
-.np_plreg_weighted_coef <- function(X, y, w, ridge = 0.0) {
+.np_plreg_weighted_coef <- function(X, y, w, ridge = 1.0e-12) {
   X <- as.matrix(X)
   y <- as.double(y)
   w <- as.double(w)
@@ -1983,7 +1983,7 @@
                                      B,
                                      counts = NULL,
                                      counts.drawer = NULL,
-                                     ridge = 0.0) {
+                                     ridge = 1.0e-12) {
   txdat <- toFrame(txdat)
   tzdat <- toFrame(tzdat)
   exdat <- toFrame(exdat)
