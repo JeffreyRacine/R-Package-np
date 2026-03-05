@@ -163,7 +163,7 @@
       W = W,
       w.eval = W.eval[ii, ],
       k = kw[, ii],
-      ridge.base = 1.0e-12
+      ridge.base = 0.0
     )
     if (is.null(solve.out))
       stop(sprintf("failed to solve smooth-coefficient hat system at evaluation row %d", ii))
@@ -383,7 +383,7 @@ npscoefhat <-
            ezdat = tzdat,
            y = NULL,
            output = c("matrix", "apply"),
-           ridge = 1.0e-12,
+           ridge = 0.0,
            iterate = FALSE,
            leave.one.out = FALSE,
            ...){
@@ -393,8 +393,8 @@ npscoefhat <-
     iterate <- npValidateScalarLogical(iterate, "iterate")
     leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
     ridge <- as.double(ridge)
-    if (length(ridge) != 1L || is.na(ridge) || !is.finite(ridge) || ridge <= 0)
-      stop("argument 'ridge' must be a positive finite scalar")
+    if (length(ridge) != 1L || is.na(ridge) || !is.finite(ridge) || ridge < 0)
+      stop("argument 'ridge' must be a non-negative finite scalar")
     if (iterate)
       stop("iterate=TRUE is not supported in npscoefhat")
 
