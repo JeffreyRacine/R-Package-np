@@ -55,10 +55,16 @@ npreghat <-
 
 .npreghat_solve_eval <- function(W, w.eval, k, ridge.base) {
   XtWX <- crossprod(W, W * k)
-  ridge <- max(0, as.double(ridge.base))
+  ridge.grid <- npRidgeSequenceFromBase(
+    n.train = nrow(W),
+    ridge.base = max(0.0, as.double(ridge.base)),
+    cap = 1.0
+  )
+  ridge <- ridge.grid[1L]
   solved <- FALSE
 
-  for (attempt in 0:8) {
+  for (ridge.try in ridge.grid) {
+    ridge <- ridge.try
     A <- XtWX
     if (ridge > 0)
       diag(A) <- diag(A) + ridge
@@ -72,8 +78,6 @@ npreghat <-
       solved <- TRUE
       break
     }
-
-    ridge <- if (ridge > 0) ridge * 10 else 1e-12
   }
 
   if (!solved)

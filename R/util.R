@@ -116,6 +116,24 @@ npRidgeSequenceAdditive <- function(n.train, cap = 1.0) {
   unique(as.double(seq.out))
 }
 
+npRidgeSequenceFromBase <- function(n.train, ridge.base = 0.0, cap = 1.0) {
+  if (!is.numeric(ridge.base) || length(ridge.base) != 1L || is.na(ridge.base) ||
+      !is.finite(ridge.base) || ridge.base < 0)
+    stop("'ridge.base' must be a non-negative finite numeric scalar")
+
+  base <- as.double(ridge.base)
+  step <- 1.0 / as.double(n.train)
+  cap <- as.double(cap)
+
+  if (base >= cap)
+    return(unique(c(base, cap)))
+
+  seq.out <- seq.int(from = base, to = cap, by = step)
+  if (tail(seq.out, 1L) < cap)
+    seq.out <- c(seq.out, cap)
+  unique(as.double(seq.out))
+}
+
 npValidateGlpDegree <- function(regtype, degree, ncon, argname = "degree") {
   degree.max <- 12L
 
