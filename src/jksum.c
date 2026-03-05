@@ -7948,7 +7948,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           }
         }
 #else
-        if(ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+        if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
           for(l = 0; l < num_reg_continuous; l++){
             TCON[l][0] = matrix_X_continuous[l][j];
             if(BANDWIDTH_reg == BW_GEN_NN)
