@@ -82,8 +82,10 @@
     if (missing(plot.errors.method) &
         any(!missing(plot.errors.boot.num), !missing(plot.errors.boot.method),
             !missing(plot.errors.boot.blocklen))){
-      warning(paste("plot.errors.method must be set to 'bootstrap' to use bootstrapping.",
-                    "\nProceeding without bootstrapping."))
+      stop(
+        "plot.errors.method must be set to 'bootstrap' when bootstrap error arguments are supplied",
+        call. = FALSE
+      )
     }
 
     normalized.opts <- .np_plot_normalize_common_options(
