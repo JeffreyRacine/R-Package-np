@@ -161,40 +161,98 @@ test_that("npplreg inid fast path matches explicit resample refits", {
   expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-7)
 })
 
-test_that("inid lc plot bootstrap fails fast for unsupported gradients", {
+test_that("npreg inid fast path supports continuous-slice gradients", {
+  skip_if_not_installed("np")
+
+  set.seed(3212)
+  n <- 45
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(2 * pi * x1) + 0.4 * x2 + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(15), , drop = FALSE]
+  B <- 9L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  bw <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "ll",
+    bws = c(0.3, 0.3),
+    bandwidth.compute = FALSE
+  )
+
+  fast.fun <- getFromNamespace(".np_inid_boot_from_regression", "np")
+  fast.out <- fast.fun(
+    xdat = tx,
+    exdat = ex,
+    bws = bw,
+    ydat = y,
+    B = B,
+    counts = counts,
+    gradients = TRUE,
+    gradient.order = 1L,
+    slice.index = 1L
+  )
+
+  explicit.t <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+  for (b in seq_len(B)) {
+    idx <- rep.int(seq_len(n), counts[, b])
+    explicit.t[b, ] <- npreg(
+      txdat = tx[idx, , drop = FALSE],
+      tydat = y[idx],
+      exdat = ex,
+      bws = bw,
+      gradients = TRUE,
+      gradient.order = 1L,
+      warn.glp.gradient = FALSE
+    )$grad[, 1L]
+  }
+
+  fit0 <- npreg(
+    txdat = tx,
+    tydat = y,
+    exdat = ex,
+    bws = bw,
+    gradients = TRUE,
+    gradient.order = 1L,
+    warn.glp.gradient = FALSE
+  )$grad[, 1L]
+
+  expect_equal(fast.out$t, explicit.t, tolerance = 1e-6)
+  expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-6)
+})
+
+test_that("rbandwidth plot bootstrap supports gradients across methods", {
   skip_if_not_installed("np")
 
   set.seed(322)
   n <- 60
   x <- runif(n)
   y <- sin(2 * pi * x) + rnorm(n, sd = 0.15)
-  bw <- npregbw(y ~ x, regtype = "lc", nmulti = 1)
+  bw <- npregbw(y ~ x, regtype = "ll", nmulti = 1)
 
-  run_plot <- function(gradients) {
+  run_plot <- function(method) {
     suppressWarnings(
       plot(
         bw,
         plot.behavior = "data",
         perspective = FALSE,
-        gradients = gradients,
+        gradients = TRUE,
         plot.errors.method = "bootstrap",
-        plot.errors.boot.method = "inid",
+        plot.errors.boot.method = method,
         plot.errors.boot.num = 9
       )
     )
   }
 
-  set.seed(9322)
-  out.fast <- run_plot(gradients = FALSE)
-
-  expect_type(out.fast, "list")
-  expect_true(length(out.fast) > 0)
-
-  expect_error(
-    run_plot(gradients = TRUE),
-    "inid bootstrap requires helper mode with gradients=FALSE and bws$type='fixed'",
-    fixed = TRUE
-  )
+  methods <- c("inid", "fixed", "geom", "wild")
+  for (m in methods) {
+    set.seed(9320 + match(m, methods))
+    out <- run_plot(method = m)
+    expect_type(out, "list")
+    expect_true(length(out) > 0)
+  }
 })
 
 test_that("plot bootstrap accepts wild selector", {

@@ -532,7 +532,10 @@
                                           B,
                                           counts = NULL,
                                           counts.drawer = NULL,
-                                          ridge = 1.0e-12) {
+                                          ridge = 1.0e-12,
+                                          gradients = FALSE,
+                                          gradient.order = 1L,
+                                          slice.index = 1L) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -548,6 +551,62 @@
 
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   ncon <- bws$ncon
+
+  if (isTRUE(gradients)) {
+    fit0 <- suppressWarnings(npreg(
+      txdat = xdat,
+      tydat = ydat,
+      exdat = exdat,
+      bws = bws,
+      gradients = TRUE,
+      gradient.order = gradient.order,
+      warn.glp.gradient = FALSE
+    ))
+    t0 <- fit0$grad[, slice.index]
+
+    chunk.size <- .np_inid_chunk_size(n = n, B = B)
+    prob <- rep.int(1 / n, n)
+    tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
+    progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
+    progress <- .np_plot_progress_begin(total = B, label = progress.label)
+    on.exit({
+      .np_plot_progress_end(progress)
+    }, add = TRUE)
+
+    counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
+
+    start <- 1L
+    while (start <= B) {
+      stopi <- min(B, start + chunk.size - 1L)
+      bsz <- stopi - start + 1L
+      counts.chunk <- if (!is.null(counts.mat)) {
+        counts.mat[, start:stopi, drop = FALSE]
+      } else if (!is.null(counts.drawer)) {
+        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
+      } else {
+        stats::rmultinom(n = bsz, size = n, prob = prob)
+      }
+
+      for (jj in seq_len(bsz)) {
+        idx <- rep.int(seq_len(n), as.integer(counts.chunk[, jj]))
+        fit.b <- suppressWarnings(npreg(
+          txdat = xdat[idx, , drop = FALSE],
+          tydat = ydat[idx],
+          exdat = exdat,
+          bws = bws,
+          gradients = TRUE,
+          gradient.order = gradient.order,
+          warn.glp.gradient = FALSE
+        ))
+        tmat[start + jj - 1L, ] <- fit.b$grad[, slice.index]
+      }
+
+      progress <- .np_plot_progress_tick(state = progress, done = stopi)
+      start <- stopi + 1L
+    }
+
+    return(list(t = tmat, t0 = as.vector(t0)))
+  }
 
   if (identical(regtype, "lc")) {
     H <- suppressWarnings(
@@ -1981,15 +2040,13 @@ compute.bootstrap.errors.rbandwidth =
       }
     }
 
-    inid.helper.ok <- !isTRUE(gradients) &&
-      identical(bws$type, "fixed")
-    block.helper.ok <- !isTRUE(gradients) &&
-      identical(bws$type, "fixed")
+    inid.helper.ok <- identical(bws$type, "fixed")
+    block.helper.ok <- identical(bws$type, "fixed")
 
     if (is.inid && !isTRUE(inid.helper.ok))
-      stop("inid bootstrap requires helper mode with gradients=FALSE and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", call. = FALSE)
+      stop("inid bootstrap requires helper mode with bws$type='fixed' in compute.bootstrap.errors.rbandwidth", call. = FALSE)
     if (is.block && !isTRUE(block.helper.ok))
-      stop(sprintf("%s bootstrap requires helper mode with gradients=FALSE and bws$type='fixed' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
+      stop(sprintf("%s bootstrap requires helper mode with bws$type='fixed' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
 
     if ((is.inid && isTRUE(inid.helper.ok)) || (is.block && isTRUE(block.helper.ok))) {
       counts.drawer <- if (is.block) {
@@ -2009,7 +2066,10 @@ compute.bootstrap.errors.rbandwidth =
           bws = bws,
           ydat = ydat,
           B = plot.errors.boot.num,
-          counts.drawer = counts.drawer
+          counts.drawer = counts.drawer,
+          gradients = gradients,
+          gradient.order = gradient.order,
+          slice.index = slice.index
         ),
         error = function(e) {
           stop(sprintf("%s regression helper failed in compute.bootstrap.errors.rbandwidth (%s)",
