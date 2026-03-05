@@ -2,7 +2,7 @@
 
 Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
 
-Last refresh: 2026-03-04 (release-hygiene follow-up)  
+Last refresh: 2026-03-05 (win-builder result ingestion + Windows link remediation)  
 Tarball: `np_0.70-1.tar.gz`  
 Check log: `/Users/jracine/Development/np.Rcheck/00check.log`  
 Run bundle: `/tmp/release_hygiene_followup_20260304_232456`
@@ -36,6 +36,27 @@ Run bundle: `/tmp/release_hygiene_followup_20260304_232456`
 - final win-builder check/result disposition remains pending maintainer email receipt (random result directory links are emailed by win-builder).
 4. Result ingestion command (when email links arrive):
 - `/Users/jracine/Development/winbuilder_ingest_results.sh`
+
+## Win-Builder Result Disposition (2026-03-05)
+1. Ingested result links:
+- oldrelease (R 4.4.3): `https://win-builder.r-project.org/wUqA3lnnJu1V`
+- release (R 4.5.2): `https://win-builder.r-project.org/3gsWddmTIwas`
+2. Ingestion bundle:
+- `/tmp/winbuilder_results_20260305_user_emails_055344`
+3. Observed check status for both targets:
+- `Status: 1 ERROR, 1 NOTE`
+4. Blocking `ERROR` root cause (from `00install.out`):
+- unresolved LAPACK symbols at link time from `linalg.o`:
+  - `dgetrf_`, `dgesv_`, `dgetri_`
+- install stops with `ERROR: compilation failed for package 'np'`.
+5. NOTE interpretation:
+- `CRAN incoming feasibility` (version jump) is expected;
+- URL reachability checks can emit transient/host-policy outcomes and are non-blocking for this compile failure.
+6. Remediation applied (pending win-builder re-run verification):
+- `/Users/jracine/Development/np-master/src/Makevars.win` now links:
+  - `PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)`
+7. Compiler warning interpretation:
+- warnings such as `-Wunused-but-set-variable` and `-Wmaybe-uninitialized` are diagnostics and did not cause this `ERROR` termination.
 
 ## Cleared In This Refresh
 1. `top-level files` warning from non-package artifacts (`archive`, `cran-comments.md`) cleared via `.Rbuildignore`.

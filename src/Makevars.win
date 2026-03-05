@@ -1,1 +1,5 @@
 # -*- Makefile -*-
+
+# linalg.c calls LAPACK/BLAS entry points (e.g., dgetrf_/dgesv_).
+# Link explicitly on Windows to avoid unresolved symbol failures.
+PKG_LIBS = $(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)
