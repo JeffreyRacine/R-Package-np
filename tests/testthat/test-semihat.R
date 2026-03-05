@@ -413,15 +413,13 @@ test_that("semihat validates class and scalar controls", {
     bws = 0.2,
     bandwidth.compute = FALSE
   )
-  expect_error(
-    npscoefhat(
-      bws = scbw,
-      txdat = data.frame(x = x),
-      tzdat = data.frame(z = z),
-      ridge = 0
-    ),
-    "positive finite scalar"
+  h0 <- npscoefhat(
+    bws = scbw,
+    txdat = data.frame(x = x),
+    tzdat = data.frame(z = z),
+    ridge = 0
   )
+  expect_true(is.matrix(h0))
 })
 
 test_that("plot bootstrap supports wild for sc/pl/si bandwidth objects", {

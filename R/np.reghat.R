@@ -70,7 +70,7 @@ npreghat <-
       diag(A) <- diag(A) + ridge
 
     v <- tryCatch(
-      qr.solve(t(A), w.eval, tol = .Machine$double.eps),
+      drop(solve(t(A), matrix(w.eval, ncol = 1L))),
       error = function(e) NULL
     )
 
@@ -278,7 +278,7 @@ npreghat.rbandwidth <-
            degree = NULL,
            deriv = NULL,
            leave.one.out = FALSE,
-           ridge = 1.0e-12,
+           ridge = 0.0,
            s = NULL,
            ...){
 

@@ -1121,52 +1121,26 @@
   A
 }
 
-.np_inid_lp_solver_backend <- function() {
-  backend <- getOption("np.plot.inid.lp.solver", "solve")
-  backend <- as.character(backend)[1L]
-  if (is.na(backend) || !(backend %in% c("auto", "chol", "solve", "qr")))
-    backend <- "auto"
-  backend
-}
-
-.np_inid_lp_solve_once <- function(A, z, backend) {
-  if (identical(backend, "chol")) {
-    R <- tryCatch(chol(A), error = function(e) NULL)
-    if (!is.null(R))
-      return(backsolve(R, forwardsolve(t(R), z)))
-    return(NULL)
-  }
-  if (identical(backend, "solve"))
-    return(tryCatch(solve(A, z), error = function(e) NULL))
-  if (identical(backend, "qr"))
-    return(tryCatch(qr.solve(A, z, tol = .Machine$double.eps), error = function(e) NULL))
-
-  R <- tryCatch(chol(A), error = function(e) NULL)
-  if (!is.null(R)) {
-    beta <- tryCatch(backsolve(R, forwardsolve(t(R), z)), error = function(e) NULL)
-    if (!is.null(beta) && all(is.finite(beta)))
-      return(beta)
-  }
-
-  beta <- tryCatch(solve(A, z), error = function(e) NULL)
-  if (!is.null(beta) && all(is.finite(beta)))
-    return(beta)
-
-  tryCatch(qr.solve(A, z, tol = .Machine$double.eps), error = function(e) NULL)
-}
-
 .np_inid_lp_predict_row <- function(A, z, rhs, ridge.grid) {
   ridge.grid <- as.double(ridge.grid)
   if (!length(ridge.grid) || anyNA(ridge.grid) || any(!is.finite(ridge.grid)) || any(ridge.grid < 0))
     stop("argument 'ridge.grid' must be a non-empty non-negative finite numeric vector")
-  backend <- .np_inid_lp_solver_backend()
+  z <- as.double(z)
+  if (!length(z))
+    return(NA_real_)
+  z1 <- z[1L]
 
   for (ridge in ridge.grid) {
     Ar <- A
+    zr <- z
     if (ridge > 0)
       diag(Ar) <- diag(Ar) + ridge
-
-    beta <- .np_inid_lp_solve_once(A = Ar, z = z, backend = backend)
+    if (ridge > 0)
+      zr[1L] <- z1 + ridge * z1 / NZD(Ar[1L, 1L])
+    beta <- tryCatch(
+      drop(solve(Ar, matrix(zr, ncol = 1L))),
+      error = function(e) NULL
+    )
     if (!is.null(beta) && all(is.finite(beta)))
       return(sum(rhs * beta))
   }
@@ -1279,7 +1253,7 @@
                                           B,
                                           counts = NULL,
                                           counts.drawer = NULL,
-                                          ridge = 1.0e-12) {
+                                          ridge = 0.0) {
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   ydat <- as.double(ydat)
@@ -1963,7 +1937,7 @@
   list(train = x.train.num, eval = x.eval.num)
 }
 
-.np_plreg_weighted_coef <- function(X, y, w, ridge = 1.0e-12) {
+.np_plreg_weighted_coef <- function(X, y, w, ridge = 0.0) {
   X <- as.matrix(X)
   y <- as.double(y)
   w <- as.double(w)
@@ -1971,19 +1945,10 @@
     stop("weighted plreg solve dimension mismatch")
 
   w <- pmax(w, 0.0)
-  sw <- sqrt(w)
-  Xw <- X * sw
-  yw <- y * sw
-
-  beta <- tryCatch(
-    qr.solve(Xw, yw, tol = .Machine$double.eps),
-    error = function(e) NULL
-  )
-  if (!is.null(beta) && all(is.finite(beta)))
-    return(as.double(beta))
 
   XtWX <- crossprod(X, X * w)
-  XtWy <- crossprod(X, y * w)
+  XtWy <- drop(crossprod(X, y * w))
+  XtWy0 <- XtWy[1L]
   ridge.grid <- npRidgeSequenceFromBase(
     n.train = nrow(X),
     ridge.base = max(0.0, as.double(ridge)),
@@ -1993,10 +1958,13 @@
   for (ridge.try in ridge.grid) {
     A <- XtWX
     ridge <- ridge.try
+    z <- XtWy
     if (ridge > 0)
       diag(A) <- diag(A) + ridge
+    if (ridge > 0)
+      z[1L] <- XtWy0 + ridge * XtWy0 / NZD(A[1L, 1L])
     beta <- tryCatch(
-      qr.solve(A, XtWy, tol = .Machine$double.eps),
+      drop(solve(A, matrix(z, ncol = 1L))),
       error = function(e) NULL
     )
     if (!is.null(beta) && all(is.finite(beta)))
@@ -2015,7 +1983,7 @@
                                      B,
                                      counts = NULL,
                                      counts.drawer = NULL,
-                                     ridge = 1.0e-12) {
+                                     ridge = 0.0) {
   txdat <- toFrame(txdat)
   tzdat <- toFrame(tzdat)
   exdat <- toFrame(exdat)
