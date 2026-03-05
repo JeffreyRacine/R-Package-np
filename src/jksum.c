@@ -7414,6 +7414,13 @@ static inline int np_reg_cv_use_symmetric_dropone_path(const int bwm,
   return (bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN);
 }
 
+/* Canonical selector for density CV tree bypass in all-large/adaptive regimes. */
+static inline int np_den_cv_use_tree_bypass_path(const int gate_x_all_large_fixed,
+                                                 const int int_TREE_XY,
+                                                 const int BANDWIDTH_den){
+  return gate_x_all_large_fixed || !int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN);
+}
+
 // Regression CV objective for local polynomial regression:
 // lc (degree 0), ll (degree 1), and lp (general degree vector).
 // The LL/LP branches solve weighted normal equations with ridge fallback if singular.
@@ -12057,7 +12064,7 @@ double *cv){
                                ky_jk,
                                &gate_y_ctx);
 
-        if(gate_x_all_large_fixed || !int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN)){
+        if(np_den_cv_use_tree_bypass_path(gate_x_all_large_fixed, int_TREE_XY, BANDWIDTH_den)){
           const int64_t ie_dwi = MIN(ie,dwi);
           if(BANDWIDTH_den != BW_ADAP_NN){
             for(i = is+wio; i < (wio+ie_dwi); i++){
