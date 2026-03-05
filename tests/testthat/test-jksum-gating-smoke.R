@@ -92,3 +92,43 @@ test_that("jksum regression CV smoke performance remains bounded", {
   # Guardrail: this should remain a small smoke test in CI-scale environments.
   expect_lt(r_ll$elapsed + r_lc$elapsed, 20)
 })
+
+test_that("large-h fast gateway stays active for lc/ll/lp under canonical DGPs", {
+  old_opts <- options(
+    np.messages = FALSE,
+    np.largeh.rel.tol = 0.05,
+    np.disc.upper.rel.tol = 0.05
+  )
+  on.exit(options(old_opts), add = TRUE)
+
+  set.seed(42)
+  n <- 200L
+  x <- runif(n)
+  y_lc <- rnorm(n, sd = 0.5 * sd(x))
+  y_ll <- x + rnorm(n, sd = 0.5 * sd(x))
+  dat_lc <- data.frame(y = y_lc, x = x)
+  dat_ll <- data.frame(y = y_ll, x = x)
+
+  set.seed(42)
+  bw_ll <- npregbw(y ~ x, data = dat_ll, regtype = "ll", bwmethod = "cv.ls", nmulti = 1)
+  set.seed(42)
+  bw_lc <- npregbw(y ~ x, data = dat_lc, regtype = "lc", bwmethod = "cv.ls", nmulti = 1)
+  set.seed(42)
+  bw_lp <- npregbw(
+    y ~ x,
+    data = dat_ll,
+    regtype = "lp",
+    degree = 1,
+    bwmethod = "cv.ls",
+    nmulti = 1
+  )
+
+  expect_true(is.finite(as.numeric(bw_ll$fval)))
+  expect_true(is.finite(as.numeric(bw_lc$fval)))
+  expect_true(is.finite(as.numeric(bw_lp$fval)))
+
+  expect_gt(as.integer(bw_ll$num.feval.fast), 0L)
+  expect_gt(as.integer(bw_lp$num.feval.fast), 0L)
+  expect_gt(as.integer(bw_lc$num.feval.fast), 0L)
+  expect_equal(as.numeric(bw_ll$fval), as.numeric(bw_lp$fval), tolerance = 1e-10)
+})
