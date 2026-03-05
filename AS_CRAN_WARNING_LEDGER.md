@@ -2,7 +2,7 @@
 
 Tracker State: ACTIVE (canonical: `/Users/jracine/Development/ACTIVE_ISSUES_CANONICAL_2026-02-28.md`)
 
-Last refresh: 2026-03-04 (release-hygiene follow-up)  
+Last refresh: 2026-03-05 (win-builder result ingestion + Windows link remediation)  
 Tarball: `npRmpi_0.70-1.tar.gz`  
 Check log: `/Users/jracine/Development/npRmpi.Rcheck/00check.log`  
 Run bundles:
@@ -47,6 +47,26 @@ Run bundles:
 - final win-builder check/result disposition remains pending maintainer email receipt (random result directory links are emailed by win-builder).
 4. Result ingestion command (when email links arrive):
 - `/Users/jracine/Development/winbuilder_ingest_results.sh`
+
+## Win-Builder Result Disposition (2026-03-05)
+1. Ingested result link:
+- oldrelease (R 4.4.3): `https://win-builder.r-project.org/whIxNg5rQr8Q`
+2. Ingestion bundle:
+- `/tmp/winbuilder_results_20260305_user_emails_055344`
+3. Observed check status:
+- `Status: 1 ERROR, 1 NOTE`
+4. Blocking `ERROR` root cause (from `00install.out`):
+- unresolved LAPACK symbols at link time from `linalg.o`:
+  - `dgetrf_`, `dgesv_`, `dgetri_`
+- install stops with `ERROR: compilation failed for package 'npRmpi'`.
+5. NOTE interpretation:
+- `CRAN incoming feasibility` (version jump) is expected;
+- URL checks to `mpich.org`/`sshrc-crsh.gc.ca` can return host-policy/transient responses and are not this compile blocker.
+6. Remediation applied (pending win-builder re-run verification):
+- `/Users/jracine/Development/np-npRmpi/src/Makevars.win` now appends:
+  - `$(LAPACK_LIBS) $(BLAS_LIBS) $(FLIBS)` to both WIN64 and WIN32 link lines.
+7. Compiler warning interpretation:
+- warnings such as `-Wmaybe-uninitialized` are diagnostics and did not cause this `ERROR` termination.
 
 ## Decoupling Notes
 1. `Rmpi` is intentionally removed from `Suggests` in `DESCRIPTION`.
