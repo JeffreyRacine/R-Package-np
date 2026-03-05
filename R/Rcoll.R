@@ -222,6 +222,20 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
     as.character(scmd)[1L]
 }
 
+.npRmpi_bcast_cmd_is_plot_call <- function(scmd) {
+    if (!is.call(scmd) || length(scmd) < 1L)
+        return(FALSE)
+    hd <- scmd[[1L]]
+    if (is.symbol(hd))
+        return(identical(as.character(hd), "plot"))
+    if (is.call(hd) && length(hd) >= 3L && is.symbol(hd[[1L]]) &&
+        as.character(hd[[1L]]) %in% c("::", ":::")) {
+        tgt <- hd[[3L]]
+        return(is.symbol(tgt) && identical(as.character(tgt), "plot"))
+    }
+    FALSE
+}
+
 #bin.nchar <- function(x){
 #    if (!is.character(x))
 #        stop("Must be a (binary) character")
@@ -231,11 +245,13 @@ mpi.bcast <- function (x, type, rank = 0, comm = 1, buffunit=100) {
 mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=0.1, caller.execute = FALSE){
 	myrank=mpi.comm.rank(comm)
     if(myrank == rank){
+      scmd <- substitute(cmd)
+      if (isTRUE(.npRmpi_bcast_cmd_is_plot_call(scmd))) {
+          stop("plot(...) inside mpi.bcast.cmd(...) is unsupported in canonical SPMD mode; call plot(...) directly from master with npRmpi.autodispatch=TRUE", call. = FALSE)
+      }
       if(caller.execute) tcmd <- substitute(cmd)
         #cmd <- deparse(substitute(cmd), width.cutoff=500)
 		#cmd <- serialize(cmd, NULL)
-
-		scmd <- substitute(cmd)
 		arg <-list(...)
 		commsize <- mpi.comm.size(comm=comm)
 
