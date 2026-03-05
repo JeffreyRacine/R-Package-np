@@ -207,21 +207,6 @@
   invisible(TRUE)
 }
 
-.np_plot_boot_dispatch <- function(boofun, data, method, B, blocklen = NULL) {
-  method <- match.arg(as.character(method)[1L], c("inid", "fixed", "geom"))
-  B <- as.integer(B)
-  if (method == "inid") {
-    return(boot(data = data, statistic = boofun, R = B))
-  }
-  tsboot(
-    tseries = data,
-    statistic = boofun,
-    R = B,
-    l = blocklen,
-    sim = method
-  )
-}
-
 .np_plot_boot_factor_boxplots <- function(boot.t, tdati, ti, B) {
   all.bp <- list()
   ti <- as.integer(ti)[1L]
