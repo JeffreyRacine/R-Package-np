@@ -36,3 +36,28 @@ test_that("plot runtime files avoid forbidden *bw( calls", {
 
   expect_equal(length(offenders), 0, info = paste(offenders, collapse = "\n"))
 })
+
+test_that("plot runtime files avoid silent remap/downgrade patterns", {
+  root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
+  files <- c(
+    file.path(root, "R", "np.plot.helpers.R"),
+    Sys.glob(file.path(root, "R", "np.plot.engine*.R"))
+  )
+  files <- unique(files[file.exists(files)])
+  skip_if(length(files) == 0L, "source R files unavailable in installed test context")
+
+  offenders <- character()
+  pat.assign <- "plot\\.errors\\.method\\s*=\\s*\"none\""
+  pat.warn <- "Proceeding without"
+
+  for (f in files) {
+    raw <- readLines(f, warn = FALSE)
+    code <- sub("#.*$", "", raw)
+    idx <- which(grepl(pat.assign, code, perl = TRUE) | grepl(pat.warn, raw, fixed = TRUE))
+    if (length(idx)) {
+      offenders <- c(offenders, sprintf("%s:%d: %s", basename(f), idx, trimws(raw[idx])))
+    }
+  }
+
+  expect_equal(length(offenders), 0, info = paste(offenders, collapse = "\n"))
+})
