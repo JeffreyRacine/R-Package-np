@@ -58,10 +58,16 @@ npreghat <-
   p <- nrow(XtWX)
   diag.loc <- cbind(seq_len(p), seq_len(p))
   XtWX.diag <- XtWX[diag.loc]
-  ridge <- max(0, as.double(ridge.base))
+  ridge.grid <- npRidgeSequenceFromBase(
+    n.train = nrow(W),
+    ridge.base = max(0.0, as.double(ridge.base)),
+    cap = 1.0
+  )
   solved <- FALSE
+  ridge <- ridge.grid[1L]
 
-  for (attempt in 0:8) {
+  for (ridge.try in ridge.grid) {
+    ridge <- ridge.try
     A <- XtWX
     if (ridge > 0)
       A[diag.loc] <- XtWX.diag + ridge
@@ -75,8 +81,6 @@ npreghat <-
       solved <- TRUE
       break
     }
-
-    ridge <- if (ridge > 0) ridge * 10 else 1e-12
   }
 
   if (!solved)

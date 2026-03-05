@@ -434,11 +434,13 @@
   tryCatch(qr.solve(A, z, tol = .Machine$double.eps), error = function(e) NULL)
 }
 
-.np_inid_lp_predict_row <- function(A, z, rhs, ridge.base = 1.0e-12) {
-  ridge <- max(0, as.double(ridge.base))
+.np_inid_lp_predict_row <- function(A, z, rhs, ridge.grid) {
+  ridge.grid <- as.double(ridge.grid)
+  if (!length(ridge.grid) || anyNA(ridge.grid) || any(!is.finite(ridge.grid)) || any(ridge.grid < 0))
+    stop("argument 'ridge.grid' must be a non-empty non-negative finite numeric vector")
   backend <- .np_inid_lp_solver_backend()
 
-  for (attempt in 0:8) {
+  for (ridge in ridge.grid) {
     Ar <- A
     if (ridge > 0)
       diag(Ar) <- diag(Ar) + ridge
@@ -446,14 +448,12 @@
     beta <- .np_inid_lp_solve_once(A = Ar, z = z, backend = backend)
     if (!is.null(beta) && all(is.finite(beta)))
       return(sum(rhs * beta))
-
-    ridge <- if (ridge > 0) ridge * 10 else 1.0e-12
   }
 
   NA_real_
 }
 
-.np_inid_lp_predict_chunk_general <- function(Mvals, Zvals, rhs, ridge.base = 1.0e-12) {
+.np_inid_lp_predict_chunk_general <- function(Mvals, Zvals, rhs, ridge.grid) {
   Mvals <- as.matrix(Mvals)
   Zvals <- as.matrix(Zvals)
   rhs <- as.double(rhs)
@@ -468,14 +468,14 @@
       A = A,
       z = as.double(Zvals[ii, ]),
       rhs = rhs,
-      ridge.base = ridge.base
+      ridge.grid = ridge.grid
     )
   }
 
   out
 }
 
-.np_inid_lp_predict_chunk <- function(Mvals, Zvals, rhs, ridge.base = 1.0e-12) {
+.np_inid_lp_predict_chunk <- function(Mvals, Zvals, rhs, ridge.grid) {
   Mvals <- as.matrix(Mvals)
   Zvals <- as.matrix(Zvals)
   rhs <- as.double(rhs)
@@ -543,7 +543,7 @@
         A = A,
         z = as.double(Zvals[ii, ]),
         rhs = rhs,
-        ridge.base = ridge.base
+        ridge.grid = ridge.grid
       )
     }
   }
@@ -570,6 +570,7 @@
     stop("length of ydat must match training rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
 
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
   ncon <- bws$ncon
@@ -686,14 +687,14 @@
         Mvals = M0,
         Zvals = Z0,
         rhs = rhs[i, ],
-        ridge.base = ridge
+        ridge.grid = ridge.grid
       )[1L]
     } else {
       .np_inid_lp_predict_chunk(
         Mvals = M0,
         Zvals = Z0,
         rhs = rhs[i, ],
-        ridge.base = ridge
+        ridge.grid = ridge.grid
       )[1L]
     }
   }
@@ -714,14 +715,14 @@
           Mvals = Mvals,
           Zvals = Zvals,
           rhs = rhs[i, ],
-          ridge.base = ridge
+          ridge.grid = ridge.grid
         )
       } else {
         .np_inid_lp_predict_chunk(
           Mvals = Mvals,
           Zvals = Zvals,
           rhs = rhs[i, ],
-          ridge.base = ridge
+          ridge.grid = ridge.grid
         )
       }
     }
@@ -764,18 +765,17 @@
   as.double(ydat)
 }
 
-.np_inid_scoef_predict_row <- function(mrow, zrow, rhs, epsilon) {
+.np_inid_scoef_predict_row <- function(mrow, zrow, rhs, ridge.grid) {
   A <- .np_inid_lp_unpack_sym_row(mrow = mrow, p = length(rhs))
   tyw <- as.double(zrow)
   nc <- ncol(A)
+  ridge.grid <- as.double(ridge.grid)
+  if (!length(ridge.grid) || anyNA(ridge.grid) || any(!is.finite(ridge.grid)) || any(ridge.grid < 0))
+    stop("argument 'ridge.grid' must be a non-empty non-negative finite numeric vector")
 
   maxPenalty <- sqrt(.Machine$double.xmax)
   coef.ii <- rep(maxPenalty, nc)
-  ridge <- 0.0
-  doridge <- TRUE
-
-  while (doridge) {
-    doridge <- FALSE
+  for (ridge in ridge.grid) {
     ridge.val <- ridge * tyw[1L] / NZD(A[1L, 1L])
     coef.try <- tryCatch(
       solve(
@@ -784,12 +784,8 @@
       ),
       error = function(e) e
     )
-    if (inherits(coef.try, "error") || any(!is.finite(coef.try))) {
-      ridge <- ridge + epsilon
-      doridge <- TRUE
-      coef.try <- rep(maxPenalty, nc)
-    }
-    coef.ii <- as.double(coef.try)
+    if (!(inherits(coef.try, "error") || any(!is.finite(coef.try))))
+      return(sum(as.double(rhs) * as.double(coef.try)))
   }
 
   sum(as.double(rhs) * coef.ii)
@@ -926,7 +922,7 @@
   p <- ncol(W.train)
   mcols <- p * (p + 1L) / 2L
   ones <- matrix(1.0, nrow = n, ncol = 1L)
-  epsilon <- 1.0 / neval
+  ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
 
   Mfeat <- vector("list", neval)
   Zfeat <- vector("list", neval)
@@ -957,7 +953,7 @@
         mrow = M0[1L, ],
         zrow = Z0[1L, ],
         rhs = W.eval[i, ],
-        epsilon = epsilon
+        ridge.grid = ridge.grid
       )
     }
     t0[i] <- t0i
@@ -987,7 +983,7 @@
             mrow = Mvals[bb, ],
             zrow = Zvals[bb, ],
             rhs = W.eval[i, ],
-            epsilon = epsilon
+            ridge.grid = ridge.grid
           )
         }
       }
@@ -1072,10 +1068,15 @@
 
   XtWX <- crossprod(X, X * w)
   XtWy <- crossprod(X, y * w)
-  ridge <- max(0.0, as.double(ridge))
+  ridge.grid <- npRidgeSequenceFromBase(
+    n.train = nrow(X),
+    ridge.base = max(0.0, as.double(ridge)),
+    cap = 1.0
+  )
 
-  for (attempt in 0:8) {
+  for (ridge.try in ridge.grid) {
     A <- XtWX
+    ridge <- ridge.try
     if (ridge > 0)
       diag(A) <- diag(A) + ridge
     beta <- tryCatch(
@@ -1084,7 +1085,6 @@
     )
     if (!is.null(beta) && all(is.finite(beta)))
       return(as.double(beta))
-    ridge <- if (ridge > 0) ridge * 10 else 1.0e-12
   }
 
   stop("plreg weighted solve failed")
