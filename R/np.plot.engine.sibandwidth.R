@@ -103,22 +103,8 @@
 
     neval = maxneval = length(ydat)
     
-    tobj <- if (gradients || plot.behavior != "plot") {
-      npindex(txdat = xdat, tydat = ydat, bws = bws, gradients = gradients)
-    } else {
-      xadj <- adjustLevels(toFrame(xdat), bws$xdati)
-      list(
-        index = as.vector(toMatrix(xadj) %*% bws$beta),
-        mean = as.vector(npindexhat(
-          bws = bws,
-          txdat = xdat,
-          exdat = xdat,
-          y = ydat,
-          output = "apply",
-          s = 0L
-        ))
-      )
-    }
+    tobj = npindex(txdat = xdat, tydat = ydat,
+      bws = bws, gradients = gradients)
     
     temp.err = matrix(data = NA, nrow = maxneval, ncol = 3)
     temp.mean = replicate(maxneval, NA)

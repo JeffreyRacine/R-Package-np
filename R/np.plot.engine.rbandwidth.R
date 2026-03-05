@@ -136,18 +136,6 @@
     plot.errors.bar <- normalized.opts$plot.errors.bar
     common.scale <- normalized.opts$common.scale
     plot.errors <- normalized.opts$plot.errors
-    rbw_hat_apply <- function(eval.df, s.vec = NULL) {
-      hat.args <- list(
-        bws = bws,
-        txdat = xdat,
-        exdat = eval.df,
-        y = ydat,
-        output = "apply"
-      )
-      if (!is.null(s.vec))
-        hat.args$s <- as.integer(s.vec)
-      as.vector(do.call(npreghat.rbandwidth, hat.args))
-    }
     plot.gradient.order.label <- rep.int(1L, bws$ndim)
     if (gradients && identical(bws$regtype, "lp")) {
       go <- npValidateGlpGradientOrder(regtype = bws$regtype,
@@ -192,21 +180,10 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      if (plot.errors.method == "asymptotic") {
-        tobj = npreg(txdat = xdat, tydat = ydat,
-          exdat = x.eval, bws = bws,
-          gradient.order = gradient.order,
-          warn.glp.gradient = FALSE)
-      } else {
-        mean.hat <- rbw_hat_apply(
-          eval.df = x.eval,
-          s.vec = if (bws$ncon > 0L) integer(bws$ncon) else NULL
-        )
-        tobj <- list(
-          mean = mean.hat,
-          merr = rep_len(NA_real_, length(mean.hat))
-        )
-      }
+      tobj = npreg(txdat = xdat, tydat = ydat,
+        exdat = x.eval, bws = bws,
+        gradient.order = gradient.order,
+        warn.glp.gradient = FALSE)
 
       terr = matrix(data = tobj$merr, nrow = dim(x.eval)[1], ncol = 3)
       terr[,3] = NA
@@ -483,29 +460,18 @@
           ei[(xi.neval+1):maxneval] = NA
         }
         
-        eval.slice <- subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
-        if (!gradients && plot.errors.method != "asymptotic") {
-          tr <- list(
-            mean = rbw_hat_apply(
-              eval.df = eval.slice,
-              s.vec = if (bws$ncon > 0L) integer(bws$ncon) else NULL
-            ),
-            merr = rep_len(NA_real_, xi.neval)
-          )
+        tr <- if (gradients && identical(bws$regtype, "lp")) {
+          suppressWarnings(npreg(txdat = xdat, tydat = ydat,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE], bws = bws,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            warn.glp.gradient = FALSE))
         } else {
-          tr <- if (gradients && identical(bws$regtype, "lp")) {
-            suppressWarnings(npreg(txdat = xdat, tydat = ydat,
-              exdat = eval.slice, bws = bws,
-              gradients = gradients,
-              gradient.order = gradient.order,
-              warn.glp.gradient = FALSE))
-          } else {
-            npreg(txdat = xdat, tydat = ydat,
-              exdat = eval.slice, bws = bws,
-              gradients = gradients,
-              gradient.order = gradient.order,
-              warn.glp.gradient = FALSE)
-          }
+          npreg(txdat = xdat, tydat = ydat,
+            exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE], bws = bws,
+            gradients = gradients,
+            gradient.order = gradient.order,
+            warn.glp.gradient = FALSE)
         }
 
         temp.mean[seq_len(xi.neval)] = if(gradients) tr$grad[,i] else tr$mean
