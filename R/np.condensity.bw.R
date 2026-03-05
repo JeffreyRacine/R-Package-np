@@ -237,7 +237,6 @@ npcdensbw.conbandwidth <-
         xnuno = dim(xuno)[2],
         xnord = dim(xord)[2],
         xncon = dim(xcon)[2],
-        fast = FALSE,
         old.cdens = FALSE,
         int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
         scale.init.categorical.sample = scale.init.categorical.sample,
