@@ -39,9 +39,8 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
   - `.C("np_set_tgauss2", ..., PACKAGE="npRmpi")`
   resolving R CMD check foreign-call NOTEs about cross-package targets.
 
-* Deprecated `bwmethod="cv.ls.np"`: calls are now aliased to `cv.ls` with a
-  one-time per-session warning to preserve backward compatibility while
-  removing a stale legacy selector path.
+* Removed stale legacy conditional-density bwmethod aliasing so only
+  canonical least-squares selector semantics remain.
 
 * Synchronized `plot()` bootstrap error-band enhancements/fixes from
   np master:
