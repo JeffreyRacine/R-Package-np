@@ -37,6 +37,15 @@ condbandwidth <-
            bandwidth.compute = TRUE,
            timing = NA,
            total.time = NA,
+           regtype = "lc",
+           pregtype = "Local-Constant",
+           basis = "glp",
+           degree = integer(0),
+           bernstein.basis = FALSE,
+           regtype.engine = "lc",
+           basis.engine = "glp",
+           degree.engine = integer(0),
+           bernstein.basis.engine = FALSE,
            ...){
 
   if (missing(xbw) || missing(ybw))
@@ -221,7 +230,16 @@ condbandwidth <-
     rows.omit = rows.omit,
     nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
     timing = timing,
-    total.time = total.time)
+    total.time = total.time,
+    regtype = regtype,
+    pregtype = pregtype,
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    regtype.engine = regtype.engine,
+    basis.engine = basis.engine,
+    degree.engine = degree.engine,
+    bernstein.basis.engine = bernstein.basis.engine)
 
   mybw$klist = list(
     x =
