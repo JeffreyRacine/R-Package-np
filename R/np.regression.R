@@ -171,6 +171,12 @@ npreg.rbandwidth <-
     glp.gradient.order <- npValidateGlpGradientOrder(regtype = bws$regtype,
                                                      gradient.order = gradient.order,
                                                      ncon = bws$ncon)
+    if (isTRUE(gradients) &&
+        identical(bws$regtype, "lp") &&
+        (bws$ncon > 0L) &&
+        all(bws$degree == 0L)) {
+      stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
+    }
 
     reg.c <- npRegtypeToC(regtype = bws$regtype,
                           degree = bws$degree,

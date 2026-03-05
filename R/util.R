@@ -300,7 +300,6 @@ npCheckRegressionDesignCondition <- function(reg.code,
 npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
   # Internal regression-type codes:
   # lc -> REGTYPE_LC, ll -> REGTYPE_LL, lp -> REGTYPE_LP.
-  # lp with all degree 0/1 collapses to lc/ll for specialized fast paths.
   if (identical(regtype, "lc"))
     return(list(code = REGTYPE_LC, degree = NULL))
 
@@ -308,12 +307,6 @@ npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
     return(list(code = REGTYPE_LL, degree = NULL))
 
   degree <- npValidateGlpDegree(regtype, degree, ncon)
-
-  if ((ncon == 0L) || all(degree == 0L))
-    return(list(code = REGTYPE_LC, degree = degree))
-
-  if (all(degree == 1L))
-    return(list(code = REGTYPE_LL, degree = degree))
 
   list(code = REGTYPE_LP, degree = degree)
 }

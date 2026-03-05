@@ -21,3 +21,34 @@ test_that("npreg.rbandwidth validates gradient flags as logical scalars", {
   expect_match(fn.body, "gradients <- npValidateScalarLogical\\(gradients, \"gradients\"\\)")
   expect_match(fn.body, "residuals <- npValidateScalarLogical\\(residuals, \"residuals\"\\)")
 })
+
+test_that("lp regtype remains lp internally for degree 0/1", {
+  npRegtypeToC <- getFromNamespace("npRegtypeToC", "np")
+  REGTYPE_LP <- getFromNamespace("REGTYPE_LP", "np")
+
+  expect_identical(npRegtypeToC(regtype = "lp", degree = 0L, ncon = 1L)$code, REGTYPE_LP)
+  expect_identical(npRegtypeToC(regtype = "lp", degree = 1L, ncon = 1L)$code, REGTYPE_LP)
+})
+
+test_that("lp degree-0 gradients fail fast while value path remains available", {
+  set.seed(20260305)
+  dat <- data.frame(y = rnorm(30), x = runif(30))
+  bw <- np::npregbw(
+    y ~ x,
+    data = dat,
+    bws = 0.45,
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 0
+  )
+
+  expect_identical(bw$regtype, "lp")
+  expect_error(
+    np::npreg(bws = bw, data = dat, gradients = TRUE),
+    "regtype='lp' with degree=0 does not support derivatives"
+  )
+  expect_no_error(
+    fit <- np::npreg(bws = bw, data = dat, gradients = FALSE)
+  )
+  expect_identical(fit$bws$regtype, "lp")
+})
