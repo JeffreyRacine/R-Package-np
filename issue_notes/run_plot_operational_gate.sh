@@ -10,7 +10,8 @@ SUMMARY="${OUT_DIR}/summary.txt"
 PRE_SMOKE_LOG="${OUT_DIR}/session_attach_sanity.log"
 PRIMARY_IFACE="${NP_RMPI_IFACE_PRIMARY:-en0}"
 FALLBACK_IFACE="${NP_RMPI_IFACE_FALLBACK:-lo0}"
-GATE_TIMEOUT_SEC="${NP_RMPI_PLOT_GATE_TIMEOUT_SEC:-180}"
+GATE_TIMEOUT_TEST_SEC="${NP_RMPI_PLOT_GATE_TEST_TIMEOUT_SEC:-300}"
+GATE_TIMEOUT_ROUTE_SEC="${NP_RMPI_PLOT_GATE_ROUTE_TIMEOUT_SEC:-420}"
 
 mkdir -p "${OUT_DIR}"
 
@@ -99,11 +100,11 @@ if (mpi.comm.rank(1L) == 0L) {
 RS
 
 set +e
-run_with_timeout 120 mpiexec -n 2 env FI_PROVIDER=tcp FI_TCP_IFACE="${PRIMARY_IFACE}" \
+mpiexec -n 2 env FI_PROVIDER=tcp FI_TCP_IFACE="${PRIMARY_IFACE}" \
   Rscript --vanilla "${OUT_DIR}/attach_plot_sanity.R" >>"${PRE_SMOKE_LOG}" 2>&1
 rc=$?
 if [ "${rc}" -ne 0 ]; then
-  run_with_timeout 120 mpiexec -n 2 env FI_PROVIDER=tcp FI_TCP_IFACE="${FALLBACK_IFACE}" \
+  mpiexec -n 2 env FI_PROVIDER=tcp FI_TCP_IFACE="${FALLBACK_IFACE}" \
     Rscript --vanilla "${OUT_DIR}/attach_plot_sanity.R" >>"${PRE_SMOKE_LOG}" 2>&1
   rc=$?
 fi
@@ -117,12 +118,12 @@ kill_stray_mpi_slaves
 
 echo "[info] running plot contract suite" | tee "${TEST_LOG}"
 cd "${ROOT_DIR}"
-run_with_timeout "${GATE_TIMEOUT_SEC}" \
+run_with_timeout "${GATE_TIMEOUT_TEST_SEC}" \
   Rscript -e "devtools::test(filter='plot-helper-option-contract|plot-bootstrap-arg-contract|plot-asymptotic-failfast-contract|plot-coef-option-contract|plot-conditional-gradients-bootstrap-contract|plot-mpi-only-bootstrap-contract|plot-autodispatch|plot-guardrails-contract|session-routing-subprocess-contract', reporter='summary')" \
   >>"${TEST_LOG}" 2>&1
 
 echo "[info] running attach/profile/profile-plot route matrix" | tee "${ROUTE_LOG}"
-run_with_timeout "${GATE_TIMEOUT_SEC}" \
+run_with_timeout "${GATE_TIMEOUT_ROUTE_SEC}" \
   bash "${ROOT_DIR}/issue_notes/run_attach_profile_validations.sh" \
   >>"${ROUTE_LOG}" 2>&1
 

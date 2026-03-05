@@ -97,22 +97,15 @@
   }
 
   if (identical(regtype, "lc")) {
-    kw.args <- list(
-      txdat = tzdat,
+    ez.arg <- if (leave.one.out) NULL else ezdat
+    return(.np_kernel_weights_direct(
       bws = bws,
+      txdat = tzdat,
+      exdat = ez.arg,
       leave.one.out = leave.one.out,
       bandwidth.divide = TRUE,
-      return.kernel.weights = TRUE
-    )
-    if (!leave.one.out)
-      kw.args$exdat <- ezdat
-    kw.obj <- do.call(npksum, kw.args)
-    kw <- kw.obj$kw
-    if (!is.matrix(kw))
-      kw <- matrix(kw, nrow = nrow(tzdat))
-    if (leave.one.out && nrow(kw) == ncol(kw))
-      diag(kw) <- 0.0
-    return(kw)
+      kernel.pow = 1.0
+    ))
   }
 
   rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
@@ -135,24 +128,14 @@
 
   z.train <- adjustLevels(tzdat, rbw$xdati)
   z.eval <- if (leave.one.out) z.train else adjustLevels(ezdat, rbw$xdati, allowNewCells = TRUE)
-  ## In npRmpi runtime, use the route-safe npksum.default path to avoid
-  ## nested/unsafe direct kernel dispatch in active session pools.
-  kw.args <- list(
-    txdat = z.train,
+  kw <- .np_kernel_weights_direct(
     bws = rbw,
-    return.kernel.weights = TRUE,
+    txdat = z.train,
+    exdat = if (leave.one.out) NULL else z.eval,
+    leave.one.out = leave.one.out,
     bandwidth.divide = TRUE,
-    leave.one.out = leave.one.out
+    kernel.pow = 1.0
   )
-  if (!leave.one.out)
-    kw.args$exdat <- z.eval
-
-  kw.obj <- do.call(npksum.default, kw.args)
-  kw <- kw.obj$kw
-  if (!is.matrix(kw))
-    kw <- matrix(kw, nrow = nrow(z.train))
-  if (leave.one.out && nrow(kw) == ncol(kw))
-    diag(kw) <- 0.0
 
   ntrain <- nrow(z.train)
   neval <- ncol(kw)

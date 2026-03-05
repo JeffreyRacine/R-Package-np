@@ -186,6 +186,14 @@
       plot.errors <- FALSE
     }
 
+    if (identical(plot.errors.method, "bootstrap") &&
+        identical(plot.errors.boot.method, "wild")) {
+      stop(
+        "plot.errors.boot.method='wild' is unsupported for smooth coefficient bootstrap in npRmpi canonical SPMD mode; use 'inid', 'fixed', or 'geom'",
+        call. = FALSE
+      )
+    }
+
     if ((sum(c(bws$xdati$icon, bws$xdati$iord, bws$zdati$icon, bws$zdati$iord))== 2) && (sum(c(bws$xdati$iuno, bws$zdati$iuno)) == 0) && perspective && !gradients &&
         !any(xor(c(bws$xdati$iord, bws$zdati$iord), c(bws$xdati$inumord, bws$zdati$inumord)))){
 
@@ -233,7 +241,14 @@
       if (is.ordered(tdat))
         x2.eval <- (tdati$all.dlev[[ti]])[as.integer(x2.eval)]
 
-      scoef.args <- list(txdat = xdat, tydat = ydat, bws = bws, iterate = FALSE, errors = plot.errors, betas = coef)
+      scoef.args <- list(
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        iterate = FALSE,
+        errors = (plot.errors && identical(plot.errors.method, "asymptotic")),
+        betas = coef
+      )
       if (!miss.z)
         scoef.args$tzdat <- zdat
       if (miss.z) {
@@ -465,7 +480,7 @@
             tydat = ydat,
             exdat = ex.slice,
             bws = bws,
-            errors = plot.errors,
+            errors = (plot.errors && identical(plot.errors.method, "asymptotic")),
             betas = coef
           )
           if (!miss.z) {

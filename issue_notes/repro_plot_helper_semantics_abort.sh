@@ -151,6 +151,8 @@ for case in r si sc; do
   set -e
   if [ "${ec}" -eq 0 ]; then
     status="OK"
+  elif rg -q "unsupported for smooth coefficient bootstrap in npRmpi canonical SPMD mode" "${OUT_DIR}/${case}.log"; then
+    status="FAIL_FAST"
   elif [ "${ec}" -eq 124 ] || [ "${ec}" -eq 137 ]; then
     status="TIMEOUT"
   elif [ "${ec}" -eq 134 ] || [ "${ec}" -eq 139 ] || [ "${ec}" -eq 6 ] || [ "${ec}" -eq 10 ] || [ "${ec}" -eq 11 ]; then

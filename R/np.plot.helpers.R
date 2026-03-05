@@ -3659,60 +3659,7 @@ compute.bootstrap.errors.scbandwidth =
     }
 
     if (is.null(boot.out) && is.wild.hat) {
-      if (length(plot.errors.boot.wild) > 1L)
-        plot.errors.boot.wild <- plot.errors.boot.wild[1L]
-      plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
-
-      if (miss.z) {
-        fit.train <- npscoef.scbandwidth(
-          txdat = xdat,
-          tydat = ydat,
-          bws = bws,
-          iterate = FALSE
-        )
-        H <- npscoefhat(
-          bws = bws,
-          txdat = xdat,
-          exdat = exdat,
-          output = "matrix",
-          iterate = FALSE
-        )
-      } else {
-        fit.train <- npscoef.scbandwidth(
-          txdat = xdat,
-          tydat = ydat,
-          tzdat = zdat,
-          bws = bws,
-          iterate = FALSE
-        )
-        H <- npscoefhat(
-          bws = bws,
-          txdat = xdat,
-          tzdat = zdat,
-          exdat = exdat,
-          ezdat = ezdat,
-          output = "matrix",
-          iterate = FALSE
-        )
-      }
-
-      t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - as.vector(fit.train$mean))
-      n <- length(eps)
-      B <- plot.errors.boot.num
-
-      boot.out <- .npRmpi_with_local_bootstrap({
-        list(
-          t = .np_wild_boot_t(
-            H = H,
-            fit.mean = as.vector(fit.train$mean),
-            residuals = eps,
-            B = B,
-            wild = plot.errors.boot.wild
-          ),
-          t0 = t0
-        )
-      })
+      stop("plot.errors.boot.method='wild' is unsupported for smooth coefficient bootstrap in npRmpi canonical SPMD mode; use 'inid', 'fixed', or 'geom'", call. = FALSE)
     }
 
     if (is.null(boot.out))
