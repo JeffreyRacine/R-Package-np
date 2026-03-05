@@ -1,3 +1,54 @@
+Changes from Version 0.70-0 to 0.70-1 [05-Mar-2026]
+
+* Completed canonical plot-remediation hardening for core S3 families with
+  explicit fail-fast behavior:
+  - no silent bootstrap-method remaps
+  - no hidden fallback branches for unsupported plot/bootstrap configurations
+  - explicit errors for unsupported argument/mode combinations.
+
+* Added broad plot contract coverage for regression/index/smooth-coefficient/
+  density/distribution families:
+  - bootstrap argument contract gates
+  - asymptotic-only contract gates
+  - helper option-forwarding and semantics parity contracts
+  - regression guards for `plot.errors.method` remap regressions.
+
+* Leaned core plot bootstrap/mean paths by standardizing helper usage where
+  canonical (`npreghat`, `npscoefhat`, and canonical ksum helper routes),
+  with explicit fail-fast handling instead of legacy fallback toggles.
+
+* Removed superseded legacy/debug toggles and stale compatibility branches in
+  plotting and CV routing paths, including:
+  - residual fastpath-disable scaffolding in plot helpers,
+  - stale `np.groupcv.fast` option footprint,
+  - obsolete conditional-density fast-switch slot.
+
+* Enforced canonical LP behavior and removed silent behavior coercions:
+  - removed transform-bounds auto-remap in regression bandwidth routing,
+  - removed legacy CV aliasing and unsupported cv-iterate remaps,
+  - removed Bernstein OOS alternate fallback routing while preserving
+    canonical LP path behavior.
+
+* Restored and hardened CV path-lock behavior:
+  - centralized CVLS route predicates in one helper path,
+  - added path-lock tests preventing inline predicate drift/regressions,
+  - hardened large-h gate coverage with route-safety contracts.
+
+* Standardized ridge ladders in helper-side optimization/solve paths to
+  additive `1/n.train` sequences for touched helper families.
+
+* Fixed helper/core ridge-base mismatch in ill-posed helper parity:
+  - `npreghat`/`semihat` now default to zero-ridge-first solve semantics
+    (matching core behavior that attempts un-ridged solve first),
+  - retained `ridge=1e-12` defaults for inid/plreg bootstrap helper internals
+    where explicit parity/stability checks favored nonzero base ridge.
+
+* Added/updated reproducible issue-note harnesses for plot-helper parity and
+  closeout validation, with artifact-oriented reporting.
+
+* Added Windows toolchain hardening for LAPACK/BLAS linkage and documented
+  win-builder release-check ingestion workflow updates.
+
 Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
 
 * Completed migration from monolithic plotting entry points to modular S3
