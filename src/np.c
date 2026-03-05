@@ -133,7 +133,6 @@ static double (*bwmfunc_raw)(double *) = NULL;
 static double bwm_eval_count = 0.0;
 static double bwm_invalid_count = 0.0;
 static double bwm_fast_eval_count = 0.0;
-static double bwm_fallback_eval_count = 0.0;
 
 static void resolve_bounds_or_default(SEXP lb_r, SEXP ub_r, int ncon, double ** lb_p, double ** ub_p)
 {
@@ -408,15 +407,12 @@ static void bwm_reset_counters(void)
   bwm_eval_count = 0.0;
   bwm_invalid_count = 0.0;
   bwm_fast_eval_count = 0.0;
-  bwm_fallback_eval_count = 0.0;
   np_fastcv_alllarge_hits_reset();
-  np_fastcv_alllarge_fallbacks_reset();
 }
 
 static inline void bwm_snapshot_fast_counters(void)
 {
   bwm_fast_eval_count = np_fastcv_alllarge_hits_get();
-  bwm_fallback_eval_count = np_fastcv_alllarge_fallbacks_get();
 }
 
 static double bwm_sigmoid(double x)
@@ -754,7 +750,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                       double * objective_function_values, double * objective_function_evals,
                       double * objective_function_invalid, double * timing,
                       double * objective_function_fast,
-                      double * objective_function_fallback,
                       int * penalty_mode, double * penalty_mult,
                       int * glp_degree,
                       int * glp_bernstein,
@@ -816,7 +811,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * objective_function_values, double * objective_function_evals,
                                double * objective_function_invalid, double * timing,
                                double * objective_function_fast,
-                               double * objective_function_fallback,
                                int * penalty_mode, double * penalty_mult,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub);
@@ -827,7 +821,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     double * objective_function_values, double * objective_function_evals,
                                     double * objective_function_invalid, double * timing,
                                     double * objective_function_fast,
-                                    double * objective_function_fallback,
                                     int * penalty_mode, double * penalty_mult,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub);
@@ -874,7 +867,7 @@ SEXP C_np_regression_bw(SEXP runo,
   SEXP out = R_NilValue, out_names = R_NilValue;
   SEXP out_bw = R_NilValue, out_fval = R_NilValue, out_fval_hist = R_NilValue;
   SEXP out_eval_hist = R_NilValue, out_invalid_hist = R_NilValue, out_timing = R_NilValue;
-  SEXP out_fast = R_NilValue, out_fallback = R_NilValue;
+  SEXP out_fast = R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -919,17 +912,16 @@ SEXP C_np_regression_bw(SEXP runo,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
-  PROTECT(out_fallback = allocVector(REALSXP, 1));
 
   memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
 
   np_regression_bw(REAL(runo_r), REAL(rord_r), REAL(rcon_r), REAL(y_r),
                    REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                    REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                   REAL(out_fast), REAL(out_fallback),
+                   REAL(out_fast),
                    &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p);
 
-  PROTECT(out = allocVector(VECSXP, 8));
+  PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -937,9 +929,8 @@ SEXP C_np_regression_bw(SEXP runo,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
-  SET_VECTOR_ELT(out, 7, out_fallback);
 
-  PROTECT(out_names = allocVector(STRSXP, 8));
+  PROTECT(out_names = allocVector(STRSXP, 7));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -947,10 +938,9 @@ SEXP C_np_regression_bw(SEXP runo,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
-  SET_STRING_ELT(out_names, 7, mkChar("fallback.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(21);
+  UNPROTECT(20);
   return out;
 }
 
@@ -1444,7 +1434,7 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   SEXP cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_fallback=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -1484,17 +1474,16 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
-  PROTECT(out_fallback = allocVector(REALSXP, 1));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_density_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
                             REAL(u_uno_r), REAL(u_ord_r), REAL(u_con_r), REAL(mysd_r),
                             INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                             REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                            REAL(out_fast), REAL(out_fallback), &pmode, &pmult,
+                            REAL(out_fast), &pmode, &pmult,
                             cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
 
-  PROTECT(out = allocVector(VECSXP, 8));
+  PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -1502,9 +1491,8 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
-  SET_VECTOR_ELT(out, 7, out_fallback);
 
-  PROTECT(out_names = allocVector(STRSXP, 8));
+  PROTECT(out_names = allocVector(STRSXP, 7));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -1512,10 +1500,9 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
-  SET_STRING_ELT(out_names, 7, mkChar("fallback.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(24);
+  UNPROTECT(23);
   return out;
 }
 
@@ -1545,7 +1532,7 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
-  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue, out_fallback=R_NilValue;
+  SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
@@ -1588,7 +1575,6 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   PROTECT(out_invalid_hist = allocVector(REALSXP, hlen));
   PROTECT(out_timing = allocVector(REALSXP, 1));
   PROTECT(out_fast = allocVector(REALSXP, 1));
-  PROTECT(out_fallback = allocVector(REALSXP, 1));
 
   memcpy(REAL(out_bw), REAL(bw_r), (size_t)XLENGTH(bw_r) * sizeof(double));
   np_distribution_conditional_bw(REAL(c_uno_r), REAL(c_ord_r), REAL(c_con_r),
@@ -1596,10 +1582,10 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                  REAL(cg_uno_r), REAL(cg_ord_r), REAL(cg_con_r), REAL(mysd_r),
                                  INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                                  REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                                 REAL(out_fast), REAL(out_fallback), &pmode, &pmult,
+                                 REAL(out_fast), &pmode, &pmult,
                                  cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
 
-  PROTECT(out = allocVector(VECSXP, 8));
+  PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
   SET_VECTOR_ELT(out, 1, out_fval);
   SET_VECTOR_ELT(out, 2, out_fval_hist);
@@ -1607,9 +1593,8 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   SET_VECTOR_ELT(out, 4, out_invalid_hist);
   SET_VECTOR_ELT(out, 5, out_timing);
   SET_VECTOR_ELT(out, 6, out_fast);
-  SET_VECTOR_ELT(out, 7, out_fallback);
 
-  PROTECT(out_names = allocVector(STRSXP, 8));
+  PROTECT(out_names = allocVector(STRSXP, 7));
   SET_STRING_ELT(out_names, 0, mkChar("bw"));
   SET_STRING_ELT(out_names, 1, mkChar("fval"));
   SET_STRING_ELT(out_names, 2, mkChar("fval.history"));
@@ -1617,10 +1602,9 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   SET_STRING_ELT(out_names, 4, mkChar("invalid.history"));
   SET_STRING_ELT(out_names, 5, mkChar("timing"));
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
-  SET_STRING_ELT(out_names, 7, mkChar("fallback.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(27);
+  UNPROTECT(26);
   return out;
 }
 
@@ -3027,7 +3011,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * objective_function_values, double * objective_function_evals,
                                double * objective_function_invalid, double * timing,
                                double * objective_function_fast,
-                               double * objective_function_fallback,
                                int * penalty_mode, double * penalty_mult,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub){
@@ -3051,7 +3034,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int dfc_dir;
   
   int i,j;
-  double fast_eval_total = 0.0, fallback_eval_total = 0.0;
+  double fast_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int itmax, iter;
@@ -3705,7 +3688,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   objective_function_invalid[0]=bwm_invalid_count;
   bwm_snapshot_fast_counters();
   fast_eval_total += bwm_fast_eval_count;
-  fallback_eval_total += bwm_fallback_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -3833,7 +3815,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
-      fallback_eval_total += bwm_fallback_eval_count;
     }
 
     /* Save best for estimation */
@@ -3860,7 +3841,6 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   fval[0] = -fret;
   fval[1] = iImproved;
   objective_function_fast[0] = fast_eval_total;
-  objective_function_fallback[0] = fallback_eval_total;
   /* end return data */
 
   /* Free data objects */
@@ -3959,7 +3939,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     double * objective_function_values, double * objective_function_evals,
                                     double * objective_function_invalid, double * timing,
                                     double * objective_function_fast,
-                                    double * objective_function_fallback,
                                     int * penalty_mode, double * penalty_mult,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub){
@@ -3983,7 +3962,7 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int dfc_dir;
   
   int i,j;
-  double fast_eval_total = 0.0, fallback_eval_total = 0.0;
+  double fast_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int itmax, iter;
@@ -4623,7 +4602,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   objective_function_invalid[0]=bwm_invalid_count;
   bwm_snapshot_fast_counters();
   fast_eval_total += bwm_fast_eval_count;
-  fallback_eval_total += bwm_fallback_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -4750,7 +4728,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
-      fallback_eval_total += bwm_fallback_eval_count;
     }
 
     /* Save best for estimation */
@@ -4777,7 +4754,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   fval[0] = fret;
   fval[1] = iImproved;
   objective_function_fast[0] = fast_eval_total;
-  objective_function_fallback[0] = fallback_eval_total;
   /* end return data */
 
   /* Free data objects */
@@ -5656,7 +5632,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
                       double * objective_function_values, double * objective_function_evals,
                       double * objective_function_invalid, double * timing,
                       double * objective_function_fast,
-                      double * objective_function_fallback,
                       int * penalty_mode, double * penalty_mult,
                       int * glp_degree,
                       int * glp_bernstein,
@@ -5684,7 +5659,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   int dfc_dir;
 
   int i,j;
-  double fast_eval_total = 0.0, fallback_eval_total = 0.0;
+  double fast_eval_total = 0.0;
   int num_var;
   int iMultistart, iMs_counter, iNum_Multistart, iImproved;
   int itmax, iter;
@@ -6063,7 +6038,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   objective_function_invalid[0]=bwm_invalid_count;
   bwm_snapshot_fast_counters();
   fast_eval_total += bwm_fast_eval_count;
-  fallback_eval_total += bwm_fallback_eval_count;
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
@@ -6192,7 +6166,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
       objective_function_invalid[iMs_counter]=bwm_invalid_count;
       bwm_snapshot_fast_counters();
       fast_eval_total += bwm_fast_eval_count;
-      fallback_eval_total += bwm_fallback_eval_count;
 
     }
 
@@ -6222,7 +6195,6 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   fval[0] = fret;
   fval[1] = iImproved;
   objective_function_fast[0] = fast_eval_total;
-  objective_function_fallback[0] = fallback_eval_total;
   /* end return data */
 
   /* Free data objects */

@@ -1009,14 +1009,6 @@ double np_fastcv_alllarge_hits_get(void){
   return (double)np_fastcv_alllarge_hits;
 }
 
-void np_fastcv_alllarge_fallbacks_reset(void){
-  return;
-}
-
-double np_fastcv_alllarge_fallbacks_get(void){
-  return 0.0;
-}
-
 static inline void np_disc_profile_cache_clear(void){
   if(np_disc_profile_cache.xtu_rows != NULL) free((void *)np_disc_profile_cache.xtu_rows);
   if(np_disc_profile_cache.xto_rows != NULL) free((void *)np_disc_profile_cache.xto_rows);
