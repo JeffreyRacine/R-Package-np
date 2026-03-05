@@ -7407,6 +7407,13 @@ static int np_reg_cv_all_large_gate(const int BANDWIDTH_reg,
   return 1;
 }
 
+/* Canonical selector for CVLS route between full symmetric drop-one and reduced branch. */
+static inline int np_reg_cv_use_symmetric_dropone_path(const int bwm,
+                                                       const int ks_tree_use,
+                                                       const int BANDWIDTH_reg){
+  return (bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN);
+}
+
 // Regression CV objective for local polynomial regression:
 // lc (degree 0), ll (degree 1), and lp (general degree vector).
 // The LL/LP branches solve weighted normal equations with ridge fallback if singular.
@@ -7782,7 +7789,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
         }
 
 #ifdef MPI2
-        if((bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+        if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
           if((j % iNum_Processors) == 0){
             if((j+my_rank) < (num_obs)){
               for(l = 0; l < num_reg_continuous; l++){
@@ -8575,7 +8582,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
 
 #ifdef MPI2
-      if((bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+      if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
         if((j % iNum_Processors) == 0){
           if((j+my_rank) < (num_obs)){
             for(l = 0; l < num_reg_continuous; l++){
@@ -8768,7 +8775,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       }
 
 #else
-      if((bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)){
+      if(np_reg_cv_use_symmetric_dropone_path(bwm, ks_tree_use, BANDWIDTH_reg)){
 
         for(l = 0; l < num_reg_continuous; l++){
           

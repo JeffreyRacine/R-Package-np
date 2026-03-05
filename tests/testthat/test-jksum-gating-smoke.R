@@ -136,8 +136,8 @@ test_that("large-h fast gateway is active again for lc/ll/lp under canonical DGP
     x <- runif(n)
     y_lc <- rnorm(n, sd = 0.5 * sd(x))
     y_ll <- x + rnorm(n, sd = 0.5 * sd(x))
-    dat_lc <- data.frame(y = y_lc, x = x, z1 = factor(0L), z2 = ordered(0L))
-    dat_ll <- data.frame(y = y_ll, x = x, z1 = factor(0L), z2 = ordered(0L))
+    dat_lc <- data.frame(y = y_lc, x = x)
+    dat_ll <- data.frame(y = y_ll, x = x)
 
     set.seed(42)
     bw_ll <- npregbw(y ~ x, data = dat_ll, regtype = "ll", bwmethod = "cv.ls", nmulti = 1)
@@ -148,7 +148,7 @@ test_that("large-h fast gateway is active again for lc/ll/lp under canonical DGP
       y ~ x,
       data = dat_ll,
       regtype = "lp",
-      ckerorder = 4,
+      degree = 1,
       bwmethod = "cv.ls",
       nmulti = 1
     )
