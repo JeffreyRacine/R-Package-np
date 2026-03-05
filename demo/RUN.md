@@ -28,9 +28,10 @@ This directory is the canonical demo harness for `npRmpi` timing/behavior checks
 - `../inst/Rprofile`: canonical profile startup (also available as `system.file("Rprofile", package="npRmpi")`)
 
 The `makefile` is the source of truth for launch semantics:
-- `attach`: timeout + `FI_*` env + `en0` then `lo0` retry
-- `profile`: timeout + explicit `R_PROFILE_USER` + cleared `R_PROFILE` + `FI_*` env + `en0` then `lo0` retry
+- `attach`: timeout + cleared profile envs (`R_PROFILE_USER`, `R_PROFILE`) + optional `FI_*` env overrides
+- `profile`: timeout + explicit `R_PROFILE_USER` + cleared `R_PROFILE` + optional `FI_*` env overrides + `NP_RMPI_PROFILE_RECV_TIMEOUT_SEC`
 - all mode loops (`serial`, `attach`, `profile`) are fail-fast per demo; any failed demo exits non-zero immediately (no masked failures).
+- attach demo scripts execute estimator bodies on master rank only (`mpi.comm.rank(0L) == 0L`) and finalize with `npRmpi.quit(mode="attach", ...)`.
 
 Profile startup contract (required):
 - provide exactly one profile source per profile run:
@@ -134,6 +135,15 @@ make -f ../makefile MODE=profile NP=2 NP_DEMO_N=100 RPROFILE="$RPROFILE"
 ```
 
 If you also copy a local profile file, point `RPROFILE` to that explicit absolute path.
+
+Optional MPI/libfabric network overrides (only when needed on your host):
+
+```bash
+FI_PROVIDER=tcp FI_TCP_IFACE=en0 FI_SOCKETS_IFACE=en0 \
+make -f ../makefile MODE=attach NP=2 NP_DEMO_N=100
+```
+
+By default, the launcher does not force `FI_*`; it uses host MPI defaults.
 
 ## Troubleshooting
 

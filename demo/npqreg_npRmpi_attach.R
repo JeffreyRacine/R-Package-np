@@ -12,6 +12,8 @@ library(npRmpi)
 ## Initialize master and slaves.
 npRmpi.init(mode="attach", comm=1, autodispatch=TRUE)
 
+if (mpi.comm.rank(0L) == 0L) {
+
 ## Turn off progress i/o as this clutters the output file (if you want
 ## to see search progress you can comment out this command)
 data("Italy")
@@ -34,7 +36,7 @@ cat("Elapsed time =", t[3], "\n")
 ## Clean up properly then quit()
 
 npRmpi.quit(mode="attach", comm=1)
-mpi.quit()
+}
 ## Batch/cluster attach-mode shutdown (for mpiexec workflows):
 ##   npRmpi.quit(mode="attach", comm=1)
 ## (no force=TRUE required for attach mode)
