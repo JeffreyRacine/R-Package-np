@@ -82,3 +82,25 @@ test_that("npRmpi plot runtime files avoid silent remap/downgrade patterns", {
 
   expect_equal(length(offenders), 0, info = paste(offenders, collapse = "\n"))
 })
+
+test_that("npRmpi runtime and demos avoid nested mpi.bcast.cmd(plot(...)) calls", {
+  root <- normalizePath(testthat::test_path("..", ".."), mustWork = TRUE)
+  files <- c(
+    Sys.glob(file.path(root, "R", "*.R")),
+    Sys.glob(file.path(root, "demo", "*.R"))
+  )
+  files <- unique(files[file.exists(files)])
+  skip_if(length(files) == 0L, "source R/demo files unavailable in installed test context")
+
+  pat <- "mpi\\.bcast\\.cmd\\s*\\(\\s*(?:[A-Za-z0-9._]+::)?plot\\s*\\("
+  offenders <- character()
+
+  for (f in files) {
+    raw <- readLines(f, warn = FALSE)
+    code <- paste(sub("#.*$", "", raw), collapse = "\n")
+    if (grepl(pat, code, perl = TRUE))
+      offenders <- c(offenders, basename(f))
+  }
+
+  expect_equal(length(offenders), 0, info = paste(offenders, collapse = ", "))
+})
