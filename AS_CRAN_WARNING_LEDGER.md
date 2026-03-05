@@ -30,7 +30,10 @@ Run bundle: `/tmp/release_hygiene_followup_20260304_232456`
 - `/tmp/winbuilder_submit_20260304_233529/np_win_oldrelease_dir_noemail.log`
 3. Submission status:
 - submission command exit codes are `0` for both targets;
-- win-builder result disposition is pending maintainer email receipt.
+- upload acceptance evidence observed via FTP queue visibility/disappearance in timed poll:
+  - `/tmp/winbuilder_poll_20260304_234306/summary.txt`
+  - tarballs present through poll 8 then absent from poll 9 onward in `R-oldrelease`.
+- final win-builder check/result disposition remains pending maintainer email receipt (random result directory links are emailed by win-builder).
 
 ## Cleared In This Refresh
 1. `top-level files` warning from non-package artifacts (`archive`, `cran-comments.md`) cleared via `.Rbuildignore`.
