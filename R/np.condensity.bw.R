@@ -311,7 +311,6 @@ npcdensbw.conbandwidth <-
       tbw$ifval = myout$fval[2]
       tbw$num.feval <- sum(myout$eval.history[is.finite(myout$eval.history)])
       tbw$num.feval.fast <- myout$fast.history[1]
-      tbw$num.feval.fallback <- myout$fallback.history[1]
       tbw$fval.history <- myout$fval.history
       tbw$eval.history <- myout$eval.history
       tbw$invalid.history <- myout$invalid.history
@@ -386,7 +385,6 @@ npcdensbw.conbandwidth <-
                         ifval = tbw$ifval,
                         num.feval = tbw$num.feval,
                         num.feval.fast = tbw$num.feval.fast,
-                        num.feval.fallback = tbw$num.feval.fallback,
                         fval.history = tbw$fval.history,
                         eval.history = tbw$eval.history,
                         invalid.history = tbw$invalid.history,

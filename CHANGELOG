@@ -106,7 +106,7 @@ Changes from Version 0.60-20 to 0.70-0 [20-Feb-2026]
 
 * Expanded all-large (`h`/`lambda`) fast-path accounting/reporting across
   conditional estimators:
-  - exposed `num.feval.fast` and `num.feval.fallback` alongside `num.feval`
+  - exposed `num.feval.fast` alongside `num.feval`
     in relevant summaries
   - synchronized all-large fast branches for conditional density/distribution
     CV pathways

@@ -77,12 +77,10 @@ Speedups are reported as `baseline / current` (so `>1` is faster) with percent c
 - Added cumulative bandwidth summary counters to mirror serial package behavior:
   - `num.feval`
   - `num.feval.fast`
-  - `num.feval.fallback`
-- Summary now prints: `Number of Function Evaluations: N (fast = X, fallback = Y)`.
+- Summary now prints: `Number of Function Evaluations: N (fast = X)`.
 
 ### Notes
 - Fast-path usage is conditional and may be sparse in nonlinear/small-bandwidth regimes.
-- Fallback count tracks all-large attempts that reverted to generic evaluation.
 - `npRmpi` behavior should be interpreted with MPI lifecycle/broadcast requirements intact.
 
 ### Release/Validation

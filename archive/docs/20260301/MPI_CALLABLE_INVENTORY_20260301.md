@@ -198,7 +198,7 @@ Implication:
 
 ### 8.6 Session/Option Side Effects to Track
 Package load/startup mutates options:
-- `np.messages`, `np.tree`, `np.largeh.rel.tol`, `np.disc.upper.rel.tol`, `np.groupcv.fast`
+- `np.messages`, `np.tree`, `np.largeh.rel.tol`, `np.disc.upper.rel.tol`
 - `npRmpi.reuse.slaves` defaulting logic
 
 Source:
@@ -301,7 +301,7 @@ This section maps key production chains from user entry to native/MPI layers.
 - `plot` can loop across slices and call `np*` repeatedly; helper must avoid rebroadcasting each nested step.
 
 5. Option synchronization must be explicit and whitelisted:
-- `np.messages`, `np.tree`, `np.largeh.rel.tol`, `np.disc.upper.rel.tol`, `np.groupcv.fast` affect kernel/CV branches and must be synchronized before estimator entry.
+- `np.messages`, `np.tree`, `np.largeh.rel.tol`, `np.disc.upper.rel.tol` affect kernel/CV branches and must be synchronized before estimator entry.
 
 6. Temporary symbol namespace policy is still missing:
 - Existing `.tmp*` globals in MPI utility code increase collision risk; helper temp objects should use a dedicated prefix and cleanup lifecycle.

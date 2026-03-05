@@ -14,7 +14,7 @@ Repo-specific note:
   - tail/spread checks (`p90`/`p95`, `sd`/`IQR`/`MAD`) must also be non-regressing versus MEI/tolerance;
   - all gated methods/modes must agree in direction, otherwise anomaly rationalization versus MEI is mandatory;
   - default MPI performance gates to `nslaves=1`; for scaling/performance claims include at least one `nslaves>1` run; `nslaves=0` is unsupported.
-- Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`, `num.feval.fallback`.
+- Keep shared regression summary telemetry in sync with `np-master`: `num.feval`, `num.feval.fast`.
 - Keep `man/np.kernels.Rd` and kernel/options/plot cross-links aligned, while preserving package-specific `npRmpi` docs text.
 - Runtime contract: `npRmpi` must never call serial `np` estimator/plot/bootstrap/helper code paths and must not silently fall back to serial execution when MPI mode is selected.
 - Demo execution contract (`np-npRmpi/demo`):
