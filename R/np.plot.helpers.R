@@ -222,11 +222,11 @@
 }
 
 .np_plot_inid_fastpath_enabled <- function() {
-  !isTRUE(getOption("np.plot.inid.fastpath.disable", FALSE))
+  TRUE
 }
 
 .np_plot_block_fastpath_enabled <- function() {
-  !isTRUE(getOption("np.plot.block.fastpath.disable", FALSE))
+  TRUE
 }
 
 .np_plot_require_bws <- function(bws, where) {
@@ -1588,7 +1588,7 @@
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("inid regression fast path produced non-finite values")
+    stop("inid regression helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
 }
@@ -1965,7 +1965,7 @@
 
   p <- ncol(txdat)
   if (p < 1L)
-    stop("plreg inid fast path requires at least one linear regressor")
+    stop("plreg inid helper path requires at least one linear regressor")
   if (ncol(exdat) != p)
     stop("training/evaluation linear regressor dimensions do not match")
 
@@ -2047,11 +2047,11 @@
   neval <- nrow(exdat)
   p <- ncol(txdat)
   if (nrow(tzdat) != n)
-    stop("plreg inid fast path requires aligned txdat/tzdat rows")
+    stop("plreg inid helper path requires aligned txdat/tzdat rows")
   if (nrow(ezdat) != neval)
-    stop("plreg inid fast path requires aligned exdat/ezdat rows")
+    stop("plreg inid helper path requires aligned exdat/ezdat rows")
   if (n < 1L || neval < 1L || p < 1L || B < 1L)
-    stop("invalid plreg inid fast path dimensions")
+    stop("invalid plreg inid helper path dimensions")
 
   y.num <- if (is.factor(ydat)) {
     ty <- adjustLevels(data.frame(ydat), bws$bw$yzbw$ydati)
@@ -2151,12 +2151,12 @@
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("plreg inid fast path produced non-finite values")
+    stop("plreg inid helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
 }
 
-.np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum fast path") {
+.np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum helper path") {
   if (is.null(dim(ksum))) {
     if (B == 1L && length(ksum) == nout)
       return(matrix(as.double(ksum), nrow = 1L))
@@ -2174,7 +2174,7 @@
   stop(sprintf("%s returned unexpected matrix shape", where))
 }
 
-.np_ksum_kernel_weights_matrix <- function(kernel.weights, ntrain, neval, where = "ksum fast path") {
+.np_ksum_kernel_weights_matrix <- function(kernel.weights, ntrain, neval, where = "ksum helper path") {
   if (is.null(kernel.weights))
     stop(sprintf("%s did not return kernel weights", where))
 
@@ -2189,7 +2189,7 @@
   stop(sprintf("%s returned kernel weights with unexpected shape", where))
 }
 
-.np_ksum_extract_kernel_weights <- function(npksum.out, where = "ksum fast path") {
+.np_ksum_extract_kernel_weights <- function(npksum.out, where = "ksum helper path") {
   if (is.null(npksum.out) || !is.list(npksum.out))
     stop(sprintf("%s did not return a valid npksum object", where))
 
@@ -2516,7 +2516,7 @@
   neval <- nrow(exdat)
 
   if (nrow(ydat) != n || nrow(eydat) != neval)
-    stop("conditional inid fast path requires aligned x/y training and evaluation rows")
+    stop("conditional inid helper path requires aligned x/y training and evaluation rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid conditional inid bootstrap dimensions")
   if (!.np_con_inid_ksum_eligible(bws))
@@ -3515,7 +3515,7 @@ compute.bootstrap.errors.rbandwidth =
     }
 
     if (is.null(boot.out))
-      stop("no MPI fast path available for this regression bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("no MPI helper path available for this regression bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -3726,7 +3726,7 @@ compute.bootstrap.errors.scbandwidth =
     }
 
     if (is.null(boot.out))
-      stop("no MPI fast path available for this smooth coefficient bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("no MPI helper path available for this smooth coefficient bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -3915,7 +3915,7 @@ compute.bootstrap.errors.plbandwidth =
       }
 
       if (is.null(boot.out))
-        stop("no MPI fast path available for this partially linear bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+        stop("no MPI helper path available for this partially linear bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     }
 
     all.bp <- list()
@@ -4052,7 +4052,7 @@ compute.bootstrap.errors.bandwidth =
             counts.drawer = counts.drawer
           ),
           error = function(e) {
-            stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.bandwidth (%s)",
+            stop(sprintf("%s ksum helper path failed in compute.bootstrap.errors.bandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
@@ -4062,7 +4062,7 @@ compute.bootstrap.errors.bandwidth =
     }
 
     if (is.null(boot.out))
-      stop("no MPI fast path available for this unconditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("no MPI helper path available for this unconditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -4183,7 +4183,7 @@ compute.bootstrap.errors.dbandwidth =
             counts.drawer = counts.drawer
           ),
           error = function(e) {
-            stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.dbandwidth (%s)",
+            stop(sprintf("%s ksum helper path failed in compute.bootstrap.errors.dbandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
@@ -4193,7 +4193,7 @@ compute.bootstrap.errors.dbandwidth =
     }
 
     if (is.null(boot.out))
-      stop("no MPI fast path available for this unconditional distribution bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("no MPI helper path available for this unconditional distribution bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -4349,7 +4349,7 @@ compute.bootstrap.errors.conbandwidth =
     }
 
     if (is.null(boot.out))
-      stop("no MPI fast path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("no MPI helper path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -4512,7 +4512,7 @@ compute.bootstrap.errors.condbandwidth =
     }
 
     if (is.null(boot.out))
-      stop("no MPI fast path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("no MPI helper path available for this conditional bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     all.bp <- list()
 
@@ -4707,7 +4707,7 @@ compute.bootstrap.errors.sibandwidth =
     }
 
     if (is.null(boot.out))
-      stop("no MPI fast path available for this single-index bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("no MPI helper path available for this single-index bootstrap configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     
     if (plot.errors.type == "pmzsd") {
       boot.err[,1:2] = qnorm(plot.errors.alpha/2, lower.tail = FALSE)*sqrt(diag(cov(boot.out$t)))
