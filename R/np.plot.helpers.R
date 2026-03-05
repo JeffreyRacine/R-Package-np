@@ -4309,25 +4309,10 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
 
+    if (is.inid && !isTRUE(fast.inid))
+      stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     if (is.block && !isTRUE(fast.block))
       stop("fixed/geom conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
-
-    fit.cond <- function(tx, ty) {
-      switch(
-        tboo,
-        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-      )
-    }
-    out.cond <- function(fit) {
-      switch(
-        tboo,
-        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-      )
-    }
 
     boot.out <- NULL
     if (fast.inid || fast.block) {
@@ -4354,25 +4339,11 @@ compute.bootstrap.errors.conbandwidth =
             counts.drawer = counts.drawer
           ),
           error = function(e) {
-            stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.conbandwidth (%s)",
+            stop(sprintf("%s ksum helper failed in compute.bootstrap.errors.conbandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
           }
-        )
-      })
-    }
-
-    if (is.null(boot.out) && is.inid) {
-      boot.out <- .npRmpi_with_local_bootstrap({
-        boofun <- function(data, indices) out.cond(fit.cond(
-          tx = xdat[indices, , drop = FALSE],
-          ty = ydat[indices, , drop = FALSE]
-        ))
-        boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num
         )
       })
     }
@@ -4501,23 +4472,10 @@ compute.bootstrap.errors.condbandwidth =
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
-
-    fit.cond <- function(tx, ty) {
-      switch(
-        tboo,
-        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-      )
-    }
-    out.cond <- function(fit) {
-      switch(
-        tboo,
-        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-      )
-    }
+    if (is.inid && !isTRUE(fast.inid))
+      stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
+    if (is.block && !isTRUE(fast.block))
+      stop("fixed/geom conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     boot.out <- NULL
     if (fast.inid || fast.block) {
@@ -4544,25 +4502,11 @@ compute.bootstrap.errors.condbandwidth =
             counts.drawer = counts.drawer
           ),
           error = function(e) {
-            stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.condbandwidth (%s)",
+            stop(sprintf("%s ksum helper failed in compute.bootstrap.errors.condbandwidth (%s)",
                          if (fast.block) plot.errors.boot.method else "inid",
                          conditionMessage(e)),
                  call. = FALSE)
           }
-        )
-      })
-    }
-
-    if (is.null(boot.out) && is.inid) {
-      boot.out <- .npRmpi_with_local_bootstrap({
-        boofun <- function(data, indices) out.cond(fit.cond(
-          tx = xdat[indices, , drop = FALSE],
-          ty = ydat[indices, , drop = FALSE]
-        ))
-        boot(
-          data = data.frame(xdat, ydat),
-          statistic = boofun,
-          R = plot.errors.boot.num
         )
       })
     }
