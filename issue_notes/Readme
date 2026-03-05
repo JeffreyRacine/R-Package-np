@@ -91,3 +91,19 @@ What it runs:
 - plot-focused contract suite (helper/bootstrap/guardrails/session subprocess),
 - attach/profile/profile-plot route matrix via `run_attach_profile_validations.sh`,
 - orphan slave-process scan and summarized pass/fail report.
+
+Plot-helper semantics abort repro sweep
+
+Use this to isolate process-level abort/segfault behavior seen while mirroring
+plot-helper semantics contracts in `npRmpi`:
+
+./issue_notes/repro_plot_helper_semantics_abort.sh
+
+Optional explicit output directory:
+
+./issue_notes/repro_plot_helper_semantics_abort.sh /tmp/nprmpi_plot_helper_semantics_abort_manual
+
+Optional tuning:
+
+- `NP_RMPI_SEMANTICS_REPEATS` (default `3`)
+- `NP_RMPI_SEMANTICS_TIMEOUT_SEC` (default `180`)
