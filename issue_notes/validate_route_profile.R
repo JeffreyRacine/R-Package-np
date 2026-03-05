@@ -18,9 +18,13 @@ y <- cos(2 * pi * x) + z1 + rnorm(n, sd = .25)
 z1 <- factor(z1)
 z2 <- factor(z2)
 mydat <- data.frame(y, x, zc, z1, z2)
+d.cop <- data.frame(x = mydat$x, y = mydat$y)
+u.cop <- data.frame(x = c(0.25, 0.5, 0.75), y = c(0.25, 0.5, 0.75))
 rm(x, y, zc, z1, z2)
 
 mpi.bcast.Robj2slave(mydat)
+mpi.bcast.Robj2slave(d.cop)
+mpi.bcast.Robj2slave(u.cop)
 
 t <- system.time(mpi.bcast.cmd(
   bw <- npregbw(y ~ x + z1 + z2,
@@ -59,11 +63,23 @@ mpi.bcast.cmd(
   fit.si <- npindex(bws = bw.si, data = mydat, gradients = FALSE),
   caller.execute = TRUE
 )
+mpi.bcast.cmd(
+  bw.cop <- npudistbw(~x + y, data = d.cop),
+  caller.execute = TRUE
+)
+mpi.bcast.cmd(
+  cop <- npcopula(bws = bw.cop, data = d.cop, u = u.cop, n.quasi.inv = 60),
+  caller.execute = TRUE
+)
 
 stopifnot(inherits(fit, "npregression"))
 stopifnot(inherits(fit.sc, "smoothcoefficient"))
 stopifnot(inherits(fit.pl, "plregression"))
 stopifnot(inherits(fit.si, "singleindex"))
+stopifnot(inherits(cop, "data.frame"))
+stopifnot(nrow(cop) == 9L)
+stopifnot(all(is.finite(cop$copula)))
+cat("PROFILE_NPCOPULA_ROUTE_OK\n")
 cat("PROFILE_ROUTE_OK\n")
 cat("Elapsed time =", t[3], "\n")
 

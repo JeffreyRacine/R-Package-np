@@ -32,6 +32,23 @@ run_with_timeout() {
   fi
 }
 
+all_tokens_present() {
+  local token_spec="$1"
+  local route_log="$2"
+  local tok
+  IFS=',' read -r -a _tokens <<< "${token_spec}"
+  for tok in "${_tokens[@]}"; do
+    tok="${tok//[[:space:]]/}"
+    if [ -z "${tok}" ]; then
+      continue
+    fi
+    if ! rg -n "${tok}" "${route_log}" >/dev/null; then
+      return 1
+    fi
+  done
+  return 0
+}
+
 kill_stray_mpi_slaves() {
   local pids
   pids="$(pgrep -f 'slavedaemon\.R|Rslaves\.sh' || true)"
@@ -123,7 +140,7 @@ run_mpiexec_route() {
     fi
     set -e
 
-    if [ "${rc}" -eq 0 ] && rg -n "${token}" "${route_log}" >/dev/null; then
+    if [ "${rc}" -eq 0 ] && all_tokens_present "${token}" "${route_log}"; then
       return 0
     fi
     kill_stray_mpi_slaves
@@ -141,12 +158,12 @@ R CMD INSTALL --preclean -l "${TMP_LIB}" "${ROOT_DIR}" >>"${INSTALL_LOG}" 2>&1
 run_manual_route
 run_mpiexec_route "attach" \
   "${ROOT_DIR}/issue_notes/validate_route_attach.R" \
-  "ATTACH_ROUTE_OK" \
+  "ATTACH_ROUTE_OK,ATTACH_NPCOPULA_ROUTE_OK" \
   "${ATTACH_LOG}" \
   0
 run_mpiexec_route "profile" \
   "${ROOT_DIR}/issue_notes/validate_route_profile.R" \
-  "PROFILE_ROUTE_OK" \
+  "PROFILE_ROUTE_OK,PROFILE_NPCOPULA_ROUTE_OK" \
   "${PROFILE_LOG}" \
   1
 run_mpiexec_route "profile-plot" \

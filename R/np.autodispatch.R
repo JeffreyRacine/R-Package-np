@@ -1387,23 +1387,27 @@
     if (is.null(nm) || identical(nm, "")) next
     if (!nm %in% targets) next
 
-    # Prefer forcing already-bound formal arguments in the caller frame.
-    # This avoids unresolved placeholders such as `..1` from match.call()
-    # when methods forward `...` through nested generic/method dispatch.
-    not_found <- new.env(parent = emptyenv())
-    val <- tryCatch(get0(nm, envir = caller_env, inherits = FALSE, ifnotfound = not_found),
-                    error = function(e) not_found)
-    if (identical(val, not_found)) {
-      expr_i <- arg.list[[i]]
-      # Nested S3/generic forwarding can emit placeholders like `..1` in
-      # match.call() output. Resolve these using the named formal from dynamic
-      # frames before falling back to raw expression evaluation.
-      if (is.symbol(expr_i) && grepl("^\\.\\.[0-9]+$", as.character(expr_i))) {
-        val <- .npRmpi_autodispatch_lookup_named_arg(nm, caller_env = caller_env)
-        if (is.null(val))
-          val <- .npRmpi_autodispatch_eval_arg(expr_i, caller_env = caller_env)
-      } else {
+    expr_i <- arg.list[[i]]
+    # Nested S3/generic forwarding can emit placeholders like `..1` in
+    # match.call() output. Resolve these using the named formal from dynamic
+    # frames before falling back to raw expression evaluation.
+    if (is.symbol(expr_i) && grepl("^\\.\\.[0-9]+$", as.character(expr_i))) {
+      val <- .npRmpi_autodispatch_lookup_named_arg(nm, caller_env = caller_env)
+      if (is.null(val))
         val <- .npRmpi_autodispatch_eval_arg(expr_i, caller_env = caller_env)
+    } else {
+      eval.res <- tryCatch(
+        list(ok = TRUE, value = .npRmpi_autodispatch_eval_arg(expr_i, caller_env = caller_env)),
+        error = function(e) list(ok = FALSE, error = e)
+      )
+      if (isTRUE(eval.res$ok)) {
+        val <- eval.res$value
+      } else {
+        not_found <- new.env(parent = emptyenv())
+        val <- tryCatch(get0(nm, envir = caller_env, inherits = FALSE, ifnotfound = not_found),
+                        error = function(e) not_found)
+        if (identical(val, not_found))
+          stop(conditionMessage(eval.res$error), call. = FALSE)
       }
     }
     ref <- .npRmpi_autodispatch_remote_ref(val)
