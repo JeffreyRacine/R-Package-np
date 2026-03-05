@@ -248,10 +248,12 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 				invisible(mpi.send(x=scmd.arg, type=4, dest=i, tag=50000+i, comm=comm))
 			}
 	      if (caller.execute) {
+          .npRmpi_with_manual_bcast_context({
 	       if (length(arg) > 0)
 	         do.call(.npRmpi_bcast_cmd_funref(scmd), arg, envir = parent.frame())
 	       else
 	         .npRmpi_eval_scmd(tcmd, envir = parent.frame())
+          })
 	      }
   
     } 
@@ -278,14 +280,20 @@ mpi.bcast.cmd <- function (cmd=NULL, ..., rank=0, comm=1, nonblock=FALSE, sleep=
 		}
 				if (length(scmd.arg$arg)>0) {
 				as.call(list(
-				  as.name("do.call"),
-				  .npRmpi_bcast_cmd_funref(scmd.arg$scmd),
-				  scmd.arg$arg,
-				  quote = FALSE,
-				  envir = .GlobalEnv
+            .npRmpi_bcast_cmd_funref(".npRmpi_with_manual_bcast_context"),
+				  as.call(list(
+				    as.name("do.call"),
+				    .npRmpi_bcast_cmd_funref(scmd.arg$scmd),
+				    scmd.arg$arg,
+				    quote = FALSE,
+				    envir = .GlobalEnv
+				  ))
 				))
-			} else 
-				scmd.arg$scmd
+			} else
+        as.call(list(
+          .npRmpi_bcast_cmd_funref(".npRmpi_with_manual_bcast_context"),
+          scmd.arg$scmd
+        ))
 		}
 }
 

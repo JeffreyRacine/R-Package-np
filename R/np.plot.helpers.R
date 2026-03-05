@@ -3254,6 +3254,13 @@ compute.default.error.range <- function(center, err) {
     c("simultaneous", "pointwise", "bonferroni", "pmzsd", "all")
   )
 
+  if (identical(plot.errors.method, "bootstrap") &&
+      isTRUE(.npRmpi_autodispatch_called_from_bcast()))
+    stop(
+      "cannot run bootstrap plot paths inside mpi.bcast.cmd context; invoke plot(...) from master context with npRmpi.autodispatch=TRUE",
+      call. = FALSE
+    )
+
   if (!is.numeric(plot.errors.alpha) || length(plot.errors.alpha) != 1 ||
       is.na(plot.errors.alpha) || plot.errors.alpha <= 0 || plot.errors.alpha >= 0.5)
     stop("the tail probability plot.errors.alpha must lie in (0,0.5)")

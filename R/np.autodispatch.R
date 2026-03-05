@@ -143,6 +143,17 @@
   isTRUE(getOption("npRmpi.autodispatch.context", FALSE))
 }
 
+.npRmpi_manual_bcast_in_context <- function() {
+  isTRUE(getOption("npRmpi.manual.bcast.context", FALSE))
+}
+
+.npRmpi_with_manual_bcast_context <- function(expr) {
+  old <- getOption("npRmpi.manual.bcast.context", FALSE)
+  options(npRmpi.manual.bcast.context = TRUE)
+  on.exit(options(npRmpi.manual.bcast.context = old), add = TRUE)
+  force(expr)
+}
+
 .npRmpi_eval_without_dispatch <- function(mc, caller_env) {
   old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
   options(npRmpi.autodispatch.disable = TRUE)
@@ -160,6 +171,8 @@
 }
 
 .npRmpi_autodispatch_called_from_bcast <- function() {
+  if (isTRUE(.npRmpi_manual_bcast_in_context()))
+    return(TRUE)
   calls <- sys.calls()
   if (!length(calls)) return(FALSE)
   any(vapply(calls, function(cl) {

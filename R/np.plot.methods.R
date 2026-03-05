@@ -17,6 +17,25 @@
   .npRmpi_require_active_slave_pool(where = where)
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = where)
 
+  if (isTRUE(.npRmpi_autodispatch_called_from_bcast())) {
+    req.method <- if (!is.null(dots$plot.errors.method) &&
+                      length(dots$plot.errors.method) >= 1L &&
+                      !is.na(dots$plot.errors.method[1L])) {
+      as.character(dots$plot.errors.method[1L])
+    } else {
+      NA_character_
+    }
+    if (identical(req.method, "bootstrap")) {
+      stop(
+        sprintf(
+          "%s cannot run plot.errors.method='bootstrap' inside mpi.bcast.cmd(...); call plot(...) from master context with npRmpi.autodispatch=TRUE",
+          where
+        ),
+        call. = FALSE
+      )
+    }
+  }
+
   .np_with_seed(
     random.seed,
     do.call(method, c(list(bws = .npRmpi_autodispatch_untag(bws)), dots))
