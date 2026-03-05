@@ -1163,7 +1163,11 @@ SEXP C_np_density_conditional(SEXP tyuno,
                               SEXP ckerlbx,
                               SEXP ckerubx,
                               SEXP ckerlby,
-                              SEXP ckeruby)
+                              SEXP ckeruby,
+                              SEXP regtype,
+                              SEXP glp_degree,
+                              SEXP glp_bernstein,
+                              SEXP glp_basis)
 {
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
@@ -1172,6 +1176,7 @@ SEXP C_np_density_conditional(SEXP tyuno,
   SEXP rbw_r=R_NilValue, ymcv_r=R_NilValue, ypadnum_r=R_NilValue, xmcv_r=R_NilValue, xpadnum_r=R_NilValue;
   SEXP nconfac_r=R_NilValue, ncatfac_r=R_NilValue, mysd_r=R_NilValue, myopti_i=R_NilValue;
   SEXP ckerlbx_r=R_NilValue, ckerubx_r=R_NilValue, ckerlby_r=R_NilValue, ckeruby_r=R_NilValue;
+  SEXP regtype_i=R_NilValue, glp_degree_i=R_NilValue, glp_bernstein_i=R_NilValue, glp_basis_i=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_cond=R_NilValue, out_cderr=R_NilValue, out_grad=R_NilValue, out_gerr=R_NilValue, out_ll=R_NilValue;
   int en = asInteger(enrow);
@@ -1213,11 +1218,28 @@ SEXP C_np_density_conditional(SEXP tyuno,
   PROTECT(ckerubx_r = coerceVector(ckerubx, REALSXP));
   PROTECT(ckerlby_r = coerceVector(ckerlby, REALSXP));
   PROTECT(ckeruby_r = coerceVector(ckeruby, REALSXP));
+  PROTECT(regtype_i = coerceVector(regtype, INTSXP));
+  PROTECT(glp_degree_i = coerceVector(glp_degree, INTSXP));
+  PROTECT(glp_bernstein_i = coerceVector(glp_bernstein, INTSXP));
+  PROTECT(glp_basis_i = coerceVector(glp_basis, INTSXP));
 
   ncon_x = (int)INTEGER(myopti_i)[CD_UNCONI];
   ncon_y = (int)INTEGER(myopti_i)[CD_CNCONI];
   resolve_bounds_or_default(ckerlbx_r, ckerubx_r, ncon_x, &cxkerlb_p, &cxkerub_p);
   resolve_bounds_or_default(ckerlby_r, ckeruby_r, ncon_y, &cykerlb_p, &cykerub_p);
+
+  int_ll_extern = asInteger(regtype_i);
+  if ((int_ll_extern == LL_LP) && (ncon_x > 0)) {
+    if ((int)XLENGTH(glp_degree_i) != ncon_x)
+      error("C_np_density_conditional: length(glp_degree) must equal number of continuous x variables");
+    vector_glp_degree_extern = INTEGER(glp_degree_i);
+    int_glp_bernstein_extern = asInteger(glp_bernstein_i);
+    int_glp_basis_extern = asInteger(glp_basis_i);
+  } else {
+    vector_glp_degree_extern = NULL;
+    int_glp_bernstein_extern = 0;
+    int_glp_basis_extern = 1;
+  }
 
   PROTECT(out_cond = allocVector(REALSXP, en));
   PROTECT(out_cderr = allocVector(REALSXP, en));
@@ -1250,8 +1272,12 @@ SEXP C_np_density_conditional(SEXP tyuno,
   SET_STRING_ELT(out_names, 3, mkChar("congerr"));
   SET_STRING_ELT(out_names, 4, mkChar("log_likelihood"));
   setAttrib(out, R_NamesSymbol, out_names);
+  vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  int_ll_extern = LL_LC;
 
-  UNPROTECT(32);
+  UNPROTECT(36);
   return out;
 }
 
