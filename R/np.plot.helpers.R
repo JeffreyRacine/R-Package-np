@@ -636,21 +636,11 @@
   } else if (workers >= 1L && length(tasks) >= 2L) {
     tryCatch({
       n.tasks <- length(tasks)
-      local.idx <- seq.int(1L, n.tasks, by = workers + 1L)
-      remote.idx <- setdiff(seq_len(n.tasks), local.idx)
+      remote.idx <- seq_len(n.tasks)
       parts.out <- vector("list", n.tasks)
 
-      local.eval <- function(task) {
-        tryCatch(
-          do.call(worker.exec, c(list(task), list(...))),
-          error = function(e)
-            structure(conditionMessage(e), class = "try-error", condition = e)
-        )
-      }
-
       if (length(remote.idx) == 0L) {
-        for (ii in local.idx)
-          parts.out[[ii]] <- local.eval(tasks[[ii]])
+        parts.out
       } else {
         n.remote <- length(remote.idx)
         slave.num <- workers
@@ -664,7 +654,7 @@
         .npRmpi_bootstrap_transport_trace(
           what = what,
           event = "fanout.master_assist.start",
-          fields = list(n_remote = n.remote, slave_num = slave.num, local_n = length(local.idx))
+          fields = list(n_remote = n.remote, slave_num = slave.num, local_n = 0L)
         )
 
         init <- min(slave.num, n.remote)
@@ -692,13 +682,11 @@
           }
         }
 
-        local.ptr <- 1L
-        local.n <- length(local.idx)
         sent <- init
         done <- 0L
         done.boot <- 0L
 
-        while (done < n.remote || local.ptr <= local.n) {
+        while (done < n.remote) {
           progressed <- FALSE
 
           if (done < n.remote && isTRUE(mpi.iprobe(mpi.anysource, mpi.anytag, comm))) {
@@ -737,15 +725,6 @@
             progressed <- TRUE
           }
 
-          if (local.ptr <= local.n) {
-            task.idx <- local.idx[local.ptr]
-            parts.out[[task.idx]] <- local.eval(tasks[[task.idx]])
-            local.ptr <- local.ptr + 1L
-            done.boot <- done.boot + as.integer(tasks[[task.idx]]$bsz)
-            progress <- .np_plot_progress_tick(state = progress, done = done.boot)
-            progressed <- TRUE
-          }
-
           if (!progressed && done < n.remote) {
             if (dispatch.timeout > 0) {
               elapsed.wait <- unname(as.double(proc.time()[["elapsed"]])) - dispatch.started
@@ -767,7 +746,7 @@
         .npRmpi_bootstrap_transport_trace(
           what = what,
           event = "fanout.master_assist.done",
-          fields = list(done = done, n_remote = n.remote, local_done = local.ptr - 1L)
+          fields = list(done = done, n_remote = n.remote, local_done = 0L)
         )
       }
 

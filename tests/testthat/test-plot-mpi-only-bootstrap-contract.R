@@ -70,6 +70,76 @@ test_that("wild fanout does not switch to master-local when workers are active",
   expect_true(any(grepl("master_local=FALSE", start.lines, fixed = TRUE)))
 })
 
+test_that("wild fanout master-assist is remote-only when workers are active", {
+  run_fanout <- getFromNamespace(".npRmpi_bootstrap_run_fanout", "npRmpi")
+  tf <- tempfile("npRmpi-boot-transport-", fileext = ".tsv")
+  old.trace <- getOption("npRmpi.bootstrap.transport.trace.file")
+  options(npRmpi.bootstrap.transport.trace.file = tf)
+  on.exit(options(npRmpi.bootstrap.transport.trace.file = old.trace), add = TRUE)
+
+  qenv <- new.env(parent = emptyenv())
+  qenv$queue <- list()
+
+  local_mocked_bindings(
+    .npRmpi_has_active_slave_pool = function(comm = 1L) TRUE,
+    .npRmpi_master_only_mode = function(comm = 1L) FALSE,
+    .npRmpi_bootstrap_worker_count = function(comm = 1L) 1L,
+    mpi.any.source = function() 0L,
+    mpi.any.tag = function() 0L,
+    mpi.bcast.cmd = function(...) invisible(NULL),
+    mpi.bcast.Robj = function(...) invisible(NULL),
+    mpi.send.Robj = function(obj, dest, tag, comm = 1L) {
+      if (is.list(obj) && !is.null(obj$data.arg) && length(obj$data.arg) == 1L) {
+        task <- obj$data.arg[[1L]]
+        qenv$queue[[length(qenv$queue) + 1L]] <<- list(
+          src = as.integer(dest),
+          tag = as.integer(tag),
+          payload = matrix(
+            rep.int(as.integer(task$start), as.integer(task$bsz)),
+            nrow = as.integer(task$bsz),
+            ncol = 1L
+          )
+        )
+      }
+      invisible(NULL)
+    },
+    mpi.iprobe = function(source, tag, comm = 1L) length(qenv$queue) > 0L,
+    mpi.get.sourcetag = function() {
+      stopifnot(length(qenv$queue) > 0L)
+      c(as.integer(qenv$queue[[1L]]$src), as.integer(qenv$queue[[1L]]$tag))
+    },
+    mpi.recv.Robj = function(source, tag, comm = 1L) {
+      stopifnot(length(qenv$queue) > 0L)
+      payload <- qenv$queue[[1L]]$payload
+      qenv$queue[[1L]] <<- NULL
+      payload
+    },
+    .package = "npRmpi"
+  )
+
+  tasks <- list(
+    list(start = 1L, bsz = 2L, seed = 101L),
+    list(start = 3L, bsz = 2L, seed = 202L)
+  )
+
+  out <- run_fanout(
+    tasks = tasks,
+    worker = function(task) stop("master-local execution must not run"),
+    ncol.out = 1L,
+    what = "wild",
+    profile.where = "unit.test:remote-only"
+  )
+
+  expect_true(is.matrix(out))
+  expect_identical(dim(out), c(4L, 1L))
+  expect_equal(out[, 1L], c(1, 1, 3, 3))
+
+  lines <- readLines(tf, warn = FALSE)
+  done.lines <- lines[grepl("event=fanout.master_assist.done", lines, fixed = TRUE)]
+  expect_true(length(done.lines) >= 1L)
+  expect_true(any(grepl("local_done=0", done.lines, fixed = TRUE)))
+})
+
 test_that("wild fanout fails fast on dispatch timeout when worker replies stall", {
   run_fanout <- getFromNamespace(".npRmpi_bootstrap_run_fanout", "npRmpi")
   withr::local_options(npRmpi.bootstrap.dispatch.timeout.sec = 0.02)
