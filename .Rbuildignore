@@ -26,6 +26,14 @@ mknpkg.sh
 ^AGENTS\.md$
 ^MODERNIZATION_DOD\.md$
 ^AS_CRAN_WARNING_LEDGER\.md$
+^archive$
+^archive/
+^cran-comments\.md$
+^\.DS_Store$
+^\.Rlib$
+^\.Rlib/
+^Rplots\.pdf$
+^tests/testthat/Rplots\.pdf$
 
 ^benchmarks/oneoff
 ^benchmarks/perf
