@@ -26,7 +26,7 @@ npreghat(bws, ...)
   degree = NULL,
   deriv = NULL,
   leave.one.out = FALSE,
-  ridge = 1.0e-12,
+  ridge = 0,
   s = NULL, ...)
 
 \method{npreghat}{npregression}(bws, txdat, y, ...)
@@ -62,7 +62,7 @@ npreghat(bws, ...)
 
   \item{leave.one.out}{Logical; if \code{TRUE}, compute in-sample leave-one-out hat weights. This cannot be combined with explicit \code{exdat}/\code{newdata}.}
 
-  \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned.}
+  \item{ridge}{Base diagonal regularization used when local systems are ill-conditioned. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
 
   \item{s}{Derivative multi-index over continuous predictors.}
 
