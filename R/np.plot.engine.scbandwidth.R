@@ -231,7 +231,14 @@
       if (is.ordered(tdat))
         x2.eval <- (tdati$all.dlev[[ti]])[as.integer(x2.eval)]
 
-      scoef.args <- list(txdat = xdat, tydat = ydat, bws = bws, iterate = FALSE, errors = plot.errors, betas = coef)
+      scoef.args <- list(
+        txdat = xdat,
+        tydat = ydat,
+        bws = bws,
+        iterate = FALSE,
+        errors = (plot.errors && identical(plot.errors.method, "asymptotic")),
+        betas = coef
+      )
       if (!miss.z)
         scoef.args$tzdat <- zdat
       if (miss.z) {
@@ -463,7 +470,7 @@
             tydat = ydat,
             exdat = ex.slice,
             bws = bws,
-            errors = plot.errors,
+            errors = (plot.errors && identical(plot.errors.method, "asymptotic")),
             betas = coef
           )
           if (!miss.z) {
