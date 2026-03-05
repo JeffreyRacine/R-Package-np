@@ -291,8 +291,9 @@ npscoefbw.scbandwidth <-
                           leave.one.out = TRUE)$ksum
 
             mean.loo <- rep(maxPenalty,n)
-            epsilon <- 1.0/n
-            ridge <- double(n)
+            ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+            ridge <- rep.int(ridge.grid[1L], n)
+            ridge.idx <- rep.int(1L, n)
             doridge <- rep.int(TRUE, n)
 
             nc <- ncol(tww[-1,-1,1])
@@ -308,8 +309,11 @@ npscoefbw.scbandwidth <-
                   error = function(e) e
                 )
                 if (inherits(beta.ii, "error")) {
-                  ridge[ii] <- ridge[ii] + epsilon
-                  doridge[ii] <- TRUE
+                  ridge.idx[ii] <- ridge.idx[ii] + 1L
+                  if (ridge.idx[ii] <= length(ridge.grid)) {
+                    ridge[ii] <- ridge.grid[ridge.idx[ii]]
+                    doridge[ii] <- TRUE
+                  }
                   beta.ii <- rep(maxPenalty, nc)
                 }
                 mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
@@ -565,6 +569,7 @@ npscoefbw.scbandwidth <-
           bws$fval = min.overall
           bws$ifval = best.overall
           bws$num.feval = num.feval.overall
+          bws$num.feval.fast = NA_integer_
           bws$numimp = numimp.overall
           bws$fval.vector = value.overall
         }
@@ -615,6 +620,7 @@ npscoefbw.scbandwidth <-
                        fval = bws$fval,
                        ifval = bws$ifval,
                        num.feval = bws$num.feval,
+                       num.feval.fast = bws$num.feval.fast,
                        numimp = bws$numimp,
                        fval.vector = bws$fval.vector,
                        nobs = bws$nobs,
