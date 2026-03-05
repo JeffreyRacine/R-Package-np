@@ -1793,7 +1793,8 @@
 .npRmpi_autodispatch_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
-  caller_env <- parent.frame()
+  if (missing(caller_env) || !is.environment(caller_env))
+    caller_env <- parent.frame()
   if (!.npRmpi_autodispatch_active())
     return(.npRmpi_eval_without_dispatch(mc, caller_env))
 
@@ -1803,7 +1804,8 @@
 .npRmpi_manual_distributed_call <- function(mc, caller_env = parent.frame(), comm = 1L) {
   .npRmpi_warn_pkg_conflict_once()
   .npRmpi_warn_rmpi_conflict_once()
-  caller_env <- parent.frame()
+  if (missing(caller_env) || !is.environment(caller_env))
+    caller_env <- parent.frame()
   .npRmpi_distributed_call_impl(mc = mc, caller_env = caller_env, comm = comm, warn_nested = FALSE)
 }
 
