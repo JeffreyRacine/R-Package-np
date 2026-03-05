@@ -3126,7 +3126,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int_MINIMIZE_IO = myopti[CBW_MINIOI];
 
   itmax=myopti[CBW_ITMAXI];
-  int_WEIGHTS = myopti[CBW_FASTI];
+  int_WEIGHTS = 0;
   old_cdens = myopti[CBW_OLDI];
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CBW_TREEI];
   scale_cat = myopti[CBW_SCATI];
