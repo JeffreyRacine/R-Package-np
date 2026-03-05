@@ -781,6 +781,162 @@ test_that("ksum fast paths honor non-default kernel/bound options for density/di
   expect_equal(c.dist.fast$t, c.dist.explicit, tolerance = 1e-10)
 })
 
+test_that("conditional helper constructors forward kernel and bwscaling options", {
+  skip_if_not_installed("np")
+
+  set.seed(3262)
+  n <- 55
+  tx <- data.frame(x = runif(n))
+  ty <- data.frame(y = runif(n))
+  bw.base <- npcdensbw(
+    xdat = tx,
+    ydat = ty,
+    bws = c(0.22, 0.22),
+    bandwidth.compute = FALSE,
+    bwtype = "fixed",
+    bwscaling = FALSE,
+    cxkertype = "epanechnikov",
+    cykertype = "epanechnikov",
+    cxkerbound = "fixed",
+    cykerbound = "fixed",
+    cxkerlb = 0.0,
+    cykerlb = 0.0,
+    cxkerub = 1.0,
+    cykerub = 1.0
+  )
+  bw <- bw.base
+  bw$bwscaling <- TRUE
+
+  np.ns <- asNamespace("np")
+  cap <- new.env(parent = emptyenv())
+  cap$calls <- list()
+
+  trace(
+    what = "kbandwidth.numeric",
+    where = np.ns,
+    tracer = bquote({
+      assign(
+        "calls",
+        c(
+          get("calls", envir = .(cap)),
+          list(list(
+            bwscaling = bwscaling,
+            ckertype = ckertype,
+            ckerorder = ckerorder,
+            ckerbound = ckerbound,
+            ckerlb = ckerlb,
+            ckerub = ckerub
+          ))
+        ),
+        envir = .(cap)
+      )
+    }),
+    print = FALSE
+  )
+  on.exit(untrace("kbandwidth.numeric", where = np.ns), add = TRUE)
+
+  make.kx <- getFromNamespace(".np_con_make_kbandwidth_x", "np")
+  make.kxy <- getFromNamespace(".np_con_make_kbandwidth_xy", "np")
+  kx <- make.kx(bws = bw, xdat = tx)
+  kxy <- make.kxy(bws = bw, xdat = tx, ydat = ty)
+  expect_false(is.null(kx))
+  expect_false(is.null(kxy))
+  expect_true(length(cap$calls) >= 2L)
+
+  for (call in cap$calls) {
+    expect_identical(isTRUE(call$bwscaling), FALSE)
+    expect_identical(as.character(call$ckertype), as.character(bw$cxkertype))
+    expect_identical(as.character(call$ckerorder), as.character(bw$cxkerorder))
+    expect_identical(as.character(call$ckerbound), as.character(bw$cxkerbound))
+  }
+})
+
+test_that("manual bws bwscaling toggle is invariant for unconditional ksum helper output", {
+  skip_if_not_installed("np")
+
+  set.seed(3263)
+  n <- 70
+  tx <- data.frame(x = runif(n))
+  ex <- data.frame(x = seq(0.04, 0.96, length.out = 11))
+  B <- 7L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  bw.base <- npudensbw(
+    dat = tx,
+    bws = 0.21,
+    bandwidth.compute = FALSE,
+    bwtype = "fixed",
+    bwscaling = FALSE
+  )
+  bw.alt <- bw.base
+  bw.alt$bwscaling <- TRUE
+
+  fast.u <- getFromNamespace(".np_inid_boot_from_ksum_unconditional", "np")
+  out.base <- fast.u(
+    xdat = tx,
+    exdat = ex,
+    bws = bw.base,
+    B = B,
+    operator = "normal",
+    counts = counts
+  )
+  out.alt <- fast.u(
+    xdat = tx,
+    exdat = ex,
+    bws = bw.alt,
+    B = B,
+    operator = "normal",
+    counts = counts
+  )
+
+  expect_equal(out.base$t0, out.alt$t0, tolerance = 1e-12)
+  expect_equal(out.base$t, out.alt$t, tolerance = 1e-12)
+})
+
+test_that("lp degree is used by regression inid helper construction", {
+  skip_if_not_installed("np")
+
+  set.seed(3264)
+  n <- 75
+  x1 <- runif(n)
+  x2 <- runif(n)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  y <- sin(3 * x1) + 0.25 * x2^2 + rnorm(n, sd = 0.04)
+  ex <- tx[seq_len(20), , drop = FALSE]
+  B <- 6L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  bw2 <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(2L, 2L),
+    bws = c(0.28, 0.28),
+    bandwidth.compute = FALSE
+  )
+  bw3 <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(3L, 3L),
+    bws = c(0.28, 0.28),
+    bandwidth.compute = FALSE
+  )
+
+  fast.fun <- getFromNamespace(".np_inid_boot_from_regression", "np")
+  out2 <- fast.fun(xdat = tx, exdat = ex, bws = bw2, ydat = y, B = B, counts = counts)
+  out3 <- fast.fun(xdat = tx, exdat = ex, bws = bw3, ydat = y, B = B, counts = counts)
+
+  fit2 <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw2, gradients = FALSE, warn.glp.gradient = FALSE)$mean
+  fit3 <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw3, gradients = FALSE, warn.glp.gradient = FALSE)$mean
+
+  expect_equal(out2$t0, fit2, tolerance = 1e-6)
+  expect_equal(out3$t0, fit3, tolerance = 1e-6)
+  expect_gt(max(abs(out2$t0 - out3$t0)), 1e-6)
+})
+
 test_that("npreg plot bootstrap inid supports lp basis variants", {
   skip_if_not_installed("np")
 

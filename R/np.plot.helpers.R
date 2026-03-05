@@ -1335,7 +1335,9 @@
   xdat <- toFrame(xdat)
   kbandwidth.numeric(
     bw = bws$xbw,
-    bwscaling = if (is.null(bws$bwscaling)) FALSE else bws$bwscaling,
+    bwscaling = FALSE,
+    # npksum helper constructors require raw bandwidths; bwscaling flags are
+    # non-fit-defining here and are intentionally normalized to FALSE.
     bwtype = bws$type,
     ckertype = bws$cxkertype,
     ckerorder = bws$cxkerorder,
@@ -1361,7 +1363,9 @@
 
   kbandwidth.numeric(
     bw = c(bws$xbw, bws$ybw),
-    bwscaling = if (is.null(bws$bwscaling)) FALSE else bws$bwscaling,
+    bwscaling = FALSE,
+    # npksum helper constructors require raw bandwidths; bwscaling flags are
+    # non-fit-defining here and are intentionally normalized to FALSE.
     bwtype = bws$type,
     ckertype = bws$cxkertype,
     ckerorder = bws$cxkerorder,
