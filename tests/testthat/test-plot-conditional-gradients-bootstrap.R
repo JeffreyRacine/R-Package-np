@@ -1,4 +1,4 @@
-test_that("conditional density/distribution gradient bootstrap inid works for bandwidth objects", {
+test_that("conditional density/distribution gradient bootstrap inid fails fast for bandwidth objects", {
   skip_if_not_installed("np")
 
   set.seed(20260225)
@@ -23,38 +23,39 @@ test_that("conditional density/distribution gradient bootstrap inid works for ba
     bandwidth.compute = FALSE
   )
 
-  out.cd <- suppressWarnings(
-    plot(
-      bw.cd,
-      plot.behavior = "data",
-      perspective = FALSE,
-      gradients = TRUE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 5
-    )
+  expect_error(
+    suppressWarnings(
+      plot(
+        bw.cd,
+        plot.behavior = "data",
+        perspective = FALSE,
+        gradients = TRUE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "inid",
+        plot.errors.boot.num = 5
+      )
+    ),
+    "inid conditional helper unavailable",
+    fixed = TRUE
   )
-  out.cdist <- suppressWarnings(
-    plot(
-      bw.cdist,
-      plot.behavior = "data",
-      perspective = FALSE,
-      gradients = TRUE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 5
-    )
+  expect_error(
+    suppressWarnings(
+      plot(
+        bw.cdist,
+        plot.behavior = "data",
+        perspective = FALSE,
+        gradients = TRUE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "inid",
+        plot.errors.boot.num = 5
+      )
+    ),
+    "inid conditional helper unavailable",
+    fixed = TRUE
   )
-
-  expect_type(out.cd, "list")
-  expect_type(out.cdist, "list")
-  expect_true(length(out.cd) >= 1L)
-  expect_true(length(out.cdist) >= 1L)
-  expect_true(all(vapply(out.cd, function(z) "gc1err" %in% names(z), logical(1))))
-  expect_true(all(vapply(out.cdist, function(z) "gc1err" %in% names(z), logical(1))))
 })
 
-test_that("conditional density/distribution gradient bootstrap inid works for fitted objects", {
+test_that("conditional density/distribution gradient bootstrap inid fails fast for fitted objects", {
   skip_if_not_installed("np")
 
   set.seed(20260226)
@@ -82,31 +83,34 @@ test_that("conditional density/distribution gradient bootstrap inid works for fi
   fit.cd <- npcdens(bws = bw.cd)
   fit.cdist <- npcdist(bws = bw.cdist)
 
-  out.cd <- suppressWarnings(
-    plot(
-      fit.cd,
-      plot.behavior = "data",
-      perspective = FALSE,
-      gradients = TRUE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 5
-    )
+  expect_error(
+    suppressWarnings(
+      plot(
+        fit.cd,
+        plot.behavior = "data",
+        perspective = FALSE,
+        gradients = TRUE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "inid",
+        plot.errors.boot.num = 5
+      )
+    ),
+    "inid conditional helper unavailable",
+    fixed = TRUE
   )
-  out.cdist <- suppressWarnings(
-    plot(
-      fit.cdist,
-      plot.behavior = "data",
-      perspective = FALSE,
-      gradients = TRUE,
-      plot.errors.method = "bootstrap",
-      plot.errors.boot.method = "inid",
-      plot.errors.boot.num = 5
-    )
+  expect_error(
+    suppressWarnings(
+      plot(
+        fit.cdist,
+        plot.behavior = "data",
+        perspective = FALSE,
+        gradients = TRUE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = "inid",
+        plot.errors.boot.num = 5
+      )
+    ),
+    "inid conditional helper unavailable",
+    fixed = TRUE
   )
-
-  expect_type(out.cd, "list")
-  expect_type(out.cdist, "list")
-  expect_true(length(out.cd) >= 1L)
-  expect_true(length(out.cdist) >= 1L)
 })

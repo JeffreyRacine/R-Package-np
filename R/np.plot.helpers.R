@@ -2473,7 +2473,13 @@ compute.bootstrap.errors.bandwidth =
     fast.block <- isTRUE(is.block) &&
       isTRUE(identical(bws$type, "fixed"))
 
-    boot.out <- if (fast.inid || fast.block) {
+    if (is.inid && !isTRUE(fast.inid))
+      stop("inid unconditional helper unavailable for this configuration; no alternate fallback is permitted", call. = FALSE)
+    if (is.block && !isTRUE(fast.block))
+      stop(sprintf("%s unconditional helper unavailable for this configuration; no alternate fallback is permitted", plot.errors.boot.method), call. = FALSE)
+
+    boot.out <- NULL
+    if (fast.inid || fast.block) {
       op <- if (cdf) "integral" else "normal"
       counts.drawer <- if (fast.block) {
         .np_block_counts_drawer(
@@ -2495,41 +2501,16 @@ compute.bootstrap.errors.bandwidth =
           counts.drawer = counts.drawer
         ),
         error = function(e) {
-          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.bandwidth (%s)",
+          stop(sprintf("%s ksum helper failed in compute.bootstrap.errors.bandwidth (%s)",
                        if (fast.block) plot.errors.boot.method else "inid",
                        conditionMessage(e)),
                call. = FALSE)
         }
       )
-    } else {
-      boofun <- if (is.inid) {
-        function(data, indices) {
-          fit <- if (cdf) {
-            npudist(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
-          } else {
-            npudens(tdat = xdat[indices, , drop = FALSE], edat = exdat, bws = bws)
-          }
-          if (cdf) fit$dist else fit$dens
-        }
-      } else {
-        function(tsb) {
-          fit <- if (cdf) {
-            npudist(tdat = tsb, edat = exdat, bws = bws)
-          } else {
-            npudens(tdat = tsb, edat = exdat, bws = bws)
-          }
-          if (cdf) fit$dist else fit$dens
-        }
-      }
-
-      boot.out <- .np_plot_boot_dispatch(
-        boofun = boofun,
-        data = data.frame(xdat),
-        method = plot.errors.boot.method,
-        B = plot.errors.boot.num,
-        blocklen = plot.errors.boot.blocklen
-      )
     }
+
+    if (is.null(boot.out))
+      stop("no canonical helper path available for this unconditional bootstrap configuration", call. = FALSE)
 
     all.bp <- .np_plot_boot_factor_boxplots(
       boot.t = boot.out$t,
@@ -2639,23 +2620,13 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(!gradients) &&
       isTRUE(identical(bws$type, "fixed"))
 
-    fit.cond <- function(tx, ty) {
-      switch(
-        tboo,
-        quant = npqreg(txdat = tx, tydat = ty, exdat = exdat, tau = tau, bws = bws, gradients = gradients),
-        dist = npcdist(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients),
-        dens = npcdens(txdat = tx, tydat = ty, exdat = exdat, eydat = eydat, bws = bws, gradients = gradients)
-      )
-    }
-    out.cond <- function(fit) {
-      switch(
-        tboo,
-        quant = if (gradients) fit$yqgrad[, gradient.index] else fit$quantile,
-        dist = if (gradients) fit$congrad[, gradient.index] else fit$condist,
-        dens = if (gradients) fit$congrad[, gradient.index] else fit$condens
-      )
-    }
-    boot.out <- if (fast.inid || fast.block) {
+    if (is.inid && !isTRUE(fast.inid))
+      stop("inid conditional helper unavailable for this configuration; no alternate fallback is permitted", call. = FALSE)
+    if (is.block && !isTRUE(fast.block))
+      stop(sprintf("%s conditional helper unavailable for this configuration; no alternate fallback is permitted", plot.errors.boot.method), call. = FALSE)
+
+    boot.out <- NULL
+    if (fast.inid || fast.block) {
       counts.drawer <- if (fast.block) {
         .np_block_counts_drawer(
           n = nrow(xdat),
@@ -2678,32 +2649,16 @@ compute.bootstrap.errors.conbandwidth =
           counts.drawer = counts.drawer
         ),
         error = function(e) {
-          stop(sprintf("%s ksum fast path failed in compute.bootstrap.errors.conbandwidth (%s)",
+          stop(sprintf("%s ksum helper failed in compute.bootstrap.errors.conbandwidth (%s)",
                        if (fast.block) plot.errors.boot.method else "inid",
                        conditionMessage(e)),
                call. = FALSE)
         }
       )
-    } else {
-      boofun <- if (is.inid) {
-        function(data, indices) out.cond(fit.cond(
-          tx = xdat[indices, , drop = FALSE],
-          ty = ydat[indices, , drop = FALSE]
-        ))
-      } else {
-        function(tsb) out.cond(fit.cond(
-          tx = tsb[, seq_len(ncol(xdat)), drop = FALSE],
-          ty = tsb[, (ncol(xdat) + 1L):ncol(tsb), drop = FALSE]
-        ))
-      }
-      boot.out <- .np_plot_boot_dispatch(
-        boofun = boofun,
-        data = data.frame(xdat, ydat),
-        method = plot.errors.boot.method,
-        B = plot.errors.boot.num,
-        blocklen = plot.errors.boot.blocklen
-      )
     }
+
+    if (is.null(boot.out))
+      stop("no canonical helper path available for this conditional bootstrap configuration", call. = FALSE)
 
     if (slice.index <= bws$xndim){
       tdati <- bws$xdati
