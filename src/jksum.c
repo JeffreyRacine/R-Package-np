@@ -7472,6 +7472,24 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                    num_reg_ordered))
     return DBL_MAX;
 
+  /* Canonical CVAIC parity: LP(degree=1) should follow the LL-equivalent
+     objective branch for bandwidth search. */
+  int int_ll_cv = int_ll;
+  if((int_ll == LL_LP) &&
+     (bwm == RBWM_CVAIC) &&
+     (vector_glp_degree_extern != NULL) &&
+     (num_reg_continuous > 0)){
+    int all_deg_one = 1;
+    for(i = 0; i < num_reg_continuous; i++){
+      if(vector_glp_degree_extern[i] != 1){
+        all_deg_one = 0;
+        break;
+      }
+    }
+    if(all_deg_one)
+      int_ll_cv = LL_LL;
+  }
+
   operator = np_reg_cv_core_cache.operator;
   kernel_c = np_reg_cv_core_cache.kernel_c;
   kernel_u = np_reg_cv_core_cache.kernel_u;
@@ -7486,7 +7504,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     num_obs_eval_alloc = num_obs;
 #endif
 
-    int ks_tree_use = (int_TREE_X == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll == LL_LL)));
+    int ks_tree_use = (int_TREE_X == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll_cv == LL_LL)));
 
   if(kernel_bandwidth_mean(KERNEL_reg,
                            BANDWIDTH_reg,
@@ -7511,7 +7529,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     return(DBL_MAX);
   }
 
-  if(int_ll == LL_LP){
+  if(int_ll_cv == LL_LP){
     const int use_bernstein = (int_glp_bernstein_extern != 0);
     const int *glp_terms = NULL;
     int glp_nterms = 0;
@@ -7533,7 +7551,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
        (np_glp_cv_cache.num_obs != num_obs) ||
        (np_glp_cv_cache.ncon != num_reg_continuous) ||
        (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous)){
-      if(!np_glp_cv_cache_prepare(int_ll, num_obs, num_reg_continuous, matrix_X_continuous)){
+      if(!np_glp_cv_cache_prepare(int_ll_cv, num_obs, num_reg_continuous, matrix_X_continuous)){
         cv = DBL_MAX;
         goto finish_cv_path;
       }
@@ -8060,7 +8078,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
                                                         &ov_cont_from_cache);
 
     if(all_large_gate){
-      const int k = (int_ll == LL_LC) ? 1 : (num_reg_continuous + 1);
+      const int k = (int_ll_cv == LL_LC) ? 1 : (num_reg_continuous + 1);
       MATRIX XtX = mat_creat(k, k, UNDEFINED);
       MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
       MATRIX XtY = mat_creat(k, 1, UNDEFINED);
@@ -8238,7 +8256,7 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
   // Conduct the estimation 
 
-  if(int_ll == LL_LC) { // local constant
+  if(int_ll_cv == LL_LC) { // local constant
     // Nadaraya-Watson
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
