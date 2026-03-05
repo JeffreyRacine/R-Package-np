@@ -98,3 +98,41 @@ test_that("npreghat leave.one.out is honored and predict reuses it safely", {
   hy <- predict(H.loo, y = y, output = "apply")
   expect_equal(as.vector(hy), as.vector(H.loo %*% y), tolerance = 1e-10)
 })
+
+test_that("npreghat lp bernstein path matches predict semantics", {
+  set.seed(20260305)
+  n <- 220
+  x <- sort(runif(n))
+  y <- sin(2 * pi * x) + rnorm(n, sd = 0.08)
+  tx <- data.frame(x = x)
+  ex <- data.frame(x = seq(min(x), max(x), length.out = 60))
+
+  bw.raw <- npregbw(
+    xdat = tx,
+    ydat = y,
+    bws = 0.18,
+    regtype = "lp",
+    degree = 3L,
+    bernstein = FALSE,
+    bandwidth.compute = FALSE
+  )
+  bw.bern <- npregbw(
+    xdat = tx,
+    ydat = y,
+    bws = 0.18,
+    regtype = "lp",
+    degree = 3L,
+    bernstein = TRUE,
+    bandwidth.compute = FALSE
+  )
+
+  fit.raw <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw.raw, gradients = FALSE, warn.glp.gradient = FALSE)
+  fit.bern <- npreg(txdat = tx, tydat = y, exdat = ex, bws = bw.bern, gradients = FALSE, warn.glp.gradient = FALSE)
+
+  hat.raw <- npreghat(bws = bw.raw, txdat = tx, exdat = ex, y = y, output = "apply", s = 0L)
+  hat.bern <- npreghat(bws = bw.bern, txdat = tx, exdat = ex, y = y, output = "apply", s = 0L)
+
+  expect_equal(as.vector(hat.raw), as.vector(fit.raw$mean), tolerance = 1e-8)
+  expect_equal(as.vector(hat.bern), as.vector(fit.bern$mean), tolerance = 1e-8)
+  expect_equal(as.vector(fit.bern$mean), as.vector(fit.raw$mean), tolerance = 1e-8)
+})

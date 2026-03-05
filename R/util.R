@@ -1604,20 +1604,39 @@ mypoly <- function(x,
     }
 
   } else {
-    ## Bernstein polynomials and their derivatives (i.e. Bezier curves
-    ## i.e. B-splines with no interior knots)
-    if(is.null(ex)) {
-      if(gradient.compute) {
-        Z <- gsl.bs(x,degree=degree,deriv=r)
-      } else {
-        Z <- gsl.bs(x,degree=degree)
-      }
+    ## Bernstein polynomial basis (no interior knots) aligned with C-side LP code.
+    x.train <- as.double(x)
+    x.use <- if (is.null(ex)) x.train else as.double(ex)
+    r <- if (gradient.compute) as.integer(r) else 0L
+    if (is.na(r) || r < 0L) stop(" Error: derivative order must be a non-negative integer")
+
+    xmin <- min(x.train)
+    xmax <- max(x.train)
+    xrange <- xmax - xmin
+    if (!is.finite(xrange) || xrange <= 0) {
+      Z <- matrix(0.0, nrow = length(x.use), ncol = degree)
+    } else if (r > degree) {
+      Z <- matrix(0.0, nrow = length(x.use), ncol = degree)
     } else {
-      if(gradient.compute) {
-        Z <- predict(gsl.bs(x,degree=degree,deriv=r),newx=ex)
+      u <- (x.use - xmin) / xrange
+      m <- degree - r
+      coef.deriv <- if (r == 0L) {
+        1.0
       } else {
-        Z <- predict(gsl.bs(x,degree=degree),newx=ex)
+        exp(lfactorial(degree) - lfactorial(m)) / (xrange^r)
       }
+
+      z.list <- lapply(seq_len(degree), function(idx) {
+        out <- rep(0.0, length(u))
+        for (k in 0:r) {
+          j <- idx - k
+          if (j >= 0L && j <= m) {
+            out <- out + ((-1.0)^k) * choose(r, k) * choose(m, j) * (u^j) * ((1.0 - u)^(m - j))
+          }
+        }
+        coef.deriv * out
+      })
+      Z <- do.call(cbind, z.list)
     }
   }
 
