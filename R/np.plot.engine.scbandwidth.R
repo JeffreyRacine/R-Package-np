@@ -66,7 +66,6 @@
     if(!missing(gradients))
       stop("gradients not supported with smooth coefficient models.")
     coef <- isTRUE(coef)
-    coef_flag <- isTRUE(coef)
     coef.index <- as.integer(coef.index)[1L]
     if (!is.finite(coef.index) || is.na(coef.index) || coef.index < 1L)
       coef.index <- 1L
@@ -457,20 +456,39 @@
 
       plotOnEstimate = (plot.errors.center == "estimate")
 
-      txobj_call <- function(i, ei, xi.neval) {
-        tx.args <- list(
-          txdat = xdat,
-          tydat = ydat,
-          exdat = subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE],
+      txobj_call <- function(ex.slice, ez.slice = NULL) {
+        if (coef || identical(plot.errors.method, "asymptotic")) {
+          tx.args <- list(
+            txdat = xdat,
+            tydat = ydat,
+            exdat = ex.slice,
+            bws = bws,
+            errors = plot.errors,
+            betas = coef
+          )
+          if (!miss.z) {
+            tx.args$tzdat <- zdat
+            tx.args$ezdat <- ez.slice
+          }
+          return(do.call(npscoef, tx.args))
+        }
+
+        hat.args <- list(
           bws = bws,
-          errors = plot.errors,
-          betas = coef
+          txdat = xdat,
+          exdat = ex.slice,
+          y = ydat,
+          output = "apply"
         )
         if (!miss.z) {
-          tx.args$tzdat <- zdat
-          tx.args$ezdat <- ezdat[seq_len(xi.neval), , drop = FALSE]
+          hat.args$tzdat <- zdat
+          hat.args$ezdat <- ez.slice
         }
-        do.call(npscoef, tx.args)
+
+        list(
+          mean = as.vector(do.call(npscoefhat, hat.args)),
+          merr = rep_len(NA_real_, nrow(ex.slice))
+        )
       }
 
       plot.index = 0
@@ -499,7 +517,9 @@
           ei[(xi.neval+1):maxneval] = NA
         }
 
-        tobj <- txobj_call(i, ei, xi.neval)
+        ex.slice <- subcol(exdat, ei, i)[seq_len(xi.neval), , drop = FALSE]
+        ez.slice <- if (!miss.z) ezdat[seq_len(xi.neval), , drop = FALSE] else NULL
+        tobj <- txobj_call(ex.slice = ex.slice, ez.slice = ez.slice)
 
         temp.mean[seq_len(xi.neval)] = extract_scoef_value(tobj)
 
@@ -517,7 +537,7 @@
             boot.args <- list(
               xdat = xdat,
               ydat = ydat,
-              exdat = subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+              exdat = ex.slice,
               gradients = gradients,
               slice.index = plot.index,
               plot.errors.boot.method = plot.errors.boot.method,
@@ -531,7 +551,7 @@
             )
             if (!miss.z) {
               boot.args$zdat <- zdat
-              boot.args$ezdat <- ezdat[seq_len(xi.neval),, drop = FALSE]
+              boot.args$ezdat <- ez.slice
             }
             temp.boot.raw <- do.call(compute.bootstrap.errors, boot.args)
             temp.err[seq_len(xi.neval),] <- temp.boot.raw[["boot.err"]]
@@ -678,18 +698,9 @@
             ei[(xi.neval+1):maxneval] = NA
           }
 
-          tobj <- do.call(
-            npscoef,
-            list(
-              txdat = xdat,
-              tydat = ydat,
-              tzdat = zdat,
-              exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-              ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
-              bws = bws,
-              betas = coef_flag
-            )
-          )
+          ex.slice <- exdat[seq_len(xi.neval),, drop = FALSE]
+          ez.slice <- subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
+          tobj <- txobj_call(ex.slice = ex.slice, ez.slice = ez.slice)
 
           temp.mean[seq_len(xi.neval)] = extract_scoef_value(tobj)
 
@@ -708,8 +719,8 @@
                                                     xdat = xdat,
                                                     ydat = ydat,
                                                     zdat = zdat,
-                                                    exdat = exdat[seq_len(xi.neval),, drop = FALSE],
-                                                    ezdat = subcol(ezdat,ei,i)[seq_len(xi.neval),, drop = FALSE],
+                                                    exdat = ex.slice,
+                                                    ezdat = ez.slice,
                                                     gradients = gradients,
                                                     slice.index = plot.index,
                                                     plot.errors.boot.method = plot.errors.boot.method,
