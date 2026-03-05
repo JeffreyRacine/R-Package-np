@@ -289,13 +289,14 @@ Below is the same code modified to run in parallel using the
   \item For most estimators you can call \code{np*} functions directly
     (e.g., \code{npudensbw()}, \code{npregbw()}, \code{npcdensbw()}).
 
-  \item Guarded exceptions still require explicit
-    \code{mpi.bcast.cmd(..., caller.execute=TRUE)} (currently
-    plotting calls with \code{plot.errors.method="bootstrap"}).
+  \item Use direct master calls under
+    \code{options(npRmpi.autodispatch=TRUE, np.messages=FALSE)}.
+    In canonical SPMD mode, plotting calls (including bootstrap error
+    bands) should be invoked as plain \code{plot(...)} from master.
 
-  \item Non-bootstrap plotting works directly with autodispatch.
-    For bootstrap error bands use explicit
-    \code{mpi.bcast.cmd(plot(...), caller.execute=TRUE)}.
+  \item Nested \code{mpi.bcast.cmd(plot(...), caller.execute=TRUE)} is
+    unsupported and fails fast by contract; keep \code{mpi.bcast.cmd}
+    for low-level/manual-broadcast workflows, not top-level plot entry.
       
     \item There are a number of example files (including that above
       and below) in the \code{npRmpi/demo} directory that you may wish
