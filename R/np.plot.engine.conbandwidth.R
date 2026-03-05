@@ -144,9 +144,10 @@
     common.scale <- normalized.opts$common.scale
 
     if (plot.errors.method == "asymptotic" && quantreg && gradients) {
-      warning(paste("no asymptotic errors available for quantile regression gradients.",
-                    "\nOne must instead use bootstrapping."))
-      plot.errors.method = "none"
+      stop(
+        "asymptotic errors are unsupported for quantile regression gradients; use bootstrap errors",
+        call. = FALSE
+      )
     }
 
     plot.errors = (plot.errors.method != "none")
