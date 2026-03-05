@@ -337,9 +337,7 @@ npregbw(\dots)
   \item{transform.bounds}{ a logical value that when set to \code{TRUE}
     applies an internal transformation that maps the unconstrained
     search to the feasible bandwidth domain. Defaults to
-    \code{FALSE}. For true generalized local polynomial optimization
-    (i.e. \code{regtype="lp"} with mixed/higher continuous degrees),
-    transformed bounds are enabled internally for stability.}
+    \code{FALSE}.}
 
   \item{ukertype}{
     character string used to specify the unordered categorical kernel type.
