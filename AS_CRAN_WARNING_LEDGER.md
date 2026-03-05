@@ -45,6 +45,8 @@ Run bundles:
   - `/tmp/winbuilder_poll_20260304_234306/summary.txt`
   - tarballs present through poll 8 then absent from poll 9 onward in `R-oldrelease`.
 - final win-builder check/result disposition remains pending maintainer email receipt (random result directory links are emailed by win-builder).
+4. Result ingestion command (when email links arrive):
+- `/Users/jracine/Development/winbuilder_ingest_results.sh`
 
 ## Decoupling Notes
 1. `Rmpi` is intentionally removed from `Suggests` in `DESCRIPTION`.
