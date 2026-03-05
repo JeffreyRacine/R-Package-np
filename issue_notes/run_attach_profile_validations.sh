@@ -8,6 +8,7 @@ INSTALL_LOG="${OUT_DIR}/install.log"
 MANUAL_LOG="${OUT_DIR}/manual_broadcast.log"
 ATTACH_LOG="${OUT_DIR}/attach.log"
 PROFILE_LOG="${OUT_DIR}/profile.log"
+PROFILE_PLOT_LOG="${OUT_DIR}/profile_plot.log"
 TMP_LIB="$(mktemp -d /tmp/nprmpi_route_validation_lib.XXXXXX)"
 PRIMARY_IFACE="${NP_RMPI_IFACE_PRIMARY:-en0}"
 FALLBACK_IFACE="${NP_RMPI_IFACE_FALLBACK:-lo0}"
@@ -147,6 +148,11 @@ run_mpiexec_route "profile" \
   "${ROOT_DIR}/issue_notes/validate_route_profile.R" \
   "PROFILE_ROUTE_OK" \
   "${PROFILE_LOG}" \
+  1
+run_mpiexec_route "profile-plot" \
+  "${ROOT_DIR}/issue_notes/validate_route_profile_plot.R" \
+  "PROFILE_PLOT_ROUTE_OK" \
+  "${PROFILE_PLOT_LOG}" \
   1
 
 echo "[ok] route smoke checks passed"

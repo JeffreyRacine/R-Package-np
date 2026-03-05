@@ -64,6 +64,7 @@ Scripts used by the runner:
 - `issue_notes/validate_route_manual_broadcast.R`
 - `issue_notes/validate_route_attach.R`
 - `issue_notes/validate_route_profile.R`
+- `issue_notes/validate_route_profile_plot.R`
 
 Current status (2026-03-02):
 
@@ -71,3 +72,5 @@ Current status (2026-03-02):
 - attach route passes in current tree.
 - profile route passes in current tree when launched with the documented profile contract:
   `R_PROFILE_USER=<.../Rprofile>`, `R_PROFILE=""`, and `R CMD BATCH --no-save` (no `--vanilla`).
+- profile-plot route passes in current tree for direct master `plot(...)` with
+  `npRmpi.autodispatch=TRUE`, and nested `mpi.bcast.cmd(plot(...))` fails fast by contract.
