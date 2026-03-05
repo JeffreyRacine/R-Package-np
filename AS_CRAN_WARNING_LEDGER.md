@@ -21,6 +21,17 @@ Run bundle: `/tmp/release_hygiene_followup_20260304_232456`
 2. Run `--as-cran`:
 - `R CMD check --as-cran /Users/jracine/Development/np_0.70-1.tar.gz`
 
+## Win-Builder Submission Evidence (2026-03-04, late)
+1. Submitted via canonical devtools route:
+- `devtools::check_win_release(pkg='/Users/jracine/Development/np-master', quiet=FALSE)`
+- `devtools::check_win_oldrelease(pkg='/Users/jracine/Development/np-master', quiet=FALSE)`
+2. Submission artifacts:
+- `/tmp/winbuilder_submit_20260304_233529/np_win_release_dir_noemail.log`
+- `/tmp/winbuilder_submit_20260304_233529/np_win_oldrelease_dir_noemail.log`
+3. Submission status:
+- submission command exit codes are `0` for both targets;
+- win-builder result disposition is pending maintainer email receipt.
+
 ## Cleared In This Refresh
 1. `top-level files` warning from non-package artifacts (`archive`, `cran-comments.md`) cleared via `.Rbuildignore`.
 2. `hidden files/directories` note from local artifacts (`.DS_Store`, `.Rlib`) cleared via `.Rbuildignore`.
