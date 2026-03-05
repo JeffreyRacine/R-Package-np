@@ -5,6 +5,7 @@ suppressPackageStartupMessages(library(npRmpi))
 npRmpi.init(mode = "attach", quiet = TRUE)
 
 if (mpi.comm.rank(1L) == 0L) {
+  suppressPackageStartupMessages(library(MASS))
   set.seed(42)
   n <- 80
   x <- runif(n)
@@ -25,6 +26,16 @@ if (mpi.comm.rank(1L) == 0L) {
   u.cop <- data.frame(x = c(0.25, 0.5, 0.75), y = c(0.25, 0.5, 0.75))
   bw.cop <- npudistbw(~x + y, data = d.cop)
   cop <- npcopula(bws = bw.cop, data = d.cop, u = u.cop, n.quasi.inv = 60)
+  data(birthwt)
+  bdat <- birthwt
+  bdat$low <- factor(bdat$low)
+  bdat$smoke <- factor(bdat$smoke)
+  bdat$race <- factor(bdat$race)
+  bdat$ht <- factor(bdat$ht)
+  bdat$ui <- factor(bdat$ui)
+  bdat$ftv <- ordered(bdat$ftv)
+  bw.cm <- npcdensbw(low ~ smoke + race + ht + ui + ftv + age + lwt, data = bdat, nmulti = 1)
+  fit.cm <- npconmode(bws = bw.cm)
   stopifnot(inherits(fit, "npregression"))
   stopifnot(inherits(fit.sc, "smoothcoefficient"))
   stopifnot(inherits(fit.pl, "plregression"))
@@ -32,6 +43,8 @@ if (mpi.comm.rank(1L) == 0L) {
   stopifnot(inherits(cop, "data.frame"))
   stopifnot(nrow(cop) == 9L)
   stopifnot(all(is.finite(cop$copula)))
+  stopifnot(inherits(fit.cm, "conmode"))
+  cat("ATTACH_NPCONMODE_ROUTE_OK\n")
   cat("ATTACH_NPCOPULA_ROUTE_OK\n")
   cat("ATTACH_ROUTE_OK\n")
   npRmpi.quit(mode = "attach")

@@ -111,7 +111,7 @@ npRidgeSequenceAdditive <- function(n.train, cap = 1.0) {
 
   step <- 1.0 / as.double(n.train)
   seq.out <- seq.int(from = 0.0, to = as.double(cap), by = step)
-  if (tail(seq.out, 1L) < cap)
+  if (utils::tail(seq.out, 1L) < cap)
     seq.out <- c(seq.out, as.double(cap))
   unique(as.double(seq.out))
 }
@@ -129,7 +129,7 @@ npRidgeSequenceFromBase <- function(n.train, ridge.base = 0.0, cap = 1.0) {
     return(unique(c(base, cap)))
 
   seq.out <- seq.int(from = base, to = cap, by = step)
-  if (tail(seq.out, 1L) < cap)
+  if (utils::tail(seq.out, 1L) < cap)
     seq.out <- c(seq.out, cap)
   unique(as.double(seq.out))
 }

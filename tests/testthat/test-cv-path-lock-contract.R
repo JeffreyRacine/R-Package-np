@@ -1,8 +1,25 @@
 library(npRmpi)
 
+locate_jksum_c <- function() {
+  candidates <- c(
+    test_path("..", "..", "src", "jksum.c"),
+    test_path("..", "..", "..", "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_DIR", ""), "src", "jksum.c"),
+    file.path(Sys.getenv("R_PACKAGE_SOURCE", ""), "src", "jksum.c"),
+    file.path(getwd(), "src", "jksum.c"),
+    file.path(getwd(), "..", "src", "jksum.c")
+  )
+  candidates <- unique(candidates[nzchar(candidates)])
+  hits <- candidates[file.exists(candidates)]
+  if (length(hits) == 0L) {
+    return(NULL)
+  }
+  hits[[1L]]
+}
+
 test_that("CVLS LL/LP route predicate is centralized in one helper", {
-  src_file <- test_path("..", "..", "src", "jksum.c")
-  expect_true(file.exists(src_file))
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
 
@@ -22,8 +39,8 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
 })
 
 test_that("density CV tree-bypass predicate is centralized in one helper", {
-  src_file <- test_path("..", "..", "src", "jksum.c")
-  expect_true(file.exists(src_file))
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
 
   lines <- readLines(src_file, warn = FALSE)
   expect_true(any(grepl("np_den_cv_use_tree_bypass_path", lines, fixed = TRUE)))

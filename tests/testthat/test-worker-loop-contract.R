@@ -26,3 +26,16 @@ test_that("worker message normalizer canonicalizes do.call payloads", {
   expect_identical(out[[4L]], FALSE)
   expect_true(is.environment(out[[5L]]))
 })
+
+test_that("worker break detector handles raw and wrapped shutdown sentinels", {
+  is_break <- getFromNamespace(".npRmpi_worker_is_break_message", "npRmpi")
+
+  expect_true(is_break("kaerb"))
+  wrapped <- as.call(list(as.name(".npRmpi_with_manual_bcast_context"), "kaerb"))
+  expect_true(is_break(wrapped))
+  wrapped_fun <- as.call(list(function(x) x, "kaerb"))
+  expect_true(is_break(wrapped_fun))
+
+  expect_false(is_break("not_break"))
+  expect_false(is_break(quote(.npRmpi_with_manual_bcast_context(1 + 1))))
+})

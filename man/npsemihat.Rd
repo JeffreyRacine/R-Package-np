@@ -34,7 +34,7 @@ npscoefhat(bws,
   ezdat = tzdat,
   y = NULL,
   output = c("matrix", "apply"),
-  ridge = 1.0e-12,
+  ridge = 0,
   iterate = FALSE,
   leave.one.out = FALSE,
   ...)
@@ -58,7 +58,7 @@ npscoefhat(bws,
 
   \item{ezdat}{Evaluation \code{z} data.}
 
-  \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a positive finite scalar.}
+  \item{ridge}{Base ridge term for local linear solves in \code{npscoefhat}; must be a non-negative finite scalar. The ridge sequence starts at \code{0} (no regularization) and then increments by \code{1/n.train} as needed for stable solves.}
 
   \item{iterate}{Logical; \code{npscoefhat()} currently supports \code{iterate = FALSE} only.}
 

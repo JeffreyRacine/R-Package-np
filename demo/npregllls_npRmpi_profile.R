@@ -9,6 +9,10 @@
 mpi.bcast.cmd(np.mpi.initialize(),
               caller.execute=TRUE)
 
+mpi.bcast.cmd(options(np.messages=FALSE),
+              caller.execute=TRUE)
+
+
 ## Generate data and broadcast it to all slave nodes in the form of a
 ## data frame
 

@@ -92,6 +92,121 @@
   as.numeric(envv)
 }
 
+.npRmpi_attach_state_reset <- function() {
+  options(npRmpi.attach.close.state = "closed")
+  options(npRmpi.attach.session.id = NA_integer_)
+  invisible(TRUE)
+}
+
+.npRmpi_attach_next_session_id <- function() {
+  sid <- suppressWarnings(as.integer(getOption("npRmpi.attach.session.counter", 0L)))
+  if (!is.finite(sid) || sid < 0L)
+    sid <- 0L
+  sid <- as.integer(sid + 1L)
+  if (!is.finite(sid) || sid < 1L)
+    sid <- 1L
+  options(npRmpi.attach.session.counter = sid)
+  sid
+}
+
+.npRmpi_attach_close_ack_tag <- function(rank) {
+  rank <- suppressWarnings(as.integer(rank)[1L])
+  if (!is.finite(rank) || rank < 1L)
+    rank <- 1L
+  as.integer(62000L + rank)
+}
+
+.npRmpi_attach_close_ack_timeout <- function() {
+  opt <- getOption("npRmpi.attach.close.ack.timeout", NULL)
+  if (!is.null(opt)) {
+    if (is.numeric(opt) && length(opt) == 1L && is.finite(opt) && opt > 0)
+      return(as.numeric(opt))
+    return(5)
+  }
+  envv <- suppressWarnings(as.numeric(Sys.getenv("NP_RMPI_ATTACH_CLOSE_ACK_TIMEOUT_SEC", "5")))
+  if (!is.finite(envv) || envv <= 0)
+    return(5)
+  as.numeric(envv)
+}
+
+.npRmpi_attach_send_close_ack <- function(comm = 1L,
+                                          session_id = getOption("npRmpi.attach.session.id", NA_integer_)) {
+  rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
+  if (is.na(rank) || rank < 1L)
+    return(invisible(FALSE))
+  payload <- list(
+    kind = "attach_close_ack",
+    rank = as.integer(rank),
+    session_id = suppressWarnings(as.integer(session_id)[1L]),
+    timestamp = as.numeric(Sys.time())
+  )
+  sent <- try(
+    mpi.send.Robj(payload, dest = 0L, tag = .npRmpi_attach_close_ack_tag(rank), comm = comm),
+    silent = TRUE
+  )
+  invisible(!inherits(sent, "try-error"))
+}
+
+.npRmpi_attach_collect_close_acks <- function(comm = 1L,
+                                              session_id = getOption("npRmpi.attach.session.id", NA_integer_),
+                                              expected = NULL,
+                                              timeout_sec = .npRmpi_attach_close_ack_timeout(),
+                                              poll_sleep = 0.01) {
+  if (is.null(expected)) {
+    size <- .npRmpi_safe_int(mpi.comm.size(comm))
+    size <- if (is.na(size)) 0L else as.integer(size)
+    expected <- if (size >= 2L) seq_len(size - 1L) else integer(0)
+  }
+  expected <- as.integer(expected)
+  expected <- expected[is.finite(expected) & expected >= 1L]
+  expected <- sort(unique(expected))
+
+  if (!length(expected)) {
+    return(list(ok = TRUE, acked = integer(0), missing = integer(0), payloads = list()))
+  }
+
+  sid <- suppressWarnings(as.integer(session_id)[1L])
+  payloads <- vector("list", length(expected))
+  names(payloads) <- as.character(expected)
+  acked <- integer(0)
+  timeout_sec <- if (is.numeric(timeout_sec) && length(timeout_sec) == 1L && is.finite(timeout_sec) && timeout_sec > 0)
+    as.numeric(timeout_sec) else 5
+  poll_sleep <- if (is.numeric(poll_sleep) && length(poll_sleep) == 1L && is.finite(poll_sleep) && poll_sleep > 0)
+    as.numeric(poll_sleep) else 0.01
+  deadline <- as.numeric(Sys.time()) + timeout_sec
+
+  repeat {
+    pending <- expected[!(expected %in% acked)]
+    if (!length(pending))
+      break
+    if (as.numeric(Sys.time()) >= deadline)
+      break
+    for (rk in pending) {
+      tag <- .npRmpi_attach_close_ack_tag(rk)
+      if (!isTRUE(.npRmpi_safe(mpi.iprobe(source = rk, tag = tag, comm = comm), fallback = FALSE)))
+        next
+      msg <- .npRmpi_safe(mpi.recv.Robj(source = rk, tag = tag, comm = comm), fallback = NULL)
+      payloads[[as.character(rk)]] <- msg
+      if (!is.list(msg))
+        next
+      if (!identical(as.character(msg$kind)[1L], "attach_close_ack"))
+        next
+      if (!identical(as.integer(msg$rank)[1L], as.integer(rk)))
+        next
+      msg.sid <- suppressWarnings(as.integer(msg$session_id)[1L])
+      if (!is.na(sid) && !is.na(msg.sid) && !identical(msg.sid, sid))
+        next
+      acked <- c(acked, rk)
+    }
+    if (length(expected[!(expected %in% acked)]) > 0L)
+      Sys.sleep(poll_sleep)
+  }
+
+  acked <- sort(unique(as.integer(acked)))
+  missing <- expected[!(expected %in% acked)]
+  list(ok = !length(missing), acked = acked, missing = missing, payloads = payloads)
+}
+
 .npRmpi_worker_normalize_message <- function(msg) {
   if (!is.call(msg) || length(msg) < 4L)
     return(msg)
@@ -106,6 +221,22 @@
     quote = FALSE,
     envir = msg[[4L]]
   ))
+}
+
+.npRmpi_worker_is_break_message <- function(msg) {
+  if (is.character(msg) && length(msg) >= 1L && identical(msg[[1L]], "kaerb"))
+    return(TRUE)
+  if (!is.call(msg) || length(msg) < 2L)
+    return(FALSE)
+  hd <- msg[[1L]]
+  payload <- msg[[2L]]
+  if (!is.character(payload) || length(payload) < 1L || !identical(payload[[1L]], "kaerb"))
+    return(FALSE)
+  if (is.symbol(hd) && identical(as.character(hd), ".npRmpi_with_manual_bcast_context"))
+    return(TRUE)
+  if (is.function(hd))
+    return(TRUE)
+  FALSE
 }
 
 .npRmpi_worker_loop <- function(comm = 1L,
@@ -137,7 +268,7 @@
       }
       stop(msg.text, call. = FALSE)
     }
-    if (is.character(msg) && identical(msg, "kaerb"))
+    if (.npRmpi_worker_is_break_message(msg))
       break
 
     msg <- .npRmpi_worker_normalize_message(msg)
@@ -160,7 +291,8 @@
 
 .npRmpi_session_attach_worker_loop <- function(comm = 1L,
                                                nonblock = TRUE,
-                                               sleep = 0.1) {
+                                               sleep = 0.1,
+                                               session_id = getOption("npRmpi.attach.session.id", NA_integer_)) {
   options(echo = FALSE)
   recv.timeout <- .npRmpi_session_recv_timeout()
   .npRmpi_worker_loop(
@@ -175,6 +307,7 @@
       "and relaunch with a fresh MPI world."
     )
   )
+  .npRmpi_attach_send_close_ack(comm = comm, session_id = session_id)
   .npRmpi_safe(if (comm != 0L) mpi.comm.free(comm), fallback = NULL)
   mpi.quit()
   invisible(FALSE)
@@ -242,6 +375,7 @@ npRmpi.init <- function(...,
   else
     options(npRmpi.autodispatch.option.snapshot = NULL)
   .npRmpi_session_reset_spmd_state()
+  .npRmpi_attach_state_reset()
 
   {
     clear.fun <- tryCatch(
@@ -285,13 +419,21 @@ npRmpi.init <- function(...,
 
   rank <- .npRmpi_safe_int(mpi.comm.rank(comm))
   rank <- if (is.na(rank)) 0L else as.integer(rank)
+  sid.local <- if (rank == 0L) .npRmpi_attach_next_session_id() else 0L
+  sid.msg <- .npRmpi_safe(mpi.bcast(as.integer(sid.local), type = 1, rank = 0, comm = comm),
+                          fallback = as.integer(sid.local))
+  sid <- suppressWarnings(as.integer(sid.msg)[1L])
+  if (!is.finite(sid) || sid < 1L)
+    sid <- as.integer(sid.local)
+  options(npRmpi.attach.session.id = sid)
+  options(npRmpi.attach.close.state = "open")
 
   if (rank == 0L) {
     if (!quiet) slave.hostinfo(comm)
     return(invisible(TRUE))
   }
 
-  .npRmpi_session_attach_worker_loop(comm = comm, nonblock = nonblock, sleep = sleep)
+  .npRmpi_session_attach_worker_loop(comm = comm, nonblock = nonblock, sleep = sleep, session_id = sid)
 }
 
 npRmpi.quit <- function(force = FALSE,
@@ -324,12 +466,32 @@ npRmpi.quit <- function(force = FALSE,
   if (size.comm < 2L)
   {
     .npRmpi_session_reset_spmd_state()
+    .npRmpi_attach_state_reset()
     options(npRmpi.master.only = FALSE)
     return(invisible(FALSE))
   }
 
   if (identical(mode, "attach")) {
     comm <- 1L
+    attach.state <- as.character(getOption("npRmpi.attach.close.state", "open"))[1L]
+    if (identical(attach.state, "closed")) {
+      .npRmpi_session_reset_spmd_state()
+      .npRmpi_attach_state_reset()
+      options(npRmpi.master.only = FALSE)
+      return(invisible(TRUE))
+    }
+    if (identical(attach.state, "closing")) {
+      warning("attach-mode close already in progress; ignoring duplicate npRmpi.quit(mode='attach') call.",
+              call. = FALSE)
+      return(invisible(FALSE))
+    }
+    options(npRmpi.attach.close.state = "closing")
+
+    size.attach <- .npRmpi_safe_int(mpi.comm.size(comm))
+    size.attach <- if (is.na(size.attach)) 0L else as.integer(size.attach)
+    expected <- if (size.attach >= 2L) seq_len(size.attach - 1L) else integer(0)
+    sid <- suppressWarnings(as.integer(getOption("npRmpi.attach.session.id", NA_integer_))[1L])
+
     recv.timeout <- .npRmpi_session_recv_timeout()
     if (recv.timeout > 0)
       base::setTimeLimit(elapsed = recv.timeout, transient = TRUE)
@@ -348,16 +510,36 @@ npRmpi.quit <- function(force = FALSE,
         call. = FALSE
       )
     }
+
+    ack.info <- .npRmpi_attach_collect_close_acks(
+      comm = comm,
+      session_id = sid,
+      expected = expected,
+      timeout_sec = .npRmpi_attach_close_ack_timeout()
+    )
+    if (!isTRUE(ack.info$ok)) {
+      warning(
+        sprintf(
+          "attach-mode worker shutdown ACK incomplete for session %s; missing ranks: %s",
+          if (is.na(sid)) "NA" else as.character(sid),
+          paste(ack.info$missing, collapse = ",")
+        ),
+        call. = FALSE
+      )
+    }
+
     if (comm != 0L) {
       .npRmpi_safe(mpi.comm.free(comm), fallback = NULL)
     }
     .npRmpi_session_reset_spmd_state()
+    .npRmpi_attach_state_reset()
     options(npRmpi.master.only = FALSE)
     return(invisible(TRUE))
   }
 
   mpi.close.Rslaves(dellog = dellog, comm = comm, force = force)
   .npRmpi_session_reset_spmd_state()
+  .npRmpi_attach_state_reset()
   options(npRmpi.master.only = FALSE)
   invisible(TRUE)
 }

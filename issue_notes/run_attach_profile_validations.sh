@@ -158,12 +158,12 @@ R CMD INSTALL --preclean -l "${TMP_LIB}" "${ROOT_DIR}" >>"${INSTALL_LOG}" 2>&1
 run_manual_route
 run_mpiexec_route "attach" \
   "${ROOT_DIR}/issue_notes/validate_route_attach.R" \
-  "ATTACH_ROUTE_OK,ATTACH_NPCOPULA_ROUTE_OK" \
+  "ATTACH_ROUTE_OK,ATTACH_NPCOPULA_ROUTE_OK,ATTACH_NPCONMODE_ROUTE_OK" \
   "${ATTACH_LOG}" \
   0
 run_mpiexec_route "profile" \
   "${ROOT_DIR}/issue_notes/validate_route_profile.R" \
-  "PROFILE_ROUTE_OK,PROFILE_NPCOPULA_ROUTE_OK" \
+  "PROFILE_ROUTE_OK,PROFILE_NPCOPULA_ROUTE_OK,PROFILE_NPCONMODE_ROUTE_OK" \
   "${PROFILE_LOG}" \
   1
 run_mpiexec_route "profile-plot" \

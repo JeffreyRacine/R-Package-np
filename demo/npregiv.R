@@ -1,6 +1,7 @@
 suppressPackageStartupMessages(library(npRmpi))
 
 npRmpi.init(nslaves = 1, quiet = TRUE)
+options(np.messages=FALSE)
 on.exit({
   if (isTRUE(getOption("npRmpi.mpi.initialized", FALSE))) {
     npRmpi.quit(force = TRUE)

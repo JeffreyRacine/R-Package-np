@@ -716,6 +716,7 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
     "npRmpi.init(mode='attach', quiet=TRUE)",
     "if (mpi.comm.rank(1L) == 0L) {",
     "  set.seed(42)",
+    "  suppressPackageStartupMessages(library(MASS))",
     "  n <- 80",
     "  x <- runif(n)",
     "  z <- runif(n)",
@@ -745,6 +746,16 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
     "  fit.cf <- npcdist(txdat=xd, tydat=yd, bws=bw.cf)",
     "  bw.cop <- npudistbw(~x+y, data=d.cop)",
     "  cop <- npcopula(bws=bw.cop, data=d.cop, u=u.cop, n.quasi.inv=60)",
+    "  data(birthwt)",
+    "  bdat <- birthwt",
+    "  bdat$low <- factor(bdat$low)",
+    "  bdat$smoke <- factor(bdat$smoke)",
+    "  bdat$race <- factor(bdat$race)",
+    "  bdat$ht <- factor(bdat$ht)",
+    "  bdat$ui <- factor(bdat$ui)",
+    "  bdat$ftv <- ordered(bdat$ftv)",
+    "  bw.cm <- npcdensbw(low~smoke+race+ht+ui+ftv+age+lwt, data=bdat, nmulti=1)",
+    "  fit.cm <- npconmode(bws=bw.cm)",
     "  stopifnot(inherits(fit, 'npregression'))",
     "  stopifnot(inherits(fit.sc, 'smoothcoefficient'))",
     "  stopifnot(inherits(fit.pl, 'plregression'))",
@@ -756,6 +767,8 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
     "  stopifnot(inherits(cop, 'data.frame'))",
     "  stopifnot(nrow(cop) == 9L)",
     "  stopifnot(all(is.finite(cop$copula)))",
+    "  stopifnot(inherits(fit.cm, 'conmode'))",
+    "  cat('ATTACH_NPCONMODE_ROUTE_OK\\n')",
     "  cat('ATTACH_NPCOPULA_ROUTE_OK\\n')",
     "  cat('ATTACH_ROUTE_OK\\n')",
     "  npRmpi.quit(mode='attach')",
@@ -799,6 +812,89 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("ATTACH_ROUTE_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPCONMODE_ROUTE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPCOPULA_ROUTE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("attach mode NP transition close stays stable when stress test is enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_STRESS_TEST"), "1"),
+              "set NP_RMPI_ENABLE_ATTACH_STRESS_TEST=1 to run attach close stress")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  script <- tempfile("npRmpi-attach-stress-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "npRmpi.init(mode='attach', quiet=TRUE)",
+    "if (mpi.comm.rank(1L) == 0L) {",
+    "  suppressPackageStartupMessages(library(MASS))",
+    "  data(birthwt)",
+    "  birthwt$low <- factor(birthwt$low)",
+    "  birthwt$smoke <- factor(birthwt$smoke)",
+    "  birthwt$race <- factor(birthwt$race)",
+    "  birthwt$ht <- factor(birthwt$ht)",
+    "  birthwt$ui <- factor(birthwt$ui)",
+    "  birthwt$ftv <- ordered(birthwt$ftv)",
+    "  bw <- npcdensbw(low~smoke+race+ht+ui+ftv+age+lwt, data=birthwt, nmulti=1)",
+    "  fit <- npconmode(bws=bw)",
+    "  stopifnot(inherits(fit, 'conmode'))",
+    "  cat('ATTACH_NPCONMODE_ROUTE_OK\\n')",
+    "  npRmpi.quit(mode='attach')",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+
+  run_once <- function(np) {
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", as.character(np), file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = c(
+        env_common,
+        "R_PROFILE_USER=",
+        "R_PROFILE=",
+        "FI_TCP_IFACE=en0",
+        "FI_PROVIDER=tcp",
+        "FI_SOCKETS_IFACE=en0"
+      )
+    )
+    if (res$status != 0L) {
+      res <- run_cmd_subprocess(
+        mpiexec,
+        args = c("-n", as.character(np), file.path(R.home("bin"), "Rscript"), "--no-save", script),
+        timeout = 120L,
+        env = c(
+          env_common,
+          "R_PROFILE_USER=",
+          "R_PROFILE=",
+          "FI_TCP_IFACE=lo0",
+          "FI_PROVIDER=tcp",
+          "FI_SOCKETS_IFACE=lo0"
+        )
+      )
+    }
+    res
+  }
+
+  res2 <- run_once(2L)
+  if (res2$status != 0L && .is_mpi_init_env_failure(res2$output))
+    skip("MPI runtime interface unavailable in this environment for attach stress")
+  expect_equal(res2$status, 0L, info = paste(res2$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPCONMODE_ROUTE_OK", res2$output, fixed = TRUE)),
+              info = paste(res2$output, collapse = "\n"))
+
+  res3 <- run_once(3L)
+  if (res3$status != 0L && .is_mpi_init_env_failure(res3$output))
+    skip("MPI runtime interface unavailable in this environment for attach stress")
+  expect_equal(res3$status, 0L, info = paste(res3$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_NPCONMODE_ROUTE_OK", res3$output, fixed = TRUE)),
+              info = paste(res3$output, collapse = "\n"))
 })
 
 test_that("profile mode smoke completes under mpiexec when enabled", {
@@ -821,6 +917,7 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
   writeLines(c(
     "suppressPackageStartupMessages(library(npRmpi))",
     "if (mpi.comm.rank(0L) == 0L) {",
+    "  suppressPackageStartupMessages(library(MASS))",
     "  mpi.bcast.cmd(np.mpi.initialize(), caller.execute=TRUE)",
     "  mpi.bcast.cmd(options(np.messages=FALSE, npRmpi.autodispatch=FALSE), caller.execute=TRUE)",
     "  set.seed(42)",
@@ -834,6 +931,14 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     "  dz <- data.frame(z=z)",
     "  d.cop <- data.frame(x=x, y=y)",
     "  u.cop <- data.frame(x=c(0.25,0.5,0.75), y=c(0.25,0.5,0.75))",
+    "  data(birthwt)",
+    "  bdat <- birthwt",
+    "  bdat$low <- factor(bdat$low)",
+    "  bdat$smoke <- factor(bdat$smoke)",
+    "  bdat$race <- factor(bdat$race)",
+    "  bdat$ht <- factor(bdat$ht)",
+    "  bdat$ui <- factor(bdat$ui)",
+    "  bdat$ftv <- ordered(bdat$ftv)",
     "  xd <- data.frame(u=x)",
     "  yd <- data.frame(v=y)",
     "  mpi.bcast.Robj2slave(d)",
@@ -842,6 +947,7 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     "  mpi.bcast.Robj2slave(dz)",
     "  mpi.bcast.Robj2slave(d.cop)",
     "  mpi.bcast.Robj2slave(u.cop)",
+    "  mpi.bcast.Robj2slave(bdat)",
     "  mpi.bcast.Robj2slave(xd)",
     "  mpi.bcast.Robj2slave(yd)",
     "  mpi.bcast.Robj2slave(y)",
@@ -863,6 +969,8 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     "  mpi.bcast.cmd(fit.cf <- npcdist(txdat=xd, tydat=yd, bws=bw.cf), caller.execute=TRUE)",
     "  mpi.bcast.cmd(bw.cop <- npudistbw(~x+y, data=d.cop), caller.execute=TRUE)",
     "  mpi.bcast.cmd(cop <- npcopula(bws=bw.cop, data=d.cop, u=u.cop, n.quasi.inv=60), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(bw.cm <- npcdensbw(low~smoke+race+ht+ui+ftv+age+lwt, data=bdat, nmulti=1), caller.execute=TRUE)",
+    "  mpi.bcast.cmd(fit.cm <- npconmode(bws=bw.cm), caller.execute=TRUE)",
     "  stopifnot(inherits(fit, 'npregression'))",
     "  stopifnot(inherits(fit.sc, 'smoothcoefficient'))",
     "  stopifnot(inherits(fit.pl, 'plregression'))",
@@ -874,6 +982,8 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
     "  stopifnot(inherits(cop, 'data.frame'))",
     "  stopifnot(nrow(cop) == 9L)",
     "  stopifnot(all(is.finite(cop$copula)))",
+    "  stopifnot(inherits(fit.cm, 'conmode'))",
+    "  cat('PROFILE_NPCONMODE_ROUTE_OK\\n')",
     "  cat('PROFILE_NPCOPULA_ROUTE_OK\\n')",
     "  cat('PROFILE_ROUTE_OK\\n')",
     "  mpi.bcast.cmd(mpi.quit(), caller.execute=TRUE)",
@@ -919,5 +1029,9 @@ test_that("profile mode smoke completes under mpiexec when enabled", {
 
   expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("PROFILE_ROUTE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PROFILE_NPCONMODE_ROUTE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("PROFILE_NPCOPULA_ROUTE_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })

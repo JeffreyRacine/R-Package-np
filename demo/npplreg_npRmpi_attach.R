@@ -11,6 +11,7 @@ library(npRmpi)
 ##
 ## Initialize master and slaves.
 npRmpi.init(mode="attach", comm=1, autodispatch=TRUE)
+options(np.messages=FALSE)
 
 if (mpi.comm.rank(0L) == 0L) {
 
