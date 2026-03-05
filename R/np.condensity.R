@@ -258,10 +258,6 @@ npcdens.conbandwidth <- function(bws,
   }
   basis.code <- as.integer(npLpBasisCode(basis.engine))
 
-  if (!identical(reg.engine, "lc")) {
-    stop("regtype='ll'/'lp' for npcdens is not enabled yet in this tranche")
-  }
-
   myopti <- list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,

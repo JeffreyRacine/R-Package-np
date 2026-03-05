@@ -106,3 +106,57 @@ test_that("npc* conditional regtype argument contracts fail fast", {
     "regtype='lc' does not accept basis/degree/bernstein.basis"
   )
 })
+
+test_that("npcdens ll matches lp(degree=1, basis='glp')", {
+  d <- make_xy()
+
+  bw.ll <- npcdensbw(
+    xdat = d$x,
+    ydat = d$y,
+    bws = c(0.35, 0.35),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdensbw(
+    xdat = d$x,
+    ydat = d$y,
+    bws = c(0.35, 0.35),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = 1L
+  )
+
+  fit.ll <- npcdens(bws = bw.ll, txdat = d$x, tydat = d$y, gradients = TRUE)
+  fit.lp <- npcdens(bws = bw.lp, txdat = d$x, tydat = d$y, gradients = TRUE)
+
+  expect_equal(fitted(fit.ll), fitted(fit.lp), tolerance = 1e-10)
+  expect_equal(fit.ll$congrad, fit.lp$congrad, tolerance = 1e-10)
+})
+
+test_that("npcdist ll matches lp(degree=1, basis='glp')", {
+  d <- make_xy()
+
+  bw.ll <- npcdistbw(
+    xdat = d$x,
+    ydat = d$y,
+    bws = c(0.35, 0.35),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdistbw(
+    xdat = d$x,
+    ydat = d$y,
+    bws = c(0.35, 0.35),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = 1L
+  )
+
+  fit.ll <- npcdist(bws = bw.ll, txdat = d$x, tydat = d$y, gradients = TRUE)
+  fit.lp <- npcdist(bws = bw.lp, txdat = d$x, tydat = d$y, gradients = TRUE)
+
+  expect_equal(fitted(fit.ll), fitted(fit.lp), tolerance = 1e-10)
+  expect_equal(fit.ll$congrad, fit.lp$congrad, tolerance = 1e-10)
+})

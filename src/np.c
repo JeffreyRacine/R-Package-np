@@ -4901,6 +4901,13 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
   int * ipt_XY = NULL, *ipe_XY = NULL;
   int operator;
 
+  int int_ll_eff;
+  int ycat_offset;
+  int xcat_offset;
+  int saved_cker_bound;
+  double * saved_ckerlb = NULL;
+  double * saved_ckerub = NULL;
+
 
   num_var_unordered_extern = myopti[CD_CNUNOI];
   num_var_ordered_extern = myopti[CD_CNORDI];
@@ -5209,38 +5216,290 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
     }
   }
 
-  np_kernel_estimate_con_dens_dist_categorical(KERNEL_den_extern,
-                                               KERNEL_den_unordered_extern,
-                                               KERNEL_den_ordered_extern,
-                                               KERNEL_reg_extern,
-                                               KERNEL_reg_unordered_extern,
-                                               KERNEL_reg_ordered_extern,
-                                               BANDWIDTH_den_extern,
-                                               operator,
-                                               num_obs_train_extern,
-                                               num_obs_eval_extern,
-                                               num_var_unordered_extern,
-                                               num_var_ordered_extern,
-                                               num_var_continuous_extern,
-                                               num_reg_unordered_extern,
-                                               num_reg_ordered_extern,
-                                               num_reg_continuous_extern,
-                                               matrix_XY_unordered_train_extern, 
-                                               matrix_XY_ordered_train_extern, 
-                                               matrix_XY_continuous_train_extern, 
-                                               matrix_XY_unordered_eval_extern, 
-                                               matrix_XY_ordered_eval_extern, 
-                                               matrix_XY_continuous_eval_extern, 
-                                               &vector_scale_factor[1],
-                                               num_categories_extern,
-                                               num_categories_extern_XY,
-                                               matrix_categorical_vals_extern,
-                                               matrix_categorical_vals_extern_XY,
-                                               pdf,
-                                               pdf_stderr,
-                                               pdf_deriv,
-                                               pdf_deriv_stderr,
-                                               &log_likelihood);
+  int_ll_eff = int_ll_extern;
+  if((int_ll_eff == LL_LP) && (num_reg_continuous_extern == 0))
+    int_ll_eff = LL_LC;
+
+  if(int_ll_eff == LL_LC){
+    np_kernel_estimate_con_dens_dist_categorical(KERNEL_den_extern,
+                                                 KERNEL_den_unordered_extern,
+                                                 KERNEL_den_ordered_extern,
+                                                 KERNEL_reg_extern,
+                                                 KERNEL_reg_unordered_extern,
+                                                 KERNEL_reg_ordered_extern,
+                                                 BANDWIDTH_den_extern,
+                                                 operator,
+                                                 num_obs_train_extern,
+                                                 num_obs_eval_extern,
+                                                 num_var_unordered_extern,
+                                                 num_var_ordered_extern,
+                                                 num_var_continuous_extern,
+                                                 num_reg_unordered_extern,
+                                                 num_reg_ordered_extern,
+                                                 num_reg_continuous_extern,
+                                                 matrix_XY_unordered_train_extern,
+                                                 matrix_XY_ordered_train_extern,
+                                                 matrix_XY_continuous_train_extern,
+                                                 matrix_XY_unordered_eval_extern,
+                                                 matrix_XY_ordered_eval_extern,
+                                                 matrix_XY_continuous_eval_extern,
+                                                 &vector_scale_factor[1],
+                                                 num_categories_extern,
+                                                 num_categories_extern_XY,
+                                                 matrix_categorical_vals_extern,
+                                                 matrix_categorical_vals_extern_XY,
+                                                 pdf,
+                                                 pdf_stderr,
+                                                 pdf_deriv,
+                                                 pdf_deriv_stderr,
+                                                 &log_likelihood);
+  } else {
+    int status = 0;
+    double *vsf_x = NULL, *vsf_y = NULL, *ykw = NULL, *y_eval_one = NULL;
+    double *mean_one = NULL, *stderr_one = NULL;
+    double **xuno_eval_one = NULL, **xord_eval_one = NULL, **xcon_eval_one = NULL;
+    double **yuno_eval_one = NULL, **yord_eval_one = NULL, **ycon_eval_one = NULL;
+    double **grad_one = NULL, **graderr_one = NULL;
+    int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
+    double RS = 0.0, MSE = 0.0, MAE = 0.0, MAPE = 0.0, CORR = 0.0, SIGN = 0.0;
+    int num_y_vars = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
+    int num_x_vars = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
+
+    if((int_ll_eff == LL_LP) &&
+       ((vector_glp_degree_extern == NULL) || (num_reg_continuous_extern <= 0)))
+      error("np_density_conditional: LP conditional path requires continuous x variables and GLP degree metadata");
+
+    ycat_offset = 0;
+    xcat_offset = num_var_unordered_extern + num_var_ordered_extern;
+
+    vsf_x = alloc_vecd(MAX(1, num_x_vars));
+    vsf_y = alloc_vecd(MAX(1, num_y_vars));
+    ykw = alloc_vecd(MAX(1, num_obs_train_extern));
+    y_eval_one = alloc_vecd(1);
+    mean_one = alloc_vecd(1);
+    stderr_one = alloc_vecd(1);
+
+    if(num_reg_unordered_extern > 0) xuno_eval_one = alloc_matd(1, num_reg_unordered_extern);
+    if(num_reg_ordered_extern > 0) xord_eval_one = alloc_matd(1, num_reg_ordered_extern);
+    if(num_reg_continuous_extern > 0) xcon_eval_one = alloc_matd(1, num_reg_continuous_extern);
+
+    if(num_var_unordered_extern > 0) yuno_eval_one = alloc_matd(1, num_var_unordered_extern);
+    if(num_var_ordered_extern > 0) yord_eval_one = alloc_matd(1, num_var_ordered_extern);
+    if(num_var_continuous_extern > 0) ycon_eval_one = alloc_matd(1, num_var_continuous_extern);
+
+    if(do_grad && (num_x_vars > 0)){
+      grad_one = alloc_matd(1, num_x_vars);
+      graderr_one = alloc_matd(1, num_x_vars);
+    }
+
+    kernel_cy = (int *)calloc((size_t)MAX(1, num_var_continuous_extern), sizeof(int));
+    kernel_uy = (int *)calloc((size_t)MAX(1, num_var_unordered_extern), sizeof(int));
+    kernel_oy = (int *)calloc((size_t)MAX(1, num_var_ordered_extern), sizeof(int));
+    operator_y = (int *)calloc((size_t)MAX(1, num_y_vars), sizeof(int));
+
+    if((vsf_x == NULL) || (vsf_y == NULL) || (ykw == NULL) ||
+       (y_eval_one == NULL) || (mean_one == NULL) || (stderr_one == NULL) ||
+       (kernel_cy == NULL) || (kernel_uy == NULL) || (kernel_oy == NULL) ||
+       (operator_y == NULL) ||
+       ((num_reg_unordered_extern > 0) && (xuno_eval_one == NULL)) ||
+       ((num_reg_ordered_extern > 0) && (xord_eval_one == NULL)) ||
+       ((num_reg_continuous_extern > 0) && (xcon_eval_one == NULL)) ||
+       ((num_var_unordered_extern > 0) && (yuno_eval_one == NULL)) ||
+       ((num_var_ordered_extern > 0) && (yord_eval_one == NULL)) ||
+       ((num_var_continuous_extern > 0) && (ycon_eval_one == NULL)) ||
+       (do_grad && (num_x_vars > 0) && ((grad_one == NULL) || (graderr_one == NULL))))
+      error("np_density_conditional: memory allocation failed in conditional LP path");
+
+    for(i = 0; i < num_var_continuous_extern; i++) kernel_cy[i] = KERNEL_den_extern;
+    for(i = 0; i < num_var_unordered_extern; i++) kernel_uy[i] = KERNEL_den_unordered_extern;
+    for(i = 0; i < num_var_ordered_extern; i++) kernel_oy[i] = KERNEL_den_ordered_extern;
+    for(i = 0; i < num_y_vars; i++) operator_y[i] = operator;
+
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      vsf_x[i] = vector_scale_factor[1 + i];
+    for(i = 0; i < num_reg_unordered_extern; i++)
+      vsf_x[num_reg_continuous_extern + i] =
+        vector_scale_factor[1 + num_reg_continuous_extern + num_var_continuous_extern +
+                            num_var_unordered_extern + num_var_ordered_extern + i];
+    for(i = 0; i < num_reg_ordered_extern; i++)
+      vsf_x[num_reg_continuous_extern + num_reg_unordered_extern + i] =
+        vector_scale_factor[1 + num_reg_continuous_extern + num_var_continuous_extern +
+                            num_var_unordered_extern + num_var_ordered_extern +
+                            num_reg_unordered_extern + i];
+
+    for(i = 0; i < num_var_continuous_extern; i++)
+      vsf_y[i] = vector_scale_factor[1 + num_reg_continuous_extern + i];
+    for(i = 0; i < num_var_unordered_extern; i++)
+      vsf_y[num_var_continuous_extern + i] =
+        vector_scale_factor[1 + num_reg_continuous_extern + num_var_continuous_extern + i];
+    for(i = 0; i < num_var_ordered_extern; i++)
+      vsf_y[num_var_continuous_extern + num_var_unordered_extern + i] =
+        vector_scale_factor[1 + num_reg_continuous_extern + num_var_continuous_extern +
+                            num_var_unordered_extern + i];
+
+    saved_cker_bound = int_cker_bound_extern;
+    saved_ckerlb = vector_ckerlb_extern;
+    saved_ckerub = vector_ckerub_extern;
+    log_likelihood = 0.0;
+
+    for(j = 0; j < num_obs_eval_extern; j++){
+      for(i = 0; i < num_reg_unordered_extern; i++)
+        xuno_eval_one[i][0] = matrix_XY_unordered_eval_extern[i][j];
+      for(i = 0; i < num_reg_ordered_extern; i++)
+        xord_eval_one[i][0] = matrix_XY_ordered_eval_extern[i][j];
+      for(i = 0; i < num_reg_continuous_extern; i++)
+        xcon_eval_one[i][0] = matrix_XY_continuous_eval_extern[i][j];
+
+      for(i = 0; i < num_var_unordered_extern; i++)
+        yuno_eval_one[i][0] = matrix_XY_unordered_eval_extern[num_reg_unordered_extern + i][j];
+      for(i = 0; i < num_var_ordered_extern; i++)
+        yord_eval_one[i][0] = matrix_XY_ordered_eval_extern[num_reg_ordered_extern + i][j];
+      for(i = 0; i < num_var_continuous_extern; i++)
+        ycon_eval_one[i][0] = matrix_XY_continuous_eval_extern[num_reg_continuous_extern + i][j];
+
+      int_cker_bound_extern = int_cyker_bound_extern;
+      vector_ckerlb_extern = vector_cykerlb_extern;
+      vector_ckerub_extern = vector_cykerub_extern;
+
+      status = kernel_weighted_sum_np(kernel_cy,
+                                      kernel_uy,
+                                      kernel_oy,
+                                      BANDWIDTH_den_extern,
+                                      num_obs_train_extern,
+                                      1,
+                                      num_var_unordered_extern,
+                                      num_var_ordered_extern,
+                                      num_var_continuous_extern,
+                                      0,
+                                      0,
+                                      1,
+                                      1,
+                                      1,
+                                      0,
+                                      0,
+                                      0,
+                                      0,
+                                      operator_y,
+                                      OP_NOOP,
+                                      0,
+                                      0,
+                                      NULL,
+                                      0,
+                                      0,
+                                      0,
+                                      int_TREE_Y,
+                                      0,
+                                      NULL,
+                                      NULL,
+                                      NULL,
+                                      NULL,
+                                      (num_var_unordered_extern > 0) ? matrix_XY_unordered_train_extern + num_reg_unordered_extern : NULL,
+                                      (num_var_ordered_extern > 0) ? matrix_XY_ordered_train_extern + num_reg_ordered_extern : NULL,
+                                      (num_var_continuous_extern > 0) ? matrix_XY_continuous_train_extern + num_reg_continuous_extern : NULL,
+                                      yuno_eval_one,
+                                      yord_eval_one,
+                                      ycon_eval_one,
+                                      NULL,
+                                      NULL,
+                                      NULL,
+                                      vsf_y,
+                                      0,
+                                      NULL,
+                                      NULL,
+                                      NULL,
+                                      num_categories_extern + ycat_offset,
+                                      matrix_categorical_vals_extern + ycat_offset,
+                                      NULL,
+                                      NULL,
+                                      NULL,
+                                      ykw);
+      if(status != 0)
+        error("np_density_conditional: y-kernel response construction failed in LP path");
+
+      y_eval_one[0] = ykw[0];
+
+      int_cker_bound_extern = int_cxker_bound_extern;
+      vector_ckerlb_extern = vector_cxkerlb_extern;
+      vector_ckerub_extern = vector_cxkerub_extern;
+
+      status = kernel_estimate_regression_categorical_tree_np(int_ll_eff,
+                                                               KERNEL_reg_extern,
+                                                               KERNEL_reg_unordered_extern,
+                                                               KERNEL_reg_ordered_extern,
+                                                               BANDWIDTH_den_extern,
+                                                               num_obs_train_extern,
+                                                               1,
+                                                               num_reg_unordered_extern,
+                                                               num_reg_ordered_extern,
+                                                               num_reg_continuous_extern,
+                                                               matrix_XY_unordered_train_extern,
+                                                               matrix_XY_ordered_train_extern,
+                                                               matrix_XY_continuous_train_extern,
+                                                               xuno_eval_one,
+                                                               xord_eval_one,
+                                                               xcon_eval_one,
+                                                               ykw,
+                                                               y_eval_one,
+                                                               vsf_x,
+                                                               num_categories_extern + xcat_offset,
+                                                               matrix_categorical_vals_extern + xcat_offset,
+                                                               mean_one,
+                                                               grad_one,
+                                                               stderr_one,
+                                                               graderr_one,
+                                                               &RS,
+                                                               &MSE,
+                                                               &MAE,
+                                                               &MAPE,
+                                                               &CORR,
+                                                               &SIGN);
+
+      if(status != 0)
+        error("np_density_conditional: regression LP solve failed in conditional LP path");
+
+      pdf[j] = mean_one[0];
+      pdf_stderr[j] = stderr_one[0];
+
+      if(dens_or_dist == NP_DO_DENS){
+        const double val = (pdf[j] < DBL_MIN) ? DBL_MIN : pdf[j];
+        log_likelihood += log(val);
+      }
+
+      if(do_grad){
+        for(i = 0; i < num_x_vars; i++){
+          pdf_deriv[i][j] = (grad_one != NULL) ? grad_one[i][0] : 0.0;
+          pdf_deriv_stderr[i][j] = (graderr_one != NULL) ? graderr_one[i][0] : 0.0;
+        }
+      }
+    }
+
+    int_cker_bound_extern = saved_cker_bound;
+    vector_ckerlb_extern = saved_ckerlb;
+    vector_ckerub_extern = saved_ckerub;
+
+    safe_free(vsf_x);
+    safe_free(vsf_y);
+    safe_free(ykw);
+    safe_free(y_eval_one);
+    safe_free(mean_one);
+    safe_free(stderr_one);
+
+    if(xuno_eval_one != NULL) free_mat(xuno_eval_one, num_reg_unordered_extern);
+    if(xord_eval_one != NULL) free_mat(xord_eval_one, num_reg_ordered_extern);
+    if(xcon_eval_one != NULL) free_mat(xcon_eval_one, num_reg_continuous_extern);
+
+    if(yuno_eval_one != NULL) free_mat(yuno_eval_one, num_var_unordered_extern);
+    if(yord_eval_one != NULL) free_mat(yord_eval_one, num_var_ordered_extern);
+    if(ycon_eval_one != NULL) free_mat(ycon_eval_one, num_var_continuous_extern);
+
+    if(grad_one != NULL) free_mat(grad_one, num_x_vars);
+    if(graderr_one != NULL) free_mat(graderr_one, num_x_vars);
+
+    safe_free(kernel_cy);
+    safe_free(kernel_uy);
+    safe_free(kernel_oy);
+    safe_free(operator_y);
+  }
 
 
   /* return data to R */
