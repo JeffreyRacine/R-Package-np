@@ -749,7 +749,7 @@
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("inid regression fast path produced non-finite values")
+    stop("inid regression helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
 }
@@ -1028,7 +1028,7 @@
 
   p <- ncol(txdat)
   if (p < 1L)
-    stop("plreg inid fast path requires at least one linear regressor")
+    stop("plreg inid helper path requires at least one linear regressor")
   if (ncol(exdat) != p)
     stop("training/evaluation linear regressor dimensions do not match")
 
@@ -1110,11 +1110,11 @@
   neval <- nrow(exdat)
   p <- ncol(txdat)
   if (nrow(tzdat) != n)
-    stop("plreg inid fast path requires aligned txdat/tzdat rows")
+    stop("plreg inid helper path requires aligned txdat/tzdat rows")
   if (nrow(ezdat) != neval)
-    stop("plreg inid fast path requires aligned exdat/ezdat rows")
+    stop("plreg inid helper path requires aligned exdat/ezdat rows")
   if (n < 1L || neval < 1L || p < 1L || B < 1L)
-    stop("invalid plreg inid fast path dimensions")
+    stop("invalid plreg inid helper path dimensions")
 
   y.num <- if (is.factor(ydat)) {
     ty <- adjustLevels(data.frame(ydat), bws$bw$yzbw$ydati)
@@ -1218,12 +1218,12 @@
   }
 
   if (any(!is.finite(t0)) || any(!is.finite(tmat)))
-    stop("plreg inid fast path produced non-finite values")
+    stop("plreg inid helper path produced non-finite values")
 
   list(t = tmat, t0 = t0)
 }
 
-.np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum fast path") {
+.np_boot_matrix_from_ksum <- function(ksum, B, nout, where = "ksum helper path") {
   if (is.null(dim(ksum))) {
     if (B == 1L && length(ksum) == nout)
       return(matrix(as.double(ksum), nrow = 1L))
@@ -1394,7 +1394,7 @@
   neval <- nrow(exdat)
 
   if (nrow(ydat) != n || nrow(eydat) != neval)
-    stop("conditional inid fast path requires aligned x/y training and evaluation rows")
+    stop("conditional inid helper path requires aligned x/y training and evaluation rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid conditional inid bootstrap dimensions")
   if (!.np_con_inid_ksum_eligible(bws))
