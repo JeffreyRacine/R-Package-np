@@ -52,3 +52,31 @@ test_that("lp degree-0 gradients fail fast while value path remains available", 
   )
   expect_identical(fit$bws$regtype, "lp")
 })
+
+test_that("lp bernstein OOS warns but keeps canonical npreg path", {
+  set.seed(20260305)
+  dat <- data.frame(y = rnorm(40), x = runif(40))
+  bw <- np::npregbw(
+    y ~ x,
+    data = dat,
+    bws = 0.35,
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    degree = 2,
+    bernstein.basis = TRUE
+  )
+  ex <- data.frame(x = c(-0.2, 1.2))
+  expect_warning(
+    fit <- np::npreg(bws = bw, txdat = dat["x"], tydat = dat$y, exdat = ex),
+    "outside training support"
+  )
+  expect_identical(fit$bws$regtype, "lp")
+})
+
+test_that("npreg.rbandwidth no longer contains bernstein OOS direct fallback", {
+  npreg_rbandwidth <- getFromNamespace("npreg.rbandwidth", "np")
+  fn.body <- paste(deparse(body(npreg_rbandwidth), width.cutoff = 500L), collapse = " ")
+  expect_no_match(fn.body, "bernstein\\.oos")
+  expect_no_match(fn.body, "\\.np_kernel_weights_direct")
+  expect_no_match(fn.body, "\\.npreghat_solve_eval")
+})

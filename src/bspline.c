@@ -750,7 +750,8 @@ bspline_process_interval_for_eval (const double x, size_t * i, const int flag,
 {
   if (flag == -1)
     {
-      GSL_ERROR ("x outside of knot interval", GSL_EINVAL);
+      /* Allow left-tail extrapolation by anchoring to the first valid interval. */
+      *i = w->k - 1;
     }
   else if (flag == 1)
     {
@@ -760,7 +761,8 @@ bspline_process_interval_for_eval (const double x, size_t * i, const int flag,
 	}
       else
 	{
-	  GSL_ERROR ("x outside of knot interval", GSL_EINVAL);
+	  /* Allow right-tail extrapolation by anchoring to the last valid interval. */
+	  *i = w->k + w->l - 2;
 	}
     }
 
@@ -1345,4 +1347,3 @@ void gsl_matrix_set(gsl_matrix * m, const size_t i, const size_t j, const double
 #endif
   m->data[i * m->tda + j] = x ;
 }
-

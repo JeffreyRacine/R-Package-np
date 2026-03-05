@@ -231,7 +231,6 @@ npreg.rbandwidth <-
         eydat <- eydat[keep.eval]
     }
 
-    bernstein.oos <- FALSE
     if (identical(bws$regtype, "lp") &&
         isTRUE(bws$bernstein.basis) &&
         !no.ex &&
@@ -244,7 +243,6 @@ npreg.rbandwidth <-
           out.of.support <- c(out.of.support, colnames(txdat)[ii])
       }
       if (length(out.of.support)) {
-        bernstein.oos <- TRUE
         warning(
           "bernstein.basis=TRUE: evaluation continuous predictor(s) outside training support (",
           paste(unique(out.of.support), collapse = ", "),
@@ -294,139 +292,6 @@ npreg.rbandwidth <-
       
     if (!no.ex)
       exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
-
-    if (isTRUE(bernstein.oos)) {
-      regtype.local <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
-      degree.local <- if (identical(regtype.local, "lc")) {
-        rep.int(0L, bws$ncon)
-      } else if (identical(regtype.local, "ll")) {
-        rep.int(1L, bws$ncon)
-      } else {
-        npValidateGlpDegree(regtype = "lp", degree = bws$degree, ncon = bws$ncon)
-      }
-      basis.local <- npValidateLpBasis(
-        regtype = "lp",
-        basis = if (is.null(bws$basis)) "glp" else bws$basis
-      )
-      bernstein.local <- npValidateGlpBernstein(
-        regtype = "lp",
-        bernstein.basis = isTRUE(bws$bernstein.basis)
-      )
-      con.names <- names(txdat)[which(bws$icon)]
-
-      W.base <- W.lp(
-        xdat = txdat,
-        degree = degree.local,
-        basis = basis.local,
-        bernstein.basis = bernstein.local
-      )
-
-      apply_direct <- function(s = NULL, mean.ref = NULL) {
-        s.local <- .npreghat_resolve_s(s = s, deriv = NULL, ncon = bws$ncon, con.names = con.names)
-        if (any(s.local > degree.local))
-          stop("requested derivative order exceeds local polynomial degree")
-        if (all(degree.local == 0L) && any(s.local > 0L))
-          stop("local-constant derivative fallback is not available")
-
-        W.eval <- W.lp(
-          xdat = txdat,
-          exdat = exdat,
-          degree = degree.local,
-          gradient.vec = if (any(s.local > 0L)) s.local else NULL,
-          basis = basis.local,
-          bernstein.basis = bernstein.local
-        )
-        if (!is.matrix(W.eval))
-          W.eval <- matrix(W.eval, nrow = enrow)
-        if (nrow(W.eval) != enrow)
-          W.eval <- matrix(W.eval, nrow = enrow, byrow = FALSE)
-
-        out <- numeric(enrow)
-        se <- numeric(enrow)
-        for (ii in seq_len(enrow)) {
-          kw <- .np_kernel_weights_direct(
-            bws = bws,
-            txdat = txdat,
-            exdat = exdat[ii, , drop = FALSE],
-            leave.one.out = FALSE,
-            bandwidth.divide = TRUE,
-            kernel.pow = 1.0
-          )[, 1L]
-          solve.out <- .npreghat_solve_eval(
-            W = W.base,
-            w.eval = W.eval[ii, ],
-            k = kw,
-            ridge.base = 1.0e-12
-          )
-          if (is.null(solve.out))
-            stop(sprintf("failed to solve local system at evaluation row %d", ii))
-          h.row <- kw * drop(W.base %*% solve.out$v)
-          out[ii] <- drop(crossprod(h.row, tydat))
-
-          # Robust local-sandwich variance for the current evaluation row.
-          mean.local <- if (is.null(mean.ref)) out[ii] else mean.ref[ii]
-          u2 <- (tydat - mean.local)^2
-          v.mat <- crossprod(W.base, W.base * ((kw * kw) * u2))
-          var.local <- drop(crossprod(solve.out$v, v.mat %*% solve.out$v))
-          se[ii] <- sqrt(max(var.local, 0.0))
-        }
-        list(fit = out, se = se)
-      }
-
-      mean.fallback.out <- apply_direct()
-      mean.fallback <- mean.fallback.out$fit
-      merr.fallback <- mean.fallback.out$se
-      merr.fallback[!is.finite(merr.fallback)] <- NA_real_
-
-      grad.fallback <- NULL
-      gerr.fallback <- NULL
-      if (gradients) {
-        grad.fallback <- matrix(0.0, nrow = enrow, ncol = ncol)
-        gerr.fallback <- matrix(NA_real_, nrow = enrow, ncol = ncol)
-        cont.idx <- which(bws$icon)
-        if (length(cont.idx)) {
-          for (jj in seq_along(cont.idx)) {
-            s.vec <- integer(bws$ncon)
-            s.vec[jj] <- 1L
-            grad.fallback.out <- apply_direct(s = s.vec, mean.ref = mean.fallback)
-            grad.fallback[, cont.idx[jj]] <- grad.fallback.out$fit
-            gerr.fallback[, cont.idx[jj]] <- grad.fallback.out$se
-          }
-          gerr.fallback[!is.finite(gerr.fallback)] <- NA_real_
-        }
-      }
-
-      fit.elapsed <- proc.time()[3] - fit.start
-      optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
-      total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
-
-      ev.args <- list(
-        bws = bws,
-        eval = if (no.ex) txdat else exdat,
-        mean = mean.fallback,
-        merr = merr.fallback,
-        ntrain = tnrow,
-        trainiseval = no.ex,
-        gradients = gradients,
-        residuals = residuals,
-        xtra = rep(NA_real_, 6L),
-        rows.omit = rows.omit,
-        timing = bws$timing,
-        total.time = total.time,
-        optim.time = optim.time,
-        fit.time = fit.elapsed
-      )
-      if (gradients) {
-        ev.args$grad <- grad.fallback
-        ev.args$gerr <- gerr.fallback
-      }
-      if (residuals)
-        ev.args$resid <- resid
-      if (identical(bws$regtype, "lp"))
-        ev.args$gradient.order <- glp.gradient.order
-
-      return(do.call(npregression, ev.args))
-    }
 
     if (!no.ex)
       npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
