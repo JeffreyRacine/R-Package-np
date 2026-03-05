@@ -2006,14 +2006,6 @@ compute.bootstrap.errors.rbandwidth =
     is.inid <- plot.errors.boot.method == "inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
 
-    if (identical(bws$regtype, "lp") && isTRUE(bws$bernstein.basis) &&
-        (is.inid || is.block || is.wild.hat)) {
-      stop(
-        "bootstrap plot errors for regtype='lp' with bernstein.basis=TRUE are unsupported because helper parity with predict() is unresolved; use plot.errors.method='asymptotic' or bernstein.basis=FALSE",
-        call. = FALSE
-      )
-    }
-
     if (is.wild.hat && gradients) {
       cont.idx <- which(bws$xdati$icon)
       if (is.na(match(slice.index, cont.idx))) {
