@@ -1,3 +1,75 @@
+test_that("helper constructors forward kernel options and normalize bwscaling", {
+  set.seed(8310)
+  n <- 50
+  xdat <- data.frame(x = runif(n))
+  ydat <- data.frame(y = runif(n))
+
+  for (builder in c("npcdensbw", "npcdistbw")) {
+    bw <- do.call(builder, list(
+      xdat = xdat,
+      ydat = ydat,
+      bws = c(0.22, 0.22),
+      bandwidth.compute = FALSE,
+      bwtype = "fixed",
+      bwscaling = TRUE,
+      cxkertype = "epanechnikov",
+      cykertype = "epanechnikov",
+      cxkerorder = 2L,
+      cykerorder = 2L,
+      cxkerbound = "fixed",
+      cykerbound = "fixed",
+      cxkerlb = 0.0,
+      cykerlb = 0.0,
+      cxkerub = 1.0,
+      cykerub = 1.0
+    ))
+
+    cap <- new.env(parent = emptyenv())
+    cap$calls <- list()
+    np.ns <- asNamespace("np")
+
+    trace(
+      what = "kbandwidth.numeric",
+      where = np.ns,
+      tracer = bquote({
+        assign(
+          "calls",
+          c(
+            get("calls", envir = .(cap)),
+            list(list(
+              bwscaling = bwscaling,
+              ckertype = ckertype,
+              ckerorder = ckerorder,
+              ckerbound = ckerbound
+            ))
+          ),
+          envir = .(cap)
+        )
+      }),
+      print = FALSE
+    )
+    on.exit(try(untrace("kbandwidth.numeric", where = np.ns), silent = TRUE), add = TRUE)
+
+    make.kx <- getFromNamespace(".np_con_make_kbandwidth_x", "np")
+    make.kxy <- getFromNamespace(".np_con_make_kbandwidth_xy", "np")
+
+    obj1 <- make.kx(bws = bw, xdat = xdat)
+    obj2 <- make.kxy(bws = bw, xdat = xdat, ydat = ydat)
+
+    expect_false(is.null(obj1))
+    expect_false(is.null(obj2))
+    expect_true(length(cap$calls) >= 2L)
+
+    for (call in cap$calls) {
+      expect_identical(isTRUE(call$bwscaling), FALSE)
+      expect_identical(as.character(call$ckertype), as.character(bw$cxkertype))
+      expect_identical(as.character(call$ckerorder), as.character(bw$cxkerorder))
+      expect_identical(as.character(call$ckerbound), as.character(bw$cxkerbound))
+    }
+
+  }
+})
+
 test_that("semihat regbw args forward index LP/kernel options with bound collapse", {
   set.seed(8311)
   n <- 64
