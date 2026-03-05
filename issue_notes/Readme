@@ -74,3 +74,20 @@ Current status (2026-03-02):
   `R_PROFILE_USER=<.../Rprofile>`, `R_PROFILE=""`, and `R CMD BATCH --no-save` (no `--vanilla`).
 - profile-plot route passes in current tree for direct master `plot(...)` with
   `npRmpi.autodispatch=TRUE`, and nested `mpi.bcast.cmd(plot(...))` fails fast by contract.
+
+Plot operational gate (migrated plot methods)
+
+Run this to validate migrated plot-method operability in one pass:
+
+./issue_notes/run_plot_operational_gate.sh
+
+Optional explicit output directory:
+
+./issue_notes/run_plot_operational_gate.sh /tmp/nprmpi_plot_operational_gate_manual
+
+What it runs:
+
+- session/attach tiny plot sanity smokes,
+- plot-focused contract suite (helper/bootstrap/guardrails/session subprocess),
+- attach/profile/profile-plot route matrix via `run_attach_profile_validations.sh`,
+- orphan slave-process scan and summarized pass/fail report.
