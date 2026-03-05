@@ -2457,7 +2457,7 @@
   xdat <- toFrame(xdat)
   kbandwidth.numeric(
     bw = bws$xbw,
-    bwscaling = FALSE,
+    bwscaling = if (is.null(bws$bwscaling)) FALSE else bws$bwscaling,
     bwtype = bws$type,
     ckertype = bws$cxkertype,
     ckerorder = bws$cxkerorder,
@@ -2483,7 +2483,7 @@
 
   kbandwidth.numeric(
     bw = c(bws$xbw, bws$ybw),
-    bwscaling = FALSE,
+    bwscaling = if (is.null(bws$bwscaling)) FALSE else bws$bwscaling,
     bwtype = bws$type,
     ckertype = bws$cxkertype,
     ckerorder = bws$cxkerorder,

@@ -84,9 +84,10 @@
     common.scale <- normalized.opts$common.scale
 
     if (plot.errors.method == "asymptotic") {
-      warning(paste("asymptotic errors are not supported with single index regression.\n",
-                    "Proceeding without calculating errors"))
-      plot.errors.method = "none"
+      stop(
+        "asymptotic errors are unsupported for single-index regression plots; use bootstrap errors",
+        call. = FALSE
+      )
     }
 
     plot.errors = (plot.errors.method != "none")
