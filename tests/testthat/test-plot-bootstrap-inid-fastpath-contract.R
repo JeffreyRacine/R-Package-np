@@ -238,6 +238,104 @@ test_that("npplreg inid fast path matches explicit resample refits", {
   expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-7)
 })
 
+test_that("npreg inid fast path supports continuous-slice gradients", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = FALSE)
+
+  set.seed(3212)
+  n <- 45
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(2 * pi * x1) + 0.4 * x2 + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(15), , drop = FALSE]
+  B <- 9L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  bw <- npregbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "ll",
+    bws = c(0.3, 0.3),
+    bandwidth.compute = FALSE
+  )
+
+  fast.fun <- getFromNamespace(".np_inid_boot_from_regression", "npRmpi")
+  fast.out <- fast.fun(
+    xdat = tx,
+    exdat = ex,
+    bws = bw,
+    ydat = y,
+    B = B,
+    counts = counts,
+    gradients = TRUE,
+    gradient.order = 1L,
+    slice.index = 1L
+  )
+
+  explicit.t <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+  for (b in seq_len(B)) {
+    idx <- rep.int(seq_len(n), counts[, b])
+    explicit.t[b, ] <- npreg(
+      txdat = tx[idx, , drop = FALSE],
+      tydat = y[idx],
+      exdat = ex,
+      bws = bw,
+      gradients = TRUE,
+      gradient.order = 1L,
+      warn.glp.gradient = FALSE
+    )$grad[, 1L]
+  }
+
+  fit0 <- npreg(
+    txdat = tx,
+    tydat = y,
+    exdat = ex,
+    bws = bw,
+    gradients = TRUE,
+    gradient.order = 1L,
+    warn.glp.gradient = FALSE
+  )$grad[, 1L]
+
+  expect_equal(fast.out$t, explicit.t, tolerance = 1e-6)
+  expect_equal(as.vector(fast.out$t0), as.vector(fit0), tolerance = 1e-6)
+})
+
+test_that("rbandwidth plot bootstrap supports gradients across methods", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(322)
+  n <- 60
+  x <- runif(n)
+  y <- sin(2 * pi * x) + rnorm(n, sd = 0.15)
+  bw <- npregbw(y ~ x, regtype = "ll", nmulti = 1)
+
+  methods <- c("inid", "fixed", "geom", "wild")
+  for (m in methods) {
+    set.seed(8320 + match(m, methods))
+    out <- suppressWarnings(
+      plot(
+        bw,
+        plot.behavior = "data",
+        perspective = FALSE,
+        gradients = TRUE,
+        plot.errors.method = "bootstrap",
+        plot.errors.boot.method = m,
+        plot.errors.boot.num = 9
+      )
+    )
+    expect_type(out, "list")
+    expect_true(length(out) > 0)
+  }
+})
+
 test_that("npscoef plot bootstrap inid supports ll/lp basis variants", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
