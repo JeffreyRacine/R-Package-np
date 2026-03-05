@@ -166,10 +166,8 @@ npscoefbw.scbandwidth <-
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
     if (cv.iterate)
       cv.num.iterations <- npValidatePositiveInteger(cv.num.iterations, "cv.num.iterations")
-    if (!identical(regtype, "lc") && cv.iterate) {
-      warning("cv.iterate currently supports regtype='lc' for npscoefbw; using cv.iterate=FALSE")
-      cv.iterate <- FALSE
-    }
+    if (!identical(regtype, "lc") && cv.iterate)
+      stop("cv.iterate currently supports regtype='lc' for npscoefbw")
 
     if (!(is.vector(ydat) || is.factor(ydat)))
       stop("'ydat' must be a vector or a factor")
