@@ -299,3 +299,216 @@ test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
   expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
   expect_equal(as.numeric(fit.ll$xcoef), as.numeric(fit.lp$xcoef), tolerance = 1e-10)
 })
+
+test_that("npscoef multivariate cv and estimation match for ll and lp(degree=1)", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260306)
+  n <- 65
+  x1 <- rnorm(n)
+  x2 <- rnorm(n)
+  z1 <- runif(n, -1, 1)
+  z2 <- runif(n, -1, 1)
+  b1 <- 1 + 0.6 * z1 - 0.2 * z2
+  b2 <- -0.5 + 0.4 * z1 + 0.3 * z2
+  y <- b1 * x1 + b2 * x2 + rnorm(n, sd = 0.08)
+
+  tx <- data.frame(x1 = x1, x2 = x2)
+  tz <- data.frame(z1 = z1, z2 = z2)
+
+  set.seed(7702)
+  bw.ll.cv <- npscoefbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "ll",
+    nmulti = 1L,
+    cv.iterate = FALSE,
+    backfit.iterate = FALSE
+  )
+  set.seed(7702)
+  bw.lp.cv <- npscoefbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(1L, 1L),
+    nmulti = 1L,
+    cv.iterate = FALSE,
+    backfit.iterate = FALSE
+  )
+
+  expect_equal(as.numeric(bw.ll.cv$fval), as.numeric(bw.lp.cv$fval), tolerance = 1e-10)
+  expect_equal(as.numeric(bw.ll.cv$bw), as.numeric(bw.lp.cv$bw), tolerance = 1e-9)
+  expect_equal(as.numeric(bw.ll.cv$num.feval), as.numeric(bw.lp.cv$num.feval), tolerance = 0)
+
+  bw.ll <- npscoefbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "ll",
+    bws = c(0.7, 0.7),
+    bandwidth.compute = FALSE
+  )
+  bw.lp <- npscoefbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(1L, 1L),
+    bws = c(0.7, 0.7),
+    bandwidth.compute = FALSE
+  )
+
+  fit.ll <- npscoef(bws = bw.ll, txdat = tx, tzdat = tz, tydat = y, errors = FALSE)
+  fit.lp <- npscoef(bws = bw.lp, txdat = tx, tzdat = tz, tydat = y, errors = FALSE)
+
+  expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
+  expect_equal(as.numeric(fit.ll$beta), as.numeric(fit.lp$beta), tolerance = 1e-10)
+})
+
+test_that("npindex multivariate cv and estimation match for ll and lp(degree=1)", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  n <- 75
+
+  run_case <- function(method) {
+    set.seed(if (identical(method, "ichimura")) 20260307 else 20260308)
+    x1 <- runif(n, -1, 1)
+    x2 <- runif(n, -1, 1)
+    x3 <- runif(n, -1, 1)
+    eta <- x1 + 0.5 * x2 - 0.4 * x3
+    y <- if (identical(method, "ichimura")) {
+      eta + 0.3 * eta^2 + rnorm(n, sd = 0.1)
+    } else {
+      rbinom(n, size = 1L, prob = plogis(eta))
+    }
+    tx <- data.frame(x1 = x1, x2 = x2, x3 = x3)
+
+    set.seed(8802)
+    bw.ll.cv <- suppressWarnings(npindexbw(
+      xdat = tx,
+      ydat = y,
+      regtype = "ll",
+      method = method,
+      nmulti = 1L
+    ))
+    set.seed(8802)
+    bw.lp.cv <- suppressWarnings(npindexbw(
+      xdat = tx,
+      ydat = y,
+      regtype = "lp",
+      basis = "glp",
+      degree = 1L,
+      method = method,
+      nmulti = 1L
+    ))
+
+    expect_equal(as.numeric(bw.ll.cv$fval), as.numeric(bw.lp.cv$fval), tolerance = 1e-10)
+    expect_equal(
+      c(as.numeric(bw.ll.cv$beta), as.numeric(bw.ll.cv$bw)),
+      c(as.numeric(bw.lp.cv$beta), as.numeric(bw.lp.cv$bw)),
+      tolerance = 1e-9
+    )
+    expect_equal(as.numeric(bw.ll.cv$num.feval), as.numeric(bw.lp.cv$num.feval), tolerance = 0)
+
+    bws.fixed <- c(1, 0.3, -0.2, 0.6)
+    bw.ll <- suppressWarnings(npindexbw(
+      xdat = tx,
+      ydat = y,
+      bws = bws.fixed,
+      regtype = "ll",
+      method = method,
+      bandwidth.compute = FALSE
+    ))
+    bw.lp <- suppressWarnings(npindexbw(
+      xdat = tx,
+      ydat = y,
+      bws = bws.fixed,
+      regtype = "lp",
+      basis = "glp",
+      degree = 1L,
+      method = method,
+      bandwidth.compute = FALSE
+    ))
+
+    fit.ll <- npindex(bws = bw.ll, txdat = tx, tydat = y)
+    fit.lp <- npindex(bws = bw.lp, txdat = tx, tydat = y)
+    expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
+    expect_equal(as.numeric(fit.ll$beta), as.numeric(fit.lp$beta), tolerance = 1e-10)
+  }
+
+  run_case("ichimura")
+  run_case("kleinspady")
+})
+
+test_that("npplreg multivariate cv and estimation match for ll and lp(degree=1)", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  set.seed(20260309)
+  n <- 70
+  z1 <- runif(n, -1, 1)
+  z2 <- runif(n, -1, 1)
+  x1 <- 0.8 * z1 + rnorm(n, sd = 0.2)
+  x2 <- -0.6 * z2 + rnorm(n, sd = 0.2)
+  y <- 1 + 1.2 * x1 - 0.7 * x2 + 0.4 * z1^2 - 0.3 * z1 * z2 + rnorm(n, sd = 0.1)
+
+  tx <- data.frame(x1 = x1, x2 = x2)
+  tz <- data.frame(z1 = z1, z2 = z2)
+
+  set.seed(9902)
+  bw.ll.cv <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "ll",
+    nmulti = 1L
+  )
+  set.seed(9902)
+  bw.lp.cv <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(1L, 1L),
+    nmulti = 1L
+  )
+
+  expect_equal(as.numeric(bw.ll.cv$fval), as.numeric(bw.lp.cv$fval), tolerance = 1e-10)
+  expect_equal(as.numeric(bw.ll.cv$bw$yzbw$bw), as.numeric(bw.lp.cv$bw$yzbw$bw), tolerance = 1e-9)
+  expect_equal(as.numeric(bw.ll.cv$bw[[2L]]$bw), as.numeric(bw.lp.cv$bw[[2L]]$bw), tolerance = 1e-9)
+  expect_equal(as.numeric(bw.ll.cv$bw[[3L]]$bw), as.numeric(bw.lp.cv$bw[[3L]]$bw), tolerance = 1e-9)
+  expect_equal(as.numeric(bw.ll.cv$num.feval), as.numeric(bw.lp.cv$num.feval), tolerance = 0)
+
+  bws.fixed <- matrix(c(0.3, 0.3, 0.3, 0.3, 0.3, 0.3), nrow = 3L)
+  bw.ll <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "ll",
+    bws = bws.fixed,
+    bandwidth.compute = FALSE
+  )
+  bw.lp <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = c(1L, 1L),
+    bws = bws.fixed,
+    bandwidth.compute = FALSE
+  )
+
+  fit.ll <- npplreg(bws = bw.ll, txdat = tx, tzdat = tz, tydat = y)
+  fit.lp <- npplreg(bws = bw.lp, txdat = tx, tzdat = tz, tydat = y)
+
+  expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
+  expect_equal(as.numeric(fit.ll$xcoef), as.numeric(fit.lp$xcoef), tolerance = 1e-10)
+})
