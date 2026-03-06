@@ -611,46 +611,39 @@ npscoef.scbandwidth <-
 
     if (errors || (residuals && miss.ex)) {
       if (errors) {
-        tywtm <- npksum(txdat = tzdat,
-                        tydat = yW,
-                        weights = yW,
-                        bws = bws,
-                        leave.one.out = leave.one.out)$ksum
-
-        tyw <- tywtm[-1,1,]
-        tm <- tywtm[-1,-1,]
-
-        mean.fit <- rep(maxPenalty,nrow(txdat))
-        ridge.grid.tm <- npRidgeSequenceAdditive(n.train = nrow(txdat), cap = 1.0)
-        ridge.tm <- rep.int(ridge.grid.tm[1L], nrow(txdat))
-        ridge.idx.tm <- rep.int(1L, nrow(txdat))
-        doridge <- rep.int(TRUE, nrow(txdat))
-
-        nc <- ncol(tm[,,1])
-
-        while(any(doridge)){
-          ii <- seq_len(nrow(txdat))[doridge]
-          for (jj in ii) {
-            doridge[jj] <- FALSE
-            ridge.val <- ridge.tm[jj]*tyw[,jj][1]/NZD(tm[,,jj][1,1])
-            beta.jj <- tryCatch(
-              solve(tm[,,jj] + diag(rep(ridge.tm[jj], nc)),
-                    tyw[,jj] + c(ridge.val, rep(0, nc - 1))),
-              error = function(e) e
-            )
-            if (inherits(beta.jj, "error")) {
-              ridge.idx.tm[jj] <- ridge.idx.tm[jj] + 1L
-              if (ridge.idx.tm[jj] <= length(ridge.grid.tm)) {
-                ridge.tm[jj] <- ridge.grid.tm[ridge.idx.tm[jj]]
-                doridge[jj] <- TRUE
-              }
-              beta.jj <- rep(maxPenalty, nc)
-            }
-            mean.fit[jj] <- W.train[jj,, drop = FALSE] %*% beta.jj
-          }
+        if (identical(reg.engine, "lc")) {
+          train.moments <- lc_moments(z.eval = NULL, leave.one.out.eval = leave.one.out)
+          train.solve <- solve_moment_system(
+            tyw = train.moments$tyw,
+            tww = train.moments$tww,
+            W.eval.design = W.train
+          )
+          mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.solve$coef[,i] })
+          u2.W <- (resid <- tydat - mean.fit)^2
+          moments$s <- lc_moments(
+            z.eval = if (miss.ex) NULL else ezdat,
+            leave.one.out.eval = leave.one.out,
+            u2 = u2.W
+          )$s
+        } else {
+          lp_state.err <- .npscoef_lp_state(
+            bws = bws,
+            tzdat = tzdat,
+            ezdat = tzdat,
+            leave.one.out = leave.one.out,
+            where = "npscoef"
+          )
+          train.moments <- lp_tensor_moments(lp_state.err)
+          train.solve <- solve_moment_system(
+            tyw = train.moments$tyw,
+            tww = train.moments$tww,
+            W.eval.design = W.train,
+            Wz.eval = lp_state.err$W.eval
+          )
+          mean.fit <- sapply(seq_len(tnrow), function(i) { W.train[i,, drop = FALSE] %*% train.solve$coef[,i] })
+          u2.W <- (resid <- tydat - mean.fit)^2
+          moments$s <- lp_tensor_moments(lp_state, u2 = u2.W)$s
         }
-
-        u2.W <- (resid <- tydat - mean.fit)^2
       } else if (residuals && miss.ex) {
         resid <- tydat - mean
       }
