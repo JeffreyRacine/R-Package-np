@@ -261,6 +261,13 @@ npplregbw.default =
       bernstein.basis = spec$bernstein.basis.engine,
       bandwidth.compute = FALSE
     )
+    kernel.arg.names <- intersect(
+      c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
+        "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype"),
+      dot.names
+    )
+    if (length(kernel.arg.names))
+      reg.args[kernel.arg.names] <- dots[kernel.arg.names]
 
     plband = list()
     plband$yzbw = do.call(
@@ -294,7 +301,10 @@ npplregbw.default =
 
 
     mc.names <- names(match.call(expand.dots = FALSE))
-    margs <- c("ftol", "itmax", "nmulti", "remin", "small", "tol")
+    margs <- c("regtype", "basis", "degree", "bernstein.basis",
+               "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
+               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
+               "ftol", "itmax", "nmulti", "remin", "small", "tol")
     m <- match(margs, mc.names, nomatch = 0)
     any.m <- any(m != 0)
 
