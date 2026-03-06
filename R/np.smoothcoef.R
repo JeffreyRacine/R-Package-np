@@ -361,6 +361,7 @@ npscoef.scbandwidth <-
 
     W.train <- W <- as.matrix(data.frame(1,txdat))
     yW <- as.matrix(data.frame(tydat,1,txdat))
+    maxPenalty <- sqrt(.Machine$double.xmax)
 
     if (miss.z){
       tzdat <- txdat
@@ -368,33 +369,97 @@ npscoef.scbandwidth <-
         ezdat <- exdat
     }
 
-    moment_from_kw <- function(kw, W.design, yresp) {
-      m <- ncol(kw)
+    error.precomp <- NULL
+    if (errors) {
+      tywtm <- npksum(txdat = tzdat,
+                      tydat = yW,
+                      weights = yW,
+                      bws = bws,
+                      leave.one.out = leave.one.out)$ksum
+
+      tyw.err <- tywtm[-1,1,]
+      tm.err <- tywtm[-1,-1,]
+
+      mean.fit <- rep(maxPenalty, nrow(txdat))
+      ridge.grid.tm <- npRidgeSequenceAdditive(n.train = nrow(txdat), cap = 1.0)
+      ridge.tm <- rep.int(ridge.grid.tm[1L], nrow(txdat))
+      ridge.idx.tm <- rep.int(1L, nrow(txdat))
+      doridge.tm <- rep.int(TRUE, nrow(txdat))
+
+      nc.err <- ncol(tm.err[,,1])
+
+      while(any(doridge.tm)){
+        ii <- seq_len(nrow(txdat))[doridge.tm]
+        for (jj in ii) {
+          doridge.tm[jj] <- FALSE
+          ridge.val <- ridge.tm[jj]*tyw.err[,jj][1]/NZD(tm.err[,,jj][1,1])
+          beta.jj <- tryCatch(
+            solve(tm.err[,,jj] + diag(rep(ridge.tm[jj], nc.err)),
+                  tyw.err[,jj] + c(ridge.val, rep(0, nc.err - 1))),
+            error = function(e) e
+          )
+          if (inherits(beta.jj, "error")) {
+            ridge.idx.tm[jj] <- ridge.idx.tm[jj] + 1L
+            if (ridge.idx.tm[jj] <= length(ridge.grid.tm)) {
+              ridge.tm[jj] <- ridge.grid.tm[ridge.idx.tm[jj]]
+              doridge.tm[jj] <- TRUE
+            }
+            beta.jj <- rep(maxPenalty, nc.err)
+          }
+          mean.fit[jj] <- W.train[jj,, drop = FALSE] %*% beta.jj
+        }
+      }
+
+      error.precomp <- list(
+        mean.fit = mean.fit,
+        resid = tydat - mean.fit,
+        u2.W = (tydat - mean.fit)^2
+      )
+    }
+
+    moment_from_effective_weights <- function(weight.state, W.design, yresp, u2 = NULL) {
+      m <- nrow(weight.state$z.eval)
       p <- ncol(W.design)
       tyw.out <- matrix(0.0, nrow = p, ncol = m)
       tww.out <- array(0.0, dim = c(p, p, m))
-      for (ii in seq_len(m)) {
-        k <- kw[, ii]
-        yk <- yresp * k
-        tyw.out[, ii] <- as.vector(crossprod(W.design, yk))
-        tww.out[, , ii] <- crossprod(W.design, W.design * k)
+      s.out <- if (is.null(u2)) NULL else array(0.0, dim = c(p, p, m))
+      chunk.size <- .npscoef_effective_weight_chunk_size(ntrain = nrow(W.design), neval = m)
+      starts <- seq.int(1L, m, by = chunk.size)
+      for (start in starts) {
+        stopi <- min(m, start + chunk.size - 1L)
+        idx <- start:stopi
+        k.chunk <- .npscoef_effective_weight_chunk(state = weight.state, eval.indices = idx)
+        for (jj in seq_along(idx)) {
+          ii <- idx[[jj]]
+          k <- k.chunk[, jj]
+          yk <- yresp * k
+          tyw.out[, ii] <- as.vector(crossprod(W.design, yk))
+          tww.out[, , ii] <- crossprod(W.design, W.design * k)
+          if (!is.null(s.out))
+            s.out[, , ii] <- crossprod(W.design, W.design * ((k^2) * u2))
+        }
       }
-      list(tyw = tyw.out, tww = tww.out)
+      list(tyw = tyw.out, tww = tww.out, s = s.out)
     }
 
-    kw <- .npscoef_weight_matrix(
+    weight.state <- .npscoef_effective_weight_state(
       bws = bws,
       tzdat = tzdat,
       ezdat = if (miss.ex) tzdat else ezdat,
       leave.one.out = leave.one.out
     )
-    moments <- moment_from_kw(kw = kw, W.design = W.train, yresp = tydat)
+    moments <- moment_from_effective_weights(
+      weight.state = weight.state,
+      W.design = W.train,
+      yresp = tydat,
+      u2 = if (is.null(error.precomp)) NULL else as.double(error.precomp$u2.W)
+    )
     tyw <- moments$tyw
     tww <- moments$tww
 
     tnrow <- nrow(txdat)
     enrow <- (if (miss.ex) nrow(txdat) else nrow(exdat))
-    if (ncol(kw) != enrow)
+    if (ncol(tyw) != enrow)
       stop("internal npscoef weight-matrix dimension mismatch")
 
     if (!miss.ex)
@@ -402,7 +467,6 @@ npscoef.scbandwidth <-
 
     ## ridging jracine Jan 28 2009
 
-    maxPenalty <- sqrt(.Machine$double.xmax)
     coef.mat <- matrix(maxPenalty, ncol(W), enrow)
     ridge.grid <- npRidgeSequenceAdditive(n.train = tnrow, cap = 1.0)
     ridge <- rep.int(ridge.grid[1L], enrow)
@@ -492,46 +556,8 @@ npscoef.scbandwidth <-
 
     if (errors || (residuals && miss.ex)) {
       if (errors) {
-        tywtm <- npksum(txdat = tzdat,
-                        tydat = yW,
-                        weights = yW,
-                        bws = bws,
-                        leave.one.out = leave.one.out)$ksum
-
-        tyw <- tywtm[-1,1,]
-        tm <- tywtm[-1,-1,]
-
-        mean.fit <- rep(maxPenalty,nrow(txdat))
-        ridge.grid.tm <- npRidgeSequenceAdditive(n.train = nrow(txdat), cap = 1.0)
-        ridge.tm <- rep.int(ridge.grid.tm[1L], nrow(txdat))
-        ridge.idx.tm <- rep.int(1L, nrow(txdat))
-        doridge <- rep.int(TRUE, nrow(txdat))
-
-        nc <- ncol(tm[,,1])
-
-        while(any(doridge)){
-          ii <- seq_len(nrow(txdat))[doridge]
-          for (jj in ii) {
-            doridge[jj] <- FALSE
-            ridge.val <- ridge.tm[jj]*tyw[,jj][1]/NZD(tm[,,jj][1,1])
-            beta.jj <- tryCatch(
-              solve(tm[,,jj] + diag(rep(ridge.tm[jj], nc)),
-                    tyw[,jj] + c(ridge.val, rep(0, nc - 1))),
-              error = function(e) e
-            )
-            if (inherits(beta.jj, "error")) {
-              ridge.idx.tm[jj] <- ridge.idx.tm[jj] + 1L
-              if (ridge.idx.tm[jj] <= length(ridge.grid.tm)) {
-                ridge.tm[jj] <- ridge.grid.tm[ridge.idx.tm[jj]]
-                doridge[jj] <- TRUE
-              }
-              beta.jj <- rep(maxPenalty, nc)
-            }
-            mean.fit[jj] <- W.train[jj,, drop = FALSE] %*% beta.jj
-          }
-        }
-
-        u2.W <- (resid <- tydat - mean.fit)^2
+        u2.W <- error.precomp$u2.W
+        resid <- error.precomp$resid
       } else if (residuals && miss.ex) {
         resid <- tydat - mean
       }
@@ -562,7 +588,7 @@ npscoef.scbandwidth <-
         cm <- safe_chol2inv(tww[,,i], ridge[i], 1.0 / nrow(txdat))
         if (is.null(cm))
           next
-        s.mat <- crossprod(W.train, W.train * ((kw[, i]^2) * u2))
+        s.mat <- moments$s[, , i]
         vcv <- cm %*% s.mat %*% cm
         w.i <- W[i,,drop=FALSE]
         merr[i] <- sqrt(max(drop(w.i %*% vcv %*% t(w.i)), 0.0))

@@ -85,7 +85,7 @@
   ))
 }
 
-.npscoef_weight_matrix <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
+.npscoef_effective_weight_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
   tzdat <- toFrame(tzdat)
   ezdat <- toFrame(ezdat)
   leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
@@ -96,16 +96,16 @@
     stop("leave.one.out=TRUE requires evaluation 'z' data to match training 'z' data")
   }
 
+  state <- list(
+    bws = bws,
+    regtype = regtype,
+    leave.one.out = leave.one.out
+  )
+
   if (identical(regtype, "lc")) {
-    ez.arg <- if (leave.one.out) NULL else ezdat
-    return(.np_kernel_weights_direct(
-      bws = bws,
-      txdat = tzdat,
-      exdat = ez.arg,
-      leave.one.out = leave.one.out,
-      bandwidth.divide = TRUE,
-      kernel.pow = 1.0
-    ))
+    state$z.train <- adjustLevels(tzdat, bws$zdati)
+    state$z.eval <- if (leave.one.out) state$z.train else adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
+    return(state)
   }
 
   rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
@@ -128,18 +128,7 @@
 
   z.train <- adjustLevels(tzdat, rbw$xdati)
   z.eval <- if (leave.one.out) z.train else adjustLevels(ezdat, rbw$xdati, allowNewCells = TRUE)
-  kw <- .np_kernel_weights_direct(
-    bws = rbw,
-    txdat = z.train,
-    exdat = if (leave.one.out) NULL else z.eval,
-    leave.one.out = leave.one.out,
-    bandwidth.divide = TRUE,
-    kernel.pow = 1.0
-  )
-
-  ntrain <- nrow(z.train)
-  neval <- ncol(kw)
-  W <- W.lp(
+  W.train <- W.lp(
     xdat = z.train,
     degree = degree.rbw,
     basis = basis.rbw,
@@ -152,23 +141,97 @@
     basis = basis.rbw,
     bernstein.basis = bernstein.rbw
   )
+  neval <- nrow(z.eval)
   if (!is.matrix(W.eval))
     W.eval <- matrix(W.eval, nrow = neval)
   if (nrow(W.eval) != neval)
     W.eval <- matrix(W.eval, nrow = neval, byrow = FALSE)
 
-  H <- matrix(0.0, nrow = ntrain, ncol = neval)
-  for (ii in seq_len(neval)) {
+  state$rbw <- rbw
+  state$z.train <- z.train
+  state$z.eval <- z.eval
+  state$W.train <- W.train
+  state$W.eval <- W.eval
+  state
+}
+
+.npscoef_effective_weight_one <- function(state, eval.index) {
+  .npscoef_effective_weight_chunk(state = state, eval.indices = eval.index)[, 1L]
+}
+
+.npscoef_effective_weight_chunk_size <- function(ntrain, neval) {
+  chunk.opt <- getOption("np.scoef.weight.chunk.size")
+  if (!is.null(chunk.opt)) {
+    chunk.opt <- as.integer(chunk.opt)[1L]
+    if (is.na(chunk.opt) || chunk.opt < 1L)
+      stop("option 'np.scoef.weight.chunk.size' must be a positive integer")
+    return(min(as.integer(neval), chunk.opt))
+  }
+
+  target.bytes <- 32L * 1024L * 1024L
+  chunk <- as.integer(floor(target.bytes / (8 * max(1L, as.integer(ntrain)))))
+  if (!is.finite(chunk) || is.na(chunk) || chunk < 1L)
+    chunk <- 1L
+  min(as.integer(neval), max(1L, chunk))
+}
+
+.npscoef_effective_weight_chunk <- function(state, eval.indices) {
+  eval.indices <- as.integer(eval.indices)
+  if (!length(eval.indices))
+    return(matrix(0.0, nrow = nrow(state$z.train), ncol = 0L))
+  if (anyNA(eval.indices) || any(!is.finite(eval.indices)) ||
+      any(eval.indices < 1L) || any(eval.indices > nrow(state$z.eval))) {
+    stop("invalid evaluation index for smooth-coefficient effective weights", call. = FALSE)
+  }
+
+  eval.rows <- state$z.eval[eval.indices, , drop = FALSE]
+  bw.use <- if (identical(state$regtype, "lc")) state$bws else state$rbw
+  kw <- .np_kernel_weights_direct(
+    txdat = state$z.train,
+    exdat = eval.rows,
+    bws = bw.use,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+
+  if (isTRUE(state$leave.one.out)) {
+    for (jj in seq_along(eval.indices))
+      kw[eval.indices[[jj]], jj] <- 0.0
+  }
+
+  if (identical(state$regtype, "lc"))
+    return(kw)
+
+  out <- matrix(0.0, nrow = nrow(kw), ncol = ncol(kw))
+  for (jj in seq_along(eval.indices)) {
+    ii <- eval.indices[[jj]]
     solve.out <- .npreghat_solve_eval(
-      W = W,
-      w.eval = W.eval[ii, ],
-      k = kw[, ii],
+      W = state$W.train,
+      w.eval = state$W.eval[ii, ],
+      k = kw[, jj],
       ridge.base = 0.0
     )
-    if (is.null(solve.out))
-      stop(sprintf("failed to solve smooth-coefficient hat system at evaluation row %d", ii))
-    H[, ii] <- kw[, ii] * drop(W %*% solve.out$v)
+    if (is.null(solve.out)) {
+      stop(sprintf("failed to solve smooth-coefficient effective-weight system at evaluation row %d", ii))
+    }
+    out[, jj] <- kw[, jj] * drop(state$W.train %*% solve.out$v)
   }
+
+  out
+}
+
+.npscoef_weight_matrix <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
+  state <- .npscoef_effective_weight_state(
+    bws = bws,
+    tzdat = tzdat,
+    ezdat = ezdat,
+    leave.one.out = leave.one.out
+  )
+  neval <- nrow(state$z.eval)
+  ntrain <- nrow(state$z.train)
+  H <- matrix(0.0, nrow = ntrain, ncol = neval)
+  for (ii in seq_len(neval))
+    H[, ii] <- .npscoef_effective_weight_one(state = state, eval.index = ii)
   H
 }
 
