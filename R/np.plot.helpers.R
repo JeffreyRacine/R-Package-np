@@ -1274,57 +1274,169 @@
   ncon <- bws$ncon
 
   if (isTRUE(gradients)) {
-    fit0 <- suppressWarnings(npreg(
-      txdat = xdat,
-      tydat = ydat,
-      exdat = exdat,
-      bws = bws,
-      gradients = TRUE,
-      gradient.order = gradient.order,
-      warn.glp.gradient = FALSE
-    ))
+    fit0 <- .npRmpi_with_local_bootstrap(
+      suppressWarnings(npreg(
+        txdat = xdat,
+        tydat = ydat,
+        exdat = exdat,
+        bws = bws,
+        gradients = TRUE,
+        gradient.order = gradient.order,
+        warn.glp.gradient = FALSE
+      ))
+    )
     t0 <- fit0$grad[, slice.index]
 
-    chunk.size <- .np_inid_chunk_size(n = n, B = B)
-    prob <- rep.int(1 / n, n)
-    tmat <- matrix(NA_real_, nrow = B, ncol = length(t0))
-    progress.label <- if (!is.null(counts.drawer)) "Plot bootstrap block" else "Plot bootstrap inid"
-    progress <- .np_plot_progress_begin(total = B, label = progress.label)
-    on.exit({
-      .np_plot_progress_end(progress)
-    }, add = TRUE)
+    nout <- length(t0)
+    chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+      B = B,
+      chunk.size = .np_inid_chunk_size(n = n, B = B),
+      comm = 1L,
+      include.master = TRUE
+    )
+    tmat <- matrix(NA_real_, nrow = B, ncol = nout)
 
-    counts.mat <- if (!is.null(counts)) .np_inid_counts_matrix(n = n, B = B, counts = counts) else NULL
-
-    start <- 1L
-    while (start <= B) {
-      stopi <- min(B, start + chunk.size - 1L)
-      bsz <- stopi - start + 1L
-      counts.chunk <- if (!is.null(counts.mat)) {
-        counts.mat[, start:stopi, drop = FALSE]
-      } else if (!is.null(counts.drawer)) {
-        .np_inid_counts_matrix(n = n, B = bsz, counts = counts.drawer(start, stopi))
-      } else {
-        stats::rmultinom(n = bsz, size = n, prob = prob)
-      }
-
-      for (jj in seq_len(bsz)) {
-        idx <- rep.int(seq_len(n), as.integer(counts.chunk[, jj]))
-        fit.b <- suppressWarnings(npreg(
-          txdat = xdat[idx, , drop = FALSE],
-          tydat = ydat[idx],
-          exdat = exdat,
-          bws = bws,
-          gradients = TRUE,
-          gradient.order = gradient.order,
-          warn.glp.gradient = FALSE
-        ))
-        tmat[start + jj - 1L, ] <- fit.b$grad[, slice.index]
-      }
-
-      progress <- .np_plot_progress_tick(state = progress, done = stopi)
-      start <- stopi + 1L
+    compute_grad_chunk <- function(counts.chunk) {
+      counts.chunk <- as.matrix(counts.chunk)
+      bsz <- ncol(counts.chunk)
+      out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+      out <- .npRmpi_with_local_bootstrap({
+        for (jj in seq_len(bsz)) {
+          idx <- rep.int(seq_len(n), as.integer(counts.chunk[, jj]))
+          fit.b <- suppressWarnings(npreg(
+            txdat = xdat[idx, , drop = FALSE],
+            tydat = ydat[idx],
+            exdat = exdat,
+            bws = bws,
+            gradients = TRUE,
+            gradient.order = gradient.order,
+            warn.glp.gradient = FALSE
+          ))
+          out[jj, ] <- fit.b$grad[, slice.index]
+        }
+        out
+      })
     }
+
+    if (!is.null(counts)) {
+      counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+
+      if (.npRmpi_bootstrap_fanout_enabled(
+            comm = 1L,
+            n = n,
+            B = B,
+            chunk.size = chunk.size,
+            what = "inid-regression-grad-counts"
+          )) {
+        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        worker <- function(task) {
+          start <- as.integer(task$start)
+          stopi <- start + as.integer(task$bsz) - 1L
+          compute_grad_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
+        }
+        tmat <- .npRmpi_bootstrap_run_fanout(
+          tasks = tasks,
+          worker = worker,
+          ncol.out = nout,
+          what = "inid-regression-grad-counts",
+          profile.where = "mpi.applyLB:inid-regression-grad-counts",
+          comm = 1L,
+          required.bindings = list(
+            counts.mat = counts.mat,
+            compute_grad_chunk = compute_grad_chunk
+          )
+        )
+      }
+
+      if (anyNA(tmat)) {
+        .npRmpi_bootstrap_fail_or_fallback(
+          msg = "inid-regression-grad-counts fan-out returned incomplete results",
+          what = "inid-regression-grad-counts"
+        )
+      }
+    } else {
+      if (!is.null(counts.drawer) &&
+          .npRmpi_bootstrap_fanout_enabled(
+            comm = 1L,
+            n = n,
+            B = B,
+            chunk.size = chunk.size,
+            what = "inid-regression-grad-block"
+          )) {
+        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        worker <- function(task) {
+          start <- as.integer(task$start)
+          stopi <- start + as.integer(task$bsz) - 1L
+          counts.chunk <- .np_inid_counts_matrix(
+            n = n,
+            B = as.integer(task$bsz),
+            counts = counts.drawer(start, stopi)
+          )
+          compute_grad_chunk(counts.chunk = counts.chunk)
+        }
+        tmat <- .npRmpi_bootstrap_run_fanout(
+          tasks = tasks,
+          worker = worker,
+          ncol.out = nout,
+          what = "inid-regression-grad-block",
+          profile.where = "mpi.applyLB:inid-regression-grad-block",
+          comm = 1L,
+          required.bindings = list(
+            n = n,
+            counts.drawer = counts.drawer,
+            compute_grad_chunk = compute_grad_chunk
+          )
+        )
+      }
+
+      if (!is.null(counts.drawer) && anyNA(tmat)) {
+        .npRmpi_bootstrap_fail_or_fallback(
+          msg = "inid-regression-grad-block fan-out returned incomplete results",
+          what = "inid-regression-grad-block"
+        )
+      }
+
+      prob <- rep.int(1 / n, n)
+      if (anyNA(tmat) &&
+          .npRmpi_bootstrap_fanout_enabled(
+            comm = 1L,
+            n = n,
+            B = B,
+            chunk.size = chunk.size,
+            what = "inid-regression-grad"
+          )) {
+        tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+        worker <- function(task) {
+          set.seed(as.integer(task$seed))
+          bsz <- as.integer(task$bsz)
+          counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+          compute_grad_chunk(counts.chunk = counts.chunk)
+        }
+        tmat <- .npRmpi_bootstrap_run_fanout(
+          tasks = tasks,
+          worker = worker,
+          ncol.out = nout,
+          what = "inid-regression-grad",
+          profile.where = "mpi.applyLB:inid-regression-grad",
+          comm = 1L,
+          required.bindings = list(
+            n = n,
+            prob = prob,
+            compute_grad_chunk = compute_grad_chunk
+          )
+        )
+      }
+
+      if (anyNA(tmat)) {
+        .npRmpi_bootstrap_fail_or_fallback(
+          msg = "inid-regression-grad fan-out returned incomplete results",
+          what = "inid-regression-grad"
+        )
+      }
+    }
+
+    if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+      stop("inid regression helper gradient path produced non-finite values")
 
     return(list(t = tmat, t0 = as.vector(t0)))
   }
