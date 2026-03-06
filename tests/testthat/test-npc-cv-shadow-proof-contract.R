@@ -495,6 +495,23 @@ test_that("shadow distribution lp preserves ll canonicalization and tree parity"
 
   expect_equal(ll_res$new, lp_res$new, tolerance = 1e-12)
   expect_equal(lp_tree$new, lp_res$new, tolerance = 1e-12)
+  expect_equal(ll_res$prod, ll_res$new, tolerance = 1e-12)
+  expect_equal(lp_res$prod, lp_res$new, tolerance = 1e-12)
+})
+
+test_that("fixed-bandwidth cdist cvls LP stream avoids dense row storage", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start_matches <- grep("^static int np_conditional_distribution_cvls_fixed_lp_stream\\(", lines)
+  stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
+
+  expect_gte(length(start_matches), 1L)
+  expect_length(stop, 1L)
+  start <- tail(start_matches, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_obs|num_obs_train_extern)[^\\)]*(num_obs|num_obs_train_extern)", body))
 })
 
 test_that("kernelcv no longer references dense shadow proof helpers", {
