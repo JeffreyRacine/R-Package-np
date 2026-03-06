@@ -15030,105 +15030,15 @@ int np_shadow_cv_con_density_ml(double *vector_scale_factor, double *cv){
     goto cleanup_cvml_shadow;
 
   *cv = 0.0;
-  if(int_ll_extern == LL_LP){
-    const int num_x_vars = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
-    double *vsf_x = alloc_vecd(MAX(1, num_x_vars));
-    double *ykw = alloc_vecd(MAX(1, num_obs_train_extern));
-    double *mean_one = alloc_vecd(1);
-    double *stderr_one = alloc_vecd(1);
-    double **xuno_eval_one = (num_reg_unordered_extern > 0) ? alloc_matd(1, num_reg_unordered_extern) : NULL;
-    double **xord_eval_one = (num_reg_ordered_extern > 0) ? alloc_matd(1, num_reg_ordered_extern) : NULL;
-    double **xcon_eval_one = (num_reg_continuous_extern > 0) ? alloc_matd(1, num_reg_continuous_extern) : NULL;
-    double RS = 0.0, MSE = 0.0, MAE = 0.0, MAPE = 0.0, CORR = 0.0, SIGN = 0.0;
+  if(np_shadow_conditional_build_x_weights(vector_scale_factor, weights) != 0)
+    goto cleanup_cvml_shadow;
 
-    if((vsf_x == NULL) || (ykw == NULL) || (mean_one == NULL) || (stderr_one == NULL) ||
-       ((num_reg_unordered_extern > 0) && (xuno_eval_one == NULL)) ||
-       ((num_reg_ordered_extern > 0) && (xord_eval_one == NULL)) ||
-       ((num_reg_continuous_extern > 0) && (xcon_eval_one == NULL)))
-      goto cleanup_cvml_shadow;
-
-    np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
-                          num_var_ordered_extern,
-                          num_var_continuous_extern,
-                          num_reg_unordered_extern,
-                          num_reg_ordered_extern,
-                          num_reg_continuous_extern,
-                          vector_scale_factor,
-                          NULL,
-                          NULL,
-                          vsf_x,
-                          NULL,
-                          NULL,
-                          NULL, NULL, NULL,
-                          NULL, NULL, NULL);
-
-    for(i = 0; i < num_obs_train_extern; i++){
-      const int tree_i = (int_TREE_X == NP_TREE_TRUE) ? ipt_lookup_extern_X[i] : i;
-      for(j = 0; j < num_obs_train_extern; j++){
-        const int orig_j = (int_TREE_X == NP_TREE_TRUE) ? ipt_extern_X[j] : j;
-        ykw[j] = yrow[(size_t)i*(size_t)num_obs_train_extern + (size_t)orig_j];
-      }
-      for(j = 0; j < num_reg_unordered_extern; j++)
-        xuno_eval_one[j][0] = matrix_X_unordered_train_extern[j][tree_i];
-      for(j = 0; j < num_reg_ordered_extern; j++)
-        xord_eval_one[j][0] = matrix_X_ordered_train_extern[j][tree_i];
-      for(j = 0; j < num_reg_continuous_extern; j++)
-        xcon_eval_one[j][0] = matrix_X_continuous_train_extern[j][tree_i];
-
-      if(kernel_estimate_regression_categorical_tree_np(LL_LP,
-                                                        KERNEL_reg_extern,
-                                                        KERNEL_reg_unordered_extern,
-                                                        KERNEL_reg_ordered_extern,
-                                                        BANDWIDTH_den_extern,
-                                                        num_obs_train_extern,
-                                                        1,
-                                                        num_reg_unordered_extern,
-                                                        num_reg_ordered_extern,
-                                                        num_reg_continuous_extern,
-                                                        matrix_X_unordered_train_extern,
-                                                        matrix_X_ordered_train_extern,
-                                                        matrix_X_continuous_train_extern,
-                                                        xuno_eval_one,
-                                                        xord_eval_one,
-                                                        xcon_eval_one,
-                                                        ykw,
-                                                        NULL,
-                                                        vsf_x,
-                                                        num_categories_extern_X,
-                                                        matrix_categorical_vals_extern_X,
-                                                        mean_one,
-                                                        NULL,
-                                                        stderr_one,
-                                                        NULL,
-                                                        &RS,
-                                                        &MSE,
-                                                        &MAE,
-                                                        &MAPE,
-                                                        &CORR,
-                                                        &SIGN) != 0)
-        goto cleanup_cvml_shadow;
-
-      *cv -= log((mean_one[0] > DBL_MIN) ? mean_one[0] : DBL_MIN);
-    }
-
-    safe_free(vsf_x);
-    safe_free(ykw);
-    safe_free(mean_one);
-    safe_free(stderr_one);
-    if(xuno_eval_one != NULL) free_mat(xuno_eval_one, num_reg_unordered_extern);
-    if(xord_eval_one != NULL) free_mat(xord_eval_one, num_reg_ordered_extern);
-    if(xcon_eval_one != NULL) free_mat(xcon_eval_one, num_reg_continuous_extern);
-  } else {
-    if(np_shadow_conditional_build_x_weights(vector_scale_factor, weights) != 0)
-      goto cleanup_cvml_shadow;
-
-    for(i = 0; i < num_obs_train_extern; i++){
-      double fit = 0.0;
-      for(j = 0; j < num_obs_train_extern; j++)
-        fit += weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)j] *
-          yrow[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
-      *cv -= log((fit > DBL_MIN) ? fit : DBL_MIN);
-    }
+  for(i = 0; i < num_obs_train_extern; i++){
+    double fit = 0.0;
+    for(j = 0; j < num_obs_train_extern; j++)
+      fit += weights[(size_t)i*(size_t)num_obs_train_extern + (size_t)j] *
+        yrow[(size_t)i*(size_t)num_obs_train_extern + (size_t)j];
+    *cv -= log((fit > DBL_MIN) ? fit : DBL_MIN);
   }
 
   status = 0;
