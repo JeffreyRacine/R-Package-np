@@ -25,8 +25,7 @@ plbandwidth <-
            total.time = NA,...){
 
     npRejectLegacyLpArgs(names(list(...)), where = "plbandwidth")
-    spec <- npResolveCanonicalConditionalRegSpec(
-      mc.names = names(match.call(expand.dots = FALSE)),
+    spec <- npCanonicalConditionalRegSpec(
       regtype = regtype,
       basis = basis,
       degree = degree,

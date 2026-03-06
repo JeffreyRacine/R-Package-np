@@ -28,10 +28,18 @@ sibandwidth <-
            ...){
 
   ndim = length(beta)
-  regtype <- match.arg(regtype)
-  basis <- npValidateLpBasis(regtype = regtype, basis = basis)
-  degree <- npValidateGlpDegree(regtype = regtype, degree = degree, ncon = 1L)
-  bernstein.basis <- npValidateGlpBernstein(regtype = regtype, bernstein.basis = bernstein.basis)
+  spec <- npCanonicalConditionalRegSpec(
+    regtype = regtype,
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    ncon = 1L,
+    where = "sibandwidth"
+  )
+  regtype <- spec$regtype
+  basis <- spec$basis
+  degree <- spec$degree
+  bernstein.basis <- spec$bernstein.basis
   method = match.arg(method)
   ckertype = match.arg(ckertype)
   ckerbound = match.arg(ckerbound)
@@ -78,6 +86,10 @@ sibandwidth <-
     basis = basis,
     degree = degree,
     bernstein.basis = bernstein.basis,
+    regtype.engine = spec$regtype.engine,
+    basis.engine = spec$basis.engine,
+    degree.engine = spec$degree.engine,
+    bernstein.basis.engine = spec$bernstein.basis.engine,
     method = method,
     pmethod = switch( method,
       ichimura = "Ichimura",
