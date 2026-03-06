@@ -18,7 +18,7 @@ test_that("npreg cv objective and bandwidths match for ll and lp(degree=1)", {
       xdat = tx,
       ydat = y,
       regtype = "lp",
-      basis = "tensor",
+      basis = "glp",
       degree = 1L,
       bwmethod = m,
       nmulti = 1L
@@ -49,7 +49,7 @@ test_that("npreg and npreghat match for ll and lp(degree=1) in 1D", {
     ydat = y,
     bws = 0.2,
     regtype = "lp",
-    basis = "tensor",
+    basis = "glp",
     degree = 1L,
     bandwidth.compute = FALSE
   )
@@ -107,7 +107,7 @@ test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
     zdat = z,
     ydat = y,
     regtype = "lp",
-    basis = "tensor",
+    basis = "glp",
     degree = 1L,
     nmulti = 1L,
     cv.iterate = FALSE
@@ -129,7 +129,7 @@ test_that("npscoef cv and estimation match for ll and lp(degree=1) in 1D", {
     zdat = z,
     ydat = y,
     regtype = "lp",
-    basis = "tensor",
+    basis = "glp",
     degree = 1L,
     bws = 0.2,
     bandwidth.compute = FALSE
@@ -174,7 +174,7 @@ test_that("npindex cv, fit, and npindexhat(s=1) match for ll and lp(degree=1) in
     xdat = tx,
     ydat = y,
     regtype = "lp",
-    basis = "tensor",
+    basis = "glp",
     degree = 1L,
     method = "ichimura",
     nmulti = 1L
@@ -196,7 +196,7 @@ test_that("npindex cv, fit, and npindexhat(s=1) match for ll and lp(degree=1) in
     ydat = y,
     bws = c(1, 0.25),
     regtype = "lp",
-    basis = "tensor",
+    basis = "glp",
     degree = 1L,
     method = "ichimura",
     bandwidth.compute = FALSE
@@ -235,7 +235,7 @@ test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
     zdat = data.frame(z = z),
     ydat = y,
     regtype = "lp",
-    basis = "tensor",
+    basis = "glp",
     degree = 1L,
     nmulti = 1L
   )
@@ -257,7 +257,7 @@ test_that("npplreg cv and estimation match for ll and lp(degree=1) in 1D", {
     zdat = data.frame(z = z),
     ydat = y,
     regtype = "lp",
-    basis = "tensor",
+    basis = "glp",
     degree = 1L,
     bws = matrix(c(0.2, 0.2), nrow = 2),
     bandwidth.compute = FALSE
