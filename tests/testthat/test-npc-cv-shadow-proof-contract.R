@@ -190,6 +190,58 @@ test_that("shadow density cvml preserves the large-kernel X collapse", {
   expect_equal(res$new, collapsed, tolerance = 1e-9)
 })
 
+test_that("shadow LP objectives are sensitive to degree on oracle cells", {
+  set.seed(123)
+  n <- 35L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1^2 - x$x2 + rnorm(n, sd = 0.05))
+
+  bw.d1 <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.24, 0.31, 0.42),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = rep.int(1L, ncol(x))
+  )
+  bw.d2 <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.24, 0.31, 0.42),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = rep.int(2L, ncol(x))
+  )
+  dens.d1 <- call_shadow_density(bw.d1, x, y, criterion = "cv.ml", compare_old = FALSE)
+  dens.d2 <- call_shadow_density(bw.d2, x, y, criterion = "cv.ml", compare_old = FALSE)
+
+  bw.c1 <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.24, 0.31, 0.42),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = rep.int(1L, ncol(x))
+  )
+  bw.c2 <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.24, 0.31, 0.42),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = rep.int(2L, ncol(x))
+  )
+  dist.d1 <- call_shadow_distribution(bw.c1, x, y, compare_old = FALSE)
+  dist.d2 <- call_shadow_distribution(bw.c2, x, y, compare_old = FALSE)
+
+  expect_gt(abs(dens.d2$new - dens.d1$new), 1e-6)
+  expect_gt(abs(dist.d2$new - dist.d1$new), 1e-8)
+})
+
 test_that("shadow distribution lc matches legacy cvls for both cdfontrain modes", {
   set.seed(55)
   n <- 28L

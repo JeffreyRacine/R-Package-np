@@ -201,6 +201,10 @@ npcdensbw.conbandwidth <-
     tbw$basis.engine <- spec$basis.engine
     tbw$degree.engine <- spec$degree.engine
     tbw$bernstein.basis.engine <- spec$bernstein.basis.engine
+    reg.code <- if (identical(spec$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
+    degree.code <- if (tbw$xncon > 0L) as.integer(spec$degree.engine) else integer(0)
+    basis.code <- as.integer(npLpBasisCode(spec$basis.engine))
+    bernstein.engine <- isTRUE(spec$bernstein.basis.engine)
 
     mysd <- EssDee(data.frame(xcon,ycon))
     nconfac <- nrow^(-1.0/(2.0*bws$cxkerorder+bws$ncon))
@@ -284,6 +288,10 @@ npcdensbw.conbandwidth <-
                               as.integer(max(1, nmulti)),
                               as.integer(penalty_mode),
                               as.double(penalty.multiplier),
+                              as.integer(degree.code),
+                              as.integer(bernstein.engine),
+                              as.integer(basis.code),
+                              as.integer(reg.code),
                               as.double(cxker.bounds.c$lb),
                               as.double(cxker.bounds.c$ub),
                               as.double(cyker.bounds.c$lb),

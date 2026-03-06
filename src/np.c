@@ -832,6 +832,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * objective_function_invalid, double * timing,
                                double * objective_function_fast,
                                int * penalty_mode, double * penalty_mult,
+                               int * glp_degree,
+                               int * glp_bernstein,
+                               int * glp_basis,
+                               int * regtype,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub);
 void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_con,
@@ -2185,6 +2189,10 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                                  SEXP hist_len,
                                  SEXP penalty_mode,
                                  SEXP penalty_mult,
+                                 SEXP glp_degree,
+                                 SEXP glp_bernstein,
+                                 SEXP glp_basis,
+                                 SEXP regtype,
                                  SEXP cxkerlb,
                                  SEXP cxkerub,
                                  SEXP cykerlb,
@@ -2192,6 +2200,7 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP mysd_r=R_NilValue, myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue;
+  SEXP degree_i=R_NilValue;
   SEXP cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
@@ -2199,6 +2208,9 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
+  int bern = asInteger(glp_bernstein);
+  int basis = asInteger(glp_basis);
+  int ll_mode = asInteger(regtype);
   int ncon_x = 0;
   int ncon_y = 0;
   double * cxkerlb_p = NULL;
@@ -2218,6 +2230,7 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   PROTECT(myopti_i = coerceVector(myopti, INTSXP));
   PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
   PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
   PROTECT(cxkerlb_r = coerceVector(cxkerlb, REALSXP));
   PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
@@ -2242,6 +2255,7 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                             INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                             REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                             REAL(out_fast), &pmode, &pmult,
+                            INTEGER(degree_i), &bern, &basis, &ll_mode,
                             cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
 
   PROTECT(out = allocVector(VECSXP, 7));
@@ -2263,7 +2277,7 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(23);
+  UNPROTECT(24);
   return out;
 }
 
@@ -3773,6 +3787,10 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                                double * objective_function_invalid, double * timing,
                                double * objective_function_fast,
                                int * penalty_mode, double * penalty_mult,
+                               int * glp_degree,
+                               int * glp_bernstein,
+                               int * glp_basis,
+                               int * regtype,
                                double * cxkerlb, double * cxkerub,
                                double * cykerlb, double * cykerub){
 /* Likelihood bandwidth selection for density estimation */
@@ -3800,6 +3818,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   int iMultistart, iMs_counter, iNum_Multistart, num_all_var, num_var_var, iImproved;
   int itmax, iter;
   int int_use_starting_values, ibwmfunc, old_cdens, scale_cat;
+  int need_y_side;
 
   int num_all_cvar, num_all_uvar, num_all_ovar;
 
@@ -3877,6 +3896,12 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   bwm_use_transform = 0;
   
   ibwmfunc = myopti[CBW_MI];
+  int_ll_extern = ((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) ? *regtype : LL_LC;
+  vector_glp_degree_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? glp_degree : NULL;
+  vector_glp_gradient_order_extern = NULL;
+  int_glp_bernstein_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
+  int_glp_basis_extern = (((ibwmfunc == CBWM_CVML) || (ibwmfunc == CBWM_CVLS)) && (int_ll_extern == LL_LP)) ? *glp_basis : 1;
+  need_y_side = (ibwmfunc == CBWM_CVLS) || ((ibwmfunc == CBWM_CVML) && (int_ll_extern == LL_LP));
   bwm_use_transform = myopti[CBW_TBNDI];
   if (BANDWIDTH_den_extern != BW_FIXED)
     bwm_use_transform = 0;
@@ -3934,7 +3959,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
   
-  if(ibwmfunc == CBWM_CVLS){
+  if(need_y_side){
     num_categories_extern_Y = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern);
   }
 
@@ -3949,7 +3974,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   matrix_categorical_vals_extern_X = 
     alloc_matd(num_obs_train_extern, num_reg_unordered_extern + num_reg_ordered_extern);
 
-  if(ibwmfunc == CBWM_CVLS){
+  if(need_y_side){
     matrix_categorical_vals_extern_Y = 
       alloc_matd(num_obs_train_extern, num_var_unordered_extern + num_var_ordered_extern);
   }
@@ -4019,7 +4044,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   ipt_extern_X = ipt_X;
   ipt_lookup_extern_X = ipt_lookup_X;
 
-  if(ibwmfunc == CBWM_CVLS){
+  if(need_y_side){
     ipt_Y = (int *)malloc(num_obs_train_extern*sizeof(int));
     if(!(ipt_Y != NULL)){
       safe_free(ipt_X);
@@ -4051,7 +4076,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if(!(ipt_XY != NULL)){
     safe_free(ipt_X);
     safe_free(ipt_lookup_X);
-    if(ibwmfunc == CBWM_CVLS){
+    if(need_y_side){
       safe_free(ipt_Y);
       safe_free(ipt_lookup_Y);
     }
@@ -4062,7 +4087,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   if(!(ipt_lookup_XY != NULL)){
     safe_free(ipt_X);
     safe_free(ipt_lookup_X);
-    if(ibwmfunc == CBWM_CVLS){
+    if(need_y_side){
       safe_free(ipt_Y);
       safe_free(ipt_lookup_Y);
     }
@@ -4081,7 +4106,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
 
   int_TREE_X = int_TREE_X && ((num_reg_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
-  int_TREE_Y = int_TREE_Y && (ibwmfunc == CBWM_CVLS) && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
+  int_TREE_Y = int_TREE_Y && need_y_side && ((num_var_continuous_extern != 0) ? NP_TREE_TRUE : NP_TREE_FALSE) && (BANDWIDTH_den_extern != BW_ADAP_NN);
 
 
   if(int_TREE_X == NP_TREE_TRUE){
@@ -4223,8 +4248,8 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
                         num_categories_extern,
                         matrix_categorical_vals_extern,
                         NULL, NULL, NULL,
-                        num_categories_extern_X, (ibwmfunc == CBWM_CVLS) ? num_categories_extern_Y : NULL, num_categories_extern_XY,
-                        matrix_categorical_vals_extern_X, (ibwmfunc == CBWM_CVLS) ? matrix_categorical_vals_extern_Y : NULL, matrix_categorical_vals_extern_XY);
+                        num_categories_extern_X, need_y_side ? num_categories_extern_Y : NULL, num_categories_extern_XY,
+                        matrix_categorical_vals_extern_X, need_y_side ? matrix_categorical_vals_extern_Y : NULL, matrix_categorical_vals_extern_XY);
   
 
   vector_continuous_stddev = alloc_vecd(num_var_continuous_extern + num_reg_continuous_extern);
@@ -4632,7 +4657,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   free_mat(matrix_categorical_vals_extern_XY, num_reg_unordered_extern + num_reg_ordered_extern +
            num_var_unordered_extern + num_var_ordered_extern);
 
-  if(ibwmfunc == CBWM_CVLS)
+  if(need_y_side)
     free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
   matrix_categorical_vals_extern_Y = NULL;
 
@@ -4644,7 +4669,7 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   safe_free(ipt_lookup_X);
   safe_free(ipt_lookup_XY);
 
-  if(ibwmfunc == CBWM_CVLS){
+  if(need_y_side){
     safe_free(ipt_Y);
     safe_free(ipt_lookup_Y);
   }
@@ -4686,6 +4711,11 @@ void np_density_conditional_bw(double * c_uno, double * c_ord, double * c_con,
   vector_ckerub_extern = NULL;
   safe_free(cxylb);
   safe_free(cxyub);
+  int_ll_extern = LL_LC;
+  vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  np_glp_cv_clear_extern();
 
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");
