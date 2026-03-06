@@ -51,3 +51,14 @@ test_that("density CV tree-bypass predicate is centralized in one helper", {
   # No inline ad hoc usage in if-statements.
   expect_equal(sum(grepl("if\\(gate_x_all_large_fixed \\|\\| !int_TREE_XY \\|\\| \\(BANDWIDTH_den == BW_ADAP_NN\\)\\)", lines)), 0L)
 })
+
+test_that("conditional CV large-kernel gating remains X-only", {
+  src_file <- locate_jksum_c()
+  skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
+
+  lines <- readLines(src_file, warn = FALSE)
+
+  expect_true(any(grepl("Canonical conditional CV gate policy: large-kernel shortcuts are X-only", lines, fixed = TRUE)))
+  expect_gte(sum(grepl("^\\s*gate_y_active = 0;\\s*$", lines)), 2L)
+  expect_gte(sum(grepl("^\\s*gate_xy_active = 0;\\s*$", lines)), 1L)
+})
