@@ -1,5 +1,10 @@
 Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
 
+* Mirrored the conditional density/distribution generalized nearest-neighbor
+  LP CV `jksum.c` helper changes from `np`, keeping the canonical extracted
+  LP X-side machinery aligned across repos and validating bounded
+  generalized-NN wrapper behavior in both session and attach MPI modes.
+
 * Mirrored smooth-coefficient LL/LP core remediation from `np`, removing
   accidental `n x n` weight-matrix construction/full-matrix dependence from
   ordinary `npscoef` estimation/CV paths while preserving explicit hat/plot

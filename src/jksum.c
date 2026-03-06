@@ -14623,6 +14623,7 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
   const int num_train = num_obs_train_extern;
   const int num_reg_tot = num_reg_continuous_extern + num_reg_unordered_extern + num_reg_ordered_extern;
   const int ll_mode = (int_ll_extern == LL_LP) ? LL_LP : LL_LC;
+  const int bw_rows = (BANDWIDTH_den_extern == BW_FIXED) ? 1 : num_train;
   int *kernel_cx = NULL, *kernel_ux = NULL, *kernel_ox = NULL, *x_operator = NULL;
   double *vsfx = NULL, *lambdax = NULL, *kw = NULL, *mean_row = NULL;
   double **matrix_bandwidth_x = NULL, **matrix_bandwidth_eval_one = NULL;
@@ -14631,7 +14632,8 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
   int i, j, l;
   int status = 1;
 
-  if(BANDWIDTH_den_extern != BW_FIXED)
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
     return 1;
 
   if(num_train <= 0)
@@ -14652,7 +14654,7 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
   lambdax = alloc_vecd(MAX(1, num_reg_unordered_extern + num_reg_ordered_extern));
   kw = alloc_vecd(MAX(1, num_train));
   mean_row = alloc_vecd(1);
-  matrix_bandwidth_x = alloc_matd(1, num_reg_continuous_extern);
+  matrix_bandwidth_x = alloc_tmatd(bw_rows, num_reg_continuous_extern);
   matrix_bandwidth_eval_one = alloc_tmatd(1, num_reg_continuous_extern);
   if(num_reg_unordered_extern > 0) eval_xuno_one = alloc_matd(1, num_reg_unordered_extern);
   if(num_reg_ordered_extern > 0) eval_xord_one = alloc_matd(1, num_reg_ordered_extern);
@@ -14733,7 +14735,8 @@ static int np_shadow_conditional_build_x_weights(double *vector_scale_factor,
       eval_xord_one[l][0] = matrix_X_ordered_train_extern[l][i];
     for(l = 0; l < num_reg_continuous_extern; l++){
       eval_xcon_one[l][0] = matrix_X_continuous_train_extern[l][i];
-      matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_x[l][0];
+      matrix_bandwidth_eval_one[l][0] =
+        (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_x[l][i] : matrix_bandwidth_x[l][0];
     }
 
     if(np_shadow_conditional_kernel_row(kernel_cx,
@@ -14844,7 +14847,7 @@ cleanup_xweights:
   if(lambdax != NULL) free(lambdax);
   if(kw != NULL) free(kw);
   if(mean_row != NULL) free(mean_row);
-  if(matrix_bandwidth_x != NULL) free_mat(matrix_bandwidth_x, num_reg_continuous_extern);
+  if(matrix_bandwidth_x != NULL) free_tmat(matrix_bandwidth_x);
   if(matrix_bandwidth_eval_one != NULL) free_tmat(matrix_bandwidth_eval_one);
   if(eval_xuno_one != NULL) free_mat(eval_xuno_one, num_reg_unordered_extern);
   if(eval_xord_one != NULL) free_mat(eval_xord_one, num_reg_ordered_extern);
@@ -14864,19 +14867,23 @@ static int np_shadow_conditional_build_y_matrix(const int *operator_y,
                                                 const int num_eval,
                                                 double *out_matrix){
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
+  const int bw_rows =
+    (BANDWIDTH_den_extern == BW_FIXED) ? 1 :
+    ((BANDWIDTH_den_extern == BW_GEN_NN) ? num_eval : 0);
   int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL;
   double *vsfy = NULL, *lambday = NULL, *kw = NULL;
   double **matrix_bandwidth_y = NULL, **matrix_bandwidth_eval_one = NULL;
   double **eval_yuno_one = NULL, **eval_yord_one = NULL, **eval_ycon_one = NULL;
   int i, l, status = 1;
 
-  if(BANDWIDTH_den_extern != BW_FIXED)
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
     return 1;
 
   vsfy = alloc_vecd(MAX(1, num_var_tot));
   lambday = alloc_vecd(MAX(1, num_var_unordered_extern + num_var_ordered_extern));
   kw = alloc_vecd(MAX(1, num_obs_train_extern));
-  matrix_bandwidth_y = alloc_matd(1, num_var_continuous_extern);
+  matrix_bandwidth_y = alloc_tmatd(bw_rows, num_var_continuous_extern);
   matrix_bandwidth_eval_one = alloc_tmatd(1, num_var_continuous_extern);
   if(num_var_unordered_extern > 0) eval_yuno_one = alloc_matd(1, num_var_unordered_extern);
   if(num_var_ordered_extern > 0) eval_yord_one = alloc_matd(1, num_var_ordered_extern);
@@ -14942,7 +14949,8 @@ static int np_shadow_conditional_build_y_matrix(const int *operator_y,
       eval_yord_one[l][0] = matrix_Y_ordered_eval[l][i];
     for(l = 0; l < num_var_continuous_extern; l++){
       eval_ycon_one[l][0] = matrix_Y_continuous_eval[l][i];
-      matrix_bandwidth_eval_one[l][0] = matrix_bandwidth_y[l][0];
+      matrix_bandwidth_eval_one[l][0] =
+        (BANDWIDTH_den_extern == BW_GEN_NN) ? matrix_bandwidth_y[l][i] : matrix_bandwidth_y[l][0];
     }
 
     if(np_shadow_conditional_kernel_row(kernel_cy,
@@ -14985,7 +14993,7 @@ cleanup_ymat:
   if(vsfy != NULL) free(vsfy);
   if(lambday != NULL) free(lambday);
   if(kw != NULL) free(kw);
-  if(matrix_bandwidth_y != NULL) free_mat(matrix_bandwidth_y, num_var_continuous_extern);
+  if(matrix_bandwidth_y != NULL) free_tmat(matrix_bandwidth_y);
   if(matrix_bandwidth_eval_one != NULL) free_tmat(matrix_bandwidth_eval_one);
   if(eval_yuno_one != NULL) free_mat(eval_yuno_one, num_var_unordered_extern);
   if(eval_yord_one != NULL) free_mat(eval_yord_one, num_var_ordered_extern);
