@@ -186,6 +186,21 @@ npcdistbw.condbandwidth <-
     if (all(goodrows==0))
       stop("Data has no rows without NAs")
 
+    spec <- npCanonicalConditionalRegSpec(
+      regtype = if (is.null(bws$regtype)) "lc" else bws$regtype,
+      basis = if (is.null(bws$basis)) "glp" else bws$basis,
+      degree = if (is.null(bws$degree)) NULL else bws$degree,
+      bernstein.basis = isTRUE(bws$bernstein.basis),
+      ncon = bws$xncon,
+      where = "npcdistbw"
+    )
+    if (bandwidth.compute &&
+        identical(spec$regtype.engine, "lp") &&
+        identical(bws$method, "cv.ls"))
+      stop(
+        "public npcdistbw() LP/LL cv.ls route is temporarily disabled pending low-memory shadow CV remediation"
+      )
+
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
     if (.npRmpi_autodispatch_active())
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
@@ -639,9 +654,6 @@ npcdistbw.default <-
       ncon = sum(x.info$icon),
       where = "npcdistbw"
     )
-    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     pregtype <- switch(spec$regtype,
                        lc = "Local-Constant",
                        ll = "Local-Linear",
@@ -686,6 +698,15 @@ npcdistbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     tbw <- do.call(condbandwidth, bw.args)
+    if (bandwidth.compute &&
+        identical(tbw$regtype.engine, "lp") &&
+        identical(tbw$method, "cv.ls"))
+      stop(
+        "public npcdistbw() LP/LL cv.ls route is temporarily disabled pending low-memory shadow CV remediation"
+      )
+    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
                         
     ## next grab dummies for actual bandwidth selection and perform call
 
