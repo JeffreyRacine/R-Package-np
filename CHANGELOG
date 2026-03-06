@@ -1,8 +1,9 @@
 Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
 
 * Remediated smooth-coefficient LL/LP core and bandwidth-selection paths to
-  remove accidental full-matrix dependence from ordinary estimation/CV, while
-  preserving explicit hat/plot helper behavior where intended.
+  remove accidental `n x n` weight-matrix construction/full-matrix dependence
+  from ordinary estimation/CV, while preserving explicit hat/plot helper
+  behavior where intended.
 
 * Canonicalized semiparametric LL/LP behavior across recently generalized
   core families:
