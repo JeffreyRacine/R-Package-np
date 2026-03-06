@@ -410,14 +410,8 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
 /* Compute the cross-validation function */
     start = clock();
 
-    if(int_ll_extern == LL_LP){
-      if(np_shadow_cv_con_distribution_ls(&vector_scale_factor[1], &cv) == 1)
-        return(DBL_MAX);
-
-      diff = clock() - start;
-      timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
-      return(cv);
-    }
+    if(int_ll_extern == LL_LP)
+      error("internal error: contained LP conditional distribution cv.ls route reached kernelcv");
 
     if(np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(KERNEL_den_extern,
                                                                            KERNEL_den_unordered_extern,
@@ -569,14 +563,8 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 /* Compute the cross-validation function */
     start = clock();
 
-    if(int_ll_extern == LL_LP){
-      if(np_shadow_cv_con_density_ml(&vector_scale_factor[1], &cv) == 1)
-        return(DBL_MAX);
-
-      diff = clock() - start;
-      timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
-      return(cv);
-    }
+    if(int_ll_extern == LL_LP)
+      error("internal error: contained LP conditional density cv.ml route reached kernelcv");
 
     if(np_kernel_estimate_con_density_categorical_leave_one_out_cv(KERNEL_den_extern,
         KERNEL_den_unordered_extern,
@@ -734,14 +722,8 @@ double np_cv_func_con_density_categorical_ls_npksum(double *vector_scale_factor)
   /* Compute the cross-validation function */
     start = clock();
 
-    if(int_ll_extern == LL_LP){
-      if(np_shadow_cv_con_density_ls(&vector_scale_factor[1], &cv) == 1)
-        return(DBL_MAX);
-
-      diff = clock() - start;
-      timing_extern = ((double)diff)/((double)CLOCKS_PER_SEC);
-      return(cv);
-    }
+    if(int_ll_extern == LL_LP)
+      error("internal error: contained LP conditional density cv.ls route reached kernelcv");
 
     if(np_kernel_estimate_con_density_categorical_leave_one_out_ls_cv(KERNEL_den_extern,
                                                                       KERNEL_den_unordered_extern,

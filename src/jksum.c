@@ -14909,7 +14909,7 @@ cleanup_ymat:
   return status;
 }
 
-int np_shadow_cv_con_density_ml(double *vector_scale_factor, double *cv){
+int np_shadow_proof_cv_con_density_ml(double *vector_scale_factor, double *cv){
   double *weights = NULL, *yrow = NULL;
   int *operator_y = NULL;
   int i, j, status = 1;
@@ -14955,7 +14955,7 @@ cleanup_cvml_shadow:
   return status;
 }
 
-int np_shadow_cv_con_density_ls(double *vector_scale_factor, double *cv){
+int np_shadow_proof_cv_con_density_ls(double *vector_scale_factor, double *cv){
   double *weights = NULL, *yrow = NULL, *yconv = NULL;
   int *operator_y = NULL;
   int i, j, k, status = 1;
@@ -15022,7 +15022,7 @@ cleanup_cvls_shadow:
   return status;
 }
 
-int np_shadow_cv_con_distribution_ls(double *vector_scale_factor, double *cv){
+int np_shadow_proof_cv_con_distribution_ls(double *vector_scale_factor, double *cv){
   const int num_eval = num_obs_eval_extern;
   double *weights = NULL, *ycdf = NULL;
   int *operator_y = NULL;

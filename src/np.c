@@ -1628,10 +1628,10 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   }
 
   if(criterion_i == CBWM_CVML){
-    if(np_shadow_cv_con_density_ml(REAL(rbw_r), &new_cv) != 0)
+    if(np_shadow_proof_cv_con_density_ml(REAL(rbw_r), &new_cv) != 0)
       new_cv = NA_REAL;
   } else if(criterion_i == CBWM_CVLS){
-    if(np_shadow_cv_con_density_ls(REAL(rbw_r), &new_cv) != 0)
+    if(np_shadow_proof_cv_con_density_ls(REAL(rbw_r), &new_cv) != 0)
       new_cv = NA_REAL;
   } else {
     error("C_np_shadow_cv_density_conditional: unsupported criterion");
@@ -1969,7 +1969,7 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
       old_cv = NA_REAL;
   }
 
-  if(np_shadow_cv_con_distribution_ls(REAL(rbw_r), &new_cv) != 0)
+  if(np_shadow_proof_cv_con_distribution_ls(REAL(rbw_r), &new_cv) != 0)
     new_cv = NA_REAL;
 
   out_old = PROTECT(ScalarReal(old_cv));

@@ -373,3 +373,14 @@ test_that("shadow distribution lp preserves ll canonicalization and tree parity"
   expect_equal(ll_res$new, lp_res$new, tolerance = 1e-12)
   expect_equal(lp_tree$new, lp_res$new, tolerance = 1e-12)
 })
+
+test_that("kernelcv no longer references dense shadow proof helpers", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/kernelcv.c", warn = FALSE)
+
+  expect_false(any(grepl("np_shadow_cv_con_density_ml\\s*\\(", lines)))
+  expect_false(any(grepl("np_shadow_cv_con_density_ls\\s*\\(", lines)))
+  expect_false(any(grepl("np_shadow_cv_con_distribution_ls\\s*\\(", lines)))
+  expect_false(any(grepl("np_shadow_proof_cv_con_density_ml\\s*\\(", lines)))
+  expect_false(any(grepl("np_shadow_proof_cv_con_density_ls\\s*\\(", lines)))
+  expect_false(any(grepl("np_shadow_proof_cv_con_distribution_ls\\s*\\(", lines)))
+})
