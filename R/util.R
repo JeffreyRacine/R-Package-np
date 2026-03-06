@@ -344,6 +344,68 @@ npRegtypeToC <- function(regtype, degree, ncon, context = "npreg") {
   list(code = REGTYPE_LP, degree = degree)
 }
 
+npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
+                                          basis = c("glp", "additive", "tensor"),
+                                          degree = NULL,
+                                          bernstein.basis = FALSE,
+                                          ncon,
+                                          where = "npc*") {
+  regtype <- match.arg(regtype)
+  ncon <- npValidateNonNegativeInteger(ncon, "ncon")
+  basis <- npValidateLpBasis(regtype = "lp", basis = basis)
+  bernstein.basis <- npValidateGlpBernstein(regtype = "lp",
+                                            bernstein.basis = bernstein.basis)
+
+  if (identical(regtype, "lc")) {
+    degree <- rep.int(0L, ncon)
+    return(list(
+      regtype = "lc",
+      basis = basis,
+      degree = degree,
+      bernstein.basis = FALSE,
+      regtype.engine = "lc",
+      basis.engine = basis,
+      degree.engine = degree,
+      bernstein.basis.engine = FALSE
+    ))
+  }
+
+  if (identical(regtype, "ll")) {
+    if (ncon > 0L) {
+      degree <- rep.int(1L, ncon)
+      basis <- "glp"
+    } else {
+      degree <- integer(0)
+      basis <- "glp"
+    }
+
+    return(list(
+      regtype = "ll",
+      basis = basis,
+      degree = degree,
+      bernstein.basis = FALSE,
+      regtype.engine = "lp",
+      basis.engine = basis,
+      degree.engine = degree,
+      bernstein.basis.engine = FALSE
+    ))
+  }
+
+  degree <- npValidateGlpDegree(regtype = "lp",
+                                degree = degree,
+                                ncon = ncon)
+  list(
+    regtype = "lp",
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    regtype.engine = "lp",
+    basis.engine = basis,
+    degree.engine = degree,
+    bernstein.basis.engine = bernstein.basis
+  )
+}
+
 npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
   if (is.null(dotnames) || !length(dotnames))
     return(invisible(NULL))

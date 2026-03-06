@@ -105,6 +105,10 @@ npcdistbw(\dots)
           tol,
           transform.bounds,
           uxkertype,
+          regtype = c("lc", "ll", "lp"),
+          basis = c("glp", "additive", "tensor"),
+          degree = NULL,
+          bernstein.basis = FALSE,
           \dots)
 }
 
@@ -388,6 +392,33 @@ npcdistbw(\dots)
     character string used to specify the unordered categorical
     kernel type. Can be set as \code{aitchisonaitken} or
     \code{liracine}. Defaults to \code{aitchisonaitken}.
+  }
+
+  \item{regtype}{
+    character string specifying the conditional local method used for
+    the \code{xdat} regression weight operator. Options are
+    \code{"lc"}, \code{"ll"}, and \code{"lp"}.
+    For \code{npc*} methods, \code{"ll"} is implemented via the
+    canonical local polynomial engine with \code{degree = 1} and
+    \code{basis = "glp"}.
+  }
+
+  \item{basis}{
+    character string specifying the polynomial basis used when
+    \code{regtype="lp"}. Options are \code{"glp"},
+    \code{"additive"}, and \code{"tensor"}.
+  }
+
+  \item{degree}{
+    integer scalar or integer vector of polynomial degrees for
+    continuous \code{xdat} variables when \code{regtype="lp"}.
+    If scalar, the value is recycled to all continuous \code{xdat}
+    variables.
+  }
+
+  \item{bernstein.basis}{
+    logical value controlling Bernstein basis evaluation for
+    \code{regtype="lp"}.
   }
 
   \item{formula}{

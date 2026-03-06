@@ -220,6 +220,48 @@ npcdens.conbandwidth <- function(bws,
     exord = data.frame()
   }
 
+  reg.engine <- if (is.null(bws$regtype.engine)) {
+    if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  } else {
+    as.character(bws$regtype.engine)
+  }
+  basis.engine <- if (is.null(bws$basis.engine)) {
+    if (is.null(bws$basis)) "glp" else bws$basis
+  } else {
+    bws$basis.engine
+  }
+  degree.engine <- if (is.null(bws$degree.engine)) {
+    if (bws$xncon > 0L) {
+      if (identical(reg.engine, "lc")) rep.int(0L, bws$xncon) else npValidateGlpDegree(
+        regtype = "lp",
+        degree = bws$degree,
+        ncon = bws$xncon
+      )
+    } else {
+      integer(0)
+    }
+  } else {
+    as.integer(bws$degree.engine)
+  }
+  bernstein.engine <- if (is.null(bws$bernstein.basis.engine)) {
+    isTRUE(bws$bernstein.basis)
+  } else {
+    isTRUE(bws$bernstein.basis.engine)
+  }
+
+  reg.c <- npRegtypeToC(
+    regtype = if (identical(reg.engine, "lp")) "lp" else "lc",
+    degree = degree.engine,
+    ncon = bws$xncon,
+    context = "npcdens"
+  )
+  degree.c <- if (bws$xncon > 0L) {
+    as.integer(if (is.null(reg.c$degree)) rep.int(0L, bws$xncon) else reg.c$degree)
+  } else {
+    integer(0)
+  }
+  basis.code <- as.integer(npLpBasisCode(basis.engine))
+
   myopti <- list(
       num_obs_train = tnrow,
       num_obs_eval = enrow,
@@ -288,6 +330,10 @@ npcdens.conbandwidth <- function(bws,
           as.double(cxker.bounds.c$ub),
           as.double(cyker.bounds.c$lb),
           as.double(cyker.bounds.c$ub),
+          as.integer(reg.c$code),
+          as.integer(degree.c),
+          as.integer(bernstein.engine),
+          basis.code,
           PACKAGE = "npRmpi")
 
   if(gradients){

@@ -216,6 +216,26 @@ npcdistbw.condbandwidth <-
     xord = xdat[, bws$ixord, drop = FALSE]
 
     tbw <- bws
+    spec <- npCanonicalConditionalRegSpec(
+      regtype = if (is.null(tbw$regtype)) "lc" else tbw$regtype,
+      basis = if (is.null(tbw$basis)) "glp" else tbw$basis,
+      degree = if (is.null(tbw$degree)) NULL else tbw$degree,
+      bernstein.basis = isTRUE(tbw$bernstein.basis),
+      ncon = tbw$xncon,
+      where = "npcdistbw"
+    )
+    tbw$regtype <- spec$regtype
+    tbw$pregtype <- switch(spec$regtype,
+                           lc = "Local-Constant",
+                           ll = "Local-Linear",
+                           lp = "Local-Polynomial")
+    tbw$basis <- spec$basis
+    tbw$degree <- spec$degree
+    tbw$bernstein.basis <- spec$bernstein.basis
+    tbw$regtype.engine <- spec$regtype.engine
+    tbw$basis.engine <- spec$basis.engine
+    tbw$degree.engine <- spec$degree.engine
+    tbw$bernstein.basis.engine <- spec$bernstein.basis.engine
 
     if(!is.null(gydat)){
       gydat <- toFrame(gydat)
@@ -482,7 +502,16 @@ npcdistbw.condbandwidth <-
                          sdev = mysd,
                          bandwidth.compute = bandwidth.compute,
                          timing = tbw$timing,
-                         total.time = tbw$total.time)
+                         total.time = tbw$total.time,
+                         regtype = tbw$regtype,
+                         pregtype = tbw$pregtype,
+                         basis = tbw$basis,
+                         degree = tbw$degree,
+                         bernstein.basis = tbw$bernstein.basis,
+                         regtype.engine = tbw$regtype.engine,
+                         basis.engine = tbw$basis.engine,
+                         degree.engine = tbw$degree.engine,
+                         bernstein.basis.engine = tbw$bernstein.basis.engine)
            
     tbw
   }
@@ -564,6 +593,10 @@ npcdistbw.default <-
            tol,
            transform.bounds,
            uxkertype,
+           regtype = c("lc", "ll", "lp"),
+           basis = c("glp", "additive", "tensor"),
+           degree = NULL,
+           bernstein.basis = FALSE,
            ## dummy arguments for condbandwidth() function call
            ...){
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
@@ -576,8 +609,52 @@ npcdistbw.default <-
     ## maintain y names and 'toFrame'
     ydat <- toFrame(ydat)
 
+    x.info <- untangle(xdat)
+    y.info <- untangle(ydat)
+
+    mc <- match.call(expand.dots = FALSE)
+    mc.names <- names(mc)
+    regtype.named <- any(mc.names == "regtype")
+    basis.named <- any(mc.names == "basis")
+    degree.named <- any(mc.names == "degree")
+    bernstein.named <- any(mc.names == "bernstein.basis")
+
+    regtype <- if (regtype.named) match.arg(regtype) else "lc"
+    if (identical(regtype, "lc") && (basis.named || degree.named || bernstein.named))
+      stop("regtype='lc' does not accept basis/degree/bernstein.basis; use regtype='lp' for local-polynomial controls")
+    if (identical(regtype, "ll")) {
+      if (degree.named)
+        stop("regtype='ll' uses canonical LP(degree=1, basis='glp'); remove 'degree' or use regtype='lp'")
+      if (basis.named && !identical(match.arg(basis), "glp"))
+        stop("regtype='ll' uses canonical basis='glp'; use regtype='lp' for alternate LP bases")
+      if (bernstein.named && isTRUE(bernstein.basis))
+        stop("regtype='ll' uses canonical bernstein.basis=FALSE; use regtype='lp' for Bernstein LP")
+    }
+
+    spec <- npCanonicalConditionalRegSpec(
+      regtype = regtype,
+      basis = basis,
+      degree = degree,
+      bernstein.basis = bernstein.basis,
+      ncon = sum(x.info$icon),
+      where = "npcdistbw"
+    )
+    pregtype <- switch(spec$regtype,
+                       lc = "Local-Constant",
+                       ll = "Local-Linear",
+                       lp = "Local-Polynomial")
+
     ## first grab dummy args for bandwidth() and perform 'bootstrap'
     ## bandwidth() call
+
+    mc.names <- names(mc)
+    margs <- c("bwmethod", "bwscaling", "bwtype", "cxkertype", "cxkerorder",
+               "cxkerbound", "cxkerlb", "cxkerub",
+               "cykertype", "cykerorder", "cykerbound", "cykerlb", "cykerub",
+               "uxkertype", "oxkertype", "oykertype")
+
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
 
     y.idx <- seq_len(length(ydat))
     x.idx <- seq_len(length(xdat))
@@ -586,64 +663,49 @@ npcdistbw.default <-
       ybw = bws[y.idx],
       uykertype = "aitchisonaitken",
       nobs = nrow(xdat),
-      xdati = untangle(xdat),
-      ydati = untangle(ydat),
+      xdati = x.info,
+      ydati = y.info,
       xnames = names(xdat),
       ynames = names(ydat),
-      bandwidth.compute = bandwidth.compute
+      bandwidth.compute = bandwidth.compute,
+      regtype = spec$regtype,
+      pregtype = pregtype,
+      basis = spec$basis,
+      degree = spec$degree,
+      bernstein.basis = spec$bernstein.basis,
+      regtype.engine = spec$regtype.engine,
+      basis.engine = spec$basis.engine,
+      degree.engine = spec$degree.engine,
+      bernstein.basis.engine = spec$bernstein.basis.engine
     )
-    if (!missing(bwmethod)) bw.args$bwmethod <- bwmethod
-    if (!missing(bwscaling)) bw.args$bwscaling <- bwscaling
-    if (!missing(bwtype)) bw.args$bwtype <- bwtype
-    if (!missing(cxkertype)) bw.args$cxkertype <- cxkertype
-    if (!missing(cxkerorder)) bw.args$cxkerorder <- cxkerorder
-    if (!missing(cxkerbound)) bw.args$cxkerbound <- cxkerbound
-    if (!missing(cxkerlb)) bw.args$cxkerlb <- cxkerlb
-    if (!missing(cxkerub)) bw.args$cxkerub <- cxkerub
-    if (!missing(cykertype)) bw.args$cykertype <- cykertype
-    if (!missing(cykerorder)) bw.args$cykerorder <- cykerorder
-    if (!missing(cykerbound)) bw.args$cykerbound <- cykerbound
-    if (!missing(cykerlb)) bw.args$cykerlb <- cykerlb
-    if (!missing(cykerub)) bw.args$cykerub <- cykerub
-    if (!missing(uxkertype)) bw.args$uxkertype <- uxkertype
-    if (!missing(oxkertype)) bw.args$oxkertype <- oxkertype
-    if (!missing(oykertype)) bw.args$oykertype <- oykertype
+    if (any.m) {
+      nms <- mc.names[m]
+      bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
     tbw <- do.call(condbandwidth, bw.args)
                         
     ## next grab dummies for actual bandwidth selection and perform call
 
-    opt.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
-    if (!missing(gydat)) opt.args$gydat <- gydat
-    if (!missing(bandwidth.compute)) opt.args$bandwidth.compute <- bandwidth.compute
-    if (!missing(nmulti)) opt.args$nmulti <- nmulti
-    if (!missing(remin)) opt.args$remin <- remin
-    if (!missing(itmax)) opt.args$itmax <- itmax
-    if (!missing(do.full.integral)) opt.args$do.full.integral <- do.full.integral
-    if (!missing(ngrid)) opt.args$ngrid <- ngrid
-    if (!missing(ftol)) opt.args$ftol <- ftol
-    if (!missing(tol)) opt.args$tol <- tol
-    if (!missing(small)) opt.args$small <- small
-    if (!missing(memfac)) opt.args$memfac <- memfac
-    if (!missing(lbc.dir)) opt.args$lbc.dir <- lbc.dir
-    if (!missing(dfc.dir)) opt.args$dfc.dir <- dfc.dir
-    if (!missing(cfac.dir)) opt.args$cfac.dir <- cfac.dir
-    if (!missing(initc.dir)) opt.args$initc.dir <- initc.dir
-    if (!missing(lbd.dir)) opt.args$lbd.dir <- lbd.dir
-    if (!missing(hbd.dir)) opt.args$hbd.dir <- hbd.dir
-    if (!missing(dfac.dir)) opt.args$dfac.dir <- dfac.dir
-    if (!missing(initd.dir)) opt.args$initd.dir <- initd.dir
-    if (!missing(lbc.init)) opt.args$lbc.init <- lbc.init
-    if (!missing(hbc.init)) opt.args$hbc.init <- hbc.init
-    if (!missing(cfac.init)) opt.args$cfac.init <- cfac.init
-    if (!missing(lbd.init)) opt.args$lbd.init <- lbd.init
-    if (!missing(hbd.init)) opt.args$hbd.init <- hbd.init
-    if (!missing(dfac.init)) opt.args$dfac.init <- dfac.init
-    if (!missing(scale.init.categorical.sample))
-      opt.args$scale.init.categorical.sample <- scale.init.categorical.sample
-    if (!missing(transform.bounds)) opt.args$transform.bounds <- transform.bounds
-    if (!missing(invalid.penalty)) opt.args$invalid.penalty <- invalid.penalty
-    if (!missing(penalty.multiplier)) opt.args$penalty.multiplier <- penalty.multiplier
-    tbw <- do.call(npcdistbw.condbandwidth, opt.args)
+    mc.names <- names(mc)
+    margs <- c("gydat", "bandwidth.compute", "nmulti", "remin", "itmax", "do.full.integral", "ngrid", "ftol",
+               "tol", "small", "memfac",
+               "lbc.dir", "dfc.dir", "cfac.dir","initc.dir", 
+               "lbd.dir", "hbd.dir", "dfac.dir", "initd.dir", 
+               "lbc.init", "hbc.init", "cfac.init", 
+               "lbd.init", "hbd.init", "dfac.init", 
+               "scale.init.categorical.sample",
+               "transform.bounds",
+               "invalid.penalty",
+               "penalty.multiplier")
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
+
+    bwsel.args <- list(xdat = xdat, ydat = ydat, bws = tbw)
+    if (any.m) {
+      nms <- mc.names[m]
+      bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+    }
+    tbw <- do.call(npcdistbw.condbandwidth, bwsel.args)
 
     mc <- match.call(expand.dots = FALSE)
     environment(mc) <- parent.frame()
