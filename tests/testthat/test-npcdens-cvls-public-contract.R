@@ -88,94 +88,40 @@ test_that("public npcdensbw cv.ls keeps lc on the legacy objective", {
   expect_equal(bw.lc$fval, -shadow$old, tolerance = 1e-10)
 })
 
-test_that("public npcdensbw cv.ls enforces ll == lp(glp, degree=1)", {
+test_that("public npcdensbw cv.ls LP/LL routes fail fast during containment", {
   set.seed(141)
   n <- 36L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
   degree <- rep.int(1L, ncol(x))
 
-  bw.ll <- npcdensbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ls", nmulti = 0)
-  bw.lp <- npcdensbw(
-    xdat = x,
-    ydat = y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree,
-    bwmethod = "cv.ls",
-    nmulti = 0
+  expect_error(
+    npcdensbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ls", nmulti = 0),
+    "temporarily disabled pending low-memory shadow CV remediation"
   )
-
-  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-12)
-  expect_equal(bw.ll$xbw, bw.lp$xbw, tolerance = 1e-12)
-  expect_equal(bw.ll$ybw, bw.lp$ybw, tolerance = 1e-12)
-})
-
-test_that("public npcdensbw cv.ls preserves tree parity on the LP route", {
-  old <- options(np.tree = FALSE)
-  on.exit(options(old), add = TRUE)
-
-  set.seed(151)
-  n <- 34L
-  x <- data.frame(x1 = runif(n), x2 = runif(n))
-  y <- data.frame(y1 = sin(2 * pi * x$x1) + rnorm(n, sd = 0.1))
-  degree <- rep.int(1L, ncol(x))
-
-  options(np.tree = FALSE)
-  bw.nt <- npcdensbw(
-    xdat = x,
-    ydat = y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree,
-    bwmethod = "cv.ls",
-    nmulti = 0
+  expect_error(
+    npcdensbw(
+      xdat = x,
+      ydat = y,
+      regtype = "lp",
+      basis = "glp",
+      degree = degree,
+      bwmethod = "cv.ls",
+      nmulti = 0
+    ),
+    "temporarily disabled pending low-memory shadow CV remediation"
   )
-  options(np.tree = TRUE)
-  bw.tr <- npcdensbw(
-    xdat = x,
-    ydat = y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree,
-    bwmethod = "cv.ls",
-    nmulti = 0
+  expect_error(
+    npcdensbw(
+      xdat = x,
+      ydat = y,
+      regtype = "lp",
+      basis = "glp",
+      degree = degree,
+      bwtype = "generalized_nn",
+      bwmethod = "cv.ls",
+      nmulti = 0
+    ),
+    "temporarily disabled pending low-memory shadow CV remediation"
   )
-
-  expect_equal(bw.nt$fval, bw.tr$fval, tolerance = 1e-10)
-})
-
-test_that("public npcdensbw cv.ls generalized-nn is finite and preserves ll canonicalization", {
-  set.seed(212)
-  n <- 40L
-  x <- data.frame(x1 = runif(n), x2 = runif(n))
-  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.12))
-  degree <- rep.int(1L, ncol(x))
-
-  bw.ll <- npcdensbw(
-    xdat = x,
-    ydat = y,
-    regtype = "ll",
-    bwtype = "generalized_nn",
-    bwmethod = "cv.ls",
-    nmulti = 0
-  )
-  bw.lp <- npcdensbw(
-    xdat = x,
-    ydat = y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree,
-    bwtype = "generalized_nn",
-    bwmethod = "cv.ls",
-    nmulti = 0
-  )
-
-  expect_true(is.finite(bw.ll$fval))
-  expect_true(is.finite(bw.lp$fval))
-  expect_gt(bw.ll$fval, -1e6)
-  expect_gt(bw.lp$fval, -1e6)
-  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
-  expect_equal(bw.ll$xbw, bw.lp$xbw, tolerance = 1e-10)
-  expect_equal(bw.ll$ybw, bw.lp$ybw, tolerance = 1e-10)
 })
