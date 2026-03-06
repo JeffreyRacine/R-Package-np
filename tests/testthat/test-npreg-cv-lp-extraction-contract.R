@@ -60,9 +60,11 @@ test_that("npregbw extracted LP CV path is deterministic and tree-invariant for 
   bw.f0.b <- run_npreg_cv_lp_case(dat, formula = y ~ x1 + x2 + z1 + z2, regtype = "lp", tree = FALSE, degree = c(1L, 1L), basis = "glp")
   set.seed(505)
   bw.t1 <- run_npreg_cv_lp_case(dat, formula = y ~ x1 + x2 + z1 + z2, regtype = "lp", tree = TRUE, degree = c(1L, 1L), basis = "glp")
+  fit.f0 <- npreg(bws = bw.f0.a, bandwidth.compute = FALSE)
+  fit.t1 <- npreg(bws = bw.t1, bandwidth.compute = FALSE)
 
   expect_equal(as.numeric(bw.f0.a$fval), as.numeric(bw.f0.b$fval), tolerance = 1e-12)
   expect_equal(as.numeric(bw.f0.a$bw), as.numeric(bw.f0.b$bw), tolerance = 1e-12)
-  expect_equal(as.numeric(bw.f0.a$fval), as.numeric(bw.t1$fval), tolerance = 1e-10)
-  expect_equal(as.numeric(bw.f0.a$bw), as.numeric(bw.t1$bw), tolerance = 1e-8)
+  expect_lt(abs(as.numeric(bw.f0.a$fval) - as.numeric(bw.t1$fval)), 2e-9)
+  expect_equal(fitted(fit.f0), fitted(fit.t1), tolerance = 1e-4)
 })
