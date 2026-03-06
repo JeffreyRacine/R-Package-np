@@ -7564,12 +7564,18 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
   double **basis_local = NULL;
   double *ones = NULL;
   double *moments = NULL, *rhs = NULL, *kw = NULL, *xj = NULL;
+  double *moments_local = NULL, *rhs_local = NULL;
   double *vsf = NULL;
   double **train_u = NULL, **train_o = NULL, **train_c = NULL;
   MATRIX eval_u = NULL, eval_o = NULL, eval_c = NULL;
   MATRIX matrix_bandwidth_eval = NULL;
   MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL, SHIFT = NULL, SHIFTINV = NULL, TMP = NULL;
   double mean_dummy = 0.0;
+#ifdef MPI2
+  const int use_mpi_transport = (iNum_Processors > 1);
+#else
+  const int use_mpi_transport = 0;
+#endif
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
@@ -7631,9 +7637,28 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
      (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
     goto cleanup_glp_cv;
 
+#ifdef MPI2
+  if(use_mpi_transport){
+    moments_local = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
+    rhs_local = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
+    if((moments_local == NULL) || (rhs_local == NULL))
+      goto cleanup_glp_cv;
+  }
+#endif
+
   for(j = 0; j < num_obs - 1; j++){
     const double yj = vector_Y[j];
     const int nsub = num_obs - j - 1;
+#ifdef MPI2
+    double * const moments_acc = use_mpi_transport ? moments_local : moments;
+    double * const rhs_acc = use_mpi_transport ? rhs_local : rhs;
+
+    if(use_mpi_transport && ((j % iNum_Processors) != my_rank))
+      continue;
+#else
+    double * const moments_acc = moments;
+    double * const rhs_acc = rhs;
+#endif
 
     for(l = 0; l < num_reg_unordered; l++){
       eval_u[l][0] = matrix_X_unordered[l][j];
@@ -7708,10 +7733,10 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
       const int ii = j + 1 + i;
       const double w = kw[i];
       const double yi = vector_Y[ii];
-      double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
-      double * const si = moments + (size_t)ii*(size_t)nterms*(size_t)nterms;
-      double * const tj = rhs + (size_t)j*(size_t)nterms;
-      double * const ti = rhs + (size_t)ii*(size_t)nterms;
+      double * const sj = moments_acc + (size_t)j*(size_t)nterms*(size_t)nterms;
+      double * const si = moments_acc + (size_t)ii*(size_t)nterms*(size_t)nterms;
+      double * const tj = rhs_acc + (size_t)j*(size_t)nterms;
+      double * const ti = rhs_acc + (size_t)ii*(size_t)nterms;
 
       if(w == 0.0)
         continue;
@@ -7728,6 +7753,13 @@ static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
       }
     }
   }
+
+#ifdef MPI2
+  if(use_mpi_transport){
+    MPI_Allreduce(moments_local, moments, num_obs*nterms*nterms, MPI_DOUBLE, MPI_SUM, comm[1]);
+    MPI_Allreduce(rhs_local, rhs, num_obs*nterms, MPI_DOUBLE, MPI_SUM, comm[1]);
+  }
+#endif
 
   result.cv = 0.0;
   result.traceH = 0.0;
@@ -7793,7 +7825,9 @@ cleanup_glp_cv:
   if(SHIFTINV != NULL) mat_free(SHIFTINV);
   if(TMP != NULL) mat_free(TMP);
   if(moments != NULL) free(moments);
+  if(moments_local != NULL) free(moments_local);
   if(rhs != NULL) free(rhs);
+  if(rhs_local != NULL) free(rhs_local);
   if(xj != NULL) free(xj);
   if(kw != NULL) free(kw);
   if(terms_local != NULL) free(terms_local);
