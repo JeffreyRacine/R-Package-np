@@ -124,6 +124,27 @@ call_shadow_distribution <- function(bw, x, ytrain, yeval = ytrain,
   )
 }
 
+call_shadow_xweights_row <- function(bw, x, y, row_index, use_tree = FALSE) {
+  n <- nrow(x)
+  .Call(
+    "C_np_shadow_cv_xweights_conditional",
+    empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(y),
+    empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(x),
+    as.double(shadow_rbw(bw)),
+    shadow_bwtype_code(bw),
+    shadow_cker_code(bw$cxkertype),
+    shadow_uker_code(bw$uxkertype),
+    shadow_oker_code(bw$oxkertype),
+    use_tree,
+    shadow_reg_code(bw),
+    shadow_degree(bw),
+    isTRUE(bw$bernstein.basis.engine),
+    shadow_basis_code(bw$basis.engine),
+    as.integer(row_index),
+    PACKAGE = "np"
+  )
+}
+
 test_that("shadow density lc matches legacy cv objectives", {
   set.seed(42)
   n <- 40L
@@ -234,6 +255,73 @@ test_that("shadow density generalized-nn LP cures the legacy penalty collapse", 
   expect_true(is.finite(lp_ls$new))
   expect_equal(ll_ls$new, lp_ls$new, tolerance = 1e-10)
   expect_gt(ll_ls$new, -1e6)
+})
+
+test_that("shadow fixed-bandwidth X-side row helper matches dense oracle and leaves self out", {
+  set.seed(512)
+  n <- 18L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.08))
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.28, 0.37, 0.41),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+
+  for (row in seq_len(n)) {
+    res <- call_shadow_xweights_row(bw, x, y, row_index = row)
+    expect_equal(res$streamed, res$dense, tolerance = 1e-12)
+    expect_equal(res$streamed[row], 0, tolerance = 1e-12)
+    expect_equal(sum(res$streamed), 1, tolerance = 1e-10)
+  }
+})
+
+test_that("shadow fixed-bandwidth X-side row helper preserves ll == lp degree-1 and tree parity", {
+  set.seed(513)
+  n <- 20L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 - x$x2 + rnorm(n, sd = 0.06))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.31, 0.36, 0.42),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.31, 0.36, 0.42),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  res.ll <- call_shadow_xweights_row(bw.ll, x, y, row_index = 7L)
+  res.lp <- call_shadow_xweights_row(bw.lp, x, y, row_index = 7L)
+  res.tree <- call_shadow_xweights_row(bw.lp, x, y, row_index = 7L, use_tree = TRUE)
+
+  expect_equal(res.ll$streamed, res.lp$streamed, tolerance = 1e-12)
+  expect_equal(res.lp$streamed, res.tree$streamed, tolerance = 1e-12)
+})
+
+test_that("shadow fixed-bandwidth X-side row helper stays row-streamed", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start <- grep("^int np_shadow_proof_conditional_x_weight_row_fixed\\(", lines)
+  stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
+
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[(start + 1L):(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_train|num_obs_train_extern)[^\\)]*(num_train|num_obs_train_extern)", body))
 })
 
 test_that("shadow LP objectives are sensitive to degree on oracle cells", {
