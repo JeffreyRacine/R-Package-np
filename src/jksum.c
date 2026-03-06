@@ -12364,7 +12364,10 @@ double *MSE,
 double *MAE,
 double *MAPE,
 double *CORR,
-double *SIGN){
+double *SIGN,
+int leave_one_out,
+int drop_one_train,
+int drop_which_train){
 
   // note that mean has 2*num_obs allocated for npksum
   int i, j, l, sf_flag = 0;
@@ -12403,6 +12406,9 @@ double *SIGN){
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
+  const int use_drop_one_train =
+    (drop_one_train != 0) && (drop_which_train >= 0) && (drop_which_train < num_obs_train);
+  const int can_pair_loo = (leave_one_out != 0) && (num_obs_eval == num_obs_train);
   np_gate_ctx_clear(&gate_ctx_local);
   const NP_GateOverrideCtx * const est_gate_ctx_ptr = &gate_ctx_local;
 
@@ -13084,15 +13090,15 @@ double *SIGN){
                            num_reg_unordered,
                            num_reg_ordered,
                            num_reg_continuous,
-                           0, // no leave one out 
+                           can_pair_loo ? 1 : 0,
                            0,
                            1, // kernel_pow = 1
                            1, // bandwidth_divide = TRUE, always
                            0, 
                            0, // not symmetric
                            0, // do not gather-scatter
-                           0, // do not drop train
-                           0, // do not drop train
+                           use_drop_one_train,
+                           use_drop_one_train ? drop_which_train : 0,
                            operator, // no special operators being used
                            pop, // permutations used for gradients
                            0, // no score
@@ -13325,8 +13331,8 @@ double *SIGN){
                              0,
                              0,
                              0,
-                             0,
-                             0,
+                             can_pair_loo ? 1 : use_drop_one_train,
+                             can_pair_loo ? j : (use_drop_one_train ? drop_which_train : 0),
                              operator,
                              OP_NOOP,
                              0,
@@ -13428,8 +13434,8 @@ double *SIGN){
                              0,
                              0,
                              0,
-                             0,
-                             0,
+                             can_pair_loo ? 1 : use_drop_one_train,
+                             can_pair_loo ? j : (use_drop_one_train ? drop_which_train : 0),
                              operator,
                              OP_NOOP,
                              0,
@@ -13735,8 +13741,8 @@ double *SIGN){
                                  0, 
                                  1, // symmetric
                                  0, // NO gather-scatter sum
-                                 0, // do not drop train
-                                 0, // do not drop train
+                                 can_pair_loo ? 1 : use_drop_one_train,
+                                 can_pair_loo ? (j + my_rank) : (use_drop_one_train ? drop_which_train : 0),
                                  operator, // no convolution
                                  OP_NOOP, // no permutations
                                  0, // no score
@@ -13817,8 +13823,8 @@ double *SIGN){
                              0, 
                              1, // symmetric
                              0, // gather-scatter sum
-                             0, // do not drop train
-                             0, // do not drop train
+                             can_pair_loo ? 1 : use_drop_one_train,
+                             can_pair_loo ? j : (use_drop_one_train ? drop_which_train : 0),
                              operator, // no convolution
                              OP_NOOP, // no permutations
                              0, // no score
