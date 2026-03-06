@@ -1638,7 +1638,7 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
     error("C_np_shadow_cv_density_conditional: unsupported criterion");
   }
 
-  if((criterion_i == CBWM_CVML) &&
+  if(((criterion_i == CBWM_CVML) || (criterion_i == CBWM_CVLS)) &&
      ((int_ll_extern != LL_LP) || (BANDWIDTH_den_extern == BW_FIXED))){
     nscale = (int)XLENGTH(rbw_r);
     prod_vsf = (double *)malloc((size_t)(nscale + 1) * sizeof(double));
@@ -1647,7 +1647,10 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
     prod_vsf[0] = 0.0;
     for(i = 0; i < nscale; i++)
       prod_vsf[i + 1] = REAL(rbw_r)[i];
-    prod_cv = np_cv_func_con_density_categorical_ml(prod_vsf);
+    if(criterion_i == CBWM_CVML)
+      prod_cv = np_cv_func_con_density_categorical_ml(prod_vsf);
+    else
+      prod_cv = np_cv_func_con_density_categorical_ls_npksum(prod_vsf);
     safe_free(prod_vsf);
     prod_vsf = NULL;
   }

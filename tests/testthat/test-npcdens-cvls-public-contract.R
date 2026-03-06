@@ -88,29 +88,74 @@ test_that("public npcdensbw cv.ls keeps lc on the legacy objective", {
   expect_equal(bw.lc$fval, -shadow$old, tolerance = 1e-10)
 })
 
-test_that("public npcdensbw cv.ls LP/LL routes fail fast during containment", {
+test_that("public npcdensbw cv.ls fixed LP/LL route activates with ll == lp parity", {
   set.seed(141)
   n <- 36L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
   degree <- rep.int(1L, ncol(x))
 
-  expect_error(
-    npcdensbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ls", nmulti = 0),
-    "temporarily disabled pending low-memory shadow CV remediation"
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwmethod = "cv.ls",
+    nmulti = 0
   )
-  expect_error(
-    npcdensbw(
-      xdat = x,
-      ydat = y,
-      regtype = "lp",
-      basis = "glp",
-      degree = degree,
-      bwmethod = "cv.ls",
-      nmulti = 0
-    ),
-    "temporarily disabled pending low-memory shadow CV remediation"
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ls",
+    nmulti = 0
   )
+
+  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
+})
+
+test_that("public npcdensbw cv.ls fixed LP route preserves tree parity", {
+  set.seed(142)
+  n <- 34L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.12))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.serial <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+
+  old_opt <- getOption("np.tree")
+  on.exit(options(np.tree = old_opt), add = TRUE)
+  options(np.tree = TRUE)
+
+  bw.tree <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+
+  expect_equal(bw.tree$fval, bw.serial$fval, tolerance = 1e-8)
+})
+
+test_that("public npcdensbw cv.ls generalized-nn LP route stays contained", {
+  set.seed(143)
+  n <- 36L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
+  degree <- rep.int(1L, ncol(x))
+
   expect_error(
     npcdensbw(
       xdat = x,

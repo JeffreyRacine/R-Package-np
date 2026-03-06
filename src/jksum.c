@@ -7135,6 +7135,9 @@ void np_glp_cv_clear_extern(void){
   np_glp_cv_cache_clear();
 }
 
+static int np_conditional_density_cvls_fixed_lp_stream(double *vector_scale_factor,
+                                                       double *cv);
+
 typedef struct {
   int ready;
   int ncon;
@@ -10982,6 +10985,9 @@ double *cv){
   np_gate_ctx_clear(&gate_x_ctx);
   np_gate_ctx_clear(&gate_y_ctx);
   np_gate_ctx_clear(&gate_xy_ctx);
+
+  if((BANDWIDTH_den == BW_FIXED) && (int_ll_extern == LL_LP))
+    return np_conditional_density_cvls_fixed_lp_stream(vector_scale_factor, cv);
 
   int64_t i,j,k,l;
 
@@ -15004,9 +15010,10 @@ cleanup_xweight_row:
   return status;
 }
 
-static int np_shadow_conditional_y_row_fixed(double *vector_scale_factor,
-                                             int eval_idx,
-                                             double *row_out){
+static int np_shadow_conditional_y_row_fixed_op(double *vector_scale_factor,
+                                                int eval_idx,
+                                                int operator_code,
+                                                double *row_out){
   const int num_train = num_obs_train_extern;
   const int num_var_tot = num_var_continuous_extern + num_var_unordered_extern + num_var_ordered_extern;
   int *kernel_cy = NULL, *kernel_uy = NULL, *kernel_oy = NULL, *operator_y = NULL;
@@ -15076,7 +15083,7 @@ static int np_shadow_conditional_y_row_fixed(double *vector_scale_factor,
   for(i = 0; i < num_var_continuous_extern; i++) kernel_cy[i] = KERNEL_den_extern;
   for(i = 0; i < num_var_unordered_extern; i++) kernel_uy[i] = KERNEL_den_unordered_extern;
   for(i = 0; i < num_var_ordered_extern; i++) kernel_oy[i] = KERNEL_den_ordered_extern;
-  for(i = 0; i < num_var_tot; i++) operator_y[i] = OP_NORMAL;
+  for(i = 0; i < num_var_tot; i++) operator_y[i] = operator_code;
 
   if(kernel_bandwidth_mean(KERNEL_den_extern,
                            BANDWIDTH_den_extern,
@@ -15159,6 +15166,15 @@ cleanup_yweight_row:
   return status;
 }
 
+static int np_shadow_conditional_y_row_fixed(double *vector_scale_factor,
+                                             int eval_idx,
+                                             double *row_out){
+  return np_shadow_conditional_y_row_fixed_op(vector_scale_factor,
+                                              eval_idx,
+                                              OP_NORMAL,
+                                              row_out);
+}
+
 static int np_conditional_density_cvml_fixed_lp_stream(double *vector_scale_factor,
                                                        double *cv){
   const int num_obs = num_obs_train_extern;
@@ -15195,6 +15211,59 @@ static int np_conditional_density_cvml_fixed_lp_stream(double *vector_scale_fact
 cleanup_cvml_fixed_lp_stream:
   if(xrow != NULL) free(xrow);
   if(yrow != NULL) free(yrow);
+  return status;
+}
+
+static int np_conditional_density_cvls_fixed_lp_stream(double *vector_scale_factor,
+                                                       double *cv){
+  const int num_obs = num_obs_train_extern;
+  double *xrow = NULL, *yrow = NULL, *yconv = NULL;
+  int i, j, k;
+  int status = 1;
+
+  if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
+    return 1;
+
+  xrow = alloc_vecd(MAX(1, num_obs));
+  yrow = alloc_vecd(MAX(1, num_obs));
+  yconv = alloc_vecd(MAX(1, num_obs));
+  if((xrow == NULL) || (yrow == NULL) || (yconv == NULL))
+    goto cleanup_cvls_fixed_lp_stream;
+
+  *cv = 0.0;
+  for(i = 0; i < num_obs; i++){
+    double lin = 0.0;
+    double quad = 0.0;
+
+    if(np_shadow_proof_conditional_x_weight_row_fixed(vector_scale_factor, i, xrow) != 0)
+      goto cleanup_cvls_fixed_lp_stream;
+    if(np_shadow_conditional_y_row_fixed(vector_scale_factor, i, yrow) != 0)
+      goto cleanup_cvls_fixed_lp_stream;
+
+    for(j = 0; j < num_obs; j++)
+      lin += xrow[j]*yrow[j];
+
+    for(j = 0; j < num_obs; j++){
+      double inner = 0.0;
+      if(xrow[j] == 0.0)
+        continue;
+      if(np_shadow_conditional_y_row_fixed_op(vector_scale_factor, j, OP_CONVOLUTION, yconv) != 0)
+        goto cleanup_cvls_fixed_lp_stream;
+      for(k = 0; k < num_obs; k++)
+        inner += xrow[k]*yconv[k];
+      quad += xrow[j]*inner;
+    }
+
+    *cv += quad - 2.0*lin;
+  }
+
+  *cv /= (double)num_obs;
+  status = 0;
+
+cleanup_cvls_fixed_lp_stream:
+  if(xrow != NULL) free(xrow);
+  if(yrow != NULL) free(yrow);
+  if(yconv != NULL) free(yconv);
   return status;
 }
 
