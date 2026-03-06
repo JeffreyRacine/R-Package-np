@@ -1379,12 +1379,18 @@ genBwScaleStrs <- function(x){
   ## processed into a single string
 
   vari <- names(x$sumNum)
-  
-  t.icon <- lapply(vari, function(v){
-    x$dati[[v]]$icon })
 
-  sumText <- lapply(seq_along(vari), function(i) {
-    if (isTRUE(t.icon[[i]])) {
+  flat_varnames <- unlist(x$varnames[vari], use.names = FALSE)
+  flat_vartitles <- unlist(
+    lapply(vari, function(v) rep.int(x$vartitleabb[[v]], length(x$varnames[[v]]))),
+    use.names = FALSE
+  )
+  flat_bandwidth <- unlist(x$bandwidth[vari], use.names = FALSE)
+  flat_sum <- unlist(x$sumNum[vari], use.names = FALSE)
+  flat_icon <- unlist(lapply(vari, function(v) x$dati[[v]]$icon), use.names = FALSE)
+
+  sumText <- lapply(seq_along(flat_varnames), function(i) {
+    if (isTRUE(flat_icon[[i]])) {
       if (x$type == "fixed") "Scale Factor:" else ""
     } else {
       "Lambda Max:"
@@ -1398,13 +1404,13 @@ genBwScaleStrs <- function(x){
     paste(blank(maxNameLen - nchar(sumText[[i]])), sumText[[i]], sep="")
   })
 
-  t.nchar <- lapply(x$varnames[vari], nchar)
+  t.nchar <- lapply(flat_varnames, nchar)
                     
   maxNameLen <- max(unlist(t.nchar))
 
   vatText <- lapply(seq_along(t.nchar), function(j){
-    paste("\n", rpad(x$vartitleabb[[vari[j]]]), "Var. Name: ",
-          x$varnames[[vari[j]]],
+    paste("\n", rpad(flat_vartitles[[j]]), "Var. Name: ",
+          flat_varnames[[j]],
           sapply(t.nchar[[j]], function(nc){
             paste(rep(' ', maxNameLen - nc), collapse='')
           }), sep='')
@@ -1413,8 +1419,8 @@ genBwScaleStrs <- function(x){
   return(sapply(seq_along(t.nchar), function(j){
     sum.str <- ""
     if (isTRUE(print.sumText[[j]]))
-      sum.str <- paste(sumText[[j]], " ", npFormat(x$sumNum[[j]]), sep = "")
-    paste(vatText[[j]], " Bandwidth: ", npFormat(x$bandwidth[[j]]), " ",
+      sum.str <- paste(sumText[[j]], " ", npFormat(flat_sum[[j]]), sep = "")
+    paste(vatText[[j]], " Bandwidth: ", npFormat(flat_bandwidth[[j]]), " ",
           sum.str, sep = "", collapse = "")
   }))
 }
