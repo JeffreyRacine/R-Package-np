@@ -1,8 +1,9 @@
 Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
 
 * Mirrored smooth-coefficient LL/LP core remediation from `np`, removing
-  accidental full-matrix dependence from ordinary `npscoef` estimation/CV
-  paths while preserving explicit hat/plot helper behavior.
+  accidental `n x n` weight-matrix construction/full-matrix dependence from
+  ordinary `npscoef` estimation/CV paths while preserving explicit hat/plot
+  helper behavior.
 
 * Added `npscoefbw()` fast-summary accounting (`num.feval.fast`) without
   adding generic `npksum()` hot-path overhead.
