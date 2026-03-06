@@ -42,6 +42,15 @@ cdist_shadow_rbw <- function(bw) {
   )
 }
 
+cdist_shadow_bwtype <- function(bw) {
+  switch(bw$type,
+    fixed = 0L,
+    generalized_nn = 1L,
+    adaptive_nn = 2L,
+    stop("unsupported bandwidth type")
+  )
+}
+
 call_public_cdist_cvls_shadow <- function(bw, x, ytrain, yeval = ytrain, cdfontrain = FALSE) {
   n <- nrow(x)
   ne <- nrow(yeval)
@@ -51,6 +60,7 @@ call_public_cdist_cvls_shadow <- function(bw, x, ytrain, yeval = ytrain, cdfontr
     cdist_shadow_empty(ne), cdist_shadow_empty(ne), as.matrix(yeval),
     cdist_shadow_empty(n), cdist_shadow_empty(n), as.matrix(x),
     as.double(cdist_shadow_rbw(bw)),
+    cdist_shadow_bwtype(bw),
     cdist_shadow_cker(bw$cykertype),
     cdist_shadow_uker(bw$uykertype),
     cdist_shadow_oker(bw$oykertype),
@@ -144,4 +154,37 @@ test_that("public npcdistbw cv.ls preserves tree parity on the LP route", {
   )
 
   expect_equal(bw.nt$fval, bw.tr$fval, tolerance = 1e-10)
+})
+
+test_that("public npcdistbw cv.ls generalized-nn is finite and preserves ll canonicalization", {
+  set.seed(191)
+  n <- 40L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.12))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+  bw.lp <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+
+  expect_true(is.finite(bw.ll$fval))
+  expect_true(is.finite(bw.lp$fval))
+  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
+  expect_equal(bw.ll$xbw, bw.lp$xbw, tolerance = 1e-10)
+  expect_equal(bw.ll$ybw, bw.lp$ybw, tolerance = 1e-10)
 })

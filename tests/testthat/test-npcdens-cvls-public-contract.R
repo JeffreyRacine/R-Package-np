@@ -42,6 +42,15 @@ cvls_shadow_rbw <- function(bw) {
   )
 }
 
+cvls_shadow_bwtype <- function(bw) {
+  switch(bw$type,
+    fixed = 0L,
+    generalized_nn = 1L,
+    adaptive_nn = 2L,
+    stop("unsupported bandwidth type")
+  )
+}
+
 call_public_cvls_shadow <- function(bw, x, y) {
   n <- nrow(x)
   .Call(
@@ -49,6 +58,7 @@ call_public_cvls_shadow <- function(bw, x, y) {
     cvls_shadow_empty(n), cvls_shadow_empty(n), as.matrix(y),
     cvls_shadow_empty(n), cvls_shadow_empty(n), as.matrix(x),
     as.double(cvls_shadow_rbw(bw)),
+    cvls_shadow_bwtype(bw),
     cvls_shadow_cker(bw$cykertype),
     cvls_shadow_uker(bw$uykertype),
     cvls_shadow_oker(bw$oykertype),
@@ -133,4 +143,39 @@ test_that("public npcdensbw cv.ls preserves tree parity on the LP route", {
   )
 
   expect_equal(bw.nt$fval, bw.tr$fval, tolerance = 1e-10)
+})
+
+test_that("public npcdensbw cv.ls generalized-nn is finite and preserves ll canonicalization", {
+  set.seed(212)
+  n <- 40L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.12))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+
+  expect_true(is.finite(bw.ll$fval))
+  expect_true(is.finite(bw.lp$fval))
+  expect_gt(bw.ll$fval, -1e6)
+  expect_gt(bw.lp$fval, -1e6)
+  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
+  expect_equal(bw.ll$xbw, bw.lp$xbw, tolerance = 1e-10)
+  expect_equal(bw.ll$ybw, bw.lp$ybw, tolerance = 1e-10)
 })

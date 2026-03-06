@@ -1316,6 +1316,7 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
                                         SEXP txord,
                                         SEXP txcon,
                                         SEXP rbw,
+                                        SEXP bwtype,
                                         SEXP kernel_y,
                                         SEXP kernel_yu,
                                         SEXP kernel_yo,
@@ -1390,7 +1391,7 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   KERNEL_reg_extern = asInteger(kernel_x);
   KERNEL_reg_unordered_extern = asInteger(kernel_xu);
   KERNEL_reg_ordered_extern = asInteger(kernel_xo);
-  BANDWIDTH_den_extern = BW_FIXED;
+  BANDWIDTH_den_extern = asInteger(bwtype);
 
   matrix_Y_unordered_train_extern = alloc_matd(num_obs, num_var_unordered_extern);
   matrix_Y_ordered_train_extern = alloc_matd(num_obs, num_var_ordered_extern);
@@ -1700,6 +1701,7 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
                                              SEXP txord,
                                              SEXP txcon,
                                              SEXP rbw,
+                                             SEXP bwtype,
                                              SEXP kernel_y,
                                              SEXP kernel_yu,
                                              SEXP kernel_yo,
@@ -1792,7 +1794,7 @@ SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
   KERNEL_reg_extern = asInteger(kernel_x);
   KERNEL_reg_unordered_extern = asInteger(kernel_xu);
   KERNEL_reg_ordered_extern = asInteger(kernel_xo);
-  BANDWIDTH_den_extern = BW_FIXED;
+  BANDWIDTH_den_extern = asInteger(bwtype);
 
   matrix_Y_unordered_train_extern = alloc_matd(num_obs_train, num_var_unordered_extern);
   matrix_Y_ordered_train_extern = alloc_matd(num_obs_train, num_var_ordered_extern);

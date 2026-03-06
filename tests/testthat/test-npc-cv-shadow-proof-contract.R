@@ -51,6 +51,15 @@ shadow_rbw <- function(bw) {
   )
 }
 
+shadow_bwtype_code <- function(bw) {
+  switch(bw$type,
+    fixed = 0L,
+    generalized_nn = 1L,
+    adaptive_nn = 2L,
+    stop("unsupported bandwidth type for shadow test")
+  )
+}
+
 shadow_reg_code <- function(bw) {
   if (identical(bw$regtype.engine, "lp")) 2L else 0L
 }
@@ -68,6 +77,7 @@ call_shadow_density <- function(bw, x, y, criterion = c("cv.ml", "cv.ls"),
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(y),
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(x),
     as.double(shadow_rbw(bw)),
+    shadow_bwtype_code(bw),
     shadow_cker_code(bw$cykertype),
     shadow_uker_code(bw$uykertype),
     shadow_oker_code(bw$oykertype),
@@ -96,6 +106,7 @@ call_shadow_distribution <- function(bw, x, ytrain, yeval = ytrain,
     empty_shadow_matrix(ne), empty_shadow_matrix(ne), as.matrix(yeval),
     empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(x),
     as.double(shadow_rbw(bw)),
+    shadow_bwtype_code(bw),
     shadow_cker_code(bw$cykertype),
     shadow_uker_code(bw$uykertype),
     shadow_oker_code(bw$oykertype),
@@ -190,6 +201,41 @@ test_that("shadow density cvml preserves the large-kernel X collapse", {
   expect_equal(res$new, collapsed, tolerance = 1e-9)
 })
 
+test_that("shadow density generalized-nn LP cures the legacy penalty collapse", {
+  set.seed(203)
+  n <- 38L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.12))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(4, 7, 5),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(4, 7, 5),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  ll_ls <- call_shadow_density(bw.ll, x, y, criterion = "cv.ls", compare_old = FALSE)
+  lp_ls <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls", compare_old = FALSE)
+
+  expect_true(is.finite(ll_ls$new))
+  expect_true(is.finite(lp_ls$new))
+  expect_equal(ll_ls$new, lp_ls$new, tolerance = 1e-10)
+  expect_gt(ll_ls$new, -1e6)
+})
+
 test_that("shadow LP objectives are sensitive to degree on oracle cells", {
   set.seed(123)
   n <- 35L
@@ -260,6 +306,40 @@ test_that("shadow distribution lc matches legacy cvls for both cdfontrain modes"
 
   expect_equal(res_false$new, res_false$old, tolerance = 1e-12)
   expect_equal(res_true$new, res_true$old, tolerance = 1e-12)
+})
+
+test_that("shadow distribution generalized-nn LP preserves ll canonicalization", {
+  set.seed(263)
+  n <- 36L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.1))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(4, 6, 5),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(4, 6, 5),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  dist.ll <- call_shadow_distribution(bw.ll, x, y, compare_old = FALSE)
+  dist.lp <- call_shadow_distribution(bw.lp, x, y, compare_old = FALSE)
+
+  expect_true(is.finite(dist.ll$new))
+  expect_true(is.finite(dist.lp$new))
+  expect_equal(dist.ll$new, dist.lp$new, tolerance = 1e-10)
 })
 
 test_that("shadow distribution lp preserves ll canonicalization and tree parity", {
