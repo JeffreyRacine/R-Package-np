@@ -25,3 +25,34 @@ test_that("npplreg lp degree metadata is preserved in plbandwidth summary", {
     expect_true(grepl(paste0("degree = ", deg), reg_line))
   }
 })
+
+test_that("npplregbw forwards kernel-defining options to child regression bandwidths", {
+  if (!spawn_mpi_slaves())
+    skip("Could not spawn MPI slaves")
+
+  set.seed(20260306)
+  n <- 40
+  xdat <- data.frame(x = runif(n))
+  zdat <- data.frame(z = runif(n))
+  y <- 2 * xdat$x + sin(2 * pi * zdat$z) + rnorm(n, sd = 0.1)
+
+  bw <- npplregbw(
+    xdat = xdat,
+    zdat = zdat,
+    ydat = y,
+    nmulti = 1L,
+    regtype = "lp",
+    basis = "glp",
+    degree = 2L,
+    bernstein.basis = TRUE,
+    bwtype = "fixed",
+    ckertype = "epanechnikov",
+    ckerorder = 2L
+  )
+
+  expect_identical(bw$ckertype, "epanechnikov")
+  expect_identical(bw$bw$yzbw$ckertype, "epanechnikov")
+  expect_identical(bw$bw[[2L]]$ckertype, "epanechnikov")
+  expect_match(bw$bw$yzbw$pckertype, "Epanechnikov")
+  expect_match(bw$bw[[2L]]$pckertype, "Epanechnikov")
+})

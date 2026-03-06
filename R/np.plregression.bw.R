@@ -269,6 +269,13 @@ npplregbw.default =
       bernstein.basis = spec$bernstein.basis.engine,
       bandwidth.compute = FALSE
     )
+    kernel.arg.names <- intersect(
+      c("bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
+        "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype"),
+      dot.names
+    )
+    if (length(kernel.arg.names))
+      reg.args[kernel.arg.names] <- dots[kernel.arg.names]
 
     plband = list()
     plband$yzbw = do.call(
@@ -301,6 +308,14 @@ npplregbw.default =
                        bandwidth.compute = bandwidth.compute)
 
 
+    mc.names <- names(match.call(expand.dots = FALSE))
+    margs <- c("regtype", "basis", "degree", "bernstein.basis",
+               "bwmethod", "bwscaling", "bwtype", "ckertype", "ckerorder",
+               "ckerbound", "ckerlb", "ckerub", "ukertype", "okertype",
+               "ftol", "itmax", "nmulti", "remin", "small", "tol")
+    m <- match(margs, mc.names, nomatch = 0)
+    any.m <- any(m != 0)
+
     if (bandwidth.compute) {
       if (!missing(nmulti)) nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
       if (!missing(remin)) remin <- npValidateScalarLogical(remin, "remin")
@@ -308,14 +323,12 @@ npplregbw.default =
       if (!missing(ftol)) ftol <- npValidatePositiveFiniteNumeric(ftol, "ftol")
       if (!missing(tol)) tol <- npValidatePositiveFiniteNumeric(tol, "tol")
       if (!missing(small)) small <- npValidatePositiveFiniteNumeric(small, "small")
-      opt.args <- list(xdat = xdat, ydat = ydat, zdat = zdat, bws = tbw)
-      if (!missing(nmulti)) opt.args$nmulti <- nmulti
-      if (!missing(remin)) opt.args$remin <- remin
-      if (!missing(itmax)) opt.args$itmax <- itmax
-      if (!missing(ftol)) opt.args$ftol <- ftol
-      if (!missing(tol)) opt.args$tol <- tol
-      if (!missing(small)) opt.args$small <- small
-      tbw <- do.call(npplregbw.plbandwidth, opt.args)
+      bwsel.args <- list(xdat = xdat, ydat = ydat, zdat = zdat, bws = tbw)
+      if (any.m) {
+        nms <- mc.names[m]
+        bwsel.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
+      }
+      tbw <- do.call(npplregbw.plbandwidth, bwsel.args)
     }
 
     mc <- match.call(expand.dots = FALSE)
