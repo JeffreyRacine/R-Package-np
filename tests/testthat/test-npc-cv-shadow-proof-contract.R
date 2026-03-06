@@ -1,0 +1,243 @@
+library(np)
+
+empty_shadow_matrix <- function(n) {
+  matrix(numeric(0), nrow = n, ncol = 0)
+}
+
+shadow_cker_code <- function(kernel) {
+  switch(kernel,
+    gaussian = 0L,
+    epanechnikov = 4L,
+    uniform = 8L,
+    truncated = 9L,
+    stop("unsupported continuous kernel for shadow test")
+  )
+}
+
+shadow_uker_code <- function(kernel) {
+  switch(kernel,
+    aitchisonaitken = 0L,
+    liracine = 1L,
+    stop("unsupported unordered kernel for shadow test")
+  )
+}
+
+shadow_oker_code <- function(kernel) {
+  switch(kernel,
+    wangvanryzin = 0L,
+    liracine = 2L,
+    racineliyan = 3L,
+    stop("unsupported ordered kernel for shadow test")
+  )
+}
+
+shadow_basis_code <- function(basis) {
+  switch(basis,
+    additive = 0L,
+    glp = 1L,
+    tensor = 2L,
+    stop("unsupported LP basis for shadow test")
+  )
+}
+
+shadow_rbw <- function(bw) {
+  c(
+    bw$xbw[bw$ixcon],
+    bw$ybw[bw$iycon],
+    bw$ybw[bw$iyuno],
+    bw$ybw[bw$iyord],
+    bw$xbw[bw$ixuno],
+    bw$xbw[bw$ixord]
+  )
+}
+
+shadow_reg_code <- function(bw) {
+  if (identical(bw$regtype.engine, "lp")) 2L else 0L
+}
+
+shadow_degree <- function(bw) {
+  if (identical(bw$regtype.engine, "lp")) as.integer(bw$degree.engine) else integer(0)
+}
+
+call_shadow_density <- function(bw, x, y, criterion = c("cv.ml", "cv.ls"),
+                                use_tree = FALSE, compare_old = TRUE) {
+  criterion <- match.arg(criterion)
+  n <- nrow(x)
+  .Call(
+    "C_np_shadow_cv_density_conditional",
+    empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(y),
+    empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(x),
+    as.double(shadow_rbw(bw)),
+    shadow_cker_code(bw$cykertype),
+    shadow_uker_code(bw$uykertype),
+    shadow_oker_code(bw$oykertype),
+    shadow_cker_code(bw$cxkertype),
+    shadow_uker_code(bw$uxkertype),
+    shadow_oker_code(bw$oxkertype),
+    use_tree,
+    if (identical(criterion, "cv.ml")) 0L else 1L,
+    shadow_reg_code(bw),
+    shadow_degree(bw),
+    isTRUE(bw$bernstein.basis.engine),
+    shadow_basis_code(bw$basis.engine),
+    compare_old,
+    PACKAGE = "np"
+  )
+}
+
+call_shadow_distribution <- function(bw, x, ytrain, yeval = ytrain,
+                                     use_tree = FALSE, cdfontrain = FALSE,
+                                     compare_old = TRUE) {
+  n <- nrow(x)
+  ne <- nrow(yeval)
+  .Call(
+    "C_np_shadow_cv_distribution_conditional",
+    empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(ytrain),
+    empty_shadow_matrix(ne), empty_shadow_matrix(ne), as.matrix(yeval),
+    empty_shadow_matrix(n), empty_shadow_matrix(n), as.matrix(x),
+    as.double(shadow_rbw(bw)),
+    shadow_cker_code(bw$cykertype),
+    shadow_uker_code(bw$uykertype),
+    shadow_oker_code(bw$oykertype),
+    shadow_cker_code(bw$cxkertype),
+    shadow_uker_code(bw$uxkertype),
+    shadow_oker_code(bw$oxkertype),
+    use_tree,
+    shadow_reg_code(bw),
+    shadow_degree(bw),
+    isTRUE(bw$bernstein.basis.engine),
+    shadow_basis_code(bw$basis.engine),
+    cdfontrain,
+    compare_old,
+    PACKAGE = "np"
+  )
+}
+
+test_that("shadow density lc matches legacy cv objectives", {
+  set.seed(42)
+  n <- 40L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = rnorm(n))
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.35, 0.45, 0.55),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  res_ml <- call_shadow_density(bw, x, y, criterion = "cv.ml", compare_old = TRUE)
+  res_ls <- call_shadow_density(bw, x, y, criterion = "cv.ls", compare_old = TRUE)
+
+  expect_equal(res_ml$new, res_ml$old, tolerance = 1e-12)
+  expect_equal(res_ls$new, res_ls$old, tolerance = 1e-12)
+})
+
+test_that("shadow density lp preserves ll canonicalization and tree parity", {
+  set.seed(33)
+  n <- 42L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.15))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.31, 0.43, 0.57),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.31, 0.43, 0.57),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  ll_ml <- call_shadow_density(bw.ll, x, y, criterion = "cv.ml", compare_old = FALSE)
+  lp_ml <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml", compare_old = FALSE)
+  ll_ls <- call_shadow_density(bw.ll, x, y, criterion = "cv.ls", compare_old = FALSE)
+  lp_ls <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls", compare_old = FALSE)
+  lp_ml_tree <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml", use_tree = TRUE, compare_old = FALSE)
+  lp_ls_tree <- call_shadow_density(bw.lp, x, y, criterion = "cv.ls", use_tree = TRUE, compare_old = FALSE)
+
+  expect_equal(ll_ml$new, lp_ml$new, tolerance = 1e-12)
+  expect_equal(ll_ls$new, lp_ls$new, tolerance = 1e-12)
+  expect_equal(lp_ml_tree$new, lp_ml$new, tolerance = 1e-10)
+  expect_equal(lp_ls_tree$new, lp_ls$new, tolerance = 1e-12)
+})
+
+test_that("shadow density cvml preserves the large-kernel X collapse", {
+  set.seed(11)
+  n <- 30L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = rnorm(n))
+  big <- 1e6
+  bw <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(big, big, big),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  res <- call_shadow_density(bw, x, y, criterion = "cv.ml", compare_old = FALSE)
+  collapsed <- -n * log(mean(dnorm(outer(y$y1, y$y1, "-"), sd = big)))
+
+  expect_equal(res$new, collapsed, tolerance = 1e-9)
+})
+
+test_that("shadow distribution lc matches legacy cvls for both cdfontrain modes", {
+  set.seed(55)
+  n <- 28L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = rnorm(n))
+  bw <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.33, 0.44, 0.51),
+    bandwidth.compute = FALSE,
+    regtype = "lc"
+  )
+
+  res_false <- call_shadow_distribution(bw, x, y, cdfontrain = FALSE, compare_old = TRUE)
+  res_true <- call_shadow_distribution(bw, x, y, cdfontrain = TRUE, compare_old = TRUE)
+
+  expect_equal(res_false$new, res_false$old, tolerance = 1e-12)
+  expect_equal(res_true$new, res_true$old, tolerance = 1e-12)
+})
+
+test_that("shadow distribution lp preserves ll canonicalization and tree parity", {
+  set.seed(88)
+  n <- 34L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 - x$x2 + rnorm(n, sd = 0.2))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.28, 0.39, 0.52),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    bws = c(0.28, 0.39, 0.52),
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  ll_res <- call_shadow_distribution(bw.ll, x, y, compare_old = FALSE)
+  lp_res <- call_shadow_distribution(bw.lp, x, y, compare_old = FALSE)
+  lp_tree <- call_shadow_distribution(bw.lp, x, y, use_tree = TRUE, compare_old = FALSE)
+
+  expect_equal(ll_res$new, lp_res$new, tolerance = 1e-12)
+  expect_equal(lp_tree$new, lp_res$new, tolerance = 1e-12)
+})

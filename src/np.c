@@ -148,6 +148,26 @@ static void resolve_bounds_or_default(SEXP lb_r, SEXP ub_r, int ncon, double ** 
     }
   }
 }
+
+static void np_shadow_matrix_dims(SEXP x, int *nrow, int *ncol)
+{
+  SEXP dim = getAttrib(x, R_DimSymbol);
+  if(dim == R_NilValue || XLENGTH(dim) != 2){
+    *nrow = 0;
+    *ncol = 0;
+    return;
+  }
+  *nrow = INTEGER(dim)[0];
+  *ncol = INTEGER(dim)[1];
+}
+
+static void np_shadow_fill_matrix(double **dest, const double *src, int nrow, int ncol)
+{
+  int i, j;
+  for(j = 0; j < ncol; j++)
+    for(i = 0; i < nrow; i++)
+      dest[j][i] = src[j*nrow + i];
+}
 static int bwm_use_transform = 0;
 static int bwm_num_reg_continuous = 0;
 static int bwm_num_reg_unordered = 0;
@@ -1278,6 +1298,721 @@ SEXP C_np_density_conditional(SEXP tyuno,
   int_ll_extern = LL_LC;
 
   UNPROTECT(36);
+  return out;
+}
+
+SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
+                                        SEXP tyord,
+                                        SEXP tycon,
+                                        SEXP txuno,
+                                        SEXP txord,
+                                        SEXP txcon,
+                                        SEXP rbw,
+                                        SEXP kernel_y,
+                                        SEXP kernel_yu,
+                                        SEXP kernel_yo,
+                                        SEXP kernel_x,
+                                        SEXP kernel_xu,
+                                        SEXP kernel_xo,
+                                        SEXP use_tree,
+                                        SEXP criterion,
+                                        SEXP regtype,
+                                        SEXP glp_degree,
+                                        SEXP glp_bernstein,
+                                        SEXP glp_basis,
+                                        SEXP compare_old)
+{
+  SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
+  SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
+  SEXP rbw_r=R_NilValue, degree_i=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_old=R_NilValue, out_new=R_NilValue;
+  int nrow_yuno = 0, ncol_yuno = 0, nrow_yord = 0, ncol_yord = 0, nrow_ycon = 0, ncol_ycon = 0;
+  int nrow_xuno = 0, ncol_xuno = 0, nrow_xord = 0, ncol_xord = 0, nrow_xcon = 0, ncol_xcon = 0;
+  int num_obs = 0;
+  int tree_flag = asLogical(use_tree);
+  int do_old = asLogical(compare_old);
+  int criterion_i = asInteger(criterion);
+  int int_large_sf_save = int_LARGE_SF;
+  double nconfac_save = nconfac_extern;
+  double ncatfac_save = ncatfac_extern;
+  double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
+  double *shadow_continuous_stddev = NULL;
+  double old_cv = NA_REAL, new_cv = NA_REAL;
+  int i;
+
+  tyuno_r = PROTECT(coerceVector(tyuno, REALSXP));
+  tyord_r = PROTECT(coerceVector(tyord, REALSXP));
+  tycon_r = PROTECT(coerceVector(tycon, REALSXP));
+  txuno_r = PROTECT(coerceVector(txuno, REALSXP));
+  txord_r = PROTECT(coerceVector(txord, REALSXP));
+  txcon_r = PROTECT(coerceVector(txcon, REALSXP));
+  rbw_r = PROTECT(coerceVector(rbw, REALSXP));
+  degree_i = PROTECT(coerceVector(glp_degree, INTSXP));
+
+  np_shadow_matrix_dims(tyuno, &nrow_yuno, &ncol_yuno);
+  np_shadow_matrix_dims(tyord, &nrow_yord, &ncol_yord);
+  np_shadow_matrix_dims(tycon, &nrow_ycon, &ncol_ycon);
+  np_shadow_matrix_dims(txuno, &nrow_xuno, &ncol_xuno);
+  np_shadow_matrix_dims(txord, &nrow_xord, &ncol_xord);
+  np_shadow_matrix_dims(txcon, &nrow_xcon, &ncol_xcon);
+
+  num_obs = MAX(MAX(nrow_yuno, nrow_yord), MAX(MAX(nrow_ycon, nrow_xuno), MAX(nrow_xord, nrow_xcon)));
+  if(num_obs <= 0)
+    error("C_np_shadow_cv_density_conditional: zero-row inputs are not supported");
+
+  if((nrow_yuno > 0 && nrow_yuno != num_obs) || (nrow_yord > 0 && nrow_yord != num_obs) ||
+     (nrow_ycon > 0 && nrow_ycon != num_obs) || (nrow_xuno > 0 && nrow_xuno != num_obs) ||
+     (nrow_xord > 0 && nrow_xord != num_obs) || (nrow_xcon > 0 && nrow_xcon != num_obs))
+    error("C_np_shadow_cv_density_conditional: all inputs must share the same row count");
+
+  num_obs_train_extern = num_obs_eval_extern = num_obs;
+  num_var_unordered_extern = ncol_yuno;
+  num_var_ordered_extern = ncol_yord;
+  num_var_continuous_extern = ncol_ycon;
+  num_reg_unordered_extern = ncol_xuno;
+  num_reg_ordered_extern = ncol_xord;
+  num_reg_continuous_extern = ncol_xcon;
+  int_LARGE_SF = 1;
+  nconfac_extern = 1.0;
+  ncatfac_extern = 1.0;
+
+  KERNEL_den_extern = asInteger(kernel_y);
+  KERNEL_den_unordered_extern = asInteger(kernel_yu);
+  KERNEL_den_ordered_extern = asInteger(kernel_yo);
+  KERNEL_reg_extern = asInteger(kernel_x);
+  KERNEL_reg_unordered_extern = asInteger(kernel_xu);
+  KERNEL_reg_ordered_extern = asInteger(kernel_xo);
+  BANDWIDTH_den_extern = BW_FIXED;
+
+  matrix_Y_unordered_train_extern = alloc_matd(num_obs, num_var_unordered_extern);
+  matrix_Y_ordered_train_extern = alloc_matd(num_obs, num_var_ordered_extern);
+  matrix_Y_continuous_train_extern = alloc_matd(num_obs, num_var_continuous_extern);
+  matrix_X_unordered_train_extern = alloc_matd(num_obs, num_reg_unordered_extern);
+  matrix_X_ordered_train_extern = alloc_matd(num_obs, num_reg_ordered_extern);
+  matrix_X_continuous_train_extern = alloc_matd(num_obs, num_reg_continuous_extern);
+  matrix_Y_unordered_eval_extern = matrix_Y_unordered_train_extern;
+  matrix_Y_ordered_eval_extern = matrix_Y_ordered_train_extern;
+  matrix_Y_continuous_eval_extern = matrix_Y_continuous_train_extern;
+
+  np_shadow_fill_matrix(matrix_Y_unordered_train_extern, REAL(tyuno_r), num_obs, num_var_unordered_extern);
+  np_shadow_fill_matrix(matrix_Y_ordered_train_extern, REAL(tyord_r), num_obs, num_var_ordered_extern);
+  np_shadow_fill_matrix(matrix_Y_continuous_train_extern, REAL(tycon_r), num_obs, num_var_continuous_extern);
+  np_shadow_fill_matrix(matrix_X_unordered_train_extern, REAL(txuno_r), num_obs, num_reg_unordered_extern);
+  np_shadow_fill_matrix(matrix_X_ordered_train_extern, REAL(txord_r), num_obs, num_reg_ordered_extern);
+  np_shadow_fill_matrix(matrix_X_continuous_train_extern, REAL(txcon_r), num_obs, num_reg_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    shadow_continuous_stddev =
+      (double *)malloc((size_t)(num_reg_continuous_extern + num_var_continuous_extern) * sizeof(double));
+    if(shadow_continuous_stddev == NULL)
+      error("C_np_shadow_cv_density_conditional: stddev allocation failed");
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      shadow_continuous_stddev[i] =
+        standerrd(num_obs, matrix_X_continuous_train_extern[i]);
+    for(i = 0; i < num_var_continuous_extern; i++)
+      shadow_continuous_stddev[num_reg_continuous_extern + i] =
+        standerrd(num_obs, matrix_Y_continuous_train_extern[i]);
+    vector_continuous_stddev_extern = shadow_continuous_stddev;
+  } else {
+    vector_continuous_stddev_extern = NULL;
+  }
+
+  if(tree_flag){
+    int_TREE_X = (num_reg_continuous_extern > 0) ? NP_TREE_TRUE : NP_TREE_FALSE;
+    int_TREE_Y = (num_var_continuous_extern > 0) ? NP_TREE_TRUE : NP_TREE_FALSE;
+    int_TREE_XY = NP_TREE_FALSE;
+    if(int_TREE_X == NP_TREE_TRUE){
+      ipt_extern_X = (int *)malloc((size_t)num_obs*sizeof(int));
+      ipt_lookup_extern_X = (int *)malloc((size_t)num_obs*sizeof(int));
+      if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
+        error("C_np_shadow_cv_density_conditional: x-tree allocation failed");
+      for(i = 0; i < num_obs; i++) ipt_extern_X[i] = i;
+      build_kdtree(matrix_X_continuous_train_extern, num_obs, num_reg_continuous_extern,
+                   4*num_reg_continuous_extern, ipt_extern_X, &kdt_extern_X);
+      for(i = 0; i < num_obs; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
+      for(int j = 0; j < num_reg_unordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs + ipt_extern_X[i]];
+      for(int j = 0; j < num_reg_ordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs + ipt_extern_X[i]];
+      for(int j = 0; j < num_reg_continuous_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs + ipt_extern_X[i]];
+    } else {
+      ipt_extern_X = NULL;
+      ipt_lookup_extern_X = NULL;
+      kdt_extern_X = NULL;
+    }
+    if(int_TREE_Y == NP_TREE_TRUE){
+      ipt_extern_Y = (int *)malloc((size_t)num_obs*sizeof(int));
+      ipt_lookup_extern_Y = (int *)malloc((size_t)num_obs*sizeof(int));
+      if((ipt_extern_Y == NULL) || (ipt_lookup_extern_Y == NULL))
+        error("C_np_shadow_cv_density_conditional: y-tree allocation failed");
+      for(i = 0; i < num_obs; i++) ipt_extern_Y[i] = i;
+      build_kdtree(matrix_Y_continuous_train_extern, num_obs, num_var_continuous_extern,
+                   4*num_var_continuous_extern, ipt_extern_Y, &kdt_extern_Y);
+      for(i = 0; i < num_obs; i++) ipt_lookup_extern_Y[ipt_extern_Y[i]] = i;
+      for(int j = 0; j < num_var_unordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_Y_unordered_train_extern[j][i] = REAL(tyuno_r)[j*num_obs + ipt_extern_Y[i]];
+      for(int j = 0; j < num_var_ordered_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_Y_ordered_train_extern[j][i] = REAL(tyord_r)[j*num_obs + ipt_extern_Y[i]];
+      for(int j = 0; j < num_var_continuous_extern; j++)
+        for(i = 0; i < num_obs; i++)
+          matrix_Y_continuous_train_extern[j][i] = REAL(tycon_r)[j*num_obs + ipt_extern_Y[i]];
+    } else {
+      ipt_extern_Y = NULL;
+      ipt_lookup_extern_Y = NULL;
+      kdt_extern_Y = NULL;
+    }
+  } else {
+    int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+    ipt_extern_X = ipt_extern_Y = ipt_extern_XY = NULL;
+    ipt_lookup_extern_X = ipt_lookup_extern_Y = ipt_lookup_extern_XY = NULL;
+    kdt_extern_X = kdt_extern_Y = kdt_extern_XY = NULL;
+  }
+
+  num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
+  num_categories_extern_Y = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern);
+  matrix_categorical_vals_extern_X = alloc_matd(num_obs, num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern_Y = alloc_matd(num_obs, num_var_unordered_extern + num_var_ordered_extern);
+  determine_categorical_vals(num_obs,
+                             0,
+                             0,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             NULL,
+                             NULL,
+                             matrix_X_unordered_train_extern,
+                             matrix_X_ordered_train_extern,
+                             num_categories_extern_X,
+                             matrix_categorical_vals_extern_X);
+  determine_categorical_vals(num_obs,
+                             num_var_unordered_extern,
+                             num_var_ordered_extern,
+                             0,
+                             0,
+                             matrix_Y_unordered_train_extern,
+                             matrix_Y_ordered_train_extern,
+                             NULL,
+                             NULL,
+                             num_categories_extern_Y,
+                             matrix_categorical_vals_extern_Y);
+
+  int_ll_extern = asInteger(regtype);
+  if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
+    if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
+      error("C_np_shadow_cv_density_conditional: glp_degree length mismatch");
+    vector_glp_degree_extern = INTEGER(degree_i);
+    int_glp_bernstein_extern = asInteger(glp_bernstein);
+    int_glp_basis_extern = asInteger(glp_basis);
+  } else {
+    vector_glp_degree_extern = NULL;
+    int_glp_bernstein_extern = 0;
+    int_glp_basis_extern = 1;
+  }
+
+  if(do_old && !tree_flag && (int_ll_extern == LL_LC)){
+    num_categories_extern = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
+                                       num_reg_unordered_extern + num_reg_ordered_extern);
+    matrix_categorical_vals_extern = alloc_matd(num_obs, num_var_unordered_extern + num_var_ordered_extern +
+                                                num_reg_unordered_extern + num_reg_ordered_extern);
+    determine_categorical_vals(num_obs,
+                               num_var_unordered_extern,
+                               num_var_ordered_extern,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               matrix_Y_unordered_train_extern,
+                               matrix_Y_ordered_train_extern,
+                               matrix_X_unordered_train_extern,
+                               matrix_X_ordered_train_extern,
+                               num_categories_extern,
+                               matrix_categorical_vals_extern);
+    num_categories_extern_XY = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
+                                          num_reg_unordered_extern + num_reg_ordered_extern);
+    matrix_categorical_vals_extern_XY = alloc_matd(num_obs, num_var_unordered_extern + num_var_ordered_extern +
+                                                   num_reg_unordered_extern + num_reg_ordered_extern);
+    matrix_XY_unordered_train_extern = alloc_matd(num_obs, num_var_unordered_extern + num_reg_unordered_extern);
+    matrix_XY_ordered_train_extern = alloc_matd(num_obs, num_var_ordered_extern + num_reg_ordered_extern);
+    matrix_XY_continuous_train_extern = alloc_matd(num_obs, num_var_continuous_extern + num_reg_continuous_extern);
+    for(i = 0; i < num_reg_unordered_extern; i++)
+      memcpy(matrix_XY_unordered_train_extern[i], matrix_X_unordered_train_extern[i], (size_t)num_obs*sizeof(double));
+    for(i = 0; i < num_var_unordered_extern; i++)
+      memcpy(matrix_XY_unordered_train_extern[num_reg_unordered_extern + i], matrix_Y_unordered_train_extern[i], (size_t)num_obs*sizeof(double));
+    for(i = 0; i < num_reg_ordered_extern; i++)
+      memcpy(matrix_XY_ordered_train_extern[i], matrix_X_ordered_train_extern[i], (size_t)num_obs*sizeof(double));
+    for(i = 0; i < num_var_ordered_extern; i++)
+      memcpy(matrix_XY_ordered_train_extern[num_reg_ordered_extern + i], matrix_Y_ordered_train_extern[i], (size_t)num_obs*sizeof(double));
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      memcpy(matrix_XY_continuous_train_extern[i], matrix_X_continuous_train_extern[i], (size_t)num_obs*sizeof(double));
+    for(i = 0; i < num_var_continuous_extern; i++)
+      memcpy(matrix_XY_continuous_train_extern[num_reg_continuous_extern + i], matrix_Y_continuous_train_extern[i], (size_t)num_obs*sizeof(double));
+    np_splitxy_vsf_mcv_nc(num_var_unordered_extern,
+                          num_var_ordered_extern,
+                          num_var_continuous_extern,
+                          num_reg_unordered_extern,
+                          num_reg_ordered_extern,
+                          num_reg_continuous_extern,
+                          REAL(rbw_r),
+                          num_categories_extern,
+                          matrix_categorical_vals_extern,
+                          NULL, NULL, NULL,
+                          NULL, NULL, num_categories_extern_XY,
+                          NULL, NULL, matrix_categorical_vals_extern_XY);
+    if(criterion_i == CBWM_CVML){
+      if(np_kernel_estimate_con_density_categorical_leave_one_out_cv(KERNEL_den_extern,
+                                                                     KERNEL_den_unordered_extern,
+                                                                     KERNEL_den_ordered_extern,
+                                                                     KERNEL_reg_extern,
+                                                                     KERNEL_reg_unordered_extern,
+                                                                     KERNEL_reg_ordered_extern,
+                                                                     BANDWIDTH_den_extern,
+                                                                     num_obs_train_extern,
+                                                                     num_var_unordered_extern,
+                                                                     num_var_ordered_extern,
+                                                                     num_var_continuous_extern,
+                                                                     num_reg_unordered_extern,
+                                                                     num_reg_ordered_extern,
+                                                                     num_reg_continuous_extern,
+                                                                     matrix_Y_unordered_train_extern,
+                                                                     matrix_Y_ordered_train_extern,
+                                                                     matrix_Y_continuous_train_extern,
+                                                                     matrix_X_unordered_train_extern,
+                                                                     matrix_X_ordered_train_extern,
+                                                                     matrix_X_continuous_train_extern,
+                                                                     matrix_XY_unordered_train_extern,
+                                                                     matrix_XY_ordered_train_extern,
+                                                                     matrix_XY_continuous_train_extern,
+                                                                     REAL(rbw_r),
+                                                                     num_categories_extern,
+                                                                     &old_cv) != 0)
+        old_cv = NA_REAL;
+    } else if(criterion_i == CBWM_CVLS){
+      if(kernel_estimate_con_density_categorical_convolution_cv(KERNEL_den_extern,
+                                                                KERNEL_den_unordered_extern,
+                                                                KERNEL_den_ordered_extern,
+                                                                KERNEL_reg_extern,
+                                                                KERNEL_reg_unordered_extern,
+                                                                KERNEL_reg_ordered_extern,
+                                                                BANDWIDTH_den_extern,
+                                                                num_obs_train_extern,
+                                                                num_var_unordered_extern,
+                                                                num_var_ordered_extern,
+                                                                num_var_continuous_extern,
+                                                                num_reg_unordered_extern,
+                                                                num_reg_ordered_extern,
+                                                                num_reg_continuous_extern,
+                                                                matrix_Y_unordered_train_extern,
+                                                                matrix_Y_ordered_train_extern,
+                                                                matrix_Y_continuous_train_extern,
+                                                                matrix_X_unordered_train_extern,
+                                                                matrix_X_ordered_train_extern,
+                                                                matrix_X_continuous_train_extern,
+                                                                REAL(rbw_r),
+                                                                num_categories_extern,
+                                                                matrix_categorical_vals_extern,
+                                                                &old_cv) != 0)
+        old_cv = NA_REAL;
+    }
+  }
+
+  if(criterion_i == CBWM_CVML){
+    if(np_shadow_cv_con_density_ml(REAL(rbw_r), &new_cv) != 0)
+      new_cv = NA_REAL;
+  } else if(criterion_i == CBWM_CVLS){
+    if(np_shadow_cv_con_density_ls(REAL(rbw_r), &new_cv) != 0)
+      new_cv = NA_REAL;
+  } else {
+    error("C_np_shadow_cv_density_conditional: unsupported criterion");
+  }
+
+  out_old = PROTECT(ScalarReal(old_cv));
+  out_new = PROTECT(ScalarReal(new_cv));
+  out = PROTECT(allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(out, 0, out_old);
+  SET_VECTOR_ELT(out, 1, out_new);
+  out_names = PROTECT(allocVector(STRSXP, 2));
+  SET_STRING_ELT(out_names, 0, mkChar("old"));
+  SET_STRING_ELT(out_names, 1, mkChar("new"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
+  if(kdt_extern_Y != NULL) free_kdtree(&kdt_extern_Y);
+  safe_free(ipt_extern_X); safe_free(ipt_lookup_extern_X);
+  safe_free(ipt_extern_Y); safe_free(ipt_lookup_extern_Y);
+  if(matrix_Y_unordered_train_extern != NULL) free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
+  if(matrix_Y_ordered_train_extern != NULL) free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
+  if(matrix_Y_continuous_train_extern != NULL) free_mat(matrix_Y_continuous_train_extern, num_var_continuous_extern);
+  if(matrix_X_unordered_train_extern != NULL) free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+  if(matrix_X_ordered_train_extern != NULL) free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+  if(matrix_X_continuous_train_extern != NULL) free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  if(num_categories_extern_X != NULL) safe_free(num_categories_extern_X);
+  if(num_categories_extern_Y != NULL) safe_free(num_categories_extern_Y);
+  if(matrix_categorical_vals_extern_X != NULL) free_mat(matrix_categorical_vals_extern_X, num_reg_unordered_extern + num_reg_ordered_extern);
+  if(matrix_categorical_vals_extern_Y != NULL) free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
+  if(num_categories_extern != NULL) safe_free(num_categories_extern);
+  if(num_categories_extern_XY != NULL) safe_free(num_categories_extern_XY);
+  if(matrix_categorical_vals_extern != NULL) free_mat(matrix_categorical_vals_extern, num_var_unordered_extern + num_var_ordered_extern + num_reg_unordered_extern + num_reg_ordered_extern);
+  if(matrix_categorical_vals_extern_XY != NULL) free_mat(matrix_categorical_vals_extern_XY, num_var_unordered_extern + num_var_ordered_extern + num_reg_unordered_extern + num_reg_ordered_extern);
+  if(matrix_XY_unordered_train_extern != NULL) free_mat(matrix_XY_unordered_train_extern, num_var_unordered_extern + num_reg_unordered_extern);
+  if(matrix_XY_ordered_train_extern != NULL) free_mat(matrix_XY_ordered_train_extern, num_var_ordered_extern + num_reg_ordered_extern);
+  if(matrix_XY_continuous_train_extern != NULL) free_mat(matrix_XY_continuous_train_extern, num_var_continuous_extern + num_reg_continuous_extern);
+
+  matrix_Y_unordered_train_extern = matrix_Y_ordered_train_extern = matrix_Y_continuous_train_extern = NULL;
+  matrix_X_unordered_train_extern = matrix_X_ordered_train_extern = matrix_X_continuous_train_extern = NULL;
+  matrix_Y_unordered_eval_extern = matrix_Y_ordered_eval_extern = matrix_Y_continuous_eval_extern = NULL;
+  matrix_categorical_vals_extern = matrix_categorical_vals_extern_X = matrix_categorical_vals_extern_Y = matrix_categorical_vals_extern_XY = NULL;
+  matrix_XY_unordered_train_extern = matrix_XY_ordered_train_extern = matrix_XY_continuous_train_extern = NULL;
+  num_categories_extern = num_categories_extern_X = num_categories_extern_Y = num_categories_extern_XY = NULL;
+  int_ll_extern = LL_LC;
+  vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+  int_LARGE_SF = int_large_sf_save;
+  nconfac_extern = nconfac_save;
+  ncatfac_extern = ncatfac_save;
+  vector_continuous_stddev_extern = vector_continuous_stddev_save;
+  if(shadow_continuous_stddev != NULL) safe_free(shadow_continuous_stddev);
+  np_glp_cv_clear_extern();
+
+  UNPROTECT(12);
+  return out;
+}
+
+SEXP C_np_shadow_cv_distribution_conditional(SEXP tyuno,
+                                             SEXP tyord,
+                                             SEXP tycon,
+                                             SEXP eyuno,
+                                             SEXP eyord,
+                                             SEXP eycon,
+                                             SEXP txuno,
+                                             SEXP txord,
+                                             SEXP txcon,
+                                             SEXP rbw,
+                                             SEXP kernel_y,
+                                             SEXP kernel_yu,
+                                             SEXP kernel_yo,
+                                             SEXP kernel_x,
+                                             SEXP kernel_xu,
+                                             SEXP kernel_xo,
+                                             SEXP use_tree,
+                                             SEXP regtype,
+                                             SEXP glp_degree,
+                                             SEXP glp_bernstein,
+                                             SEXP glp_basis,
+                                             SEXP cdfontrain,
+                                             SEXP compare_old)
+{
+  SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
+  SEXP eyuno_r=R_NilValue, eyord_r=R_NilValue, eycon_r=R_NilValue;
+  SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
+  SEXP rbw_r=R_NilValue, degree_i=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_old=R_NilValue, out_new=R_NilValue;
+  int nrow_tyuno = 0, ncol_tyuno = 0, nrow_tyord = 0, ncol_tyord = 0, nrow_tycon = 0, ncol_tycon = 0;
+  int nrow_eyuno = 0, ncol_eyuno = 0, nrow_eyord = 0, ncol_eyord = 0, nrow_eycon = 0, ncol_eycon = 0;
+  int nrow_xuno = 0, ncol_xuno = 0, nrow_xord = 0, ncol_xord = 0, nrow_xcon = 0, ncol_xcon = 0;
+  int num_obs_train = 0, num_obs_eval = 0;
+  int tree_flag = asLogical(use_tree);
+  int do_old = asLogical(compare_old);
+  int int_large_sf_save = int_LARGE_SF;
+  int cdfontrain_save = cdfontrain_extern;
+  double nconfac_save = nconfac_extern;
+  double ncatfac_save = ncatfac_extern;
+  double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
+  double *shadow_continuous_stddev = NULL;
+  double old_cv = NA_REAL, new_cv = NA_REAL;
+  int i;
+
+  tyuno_r = PROTECT(coerceVector(tyuno, REALSXP));
+  tyord_r = PROTECT(coerceVector(tyord, REALSXP));
+  tycon_r = PROTECT(coerceVector(tycon, REALSXP));
+  eyuno_r = PROTECT(coerceVector(eyuno, REALSXP));
+  eyord_r = PROTECT(coerceVector(eyord, REALSXP));
+  eycon_r = PROTECT(coerceVector(eycon, REALSXP));
+  txuno_r = PROTECT(coerceVector(txuno, REALSXP));
+  txord_r = PROTECT(coerceVector(txord, REALSXP));
+  txcon_r = PROTECT(coerceVector(txcon, REALSXP));
+  rbw_r = PROTECT(coerceVector(rbw, REALSXP));
+  degree_i = PROTECT(coerceVector(glp_degree, INTSXP));
+
+  np_shadow_matrix_dims(tyuno, &nrow_tyuno, &ncol_tyuno);
+  np_shadow_matrix_dims(tyord, &nrow_tyord, &ncol_tyord);
+  np_shadow_matrix_dims(tycon, &nrow_tycon, &ncol_tycon);
+  np_shadow_matrix_dims(eyuno, &nrow_eyuno, &ncol_eyuno);
+  np_shadow_matrix_dims(eyord, &nrow_eyord, &ncol_eyord);
+  np_shadow_matrix_dims(eycon, &nrow_eycon, &ncol_eycon);
+  np_shadow_matrix_dims(txuno, &nrow_xuno, &ncol_xuno);
+  np_shadow_matrix_dims(txord, &nrow_xord, &ncol_xord);
+  np_shadow_matrix_dims(txcon, &nrow_xcon, &ncol_xcon);
+
+  num_obs_train = MAX(MAX(nrow_tyuno, nrow_tyord), MAX(MAX(nrow_tycon, nrow_xuno), MAX(nrow_xord, nrow_xcon)));
+  num_obs_eval = MAX(nrow_eyuno, MAX(nrow_eyord, nrow_eycon));
+
+  if(num_obs_train <= 0)
+    error("C_np_shadow_cv_distribution_conditional: zero-row training inputs are not supported");
+  if(num_obs_eval <= 0)
+    error("C_np_shadow_cv_distribution_conditional: zero-row evaluation inputs are not supported");
+
+  if((nrow_tyuno > 0 && nrow_tyuno != num_obs_train) || (nrow_tyord > 0 && nrow_tyord != num_obs_train) ||
+     (nrow_tycon > 0 && nrow_tycon != num_obs_train) || (nrow_xuno > 0 && nrow_xuno != num_obs_train) ||
+     (nrow_xord > 0 && nrow_xord != num_obs_train) || (nrow_xcon > 0 && nrow_xcon != num_obs_train))
+    error("C_np_shadow_cv_distribution_conditional: all training inputs must share the same row count");
+
+  if((nrow_eyuno > 0 && nrow_eyuno != num_obs_eval) || (nrow_eyord > 0 && nrow_eyord != num_obs_eval) ||
+     (nrow_eycon > 0 && nrow_eycon != num_obs_eval))
+    error("C_np_shadow_cv_distribution_conditional: all evaluation inputs must share the same row count");
+
+  num_obs_train_extern = num_obs_train;
+  num_obs_eval_extern = num_obs_eval;
+  num_var_unordered_extern = ncol_tyuno;
+  num_var_ordered_extern = ncol_tyord;
+  num_var_continuous_extern = ncol_tycon;
+  num_reg_unordered_extern = ncol_xuno;
+  num_reg_ordered_extern = ncol_xord;
+  num_reg_continuous_extern = ncol_xcon;
+  int_LARGE_SF = 1;
+  nconfac_extern = 1.0;
+  ncatfac_extern = 1.0;
+  cdfontrain_extern = asLogical(cdfontrain);
+
+  KERNEL_den_extern = asInteger(kernel_y);
+  KERNEL_den_unordered_extern = asInteger(kernel_yu);
+  KERNEL_den_ordered_extern = asInteger(kernel_yo);
+  KERNEL_reg_extern = asInteger(kernel_x);
+  KERNEL_reg_unordered_extern = asInteger(kernel_xu);
+  KERNEL_reg_ordered_extern = asInteger(kernel_xo);
+  BANDWIDTH_den_extern = BW_FIXED;
+
+  matrix_Y_unordered_train_extern = alloc_matd(num_obs_train, num_var_unordered_extern);
+  matrix_Y_ordered_train_extern = alloc_matd(num_obs_train, num_var_ordered_extern);
+  matrix_Y_continuous_train_extern = alloc_matd(num_obs_train, num_var_continuous_extern);
+  matrix_Y_unordered_eval_extern = alloc_matd(num_obs_eval, num_var_unordered_extern);
+  matrix_Y_ordered_eval_extern = alloc_matd(num_obs_eval, num_var_ordered_extern);
+  matrix_Y_continuous_eval_extern = alloc_matd(num_obs_eval, num_var_continuous_extern);
+  matrix_X_unordered_train_extern = alloc_matd(num_obs_train, num_reg_unordered_extern);
+  matrix_X_ordered_train_extern = alloc_matd(num_obs_train, num_reg_ordered_extern);
+  matrix_X_continuous_train_extern = alloc_matd(num_obs_train, num_reg_continuous_extern);
+
+  np_shadow_fill_matrix(matrix_Y_unordered_train_extern, REAL(tyuno_r), num_obs_train, num_var_unordered_extern);
+  np_shadow_fill_matrix(matrix_Y_ordered_train_extern, REAL(tyord_r), num_obs_train, num_var_ordered_extern);
+  np_shadow_fill_matrix(matrix_Y_continuous_train_extern, REAL(tycon_r), num_obs_train, num_var_continuous_extern);
+  np_shadow_fill_matrix(matrix_Y_unordered_eval_extern, REAL(eyuno_r), num_obs_eval, num_var_unordered_extern);
+  np_shadow_fill_matrix(matrix_Y_ordered_eval_extern, REAL(eyord_r), num_obs_eval, num_var_ordered_extern);
+  np_shadow_fill_matrix(matrix_Y_continuous_eval_extern, REAL(eycon_r), num_obs_eval, num_var_continuous_extern);
+  np_shadow_fill_matrix(matrix_X_unordered_train_extern, REAL(txuno_r), num_obs_train, num_reg_unordered_extern);
+  np_shadow_fill_matrix(matrix_X_ordered_train_extern, REAL(txord_r), num_obs_train, num_reg_ordered_extern);
+  np_shadow_fill_matrix(matrix_X_continuous_train_extern, REAL(txcon_r), num_obs_train, num_reg_continuous_extern);
+
+  if((num_reg_continuous_extern + num_var_continuous_extern) > 0){
+    shadow_continuous_stddev =
+      (double *)malloc((size_t)(num_reg_continuous_extern + num_var_continuous_extern) * sizeof(double));
+    if(shadow_continuous_stddev == NULL)
+      error("C_np_shadow_cv_distribution_conditional: stddev allocation failed");
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      shadow_continuous_stddev[i] =
+        standerrd(num_obs_train, matrix_X_continuous_train_extern[i]);
+    for(i = 0; i < num_var_continuous_extern; i++)
+      shadow_continuous_stddev[num_reg_continuous_extern + i] =
+        standerrd(num_obs_train, matrix_Y_continuous_train_extern[i]);
+    vector_continuous_stddev_extern = shadow_continuous_stddev;
+  } else {
+    vector_continuous_stddev_extern = NULL;
+  }
+
+  int_TREE_X = (tree_flag && (num_reg_continuous_extern > 0)) ? NP_TREE_TRUE : NP_TREE_FALSE;
+  int_TREE_Y = NP_TREE_FALSE;
+  int_TREE_XY = NP_TREE_FALSE;
+  if(int_TREE_X == NP_TREE_TRUE){
+    ipt_extern_X = (int *)malloc((size_t)num_obs_train*sizeof(int));
+    ipt_lookup_extern_X = (int *)malloc((size_t)num_obs_train*sizeof(int));
+    if((ipt_extern_X == NULL) || (ipt_lookup_extern_X == NULL))
+      error("C_np_shadow_cv_distribution_conditional: x-tree allocation failed");
+    for(i = 0; i < num_obs_train; i++) ipt_extern_X[i] = i;
+    build_kdtree(matrix_X_continuous_train_extern, num_obs_train, num_reg_continuous_extern,
+                 4*num_reg_continuous_extern, ipt_extern_X, &kdt_extern_X);
+    for(i = 0; i < num_obs_train; i++) ipt_lookup_extern_X[ipt_extern_X[i]] = i;
+    for(int j = 0; j < num_reg_unordered_extern; j++)
+      for(i = 0; i < num_obs_train; i++)
+        matrix_X_unordered_train_extern[j][i] = REAL(txuno_r)[j*num_obs_train + ipt_extern_X[i]];
+    for(int j = 0; j < num_reg_ordered_extern; j++)
+      for(i = 0; i < num_obs_train; i++)
+        matrix_X_ordered_train_extern[j][i] = REAL(txord_r)[j*num_obs_train + ipt_extern_X[i]];
+    for(int j = 0; j < num_reg_continuous_extern; j++)
+      for(i = 0; i < num_obs_train; i++)
+        matrix_X_continuous_train_extern[j][i] = REAL(txcon_r)[j*num_obs_train + ipt_extern_X[i]];
+  } else {
+    ipt_extern_X = NULL;
+    ipt_lookup_extern_X = NULL;
+    kdt_extern_X = NULL;
+  }
+  ipt_extern_Y = ipt_lookup_extern_Y = NULL;
+  ipt_extern_XY = ipt_lookup_extern_XY = NULL;
+  kdt_extern_Y = kdt_extern_XY = NULL;
+
+  num_categories_extern_X = alloc_vecu(num_reg_unordered_extern + num_reg_ordered_extern);
+  num_categories_extern_Y = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern);
+  matrix_categorical_vals_extern_X = alloc_matd(num_obs_train, num_reg_unordered_extern + num_reg_ordered_extern);
+  matrix_categorical_vals_extern_Y = alloc_matd(num_obs_train, num_var_unordered_extern + num_var_ordered_extern);
+  determine_categorical_vals(num_obs_train,
+                             0,
+                             0,
+                             num_reg_unordered_extern,
+                             num_reg_ordered_extern,
+                             NULL,
+                             NULL,
+                             matrix_X_unordered_train_extern,
+                             matrix_X_ordered_train_extern,
+                             num_categories_extern_X,
+                             matrix_categorical_vals_extern_X);
+  determine_categorical_vals(num_obs_train,
+                             num_var_unordered_extern,
+                             num_var_ordered_extern,
+                             0,
+                             0,
+                             matrix_Y_unordered_train_extern,
+                             matrix_Y_ordered_train_extern,
+                             NULL,
+                             NULL,
+                             num_categories_extern_Y,
+                             matrix_categorical_vals_extern_Y);
+
+  int_ll_extern = asInteger(regtype);
+  if((int_ll_extern == LL_LP) && (num_reg_continuous_extern > 0)){
+    if((int)XLENGTH(degree_i) != num_reg_continuous_extern)
+      error("C_np_shadow_cv_distribution_conditional: glp_degree length mismatch");
+    vector_glp_degree_extern = INTEGER(degree_i);
+    int_glp_bernstein_extern = asInteger(glp_bernstein);
+    int_glp_basis_extern = asInteger(glp_basis);
+  } else {
+    vector_glp_degree_extern = NULL;
+    int_glp_bernstein_extern = 0;
+    int_glp_basis_extern = 1;
+  }
+
+  if(do_old && !tree_flag && (int_ll_extern == LL_LC)){
+    num_categories_extern = alloc_vecu(num_var_unordered_extern + num_var_ordered_extern +
+                                       num_reg_unordered_extern + num_reg_ordered_extern);
+    matrix_categorical_vals_extern = alloc_matd(num_obs_train, num_var_unordered_extern + num_var_ordered_extern +
+                                                num_reg_unordered_extern + num_reg_ordered_extern);
+    determine_categorical_vals(num_obs_train,
+                               num_var_unordered_extern,
+                               num_var_ordered_extern,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               matrix_Y_unordered_train_extern,
+                               matrix_Y_ordered_train_extern,
+                               matrix_X_unordered_train_extern,
+                               matrix_X_ordered_train_extern,
+                               num_categories_extern,
+                               matrix_categorical_vals_extern);
+    matrix_XY_unordered_train_extern = alloc_matd(num_obs_train, num_var_unordered_extern + num_reg_unordered_extern);
+    matrix_XY_ordered_train_extern = alloc_matd(num_obs_train, num_var_ordered_extern + num_reg_ordered_extern);
+    matrix_XY_continuous_train_extern = alloc_matd(num_obs_train, num_var_continuous_extern + num_reg_continuous_extern);
+    for(i = 0; i < num_reg_unordered_extern; i++)
+      memcpy(matrix_XY_unordered_train_extern[i], matrix_X_unordered_train_extern[i], (size_t)num_obs_train*sizeof(double));
+    for(i = 0; i < num_var_unordered_extern; i++)
+      memcpy(matrix_XY_unordered_train_extern[num_reg_unordered_extern + i], matrix_Y_unordered_train_extern[i], (size_t)num_obs_train*sizeof(double));
+    for(i = 0; i < num_reg_ordered_extern; i++)
+      memcpy(matrix_XY_ordered_train_extern[i], matrix_X_ordered_train_extern[i], (size_t)num_obs_train*sizeof(double));
+    for(i = 0; i < num_var_ordered_extern; i++)
+      memcpy(matrix_XY_ordered_train_extern[num_reg_ordered_extern + i], matrix_Y_ordered_train_extern[i], (size_t)num_obs_train*sizeof(double));
+    for(i = 0; i < num_reg_continuous_extern; i++)
+      memcpy(matrix_XY_continuous_train_extern[i], matrix_X_continuous_train_extern[i], (size_t)num_obs_train*sizeof(double));
+    for(i = 0; i < num_var_continuous_extern; i++)
+      memcpy(matrix_XY_continuous_train_extern[num_reg_continuous_extern + i], matrix_Y_continuous_train_extern[i], (size_t)num_obs_train*sizeof(double));
+    if(np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(KERNEL_den_extern,
+                                                                           KERNEL_den_unordered_extern,
+                                                                           KERNEL_den_ordered_extern,
+                                                                           KERNEL_reg_extern,
+                                                                           KERNEL_reg_unordered_extern,
+                                                                           KERNEL_reg_ordered_extern,
+                                                                           BANDWIDTH_den_extern,
+                                                                           num_obs_train_extern,
+                                                                           num_obs_eval_extern,
+                                                                           num_var_unordered_extern,
+                                                                           num_var_ordered_extern,
+                                                                           num_var_continuous_extern,
+                                                                           num_reg_unordered_extern,
+                                                                           num_reg_ordered_extern,
+                                                                           num_reg_continuous_extern,
+                                                                           cdfontrain_extern,
+                                                                           dbl_memfac_ccdf_extern,
+                                                                           matrix_Y_unordered_train_extern,
+                                                                           matrix_Y_ordered_train_extern,
+                                                                           matrix_Y_continuous_train_extern,
+                                                                           matrix_X_unordered_train_extern,
+                                                                           matrix_X_ordered_train_extern,
+                                                                           matrix_X_continuous_train_extern,
+                                                                           matrix_XY_unordered_train_extern,
+                                                                           matrix_XY_ordered_train_extern,
+                                                                           matrix_XY_continuous_train_extern,
+                                                                           matrix_Y_unordered_eval_extern,
+                                                                           matrix_Y_ordered_eval_extern,
+                                                                           matrix_Y_continuous_eval_extern,
+                                                                           REAL(rbw_r),
+                                                                           num_categories_extern,
+                                                                           matrix_categorical_vals_extern,
+                                                                           &old_cv) != 0)
+      old_cv = NA_REAL;
+  }
+
+  if(np_shadow_cv_con_distribution_ls(REAL(rbw_r), &new_cv) != 0)
+    new_cv = NA_REAL;
+
+  out_old = PROTECT(ScalarReal(old_cv));
+  out_new = PROTECT(ScalarReal(new_cv));
+  out = PROTECT(allocVector(VECSXP, 2));
+  SET_VECTOR_ELT(out, 0, out_old);
+  SET_VECTOR_ELT(out, 1, out_new);
+  out_names = PROTECT(allocVector(STRSXP, 2));
+  SET_STRING_ELT(out_names, 0, mkChar("old"));
+  SET_STRING_ELT(out_names, 1, mkChar("new"));
+  setAttrib(out, R_NamesSymbol, out_names);
+
+  if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
+  safe_free(ipt_extern_X); safe_free(ipt_lookup_extern_X);
+  if(matrix_Y_unordered_train_extern != NULL) free_mat(matrix_Y_unordered_train_extern, num_var_unordered_extern);
+  if(matrix_Y_ordered_train_extern != NULL) free_mat(matrix_Y_ordered_train_extern, num_var_ordered_extern);
+  if(matrix_Y_continuous_train_extern != NULL) free_mat(matrix_Y_continuous_train_extern, num_var_continuous_extern);
+  if(matrix_Y_unordered_eval_extern != NULL) free_mat(matrix_Y_unordered_eval_extern, num_var_unordered_extern);
+  if(matrix_Y_ordered_eval_extern != NULL) free_mat(matrix_Y_ordered_eval_extern, num_var_ordered_extern);
+  if(matrix_Y_continuous_eval_extern != NULL) free_mat(matrix_Y_continuous_eval_extern, num_var_continuous_extern);
+  if(matrix_X_unordered_train_extern != NULL) free_mat(matrix_X_unordered_train_extern, num_reg_unordered_extern);
+  if(matrix_X_ordered_train_extern != NULL) free_mat(matrix_X_ordered_train_extern, num_reg_ordered_extern);
+  if(matrix_X_continuous_train_extern != NULL) free_mat(matrix_X_continuous_train_extern, num_reg_continuous_extern);
+  if(num_categories_extern_X != NULL) safe_free(num_categories_extern_X);
+  if(num_categories_extern_Y != NULL) safe_free(num_categories_extern_Y);
+  if(matrix_categorical_vals_extern_X != NULL) free_mat(matrix_categorical_vals_extern_X, num_reg_unordered_extern + num_reg_ordered_extern);
+  if(matrix_categorical_vals_extern_Y != NULL) free_mat(matrix_categorical_vals_extern_Y, num_var_unordered_extern + num_var_ordered_extern);
+  if(num_categories_extern != NULL) safe_free(num_categories_extern);
+  if(matrix_categorical_vals_extern != NULL) free_mat(matrix_categorical_vals_extern, num_var_unordered_extern + num_var_ordered_extern + num_reg_unordered_extern + num_reg_ordered_extern);
+  if(matrix_XY_unordered_train_extern != NULL) free_mat(matrix_XY_unordered_train_extern, num_var_unordered_extern + num_reg_unordered_extern);
+  if(matrix_XY_ordered_train_extern != NULL) free_mat(matrix_XY_ordered_train_extern, num_var_ordered_extern + num_reg_ordered_extern);
+  if(matrix_XY_continuous_train_extern != NULL) free_mat(matrix_XY_continuous_train_extern, num_var_continuous_extern + num_reg_continuous_extern);
+
+  matrix_Y_unordered_train_extern = matrix_Y_ordered_train_extern = matrix_Y_continuous_train_extern = NULL;
+  matrix_Y_unordered_eval_extern = matrix_Y_ordered_eval_extern = matrix_Y_continuous_eval_extern = NULL;
+  matrix_X_unordered_train_extern = matrix_X_ordered_train_extern = matrix_X_continuous_train_extern = NULL;
+  matrix_categorical_vals_extern = matrix_categorical_vals_extern_X = matrix_categorical_vals_extern_Y = NULL;
+  matrix_XY_unordered_train_extern = matrix_XY_ordered_train_extern = matrix_XY_continuous_train_extern = NULL;
+  num_categories_extern = num_categories_extern_X = num_categories_extern_Y = NULL;
+  int_ll_extern = LL_LC;
+  vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  int_TREE_X = int_TREE_Y = int_TREE_XY = NP_TREE_FALSE;
+  int_LARGE_SF = int_large_sf_save;
+  cdfontrain_extern = cdfontrain_save;
+  nconfac_extern = nconfac_save;
+  ncatfac_extern = ncatfac_save;
+  vector_continuous_stddev_extern = vector_continuous_stddev_save;
+  if(shadow_continuous_stddev != NULL) safe_free(shadow_continuous_stddev);
+  np_glp_cv_clear_extern();
+
+  UNPROTECT(15);
   return out;
 }
 
