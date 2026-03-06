@@ -51,7 +51,7 @@ public_shadow_bwtype <- function(bw) {
   )
 }
 
-call_public_cvml_shadow <- function(bw, x, y) {
+call_public_cvml_shadow <- function(bw, x, y, tree = FALSE) {
   n <- nrow(x)
   .Call(
     "C_np_shadow_cv_density_conditional",
@@ -69,7 +69,7 @@ call_public_cvml_shadow <- function(bw, x, y) {
     0L,
     0L,
     integer(0),
-    FALSE,
+    tree,
     0L,
     TRUE,
     PACKAGE = "np"
@@ -111,7 +111,7 @@ test_that("public npcdensbw cv.ml enforces ll == lp(glp, degree=1)", {
   expect_equal(bw.ll$ybw, bw.lp$ybw, tolerance = 1e-12)
 })
 
-test_that("public npcdensbw cv.ml preserves tree parity on the LP route", {
+test_that("public npcdensbw cv.ml preserves tree parity at fixed LP bandwidths", {
   old <- options(np.tree = FALSE)
   on.exit(options(old), add = TRUE)
 
@@ -122,7 +122,7 @@ test_that("public npcdensbw cv.ml preserves tree parity on the LP route", {
   degree <- rep.int(1L, ncol(x))
 
   options(np.tree = FALSE)
-  bw.nt <- npcdensbw(
+  bw.lp <- npcdensbw(
     xdat = x,
     ydat = y,
     regtype = "lp",
@@ -131,18 +131,11 @@ test_that("public npcdensbw cv.ml preserves tree parity on the LP route", {
     bwmethod = "cv.ml",
     nmulti = 0
   )
-  options(np.tree = TRUE)
-  bw.tr <- npcdensbw(
-    xdat = x,
-    ydat = y,
-    regtype = "lp",
-    basis = "glp",
-    degree = degree,
-    bwmethod = "cv.ml",
-    nmulti = 0
-  )
+  shadow.nt <- call_public_cvml_shadow(bw.lp, x, y, FALSE)
+  shadow.tr <- call_public_cvml_shadow(bw.lp, x, y, TRUE)
 
-  expect_equal(bw.nt$fval, bw.tr$fval, tolerance = 1e-10)
+  expect_equal(shadow.nt$old, shadow.tr$old, tolerance = 1e-10)
+  expect_equal(shadow.nt$new, shadow.tr$new, tolerance = 1e-10)
 })
 
 test_that("public npcdensbw cv.ml generalized-nn is finite and preserves ll canonicalization", {
@@ -176,4 +169,37 @@ test_that("public npcdensbw cv.ml generalized-nn is finite and preserves ll cano
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-10)
   expect_equal(bw.ll$xbw, bw.lp$xbw, tolerance = 1e-10)
   expect_equal(bw.ll$ybw, bw.lp$ybw, tolerance = 1e-10)
+})
+
+test_that("public npcdens cv.ml LP route does not collapse gaussian bandwidths", {
+  set.seed(42)
+  n <- 100L
+  x <- data.frame(x = rnorm(n))
+  y <- data.frame(y = x$x + rnorm(n))
+
+  bw.lc <- npcdensbw(xdat = x, ydat = y, regtype = "lc", bwmethod = "cv.ml", nmulti = 0)
+  bw.ll <- npcdensbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ml", nmulti = 0)
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = 3L,
+    bwmethod = "cv.ml",
+    nmulti = 0
+  )
+
+  fit.ll <- npcdens(bws = bw.ll)
+  fit.lp <- npcdens(bws = bw.lp)
+
+  expect_true(all(is.finite(fitted(fit.ll))))
+  expect_true(all(is.finite(fitted(fit.lp))))
+  expect_gte(min(fitted(fit.ll)), 0)
+  expect_gte(min(fitted(fit.lp)), 0)
+  expect_lt(max(fitted(fit.ll)), 10)
+  expect_lt(max(fitted(fit.lp)), 10)
+  expect_gt(unname(bw.ll$bandwidth$y), 1e-4)
+  expect_gt(unname(bw.lp$bandwidth$y), 1e-4)
+  expect_lt(max(fitted(fit.ll)) / max(fitted(npcdens(bws = bw.lc))), 20)
+  expect_lt(max(fitted(fit.lp)) / max(fitted(npcdens(bws = bw.lc))), 20)
 })
