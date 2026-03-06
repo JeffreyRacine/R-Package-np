@@ -1,5 +1,11 @@
 Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
 
+* Extended conditional density/distribution LP CV internals to support
+  generalized nearest-neighbor bandwidths in the canonical extracted
+  `jksum.c` shadow/micro-core path, eliminating the previous LP
+  generalized-NN `cv.ls` penalty collapse in source-of-truth proof cells
+  while preserving existing public fixed-bandwidth behavior.
+
 * Remediated smooth-coefficient LL/LP core and bandwidth-selection paths to
   remove accidental `n x n` weight-matrix construction/full-matrix dependence
   from ordinary estimation/CV, while preserving explicit hat/plot helper
