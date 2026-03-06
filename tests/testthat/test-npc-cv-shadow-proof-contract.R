@@ -200,6 +200,9 @@ test_that("shadow density lp preserves ll canonicalization and tree parity", {
   expect_equal(ll_ls$new, lp_ls$new, tolerance = 1e-12)
   expect_equal(lp_ml_tree$new, lp_ml$new, tolerance = 1e-10)
   expect_equal(lp_ls_tree$new, lp_ls$new, tolerance = 1e-12)
+  expect_equal(ll_ml$prod, ll_ml$new, tolerance = 1e-12)
+  expect_equal(lp_ml$prod, lp_ml$new, tolerance = 1e-12)
+  expect_equal(lp_ml_tree$prod, lp_ml_tree$new, tolerance = 1e-10)
 })
 
 test_that("shadow density cvml preserves the large-kernel X collapse", {
@@ -322,6 +325,20 @@ test_that("shadow fixed-bandwidth X-side row helper stays row-streamed", {
   body <- paste(lines[(start + 1L):(stop - 1L)], collapse = "\n")
 
   expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_train|num_obs_train_extern)[^\\)]*(num_train|num_obs_train_extern)", body))
+})
+
+test_that("fixed-bandwidth cvml LP stream avoids dense row storage", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start <- grep("^static int np_conditional_density_cvml_fixed_lp_stream\\(", lines)
+  stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
+
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_obs|num_obs_train_extern)[^\\)]*(num_obs|num_obs_train_extern)", body))
 })
 
 test_that("shadow LP objectives are sensitive to degree on oracle cells", {

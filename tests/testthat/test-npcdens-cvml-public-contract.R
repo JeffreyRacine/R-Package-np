@@ -51,7 +51,27 @@ public_shadow_bwtype <- function(bw) {
   )
 }
 
-call_public_cvml_shadow <- function(bw, x, y, tree = FALSE) {
+public_shadow_regtype <- function(bw) {
+  if (identical(bw$regtype.engine, "lp")) 2L else 0L
+}
+
+public_shadow_degree <- function(bw) {
+  if (identical(bw$regtype.engine, "lp")) as.integer(bw$degree.engine) else integer(0)
+}
+
+public_shadow_basis <- function(basis_engine, regtype_engine) {
+  if (!identical(regtype_engine, "lp")) {
+    return(0L)
+  }
+  switch(basis_engine,
+    additive = 0L,
+    glp = 1L,
+    tensor = 2L,
+    stop("unsupported LP basis")
+  )
+}
+
+call_public_cvml_shadow <- function(bw, x, y, tree = FALSE, compare_old = TRUE) {
   n <- nrow(x)
   .Call(
     "C_np_shadow_cv_density_conditional",
@@ -65,13 +85,13 @@ call_public_cvml_shadow <- function(bw, x, y, tree = FALSE) {
     public_shadow_cker(bw$cxkertype),
     public_shadow_uker(bw$uxkertype),
     public_shadow_oker(bw$oxkertype),
-    FALSE,
-    0L,
-    0L,
-    integer(0),
     tree,
     0L,
-    TRUE,
+    public_shadow_regtype(bw),
+    public_shadow_degree(bw),
+    isTRUE(bw$bernstein.basis.engine),
+    public_shadow_basis(bw$basis.engine, bw$regtype.engine),
+    compare_old,
     PACKAGE = "np"
   )
 }
@@ -88,29 +108,74 @@ test_that("public npcdensbw cv.ml keeps lc on the legacy objective", {
   expect_equal(-bw.lc$fval, shadow$old, tolerance = 1e-10)
 })
 
-test_that("public npcdensbw cv.ml LP/LL routes fail fast during containment", {
+test_that("public npcdensbw cv.ml fixed LP/LL route activates with ll == lp parity", {
   set.seed(101)
   n <- 36L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = x$x1 - x$x2 + rnorm(n, sd = 0.2))
   degree <- rep.int(1L, ncol(x))
 
-  expect_error(
-    npcdensbw(xdat = x, ydat = y, regtype = "ll", bwmethod = "cv.ml", nmulti = 0),
-    "temporarily disabled pending low-memory shadow CV remediation"
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwmethod = "cv.ml",
+    nmulti = 0
   )
-  expect_error(
-    npcdensbw(
-      xdat = x,
-      ydat = y,
-      regtype = "lp",
-      basis = "glp",
-      degree = degree,
-      bwmethod = "cv.ml",
-      nmulti = 0
-    ),
-    "temporarily disabled pending low-memory shadow CV remediation"
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ml",
+    nmulti = 0
   )
+ 
+  expect_equal(-bw.ll$fval, -bw.lp$fval, tolerance = 1e-8)
+})
+
+test_that("public npcdensbw cv.ml fixed LP route preserves tree parity", {
+  set.seed(102)
+  n <- 34L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.15))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.serial <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ml",
+    nmulti = 0
+  )
+
+  old_opt <- getOption("np.tree")
+  on.exit(options(np.tree = old_opt), add = TRUE)
+  options(np.tree = TRUE)
+
+  bw.tree <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwmethod = "cv.ml",
+    nmulti = 0
+  )
+
+  expect_equal(-bw.tree$fval, -bw.serial$fval, tolerance = 1e-8)
+})
+
+test_that("public npcdensbw cv.ml generalized-nn LP route stays contained", {
+  set.seed(103)
+  n <- 36L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 - x$x2 + rnorm(n, sd = 0.2))
+  degree <- rep.int(1L, ncol(x))
+
   expect_error(
     npcdensbw(
       xdat = x,

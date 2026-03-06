@@ -1334,7 +1334,7 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   SEXP tyuno_r=R_NilValue, tyord_r=R_NilValue, tycon_r=R_NilValue;
   SEXP txuno_r=R_NilValue, txord_r=R_NilValue, txcon_r=R_NilValue;
   SEXP rbw_r=R_NilValue, degree_i=R_NilValue;
-  SEXP out=R_NilValue, out_names=R_NilValue, out_old=R_NilValue, out_new=R_NilValue;
+  SEXP out=R_NilValue, out_names=R_NilValue, out_old=R_NilValue, out_new=R_NilValue, out_prod=R_NilValue;
   int nrow_yuno = 0, ncol_yuno = 0, nrow_yord = 0, ncol_yord = 0, nrow_ycon = 0, ncol_ycon = 0;
   int nrow_xuno = 0, ncol_xuno = 0, nrow_xord = 0, ncol_xord = 0, nrow_xcon = 0, ncol_xcon = 0;
   int num_obs = 0;
@@ -1346,8 +1346,9 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   double ncatfac_save = ncatfac_extern;
   double *vector_continuous_stddev_save = vector_continuous_stddev_extern;
   double *shadow_continuous_stddev = NULL;
-  double old_cv = NA_REAL, new_cv = NA_REAL;
-  int i;
+  double old_cv = NA_REAL, new_cv = NA_REAL, prod_cv = NA_REAL;
+  int i, nscale = 0;
+  double *prod_vsf = NULL;
 
   tyuno_r = PROTECT(coerceVector(tyuno, REALSXP));
   tyord_r = PROTECT(coerceVector(tyord, REALSXP));
@@ -1637,14 +1638,31 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
     error("C_np_shadow_cv_density_conditional: unsupported criterion");
   }
 
+  if((criterion_i == CBWM_CVML) &&
+     ((int_ll_extern != LL_LP) || (BANDWIDTH_den_extern == BW_FIXED))){
+    nscale = (int)XLENGTH(rbw_r);
+    prod_vsf = (double *)malloc((size_t)(nscale + 1) * sizeof(double));
+    if(prod_vsf == NULL)
+      error("C_np_shadow_cv_density_conditional: production scale-factor allocation failed");
+    prod_vsf[0] = 0.0;
+    for(i = 0; i < nscale; i++)
+      prod_vsf[i + 1] = REAL(rbw_r)[i];
+    prod_cv = np_cv_func_con_density_categorical_ml(prod_vsf);
+    safe_free(prod_vsf);
+    prod_vsf = NULL;
+  }
+
   out_old = PROTECT(ScalarReal(old_cv));
   out_new = PROTECT(ScalarReal(new_cv));
-  out = PROTECT(allocVector(VECSXP, 2));
+  out_prod = PROTECT(ScalarReal(prod_cv));
+  out = PROTECT(allocVector(VECSXP, 3));
   SET_VECTOR_ELT(out, 0, out_old);
   SET_VECTOR_ELT(out, 1, out_new);
-  out_names = PROTECT(allocVector(STRSXP, 2));
+  SET_VECTOR_ELT(out, 2, out_prod);
+  out_names = PROTECT(allocVector(STRSXP, 3));
   SET_STRING_ELT(out_names, 0, mkChar("old"));
   SET_STRING_ELT(out_names, 1, mkChar("new"));
+  SET_STRING_ELT(out_names, 2, mkChar("prod"));
   setAttrib(out, R_NamesSymbol, out_names);
 
   if(kdt_extern_X != NULL) free_kdtree(&kdt_extern_X);
@@ -1687,7 +1705,7 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   if(shadow_continuous_stddev != NULL) safe_free(shadow_continuous_stddev);
   np_glp_cv_clear_extern();
 
-  UNPROTECT(12);
+  UNPROTECT(13);
   return out;
 }
 
