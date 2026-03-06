@@ -328,7 +328,8 @@ npindex.sibandwidth <-
       index.eval <- exdat %*% bws$beta
     }
 
-    regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+    spec <- .npindex_resolve_spec(bws, where = "npindex")
+    regtype <- spec$regtype.engine
     npreg.idx.args <- list(
       txdat = index,
       tydat = tydat,
@@ -339,9 +340,9 @@ npindex.sibandwidth <-
       warn.glp.gradient = FALSE
     )
     if (identical(regtype, "lp")) {
-      npreg.idx.args$basis <- bws$basis
-      npreg.idx.args$degree <- bws$degree
-      npreg.idx.args$bernstein.basis <- bws$bernstein.basis
+      npreg.idx.args$basis <- spec$basis.engine
+      npreg.idx.args$degree <- spec$degree.engine
+      npreg.idx.args$bernstein.basis <- spec$bernstein.basis.engine
     }
 
     ## Next, if no gradients are requested, use (faster) npksum
@@ -536,9 +537,9 @@ npindex.sibandwidth <-
           warn.glp.gradient = FALSE
         )
         if (identical(regtype, "lp")) {
-          boot.args$basis <- bws$basis
-          boot.args$degree <- bws$degree
-          boot.args$bernstein.basis <- bws$bernstein.basis
+          boot.args$basis <- spec$basis.engine
+          boot.args$degree <- spec$degree.engine
+          boot.args$bernstein.basis <- spec$bernstein.basis.engine
         }
         model <- do.call(npreg, boot.args)[c('mean','grad')]
         
@@ -571,9 +572,9 @@ npindex.sibandwidth <-
             warn.glp.gradient = FALSE
           )
           if (identical(regtype, "lp")) {
-            boot.args$basis <- bws$basis
-            boot.args$degree <- bws$degree
-            boot.args$bernstein.basis <- bws$bernstein.basis
+            boot.args$basis <- spec$basis.engine
+            boot.args$degree <- spec$degree.engine
+            boot.args$bernstein.basis <- spec$bernstein.basis.engine
           }
           do.call(npreg, boot.args)$mean
         }

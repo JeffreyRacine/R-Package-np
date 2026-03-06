@@ -25,8 +25,18 @@ plbandwidth <-
            total.time = NA,...){
 
     npRejectLegacyLpArgs(names(list(...)), where = "plbandwidth")
-    regtype = match.arg(regtype)
-    basis <- npValidateLpBasis(regtype = regtype, basis = basis)
+    spec <- npCanonicalConditionalRegSpec(
+      regtype = regtype,
+      basis = basis,
+      degree = degree,
+      bernstein.basis = bernstein.basis,
+      ncon = sum(zdati$icon),
+      where = "plbandwidth"
+    )
+    regtype <- spec$regtype
+    basis <- spec$basis
+    degree <- spec$degree
+    bernstein.basis <- spec$bernstein.basis
     bwmethod = match.arg(bwmethod)
     bwtype = match.arg(bwtype)
     ckertype = match.arg(ckertype)
@@ -57,15 +67,10 @@ plbandwidth <-
     if (bwtype != "fixed" && cbounds$bound != "none")
       stop("finite continuous kernel bounds require bwtype = \"fixed\"")
     ncon <- sum(zdati$icon)
-    degree <- npValidateGlpDegree(regtype = regtype,
-                                  degree = degree,
-                                  ncon = ncon)
-    bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
-                                              bernstein.basis = bernstein.basis)
-    if (identical(regtype, "lp") && ncon > 0L && is.finite(nobs)) {
-      lp.dim <- dim_basis(basis = basis,
+    if (identical(spec$regtype.engine, "lp") && ncon > 0L && is.finite(nobs)) {
+      lp.dim <- dim_basis(basis = spec$basis.engine,
                           kernel = TRUE,
-                          degree = degree,
+                          degree = spec$degree.engine,
                           segments = rep.int(1L, ncon))
       if (is.finite(lp.dim) && lp.dim > (nobs - 1.0))
         stop(sprintf("LP basis dimension (%s) exceeds nobs - 1 (%s); reduce degree",
@@ -95,6 +100,10 @@ plbandwidth <-
       basis = basis,
       degree = degree,
       bernstein.basis = bernstein.basis,
+      regtype.engine = spec$regtype.engine,
+      basis.engine = spec$basis.engine,
+      degree.engine = spec$degree.engine,
+      bernstein.basis.engine = spec$bernstein.basis.engine,
       method = bwmethod,
       pmethod = bwmToPrint(bwmethod),
       scaling = bwscaling,

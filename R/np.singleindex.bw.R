@@ -95,6 +95,127 @@ npindexbw.NULL <-
     tbw
   }
 
+.npindex_resolve_spec <- function(source, where = "npindex") {
+  if (!is.null(source$regtype.engine)) {
+    return(list(
+      regtype = if (is.null(source$regtype)) "lc" else as.character(source$regtype),
+      basis = if (is.null(source$basis)) "glp" else as.character(source$basis),
+      degree = if (is.null(source$degree)) integer(0) else as.integer(source$degree),
+      bernstein.basis = isTRUE(source$bernstein.basis),
+      regtype.engine = as.character(source$regtype.engine),
+      basis.engine = if (is.null(source$basis.engine)) "glp" else as.character(source$basis.engine),
+      degree.engine = if (is.null(source$degree.engine)) integer(0) else as.integer(source$degree.engine),
+      bernstein.basis.engine = isTRUE(source$bernstein.basis.engine)
+    ))
+  }
+
+  npCanonicalConditionalRegSpec(
+    regtype = if (is.null(source$regtype)) "lc" else as.character(source$regtype),
+    basis = if (is.null(source$basis)) "glp" else as.character(source$basis),
+    degree = source$degree,
+    bernstein.basis = isTRUE(source$bernstein.basis),
+    ncon = 1L,
+    where = where
+  )
+}
+
+.npindex_lp_loo_fit <- function(index,
+                                ydat,
+                                h,
+                                bws,
+                                spec,
+                                chunk.size = 128L) {
+  index <- as.double(index)
+  ydat <- as.double(ydat)
+  n <- length(index)
+  if (length(ydat) != n)
+    stop("index and ydat must have the same length")
+
+  index.df <- data.frame(index = index)
+  kbw <- kbandwidth(
+    bw = c(h),
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    ckerbound = bws$ckerbound,
+    ckerlb = bws$ckerlb,
+    ckerub = bws$ckerub,
+    nobs = n,
+    xdati = untangle(index.df),
+    ydati = untangle(data.frame(ydat)),
+    xnames = "index",
+    ynames = bws$ynames
+  )
+  degree <- as.integer(spec$degree.engine)
+  W <- W.lp(
+    xdat = index.df,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  W.eval <- W.lp(
+    xdat = index.df,
+    exdat = index.df,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  if (!is.matrix(W))
+    W <- matrix(W, nrow = n)
+  if (!is.matrix(W.eval))
+    W.eval <- matrix(W.eval, nrow = n)
+
+  ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = 0.0, cap = 1.0)
+  fit.loo <- double(n)
+  chunk.size <- max(1L, npValidatePositiveInteger(chunk.size, "chunk.size"))
+
+  for (start in seq.int(1L, n, by = chunk.size)) {
+    idx <- seq.int(start, min(n, start + chunk.size - 1L))
+    kw <- .np_kernel_weights_direct(
+      bws = kbw,
+      txdat = index.df,
+      exdat = index.df[idx, , drop = FALSE],
+      bandwidth.divide = TRUE,
+      kernel.pow = 1.0
+    )
+
+    kw[cbind(idx, seq_along(idx))] <- 0.0
+    W.eval.block <- W.eval[idx, , drop = FALSE]
+
+    for (jj in seq_along(idx)) {
+      w <- kw[, jj]
+      XtWy0 <- sum(w * ydat)
+      lc.mean <- XtWy0 / NZD(sum(w))
+      A <- crossprod(W, W * w)
+      z <- crossprod(W, ydat * w)
+      solved <- FALSE
+
+      for (ridge in ridge.grid) {
+        Ar <- A
+        zr <- z
+        if (ridge > 0) {
+          diag(Ar) <- diag(Ar) + ridge
+          zr[1L] <- XtWy0 + ridge * XtWy0 / NZD(A[1L, 1L])
+        }
+
+        coef <- tryCatch(chol2inv(chol(Ar)) %*% zr, error = function(e) NULL)
+        if (!is.null(coef) && all(is.finite(coef))) {
+          alpha <- min(1.0, ridge)
+          fit.loo[idx[jj]] <- (1.0 - alpha) * drop(W.eval.block[jj, , drop = FALSE] %*% coef) +
+            alpha * lc.mean
+          solved <- TRUE
+          break
+        }
+      }
+
+      if (!solved)
+        fit.loo[idx[jj]] <- lc.mean
+    }
+  }
+
+  fit.loo
+}
+
 npindexbw.default <-
   function(xdat = stop("training data xdat missing"),
            ydat = stop("training data ydat missing"),
@@ -135,13 +256,21 @@ npindexbw.default <-
                  "See documentation for details."))
 
     p <- ncol(xdat)
-    regtype <- match.arg(regtype)
+    spec <- npResolveCanonicalConditionalRegSpec(
+      mc.names = names(match.call(expand.dots = FALSE)),
+      regtype = regtype,
+      basis = basis,
+      degree = degree,
+      bernstein.basis = bernstein.basis,
+      ncon = 1L,
+      where = "npindexbw"
+    )
     tbw <- sibandwidth(beta = bws[seq_len(p)],
                        h = bws[p+1L], ...,
-                       regtype = regtype,
-                       basis = basis,
-                       degree = degree,
-                       bernstein.basis = bernstein.basis,
+                       regtype = spec$regtype,
+                       basis = spec$basis,
+                       degree = spec$degree,
+                       bernstein.basis = spec$bernstein.basis,
                        nobs = dim(xdat)[1],
                        xdati = untangle(xdat),
                        ydati = untangle(data.frame(ydat)),
@@ -243,6 +372,7 @@ npindexbw.sibandwidth <-
     p <- ncol(xdat)
     beta.idx <- if (p > 1L) seq_len(p - 1L) else integer(0)
     nobs <- nrow(xdat)
+    spec <- .npindex_resolve_spec(bws, where = "npindexbw")
 
     total.time <-
       system.time({
@@ -280,22 +410,44 @@ npindexbw.sibandwidth <-
 
               index <- xmat %*% c(1, beta)
 
-              ## One call to npksum to avoid repeated computation of the
-              ## product kernel (the expensive part)
+              fit.loo <- if (identical(spec$regtype.engine, "lc")) {
+                ## One call to npksum to avoid repeated computation of the
+                ## product kernel (the expensive part)
+                tww <- npksum(txdat=index,
+                              tydat=wmat,
+                              weights=wmat,
+                              leave.one.out=TRUE,
+                              bandwidth.divide=TRUE,
+                              bws=c(h),
+                              ckertype = bws$ckertype,
+                              ckerorder = bws$ckerorder,
+                              ckerbound = bws$ckerbound,
+                              ckerlb = bws$ckerlb,
+                              ckerub = bws$ckerub)$ksum
+                tww[1,2,]/NZD(tww[2,2,])
+              } else {
+                ok.design <- tryCatch({
+                  npCheckRegressionDesignCondition(
+                    reg.code = REGTYPE_LP,
+                    xcon = data.frame(index = index),
+                    basis = spec$basis.engine,
+                    degree = spec$degree.engine,
+                    bernstein.basis = spec$bernstein.basis.engine,
+                    where = "npindexbw"
+                  )
+                  TRUE
+                }, error = function(e) FALSE)
+                if (!ok.design)
+                  return(ichimuraMaxPenalty)
 
-              tww <- npksum(txdat=index,
-                            tydat=wmat,
-                            weights=wmat,
-                            leave.one.out=TRUE,
-                            bandwidth.divide=TRUE,
-                            bws=c(h),
-                            ckertype = bws$ckertype,
-                            ckerorder = bws$ckerorder,
-                            ckerbound = bws$ckerbound,
-                            ckerlb = bws$ckerlb,
-                            ckerub = bws$ckerub)$ksum
-
-              fit.loo <- tww[1,2,]/NZD(tww[2,2,])
+                .npindex_lp_loo_fit(
+                  index = index,
+                  ydat = ydat,
+                  h = h,
+                  bws = bws,
+                  spec = spec
+                )
+              }
 
               t.ret <- mean((ydat-fit.loo)^2)
               return(t.ret)
@@ -339,22 +491,44 @@ npindexbw.sibandwidth <-
 
               index <- xmat %*% c(1, beta)
 
-              ## One call to npksum to avoid repeated computation of the
-              ## product kernel (the expensive part)
+              ks.loo <- if (identical(spec$regtype.engine, "lc")) {
+                ## One call to npksum to avoid repeated computation of the
+                ## product kernel (the expensive part)
+                tww <- npksum(txdat=index,
+                              tydat=wmat,
+                              weights=wmat,
+                              leave.one.out=TRUE,
+                              bandwidth.divide=TRUE,
+                              bws=c(h),
+                              ckertype = bws$ckertype,
+                              ckerorder = bws$ckerorder,
+                              ckerbound = bws$ckerbound,
+                              ckerlb = bws$ckerlb,
+                              ckerub = bws$ckerub)$ksum
+                tww[1,2,]/NZD(tww[2,2,])
+              } else {
+                ok.design <- tryCatch({
+                  npCheckRegressionDesignCondition(
+                    reg.code = REGTYPE_LP,
+                    xcon = data.frame(index = index),
+                    basis = spec$basis.engine,
+                    degree = spec$degree.engine,
+                    bernstein.basis = spec$bernstein.basis.engine,
+                    where = "npindexbw"
+                  )
+                  TRUE
+                }, error = function(e) FALSE)
+                if (!ok.design)
+                  return(sqrt(.Machine$double.xmax))
 
-              tww <- npksum(txdat=index,
-                            tydat=wmat,
-                            weights=wmat,
-                            leave.one.out=TRUE,
-                            bandwidth.divide=TRUE,
-                            bws=c(h),
-                            ckertype = bws$ckertype,
-                            ckerorder = bws$ckerorder,
-                            ckerbound = bws$ckerbound,
-                            ckerlb = bws$ckerlb,
-                            ckerub = bws$ckerub)$ksum
-
-              ks.loo <- tww[1,2,]/NZD(tww[2,2,])
+                .npindex_lp_loo_fit(
+                  index = index,
+                  ydat = ydat,
+                  h = h,
+                  bws = bws,
+                  spec = spec
+                )
+              }
 
               ## Avoid taking log of zero (ks.loo = 0 or 1 since we take
               ## the log of ks.loo and the log of 1-ks.loo)
