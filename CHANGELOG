@@ -1,4 +1,32 @@
-Changes from Version 0.70-0 to 0.70-1 [05-Mar-2026]
+Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
+
+* Remediated smooth-coefficient LL/LP core and bandwidth-selection paths to
+  remove accidental full-matrix dependence from ordinary estimation/CV, while
+  preserving explicit hat/plot helper behavior where intended.
+
+* Canonicalized semiparametric LL/LP behavior across recently generalized
+  core families:
+  - `npscoef*` now uses the canonical LP engine in ordinary LL/LP paths
+  - `npplreg*` now inherits canonical component-regression semantics via
+    `npregbw()`
+  - `npindex*` objective-stage LL/LP handling now aligns with fitted-path
+    semantics.
+
+* Repaired `npreg` local-polynomial `cv.ls` fidelity by landing a canonical
+  GLP objective kernel for the fixed-bandwidth non-tree route across
+  supported GLP degrees, eliminating the degree-1 LL/LP discrepancy.
+
+* Added `npscoefbw()` fast-summary accounting (`num.feval.fast`) without
+  adding generic `npksum()` hot-path overhead.
+
+* Expanded LL/LP degree-1 regression coverage for semiparametric families,
+  including multivariate parity tests for `npscoef`, `npindex`, and
+  `npplreg`.
+
+* Fixed `npplregbw()` to propagate kernel-defining options (continuous kernel,
+  bandwidth type, bounds, and related controls) into child regression
+  bandwidth objects during computed-bandwidth calls, restoring
+  kernel-sensitive plot/helper behavior and metadata fidelity.
 
 * Completed canonical plot-remediation hardening for core S3 families with
   explicit fail-fast behavior:
