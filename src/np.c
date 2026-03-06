@@ -846,6 +846,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     double * objective_function_invalid, double * timing,
                                     double * objective_function_fast,
                                     int * penalty_mode, double * penalty_mult,
+                                    int * glp_degree,
+                                    int * glp_bernstein,
+                                    int * glp_basis,
+                                    int * regtype,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub);
 void np_kernelsum(double * tuno, double * tord, double * tcon,
@@ -2297,6 +2301,10 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                       SEXP hist_len,
                                       SEXP penalty_mode,
                                       SEXP penalty_mult,
+                                      SEXP glp_degree,
+                                      SEXP glp_bernstein,
+                                      SEXP glp_basis,
+                                      SEXP regtype,
                                       SEXP cxkerlb,
                                       SEXP cxkerub,
                                       SEXP cykerlb,
@@ -2304,13 +2312,16 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP cg_uno_r=R_NilValue, cg_ord_r=R_NilValue, cg_con_r=R_NilValue, mysd_r=R_NilValue;
-  SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
+  SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, degree_i=R_NilValue, cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
   SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
   int hlen = asInteger(hist_len);
   int pmode = asInteger(penalty_mode);
   double pmult = asReal(penalty_mult);
+  int bern = asInteger(glp_bernstein);
+  int basis = asInteger(glp_basis);
+  int ll_mode = asInteger(regtype);
   int ncon_x = 0;
   int ncon_y = 0;
   double * cxkerlb_p = NULL;
@@ -2333,6 +2344,7 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   PROTECT(myopti_i = coerceVector(myopti, INTSXP));
   PROTECT(myoptd_r = coerceVector(myoptd, REALSXP));
   PROTECT(bw_r = coerceVector(bw, REALSXP));
+  PROTECT(degree_i = coerceVector(glp_degree, INTSXP));
   PROTECT(cxkerlb_r = coerceVector(cxkerlb, REALSXP));
   PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
@@ -2358,6 +2370,7 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                  INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
                                  REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
                                  REAL(out_fast), &pmode, &pmult,
+                                 INTEGER(degree_i), &bern, &basis, &ll_mode,
                                  cxkerlb_p, cxkerub_p, cykerlb_p, cykerub_p);
 
   PROTECT(out = allocVector(VECSXP, 7));
@@ -2379,7 +2392,7 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  UNPROTECT(26);
+  UNPROTECT(27);
   return out;
 }
 
@@ -4731,6 +4744,10 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
                                     double * objective_function_invalid, double * timing,
                                     double * objective_function_fast,
                                     int * penalty_mode, double * penalty_mult,
+                                    int * glp_degree,
+                                    int * glp_bernstein,
+                                    int * glp_basis,
+                                    int * regtype,
                                     double * cxkerlb, double * cxkerub,
                                     double * cykerlb, double * cykerub){
 /* Likelihood bandwidth selection for density estimation */
@@ -4831,8 +4848,18 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   int_MINIMIZE_IO = myopti[CDBW_MINIOI];
 
   itmax=myopti[CDBW_ITMAXI];
+  ibwmfunc = myopti[CDBW_MI];
+  int_ll_extern = (ibwmfunc == CDBWM_CVLS) ? *regtype : LL_LC;
+  vector_glp_degree_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? glp_degree : NULL;
+  vector_glp_gradient_order_extern = NULL;
+  int_glp_bernstein_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? *glp_bernstein : 0;
+  int_glp_basis_extern = ((ibwmfunc == CDBWM_CVLS) && (int_ll_extern == LL_LP)) ? *glp_basis : 1;
 
   int_TREE_XY = int_TREE_Y = int_TREE_X = myopti[CDBW_TREEI];
+  if(int_ll_extern == LL_LP){
+    int_TREE_Y = NP_TREE_FALSE;
+    int_TREE_XY = NP_TREE_FALSE;
+  }
 
   scale_cat = myopti[CDBW_SCATI];
   bwm_use_transform = myopti[CDBW_TBNDI];
@@ -5269,8 +5296,6 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
 
   /* assign the function to be optimized */
 
-  ibwmfunc = myopti[CDBW_MI];
-
   switch(ibwmfunc){
   case CDBWM_CVLS : bwmfunc = cv_func_con_distribution_categorical_ls; break;
   default : REprintf("np.c: invalid bandwidth selection method.");
@@ -5627,6 +5652,11 @@ void np_distribution_conditional_bw(double * c_uno, double * c_ord, double * c_c
   vector_ckerub_extern = NULL;
   safe_free(cxylb);
   safe_free(cxyub);
+  int_ll_extern = LL_LC;
+  vector_glp_degree_extern = NULL;
+  int_glp_bernstein_extern = 0;
+  int_glp_basis_extern = 1;
+  np_glp_cv_clear_extern();
 
   if(int_MINIMIZE_IO != IO_MIN_TRUE)
     Rprintf("\r                   \r");

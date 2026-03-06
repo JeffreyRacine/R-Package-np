@@ -15,7 +15,7 @@ extern SEXP C_np_shadow_cv_density_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEX
 extern SEXP C_np_shadow_cv_distribution_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_density_conditional_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_distribution_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
-extern SEXP C_np_distribution_conditional_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
+extern SEXP C_np_distribution_conditional_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_kernelsum(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_quantile_conditional(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
@@ -35,7 +35,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_shadow_cv_distribution_conditional",(DL_FUNC) &C_np_shadow_cv_distribution_conditional,23},
     {"C_np_density_conditional_bw",    (DL_FUNC) &C_np_density_conditional_bw,    21},
     {"C_np_distribution_bw",           (DL_FUNC) &C_np_distribution_bw,           15},
-    {"C_np_distribution_conditional_bw",(DL_FUNC) &C_np_distribution_conditional_bw,20},
+    {"C_np_distribution_conditional_bw",(DL_FUNC) &C_np_distribution_conditional_bw,24},
     {"C_np_kernelsum",                 (DL_FUNC) &C_np_kernelsum,                 19},
     {"C_np_quantile_conditional",      (DL_FUNC) &C_np_quantile_conditional,      19},
     {"C_np_regression_bw",             (DL_FUNC) &C_np_regression_bw,             16},
