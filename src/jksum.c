@@ -7421,271 +7421,197 @@ static inline int np_den_cv_use_tree_bypass_path(const int gate_x_all_large_fixe
   return gate_x_all_large_fixed || !int_TREE_XY || (BANDWIDTH_den == BW_ADAP_NN);
 }
 
-// Regression CV objective for local polynomial regression:
-// lc (degree 0), ll (degree 1), and lp (general degree vector).
-// The LL/LP branches solve weighted normal equations with ridge fallback if singular.
+typedef struct {
+  double cv;
+  double traceH;
+  int ok;
+} NPRegCvLpResult;
 
-double np_kernel_estimate_regression_categorical_ls_aic(
-int int_ll,
-int bwm,
-int KERNEL_reg,
-int KERNEL_unordered_reg,
-int KERNEL_ordered_reg,
-int BANDWIDTH_reg,
-int num_obs,
-int num_reg_unordered,
-int num_reg_ordered,
-int num_reg_continuous,
-double **matrix_X_unordered,
-double **matrix_X_ordered,
-double **matrix_X_continuous,
-double *vector_Y,
-double *vector_scale_factor,
-int *num_categories){
-
-  np_gate_override_clear();
-
-  // note that mean has 2*num_obs allocated for npksum
-  int i, j, l, sf_flag = 0, num_obs_eval_alloc, tsf;
-
-  double cv = 0.0;
-  double * lambda = NULL, * vsf = NULL;
-  double ** matrix_bandwidth = NULL;
-
-  double aicc = 0.0;
-  double traceH = 0.0;
-int * operator = NULL;
-int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
+static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
+                                                     const int BANDWIDTH_reg,
+                                                     const int num_obs,
+                                                     const int num_reg_unordered,
+                                                     const int num_reg_ordered,
+                                                     const int num_reg_continuous,
+                                                     double **matrix_X_unordered,
+                                                     double **matrix_X_ordered,
+                                                     double **matrix_X_continuous,
+                                                     double *vector_Y,
+                                                     double *vector_scale_factor,
+                                                     int *num_categories,
+                                                     int *kernel_c,
+                                                     int *kernel_u,
+                                                     int *kernel_o,
+                                                     int *operator,
+                                                     double *lambda,
+                                                     double **matrix_bandwidth,
+                                                     const int ks_tree_use){
+  NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
+  int i, j, l, sf_flag = 0, tsf;
   int *ov_cont_ok = NULL;
   double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
   int ov_cont_from_cache = 0;
-
-  const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
-
-  if(!np_reg_cv_core_cache_prepare(KERNEL_reg,
-                                   KERNEL_unordered_reg,
-                                   KERNEL_ordered_reg,
-                                   BANDWIDTH_reg,
-                                   num_obs,
-                                   num_reg_continuous,
-                                   num_reg_unordered,
-                                   num_reg_ordered))
-    return DBL_MAX;
-
-  /* Canonical CVAIC parity: LP(degree=1) should follow the LL-equivalent
-     objective branch for bandwidth search. */
-  int int_ll_cv = int_ll;
-  if((int_ll == LL_LP) &&
-     (bwm == RBWM_CVAIC) &&
-     (vector_glp_degree_extern != NULL) &&
-     (num_reg_continuous > 0)){
-    int all_deg_one = 1;
-    for(i = 0; i < num_reg_continuous; i++){
-      if(vector_glp_degree_extern[i] != 1){
-        all_deg_one = 0;
-        break;
-      }
-    }
-    if(all_deg_one)
-      int_ll_cv = LL_LL;
-  }
-
-  operator = np_reg_cv_core_cache.operator;
-  kernel_c = np_reg_cv_core_cache.kernel_c;
-  kernel_u = np_reg_cv_core_cache.kernel_u;
-  kernel_o = np_reg_cv_core_cache.kernel_o;
-  lambda = np_reg_cv_core_cache.lambda;
-  matrix_bandwidth = np_reg_cv_core_cache.matrix_bandwidth;
-
+  double *vsf = NULL;
+  double aicc = 0.0;
 #ifdef MPI2
-    int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
-    num_obs_eval_alloc = stride*iNum_Processors;
+  int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
+  int num_obs_eval_alloc = stride*iNum_Processors;
 #else
-    num_obs_eval_alloc = num_obs;
+  int num_obs_eval_alloc = num_obs;
 #endif
 
-    int ks_tree_use = (int_TREE_X == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll_cv == LL_LL)));
+  const int use_bernstein = (int_glp_bernstein_extern != 0);
+  const int *glp_terms = NULL;
+  int glp_nterms = 0;
+  double **basis = NULL;
+  MATRIX XTKY = NULL, DELTA = NULL, KWM = NULL;
+  MATRIX TCON = NULL, TUNO = NULL, TORD = NULL;
+  double **matrix_bandwidth_eval = NULL;
+  double **XTKX = NULL;
+  int glp_ok = 1;
 
-  if(kernel_bandwidth_mean(KERNEL_reg,
-                           BANDWIDTH_reg,
-                           num_obs,
-                           num_obs,
-                           0,
-                           0,
-                           0,
-                           num_reg_continuous,
-                           num_reg_unordered,
-                           num_reg_ordered,
-                           0, // do not suppress_parallel
-                           vector_scale_factor,
-                           NULL,			 // Not used 
-                           NULL,			 // Not used 
-                           matrix_X_continuous,
-                           matrix_X_continuous,
-                           NULL,					 // Not used 
-                           matrix_bandwidth,
-                           lambda)==1){
-    
-    return(DBL_MAX);
+  if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
+    goto cleanup_lp_cv;
+
+  if(!np_glp_cv_cache.ready ||
+     (np_glp_cv_cache.use_bernstein != use_bernstein) ||
+     (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
+     (np_glp_cv_cache.num_obs != num_obs) ||
+     (np_glp_cv_cache.ncon != num_reg_continuous) ||
+     (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous)){
+    if(!np_glp_cv_cache_prepare(LL_LP, num_obs, num_reg_continuous, matrix_X_continuous))
+      goto cleanup_lp_cv;
   }
 
-  if(int_ll_cv == LL_LP){
-    const int use_bernstein = (int_glp_bernstein_extern != 0);
-    const int *glp_terms = NULL;
-    int glp_nterms = 0;
-    double **basis = NULL;
-    MATRIX XTKY = NULL, DELTA = NULL, KWM = NULL;
-    MATRIX TCON = NULL, TUNO = NULL, TORD = NULL;
-    double ** matrix_bandwidth_eval = NULL;
-    double ** XTKX = NULL;
-    int glp_ok = 1;
+  if(!np_glp_cv_cache.ready)
+    goto cleanup_lp_cv;
 
-    if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0)){
-      cv = DBL_MAX;
-      goto finish_cv_path;
-    }
+  glp_terms = np_glp_cv_cache.terms;
+  glp_nterms = np_glp_cv_cache.nterms;
+  basis = np_glp_cv_cache.basis;
+  if((glp_terms == NULL) || (basis == NULL) || (glp_nterms <= 0))
+    goto cleanup_lp_cv;
 
-    if(!np_glp_cv_cache.ready ||
-       (np_glp_cv_cache.use_bernstein != use_bernstein) ||
-       (np_glp_cv_cache.basis_mode != int_glp_basis_extern) ||
-       (np_glp_cv_cache.num_obs != num_obs) ||
-       (np_glp_cv_cache.ncon != num_reg_continuous) ||
-       (np_glp_cv_cache.matrix_X_continuous_train_ptr != matrix_X_continuous)){
-      if(!np_glp_cv_cache_prepare(int_ll_cv, num_obs, num_reg_continuous, matrix_X_continuous)){
-        cv = DBL_MAX;
-        goto finish_cv_path;
-      }
-    }
+  {
+    const int all_large_gate = np_reg_cv_all_large_gate(BANDWIDTH_reg,
+                                                        num_obs,
+                                                        num_reg_continuous,
+                                                        num_reg_unordered,
+                                                        num_reg_ordered,
+                                                        kernel_c,
+                                                        kernel_u,
+                                                        kernel_o,
+                                                        matrix_X_continuous,
+                                                        matrix_bandwidth,
+                                                        lambda,
+                                                        num_categories,
+                                                        matrix_categorical_vals_extern,
+                                                        &ov_cont_ok,
+                                                        &ov_cont_hmin,
+                                                        &ov_cont_k0,
+                                                        &ov_cont_from_cache);
 
-    if(!np_glp_cv_cache.ready){
-      cv = DBL_MAX;
-      goto finish_cv_path;
-    }
+    if(all_large_gate){
+      const int k = glp_nterms;
+      MATRIX XtX = mat_creat(k, k, UNDEFINED);
+      MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
+      MATRIX XtY = mat_creat(k, 1, UNDEFINED);
+      MATRIX BETA = mat_creat(k, 1, UNDEFINED);
+      int fast_ok = (XtX != NULL) && (XtXINV != NULL) && (XtY != NULL) && (BETA != NULL);
 
-    glp_terms = np_glp_cv_cache.terms;
-    glp_nterms = np_glp_cv_cache.nterms;
-    basis = np_glp_cv_cache.basis;
-    if((glp_terms == NULL) || (basis == NULL) || (glp_nterms <= 0)){
-      cv = DBL_MAX;
-      goto finish_cv_path;
-    }
+      if(fast_ok){
+        const double ridge_eps = 1.0/(double)MAX(1, num_obs);
+        int ridge_it = 0;
 
-    {
-      const int all_large_gate = np_reg_cv_all_large_gate(BANDWIDTH_reg,
-                                                          num_obs,
-                                                          num_reg_continuous,
-                                                          num_reg_unordered,
-                                                          num_reg_ordered,
-                                                          kernel_c,
-                                                          kernel_u,
-                                                          kernel_o,
-                                                          matrix_X_continuous,
-                                                          matrix_bandwidth,
-                                                          lambda,
-                                                          num_categories,
-                                                          matrix_categorical_vals_extern,
-                                                          &ov_cont_ok,
-                                                          &ov_cont_hmin,
-                                                          &ov_cont_k0,
-                                                          &ov_cont_from_cache);
+        for(i = 0; i < k; i++){
+          XtY[i][0] = 0.0;
+          BETA[i][0] = 0.0;
+          for(j = 0; j < k; j++)
+            XtX[i][j] = 0.0;
+        }
 
-      if(all_large_gate){
-        const int k = glp_nterms;
-        MATRIX XtX = mat_creat(k, k, UNDEFINED);
-        MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
-        MATRIX XtY = mat_creat(k, 1, UNDEFINED);
-        MATRIX BETA = mat_creat(k, 1, UNDEFINED);
-        int fast_ok = (XtX != NULL) && (XtXINV != NULL) && (XtY != NULL) && (BETA != NULL);
+        for(i = 0; i < num_obs; i++){
+          const double yi = vector_Y[i];
+          for(int a = 0; a < k; a++){
+            const double za = basis[a][i];
+            XtY[a][0] += za*yi;
+            for(int b = a; b < k; b++){
+              const double zb = basis[b][i];
+              XtX[a][b] += za*zb;
+              if(b != a) XtX[b][a] += za*zb;
+            }
+          }
+        }
+
+        while(mat_inv(XtX, XtXINV) == NULL){
+          for(i = 0; i < k; i++)
+            XtX[i][i] += ridge_eps;
+          ridge_it++;
+          if(ridge_it > 64){
+            fast_ok = 0;
+            break;
+          }
+        }
 
         if(fast_ok){
-          const double ridge_eps = 1.0/(double)MAX(1, num_obs);
-          int ridge_it = 0;
-
           for(i = 0; i < k; i++){
-            XtY[i][0] = 0.0;
-            BETA[i][0] = 0.0;
+            double s = 0.0;
             for(j = 0; j < k; j++)
-              XtX[i][j] = 0.0;
+              s += XtXINV[i][j]*XtY[j][0];
+            BETA[i][0] = s;
           }
 
+          result.cv = 0.0;
+          result.traceH = 0.0;
           for(i = 0; i < num_obs; i++){
-            const double yi = vector_Y[i];
-            for(int a = 0; a < k; a++){
-              const double za = basis[a][i];
-              XtY[a][0] += za*yi;
-              for(int b = a; b < k; b++){
-                const double zb = basis[b][i];
-                XtX[a][b] += za*zb;
-                if(b != a) XtX[b][a] += za*zb;
+            double yhat = 0.0;
+            double hii = 0.0;
+            for(j = 0; j < k; j++){
+              const double zj = basis[j][i];
+              yhat += BETA[j][0]*zj;
+            }
+            for(j = 0; j < k; j++){
+              const double zj = basis[j][i];
+              for(int b = 0; b < k; b++)
+                hii += zj*XtXINV[j][b]*basis[b][i];
+            }
+            {
+              const double err = vector_Y[i] - yhat;
+              if(bwm == RBWM_CVLS){
+                const double den = NZD_POS(1.0 - hii);
+                const double err_loo = err/den;
+                result.cv += err_loo*err_loo;
+              } else {
+                result.cv += err*err;
+                result.traceH += hii;
               }
             }
           }
-
-          while(mat_inv(XtX, XtXINV) == NULL){
-            for(i = 0; i < k; i++) XtX[i][i] += ridge_eps;
-            ridge_it++;
-            if(ridge_it > 64){
-              fast_ok = 0;
-              break;
-            }
-          }
-
-          if(fast_ok){
-            for(i = 0; i < k; i++){
-              double s = 0.0;
-              for(j = 0; j < k; j++) s += XtXINV[i][j]*XtY[j][0];
-              BETA[i][0] = s;
-            }
-
-            cv = 0.0;
-            traceH = 0.0;
-            for(i = 0; i < num_obs; i++){
-              double yhat = 0.0;
-              double hii = 0.0;
-              for(j = 0; j < k; j++){
-                const double zj = basis[j][i];
-                yhat += BETA[j][0]*zj;
-              }
-              for(j = 0; j < k; j++){
-                const double zj = basis[j][i];
-                for(int b = 0; b < k; b++)
-                  hii += zj*XtXINV[j][b]*basis[b][i];
-              }
-              {
-                const double err = vector_Y[i] - yhat;
-                if(bwm == RBWM_CVLS){
-                  const double den = NZD_POS(1.0 - hii);
-                  const double err_loo = err/den;
-                  cv += err_loo*err_loo;
-                } else {
-                  cv += err*err;
-                  traceH += hii;
-                }
-              }
-            }
-          }
-        }
-
-        if(XtX != NULL) mat_free(XtX);
-        if(XtXINV != NULL) mat_free(XtXINV);
-        if(XtY != NULL) mat_free(XtY);
-        if(BETA != NULL) mat_free(BETA);
-
-        if(fast_ok){
-          np_fastcv_alllarge_hits++;
-          goto finish_cv_path;
         }
       }
-    }
 
+      if(XtX != NULL) mat_free(XtX);
+      if(XtXINV != NULL) mat_free(XtXINV);
+      if(XtY != NULL) mat_free(XtY);
+      if(BETA != NULL) mat_free(BETA);
+
+      if(fast_ok){
+        np_fastcv_alllarge_hits++;
+        result.ok = 1;
+        goto cleanup_lp_cv;
+      }
+    }
+  }
+
+  {
     const int nrc1 = glp_nterms;
     const int nrc2 = nrc1 + 1;
     const int nrcc22 = nrc2*nrc2;
-    double * PKWM[nrc1], * PXTKY[nrc1], * PXTKX[nrc2];
-
-    double * PXC[MAX(1,num_reg_continuous)];
-    double * PXU[MAX(1,num_reg_unordered)];
-    double * PXO[MAX(1,num_reg_ordered)];
+    double *PKWM[nrc1], *PXTKY[nrc1], *PXTKX[nrc2];
+    double *PXC[MAX(1,num_reg_continuous)];
+    double *PXU[MAX(1,num_reg_unordered)];
+    double *PXO[MAX(1,num_reg_ordered)];
+    double *kwm = NULL, *sgn = NULL, *evalv = NULL;
 
     PXC[0] = NULL;
     PXU[0] = NULL;
@@ -7700,7 +7626,11 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 
     if((sf_flag = (int_LARGE_SF == 0))){
       int_LARGE_SF = 1;
-      vsf = (double *)malloc(num_reg_continuous*sizeof(double));
+      vsf = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
+      if(vsf == NULL){
+        glp_ok = 0;
+        goto cleanup_lp_work;
+      }
       for(i = 0; i < num_reg_continuous; i++)
         vsf[i] = matrix_bandwidth[i][0];
     } else {
@@ -7715,10 +7645,9 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     TORD = mat_creat(num_reg_ordered, 1, UNDEFINED);
     matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
     XTKX = (double **)malloc((size_t)nrc2*sizeof(double *));
-
-    double * kwm = (double *)malloc((size_t)nrcc22*(size_t)num_obs_eval_alloc*sizeof(double));
-    double * sgn = (double *)malloc((size_t)nrc2*sizeof(double));
-    double * evalv = (double *)malloc((size_t)nrc1*sizeof(double));
+    kwm = (double *)malloc((size_t)nrcc22*(size_t)num_obs_eval_alloc*sizeof(double));
+    sgn = (double *)malloc((size_t)nrc2*sizeof(double));
+    evalv = (double *)malloc((size_t)nrc1*sizeof(double));
 
     glp_ok = (XTKY != NULL) && (DELTA != NULL) && (KWM != NULL) &&
       (TCON != NULL) && (TUNO != NULL) && (TORD != NULL) &&
@@ -7726,85 +7655,91 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
       (kwm != NULL) && (sgn != NULL) && (evalv != NULL);
 
     if(!glp_ok){
-      cv = DBL_MAX;
-    } else {
-      for(i = 0; i < nrcc22*num_obs_eval_alloc; i++)
-        kwm[i] = 0.0;
+      result.cv = DBL_MAX;
+      goto cleanup_lp_work;
+    }
 
-      sgn[0] = 1.0;
-      for(i = 1; i < nrc2; i++) sgn[i] = 1.0;
+    for(i = 0; i < nrcc22*num_obs_eval_alloc; i++)
+      kwm[i] = 0.0;
 
-      XTKX[0] = vector_Y;
-      for(i = 0; i < nrc1; i++)
-        XTKX[i+1] = basis[i];
+    sgn[0] = 1.0;
+    for(i = 1; i < nrc2; i++) sgn[i] = 1.0;
 
-      for(i = 0; i < nrc2; i++)
-        PXTKX[i] = XTKX[i];
+    XTKX[0] = vector_Y;
+    for(i = 0; i < nrc1; i++)
+      XTKX[i+1] = basis[i];
 
-      for(i = 0; i < nrc1; i++){
-        PKWM[i] = KWM[i];
-        PXTKY[i] = XTKY[i];
-        KWM[i] = &kwm[(i+1)*nrc2 + 1];
-        XTKY[i] = &kwm[i+1];
-      }
+    for(i = 0; i < nrc2; i++)
+      PXTKX[i] = XTKX[i];
 
-      if(bwm == RBWM_CVAIC){
-        tsf = int_LARGE_SF;
-        int_LARGE_SF = 1;
-        kernel_weighted_sum_np_ctx(kernel_c,
-                                   kernel_u,
-                                   kernel_o,
-                                   BANDWIDTH_reg,
-                                   1,
-                                   1,
-                                   num_reg_unordered,
-                                   num_reg_ordered,
-                                   num_reg_continuous,
-                                   0,
-                                   0,
-                                   1,
-                                   0,
-                                   0,
-                                   0,
-                                   0,
-                                   0,
-                                   0,
-                                   operator,
-                                   OP_NOOP,
-                                   0,
-                                   0,
-                                   NULL,
-                                   1,
-                                   0,
-                                   0,
-                                   NP_TREE_FALSE,
-                                   0,
-                                   NULL, NULL, NULL, NULL,
-                                   matrix_X_unordered,
-                                   matrix_X_ordered,
-                                   matrix_X_continuous,
-                                   matrix_X_unordered,
-                                   matrix_X_ordered,
-                                   matrix_X_continuous,
-                                   NULL,
-                                   NULL,
-                                   NULL,
-                                   vector_scale_factor,
-                                   1,
-                                   matrix_bandwidth,
-                                   matrix_bandwidth,
-                                   lambda,
-                                   num_categories,
-                                   NULL,
-                                   NULL,
-                                   &aicc,
-                                   NULL,
-                                   NULL,
-                                   NULL);
-        int_LARGE_SF = tsf;
-      }
+    for(i = 0; i < nrc1; i++){
+      PKWM[i] = KWM[i];
+      PXTKY[i] = XTKY[i];
+      KWM[i] = &kwm[(i+1)*nrc2 + 1];
+      XTKY[i] = &kwm[i+1];
+    }
 
+    if(bwm == RBWM_CVAIC){
+      tsf = int_LARGE_SF;
+      int_LARGE_SF = 1;
+      kernel_weighted_sum_np_ctx(kernel_c,
+                                 kernel_u,
+                                 kernel_o,
+                                 BANDWIDTH_reg,
+                                 1,
+                                 1,
+                                 num_reg_unordered,
+                                 num_reg_ordered,
+                                 num_reg_continuous,
+                                 0,
+                                 0,
+                                 1,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 0,
+                                 operator,
+                                 OP_NOOP,
+                                 0,
+                                 0,
+                                 NULL,
+                                 1,
+                                 0,
+                                 0,
+                                 NP_TREE_FALSE,
+                                 0,
+                                 NULL, NULL, NULL, NULL,
+                                 matrix_X_unordered,
+                                 matrix_X_ordered,
+                                 matrix_X_continuous,
+                                 matrix_X_unordered,
+                                 matrix_X_ordered,
+                                 matrix_X_continuous,
+                                 NULL,
+                                 NULL,
+                                 NULL,
+                                 vector_scale_factor,
+                                 1,
+                                 matrix_bandwidth,
+                                 matrix_bandwidth,
+                                 lambda,
+                                 num_categories,
+                                 NULL,
+                                 NULL,
+                                 &aicc,
+                                 NULL,
+                                 NULL,
+                                 NULL);
+      int_LARGE_SF = tsf;
+    }
+
+    {
       const double epsilon = 1.0/(double)MAX(1, num_obs);
+      result.cv = 0.0;
+      result.traceH = 0.0;
+
       for(j = 0; j < num_obs; j++){
         double nepsilon = 0.0;
         double pnh = 1.0;
@@ -7992,8 +7927,10 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
           double mhat = 0.0;
           for(i = 0; i < nrc1; i++)
             mhat += evalv[i]*DELTA[i][0];
-          const double dy = vector_Y[j]-mhat;
-          cv += dy*dy;
+          {
+            const double dy = vector_Y[j]-mhat;
+            result.cv += dy*dy;
+          }
         }
 
         if(bwm == RBWM_CVAIC){
@@ -8007,12 +7944,13 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
             double hii = 0.0;
             for(i = 0; i < nrc1; i++)
               hii += evalv[i]*DELTA[i][0];
-            traceH += hii*pnh*aicc;
+            result.traceH += hii*pnh*aicc;
           }
         }
       }
     }
 
+cleanup_lp_work:
     if((XTKY != NULL) && (KWM != NULL)){
       for(i = 0; i < nrc1; i++){
         KWM[i] = PKWM[i];
@@ -8031,18 +7969,157 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     if(kwm != NULL) free(kwm);
     if(sgn != NULL) free(sgn);
     if(evalv != NULL) free(evalv);
+  }
 
-    if(sf_flag){
-      int_LARGE_SF = 0;
-      free(vsf);
-      vsf = NULL;
+cleanup_lp_cv:
+  if(sf_flag){
+    int_LARGE_SF = 0;
+    free(vsf);
+  }
+  if((ov_cont_ok != NULL) && (!ov_cont_from_cache)) free(ov_cont_ok);
+  if((ov_cont_hmin != NULL) && (!ov_cont_from_cache)) free(ov_cont_hmin);
+  if((ov_cont_k0 != NULL) && (!ov_cont_from_cache)) free(ov_cont_k0);
+
+  if(glp_ok){
+    result.ok = 1;
+  } else {
+    result.cv = DBL_MAX;
+    result.traceH = 0.0;
+  }
+
+  return result;
+}
+
+// Regression CV objective for local polynomial regression:
+// lc (degree 0), ll (degree 1), and lp (general degree vector).
+// The LL/LP branches solve weighted normal equations with ridge fallback if singular.
+
+double np_kernel_estimate_regression_categorical_ls_aic(
+int int_ll,
+int bwm,
+int KERNEL_reg,
+int KERNEL_unordered_reg,
+int KERNEL_ordered_reg,
+int BANDWIDTH_reg,
+int num_obs,
+int num_reg_unordered,
+int num_reg_ordered,
+int num_reg_continuous,
+double **matrix_X_unordered,
+double **matrix_X_ordered,
+double **matrix_X_continuous,
+double *vector_Y,
+double *vector_scale_factor,
+int *num_categories){
+
+  np_gate_override_clear();
+
+  // note that mean has 2*num_obs allocated for npksum
+  int i, j, l, sf_flag = 0, num_obs_eval_alloc, tsf;
+
+  double cv = 0.0;
+  double * lambda = NULL, * vsf = NULL;
+  double ** matrix_bandwidth = NULL;
+
+  double aicc = 0.0;
+  double traceH = 0.0;
+int * operator = NULL;
+int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
+  int *ov_cont_ok = NULL;
+  double *ov_cont_hmin = NULL, *ov_cont_k0 = NULL;
+  int ov_cont_from_cache = 0;
+
+  const int leave_one_out = (bwm == RBWM_CVLS)?1:0;
+
+  if(!np_reg_cv_core_cache_prepare(KERNEL_reg,
+                                   KERNEL_unordered_reg,
+                                   KERNEL_ordered_reg,
+                                   BANDWIDTH_reg,
+                                   num_obs,
+                                   num_reg_continuous,
+                                   num_reg_unordered,
+                                   num_reg_ordered))
+    return DBL_MAX;
+
+  /* Canonical CVAIC parity: LP(degree=1) should follow the LL-equivalent
+     objective branch for bandwidth search. */
+  int int_ll_cv = int_ll;
+  if((int_ll == LL_LP) &&
+     (bwm == RBWM_CVAIC) &&
+     (vector_glp_degree_extern != NULL) &&
+     (num_reg_continuous > 0)){
+    int all_deg_one = 1;
+    for(i = 0; i < num_reg_continuous; i++){
+      if(vector_glp_degree_extern[i] != 1){
+        all_deg_one = 0;
+        break;
+      }
     }
+    if(all_deg_one)
+      int_ll_cv = LL_LL;
+  }
 
-    if(!glp_ok){
-      cv = DBL_MAX;
-      goto finish_cv_path;
-    }
+  operator = np_reg_cv_core_cache.operator;
+  kernel_c = np_reg_cv_core_cache.kernel_c;
+  kernel_u = np_reg_cv_core_cache.kernel_u;
+  kernel_o = np_reg_cv_core_cache.kernel_o;
+  lambda = np_reg_cv_core_cache.lambda;
+  matrix_bandwidth = np_reg_cv_core_cache.matrix_bandwidth;
 
+#ifdef MPI2
+    int stride = MAX((int)ceil((double) num_obs / (double) iNum_Processors),1);
+    num_obs_eval_alloc = stride*iNum_Processors;
+#else
+    num_obs_eval_alloc = num_obs;
+#endif
+
+    int ks_tree_use = (int_TREE_X == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll_cv == LL_LL)));
+
+  if(kernel_bandwidth_mean(KERNEL_reg,
+                           BANDWIDTH_reg,
+                           num_obs,
+                           num_obs,
+                           0,
+                           0,
+                           0,
+                           num_reg_continuous,
+                           num_reg_unordered,
+                           num_reg_ordered,
+                           0, // do not suppress_parallel
+                           vector_scale_factor,
+                           NULL,			 // Not used 
+                           NULL,			 // Not used 
+                           matrix_X_continuous,
+                           matrix_X_continuous,
+                           NULL,					 // Not used 
+                           matrix_bandwidth,
+                           lambda)==1){
+    
+    return(DBL_MAX);
+  }
+
+  if(int_ll_cv == LL_LP){
+    NPRegCvLpResult lp_result = np_regression_cv_lp_objective(bwm,
+                                                              BANDWIDTH_reg,
+                                                              num_obs,
+                                                              num_reg_unordered,
+                                                              num_reg_ordered,
+                                                              num_reg_continuous,
+                                                              matrix_X_unordered,
+                                                              matrix_X_ordered,
+                                                              matrix_X_continuous,
+                                                              vector_Y,
+                                                              vector_scale_factor,
+                                                              num_categories,
+                                                              kernel_c,
+                                                              kernel_u,
+                                                              kernel_o,
+                                                              operator,
+                                                              lambda,
+                                                              matrix_bandwidth,
+                                                              ks_tree_use);
+    cv = lp_result.cv;
+    traceH = lp_result.traceH;
     goto finish_cv_path;
   }
 
