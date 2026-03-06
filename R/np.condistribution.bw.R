@@ -234,47 +234,6 @@ npcdistbw.condbandwidth <-
     tbw$degree.engine <- spec$degree.engine
     tbw$bernstein.basis.engine <- spec$bernstein.basis.engine
 
-    reg.engine <- if (is.null(tbw$regtype.engine)) {
-      if (is.null(tbw$regtype)) "lc" else as.character(tbw$regtype)
-    } else {
-      as.character(tbw$regtype.engine)
-    }
-    basis.engine <- if (is.null(tbw$basis.engine)) {
-      if (is.null(tbw$basis)) "glp" else tbw$basis
-    } else {
-      tbw$basis.engine
-    }
-    degree.engine <- if (is.null(tbw$degree.engine)) {
-      if (tbw$xncon > 0L) {
-        if (identical(reg.engine, "lc")) rep.int(0L, tbw$xncon) else npValidateGlpDegree(
-          regtype = "lp",
-          degree = tbw$degree,
-          ncon = tbw$xncon
-        )
-      } else {
-        integer(0)
-      }
-    } else {
-      as.integer(tbw$degree.engine)
-    }
-    bernstein.engine <- if (is.null(tbw$bernstein.basis.engine)) {
-      isTRUE(tbw$bernstein.basis)
-    } else {
-      isTRUE(tbw$bernstein.basis.engine)
-    }
-    reg.c <- npRegtypeToC(
-      regtype = if (identical(reg.engine, "lp")) "lp" else "lc",
-      degree = degree.engine,
-      ncon = tbw$xncon,
-      context = "npcdistbw"
-    )
-    degree.c <- if (tbw$xncon > 0L) {
-      as.integer(if (is.null(reg.c$degree)) rep.int(0L, tbw$xncon) else reg.c$degree)
-    } else {
-      integer(0)
-    }
-    basis.code <- as.integer(npLpBasisCode(basis.engine))
-
     if(!is.null(gydat)){
       gydat <- toFrame(gydat)
       if(any(is.na(gydat)))
@@ -404,10 +363,6 @@ npcdistbw.condbandwidth <-
                               as.double(cxker.bounds.c$ub),
                               as.double(cyker.bounds.c$lb),
                               as.double(cyker.bounds.c$ub),
-                              as.integer(reg.c$code),
-                              as.integer(degree.c),
-                              as.integer(bernstein.engine),
-                              basis.code,
                               PACKAGE="np"))[1]
       } else {
         nbw = double(yncol+xncol)

@@ -1453,16 +1453,11 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
                                  SEXP cxkerlb,
                                  SEXP cxkerub,
                                  SEXP cykerlb,
-                                 SEXP cykerub,
-                                 SEXP regtype,
-                                 SEXP glp_degree,
-                                 SEXP glp_bernstein,
-                                 SEXP glp_basis)
+                                 SEXP cykerub)
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP mysd_r=R_NilValue, myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue;
   SEXP cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
-  SEXP regtype_i=R_NilValue, glp_degree_i=R_NilValue, glp_bernstein_i=R_NilValue, glp_basis_i=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
   SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
@@ -1492,28 +1487,11 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
-  PROTECT(regtype_i = coerceVector(regtype, INTSXP));
-  PROTECT(glp_degree_i = coerceVector(glp_degree, INTSXP));
-  PROTECT(glp_bernstein_i = coerceVector(glp_bernstein, INTSXP));
-  PROTECT(glp_basis_i = coerceVector(glp_basis, INTSXP));
 
-  ncon_x = (int)INTEGER(myopti_i)[CBW_UNCONI];
-  ncon_y = (int)INTEGER(myopti_i)[CBW_CNCONI];
+  ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
+  ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
   resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
   resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
-
-  int_ll_extern = asInteger(regtype_i);
-  if ((int_ll_extern == LL_LP) && (ncon_x > 0)) {
-    if ((int)XLENGTH(glp_degree_i) != ncon_x)
-      error("C_np_density_conditional_bw: length(glp_degree) must equal number of continuous x variables");
-    vector_glp_degree_extern = INTEGER(glp_degree_i);
-    int_glp_bernstein_extern = asInteger(glp_bernstein_i);
-    int_glp_basis_extern = asInteger(glp_basis_i);
-  } else {
-    vector_glp_degree_extern = NULL;
-    int_glp_bernstein_extern = 0;
-    int_glp_basis_extern = 1;
-  }
 
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
   PROTECT(out_fval = allocVector(REALSXP, 2));
@@ -1550,12 +1528,7 @@ SEXP C_np_density_conditional_bw(SEXP c_uno,
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  vector_glp_degree_extern = NULL;
-  int_glp_bernstein_extern = 0;
-  int_glp_basis_extern = 1;
-  int_ll_extern = LL_LC;
-
-  UNPROTECT(27);
+  UNPROTECT(23);
   return out;
 }
 
@@ -1578,16 +1551,11 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
                                       SEXP cxkerlb,
                                       SEXP cxkerub,
                                       SEXP cykerlb,
-                                      SEXP cykerub,
-                                      SEXP regtype,
-                                      SEXP glp_degree,
-                                      SEXP glp_bernstein,
-                                      SEXP glp_basis)
+                                      SEXP cykerub)
 {
   SEXP c_uno_r=R_NilValue, c_ord_r=R_NilValue, c_con_r=R_NilValue, u_uno_r=R_NilValue, u_ord_r=R_NilValue, u_con_r=R_NilValue;
   SEXP cg_uno_r=R_NilValue, cg_ord_r=R_NilValue, cg_con_r=R_NilValue, mysd_r=R_NilValue;
   SEXP myopti_i=R_NilValue, myoptd_r=R_NilValue, bw_r=R_NilValue, cxkerlb_r=R_NilValue, cxkerub_r=R_NilValue, cykerlb_r=R_NilValue, cykerub_r=R_NilValue;
-  SEXP regtype_i=R_NilValue, glp_degree_i=R_NilValue, glp_bernstein_i=R_NilValue, glp_basis_i=R_NilValue;
   SEXP out=R_NilValue, out_names=R_NilValue;
   SEXP out_bw=R_NilValue, out_fval=R_NilValue, out_fval_hist=R_NilValue, out_eval_hist=R_NilValue;
   SEXP out_invalid_hist=R_NilValue, out_timing=R_NilValue, out_fast=R_NilValue;
@@ -1620,28 +1588,11 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   PROTECT(cxkerub_r = coerceVector(cxkerub, REALSXP));
   PROTECT(cykerlb_r = coerceVector(cykerlb, REALSXP));
   PROTECT(cykerub_r = coerceVector(cykerub, REALSXP));
-  PROTECT(regtype_i = coerceVector(regtype, INTSXP));
-  PROTECT(glp_degree_i = coerceVector(glp_degree, INTSXP));
-  PROTECT(glp_bernstein_i = coerceVector(glp_bernstein, INTSXP));
-  PROTECT(glp_basis_i = coerceVector(glp_basis, INTSXP));
 
-  ncon_x = (int)INTEGER(myopti_i)[CDBW_UNCONI];
-  ncon_y = (int)INTEGER(myopti_i)[CDBW_CNCONI];
+  ncon_x = (int)INTEGER(myopti_i)[CBW_UNCONI];
+  ncon_y = (int)INTEGER(myopti_i)[CBW_CNCONI];
   resolve_bounds_or_default(cxkerlb_r, cxkerub_r, ncon_x, &cxkerlb_p, &cxkerub_p);
   resolve_bounds_or_default(cykerlb_r, cykerub_r, ncon_y, &cykerlb_p, &cykerub_p);
-
-  int_ll_extern = asInteger(regtype_i);
-  if ((int_ll_extern == LL_LP) && (ncon_x > 0)) {
-    if ((int)XLENGTH(glp_degree_i) != ncon_x)
-      error("C_np_distribution_conditional_bw: length(glp_degree) must equal number of continuous x variables");
-    vector_glp_degree_extern = INTEGER(glp_degree_i);
-    int_glp_bernstein_extern = asInteger(glp_bernstein_i);
-    int_glp_basis_extern = asInteger(glp_basis_i);
-  } else {
-    vector_glp_degree_extern = NULL;
-    int_glp_bernstein_extern = 0;
-    int_glp_basis_extern = 1;
-  }
 
   PROTECT(out_bw = allocVector(REALSXP, XLENGTH(bw_r)));
   PROTECT(out_fval = allocVector(REALSXP, 2));
@@ -1679,12 +1630,7 @@ SEXP C_np_distribution_conditional_bw(SEXP c_uno,
   SET_STRING_ELT(out_names, 6, mkChar("fast.history"));
   setAttrib(out, R_NamesSymbol, out_names);
 
-  vector_glp_degree_extern = NULL;
-  int_glp_bernstein_extern = 0;
-  int_glp_basis_extern = 1;
-  int_ll_extern = LL_LC;
-
-  UNPROTECT(30);
+  UNPROTECT(26);
   return out;
 }
 
@@ -5506,10 +5452,7 @@ void np_density_conditional(double * tc_uno, double * tc_ord, double * tc_con,
                                                                &MAE,
                                                                &MAPE,
                                                                &CORR,
-                                                               &SIGN,
-                                                               0,
-                                                               0,
-                                                               -1);
+                                                               &SIGN);
 
       if(status != 0)
         error("np_density_conditional: regression LP solve failed in conditional LP path");
@@ -6947,10 +6890,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                                                    &MAE,
                                                    &MAPE,
                                                    &CORR,
-                                                   &SIGN,
-                                                   0,
-                                                   0,
-                                                   -1);
+                                                   &SIGN);
 
 
   }
