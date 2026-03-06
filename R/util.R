@@ -1303,9 +1303,9 @@ genBwSelStr <- function(x){
   }
 
   nfe.str <- ""
-  if(!(is.null(x$num.feval) || identical(x$num.feval, NA))){
+  if(!(is.null(x$num.feval) || (length(x$num.feval) == 1L && is.na(x$num.feval)))){
     nfe.str <- paste("\nNumber of Function Evaluations: ", format(x$num.feval), sep="")
-    if(!(is.null(x$num.feval.fast) || identical(x$num.feval.fast, NA))){
+    if(!(is.null(x$num.feval.fast) || (length(x$num.feval.fast) == 1L && is.na(x$num.feval.fast)))){
       nfe.str <- paste(nfe.str, " (fast = ", format(x$num.feval.fast), ")", sep="")
     }
   }

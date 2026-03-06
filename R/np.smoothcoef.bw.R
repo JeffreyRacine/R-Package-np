@@ -278,6 +278,96 @@ npscoefbw.scbandwidth <-
       scbw
     }
 
+    fast_largeh_tol <- getOption("np.largeh.rel.tol", 1e-3)
+    if (!is.numeric(fast_largeh_tol) || length(fast_largeh_tol) != 1L ||
+        is.na(fast_largeh_tol) || !is.finite(fast_largeh_tol) ||
+        fast_largeh_tol <= 0 || fast_largeh_tol >= 0.1)
+      fast_largeh_tol <- 1e-3
+
+    fast_disc_tol <- getOption("np.disc.upper.rel.tol", 1e-2)
+    if (!is.numeric(fast_disc_tol) || length(fast_disc_tol) != 1L ||
+        is.na(fast_disc_tol) || !is.finite(fast_disc_tol) ||
+        fast_disc_tol <= 0 || fast_disc_tol >= 0.5)
+      fast_disc_tol <- 1e-2
+
+    cont_utol <- switch(
+      bws$ckertype,
+      gaussian = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
+      "truncated gaussian" = sqrt(-2.0 * log(1.0 - fast_largeh_tol)),
+      epanechnikov = sqrt(fast_largeh_tol),
+      uniform = 1.0 - 32.0 * .Machine$double.eps,
+      0.0
+    )
+
+    cont_hmin <- numeric(0)
+    if (any(dati$icon) && is.finite(cont_utol) && cont_utol > 0) {
+      zcon <- zdat.df[, dati$icon, drop = FALSE]
+      cont_hmin <- vapply(zcon, function(col) {
+        vals <- as.double(col)
+        vals <- vals[is.finite(vals)]
+        if (!length(vals))
+          return(Inf)
+        diff(range(vals)) / cont_utol
+      }, numeric(1))
+    }
+
+    disc_upper_tol <- function(upper) {
+      max(fast_disc_tol * abs(upper),
+          16.0 * .Machine$double.eps * max(1.0, abs(upper)))
+    }
+
+    uno_upper <- numeric(0)
+    if (any(dati$iuno)) {
+      uno_idx <- which(dati$iuno)
+      uno_upper <- vapply(uno_idx, function(i) {
+        uMaxL(dati$all.nlev[[i]], kertype = bws$ukertype)
+      }, numeric(1))
+    }
+
+    ord_upper <- numeric(0)
+    if (any(dati$iord)) {
+      ord_idx <- which(dati$iord)
+      ord_upper <- vapply(ord_idx, function(i) {
+        oMaxL(dati$all.nlev[[i]], kertype = bws$okertype)
+      }, numeric(1))
+    }
+
+    npscoef_fast_eligible <- function(sbw) {
+      if (!identical(sbw$type, "fixed"))
+        return(FALSE)
+
+      bwv <- sbw$bandwidth[[1L]]
+      if (!length(bwv) || length(bwv) != length(dati$icon))
+        return(FALSE)
+
+      if (any(dati$icon)) {
+        bw_cont <- bwv[dati$icon]
+        if (any(!is.finite(bw_cont)) || any(bw_cont <= 0) ||
+            any(bw_cont < cont_hmin))
+          return(FALSE)
+      }
+
+      if (any(dati$iuno)) {
+        bw_uno <- bwv[dati$iuno]
+        ok_uno <- mapply(function(bw, upper) {
+          is.finite(bw) && abs(bw - upper) <= disc_upper_tol(upper)
+        }, bw = bw_uno, upper = uno_upper, SIMPLIFY = TRUE, USE.NAMES = FALSE)
+        if (!all(ok_uno))
+          return(FALSE)
+      }
+
+      if (any(dati$iord)) {
+        bw_ord <- bwv[dati$iord]
+        ok_ord <- mapply(function(bw, upper) {
+          is.finite(bw) && abs(bw - upper) <= disc_upper_tol(upper)
+        }, bw = bw_ord, upper = ord_upper, SIMPLIFY = TRUE, USE.NAMES = FALSE)
+        if (!all(ok_ord))
+          return(FALSE)
+      }
+
+      TRUE
+    }
+
     solve_cv_moment_system <- function(tyw, tww, W.eval.design, maxPenalty, Wz.eval = NULL) {
       neval <- ncol(tyw)
       ncoef <- nrow(tyw)
@@ -391,10 +481,14 @@ npscoefbw.scbandwidth <-
           maxPenalty <- sqrt(.Machine$double.xmax)
           cv_state <- new.env(parent = emptyenv())
           cv_state$console <- NULL
+          cv_state$fast_total <- 0L
+          cv_state$objective_fast <- FALSE
           overall.cv.ls <- function(param) {
+            cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
             if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
+            cv_state$objective_fast <- npscoef_fast_eligible(sbw)
 
             if (identical(reg.engine, "lc")) {
               tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
@@ -447,6 +541,9 @@ npscoefbw.scbandwidth <-
               fv <- maxPenalty
             }
 
+            if (isTRUE(cv_state$objective_fast))
+              cv_state$fast_total <- cv_state$fast_total + 1L
+
             return((if (is.finite(fv)) fv else maxPenalty))
 
           }
@@ -461,10 +558,12 @@ npscoefbw.scbandwidth <-
             scoef.loo.args$tzdat <- zdat
           
           partial.cv.ls <- function(param, partial.index) {
+            cv_state$objective_fast <- FALSE
             sbw <- apply_bw_to_scbw(bws, param)
 
             if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
+            cv_state$objective_fast <- npscoef_fast_eligible(sbw)
             
             if (backfit.iterate){
               bws$bw.fitted[,partial.index] <- param
@@ -492,6 +591,9 @@ npscoefbw.scbandwidth <-
             
 
             fv <- sum((partial.orig - partial.loo)^2)/n
+
+            if (isTRUE(cv_state$objective_fast))
+              cv_state$fast_total <- cv_state$fast_total + 1L
             
             cv_state$console <- printClear(cv_state$console)
             cv_state$console <- printPush(msg = paste("fval:",
@@ -677,7 +779,7 @@ npscoefbw.scbandwidth <-
           bws$fval = min.overall
           bws$ifval = best.overall
           bws$num.feval = num.feval.overall
-          bws$num.feval.fast = NA_integer_
+          bws$num.feval.fast = cv_state$fast_total
           bws$numimp = numimp.overall
           bws$fval.vector = value.overall
         }
