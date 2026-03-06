@@ -4,9 +4,16 @@
 }
 
 .np_semihat_make_regbw_args <- function(source, xdat, ydat, bw) {
-  regtype <- if (is.null(source$regtype)) "lc" else as.character(source$regtype)
   xdat <- toFrame(xdat)
   ncon.target <- sum(untangle(xdat)$icon)
+  spec <- npCanonicalConditionalRegSpec(
+    regtype = if (is.null(source$regtype)) "lc" else as.character(source$regtype),
+    basis = if (is.null(source$basis)) "glp" else as.character(source$basis),
+    degree = source$degree,
+    bernstein.basis = isTRUE(source$bernstein.basis),
+    ncon = ncon.target,
+    where = "npscoef"
+  )
 
   collapse_bound <- function(v, nm) {
     if (is.null(v))
@@ -32,17 +39,14 @@
     xdat = xdat,
     ydat = ydat,
     bws = as.double(bw),
-    regtype = regtype,
+    regtype = spec$regtype.engine,
     bandwidth.compute = FALSE
   )
 
   # Forward the full compatible estimator/bandwidth option contract.
-  if (!is.null(source$basis))
-    args$basis <- source$basis
-  if (!is.null(source$degree))
-    args$degree <- source$degree
-  if (!is.null(source$bernstein.basis))
-    args$bernstein.basis <- source$bernstein.basis
+  args$basis <- spec$basis.engine
+  args$degree <- spec$degree.engine
+  args$bernstein.basis <- spec$bernstein.basis.engine
   if (!is.null(source$method) && source$method %in% c("cv.ls", "cv.aic"))
     args$bwmethod <- source$method
   if (!is.null(source$scaling))
@@ -67,6 +71,18 @@
   args
 }
 
+.npscoef_canonical_spec <- function(source, zdat, where = "npscoef") {
+  zdat <- toFrame(zdat)
+  npCanonicalConditionalRegSpec(
+    regtype = if (is.null(source$regtype)) "lc" else as.character(source$regtype),
+    basis = if (is.null(source$basis)) "glp" else as.character(source$basis),
+    degree = source$degree,
+    bernstein.basis = isTRUE(source$bernstein.basis),
+    ncon = sum(untangle(zdat)$icon),
+    where = where
+  )
+}
+
 .np_indexhat_rbw <- function(bws, idx.train) {
   do.call(npregbw, .np_semihat_make_regbw_args(
     source = bws,
@@ -85,11 +101,11 @@
   ))
 }
 
-.npscoef_effective_weight_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
+.npscoef_lp_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE, where = "npscoef") {
   tzdat <- toFrame(tzdat)
   ezdat <- toFrame(ezdat)
   leave.one.out <- npValidateScalarLogical(leave.one.out, "leave.one.out")
-  regtype <- if (is.null(bws$regtype)) "lc" else bws$regtype
+  spec <- .npscoef_canonical_spec(source = bws, zdat = tzdat, where = where)
   same.eval <- isTRUE(all.equal(tzdat, ezdat, check.attributes = FALSE))
 
   if (leave.one.out && !same.eval) {
@@ -97,49 +113,31 @@
   }
 
   state <- list(
-    bws = bws,
-    regtype = regtype,
+    spec = spec,
     leave.one.out = leave.one.out
   )
 
-  if (identical(regtype, "lc")) {
+  if (identical(spec$regtype.engine, "lc")) {
     state$z.train <- adjustLevels(tzdat, bws$zdati)
     state$z.eval <- if (leave.one.out) state$z.train else adjustLevels(ezdat, bws$zdati, allowNewCells = TRUE)
     return(state)
   }
 
   rbw <- .npscoef_make_regbw(bws = bws, zdat = tzdat)
-  regtype.rbw <- if (is.null(rbw$regtype)) "lc" else as.character(rbw$regtype)
-  degree.rbw <- if (identical(regtype.rbw, "lc")) {
-    rep.int(0L, rbw$ncon)
-  } else if (identical(regtype.rbw, "ll")) {
-    rep.int(1L, rbw$ncon)
-  } else {
-    npValidateGlpDegree(regtype = "lp", degree = rbw$degree, ncon = rbw$ncon)
-  }
-  basis.rbw <- npValidateLpBasis(
-    regtype = "lp",
-    basis = if (is.null(rbw$basis)) "glp" else rbw$basis
-  )
-  bernstein.rbw <- npValidateGlpBernstein(
-    regtype = "lp",
-    bernstein.basis = isTRUE(rbw$bernstein.basis)
-  )
-
   z.train <- adjustLevels(tzdat, rbw$xdati)
   z.eval <- if (leave.one.out) z.train else adjustLevels(ezdat, rbw$xdati, allowNewCells = TRUE)
   W.train <- W.lp(
     xdat = z.train,
-    degree = degree.rbw,
-    basis = basis.rbw,
-    bernstein.basis = bernstein.rbw
+    degree = spec$degree.engine,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
   )
   W.eval <- W.lp(
     xdat = z.train,
     exdat = if (leave.one.out) NULL else z.eval,
-    degree = degree.rbw,
-    basis = basis.rbw,
-    bernstein.basis = bernstein.rbw
+    degree = spec$degree.engine,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
   )
   neval <- nrow(z.eval)
   if (!is.matrix(W.eval))
@@ -152,6 +150,27 @@
   state$z.eval <- z.eval
   state$W.train <- W.train
   state$W.eval <- W.eval
+  state
+}
+
+.npscoef_row_tensor_design <- function(X, Z) {
+  X <- as.matrix(X)
+  Z <- as.matrix(Z)
+  if (nrow(X) != nrow(Z))
+    stop("tensor design inputs must have the same number of rows", call. = FALSE)
+  do.call(cbind, lapply(seq_len(ncol(X)), function(j) Z * X[, j]))
+}
+
+.npscoef_effective_weight_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE) {
+  state <- .npscoef_lp_state(
+    bws = bws,
+    tzdat = tzdat,
+    ezdat = ezdat,
+    leave.one.out = leave.one.out,
+    where = "npscoefhat"
+  )
+  state$bws <- bws
+  state$regtype <- state$spec$regtype.engine
   state
 }
 
@@ -495,15 +514,9 @@ npscoefhat <-
     W.train <- cbind(1.0, X.train)
     W.eval <- cbind(1.0, X.eval)
 
-    kw <- .npscoef_weight_matrix(
-      bws = bws,
-      tzdat = tzdat,
-      ezdat = ezdat,
-      leave.one.out = leave.one.out
-    )
-
     n <- nrow(W.train)
-    m <- ncol(kw)
+    m <- nrow(W.eval)
+    spec <- .npscoef_canonical_spec(source = bws, zdat = tzdat, where = "npscoefhat")
 
     if (identical(output, "matrix")) {
       H <- matrix(0.0, nrow = m, ncol = n)
@@ -516,21 +529,71 @@ npscoefhat <-
       out <- matrix(0.0, nrow = m, ncol = ncol(yy))
     }
 
-    for (i in seq_len(m)) {
-      solve.out <- .npreghat_solve_eval(
-        W = W.train,
-        w.eval = W.eval[i, ],
-        k = kw[, i],
-        ridge.base = ridge
+    if (identical(spec$regtype.engine, "lc")) {
+      kw <- .npscoef_weight_matrix(
+        bws = bws,
+        tzdat = tzdat,
+        ezdat = ezdat,
+        leave.one.out = leave.one.out
       )
-      if (is.null(solve.out))
-        stop(sprintf("failed to solve local hat system at evaluation row %d", i))
-      h.row <- kw[, i] * drop(W.train %*% solve.out$v)
+      if (!is.matrix(kw))
+        kw <- matrix(kw, nrow = n)
 
-      if (identical(output, "matrix")) {
-        H[i, ] <- h.row
-      } else {
-        out[i, ] <- drop(crossprod(h.row, yy))
+      for (i in seq_len(m)) {
+        solve.out <- .npreghat_solve_eval(
+          W = W.train,
+          w.eval = W.eval[i, ],
+          k = kw[, i],
+          ridge.base = ridge
+        )
+        if (is.null(solve.out))
+          stop(sprintf("failed to solve local hat system at evaluation row %d", i))
+        h.row <- kw[, i] * drop(W.train %*% solve.out$v)
+
+        if (identical(output, "matrix")) {
+          H[i, ] <- h.row
+        } else {
+          out[i, ] <- drop(crossprod(h.row, yy))
+        }
+      }
+    } else {
+      lp_state <- .npscoef_lp_state(
+        bws = bws,
+        tzdat = tzdat,
+        ezdat = ezdat,
+        leave.one.out = leave.one.out,
+        where = "npscoefhat"
+      )
+      tensor.train <- .npscoef_row_tensor_design(W.train, lp_state$W.train)
+      tensor.eval <- .npscoef_row_tensor_design(W.eval, lp_state$W.eval)
+      kw <- .np_kernel_weights_direct(
+        txdat = lp_state$z.train,
+        exdat = lp_state$z.eval,
+        bws = lp_state$rbw,
+        bandwidth.divide = TRUE,
+        kernel.pow = 1.0
+      )
+      if (leave.one.out) {
+        for (ii in seq_len(min(nrow(kw), ncol(kw))))
+          kw[ii, ii] <- 0.0
+      }
+
+      for (i in seq_len(m)) {
+        solve.out <- .npreghat_solve_eval(
+          W = tensor.train,
+          w.eval = tensor.eval[i, ],
+          k = kw[, i],
+          ridge.base = ridge
+        )
+        if (is.null(solve.out))
+          stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", i))
+        h.row <- kw[, i] * drop(tensor.train %*% solve.out$v)
+
+        if (identical(output, "matrix")) {
+          H[i, ] <- h.row
+        } else {
+          out[i, ] <- drop(crossprod(h.row, yy))
+        }
       }
     }
 

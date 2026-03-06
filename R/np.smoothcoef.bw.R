@@ -166,7 +166,14 @@ npscoefbw.scbandwidth <-
     optim.abstol <- npValidatePositiveFiniteNumeric(optim.abstol, "optim.abstol")
     if (cv.iterate)
       cv.num.iterations <- npValidatePositiveInteger(cv.num.iterations, "cv.num.iterations")
-    if (!identical(regtype, "lc") && cv.iterate)
+    spec <- .npscoef_canonical_spec(
+      source = bws,
+      zdat = if (miss.z) xdat else zdat,
+      where = "npscoefbw"
+    )
+    reg.engine <- spec$regtype.engine
+
+    if (!identical(reg.engine, "lc") && cv.iterate)
       stop("cv.iterate currently supports regtype='lc' for npscoefbw")
 
     if (!(is.vector(ydat) || is.factor(ydat)))
@@ -271,6 +278,113 @@ npscoefbw.scbandwidth <-
       scbw
     }
 
+    solve_cv_moment_system <- function(tyw, tww, W.eval.design, maxPenalty, Wz.eval = NULL) {
+      neval <- ncol(tyw)
+      ncoef <- nrow(tyw)
+      pcoef <- ncol(W.eval.design)
+      coef.out <- matrix(maxPenalty, nrow = pcoef, ncol = neval)
+      ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+      ridge <- rep.int(ridge.grid[1L], neval)
+      ridge.idx <- rep.int(1L, neval)
+      doridge <- rep.int(TRUE, neval)
+
+      while(any(doridge)){
+        iloo <- seq_len(neval)[doridge]
+        for (ii in iloo) {
+          doridge[ii] <- FALSE
+          ridge.val <- ridge[ii]*tyw[,ii][1]/NZD(tww[,,ii][1,1])
+          theta.ii <- tryCatch(
+            solve(tww[,,ii] + diag(rep(ridge[ii], ncoef)),
+                  tyw[,ii] + c(ridge.val, rep(0, ncoef - 1))),
+            error = function(e) e
+          )
+          if (inherits(theta.ii, "error")) {
+            ridge.idx[ii] <- ridge.idx[ii] + 1L
+            if (ridge.idx[ii] <= length(ridge.grid)) {
+              ridge[ii] <- ridge.grid[ridge.idx[ii]]
+              doridge[ii] <- TRUE
+            }
+            theta.ii <- rep(maxPenalty, ncoef)
+          }
+
+          if (is.null(Wz.eval)) {
+            coef.out[,ii] <- theta.ii
+          } else {
+            coef.out[,ii] <- as.vector(crossprod(
+              Wz.eval[ii,],
+              matrix(theta.ii, nrow = ncol(Wz.eval), ncol = pcoef)
+            ))
+          }
+        }
+      }
+
+      coef.out
+    }
+
+    lp_full_coef <- function(sbw, leave.one.out.eval) {
+      lp_state <- .npscoef_lp_state(
+        bws = sbw,
+        tzdat = zdat.df,
+        ezdat = zdat.df,
+        leave.one.out = leave.one.out.eval,
+        where = "npscoefbw"
+      )
+      tensor.train <- .npscoef_row_tensor_design(W, lp_state$W.train)
+      ytensor <- cbind(ydat, tensor.train)
+      ksum.args <- list(
+        txdat = lp_state$z.train,
+        tydat = ytensor,
+        weights = ytensor,
+        bws = lp_state$rbw,
+        leave.one.out = leave.one.out.eval,
+        bandwidth.divide = TRUE
+      )
+      main.ks <- do.call(npksum, ksum.args)$ksum
+      tyw <- main.ks[-1L, 1L, , drop = FALSE]
+      if (length(dim(tyw)) == 3L)
+        dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
+      tww <- main.ks[-1L, -1L, , drop = FALSE]
+      solve_cv_moment_system(
+        tyw = tyw,
+        tww = tww,
+        W.eval.design = W,
+        Wz.eval = lp_state$W.eval,
+        maxPenalty = maxPenalty
+      )
+    }
+
+    lp_partial_coef <- function(sbw, wj, partial.y, leave.one.out.eval) {
+      lp_state <- .npscoef_lp_state(
+        bws = sbw,
+        tzdat = zdat.df,
+        ezdat = zdat.df,
+        leave.one.out = leave.one.out.eval,
+        where = "npscoefbw"
+      )
+      U <- lp_state$W.train * wj
+      yU <- cbind(partial.y, U)
+      ksum.args <- list(
+        txdat = lp_state$z.train,
+        tydat = yU,
+        weights = yU,
+        bws = lp_state$rbw,
+        leave.one.out = leave.one.out.eval,
+        bandwidth.divide = TRUE
+      )
+      main.ks <- do.call(npksum, ksum.args)$ksum
+      tyw <- main.ks[-1L, 1L, , drop = FALSE]
+      if (length(dim(tyw)) == 3L)
+        dim(tyw) <- c(dim(tyw)[1L], dim(tyw)[3L])
+      tww <- main.ks[-1L, -1L, , drop = FALSE]
+      as.vector(solve_cv_moment_system(
+        tyw = tyw,
+        tww = tww,
+        W.eval.design = matrix(1.0, nrow = n, ncol = 1L),
+        Wz.eval = lp_state$W.eval,
+        maxPenalty = maxPenalty
+      ))
+    }
+
     total.time <-
       system.time({
         if (bandwidth.compute){
@@ -282,37 +396,42 @@ npscoefbw.scbandwidth <-
             if (!validateBandwidthTF(sbw) || ((bws$nord+bws$nuno > 0) && any(param[!bws$icon] > 2.0*x.scale[!bws$icon])))
               return(maxPenalty)
 
-            tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
-                          leave.one.out = TRUE)$ksum
+            if (identical(reg.engine, "lc")) {
+              tww <- npksum(txdat = zdat, tydat = yW, weights = yW, bws = sbw,
+                            leave.one.out = TRUE)$ksum
 
-            mean.loo <- rep(maxPenalty,n)
-            ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
-            ridge <- rep.int(ridge.grid[1L], n)
-            ridge.idx <- rep.int(1L, n)
-            doridge <- rep.int(TRUE, n)
+              mean.loo <- rep(maxPenalty,n)
+              ridge.grid <- npRidgeSequenceAdditive(n.train = n, cap = 1.0)
+              ridge <- rep.int(ridge.grid[1L], n)
+              ridge.idx <- rep.int(1L, n)
+              doridge <- rep.int(TRUE, n)
 
-            nc <- ncol(tww[-1,-1,1])
+              nc <- ncol(tww[-1,-1,1])
 
-            while(any(doridge)){
-              iloo <- which(doridge)
-              for (ii in iloo) {
-                doridge[ii] <- FALSE
-                ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
-                beta.ii <- tryCatch(
-                  solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
-                        tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
-                  error = function(e) e
-                )
-                if (inherits(beta.ii, "error")) {
-                  ridge.idx[ii] <- ridge.idx[ii] + 1L
-                  if (ridge.idx[ii] <= length(ridge.grid)) {
-                    ridge[ii] <- ridge.grid[ridge.idx[ii]]
-                    doridge[ii] <- TRUE
+              while(any(doridge)){
+                iloo <- which(doridge)
+                for (ii in iloo) {
+                  doridge[ii] <- FALSE
+                  ridge.val <- ridge[ii]*tww[-1,1,ii][1]/NZD(tww[-1,-1,ii][1,1])
+                  beta.ii <- tryCatch(
+                    solve(tww[-1,-1,ii] + diag(rep(ridge[ii], nc)),
+                          tww[-1,1,ii] + c(ridge.val, rep(0, nc - 1))),
+                    error = function(e) e
+                  )
+                  if (inherits(beta.ii, "error")) {
+                    ridge.idx[ii] <- ridge.idx[ii] + 1L
+                    if (ridge.idx[ii] <= length(ridge.grid)) {
+                      ridge[ii] <- ridge.grid[ridge.idx[ii]]
+                      doridge[ii] <- TRUE
+                    }
+                    beta.ii <- rep(maxPenalty, nc)
                   }
-                  beta.ii <- rep(maxPenalty, nc)
+                  mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
                 }
-                mean.loo[ii] <- W[ii,, drop = FALSE] %*% beta.ii
               }
+            } else {
+              coef.loo <- lp_full_coef(sbw = sbw, leave.one.out.eval = TRUE)
+              mean.loo <- rowSums(W * t(coef.loo))
             }
 
             cv_state$console <- printClear(cv_state$console)
@@ -353,7 +472,7 @@ npscoefbw.scbandwidth <-
               partial.loo <- W[,partial.index]*scoef.loo$beta[,partial.index]
             } else {
               wj <- W[,partial.index]
-              if (identical(regtype, "lc")) {
+              if (identical(reg.engine, "lc")) {
                 tww <- npksum(txdat=zdat,
                               tydat=cbind(partial.orig * wj, wj * wj),
                               weights=cbind(partial.orig * wj, 1),
@@ -362,15 +481,12 @@ npscoefbw.scbandwidth <-
 
                 partial.loo <- wj * tww[1,2,]/NZD(tww[2,2,])
               } else {
-                kw <- .npscoef_weight_matrix(
-                  bws = sbw,
-                  tzdat = zdat.df,
-                  ezdat = zdat.df,
-                  leave.one.out = TRUE
+                partial.loo <- wj * lp_partial_coef(
+                  sbw = sbw,
+                  wj = wj,
+                  partial.y = partial.orig,
+                  leave.one.out.eval = TRUE
                 )
-                num <- as.vector(crossprod(kw, partial.orig * wj))
-                den <- as.vector(crossprod(kw, wj * wj))
-                partial.loo <- wj * num / NZD(den)
               }
             }
             
@@ -518,7 +634,7 @@ npscoefbw.scbandwidth <-
 
                   bws <- apply_bw_to_scbw(bws, bws$bw)
 
-                  if (identical(regtype, "lc")) {
+                  if (identical(reg.engine, "lc")) {
                     wj <- W[,j]
                     tww <- npksum(txdat=zdat,
                                   tydat=cbind(partial.orig * wj, wj * wj),
@@ -527,15 +643,12 @@ npscoefbw.scbandwidth <-
                     scoef$beta[,j] <- tww[1,2,]/NZD(tww[2,2,])
                   } else {
                     wj <- W[,j]
-                    kw <- .npscoef_weight_matrix(
-                      bws = bws,
-                      tzdat = zdat.df,
-                      ezdat = zdat.df,
-                      leave.one.out = FALSE
+                    scoef$beta[,j] <- lp_partial_coef(
+                      sbw = bws,
+                      wj = wj,
+                      partial.y = partial.orig,
+                      leave.one.out.eval = FALSE
                     )
-                    num <- as.vector(crossprod(kw, partial.orig * wj))
-                    den <- as.vector(crossprod(kw, wj * wj))
-                    scoef$beta[,j] <- num / NZD(den)
                   }
                   
                   bws$bw <- param.overall
