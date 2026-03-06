@@ -237,13 +237,42 @@ npplregbw.default =
     ## maintain z names and 'toFrame'
     zdat <- toFrame(zdat)
 
+    dots <- list(...)
+    dot.names <- names(dots)
+    regtype.arg <- if ("regtype" %in% dot.names) dots$regtype else "lc"
+    basis.arg <- if ("basis" %in% dot.names) dots$basis else "glp"
+    degree.arg <- if ("degree" %in% dot.names) dots$degree else NULL
+    bernstein.arg <- if ("bernstein.basis" %in% dot.names) dots$bernstein.basis else FALSE
+
+    spec <- npResolveCanonicalConditionalRegSpec(
+      mc.names = dot.names,
+      regtype = regtype.arg,
+      basis = basis.arg,
+      degree = degree.arg,
+      bernstein.basis = bernstein.arg,
+      ncon = sum(untangle(zdat)$icon),
+      where = "npplregbw"
+    )
+
+    reg.args <- list(
+      regtype = spec$regtype.engine,
+      basis = spec$basis.engine,
+      degree = spec$degree.engine,
+      bernstein.basis = spec$bernstein.basis.engine,
+      bandwidth.compute = FALSE
+    )
+
     plband = list()
-    plband$yzbw = npregbw(xdat = zdat, ydat = ydat,
-      bws = bws[1,], ..., bandwidth.compute = FALSE)
+    plband$yzbw = do.call(
+      npregbw,
+      c(list(xdat = zdat, ydat = ydat, bws = bws[1, ]), reg.args)
+    )
 
     for (i in seq_len(dim(xdat)[2]))
-      plband[[i+1]] = npregbw(xdat = zdat, ydat = xdat[,i],
-              bws = bws[i+1,], ..., bandwidth.compute = FALSE)
+      plband[[i+1]] = do.call(
+        npregbw,
+        c(list(xdat = zdat, ydat = xdat[, i], bws = bws[i + 1, ]), reg.args)
+      )
 
     tbw <- plbandwidth(bws = plband,
                        nobs = dim(xdat)[1],

@@ -406,6 +406,54 @@ npCanonicalConditionalRegSpec <- function(regtype = c("lc", "ll", "lp"),
   )
 }
 
+npResolveCanonicalConditionalRegSpec <- function(mc.names,
+                                                 regtype = c("lc", "ll", "lp"),
+                                                 basis = c("glp", "additive", "tensor"),
+                                                 degree = NULL,
+                                                 bernstein.basis = FALSE,
+                                                 ncon,
+                                                 where = "npreg") {
+  mc.names <- if (is.null(mc.names)) character(0) else as.character(mc.names)
+  regtype.named <- any(mc.names == "regtype")
+  basis.named <- any(mc.names == "basis")
+  degree.named <- any(mc.names == "degree")
+  bernstein.named <- any(mc.names == "bernstein.basis")
+
+  regtype <- if (regtype.named) match.arg(regtype) else "lc"
+
+  if (identical(regtype, "lc") && (basis.named || degree.named || bernstein.named)) {
+    stop("regtype='lc' does not accept basis/degree/bernstein.basis; use regtype='lp' for local-polynomial controls")
+  }
+
+  if (identical(regtype, "ll")) {
+    if (degree.named) {
+      degree <- npValidateGlpDegree(regtype = "lp", degree = degree, ncon = ncon)
+      if (!identical(as.integer(degree), rep.int(1L, ncon)))
+        stop("regtype='ll' uses canonical LP(degree=1, basis='glp'); remove 'degree' or use regtype='lp'")
+    }
+    if (basis.named) {
+      basis <- match.arg(basis)
+      if (!identical(basis, "glp"))
+        stop("regtype='ll' uses canonical basis='glp'; use regtype='lp' for alternate LP bases")
+    }
+    if (bernstein.named) {
+      bernstein.basis <- npValidateGlpBernstein(regtype = "lp",
+                                                bernstein.basis = bernstein.basis)
+      if (isTRUE(bernstein.basis))
+        stop("regtype='ll' uses canonical bernstein.basis=FALSE; use regtype='lp' for Bernstein LP")
+    }
+  }
+
+  npCanonicalConditionalRegSpec(
+    regtype = regtype,
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    ncon = ncon,
+    where = where
+  )
+}
+
 npRejectLegacyLpArgs <- function(dotnames, where = "npreg") {
   if (is.null(dotnames) || !length(dotnames))
     return(invisible(NULL))
