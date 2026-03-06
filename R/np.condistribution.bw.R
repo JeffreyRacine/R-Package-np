@@ -150,10 +150,6 @@ npcdistbw.condbandwidth <-
     memfac <- npValidatePositiveFiniteNumeric(memfac, "memfac")
     penalty.multiplier <- npValidatePositiveFiniteNumeric(penalty.multiplier, "penalty.multiplier")
     nmulti <- npValidateNonNegativeInteger(nmulti, "nmulti")
-    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
     if (length(bws$ybw) != dim(ydat)[2])
       stop(paste("length of bandwidth vector does not match number of columns of", "'ydat'"))
 
@@ -189,6 +185,10 @@ npcdistbw.condbandwidth <-
 
     if (all(goodrows==0))
       stop("Data has no rows without NAs")
+
+    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat = xdat[goodrows,,drop = FALSE]
     ydat = ydat[goodrows,,drop = FALSE]
@@ -236,6 +236,10 @@ npcdistbw.condbandwidth <-
     tbw$basis.engine <- spec$basis.engine
     tbw$degree.engine <- spec$degree.engine
     tbw$bernstein.basis.engine <- spec$bernstein.basis.engine
+    reg.code <- if (identical(spec$regtype.engine, "lp")) REGTYPE_LP else REGTYPE_LC
+    degree.code <- if (tbw$xncon > 0L) as.integer(spec$degree.engine) else integer(0)
+    basis.code <- as.integer(npLpBasisCode(spec$basis.engine))
+    bernstein.engine <- isTRUE(spec$bernstein.basis.engine)
 
     if(!is.null(gydat)){
       gydat <- toFrame(gydat)
@@ -362,6 +366,10 @@ npcdistbw.condbandwidth <-
                               as.integer(max(1, nmulti)),
                               as.integer(penalty_mode),
                               as.double(penalty.multiplier),
+                              as.integer(degree.code),
+                              as.integer(bernstein.engine),
+                              as.integer(basis.code),
+                              as.integer(reg.code),
                               as.double(cxker.bounds.c$lb),
                               as.double(cxker.bounds.c$ub),
                               as.double(cyker.bounds.c$lb),
@@ -520,10 +528,6 @@ npcdistbw.NULL <-
   function(xdat = stop("data 'xdat' missing"),
            ydat = stop("data 'ydat' missing"),
            bws, ...){
-    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
 
@@ -599,10 +603,6 @@ npcdistbw.default <-
            bernstein.basis = FALSE,
            ## dummy arguments for condbandwidth() function call
            ...){
-    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
-
     ## maintain x names and 'toFrame'
     xdat <- toFrame(xdat)
 
@@ -639,6 +639,9 @@ npcdistbw.default <-
       ncon = sum(x.info$icon),
       where = "npcdistbw"
     )
+    .npRmpi_require_active_slave_pool(where = "npcdistbw()")
+    if (.npRmpi_autodispatch_active())
+      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
     pregtype <- switch(spec$regtype,
                        lc = "Local-Constant",
                        ll = "Local-Linear",

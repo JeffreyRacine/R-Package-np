@@ -17,6 +17,23 @@ locate_jksum_c <- function() {
   hits[[1L]]
 }
 
+locate_kernelcv_c <- function() {
+  candidates <- c(
+    test_path("..", "..", "src", "kernelcv.c"),
+    test_path("..", "..", "..", "src", "kernelcv.c"),
+    file.path(Sys.getenv("R_PACKAGE_DIR", ""), "src", "kernelcv.c"),
+    file.path(Sys.getenv("R_PACKAGE_SOURCE", ""), "src", "kernelcv.c"),
+    file.path(getwd(), "src", "kernelcv.c"),
+    file.path(getwd(), "..", "src", "kernelcv.c")
+  )
+  candidates <- unique(candidates[nzchar(candidates)])
+  hits <- candidates[file.exists(candidates)]
+  if (length(hits) == 0L) {
+    return(NULL)
+  }
+  hits[[1L]]
+}
+
 test_that("CVLS LL/LP route predicate is centralized in one helper", {
   src_file <- locate_jksum_c()
   skip_if(is.null(src_file), "source file src/jksum.c unavailable in this test context")
@@ -61,4 +78,17 @@ test_that("conditional CV large-kernel gating remains X-only", {
   expect_true(any(grepl("Canonical conditional CV gate policy: large-kernel shortcuts are X-only", lines, fixed = TRUE)))
   expect_gte(sum(grepl("^\\s*gate_y_active = 0;\\s*$", lines)), 2L)
   expect_gte(sum(grepl("^\\s*gate_xy_active = 0;\\s*$", lines)), 1L)
+})
+
+test_that("conditional public LP CV routes stay thin kernelcv dispatches", {
+  src_file <- locate_kernelcv_c()
+  skip_if(is.null(src_file), "source file src/kernelcv.c unavailable in this test context")
+
+  lines <- readLines(src_file, warn = FALSE)
+
+  expect_equal(sum(grepl("int_ll_extern == LL_LP", lines, fixed = TRUE)), 3L)
+  expect_equal(sum(grepl("np_shadow_cv_con_density_ml\\(", lines)), 1L)
+  expect_equal(sum(grepl("np_shadow_cv_con_density_ls\\(", lines)), 1L)
+  expect_equal(sum(grepl("np_shadow_cv_con_distribution_ls\\(", lines)), 1L)
+  expect_equal(sum(grepl("kernel_estimate_regression_categorical_tree_np", lines, fixed = TRUE)), 0L)
 })
