@@ -9963,6 +9963,10 @@ double *cv){
     }
   }
 
+  /* Canonical conditional CV gate policy: large-kernel shortcuts are X-only.
+     Keep Y kernels on the standard path to avoid Y-side gate semantics drift. */
+  gate_y_active = 0;
+  
   
   *cv = 0;
 
@@ -11362,6 +11366,11 @@ double *cv){
       gate_xy_active = 1;
     }
   }
+
+  /* Canonical conditional CV gate policy: large-kernel shortcuts are X-only.
+     Keep Y/XY kernels on the standard path to avoid non-X gate semantics. */
+  gate_y_active = 0;
+  gate_xy_active = 0;
 
   // extra kernel bookkeeping for trees
   int KERNEL_XY[MAX(1,num_all_cvar)];
