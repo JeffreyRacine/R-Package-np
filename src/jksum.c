@@ -7428,22 +7428,12 @@ typedef struct {
   int ok;
 } NPRegCvLpResult;
 
-static inline int np_glp_all_degree_one(const int ncon){
-  int i;
-  if((vector_glp_degree_extern == NULL) || (ncon <= 0))
-    return 0;
-  for(i = 0; i < ncon; i++)
-    if(vector_glp_degree_extern[i] != 1)
-      return 0;
-  return 1;
-}
-
-static inline int np_reg_cv_use_degree1_rawbasis_kernel(const int int_ll,
-                                                        const int bwm,
-                                                        const int BANDWIDTH_reg,
-                                                        const int num_reg_continuous,
-                                                        const int ks_tree_use,
-                                                        const int use_bernstein){
+static inline int np_reg_cv_use_canonical_glp_fixed_kernel(const int int_ll,
+                                                           const int bwm,
+                                                           const int BANDWIDTH_reg,
+                                                           const int num_reg_continuous,
+                                                           const int ks_tree_use,
+                                                           const int use_bernstein){
   if((bwm != RBWM_CVLS) ||
      (BANDWIDTH_reg != BW_FIXED) ||
      ks_tree_use ||
@@ -7455,47 +7445,96 @@ static inline int np_reg_cv_use_degree1_rawbasis_kernel(const int int_ll,
 
   if((int_ll == LL_LP) &&
      (!use_bernstein) &&
-     (int_glp_basis_extern == 1) &&
-     np_glp_all_degree_one(num_reg_continuous))
+     (int_glp_basis_extern == 1))
     return 1;
 
   return 0;
 }
 
-/* Canonical degree-1 CVLS moments are accumulated in raw basis [1, X].
-   For numerical stability we solve the exactly equivalent centered local
-   system at x_j. This is a basis change only; estimator semantics remain
-   raw-basis/local-polynomial, and the fitted leave-one-out value is the
-   centered intercept. */
-static void np_reg_degree1_center_raw_moments_at_eval(const double *basis_j,
-                                                      const double *raw_s,
-                                                      const double *raw_t,
-                                                      const int p,
-                                                      MATRIX KWM,
-                                                      MATRIX XTKY){
-  int a, b;
+static inline double np_glp_binom_coeff(const int n, const int k){
+  int i, kk;
+  double c = 1.0;
+  if((k < 0) || (k > n))
+    return 0.0;
+  kk = MIN(k, n-k);
+  for(i = 1; i <= kk; i++)
+    c *= ((double)(n - kk + i))/((double)i);
+  return c;
+}
 
-  XTKY[0][0] = raw_t[0];
-  KWM[0][0] = raw_s[0];
-
-  for(a = 1; a < p; a++){
-    const double xja = basis_j[a];
-    XTKY[a][0] = raw_t[a] - xja*raw_t[0];
-    KWM[0][a] = raw_s[a] - xja*raw_s[0];
-    KWM[a][0] = KWM[0][a];
-  }
-
-  for(a = 1; a < p; a++){
-    const double xja = basis_j[a];
-    const double sa0 = raw_s[a*p];
-    for(b = 1; b < p; b++){
-      const double xjb = basis_j[b];
-      KWM[a][b] = raw_s[a*p+b] - xja*raw_s[b] - xjb*sa0 + xja*xjb*raw_s[0];
+static void np_glp_fill_shift_raw_from_center(const int ncon,
+                                              const int *terms,
+                                              const int nterms,
+                                              const double *xj,
+                                              MATRIX SHIFT){
+  int r, c, j;
+  for(r = 0; r < nterms; r++){
+    const int *alpha = terms + r*ncon;
+    for(c = 0; c < nterms; c++){
+      const int *beta = terms + c*ncon;
+      double coef = 1.0;
+      int ok = 1;
+      for(j = 0; j < ncon; j++){
+        const int aj = alpha[j];
+        const int bj = beta[j];
+        if(bj > aj){
+          ok = 0;
+          break;
+        }
+        coef *= np_glp_binom_coeff(aj, bj)*ipow(xj[j], aj - bj);
+      }
+      SHIFT[r][c] = ok ? coef : 0.0;
     }
   }
 }
 
-static NPRegCvLpResult np_regression_cv_degree1_rawbasis_fixed(
+static int np_glp_center_raw_moments_at_eval(const int ncon,
+                                             const int *terms,
+                                             const int nterms,
+                                             const double *xj,
+                                             const double *raw_s,
+                                             const double *raw_t,
+                                             MATRIX SHIFT,
+                                             MATRIX SHIFTINV,
+                                             MATRIX TMP,
+                                             MATRIX KWM,
+                                             MATRIX XTKY){
+  int a, b, c;
+
+  np_glp_fill_shift_raw_from_center(ncon, terms, nterms, xj, SHIFT);
+  if(mat_inv(SHIFT, SHIFTINV) == NULL)
+    return 0;
+
+  for(a = 0; a < nterms; a++){
+    double ta = 0.0;
+    for(c = 0; c < nterms; c++)
+      ta += SHIFTINV[a][c]*raw_t[c];
+    XTKY[a][0] = ta;
+  }
+
+  for(a = 0; a < nterms; a++){
+    for(b = 0; b < nterms; b++){
+      double sab = 0.0;
+      for(c = 0; c < nterms; c++)
+        sab += SHIFTINV[a][c]*raw_s[c*nterms+b];
+      TMP[a][b] = sab;
+    }
+  }
+
+  for(a = 0; a < nterms; a++){
+    for(b = 0; b < nterms; b++){
+      double sab = 0.0;
+      for(c = 0; c < nterms; c++)
+        sab += TMP[a][c]*SHIFTINV[b][c];
+      KWM[a][b] = sab;
+    }
+  }
+
+  return 1;
+}
+
+static NPRegCvLpResult np_regression_cv_glp_rawbasis_fixed(
+    const int int_ll,
     const int num_obs,
     const int num_reg_unordered,
     const int num_reg_ordered,
@@ -7512,41 +7551,65 @@ static NPRegCvLpResult np_regression_cv_degree1_rawbasis_fixed(
     int *operator,
     double *lambda,
     double **matrix_bandwidth,
-    double *diag_s_out,
-    double *diag_t_out,
-    double *diag_beta_out,
-    double *diag_fit_out){
+    const int *glp_terms_in,
+    const int glp_nterms_in,
+    double **glp_basis_in){
   NPRegCvLpResult result = {DBL_MAX, 0.0, 0};
-  const int p = num_reg_continuous + 1;
-  const int pp = p*p;
   const double epsilon = 1.0/(double)MAX(1, num_obs);
   int i, j, a, b, l, sf_flag = 0;
-  double *moments = NULL, *rhs = NULL, *basis = NULL, *kw = NULL;
+  int nterms = glp_nterms_in;
+  const int *terms = glp_terms_in;
+  double **basis = glp_basis_in;
+  int *terms_local = NULL;
+  double **basis_local = NULL;
+  double *ones = NULL;
+  double *moments = NULL, *rhs = NULL, *kw = NULL, *xj = NULL;
   double *vsf = NULL;
   double **train_u = NULL, **train_o = NULL, **train_c = NULL;
   MATRIX eval_u = NULL, eval_o = NULL, eval_c = NULL;
   MATRIX matrix_bandwidth_eval = NULL;
-  MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL;
+  MATRIX KWM = NULL, XTKY = NULL, DELTA = NULL, SHIFT = NULL, SHIFTINV = NULL, TMP = NULL;
   double mean_dummy = 0.0;
 
   if((num_obs <= 0) || (num_reg_continuous <= 0))
     return result;
 
+  if(int_ll == LL_LL){
+    nterms = num_reg_continuous + 1;
+    terms_local = (int *)calloc((size_t)nterms*(size_t)num_reg_continuous, sizeof(int));
+    basis_local = (double **)malloc((size_t)nterms*sizeof(double *));
+    ones = alloc_vecd(num_obs);
+    if((terms_local == NULL) || (basis_local == NULL) || (ones == NULL))
+      goto cleanup_glp_cv;
+    for(i = 0; i < num_obs; i++)
+      ones[i] = 1.0;
+    basis_local[0] = ones;
+    for(l = 0; l < num_reg_continuous; l++){
+      terms_local[(l+1)*num_reg_continuous + l] = 1;
+      basis_local[l+1] = matrix_X_continuous[l];
+    }
+    terms = terms_local;
+    basis = basis_local;
+  }
+
+  if((terms == NULL) || (basis == NULL) || (nterms <= 0))
+    goto cleanup_glp_cv;
+
   if((sf_flag = (int_LARGE_SF == 0))){
     int_LARGE_SF = 1;
     vsf = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
     if(vsf == NULL)
-      goto cleanup_degree1_cv;
+      goto cleanup_glp_cv;
     for(l = 0; l < num_reg_continuous; l++)
       vsf[l] = matrix_bandwidth[l][0];
   } else {
     vsf = vector_scale_factor;
   }
 
-  moments = (double *)calloc((size_t)num_obs, (size_t)pp*sizeof(double));
-  rhs = (double *)calloc((size_t)num_obs, (size_t)p*sizeof(double));
-  basis = (double *)calloc((size_t)num_obs, (size_t)p*sizeof(double));
+  moments = (double *)calloc((size_t)num_obs, (size_t)nterms*(size_t)nterms*sizeof(double));
+  rhs = (double *)calloc((size_t)num_obs, (size_t)nterms*sizeof(double));
   kw = alloc_vecd(MAX(1, num_obs - 1));
+  xj = (double *)malloc((size_t)num_reg_continuous*sizeof(double));
   train_u = (double **)malloc((size_t)MAX(1, num_reg_unordered)*sizeof(double *));
   train_o = (double **)malloc((size_t)MAX(1, num_reg_ordered)*sizeof(double *));
   train_c = (double **)malloc((size_t)MAX(1, num_reg_continuous)*sizeof(double *));
@@ -7554,25 +7617,21 @@ static NPRegCvLpResult np_regression_cv_degree1_rawbasis_fixed(
   eval_o = mat_creat(num_reg_ordered, 1, UNDEFINED);
   eval_c = mat_creat(num_reg_continuous, 1, UNDEFINED);
   matrix_bandwidth_eval = alloc_tmatd(1, num_reg_continuous);
-  KWM = mat_creat(p, p, UNDEFINED);
-  XTKY = mat_creat(p, 1, UNDEFINED);
-  DELTA = mat_creat(p, 1, UNDEFINED);
+  KWM = mat_creat(nterms, nterms, UNDEFINED);
+  XTKY = mat_creat(nterms, 1, UNDEFINED);
+  DELTA = mat_creat(nterms, 1, UNDEFINED);
+  SHIFT = mat_creat(nterms, nterms, UNDEFINED);
+  SHIFTINV = mat_creat(nterms, nterms, UNDEFINED);
+  TMP = mat_creat(nterms, nterms, UNDEFINED);
 
-  if((moments == NULL) || (rhs == NULL) || (basis == NULL) || (kw == NULL) ||
+  if((moments == NULL) || (rhs == NULL) || (kw == NULL) || (xj == NULL) ||
      (train_u == NULL) || (train_o == NULL) || (train_c == NULL) ||
      (eval_u == NULL) || (eval_o == NULL) || (eval_c == NULL) ||
-     (matrix_bandwidth_eval == NULL) || (KWM == NULL) || (XTKY == NULL) || (DELTA == NULL))
-    goto cleanup_degree1_cv;
-
-  for(j = 0; j < num_obs; j++){
-    double * const bj = basis + (size_t)j*(size_t)p;
-    bj[0] = 1.0;
-    for(l = 0; l < num_reg_continuous; l++)
-      bj[l+1] = matrix_X_continuous[l][j];
-  }
+     (matrix_bandwidth_eval == NULL) || (KWM == NULL) || (XTKY == NULL) ||
+     (DELTA == NULL) || (SHIFT == NULL) || (SHIFTINV == NULL) || (TMP == NULL))
+    goto cleanup_glp_cv;
 
   for(j = 0; j < num_obs - 1; j++){
-    const double * const bj = basis + (size_t)j*(size_t)p;
     const double yj = vector_Y[j];
     const int nsub = num_obs - j - 1;
 
@@ -7643,29 +7702,28 @@ static NPRegCvLpResult np_regression_cv_degree1_rawbasis_fixed(
                                   NULL,
                                   kw,
                                   NULL) != 0)
-      goto cleanup_degree1_cv;
+      goto cleanup_glp_cv;
 
     for(i = 0; i < nsub; i++){
       const int ii = j + 1 + i;
       const double w = kw[i];
-      const double * const bi = basis + (size_t)ii*(size_t)p;
       const double yi = vector_Y[ii];
-      double * const sj = moments + (size_t)j*(size_t)pp;
-      double * const si = moments + (size_t)ii*(size_t)pp;
-      double * const tj = rhs + (size_t)j*(size_t)p;
-      double * const ti = rhs + (size_t)ii*(size_t)p;
+      double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
+      double * const si = moments + (size_t)ii*(size_t)nterms*(size_t)nterms;
+      double * const tj = rhs + (size_t)j*(size_t)nterms;
+      double * const ti = rhs + (size_t)ii*(size_t)nterms;
 
       if(w == 0.0)
         continue;
 
-      for(a = 0; a < p; a++){
-        const double bia = bi[a];
-        const double bja = bj[a];
+      for(a = 0; a < nterms; a++){
+        const double bia = basis[a][ii];
+        const double bja = basis[a][j];
         tj[a] += w*bia*yi;
         ti[a] += w*bja*yj;
-        for(b = 0; b < p; b++){
-          sj[a*p+b] += w*bia*bi[b];
-          si[a*p+b] += w*bja*bj[b];
+        for(b = 0; b < nterms; b++){
+          sj[a*nterms+b] += w*bia*basis[b][ii];
+          si[a*nterms+b] += w*bja*basis[b][j];
         }
       }
     }
@@ -7675,40 +7733,42 @@ static NPRegCvLpResult np_regression_cv_degree1_rawbasis_fixed(
   result.traceH = 0.0;
 
   for(j = 0; j < num_obs; j++){
-    const double * const bj = basis + (size_t)j*(size_t)p;
-    const double * const sj = moments + (size_t)j*(size_t)pp;
-    const double * const tj = rhs + (size_t)j*(size_t)p;
+    const double * const sj = moments + (size_t)j*(size_t)nterms*(size_t)nterms;
+    const double * const tj = rhs + (size_t)j*(size_t)nterms;
     double nepsilon = 0.0;
     double fit = 0.0;
 
-    np_reg_degree1_center_raw_moments_at_eval(bj, sj, tj, p, KWM, XTKY);
+    for(l = 0; l < num_reg_continuous; l++)
+      xj[l] = matrix_X_continuous[l][j];
+
+    if(!np_glp_center_raw_moments_at_eval(num_reg_continuous,
+                                          terms,
+                                          nterms,
+                                          xj,
+                                          sj,
+                                          tj,
+                                          SHIFT,
+                                          SHIFTINV,
+                                          TMP,
+                                          KWM,
+                                          XTKY))
+      goto cleanup_glp_cv;
 
     while(mat_solve(KWM, XTKY, DELTA) == NULL){
-      for(a = 0; a < p; a++)
+      for(a = 0; a < nterms; a++)
         KWM[a][a] += epsilon;
       nepsilon += epsilon;
       if(nepsilon > 128.0*epsilon)
-        goto cleanup_degree1_cv;
+        goto cleanup_glp_cv;
     }
 
     XTKY[0][0] += nepsilon*XTKY[0][0]/NZD_POS(KWM[0][0]);
     if(nepsilon > 0.0){
       if(mat_solve(KWM, XTKY, DELTA) == NULL)
-        goto cleanup_degree1_cv;
+        goto cleanup_glp_cv;
     }
 
     fit = DELTA[0][0];
-
-    if(j == 0){
-      if(diag_s_out != NULL)
-        for(a = 0; a < pp; a++) diag_s_out[a] = sj[a];
-      if(diag_t_out != NULL)
-        for(a = 0; a < p; a++) diag_t_out[a] = tj[a];
-      if(diag_beta_out != NULL)
-        for(a = 0; a < p; a++) diag_beta_out[a] = DELTA[a][0];
-      if(diag_fit_out != NULL)
-        diag_fit_out[0] = fit;
-    }
 
     {
       const double dy = vector_Y[j] - fit;
@@ -7718,7 +7778,7 @@ static NPRegCvLpResult np_regression_cv_degree1_rawbasis_fixed(
 
   result.ok = 1;
 
-cleanup_degree1_cv:
+cleanup_glp_cv:
   if(train_u != NULL) free(train_u);
   if(train_o != NULL) free(train_o);
   if(train_c != NULL) free(train_c);
@@ -7729,10 +7789,16 @@ cleanup_degree1_cv:
   if(KWM != NULL) mat_free(KWM);
   if(XTKY != NULL) mat_free(XTKY);
   if(DELTA != NULL) mat_free(DELTA);
+  if(SHIFT != NULL) mat_free(SHIFT);
+  if(SHIFTINV != NULL) mat_free(SHIFTINV);
+  if(TMP != NULL) mat_free(TMP);
   if(moments != NULL) free(moments);
   if(rhs != NULL) free(rhs);
-  if(basis != NULL) free(basis);
+  if(xj != NULL) free(xj);
   if(kw != NULL) free(kw);
+  if(terms_local != NULL) free(terms_local);
+  if(basis_local != NULL) free(basis_local);
+  if(ones != NULL) free(ones);
   if(sf_flag){
     int_LARGE_SF = 0;
     free(vsf);
@@ -7812,13 +7878,13 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
     goto cleanup_lp_cv;
 
   {
-    const int use_degree1_kernel =
-      np_reg_cv_use_degree1_rawbasis_kernel(LL_LP,
-                                            bwm,
-                                            BANDWIDTH_reg,
-                                            num_reg_continuous,
-                                            ks_tree_use,
-                                            use_bernstein);
+    const int use_canonical_glp_kernel =
+      np_reg_cv_use_canonical_glp_fixed_kernel(LL_LP,
+                                               bwm,
+                                               BANDWIDTH_reg,
+                                               num_reg_continuous,
+                                               ks_tree_use,
+                                               use_bernstein);
     const int all_large_gate = np_reg_cv_all_large_gate(BANDWIDTH_reg,
                                                         num_obs,
                                                         num_reg_continuous,
@@ -7837,27 +7903,27 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
                                                         &ov_cont_k0,
                                                         &ov_cont_from_cache);
 
-    if(use_degree1_kernel && !all_large_gate){
-      result = np_regression_cv_degree1_rawbasis_fixed(num_obs,
-                                                       num_reg_unordered,
-                                                       num_reg_ordered,
-                                                       num_reg_continuous,
-                                                       matrix_X_unordered,
-                                                       matrix_X_ordered,
-                                                       matrix_X_continuous,
-                                                       vector_Y,
-                                                       vector_scale_factor,
-                                                       num_categories,
-                                                       kernel_c,
-                                                       kernel_u,
-                                                       kernel_o,
-                                                       operator,
-                                                       lambda,
-                                                       matrix_bandwidth,
-                                                       NULL,
-                                                       NULL,
-                                                       NULL,
-                                                       NULL);
+    if(use_canonical_glp_kernel && !all_large_gate){
+      result = np_regression_cv_glp_rawbasis_fixed(LL_LP,
+                                                   num_obs,
+                                                   num_reg_unordered,
+                                                   num_reg_ordered,
+                                                   num_reg_continuous,
+                                                   matrix_X_unordered,
+                                                   matrix_X_ordered,
+                                                   matrix_X_continuous,
+                                                   vector_Y,
+                                                   vector_scale_factor,
+                                                   num_categories,
+                                                   kernel_c,
+                                                   kernel_u,
+                                                   kernel_o,
+                                                   operator,
+                                                   lambda,
+                                                   matrix_bandwidth,
+                                                   glp_terms,
+                                                   glp_nterms,
+                                                   basis);
       goto cleanup_lp_cv;
     }
 
@@ -8613,35 +8679,35 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
     }
   }
 
-  if(np_reg_cv_use_degree1_rawbasis_kernel(int_ll_cv,
-                                           bwm,
-                                           BANDWIDTH_reg,
-                                           num_reg_continuous,
-                                           ks_tree_use,
-                                           0)){
-    NPRegCvLpResult degree1_result =
-      np_regression_cv_degree1_rawbasis_fixed(num_obs,
-                                              num_reg_unordered,
-                                              num_reg_ordered,
+  if(np_reg_cv_use_canonical_glp_fixed_kernel(int_ll_cv,
+                                              bwm,
+                                              BANDWIDTH_reg,
                                               num_reg_continuous,
-                                              matrix_X_unordered,
-                                              matrix_X_ordered,
-                                              matrix_X_continuous,
-                                              vector_Y,
-                                              vector_scale_factor,
-                                              num_categories,
-                                              kernel_c,
-                                              kernel_u,
-                                              kernel_o,
-                                              operator,
-                                              lambda,
-                                              matrix_bandwidth,
-                                              NULL,
-                                              NULL,
-                                              NULL,
-                                              NULL);
-    cv = degree1_result.cv;
-    traceH = degree1_result.traceH;
+                                              ks_tree_use,
+                                              0)){
+    NPRegCvLpResult glp_result =
+      np_regression_cv_glp_rawbasis_fixed(int_ll_cv,
+                                          num_obs,
+                                          num_reg_unordered,
+                                          num_reg_ordered,
+                                          num_reg_continuous,
+                                          matrix_X_unordered,
+                                          matrix_X_ordered,
+                                          matrix_X_continuous,
+                                          vector_Y,
+                                          vector_scale_factor,
+                                          num_categories,
+                                          kernel_c,
+                                          kernel_u,
+                                          kernel_o,
+                                          operator,
+                                          lambda,
+                                          matrix_bandwidth,
+                                          NULL,
+                                          0,
+                                          NULL);
+    cv = glp_result.cv;
+    traceH = glp_result.traceH;
     goto finish_cv_path;
   }
 

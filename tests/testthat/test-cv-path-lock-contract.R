@@ -41,6 +41,10 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
   lines <- readLines(src_file, warn = FALSE)
 
   expect_true(any(grepl("np_reg_cv_use_symmetric_dropone_path", lines, fixed = TRUE)))
+  expect_true(any(grepl("np_reg_cv_use_canonical_glp_fixed_kernel", lines, fixed = TRUE)))
+  expect_equal(sum(grepl("np_reg_cv_use_degree1_rawbasis_kernel", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("np_regression_cv_degree1_rawbasis_fixed", lines, fixed = TRUE)), 0L)
+  expect_equal(sum(grepl("np_reg_degree1_center_raw_moments_at_eval", lines, fixed = TRUE)), 0L)
 
   raw_pred <- "(bwm == RBWM_CVLS) || ks_tree_use || (BANDWIDTH_reg == BW_ADAP_NN)"
   # Exactly one raw predicate instance is allowed (the helper definition itself).
@@ -53,6 +57,9 @@ test_that("CVLS LL/LP route predicate is centralized in one helper", {
 
   helper_calls <- sum(grepl("np_reg_cv_use_symmetric_dropone_path\\(", lines))
   expect_gte(helper_calls, 3L)
+
+  canonical_glp_calls <- sum(grepl("np_reg_cv_use_canonical_glp_fixed_kernel\\(", lines))
+  expect_gte(canonical_glp_calls, 3L)
 })
 
 test_that("density CV tree-bypass predicate is centralized in one helper", {
