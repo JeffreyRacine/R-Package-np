@@ -7135,8 +7135,6 @@ void np_glp_cv_clear_extern(void){
   np_glp_cv_cache_clear();
 }
 
-static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale_factor,
-                                                            double *cv);
 
 typedef struct {
   int ready;
@@ -9800,8 +9798,9 @@ double *cv){
   np_gate_ctx_clear(&gate_x_ctx);
   np_gate_ctx_clear(&gate_y_ctx);
 
-  if((BANDWIDTH_den == BW_FIXED) && (int_ll_extern == LL_LP))
-    return np_conditional_distribution_cvls_fixed_lp_stream(vector_scale_factor, cv);
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+     (int_ll_extern == LL_LP))
+    return np_conditional_distribution_cvls_lp_stream(vector_scale_factor, cv);
 
   int indy;
   int64_t i,j,l,iwx,iwy;
@@ -15396,13 +15395,6 @@ cleanup_cdist_lp_stream:
   if(xrow != NULL) free(xrow);
   if(yint != NULL) free(yint);
   return status;
-}
-
-static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale_factor,
-                                                            double *cv){
-  if(BANDWIDTH_den_extern != BW_FIXED)
-    return 1;
-  return np_conditional_distribution_cvls_lp_stream(vector_scale_factor, cv);
 }
 
 static int np_shadow_conditional_build_y_matrix(const int *operator_y,

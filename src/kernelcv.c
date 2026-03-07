@@ -410,7 +410,9 @@ double cv_func_con_distribution_categorical_ls(double *vector_scale_factor)
 /* Compute the cross-validation function */
     start = clock();
 
-    if((int_ll_extern == LL_LP) && (BANDWIDTH_den_extern != BW_FIXED))
+    if((int_ll_extern == LL_LP) &&
+       (BANDWIDTH_den_extern != BW_FIXED) &&
+       (BANDWIDTH_den_extern != BW_GEN_NN))
       error("internal error: contained LP conditional distribution cv.ls route reached kernelcv");
 
     if(np_kernel_estimate_con_distribution_categorical_leave_one_out_ls_cv(KERNEL_den_extern,

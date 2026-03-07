@@ -126,8 +126,39 @@ test_that("public npcdistbw cv.ls fixed LP/LL route activates with ll == lp pari
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
 })
 
-test_that("public npcdistbw cv.ls generalized-nn LP route stays contained", {
+test_that("public npcdistbw cv.ls generalized-nn LP route activates with ll == lp parity", {
   set.seed(172)
+  n <- 36L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+  bw.lp <- npcdistbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+
+  expect_true(is.finite(bw.ll$fval))
+  expect_true(is.finite(bw.lp$fval))
+  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
+})
+
+test_that("public npcdistbw cv.ls adaptive-nn LP route stays contained", {
+  set.seed(173)
   n <- 36L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
@@ -140,7 +171,7 @@ test_that("public npcdistbw cv.ls generalized-nn LP route stays contained", {
       regtype = "lp",
       basis = "glp",
       degree = degree,
-      bwtype = "generalized_nn",
+      bwtype = "adaptive_nn",
       bwmethod = "cv.ls",
       nmulti = 0
     ),

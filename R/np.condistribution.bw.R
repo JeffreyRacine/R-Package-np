@@ -290,7 +290,7 @@ npcdistbw.condbandwidth <-
     if (bandwidth.compute){
       if (identical(tbw$regtype.engine, "lp") &&
           identical(tbw$method, "cv.ls") &&
-          !identical(tbw$type, "fixed"))
+          identical(tbw$type, "adaptive_nn"))
         stop(
           "public npcdistbw() LP/LL cv.ls route is temporarily disabled pending low-memory shadow CV remediation"
         )
