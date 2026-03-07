@@ -420,7 +420,7 @@ test_that("shadow generalized-nn X-side row helper stays row-streamed", {
 
 test_that("fixed-bandwidth cvml LP stream avoids dense row storage", {
   lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
-  start <- grep("^static int np_conditional_density_cvml_fixed_lp_stream\\(", lines)
+  start <- grep("^int np_conditional_density_cvml_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
   expect_length(start, 1L)
