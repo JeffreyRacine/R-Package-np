@@ -9927,7 +9927,8 @@ double *cv){
   np_gate_ctx_clear(&gate_x_ctx);
   np_gate_ctx_clear(&gate_y_ctx);
 
-  if((BANDWIDTH_den == BW_FIXED) && (int_ll_extern == LL_LP))
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+     (int_ll_extern == LL_LP))
     return np_conditional_distribution_cvls_lp_stream(vector_scale_factor, cv);
 
   int indy;
@@ -15439,7 +15440,8 @@ int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
     return 1;
-  if(BANDWIDTH_den_extern != BW_FIXED)
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_train));
