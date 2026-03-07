@@ -69,6 +69,25 @@ npsigtest.npregression <-
     return(ev)
   }
 
+.np_npsig_bootstrap_bw_reselect <- function(xdat,
+                                            ydat,
+                                            bws.seed,
+                                            extra.args = list(),
+                                            bootstrap.iter,
+                                            bw.fun = npregbw) {
+  bw.args <- if (length(extra.args)) extra.args else list()
+  bw.args[c("xdat", "ydat", "bws")] <- NULL
+
+  user.nmulti <- !is.null(names(bw.args)) &&
+    "nmulti" %in% names(bw.args) &&
+    !is.null(bw.args$nmulti)
+
+  if (!user.nmulti && bootstrap.iter > 1L)
+    bw.args$nmulti <- 1L
+
+  do.call(bw.fun, c(list(xdat = xdat, ydat = ydat, bws = bws.seed), bw.args))
+}
+
 npsigtest.rbandwidth <- function(bws,
                                  xdat = stop("data xdat missing"),
                                  ydat = stop("data ydat missing"),
@@ -102,6 +121,7 @@ npsigtest.rbandwidth <- function(bws,
   ## Save seed prior to setting
 
   seed.state <- .np_seed_enter(random.seed)
+  extra.args <- list(...)
 
 
   boot.type <- match.arg(boot.type)
@@ -225,6 +245,9 @@ npsigtest.rbandwidth <- function(bws,
       
     }
     
+    if(boot.type=="II")
+      bws.boot.prev <- bws.original
+
     for (i.star in seq_len(boot.num)) {
       
       if(boot.type=="I") {
@@ -279,27 +302,33 @@ npsigtest.rbandwidth <- function(bws,
 
       if(boot.type=="II") {
 
-        ## For Bootstrap II method, starting values are taken from
-        ## bandwidths passed in (bws.original). We then conduct
-        ## cross-validation for the bootstrap sample and use only the
-        ## new bw for variable i along with the original bandwidths
-        ## for the remaining variables
+        ## Bootstrap II reuses the previous bootstrap optimum as a
+        ## hot start and drops to nmulti=1 after the first
+        ## re-selection unless the user explicitly supplied nmulti.
 
         if(boot.method == "pairwise") {
 
-          bws.boot <- npregbw(xdat = xdat.star,
-                              ydat = ydat.star,
-                              bws = bws.original,
-                              ...)
+          bws.boot <- .np_npsig_bootstrap_bw_reselect(
+            xdat = xdat.star,
+            ydat = ydat.star,
+            bws.seed = bws.boot.prev,
+            extra.args = extra.args,
+            bootstrap.iter = i.star
+          )
 
         } else {
 
-          bws.boot <- npregbw(xdat = xdat,
-                              ydat = ydat.star,
-                              bws = bws.original,
-                              ...)
+          bws.boot <- .np_npsig_bootstrap_bw_reselect(
+            xdat = xdat,
+            ydat = ydat.star,
+            bws.seed = bws.boot.prev,
+            extra.args = extra.args,
+            bootstrap.iter = i.star
+          )
 
         }
+
+        bws.boot.prev <- bws.boot
 
         ## Copy the new cross-validated bandwidth for variable i into
         ## bw.original and use this below.
@@ -432,6 +461,9 @@ npsigtest.rbandwidth <- function(bws,
         
       }
       
+      if(boot.type=="II")
+        bws.boot.prev <- bws.original
+
       for (i.star in seq_len(boot.num)) {
         
         if(boot.type=="I") {
@@ -496,27 +528,33 @@ npsigtest.rbandwidth <- function(bws,
         
         if(boot.type=="II") {
           
-          ## For Bootstrap II method, starting values are taken from
-          ## bandwidths passed in (bws.original). We then conduct
-          ## cross-validation for the bootstrap sample and use only the
-          ## new bw for variable i along with the original bandwidths
-          ## for the remaining variables
+          ## Bootstrap II reuses the previous bootstrap optimum as a
+          ## hot start and drops to nmulti=1 after the first
+          ## re-selection unless the user explicitly supplied nmulti.
           
           if(boot.method == "pairwise") {
             
-            bws.boot <- npregbw(xdat = xdat.star,
-                                ydat = ydat.star,
-                                bws = bws.original,
-                                ...)
+            bws.boot <- .np_npsig_bootstrap_bw_reselect(
+              xdat = xdat.star,
+              ydat = ydat.star,
+              bws.seed = bws.boot.prev,
+              extra.args = extra.args,
+              bootstrap.iter = i.star
+            )
             
           } else {
             
-            bws.boot <- npregbw(xdat = xdat,
-                                ydat = ydat.star,
-                                bws = bws.original,
-                                ...)
+            bws.boot <- .np_npsig_bootstrap_bw_reselect(
+              xdat = xdat,
+              ydat = ydat.star,
+              bws.seed = bws.boot.prev,
+              extra.args = extra.args,
+              bootstrap.iter = i.star
+            )
             
           }
+
+          bws.boot.prev <- bws.boot
           
           ## Copy the new cross-validated bandwidth for variable i into
           ## bw.original and use this below.
