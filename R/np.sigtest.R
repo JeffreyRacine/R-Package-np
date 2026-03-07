@@ -105,6 +105,36 @@
   seeds
 }
 
+.npRmpi_npsig_gather_rank_chunks <- function(gathered, size) {
+  size <- as.integer(size)[1L]
+  if (is.na(size) || size < 1L)
+    stop("invalid MPI gather size")
+
+  if (is.matrix(gathered)) {
+    if (!identical(ncol(gathered), size))
+      stop("npsigtest MPI gather returned malformed matrix output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.array(gathered)) {
+    dims <- dim(gathered)
+    if (length(dims) < 2L || !identical(dims[[length(dims)]], size))
+      stop("npsigtest MPI gather returned malformed array output", call. = FALSE)
+    return(lapply(seq_len(size), function(j) gathered[, j]))
+  }
+
+  if (is.list(gathered)) {
+    if (!identical(length(gathered), size))
+      stop("npsigtest MPI gather returned malformed list output", call. = FALSE)
+    return(gathered)
+  }
+
+  chunks <- as.list(gathered)
+  if (!identical(length(chunks), size))
+    stop("npsigtest MPI gather returned malformed atomic output", call. = FALSE)
+  chunks
+}
+
 .npRmpi_npsig_parallel_boot_values_collective <- function(boot.seeds,
                                                           worker,
                                                           comm = 1L) {
@@ -129,8 +159,7 @@
   gathered <- mpi.gather.Robj(local.vals, root = 0L, comm = comm)
   if (rank == 0L) {
     out <- numeric(n.boot)
-    if (!is.list(gathered))
-      gathered <- as.list(gathered)
+    gathered <- .npRmpi_npsig_gather_rank_chunks(gathered = gathered, size = size)
     for (r in seq_len(size)) {
       idx.r <- seq.int(r, n.boot, by = size)
       vals.r <- as.numeric(gathered[[r]])

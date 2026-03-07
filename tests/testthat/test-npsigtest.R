@@ -5,6 +5,19 @@ test_that("npsigtest orchestrates locally without whole-call autodispatch", {
   expect_false(grepl("\\.npRmpi_manual_distributed_call\\(", body.txt))
 })
 
+test_that("npsigtest gather helper preserves per-rank chunks when mpi.gather.Robj simplifies to a matrix", {
+  gather.fun <- getFromNamespace(".npRmpi_npsig_gather_rank_chunks", "npRmpi")
+  gathered <- matrix(1:9, nrow = 3L, ncol = 3L)
+
+  chunks <- gather.fun(gathered = gathered, size = 3L)
+
+  expect_type(chunks, "list")
+  expect_identical(length(chunks), 3L)
+  expect_identical(chunks[[1L]], 1:3)
+  expect_identical(chunks[[2L]], 4:6)
+  expect_identical(chunks[[3L]], 7:9)
+})
+
 test_that("npsigtest basic functionality works with autodispatch", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
