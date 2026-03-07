@@ -214,14 +214,6 @@ npcdensbw.conbandwidth <-
     penalty_mode <- (if (invalid.penalty == "baseline") 1L else 0L)
 
     if (bandwidth.compute){
-      if (identical(tbw$regtype.engine, "lp") &&
-          identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-          identical(tbw$type, "adaptive_nn"))
-        stop(sprintf(
-          "public npcdensbw() LP/LL %s route is temporarily disabled pending low-memory shadow CV remediation",
-          tbw$method
-        ))
-
       myopti = list(num_obs_train = nrow,
         iMultistart = (if (nmulti==0) IMULTI_FALSE else IMULTI_TRUE),
         iNum_Multistart = nmulti,
