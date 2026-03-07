@@ -477,3 +477,116 @@ test_that("nearest-neighbor plot helpers run for regression and density/distribu
     expect_type(run_plot(cdbw, xdat = x, ydat = yframe, view = "fixed"), "list")
   }
 })
+
+test_that("nearest-neighbor regression and ksum helpers match explicit resample refits", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = FALSE)
+
+  set.seed(32905)
+  n <- 40
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(2 * pi * x1) + 0.5 * x2 + rnorm(n, sd = 0.08)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(12), , drop = FALSE]
+  ty <- data.frame(y = runif(n))
+  ey <- data.frame(y = seq(0.1, 0.9, length.out = 12))
+  B <- 7L
+  counts <- rmultinom(n = B, size = n, prob = rep.int(1 / n, n))
+
+  reg.fast <- getFromNamespace(".np_inid_boot_from_regression", "npRmpi")
+  fast.u <- getFromNamespace(".np_inid_boot_from_ksum_unconditional", "npRmpi")
+  fast.c <- getFromNamespace(".np_inid_boot_from_ksum_conditional", "npRmpi")
+
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw.val <- if (identical(bt, "adaptive_nn")) c(5, 5) else c(1, 1)
+    rbw <- npregbw(
+      xdat = tx,
+      ydat = y,
+      regtype = "ll",
+      bws = bw.val,
+      bwtype = bt,
+      bandwidth.compute = FALSE
+    )
+    reg.out <- reg.fast(
+      xdat = tx,
+      exdat = ex,
+      bws = rbw,
+      ydat = y,
+      B = B,
+      counts = counts
+    )
+    reg.explicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+    for (b in seq_len(B)) {
+      idx <- rep.int(seq_len(n), counts[, b])
+      reg.explicit[b, ] <- npreg(
+        txdat = tx[idx, , drop = FALSE],
+        tydat = y[idx],
+        exdat = ex,
+        bws = rbw,
+        gradients = FALSE,
+        warn.glp.gradient = FALSE
+      )$mean
+    }
+    expect_equal(reg.out$t, reg.explicit, tolerance = 1e-10, info = paste(bt, "npreg"))
+    expect_equal(
+      reg.out$t0,
+      npreg(txdat = tx, tydat = y, exdat = ex, bws = rbw, gradients = FALSE, warn.glp.gradient = FALSE)$mean,
+      tolerance = 1e-10,
+      info = paste(bt, "npreg-t0")
+    )
+
+    ubw <- npudensbw(dat = data.frame(x = x1), bws = bw.val[1L], bwtype = bt, bandwidth.compute = FALSE)
+    uout <- fast.u(
+      xdat = data.frame(x = x1),
+      exdat = data.frame(x = ex$x1),
+      bws = ubw,
+      B = B,
+      operator = "normal",
+      counts = counts
+    )
+    uexplicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+    for (b in seq_len(B)) {
+      idx <- rep.int(seq_len(n), counts[, b])
+      uexplicit[b, ] <- npudens(
+        tdat = data.frame(x = x1)[idx, , drop = FALSE],
+        edat = data.frame(x = ex$x1),
+        bws = ubw
+      )$dens
+    }
+    expect_equal(uout$t, uexplicit, tolerance = 1e-10, info = paste(bt, "npudens"))
+
+    cbw <- npcdensbw(
+      xdat = data.frame(x = x1),
+      ydat = ty,
+      bws = rep.int(bw.val[1L], 2L),
+      bwtype = bt,
+      bandwidth.compute = FALSE
+    )
+    cout <- fast.c(
+      xdat = data.frame(x = x1),
+      ydat = ty,
+      exdat = data.frame(x = ex$x1),
+      eydat = ey,
+      bws = cbw,
+      B = B,
+      cdf = FALSE,
+      counts = counts
+    )
+    cexplicit <- matrix(NA_real_, nrow = B, ncol = nrow(ex))
+    for (b in seq_len(B)) {
+      idx <- rep.int(seq_len(n), counts[, b])
+      cexplicit[b, ] <- npcdens(
+        txdat = data.frame(x = x1)[idx, , drop = FALSE],
+        tydat = ty[idx, , drop = FALSE],
+        exdat = data.frame(x = ex$x1),
+        eydat = ey,
+        bws = cbw
+      )$condens
+    }
+    expect_equal(cout$t, cexplicit, tolerance = 1e-10, info = paste(bt, "npcdens"))
+  }
+})

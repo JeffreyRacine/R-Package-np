@@ -1246,6 +1246,192 @@
   out
 }
 
+.np_counts_to_indices <- function(counts.col) {
+  rep.int(seq_along(counts.col), as.integer(counts.col))
+}
+
+.np_inid_boot_from_regression_exact <- function(xdat,
+                                                exdat,
+                                                bws,
+                                                ydat,
+                                                B,
+                                                counts = NULL,
+                                                counts.drawer = NULL,
+                                                gradients = FALSE,
+                                                gradient.order = 1L,
+                                                slice.index = 1L) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  ydat <- as.double(ydat)
+  B <- as.integer(B)
+
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (length(ydat) != n)
+    stop("length of ydat must match training rows in exact regression bootstrap helper")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid exact regression bootstrap dimensions")
+
+  fit_one <- function(x.train, y.train) {
+    fit <- .np_regression_direct(
+      bws = bws,
+      txdat = x.train,
+      tydat = y.train,
+      exdat = exdat,
+      gradients = isTRUE(gradients),
+      gradient.order = gradient.order
+    )
+    if (isTRUE(gradients))
+      as.vector(fit$grad[, slice.index])
+    else
+      as.vector(fit$mean)
+  }
+
+  t0 <- fit_one(x.train = xdat, y.train = ydat)
+  nout <- length(t0)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
+  tmat <- matrix(NA_real_, nrow = B, ncol = nout)
+
+  compute_chunk <- function(counts.chunk) {
+    counts.chunk <- as.matrix(counts.chunk)
+    bsz <- ncol(counts.chunk)
+    out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+    for (jj in seq_len(bsz)) {
+      idx <- .np_counts_to_indices(counts.chunk[, jj])
+      out[jj, ] <- fit_one(
+        x.train = xdat[idx, , drop = FALSE],
+        y.train = ydat[idx]
+      )
+    }
+    out
+  }
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    if (.npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-regression-exact-counts"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        compute_chunk(counts.chunk = counts.mat[, start:stopi, drop = FALSE])
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-regression-exact-counts",
+        profile.where = "mpi.applyLB:inid-regression-exact-counts",
+        comm = 1L,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          compute_chunk = compute_chunk,
+          .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
+        )
+      )
+    }
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-regression-exact-counts fan-out returned incomplete results",
+        what = "inid-regression-exact-counts"
+      )
+  } else {
+    if (!is.null(counts.drawer) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-regression-exact-block"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- .np_inid_counts_matrix(
+          n = n,
+          B = as.integer(task$bsz),
+          counts = counts.drawer(start, stopi)
+        )
+        compute_chunk(counts.chunk = counts.chunk)
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-regression-exact-block",
+        profile.where = "mpi.applyLB:inid-regression-exact-block",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          counts.drawer = counts.drawer,
+          compute_chunk = compute_chunk,
+          .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
+        )
+      )
+    }
+
+    if (!is.null(counts.drawer) && anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-regression-exact-block fan-out returned incomplete results",
+        what = "inid-regression-exact-block"
+      )
+
+    prob <- rep.int(1 / n, n)
+    if (anyNA(tmat) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-regression-exact"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        set.seed(as.integer(task$seed))
+        bsz <- as.integer(task$bsz)
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        compute_chunk(counts.chunk = counts.chunk)
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-regression-exact",
+        profile.where = "mpi.applyLB:inid-regression-exact",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          prob = prob,
+          compute_chunk = compute_chunk,
+          .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
+        )
+      )
+    }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-regression-exact fan-out returned incomplete results",
+        what = "inid-regression-exact"
+      )
+  }
+
+  if (any(!is.finite(t0)) || any(!is.finite(tmat)))
+    stop("inid regression exact helper path produced non-finite values")
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_boot_from_regression <- function(xdat,
                                           exdat,
                                           bws,
@@ -1268,6 +1454,20 @@
     stop("length of ydat must match training rows")
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid inid regression bootstrap dimensions")
+  if (isTRUE(gradients) || !identical(bws$type, "fixed")) {
+    return(.np_inid_boot_from_regression_exact(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bws,
+      ydat = ydat,
+      B = B,
+      counts = counts,
+      counts.drawer = counts.drawer,
+      gradients = gradients,
+      gradient.order = gradient.order,
+      slice.index = slice.index
+    ))
+  }
   ridge.grid <- npRidgeSequenceFromBase(n.train = n, ridge.base = ridge, cap = 1.0)
 
   regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
@@ -1275,15 +1475,14 @@
 
   if (isTRUE(gradients)) {
     fit0 <- .npRmpi_with_local_bootstrap(
-      suppressWarnings(npreg(
+      .np_regression_direct(
+        bws = bws,
         txdat = xdat,
         tydat = ydat,
         exdat = exdat,
-        bws = bws,
         gradients = TRUE,
-        gradient.order = gradient.order,
-        warn.glp.gradient = FALSE
-      ))
+        gradient.order = gradient.order
+      )
     )
     t0 <- fit0$grad[, slice.index]
 
@@ -1303,15 +1502,14 @@
       out <- .npRmpi_with_local_bootstrap({
         for (jj in seq_len(bsz)) {
           idx <- rep.int(seq_len(n), as.integer(counts.chunk[, jj]))
-          fit.b <- suppressWarnings(npreg(
+          fit.b <- .np_regression_direct(
+            bws = bws,
             txdat = xdat[idx, , drop = FALSE],
             tydat = ydat[idx],
             exdat = exdat,
-            bws = bws,
             gradients = TRUE,
-            gradient.order = gradient.order,
-            warn.glp.gradient = FALSE
-          ))
+            gradient.order = gradient.order
+          )
           out[jj, ] <- fit.b$grad[, slice.index]
         }
         out
@@ -1621,7 +1819,8 @@
         comm = 1L,
         required.bindings = list(
           counts.mat = counts.mat,
-          compute_chunk = compute_chunk
+          compute_chunk = compute_chunk,
+          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
         )
       )
     }
@@ -1662,7 +1861,8 @@
         required.bindings = list(
           n = n,
           counts.drawer = counts.drawer,
-          compute_chunk = compute_chunk
+          compute_chunk = compute_chunk,
+          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
         )
       )
     }
@@ -1700,7 +1900,8 @@
         required.bindings = list(
           n = n,
           prob = prob,
-          compute_chunk = compute_chunk
+          compute_chunk = compute_chunk,
+          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
         )
       )
     }
@@ -2292,6 +2493,19 @@
   stop(sprintf("%s returned unexpected matrix shape", where))
 }
 
+.np_ksum_unconditional_eval_exact <- function(xdat, exdat, bws, operator) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  kw <- .np_plot_kernel_weights_direct(
+    bws = bws,
+    txdat = xdat,
+    exdat = exdat,
+    operator = operator,
+    where = "direct unconditional exact kernel weights"
+  )
+  colSums(kw) / nrow(xdat)
+}
+
 .np_ksum_kernel_weights_matrix <- function(kernel.weights, ntrain, neval, where = "ksum helper path") {
   if (is.null(kernel.weights))
     stop(sprintf("%s did not return kernel weights", where))
@@ -2437,6 +2651,204 @@
   )
 }
 
+.np_inid_boot_from_ksum_unconditional_exact <- function(xdat,
+                                                        exdat,
+                                                        bws,
+                                                        B,
+                                                        operator,
+                                                        counts = NULL,
+                                                        counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  exdat <- toFrame(exdat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid unconditional exact bootstrap dimensions")
+
+  fit_one <- function(x.train) {
+    .np_ksum_unconditional_eval_exact(
+      xdat = x.train,
+      exdat = exdat,
+      bws = bws,
+      operator = operator
+    )
+  }
+
+  t0 <- fit_one(x.train = xdat)
+  nout <- length(t0)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
+  tmat <- matrix(NA_real_, nrow = B, ncol = nout)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    if (.npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-unconditional-exact-counts"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- as.matrix(counts.mat[, start:stopi, drop = FALSE])
+        bsz <- ncol(counts.chunk)
+        out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+        for (jj in seq_len(bsz)) {
+          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          out[jj, ] <- .np_ksum_unconditional_eval_exact(
+            xdat = xdat[idx, , drop = FALSE],
+            exdat = exdat,
+            bws = bws,
+            operator = operator
+          )
+        }
+        out
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-ksum-unconditional-exact-counts",
+        profile.where = "mpi.applyLB:inid-ksum-unconditional-exact-counts",
+        comm = 1L,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          operator = operator,
+          n = n,
+          nout = nout,
+          .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
+        )
+      )
+    }
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-unconditional-exact-counts fan-out returned incomplete results",
+        what = "inid-ksum-unconditional-exact-counts"
+      )
+  } else {
+    if (!is.null(counts.drawer) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-unconditional-exact-block"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- .np_inid_counts_matrix(
+          n = n,
+          B = as.integer(task$bsz),
+          counts = counts.drawer(start, stopi)
+        )
+        bsz <- ncol(counts.chunk)
+        out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+        for (jj in seq_len(bsz)) {
+          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          out[jj, ] <- .np_ksum_unconditional_eval_exact(
+            xdat = xdat[idx, , drop = FALSE],
+            exdat = exdat,
+            bws = bws,
+            operator = operator
+          )
+        }
+        out
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-ksum-unconditional-exact-block",
+        profile.where = "mpi.applyLB:inid-ksum-unconditional-exact-block",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          counts.drawer = counts.drawer,
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          operator = operator,
+          nout = nout,
+          .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
+        )
+      )
+    }
+
+    if (!is.null(counts.drawer) && anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-unconditional-exact-block fan-out returned incomplete results",
+        what = "inid-ksum-unconditional-exact-block"
+      )
+
+    prob <- rep.int(1 / n, n)
+    if (anyNA(tmat) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-unconditional-exact"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        set.seed(as.integer(task$seed))
+        bsz <- as.integer(task$bsz)
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+        for (jj in seq_len(bsz)) {
+          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          out[jj, ] <- .np_ksum_unconditional_eval_exact(
+            xdat = xdat[idx, , drop = FALSE],
+            exdat = exdat,
+            bws = bws,
+            operator = operator
+          )
+        }
+        out
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-ksum-unconditional-exact",
+        profile.where = "mpi.applyLB:inid-ksum-unconditional-exact",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          prob = prob,
+          xdat = xdat,
+          exdat = exdat,
+          bws = bws,
+          operator = operator,
+          nout = nout,
+          .np_ksum_unconditional_eval_exact = .np_ksum_unconditional_eval_exact
+        )
+      )
+    }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-unconditional-exact fan-out returned incomplete results",
+        what = "inid-ksum-unconditional-exact"
+      )
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_boot_from_ksum_unconditional <- function(xdat,
                                                   exdat,
                                                   bws,
@@ -2444,6 +2856,18 @@
                                                   operator,
                                                   counts = NULL,
                                                   counts.drawer = NULL) {
+  if (!identical(bws$type, "fixed")) {
+    return(.np_inid_boot_from_ksum_unconditional_exact(
+      xdat = xdat,
+      exdat = exdat,
+      bws = bws,
+      B = B,
+      operator = operator,
+      counts = counts,
+      counts.drawer = counts.drawer
+    ))
+  }
+
   xdat <- toFrame(xdat)
   exdat <- toFrame(exdat)
   B <- as.integer(B)
@@ -2453,7 +2877,7 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid unconditional inid bootstrap dimensions")
 
-  # Use npksum.default directly to avoid nested autodispatch in MPI plot helpers.
+  # Use direct local kernel weights to avoid nested MPI-aware npksum() calls in helper fanout.
   kw <- .np_plot_kernel_weights_direct(
     bws = bws,
     txdat = xdat,
@@ -2619,6 +3043,276 @@
   )
 }
 
+.np_ksum_conditional_eval_exact <- function(xdat,
+                                            ydat,
+                                            exdat,
+                                            eydat,
+                                            kbx,
+                                            kbxy,
+                                            cdf) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  xop <- rep.int("normal", ncol(xdat))
+  yop <- rep.int(if (cdf) "integral" else "normal", ncol(ydat))
+  xyop <- c(xop, yop)
+  xydat <- data.frame(xdat, ydat)
+  exydat <- data.frame(exdat, eydat)
+
+  den <- colSums(.np_plot_kernel_weights_direct(
+    bws = kbx,
+    txdat = xdat,
+    exdat = exdat,
+    operator = xop,
+    where = "direct conditional exact denominator kernel weights"
+  )) / nrow(xdat)
+  num <- colSums(.np_plot_kernel_weights_direct(
+    bws = kbxy,
+    txdat = xydat,
+    exdat = exydat,
+    operator = xyop,
+    where = "direct conditional exact numerator kernel weights"
+  )) / nrow(xydat)
+
+  num / pmax(den, .Machine$double.eps)
+}
+
+.np_inid_boot_from_ksum_conditional_exact <- function(xdat,
+                                                      ydat,
+                                                      exdat,
+                                                      eydat,
+                                                      bws,
+                                                      B,
+                                                      cdf,
+                                                      counts = NULL,
+                                                      counts.drawer = NULL) {
+  xdat <- toFrame(xdat)
+  ydat <- toFrame(ydat)
+  exdat <- toFrame(exdat)
+  eydat <- toFrame(eydat)
+  B <- as.integer(B)
+  n <- nrow(xdat)
+  neval <- nrow(exdat)
+
+  if (nrow(ydat) != n || nrow(eydat) != neval)
+    stop("conditional exact bootstrap helper requires aligned x/y training and evaluation rows")
+  if (n < 1L || neval < 1L || B < 1L)
+    stop("invalid conditional exact bootstrap dimensions")
+  if (!.np_con_inid_ksum_eligible(bws))
+    return(NULL)
+
+  kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
+                  error = function(e) NULL)
+  kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat),
+                   error = function(e) NULL)
+  if (is.null(kbx) || is.null(kbxy))
+    return(NULL)
+
+  fit_one <- function(x.train, y.train) {
+    .np_ksum_conditional_eval_exact(
+      xdat = x.train,
+      ydat = y.train,
+      exdat = exdat,
+      eydat = eydat,
+      kbx = kbx,
+      kbxy = kbxy,
+      cdf = cdf
+    )
+  }
+
+  t0 <- fit_one(x.train = xdat, y.train = ydat)
+  nout <- length(t0)
+  chunk.size <- .npRmpi_bootstrap_tune_chunk_size(
+    B = B,
+    chunk.size = .np_inid_chunk_size(n = n, B = B),
+    comm = 1L,
+    include.master = TRUE
+  )
+  tmat <- matrix(NA_real_, nrow = B, ncol = nout)
+
+  if (!is.null(counts)) {
+    counts.mat <- .np_inid_counts_matrix(n = n, B = B, counts = counts)
+    if (.npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-conditional-exact-counts"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- as.matrix(counts.mat[, start:stopi, drop = FALSE])
+        bsz <- ncol(counts.chunk)
+        out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+        for (jj in seq_len(bsz)) {
+          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          out[jj, ] <- .np_ksum_conditional_eval_exact(
+            xdat = xdat[idx, , drop = FALSE],
+            ydat = ydat[idx, , drop = FALSE],
+            exdat = exdat,
+            eydat = eydat,
+            kbx = kbx,
+            kbxy = kbxy,
+            cdf = cdf
+          )
+        }
+        out
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-ksum-conditional-exact-counts",
+        profile.where = "mpi.applyLB:inid-ksum-conditional-exact-counts",
+        comm = 1L,
+        required.bindings = list(
+          counts.mat = counts.mat,
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          eydat = eydat,
+          kbx = kbx,
+          kbxy = kbxy,
+          cdf = cdf,
+          n = n,
+          nout = nout,
+          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
+        )
+      )
+    }
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-conditional-exact-counts fan-out returned incomplete results",
+        what = "inid-ksum-conditional-exact-counts"
+      )
+  } else {
+    if (!is.null(counts.drawer) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-conditional-exact-block"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        start <- as.integer(task$start)
+        stopi <- start + as.integer(task$bsz) - 1L
+        counts.chunk <- .np_inid_counts_matrix(
+          n = n,
+          B = as.integer(task$bsz),
+          counts = counts.drawer(start, stopi)
+        )
+        bsz <- ncol(counts.chunk)
+        out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+        for (jj in seq_len(bsz)) {
+          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          out[jj, ] <- .np_ksum_conditional_eval_exact(
+            xdat = xdat[idx, , drop = FALSE],
+            ydat = ydat[idx, , drop = FALSE],
+            exdat = exdat,
+            eydat = eydat,
+            kbx = kbx,
+            kbxy = kbxy,
+            cdf = cdf
+          )
+        }
+        out
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-ksum-conditional-exact-block",
+        profile.where = "mpi.applyLB:inid-ksum-conditional-exact-block",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          counts.drawer = counts.drawer,
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          eydat = eydat,
+          kbx = kbx,
+          kbxy = kbxy,
+          cdf = cdf,
+          nout = nout,
+          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
+        )
+      )
+    }
+
+    if (!is.null(counts.drawer) && anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-conditional-exact-block fan-out returned incomplete results",
+        what = "inid-ksum-conditional-exact-block"
+      )
+
+    prob <- rep.int(1 / n, n)
+    if (anyNA(tmat) &&
+        .npRmpi_bootstrap_fanout_enabled(
+          comm = 1L,
+          n = n,
+          B = B,
+          chunk.size = chunk.size,
+          what = "inid-ksum-conditional-exact"
+        )) {
+      tasks <- .npRmpi_bootstrap_chunk_tasks(B = B, chunk.size = chunk.size)
+      worker <- function(task) {
+        set.seed(as.integer(task$seed))
+        bsz <- as.integer(task$bsz)
+        counts.chunk <- stats::rmultinom(n = bsz, size = n, prob = prob)
+        out <- matrix(NA_real_, nrow = bsz, ncol = nout)
+        for (jj in seq_len(bsz)) {
+          idx <- rep.int(seq_len(n), counts.chunk[, jj])
+          out[jj, ] <- .np_ksum_conditional_eval_exact(
+            xdat = xdat[idx, , drop = FALSE],
+            ydat = ydat[idx, , drop = FALSE],
+            exdat = exdat,
+            eydat = eydat,
+            kbx = kbx,
+            kbxy = kbxy,
+            cdf = cdf
+          )
+        }
+        out
+      }
+      tmat <- .npRmpi_bootstrap_run_fanout(
+        tasks = tasks,
+        worker = worker,
+        ncol.out = nout,
+        what = "inid-ksum-conditional-exact",
+        profile.where = "mpi.applyLB:inid-ksum-conditional-exact",
+        comm = 1L,
+        required.bindings = list(
+          n = n,
+          prob = prob,
+          xdat = xdat,
+          ydat = ydat,
+          exdat = exdat,
+          eydat = eydat,
+          kbx = kbx,
+          kbxy = kbxy,
+          cdf = cdf,
+          nout = nout,
+          .np_ksum_conditional_eval_exact = .np_ksum_conditional_eval_exact
+        )
+      )
+    }
+
+    if (anyNA(tmat))
+      .npRmpi_bootstrap_fail_or_fallback(
+        msg = "inid-ksum-conditional-exact fan-out returned incomplete results",
+        what = "inid-ksum-conditional-exact"
+      )
+  }
+
+  list(t = tmat, t0 = t0)
+}
+
 .np_inid_boot_from_ksum_conditional <- function(xdat,
                                                 ydat,
                                                 exdat,
@@ -2628,6 +3322,20 @@
                                                 cdf,
                                                 counts = NULL,
                                                 counts.drawer = NULL) {
+  if (!identical(bws$type, "fixed")) {
+    return(.np_inid_boot_from_ksum_conditional_exact(
+      xdat = xdat,
+      ydat = ydat,
+      exdat = exdat,
+      eydat = eydat,
+      bws = bws,
+      B = B,
+      cdf = cdf,
+      counts = counts,
+      counts.drawer = counts.drawer
+    ))
+  }
+
   xdat <- toFrame(xdat)
   ydat <- toFrame(ydat)
   exdat <- toFrame(exdat)
@@ -2642,7 +3350,7 @@
     stop("invalid conditional inid bootstrap dimensions")
   if (!.np_con_inid_ksum_eligible(bws))
     return(NULL)
-  # Use npksum.default directly to avoid nested autodispatch in MPI plot helpers.
+  # Use direct local kernel weights to avoid nested MPI-aware npksum() calls in helper fanout.
   kbx <- tryCatch(.np_con_make_kbandwidth_x(bws = bws, xdat = xdat),
                   error = function(e) NULL)
   kbxy <- tryCatch(.np_con_make_kbandwidth_xy(bws = bws, xdat = xdat, ydat = ydat),
@@ -4721,8 +5429,7 @@ compute.bootstrap.errors.sibandwidth =
       })
     } else if (is.inid) {
       inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
-        !isTRUE(gradients) &&
-        identical(bws$type, "fixed")
+        !isTRUE(gradients)
       if (!isTRUE(inid.helper.ok)) {
         stop("inid single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
       } else {
@@ -4746,8 +5453,7 @@ compute.bootstrap.errors.sibandwidth =
       }
     } else if (is.block) {
       block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled()) &&
-        !isTRUE(gradients) &&
-        identical(bws$type, "fixed")
+        !isTRUE(gradients)
       if (!isTRUE(block.helper.ok)) {
         stop("fixed/geom single-index helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
       } else {

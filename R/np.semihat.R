@@ -92,6 +92,228 @@
   ))
 }
 
+.np_indexhat_numeric_y <- function(y) {
+  if (is.factor(y) || is.vector(y))
+    return(matrix(as.double(y), ncol = 1L))
+
+  as.matrix(y)
+}
+
+.np_indexhat_kbw <- function(bws, idx.train) {
+  collapse_bound <- function(v, nm) {
+    if (is.null(v))
+      return(NULL)
+    vv <- as.double(v)
+    if (length(vv) <= 1L)
+      return(vv)
+    uu <- unique(vv)
+    if (length(uu) == 1L)
+      return(uu)
+    stop(sprintf("cannot collapse %s with %d distinct values to scalar helper bound",
+                 nm, length(uu)),
+         call. = FALSE)
+  }
+
+  kbandwidth(
+    bw = c(bws$bw),
+    bwtype = bws$type,
+    ckertype = bws$ckertype,
+    ckerorder = bws$ckerorder,
+    ckerbound = bws$ckerbound,
+    ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
+    ckerub = collapse_bound(bws$ckerub, "ckerub"),
+    nobs = nrow(idx.train),
+    xdati = untangle(idx.train),
+    ydati = bws$ydati,
+    xnames = "index",
+    ynames = bws$ynames
+  )
+}
+
+.np_indexhat_core <- function(bws,
+                              idx.train,
+                              idx.eval,
+                              y = NULL,
+                              output = c("matrix", "apply"),
+                              ridge = 0.0) {
+  output <- match.arg(output)
+  kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
+  spec <- .npindex_resolve_spec(bws, where = "npindexhat")
+  regtype <- spec$regtype.engine
+
+  kw <- .np_kernel_weights_direct(
+    bws = kbw,
+    txdat = idx.train,
+    exdat = idx.eval,
+    bandwidth.divide = TRUE,
+    kernel.pow = 1.0
+  )
+
+  if (!is.matrix(kw))
+    kw <- matrix(kw, nrow = nrow(idx.train))
+
+  ntrain <- nrow(idx.train)
+  neval <- nrow(idx.eval)
+  if (nrow(kw) != ntrain || ncol(kw) != neval)
+    stop("single-index hat kernel-weight matrix shape mismatch", call. = FALSE)
+
+  if (!is.null(y)) {
+    y <- .np_indexhat_numeric_y(y)
+    if (nrow(y) != ntrain)
+      stop("number of rows in 'y' must equal number of training rows")
+  }
+
+  if (identical(regtype, "lc")) {
+    den <- pmax(colSums(kw), .Machine$double.eps)
+    if (identical(output, "matrix"))
+      return(sweep(t(kw), 1L, den, "/", check.margin = FALSE))
+
+    out <- sweep(t(kw), 1L, den, "/", check.margin = FALSE) %*% y
+    return(if (ncol(out) == 1L) as.vector(out) else out)
+  }
+
+  degree <- if (identical(regtype, "ll")) {
+    1L
+  } else {
+    spec$degree.engine
+  }
+
+  W <- W.lp(
+    xdat = idx.train,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+  W.eval <- W.lp(
+    xdat = idx.train,
+    exdat = idx.eval,
+    degree = degree,
+    basis = spec$basis.engine,
+    bernstein.basis = spec$bernstein.basis.engine
+  )
+
+  if (!is.matrix(W))
+    W <- matrix(W, nrow = ntrain)
+  if (!is.matrix(W.eval))
+    W.eval <- matrix(W.eval, nrow = neval)
+  if (nrow(W.eval) != neval)
+    W.eval <- matrix(W.eval, nrow = neval, byrow = FALSE)
+
+  if (identical(output, "matrix")) {
+    H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+  } else {
+    out <- matrix(0.0, nrow = neval, ncol = ncol(y))
+  }
+
+  for (i in seq_len(neval)) {
+    solve.out <- .npreghat_solve_eval(
+      W = W,
+      w.eval = W.eval[i, ],
+      k = kw[, i],
+      ridge.base = ridge
+    )
+
+    if (is.null(solve.out))
+      stop(sprintf("failed to solve single-index hat system at evaluation row %d", i),
+           call. = FALSE)
+
+    h.row <- kw[, i] * drop(W %*% solve.out$v)
+
+    if (identical(output, "matrix")) {
+      H[i, ] <- h.row
+    } else {
+      out[i, ] <- drop(crossprod(h.row, y))
+    }
+  }
+
+  if (identical(output, "matrix"))
+    H
+  else if (ncol(out) == 1L)
+    as.vector(out)
+  else
+    out
+}
+
+.np_indexhat_exact <- function(bws,
+                               idx.train,
+                               idx.eval,
+                               y = NULL,
+                               output = c("matrix", "apply"),
+                               s = 0L) {
+  output <- match.arg(output)
+  spec <- .npindex_resolve_spec(bws, where = "npindexhat")
+  regtype <- spec$regtype.engine
+  if (identical(regtype, "lc")) {
+    kbw <- .np_indexhat_kbw(bws = bws, idx.train = idx.train)
+    kw <- .np_kernel_weights_direct(
+      bws = kbw,
+      txdat = idx.train,
+      exdat = idx.eval,
+      bandwidth.divide = TRUE,
+      kernel.pow = 1.0
+    )
+    if (!is.matrix(kw))
+      kw <- matrix(kw, nrow = nrow(idx.train))
+    den <- pmax(colSums(kw), .Machine$double.eps)
+
+    if (identical(output, "matrix")) {
+      return(sweep(t(kw), 1L, den, "/", check.margin = FALSE))
+    }
+
+    if (is.null(y))
+      stop("argument 'y' is required when output='apply'")
+
+    y <- .np_indexhat_numeric_y(y)
+    if (nrow(y) != nrow(idx.train))
+      stop("number of rows in 'y' must equal number of training rows")
+
+    out <- sweep(t(kw), 1L, den, "/", check.margin = FALSE) %*% y
+    return(if (ncol(out) == 1L) as.vector(out) else out)
+  }
+
+  rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+
+  fit_one <- function(ycol) {
+    fit <- .np_regression_direct(
+      bws = rbw,
+      txdat = idx.train,
+      tydat = ycol,
+      exdat = idx.eval,
+      gradients = (s == 1L),
+      gradient.order = 1L
+    )
+    if (s == 1L)
+      fit$grad[, 1L]
+    else
+      fit$mean
+  }
+
+  if (identical(output, "matrix")) {
+    neval <- nrow(idx.eval)
+    ntrain <- nrow(idx.train)
+    H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+    for (j in seq_len(ntrain)) {
+      yj <- numeric(ntrain)
+      yj[j] <- 1.0
+      H[, j] <- fit_one(yj)
+    }
+    return(H)
+  }
+
+  if (is.null(y))
+    stop("argument 'y' is required when output='apply'")
+
+  y <- .np_indexhat_numeric_y(y)
+  if (nrow(y) != nrow(idx.train))
+    stop("number of rows in 'y' must equal number of training rows")
+
+  out <- matrix(0.0, nrow = nrow(idx.eval), ncol = ncol(y))
+  for (j in seq_len(ncol(y)))
+    out[, j] <- fit_one(y[, j])
+
+  if (ncol(out) == 1L) as.vector(out) else out
+}
+
 .npscoef_make_regbw <- function(bws, zdat, bw = bws$bw) {
   do.call(npregbw, .np_semihat_make_regbw_args(
     source = bws,
@@ -284,16 +506,25 @@ npindexhat <-
 
     idx.train <- data.frame(index = index.train)
     idx.eval <- data.frame(index = index.eval)
-    rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-
-    if (s == 0L) {
-      return(npreghat(
-        bws = rbw,
-        txdat = idx.train,
-        exdat = idx.eval,
+    if (!identical(bws$type, "fixed")) {
+      return(.np_indexhat_exact(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = idx.eval,
         y = y,
         output = output,
-        ...
+        s = s
+      ))
+    }
+
+    if (s == 0L) {
+      return(.np_indexhat_core(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = idx.eval,
+        y = y,
+        output = output,
+        ridge = 0.0
       ))
     }
 
@@ -310,32 +541,44 @@ npindexhat <-
     if (is.na(step) || !is.finite(step) || step <= 0)
       stop("argument 'fd.step' must be a positive finite scalar")
 
-    H.plus <- npreghat(
-      bws = rbw,
-      txdat = idx.train,
-      exdat = data.frame(index = index.eval + step),
-      output = "matrix",
-      ...
-    )
-    H.minus <- npreghat(
-      bws = rbw,
-      txdat = idx.train,
-      exdat = data.frame(index = index.eval - step),
-      output = "matrix",
-      ...
-    )
-    H.deriv <- (H.plus - H.minus) / (2.0 * step)
-
-    if (identical(output, "matrix"))
-      return(H.deriv)
+    if (identical(output, "matrix")) {
+      H.plus <- .np_indexhat_core(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = data.frame(index = index.eval + step),
+        output = "matrix",
+        ridge = 0.0
+      )
+      H.minus <- .np_indexhat_core(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = data.frame(index = index.eval - step),
+        output = "matrix",
+        ridge = 0.0
+      )
+      return((H.plus - H.minus) / (2.0 * step))
+    }
 
     if (is.null(y))
       stop("argument 'y' is required when output='apply'")
-    yy <- as.matrix(y)
-    if (nrow(yy) != nrow(txdat))
-      stop("number of rows in 'y' must equal number of training rows")
-    out <- H.deriv %*% yy
-    if (ncol(out) == 1L) as.vector(out) else out
+
+    out.plus <- .np_indexhat_core(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = data.frame(index = index.eval + step),
+      y = y,
+      output = "apply",
+      ridge = 0.0
+    )
+    out.minus <- .np_indexhat_core(
+      bws = bws,
+      idx.train = idx.train,
+      idx.eval = data.frame(index = index.eval - step),
+      y = y,
+      output = "apply",
+      ridge = 0.0
+    )
+    (out.plus - out.minus) / (2.0 * step)
   }
 
 npplreghat <-

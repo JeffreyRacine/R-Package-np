@@ -208,6 +208,199 @@ npreghat <-
   kw
 }
 
+.np_regression_direct <- function(bws,
+                                  txdat,
+                                  tydat,
+                                  exdat = NULL,
+                                  gradients = FALSE,
+                                  gradient.order = 1L) {
+  no.ex <- is.null(exdat)
+  gradients <- npValidateScalarLogical(gradients, "gradients")
+
+  txdat <- toFrame(txdat)
+  if (!no.ex) {
+    exdat <- toFrame(exdat)
+    if (!(txdat %~% exdat))
+      stop("'txdat' and 'exdat' are not similar data frames!")
+  }
+
+  if (length(bws$bw) != length(txdat))
+    stop("length of bandwidth vector does not match number of columns of 'txdat'")
+
+  regtype <- if (is.null(bws$regtype)) "lc" else as.character(bws$regtype)
+  basis <- npValidateLpBasis(regtype = regtype, basis = bws$basis)
+  degree <- npValidateGlpDegree(regtype = regtype,
+                                degree = bws$degree,
+                                ncon = bws$ncon)
+  bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
+                                            bernstein.basis = bws$bernstein.basis)
+  glp.gradient.order <- npValidateGlpGradientOrder(regtype = regtype,
+                                                   gradient.order = gradient.order,
+                                                   ncon = bws$ncon)
+  if (isTRUE(gradients) &&
+      identical(regtype, "lp") &&
+      (bws$ncon > 0L) &&
+      all(degree == 0L)) {
+    stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
+  }
+
+  reg.c <- npRegtypeToC(regtype = regtype,
+                        degree = degree,
+                        ncon = bws$ncon,
+                        context = ".np_regression_direct")
+  degree.c <- if (bws$ncon > 0L) {
+    as.integer(if (is.null(reg.c$degree)) rep.int(0L, bws$ncon) else reg.c$degree)
+  } else {
+    integer(1L)
+  }
+
+  if ((any(bws$icon) &&
+       !all(vapply(txdat[, bws$icon, drop = FALSE], inherits, logical(1), c("integer", "numeric")))) ||
+      (any(bws$iord) &&
+       !all(vapply(txdat[, bws$iord, drop = FALSE], inherits, logical(1), "ordered"))) ||
+      (any(bws$iuno) &&
+       !all(vapply(txdat[, bws$iuno, drop = FALSE], inherits, logical(1), "factor")))) {
+    stop("supplied bandwidths do not match 'txdat' in type")
+  }
+
+  if (!(is.vector(tydat) || is.factor(tydat)))
+    stop("'tydat' must be a vector or a factor")
+  if (nrow(txdat) != length(tydat))
+    stop("number of explanatory data 'txdat' and dependent data 'tydat' do not match")
+
+  if (is.factor(tydat)) {
+    tydat <- adjustLevels(data.frame(tydat), bws$ydati)[, 1L]
+    tydat <- (bws$ydati$all.dlev[[1L]])[as.integer(tydat)]
+  } else {
+    tydat <- as.double(tydat)
+  }
+
+  txdat <- adjustLevels(txdat, bws$xdati)
+  if (!no.ex) {
+    exdat <- adjustLevels(exdat, bws$xdati, allowNewCells = TRUE)
+    npKernelBoundsCheckEval(exdat, bws$icon, bws$ckerlb, bws$ckerub, argprefix = "cker")
+  }
+
+  txmat <- toMatrix(txdat)
+  tuno <- txmat[, bws$iuno, drop = FALSE]
+  tcon <- txmat[, bws$icon, drop = FALSE]
+  tord <- txmat[, bws$iord, drop = FALSE]
+
+  npCheckRegressionDesignCondition(reg.code = reg.c$code,
+                                   xcon = tcon,
+                                   basis = basis,
+                                   degree = degree,
+                                   bernstein.basis = bernstein.basis,
+                                   where = ".np_regression_direct")
+
+  if (!no.ex) {
+    exmat <- toMatrix(exdat)
+    euno <- exmat[, bws$iuno, drop = FALSE]
+    econ <- exmat[, bws$icon, drop = FALSE]
+    eord <- exmat[, bws$iord, drop = FALSE]
+  } else {
+    euno <- data.frame()
+    econ <- data.frame()
+    eord <- data.frame()
+  }
+
+  tnrow <- nrow(txdat)
+  enrow <- if (no.ex) tnrow else nrow(exdat)
+  ncol.x <- ncol(txdat)
+
+  myopti <- list(
+    num_obs_train = tnrow,
+    num_obs_eval = enrow,
+    num_uno = bws$nuno,
+    num_ord = bws$nord,
+    num_con = bws$ncon,
+    int_LARGE_SF = if (bws$scaling) SF_NORMAL else SF_ARB,
+    BANDWIDTH_reg_extern = switch(bws$type,
+      fixed = BW_FIXED,
+      generalized_nn = BW_GEN_NN,
+      adaptive_nn = BW_ADAP_NN
+    ),
+    int_MINIMIZE_IO = if (isTRUE(getOption("np.messages"))) IO_MIN_FALSE else IO_MIN_TRUE,
+    kerneval = switch(bws$ckertype,
+      gaussian = CKER_GAUSS + bws$ckerorder / 2 - 1,
+      epanechnikov = CKER_EPAN + bws$ckerorder / 2 - 1,
+      uniform = CKER_UNI,
+      "truncated gaussian" = CKER_TGAUSS
+    ),
+    ukerneval = switch(bws$ukertype,
+      aitchisonaitken = UKER_AIT,
+      liracine = UKER_LR
+    ),
+    okerneval = switch(bws$okertype,
+      wangvanryzin = OKER_WANG,
+      liracine = OKER_LR,
+      "racineliyan" = OKER_RLY
+    ),
+    ey_is_ty = TRUE,
+    do_grad = gradients,
+    regtype = reg.c$code,
+    no.ex = no.ex,
+    mcv.numRow = attr(bws$xmcv, "num.row"),
+    int_do_tree = if (isTRUE(getOption("np.tree"))) DO_TREE_YES else DO_TREE_NO,
+    old.reg = FALSE
+  )
+
+  cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])
+
+  asDouble <- function(data) {
+    if (is.null(data)) as.double(0.0) else as.double(data)
+  }
+
+  glp.gradient.order.c <- if (bws$ncon > 0L) {
+    as.integer(if (is.null(glp.gradient.order)) rep.int(1L, bws$ncon) else glp.gradient.order)
+  } else {
+    integer(1L)
+  }
+
+  myout <- .Call(
+    "C_np_regression",
+    asDouble(tuno), asDouble(tord), asDouble(tcon), as.double(tydat),
+    asDouble(euno), asDouble(eord), asDouble(econ), as.double(double()),
+    asDouble(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
+    asDouble(bws$xmcv), asDouble(attr(bws$xmcv, "pad.num")),
+    asDouble(bws$nconfac), asDouble(bws$ncatfac), asDouble(bws$sdev),
+    as.integer(myopti),
+    as.integer(degree.c),
+    as.integer(glp.gradient.order.c),
+    as.integer(isTRUE(bernstein.basis)),
+    as.integer(npLpBasisCode(basis)),
+    as.integer(enrow),
+    as.integer(ncol.x),
+    as.logical(gradients),
+    as.double(cker.bounds.c$lb),
+    as.double(cker.bounds.c$ub),
+    PACKAGE = "npRmpi"
+  )
+
+  out <- list(mean = as.double(myout$mean))
+
+  if (gradients) {
+    grad <- matrix(data = myout$g, nrow = enrow, ncol = ncol.x, byrow = FALSE)
+    rorder <- numeric(ncol.x)
+    ord.idx <- seq_len(ncol.x)
+    rorder[c(ord.idx[bws$icon], ord.idx[bws$iuno], ord.idx[bws$iord])] <- ord.idx
+    grad <- as.matrix(grad[, rorder, drop = FALSE])
+
+    if (identical(regtype, "lp")) {
+      cont.idx <- which(bws$icon)
+      if (length(cont.idx)) {
+        invalid.order <- glp.gradient.order > degree
+        if (any(invalid.order))
+          grad[, cont.idx[invalid.order]] <- NA_real_
+      }
+    }
+
+    out$grad <- grad
+  }
+
+  out
+}
+
 npreghat.formula <-
   function(bws, data = NULL, newdata = NULL, ...){
 
