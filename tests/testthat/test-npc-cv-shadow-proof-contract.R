@@ -260,6 +260,8 @@ test_that("shadow density generalized-nn LP cures the legacy penalty collapse", 
   expect_true(is.finite(ll_ls$new))
   expect_true(is.finite(lp_ls$new))
   expect_equal(ll_ls$new, lp_ls$new, tolerance = 1e-10)
+  expect_equal(ll_ls$prod, ll_ls$new, tolerance = 1e-10)
+  expect_equal(lp_ls$prod, lp_ls$new, tolerance = 1e-10)
   expect_gt(ll_ls$new, -1e6)
 })
 
@@ -316,6 +318,42 @@ test_that("shadow fixed-bandwidth X-side row helper preserves ll == lp degree-1 
   expect_equal(res.lp$streamed, res.tree$streamed, tolerance = 1e-12)
 })
 
+test_that("shadow generalized-nn X-side row helper matches dense oracle and preserves ll == lp", {
+  set.seed(514)
+  n <- 22L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 + x$x2 + rnorm(n, sd = 0.07))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(5, 7, 6),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(5, 7, 6),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  res.ll <- call_shadow_xweights_row(bw.ll, x, y, row_index = 9L)
+  res.lp <- call_shadow_xweights_row(bw.lp, x, y, row_index = 9L)
+
+  expect_equal(res.ll$streamed, res.ll$dense, tolerance = 1e-12)
+  expect_equal(res.lp$streamed, res.lp$dense, tolerance = 1e-12)
+  expect_equal(res.ll$streamed, res.lp$streamed, tolerance = 1e-10)
+  expect_equal(sum(res.ll$streamed), 1, tolerance = 1e-10)
+  expect_equal(res.ll$streamed[9L], 0, tolerance = 1e-12)
+})
+
 test_that("shadow fixed-bandwidth X-side row helper stays row-streamed", {
   lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
   start <- grep("^int np_shadow_proof_conditional_x_weight_row_fixed\\(", lines)
@@ -330,9 +368,37 @@ test_that("shadow fixed-bandwidth X-side row helper stays row-streamed", {
   expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_train|num_obs_train_extern)[^\\)]*(num_train|num_obs_train_extern)", body))
 })
 
+test_that("shadow generalized-nn X-side row helper stays row-streamed", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start <- grep("^int np_shadow_proof_conditional_x_weight_row_stream\\(", lines)
+  stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
+
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[(start + 1L):(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_train|num_obs_train_extern)[^\\)]*(num_train|num_obs_train_extern)", body))
+})
+
 test_that("fixed-bandwidth cvml LP stream avoids dense row storage", {
   lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
   start <- grep("^static int np_conditional_density_cvml_fixed_lp_stream\\(", lines)
+  stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
+
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_obs|num_obs_train_extern)[^\\)]*(num_obs|num_obs_train_extern)", body))
+})
+
+test_that("generalized-nn cvls LP stream avoids dense row storage", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
   expect_length(start, 1L)

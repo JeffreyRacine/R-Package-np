@@ -1638,21 +1638,26 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
     error("C_np_shadow_cv_density_conditional: unsupported criterion");
   }
 
-  if(((criterion_i == CBWM_CVML) || (criterion_i == CBWM_CVLS)) &&
-     ((int_ll_extern != LL_LP) || (BANDWIDTH_den_extern == BW_FIXED))){
-    nscale = (int)XLENGTH(rbw_r);
-    prod_vsf = (double *)malloc((size_t)(nscale + 1) * sizeof(double));
-    if(prod_vsf == NULL)
-      error("C_np_shadow_cv_density_conditional: production scale-factor allocation failed");
-    prod_vsf[0] = 0.0;
-    for(i = 0; i < nscale; i++)
-      prod_vsf[i + 1] = REAL(rbw_r)[i];
-    if(criterion_i == CBWM_CVML)
-      prod_cv = np_cv_func_con_density_categorical_ml(prod_vsf);
-    else
-      prod_cv = np_cv_func_con_density_categorical_ls_npksum(prod_vsf);
-    safe_free(prod_vsf);
-    prod_vsf = NULL;
+  if((criterion_i == CBWM_CVML) || (criterion_i == CBWM_CVLS)){
+    if((criterion_i == CBWM_CVLS) && (int_ll_extern == LL_LP) &&
+       ((BANDWIDTH_den_extern == BW_FIXED) || (BANDWIDTH_den_extern == BW_GEN_NN))){
+      if(np_conditional_density_cvls_lp_stream(REAL(rbw_r), &prod_cv) != 0)
+        prod_cv = NA_REAL;
+    } else if((int_ll_extern != LL_LP) || (BANDWIDTH_den_extern == BW_FIXED)){
+      nscale = (int)XLENGTH(rbw_r);
+      prod_vsf = (double *)malloc((size_t)(nscale + 1) * sizeof(double));
+      if(prod_vsf == NULL)
+        error("C_np_shadow_cv_density_conditional: production scale-factor allocation failed");
+      prod_vsf[0] = 0.0;
+      for(i = 0; i < nscale; i++)
+        prod_vsf[i + 1] = REAL(rbw_r)[i];
+      if(criterion_i == CBWM_CVML)
+        prod_cv = np_cv_func_con_density_categorical_ml(prod_vsf);
+      else
+        prod_cv = np_cv_func_con_density_categorical_ls_npksum(prod_vsf);
+      safe_free(prod_vsf);
+      prod_vsf = NULL;
+    }
   }
 
   out_old = PROTECT(ScalarReal(old_cv));
@@ -1770,8 +1775,9 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
     error("C_np_shadow_cv_xweights_conditional: all inputs must share the same row count");
   if((row_idx < 0) || (row_idx >= num_obs))
     error("C_np_shadow_cv_xweights_conditional: row_index out of range");
-  if(asInteger(bwtype) != BW_FIXED)
-    error("C_np_shadow_cv_xweights_conditional: fixed bandwidths only");
+  if((asInteger(bwtype) != BW_FIXED) &&
+     (asInteger(bwtype) != BW_GEN_NN))
+    error("C_np_shadow_cv_xweights_conditional: fixed/generalized-nn bandwidths only");
 
   num_obs_train_extern = num_obs_eval_extern = num_obs;
   num_var_unordered_extern = ncol_yuno;
@@ -1882,7 +1888,7 @@ SEXP C_np_shadow_cv_xweights_conditional(SEXP tyuno,
 
   if(np_shadow_proof_conditional_x_weights_dense(REAL(rbw_r), dense_weights) != 0)
     error("C_np_shadow_cv_xweights_conditional: dense oracle failed");
-  if(np_shadow_proof_conditional_x_weight_row_fixed(REAL(rbw_r), row_idx, streamed_row) != 0)
+  if(np_shadow_proof_conditional_x_weight_row_stream(REAL(rbw_r), row_idx, streamed_row) != 0)
     error("C_np_shadow_cv_xweights_conditional: streamed row helper failed");
 
   out_dense = PROTECT(allocVector(REALSXP, num_obs));
