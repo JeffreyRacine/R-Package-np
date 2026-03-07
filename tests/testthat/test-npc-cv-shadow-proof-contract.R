@@ -412,7 +412,7 @@ test_that("generalized-nn cvls LP stream avoids dense row storage", {
 
 test_that("fixed-bandwidth cvls LP stream avoids dense row storage", {
   lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
-  start_matches <- grep("^static int np_conditional_density_cvls_fixed_lp_stream\\(", lines)
+  start_matches <- grep("^int np_conditional_density_cvls_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
   expect_gte(length(start_matches), 1L)

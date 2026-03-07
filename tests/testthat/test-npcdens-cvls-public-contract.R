@@ -51,7 +51,27 @@ cvls_shadow_bwtype <- function(bw) {
   )
 }
 
-call_public_cvls_shadow <- function(bw, x, y) {
+cvls_shadow_regtype <- function(bw) {
+  if (identical(bw$regtype.engine, "lp")) 2L else 0L
+}
+
+cvls_shadow_degree <- function(bw) {
+  if (identical(bw$regtype.engine, "lp")) as.integer(bw$degree.engine) else integer(0)
+}
+
+cvls_shadow_basis <- function(basis_engine, regtype_engine) {
+  if (!identical(regtype_engine, "lp")) {
+    return(0L)
+  }
+  switch(basis_engine,
+    additive = 0L,
+    glp = 1L,
+    tensor = 2L,
+    stop("unsupported LP basis")
+  )
+}
+
+call_public_cvls_shadow <- function(bw, x, y, compare_old = identical(bw$regtype.engine, "lc")) {
   n <- nrow(x)
   .Call(
     "C_np_shadow_cv_density_conditional",
@@ -67,11 +87,11 @@ call_public_cvls_shadow <- function(bw, x, y) {
     cvls_shadow_oker(bw$oxkertype),
     FALSE,
     1L,
-    0L,
-    integer(0),
-    FALSE,
-    0L,
-    TRUE,
+    cvls_shadow_regtype(bw),
+    cvls_shadow_degree(bw),
+    isTRUE(bw$bernstein.basis.engine),
+    cvls_shadow_basis(bw$basis.engine, bw$regtype.engine),
+    compare_old,
     PACKAGE = "np"
   )
 }
@@ -149,8 +169,39 @@ test_that("public npcdensbw cv.ls fixed LP route preserves tree parity", {
   expect_equal(bw.tree$fval, bw.serial$fval, tolerance = 1e-8)
 })
 
-test_that("public npcdensbw cv.ls generalized-nn LP route stays contained", {
+test_that("public npcdensbw cv.ls generalized-nn LP route activates with ll == lp parity", {
   set.seed(143)
+  n <- 36L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwtype = "generalized_nn",
+    bwmethod = "cv.ls",
+    nmulti = 0
+  )
+
+  expect_true(is.finite(bw.ll$fval))
+  expect_true(is.finite(bw.lp$fval))
+  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
+})
+
+test_that("public npcdensbw cv.ls adaptive-nn LP route stays contained", {
+  set.seed(144)
   n <- 36L
   x <- data.frame(x1 = runif(n), x2 = runif(n))
   y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
@@ -163,7 +214,7 @@ test_that("public npcdensbw cv.ls generalized-nn LP route stays contained", {
       regtype = "lp",
       basis = "glp",
       degree = degree,
-      bwtype = "generalized_nn",
+      bwtype = "adaptive_nn",
       bwmethod = "cv.ls",
       nmulti = 0
     ),

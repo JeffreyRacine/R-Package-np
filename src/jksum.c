@@ -7135,8 +7135,6 @@ void np_glp_cv_clear_extern(void){
   np_glp_cv_cache_clear();
 }
 
-static int np_conditional_density_cvls_fixed_lp_stream(double *vector_scale_factor,
-                                                       double *cv);
 static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale_factor,
                                                             double *cv);
 static int np_shadow_conditional_y_eval_row_fixed_op(double *vector_scale_factor,
@@ -11000,8 +10998,9 @@ double *cv){
   np_gate_ctx_clear(&gate_y_ctx);
   np_gate_ctx_clear(&gate_xy_ctx);
 
-  if((BANDWIDTH_den == BW_FIXED) && (int_ll_extern == LL_LP))
-    return np_conditional_density_cvls_fixed_lp_stream(vector_scale_factor, cv);
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+     (int_ll_extern == LL_LP))
+    return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
 
   int64_t i,j,k,l;
 
@@ -15359,13 +15358,6 @@ cleanup_cvls_lp_stream:
   if(yrow != NULL) free(yrow);
   if(yconv != NULL) free(yconv);
   return status;
-}
-
-static int np_conditional_density_cvls_fixed_lp_stream(double *vector_scale_factor,
-                                                       double *cv){
-  if(BANDWIDTH_den_extern != BW_FIXED)
-    return 1;
-  return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
 }
 
 static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale_factor,
