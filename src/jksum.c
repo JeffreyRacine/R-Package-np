@@ -11119,7 +11119,8 @@ double *cv){
   np_gate_ctx_clear(&gate_y_ctx);
   np_gate_ctx_clear(&gate_xy_ctx);
 
-  if((BANDWIDTH_den == BW_FIXED) && (int_ll_extern == LL_LP))
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+     (int_ll_extern == LL_LP))
     return np_conditional_density_cvls_lp_stream(vector_scale_factor, cv);
 
   int64_t i,j,k,l;
@@ -14996,7 +14997,7 @@ int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor,
                            num_reg_continuous_extern,
                            num_reg_unordered_extern,
                            num_reg_ordered_extern,
-                           0,
+                           1,
                            vsfx,
                            NULL,
                            NULL,
@@ -15235,7 +15236,7 @@ static int np_shadow_conditional_y_eval_row_stream_op(double *vector_scale_facto
                            num_var_continuous_extern,
                            num_var_unordered_extern,
                            num_var_ordered_extern,
-                           0,
+                           1,
                            vsfy,
                            NULL,
                            NULL,
@@ -15381,7 +15382,8 @@ int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
-  if(BANDWIDTH_den_extern != BW_FIXED)
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
