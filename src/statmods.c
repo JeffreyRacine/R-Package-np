@@ -31,6 +31,30 @@ extern int int_ROBUST;
 
 #include <math.h>
 
+/*
+  Preserve the existing Numerical Recipes sort behavior without forming
+  one-element-before-start pointers at call sites.
+*/
+static void sort_safe(int n, double *values)
+{
+    double *work;
+    int i;
+
+    if ((values == NULL) || (n <= 1))
+        return;
+
+    work = alloc_vecd(n + 1);
+    for (i = 0; i < n; i++)
+        work[i + 1] = values[i];
+
+    sort(n, work);
+
+    for (i = 0; i < n; i++)
+        values[i] = work[i + 1];
+
+    free(work);
+}
+
 int np_fround(double x)
 {
     double intpart, fracpart;
@@ -72,7 +96,7 @@ int simple_unique(int n, double * vector){
   for(i=0; i<n; i++)
     v[i]=vector[i];
 
-  sort(n,&v[-1]);
+  sort_safe(n, v);
 
   for(i=0, m=1; i < (n - 1); i++)
     m += v[i]!=v[i+1];
@@ -114,7 +138,7 @@ double meand(int n, double *vector)
 
 /* Sort... */
 
-        sort(n, &vector_temp[-1]);                /* NR Code */
+        sort_safe(n, vector_temp);
 
         int_med = np_fround(((double)n-1.0)/2.0);
         int_medl = np_fround(((double)n-2.0)/2.0);
@@ -180,7 +204,7 @@ double standerrd(int n, double *vector)
 
 /* Sort... */
 
-    sort(n, &vector_temp[-1]);                /* NR Code */
+    sort_safe(n, vector_temp);
 
 /* Interquartile Range */
 
@@ -331,7 +355,7 @@ int int_k_nn, double *nn_distance)
 /* Sort distances for observation i */
 /* NR code... */
 
-        sort(num_obs, &vector_dist[-1]);
+        sort_safe(num_obs, vector_dist);
 
 /* Compute kth nearest neighbor for observation i */
 /* vector_dist has 0, 1st nn, 2nd nn. int_k_nn is 1...n-1 */
@@ -417,7 +441,7 @@ int int_k_nn, double *nn_distance)
 /* Sort distances for observation i */
 /* NR code... */
 
-        sort(num_obs, &vector_dist[-1]);
+        sort_safe(num_obs, vector_dist);
 
 /* Compute kth nearest neighbor for observation i */
 /* vector_dist has 0, 1st nn, 2nd nn. int_k_nn is 1...n-1 */
@@ -551,7 +575,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
 /* Sort distances for observation i */
 
 /* NR code... */
-        sort(num_obs_train, &vector_dist[-1]);
+        sort_safe(num_obs_train, vector_dist);
 
 /* Initialize unique distance vector */
 
@@ -622,7 +646,7 @@ int compute_nn_distance_train_eval(int num_obs_train,
 /* Sort distances for observation i */
 
 /* NR code... */
-        sort(num_obs_train, &vector_dist[-1]);
+        sort_safe(num_obs_train, vector_dist);
 
 /* Initialize unique distance vector */
 
@@ -1162,7 +1186,7 @@ double **matrix_categorical_vals)
 
     for(k = 0; k < num_var_unordered; k++)
     {
-        sort(num_obs, &matrix[k][-1]);
+        sort_safe(num_obs, matrix[k]);
         matrix_categorical_vals[k][0]=matrix[k][0];
         for(i=1, l=1; i < num_obs;i++)
         {
@@ -1226,7 +1250,7 @@ double **matrix_categorical_vals)
 
     for(k = 0; k < num_var_ordered; k++)
     {
-        sort(num_obs, &matrix[k][-1]);
+        sort_safe(num_obs, matrix[k]);
         matrix_categorical_vals[k+num_var_unordered][0]=matrix[k][0];
         for(i=1, l=1; i < num_obs;i++)
         {
@@ -1292,7 +1316,7 @@ double **matrix_categorical_vals)
 
     for(k = 0; k < num_reg_unordered; k++)
     {
-        sort(num_obs, &matrix[k][-1]);
+        sort_safe(num_obs, matrix[k]);
         matrix_categorical_vals[k+num_var_unordered+num_var_ordered][0]=matrix[k][0];
         for(i=1, l=1; i < num_obs;i++)
         {
@@ -1356,7 +1380,7 @@ double **matrix_categorical_vals)
 
     for(k = 0; k < num_reg_ordered; k++)
     {
-        sort(num_obs, &matrix[k][-1]);
+        sort_safe(num_obs, matrix[k]);
         matrix_categorical_vals[k+num_var_unordered+num_var_ordered+num_reg_unordered][0]=matrix[k][0];
         for(i=1, l=1; i < num_obs;i++)
         {
@@ -1874,7 +1898,7 @@ double *x)
 
 /* Sort distances and determine the number of unique ones */
 
-    sort(num_obs, &dist[-1]);
+    sort_safe(num_obs, dist);
 
     for(i=1; i < num_obs; i++)
     {
