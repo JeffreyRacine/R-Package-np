@@ -15254,13 +15254,6 @@ cleanup_cvml_lp_stream:
   return status;
 }
 
-static int np_conditional_density_cvml_fixed_lp_stream(double *vector_scale_factor,
-                                                       double *cv){
-  if(BANDWIDTH_den_extern != BW_FIXED)
-    return 1;
-  return np_conditional_density_cvml_lp_stream(vector_scale_factor, cv);
-}
-
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
                                           double *cv){
   const int num_obs = num_obs_train_extern;
@@ -16568,8 +16561,9 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                                 double *cv){
   np_gate_override_clear();
 
-  if((BANDWIDTH_den == BW_FIXED) && (int_ll_extern == LL_LP))
-    return np_conditional_density_cvml_fixed_lp_stream(vector_scale_factor, cv);
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+     (int_ll_extern == LL_LP))
+    return np_conditional_density_cvml_lp_stream(vector_scale_factor, cv);
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
   const int num_cvar = num_reg_continuous + num_var_continuous;

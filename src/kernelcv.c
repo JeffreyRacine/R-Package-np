@@ -565,7 +565,9 @@ double np_cv_func_con_density_categorical_ml(double *vector_scale_factor){
 /* Compute the cross-validation function */
     start = clock();
 
-    if((int_ll_extern == LL_LP) && (BANDWIDTH_den_extern != BW_FIXED))
+    if((int_ll_extern == LL_LP) &&
+       (BANDWIDTH_den_extern != BW_FIXED) &&
+       (BANDWIDTH_den_extern != BW_GEN_NN))
       error("internal error: contained LP conditional density cv.ml route reached kernelcv");
 
     if(np_kernel_estimate_con_density_categorical_leave_one_out_cv(KERNEL_den_extern,
