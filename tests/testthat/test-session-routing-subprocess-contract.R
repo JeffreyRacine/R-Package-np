@@ -149,6 +149,46 @@ test_that("session core trio smoke completes in subprocess", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session smooth-coefficient ll coef plot-data route completes in subprocess", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(105)",
+      "n <- 60",
+      "x <- runif(n)",
+      "z <- runif(n, -2, 2)",
+      "y <- x * exp(z) * (1 + rnorm(n, sd=0.15))",
+      "fit <- npscoef(y ~ x | z, regtype='ll', betas=TRUE)",
+      "pdf(file=tempfile(fileext='.pdf'))",
+      "on.exit(dev.off(), add=TRUE)",
+      "out <- suppressWarnings(plot(",
+      "  fit,",
+      "  coef=TRUE,",
+      "  coef.index=1,",
+      "  perspective=FALSE,",
+      "  neval=20,",
+      "  plot.behavior='plot-data',",
+      "  plot.errors.method='none'))",
+      "stopifnot(is.list(out))",
+      "stopifnot(length(out) > 0L)",
+      "stopifnot(all(vapply(out, inherits, logical(1), 'smoothcoefficient')))",
+      "cat('SESSION_SCOEF_LL_PLOTDATA_OK\\n')"
+    ),
+    timeout = 120L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_SCOEF_LL_PLOTDATA_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npsigtest fast-fail contract completes in installed-build subprocess", {
   skip_on_cran()
   env <- subprocess_env()
@@ -815,6 +855,83 @@ test_that("attach mode smoke completes under mpiexec when enabled", {
   expect_true(any(grepl("ATTACH_NPCONMODE_ROUTE_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
   expect_true(any(grepl("ATTACH_NPCOPULA_ROUTE_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
+test_that("attach smooth-coefficient ll coef plot-data route completes under mpiexec when enabled", {
+  skip_on_cran()
+  skip_if_not(identical(Sys.getenv("NP_RMPI_ENABLE_ATTACH_TEST"), "1"),
+              "set NP_RMPI_ENABLE_ATTACH_TEST=1 to run attach-mode smoke")
+  mpiexec <- Sys.which("mpiexec")
+  skip_if(!nzchar(mpiexec), "mpiexec unavailable")
+
+  script <- tempfile("npRmpi-attach-scoef-ll-", fileext = ".R")
+  on.exit(unlink(script), add = TRUE)
+  writeLines(c(
+    "suppressPackageStartupMessages(library(npRmpi))",
+    "npRmpi.init(mode='attach', quiet=TRUE)",
+    "if (mpi.comm.rank(1L) == 0L) {",
+    "  options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+    "  set.seed(105)",
+    "  n <- 60",
+    "  x <- runif(n)",
+    "  z <- runif(n, -2, 2)",
+    "  y <- x * exp(z) * (1 + rnorm(n, sd=0.15))",
+    "  fit <- npscoef(y ~ x | z, regtype='ll', betas=TRUE)",
+    "  pdf(file=tempfile(fileext='.pdf'))",
+    "  on.exit(dev.off(), add=TRUE)",
+    "  out <- suppressWarnings(plot(",
+    "    fit,",
+    "    coef=TRUE,",
+    "    coef.index=1,",
+    "    perspective=FALSE,",
+    "    neval=20,",
+    "    plot.behavior='plot-data',",
+    "    plot.errors.method='none'))",
+    "  stopifnot(is.list(out))",
+    "  stopifnot(length(out) > 0L)",
+    "  stopifnot(all(vapply(out, inherits, logical(1), 'smoothcoefficient')))",
+    "  cat('ATTACH_SCOEF_LL_PLOTDATA_OK\\n')",
+    "  npRmpi.quit(mode='attach')",
+    "}"
+  ), script, useBytes = TRUE)
+
+  env_common <- subprocess_env()
+  skip_if(is.null(env_common), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_cmd_subprocess(
+    mpiexec,
+    args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+    timeout = 120L,
+    env = c(
+      env_common,
+      "R_PROFILE_USER=",
+      "R_PROFILE=",
+      "FI_TCP_IFACE=en0",
+      "FI_PROVIDER=tcp",
+      "FI_SOCKETS_IFACE=en0"
+    )
+  )
+  if (res$status != 0L) {
+    res <- run_cmd_subprocess(
+      mpiexec,
+      args = c("-n", "2", file.path(R.home("bin"), "Rscript"), "--no-save", script),
+      timeout = 120L,
+      env = c(
+        env_common,
+        "R_PROFILE_USER=",
+        "R_PROFILE=",
+        "FI_TCP_IFACE=lo0",
+        "FI_PROVIDER=tcp",
+        "FI_SOCKETS_IFACE=lo0"
+      )
+    )
+  }
+
+  if (res$status != 0L && .is_mpi_init_env_failure(res$output))
+    skip("MPI runtime interface unavailable in this environment for attach-mode smoke")
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("ATTACH_SCOEF_LL_PLOTDATA_OK", res$output, fixed = TRUE)),
               info = paste(res$output, collapse = "\n"))
 })
 

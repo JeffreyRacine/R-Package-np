@@ -474,6 +474,9 @@
 
           Sys.sleep(0.5)
       }
+
+      if (plot.behavior == "plot-data")
+        return ( list(cd1 = cd1) )
     } else {
 
       dsf = if (gradients) bws$xndim else 1

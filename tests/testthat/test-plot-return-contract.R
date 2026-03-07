@@ -1,0 +1,240 @@
+library(npRmpi)
+
+test_that("plot return contract: 3D plot-data matches data mode for regression and conditional estimators", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  with_plot_device <- function(expr) {
+    pdf(file = tempfile(fileext = ".pdf"))
+    on.exit(dev.off(), add = TRUE)
+    suppressWarnings(force(expr))
+  }
+
+  set.seed(107)
+  n <- 80
+  x <- rnorm(n)
+  z <- rnorm(n)
+  y <- x - 0.5 * z + rnorm(n, sd = 0.2)
+
+  rfit <- npreg(
+    bws = npregbw(
+      xdat = data.frame(x = x, z = z),
+      ydat = y,
+      bws = c(0.55, 0.55),
+      bandwidth.compute = FALSE
+    ),
+    txdat = data.frame(x = x, z = z),
+    tydat = y
+  )
+  rdata <- plot(rfit, plot.behavior = "data", view = "fixed")
+  rplotdata <- with_plot_device(plot(rfit, plot.behavior = "plot-data", view = "fixed"))
+
+  expect_type(rplotdata, "list")
+  expect_named(rplotdata, names(rdata))
+  expect_s3_class(rplotdata$r1, "npregression")
+  expect_equal(rplotdata$r1$mean, rdata$r1$mean)
+  expect_equal(rplotdata$r1$eval, rdata$r1$eval)
+
+  cfit <- npcdens(
+    bws = npcdensbw(
+      xdat = data.frame(x = x),
+      ydat = data.frame(y = y),
+      bws = c(0.55, 0.55),
+      bandwidth.compute = FALSE,
+      regtype = "lp",
+      degree = 4L,
+      bernstein = TRUE
+    ),
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    proper = TRUE
+  )
+  cdata <- plot(cfit, plot.behavior = "data", view = "fixed")
+  cplotdata <- with_plot_device(plot(cfit, plot.behavior = "plot-data", view = "fixed"))
+
+  expect_type(cplotdata, "list")
+  expect_named(cplotdata, names(cdata))
+  expect_s3_class(cplotdata$cd1, "condensity")
+  expect_equal(cplotdata$cd1$condens, cdata$cd1$condens)
+  expect_equal(cplotdata$cd1$condens.raw, cdata$cd1$condens.raw)
+  expect_equal(cplotdata$cd1$xeval, cdata$cd1$xeval)
+  expect_equal(cplotdata$cd1$yeval, cdata$cd1$yeval)
+
+  dfit <- npcdist(
+    bws = npcdistbw(
+      xdat = data.frame(x = x),
+      ydat = data.frame(y = y),
+      bws = c(0.55, 0.55),
+      bandwidth.compute = FALSE,
+      regtype = "lp",
+      degree = 4L,
+      bernstein = TRUE
+    ),
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    proper = TRUE
+  )
+  ddata <- suppressWarnings(plot(dfit, plot.behavior = "data", view = "fixed"))
+  dplotdata <- with_plot_device(plot(dfit, plot.behavior = "plot-data", view = "fixed"))
+
+  expect_type(dplotdata, "list")
+  expect_named(dplotdata, names(ddata))
+  expect_s3_class(dplotdata$cd1, "condistribution")
+  expect_equal(dplotdata$cd1$condist, ddata$cd1$condist)
+  expect_equal(dplotdata$cd1$condist.raw, ddata$cd1$condist.raw)
+  expect_equal(dplotdata$cd1$xeval, ddata$cd1$xeval)
+  expect_equal(dplotdata$cd1$yeval, ddata$cd1$yeval)
+})
+
+test_that("plot return contract: remaining public plot families return plot-data payloads", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  with_plot_device <- function(expr) {
+    pdf(file = tempfile(fileext = ".pdf"))
+    on.exit(dev.off(), add = TRUE)
+    suppressWarnings(force(expr))
+  }
+
+  expect_plot_modes_match <- function(object, fields, ...) {
+    data.out <- suppressWarnings(plot(object, plot.behavior = "data", ...))
+    plot.out <- with_plot_device(plot(object, plot.behavior = "plot-data", ...))
+
+    expect_type(plot.out, "list")
+    expect_named(plot.out, names(data.out))
+
+    for (nm in names(data.out)) {
+      expect_s3_class(plot.out[[nm]], class(data.out[[nm]])[1L])
+      for (field in fields) {
+        if (field %in% names(data.out[[nm]]) && field %in% names(plot.out[[nm]])) {
+          expect_equal(plot.out[[nm]][[field]], data.out[[nm]][[field]])
+        }
+      }
+    }
+  }
+
+  set.seed(108)
+  n <- 60
+  x <- runif(n)
+  x2 <- runif(n)
+  z <- runif(n)
+  y <- sin(2 * pi * x) + 0.5 * x2 + 1.2 * z + rnorm(n, sd = 0.05)
+
+  bw.ud <- npudensbw(
+    dat = data.frame(x = x),
+    bws = 0.25,
+    bandwidth.compute = FALSE
+  )
+  expect_plot_modes_match(bw.ud, fields = c("eval", "dens"), perspective = FALSE)
+
+  fit.ud <- npudens(bws = bw.ud, tdat = data.frame(x = x))
+  expect_plot_modes_match(fit.ud, fields = c("eval", "dens"), perspective = FALSE)
+
+  bw.ui <- npudistbw(
+    dat = data.frame(x = x),
+    bws = 0.25,
+    bandwidth.compute = FALSE
+  )
+  expect_plot_modes_match(bw.ui, fields = c("eval", "dist"), perspective = FALSE)
+
+  fit.ui <- npudist(bws = bw.ui, tdat = data.frame(x = x))
+  expect_plot_modes_match(fit.ui, fields = c("eval", "dist"), perspective = FALSE)
+
+  bw.reg <- npregbw(
+    xdat = data.frame(x = x),
+    ydat = y,
+    bws = 0.25,
+    bandwidth.compute = FALSE
+  )
+  expect_plot_modes_match(bw.reg, fields = c("eval", "mean", "merr"), perspective = FALSE)
+
+  bw.cd <- npcdensbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  expect_plot_modes_match(
+    bw.cd,
+    fields = c("condens", "xeval", "yeval", "conderr"),
+    perspective = TRUE,
+    view = "fixed"
+  )
+
+  bw.cf <- npcdistbw(
+    xdat = data.frame(x = x),
+    ydat = data.frame(y = y),
+    bws = c(0.25, 0.25),
+    bandwidth.compute = FALSE
+  )
+  expect_plot_modes_match(
+    bw.cf,
+    fields = c("condist", "xeval", "yeval", "conderr"),
+    perspective = TRUE,
+    view = "fixed"
+  )
+
+  fit.qr <- npqreg(
+    bws = bw.cf,
+    txdat = data.frame(x = x),
+    tydat = data.frame(y = y),
+    tau = 0.5
+  )
+  expect_plot_modes_match(
+    fit.qr,
+    fields = c("quantile", "xeval", "quanterr"),
+    perspective = TRUE,
+    view = "fixed"
+  )
+
+  bw.si <- npindexbw(
+    xdat = data.frame(x = x, x2 = x2),
+    ydat = y,
+    bws = c(0.25, 0.25, 1),
+    bandwidth.compute = FALSE
+  )
+  expect_plot_modes_match(bw.si, fields = c("index", "mean", "grad"))
+
+  fit.si <- npindex(bws = bw.si, txdat = data.frame(x = x, x2 = x2), tydat = y)
+  expect_plot_modes_match(fit.si, fields = c("index", "mean", "grad"))
+
+  bw.sc <- npscoefbw(
+    xdat = data.frame(x = x),
+    zdat = data.frame(z = z),
+    ydat = y,
+    bws = 0.25,
+    bandwidth.compute = FALSE
+  )
+  expect_plot_modes_match(bw.sc, fields = c("eval", "mean", "grad"), perspective = FALSE)
+
+  fit.sc <- npscoef(
+    bws = bw.sc,
+    txdat = data.frame(x = x),
+    tzdat = data.frame(z = z),
+    tydat = y,
+    errors = FALSE
+  )
+  expect_plot_modes_match(fit.sc, fields = c("eval", "mean", "grad"), perspective = FALSE)
+
+  fit.pl <- npplreg(
+    bws = npplregbw(
+      xdat = data.frame(z = z),
+      zdat = data.frame(x = x),
+      ydat = y,
+      bws = matrix(c(0.25, 0.25), nrow = 2),
+      bandwidth.compute = FALSE
+    ),
+    txdat = data.frame(z = z),
+    tzdat = data.frame(x = x),
+    tydat = y
+  )
+  expect_plot_modes_match(fit.pl, fields = c("mean", "merr"), perspective = FALSE)
+})
