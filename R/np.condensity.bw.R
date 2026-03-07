@@ -166,19 +166,18 @@ npcdensbw.conbandwidth <-
     if (bandwidth.compute &&
         identical(spec$regtype.engine, "lp") &&
         identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-        ((identical(bws$method, "cv.ml") && !identical(bws$type, "fixed")) ||
-         identical(bws$type, "adaptive_nn")))
+        identical(bws$type, "adaptive_nn"))
       stop(sprintf(
         "public npcdensbw() LP/LL %s route is temporarily disabled pending low-memory shadow CV remediation",
         bws$method
       ))
 
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
-    keep_local_cvls_gnn <- bandwidth.compute &&
+    keep_local_shadow_gnn <- bandwidth.compute &&
       identical(spec$regtype.engine, "lp") &&
-      identical(bws$method, "cv.ls") &&
+      identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
       identical(bws$type, "generalized_nn")
-    if (.npRmpi_autodispatch_active() && !keep_local_cvls_gnn)
+    if (.npRmpi_autodispatch_active() && !keep_local_shadow_gnn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat = xdat[goodrows,,drop = FALSE]
@@ -624,18 +623,17 @@ npcdensbw.default <-
     if (bandwidth.compute &&
         identical(tbw$regtype.engine, "lp") &&
         identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-        ((identical(tbw$method, "cv.ml") && !identical(tbw$type, "fixed")) ||
-         identical(tbw$type, "adaptive_nn")))
+        identical(tbw$type, "adaptive_nn"))
       stop(sprintf(
         "public npcdensbw() LP/LL %s route is temporarily disabled pending low-memory shadow CV remediation",
         tbw$method
       ))
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
-    keep_local_cvls_gnn <- bandwidth.compute &&
+    keep_local_shadow_gnn <- bandwidth.compute &&
       identical(tbw$regtype.engine, "lp") &&
-      identical(tbw$method, "cv.ls") &&
+      identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
       identical(tbw$type, "generalized_nn")
-    if (.npRmpi_autodispatch_active() && !keep_local_cvls_gnn)
+    if (.npRmpi_autodispatch_active() && !keep_local_shadow_gnn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
                         
     ## next grab dummies for actual bandwidth selection and perform call

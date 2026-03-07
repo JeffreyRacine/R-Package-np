@@ -15343,7 +15343,8 @@ int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
-  if(BANDWIDTH_den_extern != BW_FIXED)
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
     return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
@@ -16681,7 +16682,8 @@ int np_kernel_estimate_con_density_categorical_leave_one_out_cv(int KERNEL_den,
                                                                 double *cv){
   np_gate_override_clear();
 
-  if((BANDWIDTH_den == BW_FIXED) && (int_ll_extern == LL_LP))
+  if(((BANDWIDTH_den == BW_FIXED) || (BANDWIDTH_den == BW_GEN_NN)) &&
+     (int_ll_extern == LL_LP))
     return np_conditional_density_cvml_lp_stream(vector_scale_factor, cv);
 
   const int num_reg = num_reg_continuous+num_reg_unordered+num_reg_ordered;
