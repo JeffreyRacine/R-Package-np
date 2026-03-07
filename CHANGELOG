@@ -1,5 +1,16 @@
 Changes from Version 0.70-0 to 0.70-1 [06-Mar-2026]
 
+* Reactivated the public conditional LP/LL cross-validation routes mirrored
+  from `np` for the remediated families:
+  - `npcdensbw(cv.ml)` fixed and generalized nearest-neighbor
+  - `npcdensbw(cv.ls)` fixed and generalized nearest-neighbor
+  - `npcdistbw(cv.ls)` fixed and generalized nearest-neighbor
+  - adaptive nearest-neighbor remains explicit fail-fast containment for the
+    remediated LP/LL families.
+  Route validation for the generalized-NN mirrors passed in session/spawn,
+  attach, and profile/manual-broadcast mode, with LP generalized-NN wrapper
+  orchestration kept on the master to avoid unsafe full-wrapper autodispatch.
+
 * Mirrored the conditional density/distribution generalized nearest-neighbor
   LP CV `jksum.c` helper changes from `np`, keeping the canonical extracted
   LP X-side machinery aligned across repos and validating bounded
