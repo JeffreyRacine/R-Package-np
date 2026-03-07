@@ -59,6 +59,8 @@ npcdens.formula <-
 
     ev$condens <- napredict(ev$omit, ev$condens)
     ev$conderr <- napredict(ev$omit, ev$conderr)
+    if (!is.null(ev$condens.raw))
+      ev$condens.raw <- napredict(ev$omit, ev$condens.raw)
 
     if(ev$gradients){
         ev$congrad <- napredict(ev$omit, ev$congrad)
@@ -79,14 +81,36 @@ npcdens.call <-
 npcdens.conbandwidth <- function(bws,
                                  txdat = stop("invoked without training data 'txdat'"),
                                  tydat = stop("invoked without training data 'tydat'"),
-                                 exdat, eydat, gradients = FALSE, ...){
+                                 exdat, eydat, gradients = FALSE,
+                                 proper = FALSE,
+                                 proper.method = c("project"),
+                                 proper.control = list(),
+                                 ...){
 
   fit.start <- proc.time()[3]
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  proper.args <- .np_condens_validate_proper_args(
+    proper = proper,
+    proper.method = proper.method,
+    proper.control = proper.control
+  )
   .npRmpi_require_active_slave_pool(where = "npcdens()")
   .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdens()")
-  if (.npRmpi_autodispatch_active())
-    return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+  if (.npRmpi_autodispatch_active()) {
+    out <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+    if (inherits(out, "condensity") &&
+        !is.null(out$proper.requested) &&
+        !is.null(out$proper.applied) &&
+        !is.null(out$proper.info))
+      return(out)
+    return(.np_condens_finalize_proper_object(
+      object = out,
+      proper = proper.args$proper.requested,
+      proper.method = proper.args$proper.method,
+      proper.control = proper.args$proper.control,
+      where = "npcdens()"
+    ))
+  }
 
   if (xor(missing(exdat),missing(eydat)))
     stop("evaluation data must be supplied for both 'exdat' and 'eydat'")
@@ -355,16 +379,24 @@ npcdens.conbandwidth <- function(bws,
   optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
   total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
 
-  return( condensity(bws = bws,
-                     xeval = txeval,
-                     yeval = tyeval,
-                     condens = myout$condens, conderr = myout$conderr,
-                     congrad = myout$congrad, congerr = myout$congerr,
-                     ll = myout$log_likelihood,
-                     ntrain = tnrow, trainiseval = no.exy, gradients = gradients,
-                     rows.omit = rows.omit,
-                     timing = bws$timing, total.time = total.time,
-                     optim.time = optim.time, fit.time = fit.elapsed) )
+  out <- condensity(bws = bws,
+                    xeval = txeval,
+                    yeval = tyeval,
+                    condens = myout$condens, conderr = myout$conderr,
+                    congrad = myout$congrad, congerr = myout$congerr,
+                    ll = myout$log_likelihood,
+                    ntrain = tnrow, trainiseval = no.exy, gradients = gradients,
+                    rows.omit = rows.omit,
+                    timing = bws$timing, total.time = total.time,
+                    optim.time = optim.time, fit.time = fit.elapsed)
+
+  .np_condens_finalize_proper_object(
+    object = out,
+    proper = proper.args$proper.requested,
+    proper.method = proper.args$proper.method,
+    proper.control = proper.args$proper.control,
+    where = "npcdens()"
+  )
 
 }
 
