@@ -3,6 +3,11 @@ condensity <-
              condens, conderr = NA,
              congrad = NA, congerr = NA,
              ll = NA, ntrain, trainiseval = FALSE, gradients = FALSE,
+             proper.requested = FALSE,
+             proper.applied = FALSE,
+             proper.method = NULL,
+             condens.raw = NULL,
+             proper.info = NULL,
              rows.omit = NA,
              timing = NA, total.time = NA,
              optim.time = NA, fit.time = NA){
@@ -46,6 +51,11 @@ condensity <-
             ntrain = ntrain,
             trainiseval = trainiseval,
             gradients = gradients,
+            proper.requested = proper.requested,
+            proper.applied = proper.applied,
+            proper.method = proper.method,
+            condens.raw = condens.raw,
+            proper.info = proper.info,
             rows.omit = rows.omit,
             nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
             timing = timing, total.time = total.time,
@@ -68,6 +78,16 @@ print.condensity <- function(x, digits=NULL, ...){
 
   cat(genDenEstStr(x))
   cat(genBwKerStrs(x$bws))
+  if (!is.null(x$proper.requested) && !is.null(x$proper.applied)) {
+    proper.state <- if (isTRUE(x$proper.applied)) {
+      sprintf("requested and applied (%s)", x$proper.method)
+    } else if (isTRUE(x$proper.requested)) {
+      "requested but not applied"
+    } else {
+      "not requested"
+    }
+    cat("\nProper density repair:", proper.state)
+  }
 
   cat("\n\n")
   if(!missing(...))
@@ -78,7 +98,12 @@ print.condensity <- function(x, digits=NULL, ...){
 fitted.condensity <- function(object, ...){
  object$condens 
 }
-se.condensity <- function(x){ x$conderr }
+se.condensity <- function(x){
+  if (isTRUE(x$proper.applied)) {
+    stop("standard errors are unavailable for repaired conditional densities in tranche 1")
+  }
+  x$conderr
+}
 gradients.condensity <- function(x, errors = FALSE, ...) {
   gout <- if (!errors) x$congrad else x$congerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
@@ -109,6 +134,16 @@ predict.condensity <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
+  if (is.null(dots$proper) && isTRUE(object$proper.requested)) {
+    dots$proper <- TRUE
+  }
+  if (isTRUE(dots$proper)) {
+    proper.control <- if (is.null(dots$proper.control)) list() else dots$proper.control
+    if (is.null(proper.control$fail.on.unsupported))
+      proper.control$fail.on.unsupported <- TRUE
+    dots$proper.control <- proper.control
+  }
+
   tr <- do.call(npcdens, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
@@ -134,6 +169,16 @@ summary.condensity <- function(object, ...){
   cat(genDenEstStr(object))
 
   cat(genBwKerStrs(object$bws))
+  if (!is.null(object$proper.requested) && !is.null(object$proper.applied)) {
+    proper.state <- if (isTRUE(object$proper.applied)) {
+      sprintf("requested and applied (%s)", object$proper.method)
+    } else if (isTRUE(object$proper.requested)) {
+      "requested but not applied"
+    } else {
+      "not requested"
+    }
+    cat("\nProper density repair:", proper.state)
+  }
   cat(genTimingStr(object))
   cat('\n\n')  
 }
