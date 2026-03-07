@@ -166,6 +166,7 @@ int np_shadow_proof_cv_con_distribution_ls(double *vector_scale_factor, double *
 int np_shadow_proof_conditional_x_weights_dense(double *vector_scale_factor, double *weights_out);
 int np_shadow_proof_conditional_x_weight_row_stream(double *vector_scale_factor, int eval_idx, double *row_out);
 int np_shadow_proof_conditional_x_weight_row_fixed(double *vector_scale_factor, int eval_idx, double *row_out);
+int np_conditional_density_cvml_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor, double *cv);
 int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor, double *cv);
 double cv_func_regression_categorical_ls_nn(double *vector_scale_factor);

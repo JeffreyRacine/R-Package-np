@@ -1639,8 +1639,12 @@ SEXP C_np_shadow_cv_density_conditional(SEXP tyuno,
   }
 
   if((criterion_i == CBWM_CVML) || (criterion_i == CBWM_CVLS)){
-    if((criterion_i == CBWM_CVLS) && (int_ll_extern == LL_LP) &&
+    if((criterion_i == CBWM_CVML) && (int_ll_extern == LL_LP) &&
        ((BANDWIDTH_den_extern == BW_FIXED) || (BANDWIDTH_den_extern == BW_GEN_NN))){
+      if(np_conditional_density_cvml_lp_stream(REAL(rbw_r), &prod_cv) != 0)
+        prod_cv = NA_REAL;
+    } else if((criterion_i == CBWM_CVLS) && (int_ll_extern == LL_LP) &&
+              ((BANDWIDTH_den_extern == BW_FIXED) || (BANDWIDTH_den_extern == BW_GEN_NN))){
       if(np_conditional_density_cvls_lp_stream(REAL(rbw_r), &prod_cv) != 0)
         prod_cv = NA_REAL;
     } else if((int_ll_extern != LL_LP) || (BANDWIDTH_den_extern == BW_FIXED)){

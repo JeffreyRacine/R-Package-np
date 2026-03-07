@@ -228,6 +228,42 @@ test_that("shadow density cvml preserves the large-kernel X collapse", {
   expect_equal(res$new, collapsed, tolerance = 1e-9)
 })
 
+test_that("shadow density generalized-nn cvml preserves ll canonicalization", {
+  set.seed(202)
+  n <- 38L
+  x <- data.frame(x1 = runif(n), x2 = runif(n))
+  y <- data.frame(y1 = sin(2 * pi * x$x1) + x$x2 + rnorm(n, sd = 0.12))
+  degree <- rep.int(1L, ncol(x))
+
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(4, 7, 5),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    bws = c(4, 7, 5),
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree
+  )
+
+  ll_ml <- call_shadow_density(bw.ll, x, y, criterion = "cv.ml", compare_old = FALSE)
+  lp_ml <- call_shadow_density(bw.lp, x, y, criterion = "cv.ml", compare_old = FALSE)
+
+  expect_true(is.finite(ll_ml$new))
+  expect_true(is.finite(lp_ml$new))
+  expect_equal(ll_ml$new, lp_ml$new, tolerance = 1e-10)
+  expect_equal(ll_ml$prod, ll_ml$new, tolerance = 1e-10)
+  expect_equal(lp_ml$prod, lp_ml$new, tolerance = 1e-10)
+})
+
 test_that("shadow density generalized-nn LP cures the legacy penalty collapse", {
   set.seed(203)
   n <- 38L
@@ -385,6 +421,20 @@ test_that("shadow generalized-nn X-side row helper stays row-streamed", {
 test_that("fixed-bandwidth cvml LP stream avoids dense row storage", {
   lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
   start <- grep("^static int np_conditional_density_cvml_fixed_lp_stream\\(", lines)
+  stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
+
+  expect_length(start, 1L)
+  expect_length(stop, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_obs|num_obs_train_extern)[^\\)]*(num_obs|num_obs_train_extern)", body))
+})
+
+test_that("generalized-nn cvml LP stream avoids dense row storage", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start <- grep("^int np_conditional_density_cvml_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
   expect_length(start, 1L)

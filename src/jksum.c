@@ -15203,18 +15203,6 @@ static int np_shadow_conditional_y_row_stream_op(double *vector_scale_factor,
                                                     row_out);
 }
 
-static int np_shadow_conditional_y_row_fixed_op(double *vector_scale_factor,
-                                                int eval_idx,
-                                                int operator_code,
-                                                double *row_out){
-  if(BANDWIDTH_den_extern != BW_FIXED)
-    return 1;
-  return np_shadow_conditional_y_row_stream_op(vector_scale_factor,
-                                               eval_idx,
-                                               operator_code,
-                                               row_out);
-}
-
 static int np_shadow_conditional_y_row_stream(double *vector_scale_factor,
                                               int eval_idx,
                                               double *row_out){
@@ -15224,17 +15212,8 @@ static int np_shadow_conditional_y_row_stream(double *vector_scale_factor,
                                                row_out);
 }
 
-static int np_shadow_conditional_y_row_fixed(double *vector_scale_factor,
-                                             int eval_idx,
-                                             double *row_out){
-  return np_shadow_conditional_y_row_fixed_op(vector_scale_factor,
-                                              eval_idx,
-                                              OP_NORMAL,
-                                              row_out);
-}
-
-static int np_conditional_density_cvml_fixed_lp_stream(double *vector_scale_factor,
-                                                       double *cv){
+int np_conditional_density_cvml_lp_stream(double *vector_scale_factor,
+                                          double *cv){
   const int num_obs = num_obs_train_extern;
   const double log_DBL_MIN = log(DBL_MIN);
   double *xrow = NULL, *yrow = NULL;
@@ -15243,20 +15222,23 @@ static int np_conditional_density_cvml_fixed_lp_stream(double *vector_scale_fact
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_obs <= 0))
     return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
+    return 1;
 
   xrow = alloc_vecd(MAX(1, num_obs));
   yrow = alloc_vecd(MAX(1, num_obs));
   if((xrow == NULL) || (yrow == NULL))
-    goto cleanup_cvml_fixed_lp_stream;
+    goto cleanup_cvml_lp_stream;
 
   *cv = 0.0;
   for(i = 0; i < num_obs; i++){
     double fit = 0.0;
 
-    if(np_shadow_proof_conditional_x_weight_row_fixed(vector_scale_factor, i, xrow) != 0)
-      goto cleanup_cvml_fixed_lp_stream;
-    if(np_shadow_conditional_y_row_fixed(vector_scale_factor, i, yrow) != 0)
-      goto cleanup_cvml_fixed_lp_stream;
+    if(np_shadow_proof_conditional_x_weight_row_stream(vector_scale_factor, i, xrow) != 0)
+      goto cleanup_cvml_lp_stream;
+    if(np_shadow_conditional_y_row_stream(vector_scale_factor, i, yrow) != 0)
+      goto cleanup_cvml_lp_stream;
 
     for(j = 0; j < num_obs; j++)
       fit += xrow[j]*yrow[j];
@@ -15266,10 +15248,17 @@ static int np_conditional_density_cvml_fixed_lp_stream(double *vector_scale_fact
 
   status = 0;
 
-cleanup_cvml_fixed_lp_stream:
+cleanup_cvml_lp_stream:
   if(xrow != NULL) free(xrow);
   if(yrow != NULL) free(yrow);
   return status;
+}
+
+static int np_conditional_density_cvml_fixed_lp_stream(double *vector_scale_factor,
+                                                       double *cv){
+  if(BANDWIDTH_den_extern != BW_FIXED)
+    return 1;
+  return np_conditional_density_cvml_lp_stream(vector_scale_factor, cv);
 }
 
 int np_conditional_density_cvls_lp_stream(double *vector_scale_factor,
