@@ -112,7 +112,12 @@
     dots$proper <- TRUE
   do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
 }
-.np_plot_condistribution <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
+.np_plot_condistribution <- function(object, ...) {
+  dots <- list(...)
+  if (is.null(dots$proper) && isTRUE(object$proper.requested))
+    dots$proper <- TRUE
+  do.call(.np_plot_from_slot, c(list(object = object, slot = "bws"), dots))
+}
 .np_plot_npdistribution <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_qregression <- function(object, ...) .np_plot_from_slot(object, "bws", ...)
 .np_plot_singleindex <- function(object, ...) .np_plot_from_slot(object, "bws", ...)

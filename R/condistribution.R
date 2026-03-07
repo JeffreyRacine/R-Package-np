@@ -2,6 +2,11 @@ condistribution <-
     function(bws, xeval, yeval, condist, conderr = NA,
              congrad = NA, congerr = NA,           
              ntrain, trainiseval = FALSE, gradients = FALSE,
+             proper.requested = FALSE,
+             proper.applied = FALSE,
+             proper.method = NULL,
+             condist.raw = NULL,
+             proper.info = NULL,
              rows.omit = NA,
              timing = NA, total.time = NA,
              optim.time = NA, fit.time = NA){
@@ -43,7 +48,12 @@ condistribution <-
             congerr = congerr,
             ntrain = ntrain,
             trainiseval = trainiseval,
-            gradients = gradients, 
+            gradients = gradients,
+            proper.requested = proper.requested,
+            proper.applied = proper.applied,
+            proper.method = proper.method,
+            condist.raw = condist.raw,
+            proper.info = proper.info,
             rows.omit = rows.omit,
             nobs.omit = if (identical(rows.omit, NA)) 0 else length(rows.omit),
             timing = timing, total.time = total.time,
@@ -67,6 +77,16 @@ print.condistribution <- function(x, digits=NULL, ...){
 
   cat(genDenEstStr(x))
   cat(genBwKerStrs(x$bws))
+  if (!is.null(x$proper.requested) && !is.null(x$proper.applied)) {
+    proper.state <- if (isTRUE(x$proper.applied)) {
+      sprintf("requested and applied (%s)", x$proper.method)
+    } else if (isTRUE(x$proper.requested)) {
+      "requested but not applied"
+    } else {
+      "not requested"
+    }
+    cat("\nProper distribution repair:", proper.state)
+  }
 
 
   cat("\n\n")
@@ -78,7 +98,12 @@ print.condistribution <- function(x, digits=NULL, ...){
 fitted.condistribution <- function(object, ...){
  object$condist 
 }
-se.condistribution <- function(x){ x$conderr }
+se.condistribution <- function(x){
+  if (isTRUE(x$proper.applied)) {
+    stop("standard errors are unavailable for repaired conditional distributions in tranche 1")
+  }
+  x$conderr
+}
 gradients.condistribution <- function(x, errors = FALSE, ...) {
   gout <- if (!errors) x$congrad else x$congerr
   if (is.null(gout) || (length(gout) == 1L && is.logical(gout) && is.na(gout)))
@@ -109,6 +134,16 @@ predict.condistribution <- function(object, se.fit = FALSE, ...) {
     dots$newdata <- NULL
   }
 
+  if (is.null(dots$proper) && isTRUE(object$proper.requested)) {
+    dots$proper <- TRUE
+  }
+  if (isTRUE(dots$proper)) {
+    proper.control <- if (is.null(dots$proper.control)) list() else dots$proper.control
+    if (is.null(proper.control$fail.on.unsupported))
+      proper.control$fail.on.unsupported <- TRUE
+    dots$proper.control <- proper.control
+  }
+
   tr <- do.call(npcdist, c(list(bws = object$bws), dots))
   if(se.fit)
     return(list(fit = fitted(tr), se.fit = se(tr), 
@@ -133,6 +168,16 @@ summary.condistribution <- function(object, ...){
   cat(genDenEstStr(object))
 
   cat(genBwKerStrs(object$bws))
+  if (!is.null(object$proper.requested) && !is.null(object$proper.applied)) {
+    proper.state <- if (isTRUE(object$proper.applied)) {
+      sprintf("requested and applied (%s)", object$proper.method)
+    } else if (isTRUE(object$proper.requested)) {
+      "requested but not applied"
+    } else {
+      "not requested"
+    }
+    cat("\nProper distribution repair:", proper.state)
+  }
   cat(genTimingStr(object))
   cat('\n\n')  
 }
