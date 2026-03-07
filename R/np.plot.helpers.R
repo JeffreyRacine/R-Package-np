@@ -1359,8 +1359,7 @@
 }
 
 .np_con_inid_ksum_eligible <- function(bws) {
-  isTRUE(identical(bws$type, "fixed")) &&
-    isTRUE(identical(bws$cxkertype, bws$cykertype)) &&
+  isTRUE(identical(bws$cxkertype, bws$cykertype)) &&
     isTRUE(identical(bws$cxkerorder, bws$cykerorder)) &&
     isTRUE(identical(bws$cxkerbound, bws$cykerbound)) &&
     isTRUE(identical(bws$uxkertype, bws$uykertype)) &&
@@ -2049,13 +2048,8 @@ compute.bootstrap.errors.rbandwidth =
       }
     }
 
-    inid.helper.ok <- identical(bws$type, "fixed")
-    block.helper.ok <- identical(bws$type, "fixed")
-
-    if (is.inid && !isTRUE(inid.helper.ok))
-      stop("inid bootstrap requires helper mode with bws$type='fixed' in compute.bootstrap.errors.rbandwidth", call. = FALSE)
-    if (is.block && !isTRUE(block.helper.ok))
-      stop(sprintf("%s bootstrap requires helper mode with bws$type='fixed' in compute.bootstrap.errors.rbandwidth", plot.errors.boot.method), call. = FALSE)
+    inid.helper.ok <- TRUE
+    block.helper.ok <- TRUE
 
     if ((is.inid && isTRUE(inid.helper.ok)) || (is.block && isTRUE(block.helper.ok))) {
       counts.drawer <- if (is.block) {
@@ -2494,10 +2488,8 @@ compute.bootstrap.errors.bandwidth =
 
     is.inid = plot.errors.boot.method=="inid"
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
-    fast.inid <- isTRUE(is.inid) &&
-      isTRUE(identical(bws$type, "fixed"))
-    fast.block <- isTRUE(is.block) &&
-      isTRUE(identical(bws$type, "fixed"))
+    fast.inid <- isTRUE(is.inid)
+    fast.block <- isTRUE(is.block)
 
     if (is.inid && !isTRUE(fast.inid))
       stop("inid unconditional helper unavailable for this configuration; no alternate fallback is permitted", call. = FALSE)
@@ -2640,11 +2632,11 @@ compute.bootstrap.errors.conbandwidth =
     fast.inid <- isTRUE(is.inid) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(.np_con_inid_ksum_eligible(bws))
     fast.block <- isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(.np_con_inid_ksum_eligible(bws))
 
     if (is.inid && !isTRUE(fast.inid))
       stop("inid conditional helper unavailable for this configuration; no alternate fallback is permitted", call. = FALSE)
