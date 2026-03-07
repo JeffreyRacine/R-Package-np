@@ -2563,8 +2563,7 @@
 }
 
 .np_con_inid_ksum_eligible <- function(bws) {
-  isTRUE(identical(bws$type, "fixed")) &&
-    isTRUE(identical(bws$cxkertype, bws$cykertype)) &&
+  isTRUE(identical(bws$cxkertype, bws$cykertype)) &&
     isTRUE(identical(bws$cxkerorder, bws$cykerorder)) &&
     isTRUE(identical(bws$cxkerbound, bws$cykerbound)) &&
     isTRUE(identical(bws$uxkertype, bws$uykertype)) &&
@@ -3495,15 +3494,13 @@ compute.bootstrap.errors.rbandwidth =
       }
     }
 
-    inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
-      identical(bws$type, "fixed")
-    block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled()) &&
-      identical(bws$type, "fixed")
+    inid.helper.ok <- isTRUE(.np_plot_inid_fastpath_enabled())
+    block.helper.ok <- isTRUE(.np_plot_block_fastpath_enabled())
 
     if (is.inid && !isTRUE(inid.helper.ok))
-      stop("inid regression helper unavailable for this configuration (requires bws$type='fixed') in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("inid regression helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     if (is.block && !isTRUE(block.helper.ok))
-      stop("fixed/geom regression helper unavailable for this configuration (requires bws$type='fixed') in npRmpi; no serial fallback is permitted", call. = FALSE)
+      stop("fixed/geom regression helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
 
     if ((is.inid && isTRUE(inid.helper.ok)) || (is.block && isTRUE(block.helper.ok))) {
       counts.drawer <- if (is.block) {
@@ -4093,12 +4090,10 @@ compute.bootstrap.errors.bandwidth =
     is.block <- is.element(plot.errors.boot.method, c("fixed", "geom"))
     fast.inid <- isTRUE(.np_plot_inid_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
-      isTRUE(is.inid) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(is.inid)
     fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
-      isTRUE(is.block) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(is.block)
 
     if (is.inid && !isTRUE(fast.inid))
       stop("inid unconditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
@@ -4378,13 +4373,13 @@ compute.bootstrap.errors.conbandwidth =
       isTRUE(is.inid) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(.np_con_inid_ksum_eligible(bws))
     fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(.np_con_inid_ksum_eligible(bws))
 
     if (is.inid && !isTRUE(fast.inid))
       stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
@@ -4542,13 +4537,13 @@ compute.bootstrap.errors.condbandwidth =
       isTRUE(is.inid) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(.np_con_inid_ksum_eligible(bws))
     fast.block <- isTRUE(.np_plot_block_fastpath_enabled()) &&
       isTRUE(.npRmpi_plot_inid_ksum_fastpath_enabled()) &&
       isTRUE(is.block) &&
       isTRUE(!quantreg) &&
       isTRUE(!gradients) &&
-      isTRUE(identical(bws$type, "fixed"))
+      isTRUE(.np_con_inid_ksum_eligible(bws))
     if (is.inid && !isTRUE(fast.inid))
       stop("inid conditional helper unavailable for this configuration in npRmpi; no serial fallback is permitted", call. = FALSE)
     if (is.block && !isTRUE(fast.block))
