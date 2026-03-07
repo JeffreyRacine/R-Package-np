@@ -529,6 +529,8 @@ test_that("shadow distribution generalized-nn LP preserves ll canonicalization",
   expect_true(is.finite(dist.ll$new))
   expect_true(is.finite(dist.lp$new))
   expect_equal(dist.ll$new, dist.lp$new, tolerance = 1e-10)
+  expect_equal(dist.ll$prod, dist.ll$new, tolerance = 1e-10)
+  expect_equal(dist.lp$prod, dist.lp$new, tolerance = 1e-10)
 })
 
 test_that("shadow distribution lp preserves ll canonicalization and tree parity", {
@@ -568,6 +570,21 @@ test_that("shadow distribution lp preserves ll canonicalization and tree parity"
 test_that("fixed-bandwidth cdist cvls LP stream avoids dense row storage", {
   lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
   start_matches <- grep("^static int np_conditional_distribution_cvls_fixed_lp_stream\\(", lines)
+  stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
+
+  expect_gte(length(start_matches), 1L)
+  expect_length(stop, 1L)
+  start <- tail(start_matches, 1L)
+  expect_lt(start, stop)
+
+  body <- paste(lines[start:(stop - 1L)], collapse = "\n")
+
+  expect_false(grepl("(malloc|calloc|alloc_matd|alloc_tmatd)\\([^\\)]*(num_obs|num_obs_train_extern)[^\\)]*(num_obs|num_obs_train_extern)", body))
+})
+
+test_that("generalized-nn cdist cvls LP stream avoids dense row storage", {
+  lines <- readLines("/Users/jracine/Development/np-master/src/jksum.c", warn = FALSE)
+  start_matches <- grep("^int np_conditional_distribution_cvls_lp_stream\\(", lines)
   stop <- grep("^static int np_shadow_conditional_build_y_matrix\\(", lines)
 
   expect_gte(length(start_matches), 1L)

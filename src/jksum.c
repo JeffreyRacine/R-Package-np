@@ -7137,15 +7137,6 @@ void np_glp_cv_clear_extern(void){
 
 static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale_factor,
                                                             double *cv);
-static int np_shadow_conditional_y_eval_row_fixed_op(double *vector_scale_factor,
-                                                     int eval_idx,
-                                                     int operator_code,
-                                                     double **matrix_Y_unordered_eval,
-                                                     double **matrix_Y_ordered_eval,
-                                                     double **matrix_Y_continuous_eval,
-                                                     int num_eval,
-                                                     int map_train_tree_index,
-                                                     double *row_out);
 
 typedef struct {
   int ready;
@@ -15225,28 +15216,6 @@ static int np_shadow_conditional_y_row_fixed_op(double *vector_scale_factor,
                                                row_out);
 }
 
-static int np_shadow_conditional_y_eval_row_fixed_op(double *vector_scale_factor,
-                                                     int eval_idx,
-                                                     int operator_code,
-                                                     double **matrix_Y_unordered_eval,
-                                                     double **matrix_Y_ordered_eval,
-                                                     double **matrix_Y_continuous_eval,
-                                                     int num_eval,
-                                                     int map_train_tree_index,
-                                                     double *row_out){
-  if(BANDWIDTH_den_extern != BW_FIXED)
-    return 1;
-  return np_shadow_conditional_y_eval_row_stream_op(vector_scale_factor,
-                                                    eval_idx,
-                                                    operator_code,
-                                                    matrix_Y_unordered_eval,
-                                                    matrix_Y_ordered_eval,
-                                                    matrix_Y_continuous_eval,
-                                                    num_eval,
-                                                    map_train_tree_index,
-                                                    row_out);
-}
-
 static int np_shadow_conditional_y_row_stream(double *vector_scale_factor,
                                               int eval_idx,
                                               double *row_out){
@@ -15360,8 +15329,8 @@ cleanup_cvls_lp_stream:
   return status;
 }
 
-static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale_factor,
-                                                            double *cv){
+int np_conditional_distribution_cvls_lp_stream(double *vector_scale_factor,
+                                               double *cv){
   const int num_train = num_obs_train_extern;
   const int num_eval = num_obs_eval_extern;
   double *xrow = NULL, *yint = NULL;
@@ -15370,16 +15339,19 @@ static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale
 
   if((cv == NULL) || (vector_scale_factor == NULL) || (num_train <= 0) || (num_eval <= 0))
     return 1;
+  if((BANDWIDTH_den_extern != BW_FIXED) &&
+     (BANDWIDTH_den_extern != BW_GEN_NN))
+    return 1;
 
   xrow = alloc_vecd(MAX(1, num_train));
   yint = alloc_vecd(MAX(1, num_train));
   if((xrow == NULL) || (yint == NULL))
-    goto cleanup_cdist_fixed_lp_stream;
+    goto cleanup_cdist_lp_stream;
 
   *cv = 0.0;
   for(i = 0; i < num_train; i++){
-    if(np_shadow_proof_conditional_x_weight_row_fixed(vector_scale_factor, i, xrow) != 0)
-      goto cleanup_cdist_fixed_lp_stream;
+    if(np_shadow_proof_conditional_x_weight_row_stream(vector_scale_factor, i, xrow) != 0)
+      goto cleanup_cdist_lp_stream;
 
     for(j = 0; j < num_eval; j++){
       double fit = 0.0;
@@ -15393,16 +15365,16 @@ static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale
                                                            num_var_ordered_extern,
                                                            num_var_continuous_extern);
 
-      if(np_shadow_conditional_y_eval_row_fixed_op(vector_scale_factor,
-                                                   j,
-                                                   OP_INTEGRAL,
-                                                   matrix_Y_unordered_eval_extern,
-                                                   matrix_Y_ordered_eval_extern,
-                                                   matrix_Y_continuous_eval_extern,
-                                                   num_eval,
-                                                   cdfontrain_extern && (num_eval == num_train),
-                                                   yint) != 0)
-        goto cleanup_cdist_fixed_lp_stream;
+      if(np_shadow_conditional_y_eval_row_stream_op(vector_scale_factor,
+                                                    j,
+                                                    OP_INTEGRAL,
+                                                    matrix_Y_unordered_eval_extern,
+                                                    matrix_Y_ordered_eval_extern,
+                                                    matrix_Y_continuous_eval_extern,
+                                                    num_eval,
+                                                    cdfontrain_extern && (num_eval == num_train),
+                                                    yint) != 0)
+        goto cleanup_cdist_lp_stream;
 
       if(cdfontrain_extern && (i == j))
         continue;
@@ -15420,10 +15392,17 @@ static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale
   *cv /= ((double)num_train*(double)MAX(1, num_eval));
   status = 0;
 
-cleanup_cdist_fixed_lp_stream:
+cleanup_cdist_lp_stream:
   if(xrow != NULL) free(xrow);
   if(yint != NULL) free(yint);
   return status;
+}
+
+static int np_conditional_distribution_cvls_fixed_lp_stream(double *vector_scale_factor,
+                                                            double *cv){
+  if(BANDWIDTH_den_extern != BW_FIXED)
+    return 1;
+  return np_conditional_distribution_cvls_lp_stream(vector_scale_factor, cv);
 }
 
 static int np_shadow_conditional_build_y_matrix(const int *operator_y,
