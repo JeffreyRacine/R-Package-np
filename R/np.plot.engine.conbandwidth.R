@@ -46,6 +46,9 @@
            plot.bxp = FALSE,
            plot.bxp.out = TRUE,
            plot.par.mfrow = TRUE,
+           proper = FALSE,
+           proper.method = c("project"),
+           proper.control = list(),
            ...,
            random.seed){
 
@@ -153,6 +156,11 @@
     }
 
     plot.errors = (plot.errors.method != "none")
+    proper.args <- .np_condens_validate_proper_args(
+      proper = proper,
+      proper.method = proper.method,
+      proper.control = proper.control
+    )
 
     if ((bws$xncon + bws$xnord + bws$yncon + bws$ynord - quantreg == 2) &
         (bws$xnuno + bws$ynuno == 0) & perspective & !gradients &
@@ -219,6 +227,13 @@
       } else {
         margs$exdat <- x.eval[,1, drop = FALSE]
         margs$eydat <- x.eval[,2, drop = FALSE]
+        if (isTRUE(proper.args$proper.requested)) {
+          if (plot.errors)
+            stop("plot.errors.method != 'none' is unsupported when proper=TRUE is active on conditional density grids", call. = FALSE)
+          margs$proper <- TRUE
+          margs$proper.method <- proper.args$proper.method
+          margs$proper.control <- proper.args$proper.control
+        }
       }
       tobj <- do.call(method.fun, margs)
       tcomp <- switch(tboo,
@@ -321,6 +336,11 @@
           ret.args$yeval <- tey
           if (cdf) ret.args$condist <- tcomp else ret.args$condens <- tcomp
           ret.args$conderr <- terr[,1:2]
+          ret.args$proper.requested <- tobj$proper.requested
+          ret.args$proper.applied <- tobj$proper.applied
+          ret.args$proper.method <- tobj$proper.method
+          ret.args$condens.raw <- tobj$condens.raw
+          ret.args$proper.info <- tobj$proper.info
         }
         cd1 <- do.call(ret.fun, ret.args)
         cd1$bias = NA
@@ -546,6 +566,15 @@
         else
           margs$eydat <- eydat[seq_len(xi.neval),, drop = FALSE]
         tobj <- do.call(method.fun, margs)
+        if (!quantreg && isTRUE(proper.args$proper.requested)) {
+          tobj$proper.requested <- TRUE
+          tobj$proper.applied <- FALSE
+          tobj$proper.method <- proper.args$proper.method
+          tobj$proper.info <- .np_condens_make_reason_info(
+            reason = "x_slices_not_repeated",
+            supported = FALSE
+          )
+        }
 
         
         ## if there are gradients then we need to repeat the process for each component
@@ -739,6 +768,13 @@
             margs$tau <- tau
           else
             margs$exdat <- exdat[seq_len(xi.neval),, drop = FALSE]
+          if (!quantreg && isTRUE(proper.args$proper.requested)) {
+            if (plot.errors)
+              stop("plot.errors.method != 'none' is unsupported when proper=TRUE is active on y-varying conditional density panels", call. = FALSE)
+            margs$proper <- TRUE
+            margs$proper.method <- proper.args$proper.method
+            margs$proper.control <- proper.args$proper.control
+          }
           tobj <- do.call(method.fun, margs)
 
           
