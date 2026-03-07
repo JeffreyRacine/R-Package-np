@@ -239,6 +239,32 @@
   as.numeric(out[, 1L])
 }
 
+.npRmpi_npsig_bootstrap_bw_reselect <- function(xdat,
+                                                ydat,
+                                                bws.seed,
+                                                extra.args = list(),
+                                                bootstrap.iter,
+                                                bw.fun = npregbw,
+                                                localize = TRUE) {
+  bw.args <- if (length(extra.args)) extra.args else list()
+  bw.args[c("xdat", "ydat", "bws")] <- NULL
+
+  user.nmulti <- !is.null(names(bw.args)) &&
+    "nmulti" %in% names(bw.args) &&
+    !is.null(bw.args$nmulti)
+
+  if (!user.nmulti && bootstrap.iter > 1L)
+    bw.args$nmulti <- 1L
+
+  call.args <- c(list(xdat = xdat, ydat = ydat, bws = bws.seed), bw.args)
+
+  if (localize) {
+    .npRmpi_with_local_regression(do.call(bw.fun, call.args))
+  } else {
+    do.call(bw.fun, call.args)
+  }
+}
+
 npsigtest <-
   function(bws, ...){
     args <- list(...)
