@@ -63,6 +63,12 @@ int int_TREE_X;
 int int_TREE_Y;
 int int_TREE_XY;
 
+static int np_mpi_local_regression_mode = 0;
+#ifdef MPI2
+static int np_mpi_local_regression_saved_rank = 0;
+static int np_mpi_local_regression_saved_nproc = 1;
+#endif
+
 /* Some externals for numerical routines */
 /* Some externals for numerical routines */
 
@@ -78,6 +84,11 @@ int num_reg_ordered_extern=0;
 int int_cker_bound_extern=0;
 double *vector_ckerlb_extern=NULL;
 double *vector_ckerub_extern=NULL;
+
+int np_mpi_local_regression_active(void)
+{
+  return np_mpi_local_regression_mode;
+}
 int int_cxker_bound_extern=0;
 int int_cyker_bound_extern=0;
 int int_cxyker_bound_extern=0;
@@ -736,6 +747,33 @@ SEXP C_np_set_tgauss2(SEXP coefficients)
 
   UNPROTECT(1);
   return R_NilValue;
+}
+
+SEXP C_np_set_local_regression_mode(SEXP active)
+{
+  const int requested = asLogical(active);
+  const int previous = np_mpi_local_regression_mode;
+
+  if (requested == NA_LOGICAL)
+    error("C_np_set_local_regression_mode: 'active' must be TRUE or FALSE");
+
+#ifdef MPI2
+  if (requested && !np_mpi_local_regression_mode) {
+    np_mpi_local_regression_saved_rank = my_rank;
+    np_mpi_local_regression_saved_nproc = iNum_Processors;
+    my_rank = 0;
+    iNum_Processors = 1;
+    np_mpi_local_regression_mode = 1;
+  } else if (!requested && np_mpi_local_regression_mode) {
+    my_rank = np_mpi_local_regression_saved_rank;
+    iNum_Processors = np_mpi_local_regression_saved_nproc;
+    np_mpi_local_regression_mode = 0;
+  }
+#else
+  np_mpi_local_regression_mode = requested ? 1 : 0;
+#endif
+
+  return ScalarLogical(previous);
 }
 
 SEXP C_np_release_static_buffers(void)
@@ -6877,7 +6915,7 @@ void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                             num_reg_continuous_extern,
                             num_reg_unordered_extern,
                             num_reg_ordered_extern,
-                            0, // do not suppress_parallel
+                            np_mpi_local_regression_active() ? 1 : 0,
                             &vector_scale_factor[1],
                             /* Not used */
                             matrix_Y_continuous_train_extern,

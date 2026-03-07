@@ -20,6 +20,7 @@ extern SEXP C_np_regression_bw(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, S
 extern SEXP C_np_regression(SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP, SEXP);
 extern SEXP C_np_set_seed(SEXP);
 extern SEXP C_np_set_tgauss2(SEXP);
+extern SEXP C_np_set_local_regression_mode(SEXP);
 extern SEXP C_np_release_static_buffers(void);
 extern SEXP C_np_mpi_init(void);
 
@@ -39,6 +40,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"C_np_regression",                (DL_FUNC) &C_np_regression,                24},
     {"C_np_set_seed",                  (DL_FUNC) &C_np_set_seed,                   1},
     {"C_np_set_tgauss2",               (DL_FUNC) &C_np_set_tgauss2,                1},
+    {"C_np_set_local_regression_mode", (DL_FUNC) &C_np_set_local_regression_mode,  1},
     {"C_np_release_static_buffers",    (DL_FUNC) &C_np_release_static_buffers,     0},
     {"C_np_mpi_init",                  (DL_FUNC) &C_np_mpi_init,                   0},
     {NULL, NULL, 0}

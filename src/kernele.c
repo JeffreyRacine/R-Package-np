@@ -4442,20 +4442,22 @@ double *SIGN)
 	/* Important - only one gather permitted */
 
 	/* Gather */
-
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
-	MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-	MPI_Gather(mean_stderr, stride, MPI_DOUBLE, mean_stderr, stride, MPI_DOUBLE, 0, comm[1]);
-	MPI_Bcast(mean_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-
-	for(l = 0; l < num_reg_continuous; l++)
+	if(!np_mpi_local_regression_active())
 	{
+		MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+		MPI_Gather(mean_stderr, stride, MPI_DOUBLE, mean_stderr, stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(mean_stderr, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-		MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
-		MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-		MPI_Gather(&gradient_stderr[l][0], stride, MPI_DOUBLE, &gradient_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
-		MPI_Bcast(&gradient_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+		for(l = 0; l < num_reg_continuous; l++)
+		{
 
+			MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+			MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+			MPI_Gather(&gradient_stderr[l][0], stride, MPI_DOUBLE, &gradient_stderr[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+			MPI_Bcast(&gradient_stderr[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+
+		}
 	}
 	#endif
 
@@ -10593,21 +10595,23 @@ double **gradient)
 	}
 
 	/* Important - only one gather per module */
-
-	MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
-	MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
-
-	if(int_compute_gradient == 1)
+	if(!np_mpi_local_regression_active())
 	{
+		MPI_Gather(mean, stride, MPI_DOUBLE, mean, stride, MPI_DOUBLE, 0, comm[1]);
+		MPI_Bcast(mean, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
 
-		for(l = 0; l < num_reg_continuous; l++)
+		if(int_compute_gradient == 1)
 		{
 
-			MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
-			MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+			for(l = 0; l < num_reg_continuous; l++)
+			{
+
+				MPI_Gather(&gradient[l][0], stride, MPI_DOUBLE, &gradient[l][0], stride, MPI_DOUBLE, 0, comm[1]);
+				MPI_Bcast(&gradient[l][0], num_obs_eval, MPI_DOUBLE, 0, comm[1]);
+
+			}
 
 		}
-
 	}
 	#endif
 

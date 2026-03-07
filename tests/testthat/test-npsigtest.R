@@ -1,7 +1,7 @@
-test_that("npsigtest routes through shared autodispatch entrypoint", {
+test_that("npsigtest orchestrates locally without whole-call autodispatch", {
   fn <- getFromNamespace("npsigtest", "npRmpi")
   body.txt <- paste(deparse(body(fn), width.cutoff = 500L), collapse = " ")
-  expect_match(body.txt, "\\.npRmpi_autodispatch_call\\(")
+  expect_false(grepl("\\.npRmpi_autodispatch_call\\(", body.txt))
   expect_false(grepl("\\.npRmpi_manual_distributed_call\\(", body.txt))
 })
 
@@ -95,5 +95,48 @@ test_that("npsigtest rejects duplicate index entries under autodispatch", {
   expect_error(
     npsigtest(bws = bw, boot.num = 9, index = c(1, 1)),
     "repeated values"
+  )
+})
+
+test_that("npsigtest local regression wrapper is safe under an active slave pool", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  options(npRmpi.autodispatch = TRUE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+
+  set.seed(21)
+  n <- 35
+  x <- runif(n)
+  y <- sin(2 * pi * x) + rnorm(n, sd = 0.1)
+  bw <- npregbw(xdat = data.frame(x = x), ydat = y, bws = 0.25, bandwidth.compute = FALSE, regtype = "ll")
+
+  local.fun <- getFromNamespace(".npRmpi_npsig_npreg_local", "npRmpi")
+  fit <- local.fun(txdat = data.frame(x = x), tydat = y, bws = bw, gradients = TRUE)
+
+  expect_s3_class(fit, "regression")
+  expect_identical(length(fit$mean), n)
+  expect_identical(ncol(fit$grad), 1L)
+})
+
+test_that("npsigtest boot.type II fails fast in npRmpi", {
+  skip_on_cran()
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  options(npRmpi.autodispatch = TRUE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+
+  set.seed(31)
+  n <- 30
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- x1 + rnorm(n, sd = 0.1)
+  mydat <- data.frame(y, x1, x2)
+  bw <- npregbw(y ~ x1 + x2, data = mydat, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
+
+  expect_error(
+    npsigtest(bws = bw, boot.num = 9, boot.type = "II"),
+    "not yet supported in npRmpi",
+    fixed = TRUE
   )
 })

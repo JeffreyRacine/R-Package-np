@@ -45,10 +45,10 @@ test_that("npsigtest locked opcode rejects mismatched call heads", {
   })
 })
 
-test_that("npsigtest entrypoint no longer uses manual distributed call helper", {
+test_that("npsigtest entrypoint orchestrates locally without whole-call autodispatch", {
   fn <- getFromNamespace("npsigtest", "npRmpi")
   body.txt <- paste(deparse(body(fn), width.cutoff = 500L), collapse = " ")
-  expect_match(body.txt, "\\.npRmpi_autodispatch_call\\(")
+  expect_false(grepl("\\.npRmpi_autodispatch_call\\(", body.txt))
   expect_false(grepl("\\.npRmpi_manual_distributed_call\\(", body.txt))
 })
 
