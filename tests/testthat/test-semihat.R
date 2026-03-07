@@ -431,6 +431,86 @@ test_that("npindex and npindexhat support ll/lp basis variants", {
   }
 })
 
+test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
+  set.seed(314162)
+  n <- 80
+  x1 <- runif(n)
+  x2 <- runif(n)
+  y <- sin(2 * (x1 + x2)) + rnorm(n, sd = 0.05)
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(25), , drop = FALSE]
+
+  cfgs <- list(
+    list(regtype = "lc", basis = NULL, degree = NULL, h = 0.85),
+    list(regtype = "ll", basis = NULL, degree = NULL, h = 0.85),
+    list(regtype = "lp", basis = "tensor", degree = 2L, h = 0.85)
+  )
+
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    for (cfg in cfgs) {
+      bw.args <- list(
+        xdat = tx,
+        ydat = y,
+        bws = c(1, 1, cfg$h),
+        bandwidth.compute = FALSE,
+        regtype = cfg$regtype,
+        bwtype = bt
+      )
+      if (!is.null(cfg$basis)) {
+        bw.args$basis <- cfg$basis
+        bw.args$degree <- cfg$degree
+      }
+      bw <- do.call(npindexbw, bw.args)
+
+      fit <- npindex(
+        bws = bw,
+        txdat = tx,
+        tydat = y,
+        exdat = ex,
+        gradients = FALSE
+      )
+      H <- npindexhat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        s = 0L,
+        output = "matrix"
+      )
+      hy <- npindexhat(
+        bws = bw,
+        txdat = tx,
+        exdat = ex,
+        y = y,
+        s = 0L,
+        output = "apply"
+      )
+
+      expect_equal(as.vector(H %*% y), as.vector(fit$mean), tolerance = 1e-8, info = paste(bt, cfg$regtype))
+      expect_equal(as.vector(hy), as.vector(fit$mean), tolerance = 1e-8, info = paste(bt, cfg$regtype))
+    }
+  }
+})
+
+test_that("npindexbw lc selection no longer collapses nearest-neighbor bwtypes to fixed", {
+  set.seed(314163)
+  n <- 70
+  x1 <- rnorm(n)
+  x2 <- rnorm(n)
+  y <- x1 - x2 + rnorm(n, sd = 0.2)
+  tx <- data.frame(x1 = x1, x2 = x2)
+
+  bw.fixed <- npindexbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "fixed", nmulti = 1)
+  bw.gen <- npindexbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "generalized_nn", nmulti = 1)
+  bw.adap <- npindexbw(xdat = tx, ydat = y, regtype = "lc", bwtype = "adaptive_nn", nmulti = 1)
+
+  fit.fixed <- npindex(bws = bw.fixed, txdat = tx, tydat = y)$mean
+  fit.gen <- npindex(bws = bw.gen, txdat = tx, tydat = y)$mean
+  fit.adap <- npindex(bws = bw.adap, txdat = tx, tydat = y)$mean
+
+  expect_gt(max(abs(fit.fixed - fit.gen)), 1e-6)
+  expect_gt(max(abs(fit.fixed - fit.adap)), 1e-6)
+})
+
 test_that("semihat helper routes preserve LP and kernel-bound option contracts", {
   set.seed(314161)
   n <- 75

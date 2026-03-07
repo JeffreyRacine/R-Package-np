@@ -305,22 +305,25 @@ npindex.sibandwidth <-
 
     ## First, create the scalar index (n \times 1 vector)
 
-    index <- txdat %*% bws$beta
+    index <- as.vector(txdat %*% bws$beta)
 
     if(no.ex) {
       index.eval <- index
       exdat <- txdat
       eydat <- tydat
     } else {
-      index.eval <- exdat %*% bws$beta
+      index.eval <- as.vector(exdat %*% bws$beta)
     }
+    index.df <- data.frame(index = index)
+    index.eval.df <- data.frame(index = index.eval)
 
     spec <- .npindex_resolve_spec(bws, where = "npindex")
     regtype <- spec$regtype.engine
     npreg.idx.args <- list(
-      txdat = index,
+      txdat = index.df,
       tydat = tydat,
       bws = bws$bw,
+      bwtype = bws$type,
       ckertype = bws$ckertype,
       ckerorder = bws$ckerorder,
       regtype = regtype,
@@ -336,11 +339,12 @@ npindex.sibandwidth <-
 
     if(gradients==FALSE) {
       if (identical(regtype, "lc")) {
-        tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
+        tww <- npksum(txdat=index.df,
                       tydat=as.matrix(data.frame(tydat,1)),
                       weights=as.matrix(data.frame(tydat,1)),
-                      exdat=as.matrix(exdat) %*% as.matrix(bws$beta),
+                      exdat=index.eval.df,
                       bws=bws$bw,
+                      bwtype = bws$type,
                       ckertype = bws$ckertype,
                       ckerorder = bws$ckerorder)$ksum
 
@@ -352,10 +356,12 @@ npindex.sibandwidth <-
           ## if evaluation x's are different from training but no y's
           ## are specified
 
-          tww <- npksum(txdat=as.matrix(txdat) %*% as.matrix(bws$beta),
+          tww <- npksum(txdat=index.df,
                         tydat=as.matrix(data.frame(tydat,1)),
                         weights=as.matrix(data.frame(tydat,1)),
+                        exdat=index.df,
                         bws=bws$bw,
+                        bwtype = bws$type,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
@@ -364,7 +370,7 @@ npindex.sibandwidth <-
         }
       } else {
         model <- do.call(npreg, c(npreg.idx.args, list(
-          exdat = index.eval,
+          exdat = index.eval.df,
           gradients = FALSE
         )))
         index.mean <- model$mean
@@ -379,7 +385,7 @@ npindex.sibandwidth <-
 
     } else if(gradients==TRUE) {
       model <- do.call(npreg, c(npreg.idx.args, list(
-        exdat = index.eval,
+        exdat = index.eval.df,
         gradients = TRUE
       )))
 
@@ -441,15 +447,17 @@ npindex.sibandwidth <-
 
       W <- txdat[,-1,drop=FALSE]
 
-      tyindex <- npksum(txdat = index,
+      tyindex <- npksum(txdat = index.df,
                         tydat = rep(1,length(tydat)),
                         weights = W,
                         bws = bws$bw,
+                        bwtype = bws$type,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
-      tindex <- npksum(txdat = index,
+      tindex <- npksum(txdat = index.df,
                        bws = bws$bw,
+                       bwtype = bws$type,
                        ckertype = bws$ckertype,
                        ckerorder = bws$ckerorder)$ksum
 
@@ -511,11 +519,13 @@ npindex.sibandwidth <-
     if (gradients){
       boofun = function(data, indices){
         rindex <- txdat[indices,] %*% bws$beta
+        rindex.df <- data.frame(index = as.vector(rindex))
         boot.args <- list(
-          txdat = rindex,
+          txdat = rindex.df,
           tydat = tydat[indices],
-          exdat = index.eval,
+          exdat = index.eval.df,
           bws = bws$bw,
+          bwtype = bws$type,
           ckertype = bws$ckertype,
           ckerorder = bws$ckerorder,
           regtype = regtype,
@@ -536,21 +546,25 @@ npindex.sibandwidth <-
       boofun = function(data, indices){
         rindex = txdat[indices,] %*% bws$beta
         if (identical(regtype, "lc")) {
-          tww <- npksum(txdat = rindex,
+          rindex.df <- data.frame(index = as.vector(rindex))
+          tww <- npksum(txdat = rindex.df,
                         tydat = cbind(tydat[indices],1),
                         weights = cbind(tydat[indices],1),
-                        exdat = index.eval,
+                        exdat = index.eval.df,
                         bws = bws$bw,
+                        bwtype = bws$type,
                         ckertype = bws$ckertype,
                         ckerorder = bws$ckerorder)$ksum
 
           tww[1,2,]/NZD(tww[2,2,])
         } else {
+          rindex.df <- data.frame(index = as.vector(rindex))
           boot.args <- list(
-            txdat = rindex,
+            txdat = rindex.df,
             tydat = tydat[indices],
-            exdat = index.eval,
+            exdat = index.eval.df,
             bws = bws$bw,
+            bwtype = bws$type,
             ckertype = bws$ckertype,
             ckerorder = bws$ckerorder,
             regtype = regtype,

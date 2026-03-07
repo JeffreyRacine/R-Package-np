@@ -408,17 +408,23 @@ npindexbw.sibandwidth <-
               fit.loo <- if (identical(spec$regtype.engine, "lc")) {
                 ## One call to npksum to avoid repeated computation of the
                 ## product kernel (the expensive part)
-                tww <- npksum(txdat=index,
-                              tydat=wmat,
-                              weights=wmat,
-                              leave.one.out=TRUE,
-                              bandwidth.divide=TRUE,
-                              bws=c(h),
-                              ckertype = bws$ckertype,
-                              ckerorder = bws$ckerorder,
-                              ckerbound = bws$ckerbound,
-                              ckerlb = bws$ckerlb,
-                              ckerub = bws$ckerub)$ksum
+                tww <- tryCatch(
+                  npksum(txdat=index,
+                         tydat=wmat,
+                         weights=wmat,
+                         leave.one.out=TRUE,
+                         bandwidth.divide=TRUE,
+                         bws=c(h),
+                         bwtype = bws$type,
+                         ckertype = bws$ckertype,
+                         ckerorder = bws$ckerorder,
+                         ckerbound = bws$ckerbound,
+                         ckerlb = bws$ckerlb,
+                         ckerub = bws$ckerub)$ksum,
+                  error = function(e) NULL
+                )
+                if (is.null(tww))
+                  return(rep.int(NA_real_, length(ydat)))
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
                 ok.design <- tryCatch({
@@ -443,6 +449,9 @@ npindexbw.sibandwidth <-
                   spec = spec
                 )
               }
+
+              if (any(!is.finite(fit.loo)))
+                return(ichimuraMaxPenalty)
 
               t.ret <- mean((ydat-fit.loo)^2)
               return(t.ret)
@@ -489,17 +498,23 @@ npindexbw.sibandwidth <-
               ks.loo <- if (identical(spec$regtype.engine, "lc")) {
                 ## One call to npksum to avoid repeated computation of the
                 ## product kernel (the expensive part)
-                tww <- npksum(txdat=index,
-                              tydat=wmat,
-                              weights=wmat,
-                              leave.one.out=TRUE,
-                              bandwidth.divide=TRUE,
-                              bws=c(h),
-                              ckertype = bws$ckertype,
-                              ckerorder = bws$ckerorder,
-                              ckerbound = bws$ckerbound,
-                              ckerlb = bws$ckerlb,
-                              ckerub = bws$ckerub)$ksum
+                tww <- tryCatch(
+                  npksum(txdat=index,
+                         tydat=wmat,
+                         weights=wmat,
+                         leave.one.out=TRUE,
+                         bandwidth.divide=TRUE,
+                         bws=c(h),
+                         bwtype = bws$type,
+                         ckertype = bws$ckertype,
+                         ckerorder = bws$ckerorder,
+                         ckerbound = bws$ckerbound,
+                         ckerlb = bws$ckerlb,
+                         ckerub = bws$ckerub)$ksum,
+                  error = function(e) NULL
+                )
+                if (is.null(tww))
+                  return(rep.int(NA_real_, length(ydat)))
                 tww[1,2,]/NZD(tww[2,2,])
               } else {
                 ok.design <- tryCatch({
@@ -524,6 +539,9 @@ npindexbw.sibandwidth <-
                   spec = spec
                 )
               }
+
+              if (any(!is.finite(ks.loo)))
+                return(sqrt(.Machine$double.xmax))
 
               ## Avoid taking log of zero (ks.loo = 0 or 1 since we take
               ## the log of ks.loo and the log of 1-ks.loo)
