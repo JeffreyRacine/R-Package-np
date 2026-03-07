@@ -194,20 +194,12 @@ npcdistbw.condbandwidth <-
       ncon = bws$xncon,
       where = "npcdistbw"
     )
-    if (bandwidth.compute &&
-        identical(spec$regtype.engine, "lp") &&
-        identical(bws$method, "cv.ls") &&
-        identical(bws$type, "adaptive_nn"))
-      stop(
-        "public npcdistbw() LP/LL cv.ls route is temporarily disabled pending low-memory shadow CV remediation"
-      )
-
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    keep_local_cvls_gnn <- bandwidth.compute &&
+    keep_local_cvls_nn <- bandwidth.compute &&
       identical(spec$regtype.engine, "lp") &&
       identical(bws$method, "cv.ls") &&
-      identical(bws$type, "generalized_nn")
-    if (.npRmpi_autodispatch_active() && !keep_local_cvls_gnn)
+      identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+    if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat = xdat[goodrows,,drop = FALSE]
@@ -703,19 +695,12 @@ npcdistbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     tbw <- do.call(condbandwidth, bw.args)
-    if (bandwidth.compute &&
-        identical(tbw$regtype.engine, "lp") &&
-        identical(tbw$method, "cv.ls") &&
-        identical(tbw$type, "adaptive_nn"))
-      stop(
-        "public npcdistbw() LP/LL cv.ls route is temporarily disabled pending low-memory shadow CV remediation"
-      )
     .npRmpi_require_active_slave_pool(where = "npcdistbw()")
-    keep_local_cvls_gnn <- bandwidth.compute &&
+    keep_local_cvls_nn <- bandwidth.compute &&
       identical(tbw$regtype.engine, "lp") &&
       identical(tbw$method, "cv.ls") &&
-      identical(tbw$type, "generalized_nn")
-    if (.npRmpi_autodispatch_active() && !keep_local_cvls_gnn)
+      identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+    if (.npRmpi_autodispatch_active() && !keep_local_cvls_nn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
                         
     ## next grab dummies for actual bandwidth selection and perform call

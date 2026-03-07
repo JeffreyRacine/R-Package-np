@@ -84,24 +84,38 @@ test_that("public npcdensbw cv.ml generalized-nn LP route activates with ll == l
   expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
 })
 
-test_that("public npcdensbw cv.ml adaptive-nn LP route stays contained", {
+test_that("public npcdensbw cv.ml adaptive-nn LP route activates with ll == lp parity", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+
   set.seed(20260309)
   n <- 24L
   x <- data.frame(x1 = runif(n))
   y <- data.frame(y1 = x$x1 + rnorm(n, sd = 0.1))
   degree <- rep.int(1L, ncol(x))
 
-  expect_error(
-    npcdensbw(
-      xdat = x,
-      ydat = y,
-      regtype = "lp",
-      basis = "glp",
-      degree = degree,
-      bwtype = "adaptive_nn",
-      bwmethod = "cv.ml",
-      nmulti = 0
-    ),
-    "temporarily disabled pending low-memory shadow CV remediation"
+  bw.ll <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "adaptive_nn",
+    bwmethod = "cv.ml",
+    nmulti = 0,
+    itmax = 1
   )
+  bw.lp <- npcdensbw(
+    xdat = x,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = degree,
+    bwtype = "adaptive_nn",
+    bwmethod = "cv.ml",
+    nmulti = 0,
+    itmax = 1
+  )
+
+  expect_true(is.finite(bw.ll$fval))
+  expect_true(is.finite(bw.lp$fval))
+  expect_equal(bw.ll$fval, bw.lp$fval, tolerance = 1e-8)
 })

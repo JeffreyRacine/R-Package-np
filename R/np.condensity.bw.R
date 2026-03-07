@@ -163,21 +163,12 @@ npcdensbw.conbandwidth <-
       ncon = bws$xncon,
       where = "npcdensbw"
     )
-    if (bandwidth.compute &&
-        identical(spec$regtype.engine, "lp") &&
-        identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-        identical(bws$type, "adaptive_nn"))
-      stop(sprintf(
-        "public npcdensbw() LP/LL %s route is temporarily disabled pending low-memory shadow CV remediation",
-        bws$method
-      ))
-
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
-    keep_local_shadow_gnn <- bandwidth.compute &&
+    keep_local_shadow_nn <- bandwidth.compute &&
       identical(spec$regtype.engine, "lp") &&
       identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-      identical(bws$type, "generalized_nn")
-    if (.npRmpi_autodispatch_active() && !keep_local_shadow_gnn)
+      identical(bws$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+    if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     xdat = xdat[goodrows,,drop = FALSE]
@@ -620,20 +611,12 @@ npcdensbw.default <-
       bw.args[nms] <- mget(nms, envir = environment(), inherits = FALSE)
     }
     tbw <- do.call(conbandwidth, bw.args)
-    if (bandwidth.compute &&
-        identical(tbw$regtype.engine, "lp") &&
-        identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-        identical(tbw$type, "adaptive_nn"))
-      stop(sprintf(
-        "public npcdensbw() LP/LL %s route is temporarily disabled pending low-memory shadow CV remediation",
-        tbw$method
-      ))
     .npRmpi_require_active_slave_pool(where = "npcdensbw()")
-    keep_local_shadow_gnn <- bandwidth.compute &&
+    keep_local_shadow_nn <- bandwidth.compute &&
       identical(tbw$regtype.engine, "lp") &&
       identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
-      identical(tbw$type, "generalized_nn")
-    if (.npRmpi_autodispatch_active() && !keep_local_shadow_gnn)
+      identical(tbw$type %in% c("generalized_nn", "adaptive_nn"), TRUE)
+    if (.npRmpi_autodispatch_active() && !keep_local_shadow_nn)
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
                         
     ## next grab dummies for actual bandwidth selection and perform call
