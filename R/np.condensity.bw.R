@@ -165,8 +165,8 @@ npcdensbw.conbandwidth <-
     )
     if (bandwidth.compute &&
         identical(spec$regtype.engine, "lp") &&
-        (identical(bws$method, "cv.ls") ||
-         (identical(bws$method, "cv.ml") && !identical(bws$type, "fixed"))))
+        identical(bws$method %in% c("cv.ml", "cv.ls"), TRUE) &&
+        !identical(bws$type, "fixed"))
       stop(sprintf(
         "public npcdensbw() LP/LL %s route is temporarily disabled pending low-memory shadow CV remediation",
         bws$method
@@ -618,8 +618,8 @@ npcdensbw.default <-
     tbw <- do.call(conbandwidth, bw.args)
     if (bandwidth.compute &&
         identical(tbw$regtype.engine, "lp") &&
-        (identical(tbw$method, "cv.ls") ||
-         (identical(tbw$method, "cv.ml") && !identical(tbw$type, "fixed"))))
+        identical(tbw$method %in% c("cv.ml", "cv.ls"), TRUE) &&
+        !identical(tbw$type, "fixed"))
       stop(sprintf(
         "public npcdensbw() LP/LL %s route is temporarily disabled pending low-memory shadow CV remediation",
         tbw$method
