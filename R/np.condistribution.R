@@ -58,6 +58,8 @@ npcdist.formula <-
 
     ev$condist <- napredict(ev$omit, ev$condist)
     ev$conderr <- napredict(ev$omit, ev$conderr)
+    if (!is.null(ev$condist.raw))
+      ev$condist.raw <- napredict(ev$omit, ev$condist.raw)
 
     if(ev$gradients){
         ev$congrad <- napredict(ev$omit, ev$congrad)
@@ -79,14 +81,36 @@ npcdist.condbandwidth <-
   function(bws,
            txdat = stop("invoked without training data 'txdat'"),
            tydat = stop("invoked without training data 'tydat'"),
-           exdat, eydat, gradients = FALSE, ...){
+           exdat, eydat, gradients = FALSE,
+           proper = FALSE,
+           proper.method = c("isotonic"),
+           proper.control = list(),
+           ...){
 
     fit.start <- proc.time()[3]
     gradients <- npValidateScalarLogical(gradients, "gradients")
+    proper.args <- .np_condist_validate_proper_args(
+      proper = proper,
+      proper.method = proper.method,
+      proper.control = proper.control
+    )
     .npRmpi_require_active_slave_pool(where = "npcdist()")
     .npRmpi_guard_no_auto_object_in_manual_bcast(bws, where = "npcdist()")
-    if (.npRmpi_autodispatch_active())
-      return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
+    if (.npRmpi_autodispatch_active()) {
+      out <- .npRmpi_autodispatch_call(match.call(), parent.frame())
+      if (inherits(out, "condistribution") &&
+          !is.null(out$proper.requested) &&
+          !is.null(out$proper.applied) &&
+          !is.null(out$proper.info))
+        return(out)
+      return(.np_condist_finalize_proper_object(
+        object = out,
+        proper = proper.args$proper.requested,
+        proper.method = proper.args$proper.method,
+        proper.control = proper.args$proper.control,
+        where = "npcdist()"
+      ))
+    }
 
     if (xor(missing(exdat),missing(eydat)))
       stop("evaluation data must be supplied for both 'exdat' and 'eydat'")
@@ -356,7 +380,7 @@ npcdist.condbandwidth <-
     optim.time <- if (!is.null(bws$total.time) && is.finite(bws$total.time)) as.double(bws$total.time) else NA_real_
     total.time <- fit.elapsed + (if (is.na(optim.time)) 0.0 else optim.time)
 
-    return(condistribution(bws = bws,
+    out <- condistribution(bws = bws,
                            xeval = txeval,
                            yeval = tyeval,
                            condist = myout$condist, conderr = myout$conderr,
@@ -364,7 +388,15 @@ npcdist.condbandwidth <-
                            ntrain = tnrow, trainiseval = no.exy, gradients = gradients,
                            rows.omit = rows.omit,
                            timing = bws$timing, total.time = total.time,
-                           optim.time = optim.time, fit.time = fit.elapsed))
+                           optim.time = optim.time, fit.time = fit.elapsed)
+
+    .np_condist_finalize_proper_object(
+      object = out,
+      proper = proper.args$proper.requested,
+      proper.method = proper.args$proper.method,
+      proper.control = proper.args$proper.control,
+      where = "npcdist()"
+    )
 
   }
 
