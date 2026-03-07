@@ -100,6 +100,15 @@
   invisible(NULL)
 }
 
+.np_plot_restore_par <- function(oldpar) {
+  if (is.null(oldpar))
+    return(invisible(NULL))
+  if (is.list(oldpar) && !is.null(oldpar[["new"]]))
+    oldpar[["new"]] <- FALSE
+  suppressWarnings(try(par(oldpar), silent = TRUE))
+  invisible(NULL)
+}
+
 .np_mammen_draws <- function(n, B) {
   a <- (1 - sqrt(5)) / 2
   p.a <- (sqrt(5) + 1) / (2 * sqrt(5))

@@ -52,7 +52,7 @@
            random.seed){
 
     oldpar <- par(no.readonly = TRUE)
-    on.exit(par(oldpar), add = TRUE)
+    on.exit(.np_plot_restore_par(oldpar), add = TRUE)
 
     scalar_default <- function(value, default) {
       if (is.null(value)) default else value

@@ -31,7 +31,7 @@ np.pairs.plot <- function(pair_list) {
   y_labels <- names(y_vars)
 
   oldpar <- par(no.readonly = TRUE)
-  on.exit(par(oldpar), add = TRUE)
+  on.exit(.np_plot_restore_par(oldpar), add = TRUE)
   par(mfrow = c(length(y_vars), length(y_vars)), mar = c(4, 4, 2, 0))
   for (i in seq_len(nrow(pair_names))) {
     y1 <- pair_names[i, 1]
