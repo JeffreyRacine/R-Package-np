@@ -604,7 +604,20 @@ npscoef.scbandwidth <-
 
     if (errors || (residuals && miss.ex)) {
       if (errors) {
-        if (identical(reg.engine, "lc")) {
+        if (miss.ex && !do.iterate) {
+          mean.fit <- mean
+          resid <- tydat - mean.fit
+          u2.W <- resid^2
+          if (identical(reg.engine, "lc")) {
+            moments$s <- lc_moments(
+              z.eval = NULL,
+              leave.one.out.eval = leave.one.out,
+              u2 = u2.W
+            )$s
+          } else {
+            moments$s <- lp_tensor_moments(lp_state, u2 = u2.W)$s
+          }
+        } else if (identical(reg.engine, "lc")) {
           train.moments <- lc_moments(z.eval = NULL, leave.one.out.eval = leave.one.out)
           train.solve <- solve_moment_system(
             tyw = train.moments$tyw,
