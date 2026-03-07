@@ -78,6 +78,15 @@
   do.call(.npRmpi_npsig_npreg_local, args)
 }
 
+.npRmpi_npsig_do_leaf <- function(fun, extra.args = NULL, ...) {
+  args <- c(list(...), if (length(extra.args)) extra.args else NULL)
+  .npRmpi_autodispatch_untag(do.call(fun, args))
+}
+
+.npRmpi_npsig_npreg_leaf <- function(extra.args = NULL, ...) {
+  .npRmpi_npsig_do_leaf(npreg, extra.args = extra.args, ...)
+}
+
 .npRmpi_npsig_collective_context <- function() {
   isTRUE(.npRmpi_autodispatch_called_from_bcast())
 }
@@ -258,11 +267,13 @@
 
   call.args <- c(list(xdat = xdat, ydat = ydat, bws = bws.seed), bw.args)
 
-  if (localize) {
+  result <- if (localize) {
     .npRmpi_with_local_regression(do.call(bw.fun, call.args))
   } else {
     do.call(bw.fun, call.args)
   }
+
+  .npRmpi_autodispatch_untag(result)
 }
 
 npsigtest <-
@@ -380,12 +391,12 @@ npsigtest.rbandwidth <- function(bws,
   boot.type <- match.arg(boot.type)
   boot.method <- match.arg(boot.method)
   collective.mode <- .npRmpi_npsig_collective_context()
-
-  if(boot.type=="II")
-    stop("npsigtest(boot.type = 'II') is not yet supported in npRmpi; use np for this mode", call. = FALSE)
+  if (boot.type == "II")
+    bws.original <- bws
 
   num.obs <- nrow(xdat)
   extra.args <- list(...)
+  npreg.eval.fun <- if (boot.type == "II") .npRmpi_npsig_npreg_leaf else .npRmpi_npsig_do_local
 
   if(!joint) {
 
@@ -419,16 +430,19 @@ npsigtest.rbandwidth <- function(bws,
 
     In.mat = matrix(data = 0, ncol = 1, nrow = boot.num)
 
+    if (boot.type == "II")
+      bws <- bws.original
+
     ## Note - xdat must be a data frame
 
     ## Construct In, the average value of the squared derivatives of
     ## the jth element, discrete or continuous
 
-    npreg.out <- .npRmpi_npsig_do_local(extra.args,
-                                        txdat = xdat,
-                                        tydat = ydat,
-                                        bws = bws,
-                                        gradients = TRUE)
+    npreg.out <- npreg.eval.fun(extra.args,
+                                txdat = xdat,
+                                tydat = ydat,
+                                bws = bws,
+                                gradients = TRUE)
 
     In <- if(!pivot) {
       mean(npreg.out$grad[,index]^2)
@@ -442,11 +456,11 @@ npsigtest.rbandwidth <- function(bws,
 
       ## Compute scale and mean of unrestricted residuals
 
-      npreg.unres <- .npRmpi_npsig_do_local(extra.args,
-                                            txdat = xdat,
-                                            tydat = ydat,
-                                            bws = bws,
-                                            residuals = TRUE)
+      npreg.unres <- npreg.eval.fun(extra.args,
+                                    txdat = xdat,
+                                    tydat = ydat,
+                                    bws = bws,
+                                    residuals = TRUE)
       ei.unres <- scale(npreg.unres$resid)
       ei.unres.scale <- attr(ei.unres,"scaled:scale")
       ei.unres.center <- attr(ei.unres,"scaled:center")      
@@ -470,11 +484,11 @@ npsigtest.rbandwidth <- function(bws,
         }
       }
       
-      mhat.xi <-  .npRmpi_npsig_do_local(extra.args,
-                                         txdat = xdat,
-                                         tydat = ydat,
-                                         exdat = xdat.eval,
-                                         bws = bws)$mean
+      mhat.xi <-  npreg.eval.fun(extra.args,
+                                 txdat = xdat,
+                                 tydat = ydat,
+                                 exdat = xdat.eval,
+                                 bws = bws)$mean
 
       ## Rescale and recenter the residuals under the null to those
       ## under the alternative
@@ -487,175 +501,82 @@ npsigtest.rbandwidth <- function(bws,
       
     }
     
-    boot.seeds <- .npRmpi_npsig_bootstrap_seed_plan(
-      num.obs = num.obs,
-      boot.num = boot.num,
-      boot.method = boot.method,
-      draw.wild.mult = draw.wild.mult,
-      a = a,
-      b = b,
-      p.a = P.a
-    )
+    if (boot.type == "II") {
+      bws.boot.prev <- bws.original
 
-    joint.eval <- function(task.idx, seed.plan) {
-      out <- numeric(length(task.idx))
-      for (kk in seq_along(task.idx)) {
-        assign(".Random.seed", seed.plan[[task.idx[kk]]], envir = .GlobalEnv)
+      for (i.star in seq_len(boot.num)) {
+        msg <- paste("Bootstrap rep. ",
+                     i.star,
+                     "/",
+                     boot.num,
+                     sep = "")
+
+        if (!collective.mode)
+          console <- printPush(msg = msg, console)
+
         if (boot.method == "iid") {
           ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
-          npreg.boot <- .npRmpi_npsig_do_local(extra.args,
-                                               txdat = xdat,
-                                               tydat = ydat.star,
-                                               bws = bws,
-                                               gradients = TRUE)
         } else if (boot.method == "wild") {
           ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
-          npreg.boot <- .npRmpi_npsig_do_local(extra.args,
-                                               txdat = xdat,
-                                               tydat = ydat.star,
-                                               bws = bws,
-                                               gradients = TRUE)
         } else if (boot.method == "wild-rademacher") {
           ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
-          npreg.boot <- .npRmpi_npsig_do_local(extra.args,
-                                               txdat = xdat,
-                                               tydat = ydat.star,
-                                               bws = bws,
-                                               gradients = TRUE)
         } else {
           boot.index <- sample.int(num.obs, replace = TRUE)
           ydat.star <- ydat[boot.index]
           xdat.star <- xdat[boot.index,]
           for (jj in index)
             xdat.star[, jj] <- xdat[, jj]
-          npreg.boot <- .npRmpi_npsig_do_local(extra.args,
-                                               txdat = xdat.star,
-                                               tydat = ydat.star,
-                                               bws = bws,
-                                               gradients = TRUE)
         }
 
-        out[kk] <- if (!pivot) {
+        if (boot.method == "pairwise") {
+          bws.boot <- .npRmpi_npsig_bootstrap_bw_reselect(
+            xdat = xdat.star,
+            ydat = ydat.star,
+            bws.seed = bws.boot.prev,
+            extra.args = extra.args,
+            bootstrap.iter = i.star,
+            localize = FALSE
+          )
+        } else {
+          bws.boot <- .npRmpi_npsig_bootstrap_bw_reselect(
+            xdat = xdat,
+            ydat = ydat.star,
+            bws.seed = bws.boot.prev,
+            extra.args = extra.args,
+            bootstrap.iter = i.star,
+            localize = FALSE
+          )
+        }
+
+        bws.boot.prev <- bws.boot
+        bws <- bws.original
+        bws$bw[index] <- bws.boot$bw[index]
+
+        if (boot.method == "pairwise") {
+          npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
+                                                 txdat = xdat.star,
+                                                 tydat = ydat.star,
+                                                 bws = bws,
+                                                 gradients = TRUE)
+        } else {
+          npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
+                                                 txdat = xdat,
+                                                 tydat = ydat.star,
+                                                 bws = bws,
+                                                 gradients = TRUE)
+        }
+
+        In.vec[i.star] <- if (!pivot) {
           mean(npreg.boot$grad[, index]^2)
         } else {
           npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
           mean((npreg.boot$grad[, index] / NZD(npreg.boot$gerr[, index]))^2)
         }
+
+        if (!collective.mode)
+          console <- printPop(console)
       }
-      out
-    }
-
-    In.vec <- .npRmpi_npsig_parallel_boot_values(
-      boot.seeds = boot.seeds,
-      worker = joint.eval,
-      required.bindings = list(
-        boot.method = boot.method,
-        mhat.xi = mhat.xi,
-        ei = ei,
-        xdat = xdat,
-        ydat = ydat,
-        bws = bws,
-        index = index,
-        pivot = pivot,
-        num.obs = num.obs,
-        draw.wild.mult = draw.wild.mult,
-        a = a,
-        b = b,
-        P.a = P.a,
-        extra.args = extra.args
-      ),
-      what = "npsigtest",
-      profile.where = "npsigtest:joint"
-    )
-
-    ## Compute the P-value
-
-    P <- mean(In.vec > In)
-
-    In.mat[,1] = In.vec
-
-  } else {
-
-    ## Individual test
-
-    ## ii is the counter for successive elements of In and P...
-
-    In.mat = matrix(data = 0, ncol = length(index), nrow = boot.num)
-
-    ii <- 0
-
-    for(i in index) {
-      
-      ## Increment counter...
-      
-      ii <- ii + 1
-      
-      ## Note - xdat must be a data frame
-      
-      ## Construct In, the average value of the squared derivatives of
-      ## the jth element, discrete or continuous
-      
-      npreg.out <- .npRmpi_npsig_do_local(extra.args,
-                                          txdat = xdat,
-                                          tydat = ydat,
-                                          bws = bws,
-                                          gradients = TRUE)
-      
-      In[ii] <- if(!pivot) {
-        mean(npreg.out$grad[,i]^2)
-      } else {
-        ## Temporarily trap NaN XXX
-        npreg.out$gerr[is.nan(npreg.out$gerr)] <- .Machine$double.xmax
-        mean((npreg.out$grad[,i]/NZD(npreg.out$gerr[,i]))^2)
-      }
-      
-      if(boot.method != "pairwise") {
-
-        ## Compute scale and mean of unrestricted residuals
-
-        npreg.unres <- .npRmpi_npsig_do_local(extra.args,
-                                              txdat = xdat,
-                                              tydat = ydat,
-                                              bws = bws,
-                                              residuals = TRUE)
-        ei.unres <- scale(npreg.unres$resid)
-        ei.unres.scale <- attr(ei.unres,"scaled:scale")
-        ei.unres.center <- attr(ei.unres,"scaled:center")      
-
-        ## We now construct mhat.xi holding constant the variable whose
-        ## significance is being tested at its median. First, make a copy
-        ## of the data frame xdat
-        
-        xdat.eval <- xdat
-        
-        ## Impose the null by evaluating the conditional mean holding
-        ## xdat[,i] constant at its median (numeric) or mode
-        ## (factor/ordered) using uocquantile()
-        
-        xq <- uocquantile(xdat[,i], 0.5)
-        if (is.factor(xdat[,i]) || is.ordered(xdat[,i])) {
-          xdat.eval[,i] <- cast(xq, xdat[,i], same.levels = TRUE)
-        } else {
-          xdat.eval[,i] <- xq
-        }
-        
-        mhat.xi <-  .npRmpi_npsig_do_local(extra.args,
-                                           txdat = xdat,
-                                           tydat = ydat,
-                                           exdat = xdat.eval,
-                                           bws = bws)$mean
-        
-        ## Rescale and recenter the residuals under the null to those
-        ## under the alternative
-        
-        ei <- as.numeric(scale(ydat-mhat.xi)*ei.unres.scale+ei.unres.center)
-        
-        ## Recenter the residuals to have mean zero
-        
-        ei <- ei - mean(ei)
-        
-      }
-      
+    } else {
       boot.seeds <- .npRmpi_npsig_bootstrap_seed_plan(
         num.obs = num.obs,
         boot.num = boot.num,
@@ -666,7 +587,7 @@ npsigtest.rbandwidth <- function(bws,
         p.a = P.a
       )
 
-      indiv.eval <- function(task.idx, seed.plan) {
+      joint.eval <- function(task.idx, seed.plan) {
         out <- numeric(length(task.idx))
         for (kk in seq_along(task.idx)) {
           assign(".Random.seed", seed.plan[[task.idx[kk]]], envir = .GlobalEnv)
@@ -694,8 +615,9 @@ npsigtest.rbandwidth <- function(bws,
           } else {
             boot.index <- sample.int(num.obs, replace = TRUE)
             ydat.star <- ydat[boot.index]
-            xdat.star <- xdat
-            xdat.star[, -i] <- xdat[boot.index, -i]
+            xdat.star <- xdat[boot.index,]
+            for (jj in index)
+              xdat.star[, jj] <- xdat[, jj]
             npreg.boot <- .npRmpi_npsig_do_local(extra.args,
                                                  txdat = xdat.star,
                                                  tydat = ydat.star,
@@ -704,10 +626,10 @@ npsigtest.rbandwidth <- function(bws,
           }
 
           out[kk] <- if (!pivot) {
-            mean(npreg.boot$grad[, i]^2)
+            mean(npreg.boot$grad[, index]^2)
           } else {
             npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
-            mean((npreg.boot$grad[, i] / NZD(npreg.boot$gerr[, i]))^2)
+            mean((npreg.boot$grad[, index] / NZD(npreg.boot$gerr[, index]))^2)
           }
         }
         out
@@ -715,7 +637,7 @@ npsigtest.rbandwidth <- function(bws,
 
       In.vec <- .npRmpi_npsig_parallel_boot_values(
         boot.seeds = boot.seeds,
-        worker = indiv.eval,
+        worker = joint.eval,
         required.bindings = list(
           boot.method = boot.method,
           mhat.xi = mhat.xi,
@@ -723,7 +645,7 @@ npsigtest.rbandwidth <- function(bws,
           xdat = xdat,
           ydat = ydat,
           bws = bws,
-          i = i,
+          index = index,
           pivot = pivot,
           num.obs = num.obs,
           draw.wild.mult = draw.wild.mult,
@@ -733,8 +655,261 @@ npsigtest.rbandwidth <- function(bws,
           extra.args = extra.args
         ),
         what = "npsigtest",
-        profile.where = "npsigtest:indiv"
+        profile.where = "npsigtest:joint"
       )
+    }
+
+    ## Compute the P-value
+
+    P <- mean(In.vec > In)
+
+    In.mat[,1] = In.vec
+
+  } else {
+
+    ## Individual test
+
+    ## ii is the counter for successive elements of In and P...
+
+    In.mat = matrix(data = 0, ncol = length(index), nrow = boot.num)
+
+    ii <- 0
+
+    for(i in index) {
+      
+      ## Increment counter...
+      
+      ii <- ii + 1
+
+      if (boot.type == "II")
+        bws <- bws.original
+      
+      ## Note - xdat must be a data frame
+      
+      ## Construct In, the average value of the squared derivatives of
+      ## the jth element, discrete or continuous
+      
+      npreg.out <- npreg.eval.fun(extra.args,
+                                  txdat = xdat,
+                                  tydat = ydat,
+                                  bws = bws,
+                                  gradients = TRUE)
+      
+      In[ii] <- if(!pivot) {
+        mean(npreg.out$grad[,i]^2)
+      } else {
+        ## Temporarily trap NaN XXX
+        npreg.out$gerr[is.nan(npreg.out$gerr)] <- .Machine$double.xmax
+        mean((npreg.out$grad[,i]/NZD(npreg.out$gerr[,i]))^2)
+      }
+      
+      if(boot.method != "pairwise") {
+
+        ## Compute scale and mean of unrestricted residuals
+
+        npreg.unres <- npreg.eval.fun(extra.args,
+                                      txdat = xdat,
+                                      tydat = ydat,
+                                      bws = bws,
+                                      residuals = TRUE)
+        ei.unres <- scale(npreg.unres$resid)
+        ei.unres.scale <- attr(ei.unres,"scaled:scale")
+        ei.unres.center <- attr(ei.unres,"scaled:center")      
+
+        ## We now construct mhat.xi holding constant the variable whose
+        ## significance is being tested at its median. First, make a copy
+        ## of the data frame xdat
+        
+        xdat.eval <- xdat
+        
+        ## Impose the null by evaluating the conditional mean holding
+        ## xdat[,i] constant at its median (numeric) or mode
+        ## (factor/ordered) using uocquantile()
+        
+        xq <- uocquantile(xdat[,i], 0.5)
+        if (is.factor(xdat[,i]) || is.ordered(xdat[,i])) {
+          xdat.eval[,i] <- cast(xq, xdat[,i], same.levels = TRUE)
+        } else {
+          xdat.eval[,i] <- xq
+        }
+        
+        mhat.xi <-  npreg.eval.fun(extra.args,
+                                   txdat = xdat,
+                                   tydat = ydat,
+                                   exdat = xdat.eval,
+                                   bws = bws)$mean
+        
+        ## Rescale and recenter the residuals under the null to those
+        ## under the alternative
+        
+        ei <- as.numeric(scale(ydat-mhat.xi)*ei.unres.scale+ei.unres.center)
+        
+        ## Recenter the residuals to have mean zero
+        
+        ei <- ei - mean(ei)
+        
+      }
+      
+      if (boot.type == "II") {
+        bws.boot.prev <- bws.original
+
+        for (i.star in seq_len(boot.num)) {
+          msg <- paste("Bootstrap rep. ",
+                       i.star,
+                       "/",
+                       boot.num,
+                       " for variable ",
+                       i,
+                       " of (",
+                       paste(index, collapse = ","),
+                       ")... ",
+                       sep = "")
+
+          if (!collective.mode)
+            console <- printPush(msg = msg, console)
+
+          if (boot.method == "iid") {
+            ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
+          } else if (boot.method == "wild") {
+            ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
+          } else if (boot.method == "wild-rademacher") {
+            ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+          } else {
+            boot.index <- sample.int(num.obs, replace = TRUE)
+            ydat.star <- ydat[boot.index]
+            xdat.star <- xdat
+            xdat.star[, -i] <- xdat[boot.index, -i]
+          }
+
+          if (boot.method == "pairwise") {
+            bws.boot <- .npRmpi_npsig_bootstrap_bw_reselect(
+              xdat = xdat.star,
+              ydat = ydat.star,
+              bws.seed = bws.boot.prev,
+              extra.args = extra.args,
+              bootstrap.iter = i.star,
+              localize = FALSE
+            )
+          } else {
+            bws.boot <- .npRmpi_npsig_bootstrap_bw_reselect(
+              xdat = xdat,
+              ydat = ydat.star,
+              bws.seed = bws.boot.prev,
+              extra.args = extra.args,
+              bootstrap.iter = i.star,
+              localize = FALSE
+            )
+          }
+
+          bws.boot.prev <- bws.boot
+          bws <- bws.original
+          bws$bw[i] <- bws.boot$bw[i]
+
+          if (boot.method == "pairwise") {
+            npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
+                                                   txdat = xdat.star,
+                                                   tydat = ydat.star,
+                                                   bws = bws,
+                                                   gradients = TRUE)
+          } else {
+            npreg.boot <- .npRmpi_npsig_npreg_leaf(extra.args,
+                                                   txdat = xdat,
+                                                   tydat = ydat.star,
+                                                   bws = bws,
+                                                   gradients = TRUE)
+          }
+
+          In.vec[i.star] <- if (!pivot) {
+            mean(npreg.boot$grad[, i]^2)
+          } else {
+            npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
+            mean((npreg.boot$grad[, i] / NZD(npreg.boot$gerr[, i]))^2)
+          }
+
+          if (!collective.mode)
+            console <- printPop(console)
+        }
+      } else {
+        boot.seeds <- .npRmpi_npsig_bootstrap_seed_plan(
+          num.obs = num.obs,
+          boot.num = boot.num,
+          boot.method = boot.method,
+          draw.wild.mult = draw.wild.mult,
+          a = a,
+          b = b,
+          p.a = P.a
+        )
+
+        indiv.eval <- function(task.idx, seed.plan) {
+          out <- numeric(length(task.idx))
+          for (kk in seq_along(task.idx)) {
+            assign(".Random.seed", seed.plan[[task.idx[kk]]], envir = .GlobalEnv)
+            if (boot.method == "iid") {
+              ydat.star <- mhat.xi + ei[sample.int(num.obs, replace = TRUE)]
+              npreg.boot <- .npRmpi_npsig_do_local(extra.args,
+                                                   txdat = xdat,
+                                                   tydat = ydat.star,
+                                                   bws = bws,
+                                                   gradients = TRUE)
+            } else if (boot.method == "wild") {
+              ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, a, b, P.a)
+              npreg.boot <- .npRmpi_npsig_do_local(extra.args,
+                                                   txdat = xdat,
+                                                   tydat = ydat.star,
+                                                   bws = bws,
+                                                   gradients = TRUE)
+            } else if (boot.method == "wild-rademacher") {
+              ydat.star <- mhat.xi + ei * draw.wild.mult(num.obs, -1, 1, P.a)
+              npreg.boot <- .npRmpi_npsig_do_local(extra.args,
+                                                   txdat = xdat,
+                                                   tydat = ydat.star,
+                                                   bws = bws,
+                                                   gradients = TRUE)
+            } else {
+              boot.index <- sample.int(num.obs, replace = TRUE)
+              ydat.star <- ydat[boot.index]
+              xdat.star <- xdat
+              xdat.star[, -i] <- xdat[boot.index, -i]
+              npreg.boot <- .npRmpi_npsig_do_local(extra.args,
+                                                   txdat = xdat.star,
+                                                   tydat = ydat.star,
+                                                   bws = bws,
+                                                   gradients = TRUE)
+            }
+
+            out[kk] <- if (!pivot) {
+              mean(npreg.boot$grad[, i]^2)
+            } else {
+              npreg.boot$gerr[is.nan(npreg.boot$gerr)] <- .Machine$double.xmax
+              mean((npreg.boot$grad[, i] / NZD(npreg.boot$gerr[, i]))^2)
+            }
+          }
+          out
+        }
+
+        In.vec <- .npRmpi_npsig_parallel_boot_values(
+          boot.seeds = boot.seeds,
+          worker = indiv.eval,
+          required.bindings = list(
+            boot.method = boot.method,
+            mhat.xi = mhat.xi,
+            ei = ei,
+            xdat = xdat,
+            ydat = ydat,
+            bws = bws,
+            i = i,
+            pivot = pivot,
+            num.obs = num.obs,
+            draw.wild.mult = draw.wild.mult,
+            a = a,
+            b = b,
+            P.a = P.a,
+            extra.args = extra.args
+          ),
+          what = "npsigtest",
+          profile.where = "npsigtest:indiv"
+        )
+      }
       
       ## Compute the P-value
       

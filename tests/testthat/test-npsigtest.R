@@ -198,7 +198,7 @@ test_that("npsigtest local regression wrapper is safe under an active slave pool
   expect_identical(ncol(fit$grad), 1L)
 })
 
-test_that("npsigtest boot.type II fails fast in npRmpi", {
+test_that("npsigtest boot.type II works under autodispatch", {
   skip_on_cran()
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
@@ -213,9 +213,8 @@ test_that("npsigtest boot.type II fails fast in npRmpi", {
   mydat <- data.frame(y, x1, x2)
   bw <- npregbw(y ~ x1 + x2, data = mydat, bws = c(0.2, 0.4), bandwidth.compute = FALSE)
 
-  expect_error(
-    npsigtest(bws = bw, boot.num = 9, boot.type = "II"),
-    "not yet supported in npRmpi",
-    fixed = TRUE
-  )
+  sig <- npsigtest(bws = bw, boot.num = 9, boot.type = "II", joint = TRUE, index = 1)
+
+  expect_s3_class(sig, "sigtest")
+  expect_identical(length(sig$P), 1L)
 })
