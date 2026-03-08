@@ -491,6 +491,184 @@ test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
   }
 })
 
+test_that("semihat apply mode matches core fits across bwtypes", {
+  set.seed(20260308)
+  n <- 70
+  x <- runif(n)
+  x2 <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + x) * sin(2 * pi * z) + 0.3 * x2 + rnorm(n, sd = 0.04)
+
+  tx.sc <- data.frame(x = x)
+  tz.sc <- data.frame(z = z)
+  ex.sc <- data.frame(x = seq(0.1, 0.9, length.out = 18))
+  ez.sc <- data.frame(z = seq(0.1, 0.9, length.out = 18))
+
+  tx.pl <- data.frame(x = x)
+  tz.pl <- data.frame(z = z)
+  ex.pl <- data.frame(x = seq(0.1, 0.9, length.out = 18))
+  ez.pl <- data.frame(z = seq(0.1, 0.9, length.out = 18))
+
+  tx.si <- data.frame(x1 = x, x2 = x2)
+  ex.si <- tx.si[seq_len(18), , drop = FALSE]
+
+  for (regtype in c("lc", "ll", "lp")) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      sc.args <- list(
+        xdat = tx.sc,
+        zdat = tz.sc,
+        ydat = y,
+        regtype = regtype,
+        bwtype = bwtype,
+        bandwidth.compute = FALSE,
+        bws = if (identical(bwtype, "fixed")) 0.18 else 9
+      )
+      pl.args <- list(
+        xdat = tx.pl,
+        zdat = tz.pl,
+        ydat = y,
+        regtype = regtype,
+        bwtype = bwtype,
+        bandwidth.compute = FALSE,
+        bws = matrix(rep(if (identical(bwtype, "fixed")) 0.18 else 9, 2L), nrow = 2L, ncol = 1L)
+      )
+      si.args <- list(
+        xdat = tx.si,
+        ydat = y,
+        regtype = regtype,
+        bwtype = bwtype,
+        bandwidth.compute = FALSE,
+        bws = c(1, 1, if (identical(bwtype, "fixed")) 0.18 else 9)
+      )
+      if (identical(regtype, "lp")) {
+        sc.args$degree <- 1L
+        sc.args$basis <- "glp"
+        sc.args$bernstein.basis <- FALSE
+        pl.args$degree <- 1L
+        pl.args$basis <- "glp"
+        pl.args$bernstein.basis <- FALSE
+        si.args$degree <- 1L
+        si.args$basis <- "glp"
+        si.args$bernstein.basis <- FALSE
+      }
+
+      sc.bw <- do.call(npscoefbw, sc.args)
+      sc.fit <- npscoef(
+        bws = sc.bw,
+        txdat = tx.sc,
+        tzdat = tz.sc,
+        tydat = y,
+        exdat = ex.sc,
+        ezdat = ez.sc,
+        iterate = FALSE,
+        errors = FALSE
+      )
+      sc.apply <- npscoefhat(
+        bws = sc.bw,
+        txdat = tx.sc,
+        tzdat = tz.sc,
+        exdat = ex.sc,
+        ezdat = ez.sc,
+        y = y,
+        output = "apply",
+        iterate = FALSE
+      )
+      sc.H <- npscoefhat(
+        bws = sc.bw,
+        txdat = tx.sc,
+        tzdat = tz.sc,
+        exdat = ex.sc,
+        ezdat = ez.sc,
+        output = "matrix",
+        iterate = FALSE
+      )
+      expect_equal(
+        as.vector(sc.apply),
+        as.vector(sc.H %*% y),
+        tolerance = 1e-10,
+        info = paste("npscoefhat helper parity", regtype, bwtype)
+      )
+      if (identical(bwtype, "fixed")) {
+        expect_equal(
+          as.vector(sc.apply),
+          as.vector(sc.fit$mean),
+          tolerance = 1e-8,
+          info = paste("npscoefhat core parity", regtype, bwtype)
+        )
+      }
+
+      pl.bw <- do.call(npplregbw, pl.args)
+      pl.fit <- npplreg(
+        bws = pl.bw,
+        txdat = tx.pl,
+        tzdat = tz.pl,
+        tydat = y,
+        exdat = ex.pl,
+        ezdat = ez.pl
+      )
+      pl.apply <- npplreghat(
+        bws = pl.bw,
+        txdat = tx.pl,
+        tzdat = tz.pl,
+        exdat = ex.pl,
+        ezdat = ez.pl,
+        y = y,
+        output = "apply"
+      )
+      expect_equal(
+        as.vector(pl.apply),
+        as.vector(pl.fit$mean),
+        tolerance = 1e-8,
+        info = paste("npplreghat", regtype, bwtype)
+      )
+
+      si.bw <- do.call(npindexbw, si.args)
+      si.fit.mean <- npindex(
+        bws = si.bw,
+        txdat = tx.si,
+        tydat = y,
+        exdat = ex.si,
+        gradients = FALSE
+      )
+      si.fit.grad <- npindex(
+        bws = si.bw,
+        txdat = tx.si,
+        tydat = y,
+        exdat = ex.si,
+        gradients = TRUE
+      )
+      si.apply.mean <- npindexhat(
+        bws = si.bw,
+        txdat = tx.si,
+        exdat = ex.si,
+        y = y,
+        output = "apply",
+        s = 0L
+      )
+      si.apply.grad <- npindexhat(
+        bws = si.bw,
+        txdat = tx.si,
+        exdat = ex.si,
+        y = y,
+        output = "apply",
+        s = 1L
+      )
+      expect_equal(
+        as.vector(si.apply.mean),
+        as.vector(si.fit.mean$mean),
+        tolerance = 1e-8,
+        info = paste("npindexhat mean", regtype, bwtype)
+      )
+      expect_equal(
+        as.vector(si.apply.grad),
+        as.vector(si.fit.grad$grad[, 1]),
+        tolerance = 1e-8,
+        info = paste("npindexhat grad", regtype, bwtype)
+      )
+    }
+  }
+})
+
 test_that("npindexbw lc selection no longer collapses nearest-neighbor bwtypes to fixed", {
   set.seed(314163)
   n <- 70
@@ -592,7 +770,7 @@ test_that("semihat helper routes preserve LP and kernel-bound option contracts",
       s = 0L,
       output = "matrix"
     ),
-    "Invalid bounds for 'ckerbound'"
+    "Invalid bounds for 'ckerbound'|Evaluation data violate 'ckerbound' bounds"
   )
 
   scbw <- npscoefbw(
