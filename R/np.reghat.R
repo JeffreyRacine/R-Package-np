@@ -91,7 +91,8 @@ npreghat <-
                                       exdat = NULL,
                                       leave.one.out = FALSE,
                                       bandwidth.divide = TRUE,
-                                      kernel.pow = 1.0) {
+                                      kernel.pow = 1.0,
+                                      operator = NULL) {
   miss.ex <- is.null(exdat)
   txdat <- toFrame(txdat)
   if (!miss.ex) {
@@ -110,6 +111,22 @@ npreghat <-
   bandwidth.divide <- npValidateScalarLogical(bandwidth.divide, "bandwidth.divide")
   if (!miss.ex && leave.one.out)
     stop("you may not specify 'leave.one.out = TRUE' and provide evaluation data")
+
+  if (is.null(operator)) {
+    operator <- rep.int("normal", length(txdat))
+  } else {
+    if (length(operator) == 1L)
+      operator <- rep.int(operator, length(txdat))
+    if (length(operator) != length(txdat))
+      stop("operator not specified for all variables")
+  }
+
+  uo.operators <- c("normal", "convolution", "integral")
+  if (!all(operator %in% names(ALL_OPERATORS)))
+    stop("invalid operator specification")
+  if (!all(operator[bws$iuno | bws$iord] %in% uo.operators))
+    stop("unordered and ordered variables may only use normal, convolution, or integral operators")
+  operator.num <- ALL_OPERATORS[operator]
 
   txdat <- adjustLevels(txdat, bws$xdati, allowNewCells = TRUE)
   if (!miss.ex) {
@@ -192,7 +209,7 @@ npreghat <-
     asDouble(euno), asDouble(eord), asDouble(econ),
     as.double(c(bws$bw[bws$icon], bws$bw[bws$iuno], bws$bw[bws$iord])),
     as.double(bws$xmcv), as.double(attr(bws$xmcv, "pad.num")),
-    as.integer(rep.int(ALL_OPERATORS[["normal"]], length(txdat))),
+    as.integer(c(operator.num[bws$icon], operator.num[bws$iuno], operator.num[bws$iord])),
     as.integer(myopti), as.double(kernel.pow),
     as.integer(enrow),
     as.integer(0L),
@@ -630,6 +647,30 @@ npreghat.rbandwidth <-
     )
 
     s <- .npreghat_resolve_s(s = s, deriv = deriv, ncon = ncon, con.names = con.names)
+
+    direct.apply <- identical(output, "apply") &&
+      !is.null(y) &&
+      !isTRUE(leave.one.out) &&
+      (ncol(y) == 1L) &&
+      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L))))
+
+    if (direct.apply) {
+      direct.out <- .np_regression_direct(
+        bws = bws,
+        txdat = txdat,
+        tydat = as.vector(y[, 1L]),
+        exdat = if (no.ex) NULL else exdat,
+        gradients = any(s > 0L),
+        gradient.order = 1L
+      )
+
+      if (!any(s > 0L))
+        return(as.vector(direct.out$mean))
+
+      target.cont <- which(s == 1L)
+      target.col <- which(bws$icon)[target.cont]
+      return(as.vector(direct.out$grad[, target.col]))
+    }
 
     if (any(s > degree))
       stop("requested derivative order in 's' exceeds local polynomial degree")
