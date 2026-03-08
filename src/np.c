@@ -67,6 +67,7 @@ static int np_mpi_local_regression_mode = 0;
 #ifdef MPI2
 static int np_mpi_local_regression_saved_rank = 0;
 static int np_mpi_local_regression_saved_nproc = 1;
+static MPI_Comm np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
 #endif
 
 /* Some externals for numerical routines */
@@ -761,12 +762,17 @@ SEXP C_np_set_local_regression_mode(SEXP active)
   if (requested && !np_mpi_local_regression_mode) {
     np_mpi_local_regression_saved_rank = my_rank;
     np_mpi_local_regression_saved_nproc = iNum_Processors;
+    np_mpi_local_regression_saved_comm1 = comm[1];
+    comm[1] = MPI_COMM_SELF;
     my_rank = 0;
     iNum_Processors = 1;
     np_mpi_local_regression_mode = 1;
   } else if (!requested && np_mpi_local_regression_mode) {
+    if (np_mpi_local_regression_saved_comm1 != MPI_COMM_NULL)
+      comm[1] = np_mpi_local_regression_saved_comm1;
     my_rank = np_mpi_local_regression_saved_rank;
     iNum_Processors = np_mpi_local_regression_saved_nproc;
+    np_mpi_local_regression_saved_comm1 = MPI_COMM_NULL;
     np_mpi_local_regression_mode = 0;
   }
 #else

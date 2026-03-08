@@ -387,6 +387,50 @@ test_that("npindex and npindexhat support ll/lp basis variants", {
   }
 })
 
+test_that("npindexhat s=1 generalized-nn helper apply matches helper matrix in session mode", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(20260308)
+  n <- 70
+  x1 <- runif(n)
+  x2 <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + x1) * sin(2 * pi * z) + 0.3 * x2 + rnorm(n, sd = 0.04)
+
+  tx <- data.frame(x1 = x1, x2 = x2)
+  ex <- tx[seq_len(18), , drop = FALSE]
+  bw <- npindexbw(
+    xdat = tx,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bandwidth.compute = FALSE,
+    bws = c(1, 1, 9)
+  )
+
+  H1 <- npindexhat(
+    bws = bw,
+    txdat = tx,
+    exdat = ex,
+    s = 1L,
+    output = "matrix"
+  )
+  hy <- npindexhat(
+    bws = bw,
+    txdat = tx,
+    exdat = ex,
+    y = y,
+    s = 1L,
+    output = "apply"
+  )
+
+  expect_equal(as.vector(hy), as.vector(H1 %*% y), tolerance = 1e-10)
+})
+
 test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)

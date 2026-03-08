@@ -382,14 +382,25 @@
   rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
 
   fit_one <- function(ycol) {
-    fit <- .np_regression_direct(
-      bws = rbw,
-      txdat = idx.train,
-      tydat = ycol,
-      exdat = idx.eval,
-      gradients = (s == 1L),
-      gradient.order = 1L
-    )
+    fit <- if (s == 1L) {
+      .npRmpi_with_local_regression(.np_regression_direct(
+        bws = rbw,
+        txdat = idx.train,
+        tydat = ycol,
+        exdat = idx.eval,
+        gradients = TRUE,
+        gradient.order = 1L
+      ))
+    } else {
+      .np_regression_direct(
+        bws = rbw,
+        txdat = idx.train,
+        tydat = ycol,
+        exdat = idx.eval,
+        gradients = FALSE,
+        gradient.order = 1L
+      )
+    }
     if (s == 1L)
       fit$grad[, 1L]
     else
