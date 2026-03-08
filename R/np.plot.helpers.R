@@ -1272,6 +1272,8 @@
   if (n < 1L || neval < 1L || B < 1L)
     stop("invalid exact regression bootstrap dimensions")
 
+  use.local.direct <- isTRUE(identical(bws$type, "generalized_nn"))
+
   fit_one <- function(x.train, y.train) {
     fit <- .np_regression_direct(
       bws = bws,
@@ -1279,7 +1281,8 @@
       tydat = y.train,
       exdat = exdat,
       gradients = isTRUE(gradients),
-      gradient.order = gradient.order
+      gradient.order = gradient.order,
+      local.mode = use.local.direct
     )
     if (isTRUE(gradients))
       as.vector(fit$grad[, slice.index])
@@ -1508,7 +1511,8 @@
             tydat = ydat[idx],
             exdat = exdat,
             gradients = TRUE,
-            gradient.order = gradient.order
+            gradient.order = gradient.order,
+            local.mode = use.local.direct
           )
           out[jj, ] <- fit.b$grad[, slice.index]
         }

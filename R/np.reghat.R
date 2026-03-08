@@ -231,9 +231,11 @@ npreghat <-
                                   tydat,
                                   exdat = NULL,
                                   gradients = FALSE,
-                                  gradient.order = 1L) {
+                                  gradient.order = 1L,
+                                  local.mode = FALSE) {
   no.ex <- is.null(exdat)
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  local.mode <- npValidateScalarLogical(local.mode, "local.mode")
 
   txdat <- toFrame(txdat)
   if (!no.ex) {
@@ -373,6 +375,11 @@ npreghat <-
     as.integer(if (is.null(glp.gradient.order)) rep.int(1L, bws$ncon) else glp.gradient.order)
   } else {
     integer(1L)
+  }
+
+  if (isTRUE(local.mode) && .npRmpi_has_active_slave_pool(comm = 1L)) {
+    old.mode <- .Call("C_np_set_local_regression_mode", TRUE, PACKAGE = "npRmpi")
+    on.exit(.Call("C_np_set_local_regression_mode", old.mode, PACKAGE = "npRmpi"), add = TRUE)
   }
 
   myout <- .Call(
