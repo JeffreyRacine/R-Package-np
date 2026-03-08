@@ -2,6 +2,15 @@
 
 This document reproduces the default full-grid comparison for `npRmpi` with `n=100`, `times=50`, `nslaves=1` (128 combos).
 
+Optional nearest-neighbor sweep:
+
+```bash
+R_LIBS=/tmp/Rlib_nprmpi_current FI_TCP_IFACE=en0 \
+Rscript /Users/jracine/Development/np-npRmpi/benchmarks/perf/methods/npreg/run_npreg_combos.R \
+  --n=40 --times=1 --base_seed=42 --nmulti=1 --nslaves=1 \
+  --bwtypes=generalized_nn,adaptive_nn --max_combos=8 --tag=nn_probe
+```
+
 ## 1) Build isolated libraries
 
 ```bash
