@@ -16,7 +16,7 @@ This folder provides a parameterized benchmark harness for `npregbw()` + `npreg(
 ```bash
 Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/bench_npreg_param.R \
   --n=100 --times=50 --base_seed=42 \
-  --regtype=lc --bwmethod=cv.ls --nmulti=1 \
+  --regtype=lc --bwtype=fixed --bwmethod=cv.ls --nmulti=1 \
   --ckertype=gaussian --np_tree=FALSE --seed_policy=fixed \
   --out_raw=/tmp/npreg_one_raw.csv --out_summary=/tmp/npreg_one_summary.csv
 ```
@@ -30,6 +30,7 @@ Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/run_n
 
 Optional LP grid controls:
 
+- `--bwtypes=fixed,generalized_nn,adaptive_nn`
 - `--lp_bases=glp,additive,tensor`
 - `--lp_degree=2,2`
 - `--lp_bernstein.basis=TRUE,FALSE`
@@ -48,6 +49,7 @@ Outputs are written to `/tmp` with run IDs in filenames:
 - `base_seed=42`
 - `nmulti=1`
 - `regtype=ll`
+- `bwtype=fixed`
 - `basis=glp` (used when `regtype=lp`)
 - `degree=2,2` (used when `regtype=lp`)
 - `bernstein.basis=FALSE` (used when `regtype=lp`)
@@ -105,7 +107,7 @@ Comparison outputs:
 
 - Timing by function (`npregbw`, `npreg`, `npreg_total`) with mean/median and percent change.
 - Objective diagnostics (`fval`, `ifval`, `num_fval`, bandwidth match rate, `ok` match rate).
-- Combo timing table by (`regtype`, `basis`, `degree`, `bernstein.basis`, `bwmethod`, `ckertype`, `np_tree`, `seed_policy`, `nmulti`) with mean/median percent change.
+- Combo timing table by (`regtype`, `bwtype`, `basis`, `degree`, `bernstein.basis`, `bwmethod`, `ckertype`, `np_tree`, `seed_policy`, `nmulti`) with mean/median percent change.
 - Combo objective diagnostics by the same combination keys.
 
 ## Canonical Implementation Directive (2026-03-05)

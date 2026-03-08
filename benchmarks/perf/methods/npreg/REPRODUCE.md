@@ -2,6 +2,14 @@
 
 This document reproduces the default full-grid comparison for `np` with `n=100`, `times=50` (128 combos).
 
+Optional nearest-neighbor sweep:
+
+```bash
+Rscript /Users/jracine/Development/np-master/benchmarks/perf/methods/npreg/run_npreg_combos.R \
+  --n=40 --times=1 --base_seed=42 --nmulti=1 \
+  --bwtypes=generalized_nn,adaptive_nn --max_combos=8 --tag=nn_probe
+```
+
 ## 1) Build isolated libraries
 
 ```bash

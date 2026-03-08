@@ -37,6 +37,7 @@ prep_raw <- function(df) {
   if (!("ok" %in% names(df))) df$ok <- NA
   if (!("bw" %in% names(df))) df$bw <- ""
   if (!("np_tree" %in% names(df))) df$np_tree <- NA
+  if (!("bwtype" %in% names(df))) df$bwtype <- "fixed"
   if (!("basis" %in% names(df))) df$basis <- NA_character_
   if (!("degree" %in% names(df))) df$degree <- ""
   if (!("bernstein.basis" %in% names(df))) df$bernstein.basis <- NA
@@ -47,12 +48,12 @@ prep_raw <- function(df) {
 }
 
 combo_keys <- function(df) {
-  keep <- c("n", "regtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy")
+  keep <- c("n", "regtype", "bwtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy")
   keep[keep %in% names(df)]
 }
 
 match_keys <- function(a, b) {
-  keep <- c("n", "regtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy", "seed", "iter")
+  keep <- c("n", "regtype", "bwtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy", "seed", "iter")
   keep[keep %in% names(a) & keep %in% names(b)]
 }
 
@@ -78,6 +79,7 @@ summ_timing_by_combo <- function(df, label) {
     data.frame(
       n = g$n[1],
       regtype = g$regtype[1],
+      bwtype = if ("bwtype" %in% names(g)) g$bwtype[1] else "fixed",
       basis = if ("basis" %in% names(g)) g$basis[1] else NA_character_,
       degree = if ("degree" %in% names(g)) g$degree[1] else "",
       bernstein.basis = if ("bernstein.basis" %in% names(g)) g$bernstein.basis[1] else NA,
@@ -144,13 +146,14 @@ main <- function() {
   combo_a <- summ_timing_by_combo(a, cfg$label_a)
   combo_b <- summ_timing_by_combo(b, cfg$label_b)
   combo_keys_common <- intersect(
-    c("n", "regtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy"),
+    c("n", "regtype", "bwtype", "basis", "degree", "bernstein.basis", "bwmethod", "nmulti", "ckertype", "np_tree", "seed_policy"),
     intersect(names(combo_a), names(combo_b))
   )
   combo_m <- merge(combo_a, combo_b, by = combo_keys_common, suffixes = c("_a", "_b"), all = TRUE)
   combo_timing <- data.frame(
     n = getcol(combo_m, "n"),
     regtype = getcol(combo_m, "regtype"),
+    bwtype = getcol(combo_m, "bwtype", "fixed"),
     basis = getcol(combo_m, "basis", NA_character_),
     degree = getcol(combo_m, "degree", ""),
     bernstein.basis = getcol(combo_m, "bernstein.basis"),
@@ -218,6 +221,7 @@ main <- function() {
     data.frame(
       n = if ("n" %in% names(g)) g$n[1] else NA_integer_,
       regtype = if ("regtype" %in% names(g)) g$regtype[1] else "",
+      bwtype = if ("bwtype" %in% names(g)) g$bwtype[1] else "fixed",
       basis = if ("basis" %in% names(g)) g$basis[1] else NA_character_,
       degree = if ("degree" %in% names(g)) g$degree[1] else "",
       bernstein.basis = if ("bernstein.basis" %in% names(g)) g$bernstein.basis[1] else NA,

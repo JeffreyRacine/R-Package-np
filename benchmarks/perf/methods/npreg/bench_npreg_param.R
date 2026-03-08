@@ -12,6 +12,7 @@ parse_args <- function(args) {
   out <- list(
     n = 100L,
     regtype = "ll",
+    bwtype = "fixed",
     basis = "glp",
     degree = c(2L, 2L),
     bernstein.basis = FALSE,
@@ -37,6 +38,7 @@ parse_args <- function(args) {
 
     if (key == "n") out$n <- as.integer(val)
     else if (key == "regtype") out$regtype <- val
+    else if (key == "bwtype") out$bwtype <- val
     else if (key == "basis") out$basis <- val
     else if (key == "degree") out$degree <- parse_degree(val)
     else if (key == "bernstein.basis" || key == "bernstein_basis") out$bernstein.basis <- as.logical(val)
@@ -55,6 +57,7 @@ parse_args <- function(args) {
   }
 
   if (!out$regtype %in% c("lc", "ll", "lp")) stop("regtype must be lc, ll, or lp")
+  if (!out$bwtype %in% c("fixed", "generalized_nn", "adaptive_nn")) stop("bwtype must be fixed, generalized_nn, or adaptive_nn")
   if (!out$basis %in% c("glp", "additive", "tensor")) stop("basis must be glp, additive, or tensor")
   if (!out$bwmethod %in% c("cv.ls", "cv.aic")) stop("bwmethod must be cv.ls or cv.aic")
   if (!is.finite(out$nmulti) || out$nmulti < 1L) stop("nmulti must be an integer >= 1")
@@ -118,6 +121,7 @@ run_case <- function(seed, cfg) {
         bw_args <- list(
           formula = y ~ x1 + x2 + z1 + z2,
           regtype = cfg$regtype,
+          bwtype = cfg$bwtype,
           bwmethod = cfg$bwmethod,
           nmulti = cfg$nmulti,
           ckertype = cfg$ckertype,
@@ -173,6 +177,7 @@ run_case <- function(seed, cfg) {
     backend = rep("np", cfg$times),
     n = rep(cfg$n, cfg$times),
     regtype = rep(cfg$regtype, cfg$times),
+    bwtype = rep(cfg$bwtype, cfg$times),
     basis = rep(if (cfg$regtype == "lp") cfg$basis else NA_character_, cfg$times),
     degree = rep(if (cfg$regtype == "lp") degree_str else "", cfg$times),
     bernstein.basis = rep(if (cfg$regtype == "lp") isTRUE(cfg$bernstein.basis) else NA, cfg$times),
@@ -206,6 +211,7 @@ summarize_results <- function(df) {
     backend = okdf$backend[1],
     n = okdf$n[1],
     regtype = okdf$regtype[1],
+    bwtype = okdf$bwtype[1],
     basis = if ("basis" %in% names(okdf)) okdf$basis[1] else NA_character_,
     degree = if ("degree" %in% names(okdf)) okdf$degree[1] else "",
     bernstein.basis = if ("bernstein.basis" %in% names(okdf)) okdf$bernstein.basis[1] else NA,
@@ -244,6 +250,7 @@ main <- function(args = commandArgs(trailingOnly = TRUE)) {
     cat("backend=np",
         " n=", cfg$n,
         " regtype=", cfg$regtype,
+        " bwtype=", cfg$bwtype,
         if (cfg$regtype == "lp") paste0(" basis=", cfg$basis) else "",
         if (cfg$regtype == "lp") paste0(" degree=", paste(cfg$degree, collapse = ",")) else "",
         if (cfg$regtype == "lp") paste0(" bernstein.basis=", isTRUE(cfg$bernstein.basis)) else "",
