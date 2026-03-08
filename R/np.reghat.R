@@ -233,9 +233,11 @@ npreghat <-
                                   tydat,
                                   exdat = NULL,
                                   gradients = FALSE,
-                                  gradient.order = 1L) {
+                                  gradient.order = 1L,
+                                  local.mode = FALSE) {
   no.ex <- is.null(exdat)
   gradients <- npValidateScalarLogical(gradients, "gradients")
+  local.mode <- npValidateScalarLogical(local.mode, "local.mode")
 
   txdat <- toFrame(txdat)
   if (!no.ex) {
