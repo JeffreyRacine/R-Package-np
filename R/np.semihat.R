@@ -105,31 +105,54 @@
                              c("aitchisonaitken", "liracine"))
   okertype <- resolve_choice(if (!is.null(args$okertype)) args$okertype else source$okertype,
                              c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
-  porder <- switch(ckerorder / 2,
-                   "Second-Order",
-                   "Fourth-Order",
-                   "Sixth-Order",
-                   "Eighth-Order")
-  pscaling <- if (!is.null(args$bwscaling) && isTRUE(args$bwscaling)) {
-    "Scale Factor(s)"
-  } else {
-    "Bandwidth(s)"
-  }
-  bw.named <- as.list(stats::setNames(as.double(args$bws), names(xdat)))
+  scaling <- if (!is.null(args$bwscaling)) isTRUE(args$bwscaling) else FALSE
+  bw.vec <- stats::setNames(as.double(args$bws), names(xdat))
+  sfactor <- bandwidth <- bw.vec
+  nconfac <- nobs^(-1.0 / (2.0 * ckerorder + ncon))
+  ncatfac <- nobs^(-2.0 / (2.0 * ckerorder + ncon))
+  sdev <- if (ncon > 0L) EssDee(rcon) else numeric(0)
 
-  out <- list(
-    bw = as.double(args$bws),
+  if (sum(xdati$iuno) > 0L) {
+    if (scaling) {
+      bandwidth[xdati$iuno] <- bandwidth[xdati$iuno] * ncatfac
+    } else {
+      sfactor[xdati$iuno] <- sfactor[xdati$iuno] / ncatfac
+    }
+  }
+
+  if (sum(xdati$iord) > 0L) {
+    if (scaling) {
+      bandwidth[xdati$iord] <- bandwidth[xdati$iord] * ncatfac
+    } else {
+      sfactor[xdati$iord] <- sfactor[xdati$iord] / ncatfac
+    }
+  }
+
+  if (ncon > 0L) {
+    dfactor <- sdev * nconfac
+    if (scaling) {
+      bandwidth[xdati$icon] <- bandwidth[xdati$icon] * dfactor
+    } else {
+      sfactor[xdati$icon] <- sfactor[xdati$icon] / dfactor
+    }
+  }
+
+  out <- rbandwidth(
+    bw = bw.vec,
     regtype = args$regtype,
-    pregtype = switch(args$regtype,
-                      lc = "Local-Constant",
-                      ll = "Local-Linear",
-                      lp = "Local-Polynomial",
-                      args$regtype),
     basis = args$basis,
     degree = args$degree,
     bernstein.basis = args$bernstein.basis,
-    method = method,
-    pmethod = "Manual",
+    bwmethod = method,
+    bwscaling = scaling,
+    bwtype = bwtype,
+    ckertype = ckertype,
+    ckerorder = ckerorder,
+    ckerbound = ckerbound,
+    ckerlb = args$ckerlb,
+    ckerub = args$ckerub,
+    ukertype = ukertype,
+    okertype = okertype,
     fval = NA,
     ifval = NA,
     num.feval = NA,
@@ -137,59 +160,22 @@
     fval.history = NA,
     eval.history = NA,
     invalid.history = NA,
-    scaling = if (!is.null(args$bwscaling)) isTRUE(args$bwscaling) else FALSE,
-    pscaling = pscaling,
-    type = bwtype,
-    ptype = bwtToPrint(bwtype),
-    ckertype = ckertype,
-    ckerorder = ckerorder,
-    ckerbound = ckerbound,
-    ckerlb = args$ckerlb,
-    ckerub = args$ckerub,
-    pckertype = cktToPrint(ckertype, order = porder, kerbound = ckerbound),
-    ukertype = ukertype,
-    pukertype = uktToPrint(ukertype),
-    okertype = okertype,
-    pokertype = oktToPrint(okertype),
     nobs = nobs,
-    ndim = ncol(xdat),
-    ncon = ncon,
-    nuno = sum(xdati$iuno),
-    nord = sum(xdati$iord),
-    icon = xdati$icon,
-    iuno = xdati$iuno,
-    iord = xdati$iord,
-    xnames = names(xdat),
-    ynames = if (!is.null(source$ynames) && length(source$ynames)) source$ynames else "y",
     xdati = xdati,
     ydati = ydati,
-    xmcv = mcvConstruct(xdati),
-    sfactor = bw.named,
-    bandwidth = bw.named,
-    nconfac = nobs^(-1.0 / (2.0 * ckerorder + ncon)),
-    ncatfac = nobs^(-2.0 / (2.0 * ckerorder + ncon)),
-    sdev = EssDee(rcon),
-    sumNum = bw.named,
-    dati = list(x = xdati, y = ydati),
-    varnames = list(x = names(xdat), y = if (!is.null(source$ynames) && length(source$ynames)) source$ynames else "y"),
-    vartitle = list(x = "Explanatory", y = "Dependent"),
-    vartitleabb = list(x = "Exp.", y = "Dep."),
+    xnames = names(xdat),
+    ynames = if (!is.null(source$ynames) && length(source$ynames)) source$ynames else "y",
+    sfactor = sfactor,
+    bandwidth = bandwidth,
     rows.omit = NA,
-    nobs.omit = 0,
+    nconfac = nconfac,
+    ncatfac = ncatfac,
+    sdev = sdev,
+    bandwidth.compute = FALSE,
     timing = NA,
-    total.time = c(elapsed = 0.0),
-    klist = list(x = list(
-      ckertype = ckertype,
-      pckertype = cktToPrint(ckertype, order = porder, kerbound = ckerbound),
-      ukertype = ukertype,
-      pukertype = uktToPrint(ukertype),
-      okertype = okertype,
-      pokertype = oktToPrint(okertype)
-    )),
-    call = call(".np_semihat_make_regbw_state")
+    total.time = c(elapsed = 0.0)
   )
-
-  class(out) <- "rbandwidth"
+  out$call <- call(".np_semihat_make_regbw_state")
   out
 }
 
@@ -437,6 +423,20 @@
 
   rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
 
+  if (identical(output, "apply")) {
+    if (is.null(y))
+      stop("argument 'y' is required when output='apply'")
+
+    return(do.call(npreghat, list(
+      bws = rbw,
+      txdat = idx.train,
+      exdat = idx.eval,
+      y = y,
+      output = "apply",
+      s = s
+    )))
+  }
+
   fit_one <- function(ycol) {
     fit <- .np_regression_direct(
       bws = rbw,
@@ -452,30 +452,15 @@
       fit$mean
   }
 
-  if (identical(output, "matrix")) {
-    neval <- nrow(idx.eval)
-    ntrain <- nrow(idx.train)
-    H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
-    for (j in seq_len(ntrain)) {
-      yj <- numeric(ntrain)
-      yj[j] <- 1.0
-      H[, j] <- fit_one(yj)
-    }
-    return(H)
+  neval <- nrow(idx.eval)
+  ntrain <- nrow(idx.train)
+  H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+  for (j in seq_len(ntrain)) {
+    yj <- numeric(ntrain)
+    yj[j] <- 1.0
+    H[, j] <- fit_one(yj)
   }
-
-  if (is.null(y))
-    stop("argument 'y' is required when output='apply'")
-
-  y <- .np_indexhat_numeric_y(y)
-  if (nrow(y) != nrow(idx.train))
-    stop("number of rows in 'y' must equal number of training rows")
-
-  out <- matrix(0.0, nrow = nrow(idx.eval), ncol = ncol(y))
-  for (j in seq_len(ncol(y)))
-    out[, j] <- fit_one(y[, j])
-
-  if (ncol(out) == 1L) as.vector(out) else out
+  H
 }
 
 .np_indexhat_apply_exact <- function(bws,
@@ -483,41 +468,14 @@
                                      idx.eval,
                                      y,
                                      s = 0L) {
-  spec <- .npindex_resolve_spec(bws, where = "npindexhat")
-  if (identical(spec$regtype.engine, "lc") && s == 0L) {
-    return(.np_indexhat_exact(
-      bws = bws,
-      idx.train = idx.train,
-      idx.eval = idx.eval,
-      y = y,
-      output = "apply",
-      s = s
-    ))
-  }
-
-  if (is.null(y))
-    stop("argument 'y' is required when output='apply'")
-
-  y <- .np_indexhat_numeric_y(y)
-  if (nrow(y) != nrow(idx.train))
-    stop("number of rows in 'y' must equal number of training rows")
-
-  rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
-  out <- matrix(0.0, nrow = nrow(idx.eval), ncol = ncol(y))
-
-  for (j in seq_len(ncol(y))) {
-    fit <- .np_regression_direct(
-      bws = rbw,
-      txdat = idx.train,
-      tydat = y[, j],
-      exdat = idx.eval,
-      gradients = (s == 1L),
-      gradient.order = 1L
-    )
-    out[, j] <- if (s == 1L) fit$grad[, 1L] else fit$mean
-  }
-
-  if (ncol(out) == 1L) as.vector(out) else out
+  .np_indexhat_exact(
+    bws = bws,
+    idx.train = idx.train,
+    idx.eval = idx.eval,
+    y = y,
+    output = "apply",
+    s = s
+  )
 }
 
 .npscoef_make_regbw <- function(bws, zdat, bw = bws$bw) {
