@@ -7060,17 +7060,26 @@ static int np_glp_cv_cache_prepare(const int int_ll,
   int l, i;
   int *terms = NULL;
   int nterms = 0;
-  const int use_bernstein = (int_glp_bernstein_extern != 0);
-  const int basis_mode = int_glp_basis_extern;
+  int implicit_degree[MAX(1, ncon)];
+  const int *degree_vec = vector_glp_degree_extern;
+  const int use_bernstein =
+    ((int_ll == LL_LP) && (int_ll_extern == LL_LL)) ? 0 : (int_glp_bernstein_extern != 0);
+  const int basis_mode =
+    ((int_ll == LL_LP) && (int_ll_extern == LL_LL)) ? 1 : int_glp_basis_extern;
   double **basis = NULL;
   NPGLPBasisCtx *basis_ctx = NULL;
 
   np_glp_cv_cache_clear();
 
   if(int_ll != LL_LP) return 1;
-  if((vector_glp_degree_extern == NULL) || (ncon <= 0) || (num_obs <= 0))
+  if((int_ll_extern == LL_LL) && (ncon > 0)){
+    for(l = 0; l < ncon; l++)
+      implicit_degree[l] = 1;
+    degree_vec = implicit_degree;
+  }
+  if((degree_vec == NULL) || (ncon <= 0) || (num_obs <= 0))
     return 0;
-  if(!np_glp_build_terms(ncon, vector_glp_degree_extern, basis_mode, &terms, &nterms))
+  if(!np_glp_build_terms(ncon, degree_vec, basis_mode, &terms, &nterms))
     return 0;
   if(nterms <= 0){
     free(terms);
@@ -7098,7 +7107,7 @@ static int np_glp_cv_cache_prepare(const int int_ll,
         if(xi < xmin) xmin = xi;
         if(xi > xmax) xmax = xi;
       }
-      if(!np_glp_basis_ctx_init(&basis_ctx[l], vector_glp_degree_extern[l], xmin, xmax)){
+      if(!np_glp_basis_ctx_init(&basis_ctx[l], degree_vec[l], xmin, xmax)){
         for(i = 0; i <= l; i++) np_glp_basis_ctx_free(&basis_ctx[i]);
         free(basis_ctx);
         free_mat(basis, nterms);
@@ -7450,6 +7459,18 @@ static inline int np_reg_cv_use_canonical_glp_fixed_kernel(const int int_ll,
     return 1;
 
   return 0;
+}
+
+static inline int np_reg_cv_use_canonical_ll_degree1_lp_objective(const int int_ll,
+                                                                  const int bwm,
+                                                                  const int BANDWIDTH_reg,
+                                                                  const int num_reg_continuous,
+                                                                  const int ks_tree_use){
+  return (int_ll == LL_LL) &&
+    (bwm == RBWM_CVLS) &&
+    (BANDWIDTH_reg == BW_FIXED) &&
+    (num_reg_continuous > 0) &&
+    (!ks_tree_use);
 }
 
 static inline int np_reg_use_canonical_glp_degree1_estimation(const int int_ll,
@@ -7868,6 +7889,8 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
 #endif
 
   const int use_bernstein = (int_glp_bernstein_extern != 0);
+  int implicit_degree[MAX(1, num_reg_continuous)];
+  const int *degree_vec = vector_glp_degree_extern;
   const int *glp_terms = NULL;
   int glp_nterms = 0;
   double **basis = NULL;
@@ -7877,7 +7900,12 @@ static NPRegCvLpResult np_regression_cv_lp_objective(const int bwm,
   double **XTKX = NULL;
   int glp_ok = 1;
 
-  if((vector_glp_degree_extern == NULL) || (num_reg_continuous <= 0))
+  if((int_ll_extern == LL_LL) && (num_reg_continuous > 0)){
+    for(i = 0; i < num_reg_continuous; i++)
+      implicit_degree[i] = 1;
+    degree_vec = implicit_degree;
+  }
+  if((degree_vec == NULL) || (num_reg_continuous <= 0))
     goto cleanup_lp_cv;
 
   if(!np_glp_cv_cache.ready ||
@@ -8512,6 +8540,12 @@ int * kernel_c = NULL, * kernel_u = NULL, * kernel_o = NULL;
 #endif
 
     int ks_tree_use = (int_TREE_X == NP_TREE_TRUE) && (!((BANDWIDTH_reg == BW_ADAP_NN) && (int_ll_cv == LL_LL)));
+    if(np_reg_cv_use_canonical_ll_degree1_lp_objective(int_ll,
+                                                       bwm,
+                                                       BANDWIDTH_reg,
+                                                       num_reg_continuous,
+                                                       ks_tree_use))
+      int_ll_cv = LL_LP;
 
   if(kernel_bandwidth_mean(KERNEL_reg,
                            BANDWIDTH_reg,

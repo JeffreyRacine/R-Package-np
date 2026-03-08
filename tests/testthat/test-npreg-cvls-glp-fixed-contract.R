@@ -176,4 +176,28 @@ test_that("fixed cv.ls keeps ll and canonical lp degree-1 aligned off-model", {
   )
 
   expect_equal(obj.ll, obj.lp, tolerance = 1e-12)
+
+  set.seed(20260312)
+  x1 <- runif(52)
+  x2 <- runif(52)
+  u <- factor(sample(c("a", "b", "c"), 52, replace = TRUE))
+  o <- ordered(sample(1:3, 52, replace = TRUE))
+  y2 <- sin(2 * pi * x1) + 0.2 * x2 + as.numeric(u) / 9 + as.numeric(o) / 11
+
+  obj2.ll <- fixed_cvls_objective(
+    xdat = data.frame(x1 = x1, x2 = x2, u = u, o = o),
+    ydat = y2,
+    regtype = "ll",
+    degree = c(1L, 1L),
+    bws = c(0.28, 0.31, 0.45, 0.55)
+  )
+  obj2.lp <- fixed_cvls_objective(
+    xdat = data.frame(x1 = x1, x2 = x2, u = u, o = o),
+    ydat = y2,
+    regtype = "lp",
+    degree = c(1L, 1L),
+    bws = c(0.28, 0.31, 0.45, 0.55)
+  )
+
+  expect_equal(obj2.ll, obj2.lp, tolerance = 1e-12)
 })
