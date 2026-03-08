@@ -164,22 +164,40 @@ npreg.rbandwidth <-
     bws$basis <- npValidateLpBasis(regtype = bws$regtype,
                                    basis = bws$basis)
     bws$degree <- npValidateGlpDegree(regtype = bws$regtype,
-                                          degree = bws$degree,
-                                          ncon = bws$ncon)
+                                      degree = bws$degree,
+                                      ncon = bws$ncon)
     bws$bernstein.basis <- npValidateGlpBernstein(regtype = bws$regtype,
-                                                bernstein.basis = bws$bernstein.basis)
-    glp.gradient.order <- npValidateGlpGradientOrder(regtype = bws$regtype,
-                                                     gradient.order = gradient.order,
-                                                     ncon = bws$ncon)
+                                                  bernstein.basis = bws$bernstein.basis)
+    reg.spec <- npCanonicalConditionalRegSpec(
+      regtype = bws$regtype,
+      basis = bws$basis,
+      degree = bws$degree,
+      bernstein.basis = bws$bernstein.basis,
+      ncon = bws$ncon,
+      where = "npreg"
+    )
+    glp.gradient.order <- if (identical(reg.spec$regtype.engine, "lp")) {
+      if (identical(bws$regtype, "lp")) {
+        npValidateGlpGradientOrder(regtype = bws$regtype,
+                                   gradient.order = gradient.order,
+                                   ncon = bws$ncon)
+      } else if (bws$ncon > 0L) {
+        rep.int(1L, bws$ncon)
+      } else {
+        integer(0)
+      }
+    } else {
+      NULL
+    }
     if (isTRUE(gradients) &&
-        identical(bws$regtype, "lp") &&
+        identical(reg.spec$regtype.engine, "lp") &&
         (bws$ncon > 0L) &&
-        all(bws$degree == 0L)) {
+        all(reg.spec$degree.engine == 0L)) {
       stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
     }
 
-    reg.c <- npRegtypeToC(regtype = bws$regtype,
-                          degree = bws$degree,
+    reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
+                          degree = reg.spec$degree.engine,
                           ncon = bws$ncon,
                           context = "npreg")
     degree.c <- if (bws$ncon > 0) {
@@ -313,9 +331,9 @@ npreg.rbandwidth <-
 
     npCheckRegressionDesignCondition(reg.code = reg.c$code,
                                      xcon = tcon,
-                                     basis = bws$basis,
-                                     degree = bws$degree,
-                                     bernstein.basis = bws$bernstein.basis,
+                                     basis = reg.spec$basis.engine,
+                                     degree = reg.spec$degree.engine,
+                                     bernstein.basis = reg.spec$bernstein.basis.engine,
                                      where = "npreg")
 
     if (!no.ex){
@@ -391,8 +409,8 @@ npreg.rbandwidth <-
             as.integer(myopti),
             as.integer(degree.c),
             as.integer(glp.gradient.order.c),
-            as.integer(isTRUE(bws$bernstein.basis)),
-            as.integer(npLpBasisCode(bws$basis)),
+            as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+            as.integer(npLpBasisCode(reg.spec$basis.engine)),
             as.integer(enrow),
             as.integer(ncol),
             as.logical(gradients),

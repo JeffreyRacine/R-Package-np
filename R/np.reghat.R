@@ -256,18 +256,36 @@ npreghat <-
                                 ncon = bws$ncon)
   bernstein.basis <- npValidateGlpBernstein(regtype = regtype,
                                             bernstein.basis = bws$bernstein.basis)
-  glp.gradient.order <- npValidateGlpGradientOrder(regtype = regtype,
-                                                   gradient.order = gradient.order,
-                                                   ncon = bws$ncon)
+  reg.spec <- npCanonicalConditionalRegSpec(
+    regtype = regtype,
+    basis = basis,
+    degree = degree,
+    bernstein.basis = bernstein.basis,
+    ncon = bws$ncon,
+    where = ".np_regression_direct"
+  )
+  glp.gradient.order <- if (identical(reg.spec$regtype.engine, "lp")) {
+    if (identical(regtype, "lp")) {
+      npValidateGlpGradientOrder(regtype = regtype,
+                                 gradient.order = gradient.order,
+                                 ncon = bws$ncon)
+    } else if (bws$ncon > 0L) {
+      rep.int(1L, bws$ncon)
+    } else {
+      integer(0)
+    }
+  } else {
+    NULL
+  }
   if (isTRUE(gradients) &&
-      identical(regtype, "lp") &&
+      identical(reg.spec$regtype.engine, "lp") &&
       (bws$ncon > 0L) &&
-      all(degree == 0L)) {
+      all(reg.spec$degree.engine == 0L)) {
     stop("regtype='lp' with degree=0 does not support derivatives; use gradients=FALSE for fitted/predicted values")
   }
 
-  reg.c <- npRegtypeToC(regtype = regtype,
-                        degree = degree,
+  reg.c <- npRegtypeToC(regtype = reg.spec$regtype.engine,
+                        degree = reg.spec$degree.engine,
                         ncon = bws$ncon,
                         context = ".np_regression_direct")
   degree.c <- if (bws$ncon > 0L) {
@@ -310,9 +328,9 @@ npreghat <-
 
   npCheckRegressionDesignCondition(reg.code = reg.c$code,
                                    xcon = tcon,
-                                   basis = basis,
-                                   degree = degree,
-                                   bernstein.basis = bernstein.basis,
+                                   basis = reg.spec$basis.engine,
+                                   degree = reg.spec$degree.engine,
+                                   bernstein.basis = reg.spec$bernstein.basis.engine,
                                    where = ".np_regression_direct")
 
   if (!no.ex) {
@@ -389,8 +407,8 @@ npreghat <-
     as.integer(myopti),
     as.integer(degree.c),
     as.integer(glp.gradient.order.c),
-    as.integer(isTRUE(bernstein.basis)),
-    as.integer(npLpBasisCode(basis)),
+    as.integer(isTRUE(reg.spec$bernstein.basis.engine)),
+    as.integer(npLpBasisCode(reg.spec$basis.engine)),
     as.integer(enrow),
     as.integer(ncol.x),
     as.logical(gradients),
@@ -595,12 +613,22 @@ npreghat.rbandwidth <-
     )
 
     s <- .npreghat_resolve_s(s = s, deriv = deriv, ncon = ncon, con.names = con.names)
+    reg.spec <- npCanonicalConditionalRegSpec(
+      regtype = regtype,
+      basis = basis,
+      degree = degree,
+      bernstein.basis = bernstein.basis,
+      ncon = ncon,
+      where = "npreghat"
+    )
 
     direct.apply <- identical(output, "apply") &&
       !is.null(y) &&
       !isTRUE(leave.one.out) &&
       (ncol(y) == 1L) &&
-      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L))))
+      (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L)))) &&
+      !(identical(bws$type, "generalized_nn") &&
+          identical(reg.spec$regtype.engine, "lp"))
 
     if (direct.apply) {
       direct.out <- .np_regression_direct(
