@@ -789,16 +789,17 @@ SEXP C_np_release_static_buffers(void)
   return R_NilValue;
 }
 
-void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
-                      double * objective_function_values, double * objective_function_evals,
-                      double * objective_function_invalid, double * timing,
-                      double * objective_function_fast,
-                      int * penalty_mode, double * penalty_mult,
-                      int * glp_degree,
-                      int * glp_bernstein,
-                      int * glp_basis,
-                      double * ckerlb, double * ckerub);
+static void np_regression_bw_mode(double * runo, double * rord, double * rcon, double * y,
+                                  double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
+                                  double * objective_function_values, double * objective_function_evals,
+                                  double * objective_function_invalid, double * timing,
+                                  double * objective_function_fast,
+                                  int * penalty_mode, double * penalty_mult,
+                                  int * glp_degree,
+                                  int * glp_bernstein,
+                                  int * glp_basis,
+                                  double * ckerlb, double * ckerub,
+                                  const int eval_only);
 
 void np_regression(double * tuno, double * tord, double * tcon, double * ty,
                    double * euno, double * eord, double * econ, double * ey,
@@ -896,22 +897,23 @@ void np_quantile_conditional(double * tc_con,
                              int * myopti, double * myoptd,
                              double * yq, double * yqerr, double *yg);
 
-SEXP C_np_regression_bw(SEXP runo,
-                        SEXP rord,
-                        SEXP rcon,
-                        SEXP y,
-                        SEXP mysd,
-                        SEXP myopti,
-                        SEXP myoptd,
-                        SEXP rbw,
-                        SEXP hist_len,
-                        SEXP penalty_mode,
-                        SEXP penalty_mult,
-                        SEXP glp_degree,
-                        SEXP glp_bernstein,
-                        SEXP glp_basis,
-                        SEXP ckerlb,
-                        SEXP ckerub)
+static SEXP C_np_regression_bw_common(SEXP runo,
+                                      SEXP rord,
+                                      SEXP rcon,
+                                      SEXP y,
+                                      SEXP mysd,
+                                      SEXP myopti,
+                                      SEXP myoptd,
+                                      SEXP rbw,
+                                      SEXP hist_len,
+                                      SEXP penalty_mode,
+                                      SEXP penalty_mult,
+                                      SEXP glp_degree,
+                                      SEXP glp_bernstein,
+                                      SEXP glp_basis,
+                                      SEXP ckerlb,
+                                      SEXP ckerub,
+                                      const int eval_only)
 {
   SEXP runo_r = R_NilValue, rord_r = R_NilValue, rcon_r = R_NilValue;
   SEXP y_r = R_NilValue, mysd_r = R_NilValue, myopti_i = R_NilValue, myoptd_r = R_NilValue;
@@ -957,11 +959,12 @@ SEXP C_np_regression_bw(SEXP runo,
 
   memcpy(REAL(out_bw), REAL(rbw_r), (size_t)XLENGTH(rbw_r) * sizeof(double));
 
-  np_regression_bw(REAL(runo_r), REAL(rord_r), REAL(rcon_r), REAL(y_r),
-                   REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
-                   REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
-                   REAL(out_fast),
-                   &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p);
+  np_regression_bw_mode(REAL(runo_r), REAL(rord_r), REAL(rcon_r), REAL(y_r),
+                        REAL(mysd_r), INTEGER(myopti_i), REAL(myoptd_r), REAL(out_bw), REAL(out_fval),
+                        REAL(out_fval_hist), REAL(out_eval_hist), REAL(out_invalid_hist), REAL(out_timing),
+                        REAL(out_fast),
+                        &pmode, &pmult, INTEGER(degree_i), &bern, &basis, ckerlb_p, ckerub_p,
+                        eval_only);
 
   PROTECT(out = allocVector(VECSXP, 7));
   SET_VECTOR_ELT(out, 0, out_bw);
@@ -984,6 +987,52 @@ SEXP C_np_regression_bw(SEXP runo,
 
   UNPROTECT(20);
   return out;
+}
+
+SEXP C_np_regression_bw(SEXP runo,
+                        SEXP rord,
+                        SEXP rcon,
+                        SEXP y,
+                        SEXP mysd,
+                        SEXP myopti,
+                        SEXP myoptd,
+                        SEXP rbw,
+                        SEXP hist_len,
+                        SEXP penalty_mode,
+                        SEXP penalty_mult,
+                        SEXP glp_degree,
+                        SEXP glp_bernstein,
+                        SEXP glp_basis,
+                        SEXP ckerlb,
+                        SEXP ckerub)
+{
+  return C_np_regression_bw_common(runo, rord, rcon, y, mysd, myopti, myoptd,
+                                   rbw, hist_len, penalty_mode, penalty_mult,
+                                   glp_degree, glp_bernstein, glp_basis,
+                                   ckerlb, ckerub, 0);
+}
+
+SEXP C_np_regression_bw_eval(SEXP runo,
+                             SEXP rord,
+                             SEXP rcon,
+                             SEXP y,
+                             SEXP mysd,
+                             SEXP myopti,
+                             SEXP myoptd,
+                             SEXP rbw,
+                             SEXP hist_len,
+                             SEXP penalty_mode,
+                             SEXP penalty_mult,
+                             SEXP glp_degree,
+                             SEXP glp_bernstein,
+                             SEXP glp_basis,
+                             SEXP ckerlb,
+                             SEXP ckerub)
+{
+  return C_np_regression_bw_common(runo, rord, rcon, y, mysd, myopti, myoptd,
+                                   rbw, hist_len, penalty_mode, penalty_mult,
+                                   glp_degree, glp_bernstein, glp_basis,
+                                   ckerlb, ckerub, 1);
 }
 
 SEXP C_np_regression(SEXP tuno,
@@ -6018,16 +6067,17 @@ void np_density(double * tuno, double * tord, double * tcon,
 }
 
 
-void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
-                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
-                      double * objective_function_values, double * objective_function_evals,
-                      double * objective_function_invalid, double * timing,
-                      double * objective_function_fast,
-                      int * penalty_mode, double * penalty_mult,
-                      int * glp_degree,
-                      int * glp_bernstein,
-                      int * glp_basis,
-                      double * ckerlb, double * ckerub){
+static void np_regression_bw_mode(double * runo, double * rord, double * rcon, double * y,
+                                  double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
+                                  double * objective_function_values, double * objective_function_evals,
+                                  double * objective_function_invalid, double * timing,
+                                  double * objective_function_fast,
+                                  int * penalty_mode, double * penalty_mult,
+                                  int * glp_degree,
+                                  int * glp_bernstein,
+                                  int * glp_basis,
+                                  double * ckerlb, double * ckerub,
+                                  const int eval_only){
   //KDT * kdt = NULL; // tree structure
   //NL nl = { .node = NULL, .n = 0, .nalloc = 0 };// a node list structure -- used for searching - here for testing
   //double tb[4] = {0.25, 0.5, 0.3, 0.75};
@@ -6362,41 +6412,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   fret_best = bwmfunc_wrapper(vector_scale_factor);
   iImproved = 0;
 
-  powell(0,
-         0,
-         vector_scale_factor,
-         vector_scale_factor,
-         matrix_y,
-         num_var,
-         ftol,
-         tol,
-         small,
-         itmax,
-         &iter,
-         &fret,
-         bwmfunc_wrapper);
-
-
-  if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
-
-    initialize_nr_directions(BANDWIDTH_reg_extern,
-                             num_obs_train_extern,
-                             num_reg_continuous_extern,
-                             num_reg_unordered_extern,
-                             num_reg_ordered_extern,
-                             0,
-                             0,
-                             0,
-                             vsfh,
-                             num_categories_extern,
-                             matrix_y,
-                             0, int_RANDOM_SEED, 
-                             lbc_dir, dfc_dir, c_dir, initc_dir,
-                             lbd_dir, hbd_dir, d_dir, initd_dir,
-                             matrix_X_continuous_train_extern,
-                             matrix_Y_continuous_train_extern);
-
-
+  if(!eval_only){
     powell(0,
            0,
            vector_scale_factor,
@@ -6411,6 +6427,42 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
            &fret,
            bwmfunc_wrapper);
 
+
+    if(int_RESTART_FROM_MIN == RE_MIN_TRUE){
+      initialize_nr_directions(BANDWIDTH_reg_extern,
+                               num_obs_train_extern,
+                               num_reg_continuous_extern,
+                               num_reg_unordered_extern,
+                               num_reg_ordered_extern,
+                               0,
+                               0,
+                               0,
+                               vsfh,
+                               num_categories_extern,
+                               matrix_y,
+                               0, int_RANDOM_SEED, 
+                               lbc_dir, dfc_dir, c_dir, initc_dir,
+                               lbd_dir, hbd_dir, d_dir, initd_dir,
+                               matrix_X_continuous_train_extern,
+                               matrix_Y_continuous_train_extern);
+
+      powell(0,
+             0,
+             vector_scale_factor,
+             vector_scale_factor,
+             matrix_y,
+             num_var,
+             ftol,
+             tol,
+             small,
+             itmax,
+             &iter,
+             &fret,
+             bwmfunc_wrapper);
+
+    }
+  } else {
+    fret = fret_best;
   }
 
   iImproved = (fret < fret_best);
@@ -6424,7 +6476,7 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   /* When multistarting save initial minimum of objective function and scale factors */
 
 
-  if(iMultistart == IMULTI_TRUE){
+  if((!eval_only) && (iMultistart == IMULTI_TRUE)){
     fret_best = fret;
     vector_scale_factor_multistart = alloc_vecd(num_var + 1);
 
@@ -6620,6 +6672,26 @@ void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
   //fprintf(stderr,"\nNP TOASTY\n");
   return ;
   
+}
+
+void np_regression_bw(double * runo, double * rord, double * rcon, double * y,
+                      double * mysd, int * myopti, double * myoptd, double * rbw, double * fval,
+                      double * objective_function_values, double * objective_function_evals,
+                      double * objective_function_invalid, double * timing,
+                      double * objective_function_fast,
+                      int * penalty_mode, double * penalty_mult,
+                      int * glp_degree,
+                      int * glp_bernstein,
+                      int * glp_basis,
+                      double * ckerlb, double * ckerub){
+  np_regression_bw_mode(runo, rord, rcon, y,
+                        mysd, myopti, myoptd, rbw, fval,
+                        objective_function_values, objective_function_evals,
+                        objective_function_invalid, timing,
+                        objective_function_fast,
+                        penalty_mode, penalty_mult,
+                        glp_degree, glp_bernstein, glp_basis,
+                        ckerlb, ckerub, 0);
 }
 
 
