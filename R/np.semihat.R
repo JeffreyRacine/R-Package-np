@@ -71,6 +71,114 @@
   args
 }
 
+.np_semihat_make_regbw_state <- function(source, xdat, ydat, bw) {
+  resolve_choice <- function(value, choices, default = choices[1L]) {
+    if (is.null(value) || !length(value))
+      return(default)
+    cand <- as.character(value)[1L]
+    if (!cand %in% choices)
+      return(default)
+    cand
+  }
+
+  xdat <- toFrame(xdat)
+  if (!(is.vector(ydat) || is.factor(ydat)))
+    stop("'ydat' must be a vector")
+
+  args <- .np_semihat_make_regbw_args(source = source, xdat = xdat, ydat = ydat, bw = bw)
+  xdati <- untangle(xdat)
+  ydati <- untangle(data.frame(ydat))
+  xmat <- toMatrix(xdat)
+  rcon <- xmat[, xdati$icon, drop = FALSE]
+  nobs <- nrow(xdat)
+  ncon <- sum(xdati$icon)
+  method <- resolve_choice(if (!is.null(args$bwmethod)) args$bwmethod else source$method,
+                           c("cv.ls", "cv.aic"))
+  bwtype <- resolve_choice(if (!is.null(args$bwtype)) args$bwtype else source$type,
+                           c("fixed", "generalized_nn", "adaptive_nn"))
+  ckertype <- resolve_choice(if (!is.null(args$ckertype)) args$ckertype else source$ckertype,
+                             c("gaussian", "truncated gaussian", "epanechnikov", "uniform"))
+  ckerorder <- if (!is.null(args$ckerorder)) args$ckerorder else source$ckerorder
+  ckerbound <- resolve_choice(if (!is.null(args$ckerbound)) args$ckerbound else source$ckerbound,
+                              c("none", "range", "fixed"))
+  ukertype <- resolve_choice(if (!is.null(args$ukertype)) args$ukertype else source$ukertype,
+                             c("aitchisonaitken", "liracine"))
+  okertype <- resolve_choice(if (!is.null(args$okertype)) args$okertype else source$okertype,
+                             c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
+  scaling <- if (!is.null(args$bwscaling)) isTRUE(args$bwscaling) else FALSE
+  bw.vec <- stats::setNames(as.double(args$bws), names(xdat))
+  sfactor <- bandwidth <- bw.vec
+  nconfac <- nobs^(-1.0 / (2.0 * ckerorder + ncon))
+  ncatfac <- nobs^(-2.0 / (2.0 * ckerorder + ncon))
+  sdev <- if (ncon > 0L) EssDee(rcon) else numeric(0)
+
+  if (sum(xdati$iuno) > 0L) {
+    if (scaling) {
+      bandwidth[xdati$iuno] <- bandwidth[xdati$iuno] * ncatfac
+    } else {
+      sfactor[xdati$iuno] <- sfactor[xdati$iuno] / ncatfac
+    }
+  }
+
+  if (sum(xdati$iord) > 0L) {
+    if (scaling) {
+      bandwidth[xdati$iord] <- bandwidth[xdati$iord] * ncatfac
+    } else {
+      sfactor[xdati$iord] <- sfactor[xdati$iord] / ncatfac
+    }
+  }
+
+  if (ncon > 0L) {
+    dfactor <- sdev * nconfac
+    if (scaling) {
+      bandwidth[xdati$icon] <- bandwidth[xdati$icon] * dfactor
+    } else {
+      sfactor[xdati$icon] <- sfactor[xdati$icon] / dfactor
+    }
+  }
+
+  out <- rbandwidth(
+    bw = bw.vec,
+    regtype = args$regtype,
+    basis = args$basis,
+    degree = args$degree,
+    bernstein.basis = args$bernstein.basis,
+    bwmethod = method,
+    bwscaling = scaling,
+    bwtype = bwtype,
+    ckertype = ckertype,
+    ckerorder = ckerorder,
+    ckerbound = ckerbound,
+    ckerlb = args$ckerlb,
+    ckerub = args$ckerub,
+    ukertype = ukertype,
+    okertype = okertype,
+    fval = NA,
+    ifval = NA,
+    num.feval = NA,
+    num.feval.fast = NA,
+    fval.history = NA,
+    eval.history = NA,
+    invalid.history = NA,
+    nobs = nobs,
+    xdati = xdati,
+    ydati = ydati,
+    xnames = names(xdat),
+    ynames = if (!is.null(source$ynames) && length(source$ynames)) source$ynames else "y",
+    sfactor = sfactor,
+    bandwidth = bandwidth,
+    rows.omit = NA,
+    nconfac = nconfac,
+    ncatfac = ncatfac,
+    sdev = sdev,
+    bandwidth.compute = FALSE,
+    timing = NA,
+    total.time = c(elapsed = 0.0)
+  )
+  out$call <- call(".np_semihat_make_regbw_state")
+  out
+}
+
 .npscoef_canonical_spec <- function(source, zdat, where = "npscoef") {
   zdat <- toFrame(zdat)
   npCanonicalConditionalRegSpec(
@@ -315,12 +423,12 @@
 }
 
 .npscoef_make_regbw <- function(bws, zdat, bw = bws$bw) {
-  do.call(npregbw, .np_semihat_make_regbw_args(
+  .np_semihat_make_regbw_state(
     source = bws,
     xdat = zdat,
     ydat = rep.int(0.0, nrow(zdat)),
     bw = bw
-  ))
+  )
 }
 
 .npscoef_lp_state <- function(bws, tzdat, ezdat, leave.one.out = FALSE, where = "npscoef") {
@@ -617,9 +725,10 @@ npplreghat <-
     x.eval.num <- matrix(0.0, nrow = nrow(exdat), ncol = ncol(txdat))
 
     for (j in seq_len(ncol(txdat))) {
+      bw.xj <- bws$bw[[j + 1L]]
       if (is.factor(txdat[[j]])) {
-        trj <- adjustLevels(txdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati)
-        evj <- adjustLevels(exdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati, allowNewCells = TRUE)
+        trj <- adjustLevels(txdat[, j, drop = FALSE], bw.xj$ydati)
+        evj <- adjustLevels(exdat[, j, drop = FALSE], bw.xj$ydati, allowNewCells = TRUE)
         lev <- bws$bw[[j + 1L]]$ydati$all.dlev[[1L]]
         x.train.num[, j] <- lev[as.integer(trj[, 1L])]
         x.eval.num[, j] <- lev[as.integer(evj[, 1L])]
@@ -629,16 +738,16 @@ npplreghat <-
       }
     }
 
+    n <- nrow(txdat)
+    p <- ncol(txdat)
+    m <- nrow(exdat)
+
     H.y.eval <- npreghat(
       bws = bws$bw$yzbw,
       txdat = tzdat,
       exdat = ezdat,
       output = "matrix"
     )
-
-    n <- nrow(txdat)
-    p <- ncol(txdat)
-    m <- nrow(exdat)
 
     resx.train <- matrix(0.0, nrow = n, ncol = p)
     resx.eval <- matrix(0.0, nrow = m, ncol = p)
@@ -656,10 +765,10 @@ npplreghat <-
         y = x.train.num[, j],
         output = "apply"
       ))
-      xhat.eval <- as.vector(H.x.eval %*% x.train.num[, j])
-
+      xhat.eval <- H.x.eval %*% x.train.num[, j]
+ 
       resx.train[, j] <- x.train.num[, j] - xhat.train
-      resx.eval[, j] <- x.eval.num[, j] - xhat.eval
+      resx.eval[, j] <- x.eval.num[, j] - as.vector(xhat.eval)
     }
 
     qrR <- qr(resx.train, tol = .Machine$double.eps)
@@ -761,16 +870,91 @@ npscoefhat <-
     m <- nrow(W.eval)
     spec <- .npscoef_canonical_spec(source = bws, zdat = tzdat, where = "npscoefhat")
 
-    if (identical(output, "matrix")) {
-      H <- matrix(0.0, nrow = m, ncol = n)
-    } else {
+    if (identical(output, "apply")) {
       if (is.null(y))
         stop("argument 'y' is required when output='apply'")
       yy <- as.matrix(y)
       if (nrow(yy) != n)
         stop("number of rows in 'y' must equal number of training rows")
       out <- matrix(0.0, nrow = m, ncol = ncol(yy))
+
+      if (identical(spec$regtype.engine, "lc")) {
+        state <- .npscoef_effective_weight_state(
+          bws = bws,
+          tzdat = tzdat,
+          ezdat = ezdat,
+          leave.one.out = leave.one.out
+        )
+        chunk.size <- .npscoef_effective_weight_chunk_size(ntrain = n, neval = m)
+
+        for (start in seq.int(1L, m, by = chunk.size)) {
+          stopi <- min(m, start + chunk.size - 1L)
+          idx <- seq.int(start, stopi)
+          kw.chunk <- .npscoef_effective_weight_chunk(state = state, eval.indices = idx)
+
+          for (jj in seq_along(idx)) {
+            ii <- idx[[jj]]
+            solve.out <- .npreghat_solve_eval(
+              W = W.train,
+              w.eval = W.eval[ii, ],
+              k = kw.chunk[, jj],
+              ridge.base = ridge
+            )
+            if (is.null(solve.out))
+              stop(sprintf("failed to solve local hat system at evaluation row %d", ii))
+            h.row <- kw.chunk[, jj] * drop(W.train %*% solve.out$v)
+            out[ii, ] <- drop(crossprod(h.row, yy))
+          }
+        }
+      } else {
+        lp_state <- .npscoef_lp_state(
+          bws = bws,
+          tzdat = tzdat,
+          ezdat = ezdat,
+          leave.one.out = leave.one.out,
+          where = "npscoefhat"
+        )
+        tensor.train <- .npscoef_row_tensor_design(W.train, lp_state$W.train)
+        tensor.eval <- .npscoef_row_tensor_design(W.eval, lp_state$W.eval)
+        chunk.size <- .npscoef_effective_weight_chunk_size(ntrain = n, neval = m)
+
+        for (start in seq.int(1L, m, by = chunk.size)) {
+          stopi <- min(m, start + chunk.size - 1L)
+          idx <- seq.int(start, stopi)
+          kw.chunk <- .np_kernel_weights_direct(
+            txdat = lp_state$z.train,
+            exdat = lp_state$z.eval[idx, , drop = FALSE],
+            bws = lp_state$rbw,
+            bandwidth.divide = TRUE,
+            kernel.pow = 1.0
+          )
+
+          if (leave.one.out) {
+            for (jj in seq_along(idx))
+              kw.chunk[idx[[jj]], jj] <- 0.0
+          }
+
+          for (jj in seq_along(idx)) {
+            ii <- idx[[jj]]
+            solve.out <- .npreghat_solve_eval(
+              W = tensor.train,
+              w.eval = tensor.eval[ii, ],
+              k = kw.chunk[, jj],
+              ridge.base = ridge
+            )
+            if (is.null(solve.out))
+              stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", ii))
+            h.row <- kw.chunk[, jj] * drop(tensor.train %*% solve.out$v)
+            out[ii, ] <- drop(crossprod(h.row, yy))
+          }
+        }
+      }
+
+      if (ncol(out) == 1L) return(as.vector(out))
+      return(out)
     }
+
+    H <- matrix(0.0, nrow = m, ncol = n)
 
     if (identical(spec$regtype.engine, "lc")) {
       kw <- .npscoef_weight_matrix(
@@ -791,13 +975,7 @@ npscoefhat <-
         )
         if (is.null(solve.out))
           stop(sprintf("failed to solve local hat system at evaluation row %d", i))
-        h.row <- kw[, i] * drop(W.train %*% solve.out$v)
-
-        if (identical(output, "matrix")) {
-          H[i, ] <- h.row
-        } else {
-          out[i, ] <- drop(crossprod(h.row, yy))
-        }
+        H[i, ] <- kw[, i] * drop(W.train %*% solve.out$v)
       }
     } else {
       lp_state <- .npscoef_lp_state(
@@ -830,17 +1008,9 @@ npscoefhat <-
         )
         if (is.null(solve.out))
           stop(sprintf("failed to solve smooth-coefficient local hat system at evaluation row %d", i))
-        h.row <- kw[, i] * drop(tensor.train %*% solve.out$v)
-
-        if (identical(output, "matrix")) {
-          H[i, ] <- h.row
-        } else {
-          out[i, ] <- drop(crossprod(h.row, yy))
-        }
+        H[i, ] <- kw[, i] * drop(tensor.train %*% solve.out$v)
       }
     }
 
-    if (identical(output, "matrix"))
-      return(H)
-    if (ncol(out) == 1L) as.vector(out) else out
+    H
   }

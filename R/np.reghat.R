@@ -193,7 +193,8 @@ npreghat <-
     return.kernel.weights = TRUE,
     permutation.operator = PERMUTATION_OPERATORS[["none"]],
     compute.score = FALSE,
-    compute.ocg = FALSE
+    compute.ocg = FALSE,
+    suppress.parallel = 1L
   )
 
   cker.bounds.c <- npKernelBoundsMarshal(bws$ckerlb[bws$icon], bws$ckerub[bws$icon])

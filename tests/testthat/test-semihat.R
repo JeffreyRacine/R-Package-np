@@ -453,6 +453,89 @@ test_that("npindex and npindexhat preserve nearest-neighbor bwtype semantics", {
   }
 })
 
+test_that("npscoefhat apply mode matches green core fits across bwtypes", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(20260308)
+  n <- 70
+  x <- runif(n)
+  z <- runif(n)
+  y <- (0.4 + x) * sin(2 * pi * z) + rnorm(n, sd = 0.04)
+
+  tx.sc <- data.frame(x = x)
+  tz.sc <- data.frame(z = z)
+  ex.sc <- data.frame(x = seq(0.1, 0.9, length.out = 18))
+  ez.sc <- data.frame(z = seq(0.1, 0.9, length.out = 18))
+
+  for (regtype in c("lc", "ll", "lp")) {
+    for (bwtype in c("fixed", "generalized_nn", "adaptive_nn")) {
+      sc.args <- list(
+        xdat = tx.sc,
+        zdat = tz.sc,
+        ydat = y,
+        regtype = regtype,
+        bwtype = bwtype,
+        bandwidth.compute = FALSE,
+        bws = if (identical(bwtype, "fixed")) 0.18 else 9
+      )
+      if (identical(regtype, "lp")) {
+        sc.args$degree <- 1L
+        sc.args$basis <- "glp"
+        sc.args$bernstein.basis <- FALSE
+      }
+
+      sc.bw <- do.call(npscoefbw, sc.args)
+      sc.fit <- npscoef(
+        bws = sc.bw,
+        txdat = tx.sc,
+        tzdat = tz.sc,
+        tydat = y,
+        exdat = ex.sc,
+        ezdat = ez.sc,
+        iterate = FALSE,
+        errors = FALSE
+      )
+      sc.apply <- npscoefhat(
+        bws = sc.bw,
+        txdat = tx.sc,
+        tzdat = tz.sc,
+        exdat = ex.sc,
+        ezdat = ez.sc,
+        y = y,
+        output = "apply",
+        iterate = FALSE
+      )
+      sc.H <- npscoefhat(
+        bws = sc.bw,
+        txdat = tx.sc,
+        tzdat = tz.sc,
+        exdat = ex.sc,
+        ezdat = ez.sc,
+        output = "matrix",
+        iterate = FALSE
+      )
+      expect_equal(
+        as.vector(sc.apply),
+        as.vector(sc.H %*% y),
+        tolerance = 1e-10,
+        info = paste("npscoefhat helper parity", regtype, bwtype)
+      )
+      if (identical(bwtype, "fixed")) {
+        expect_equal(
+          as.vector(sc.apply),
+          as.vector(sc.fit$mean),
+          tolerance = 1e-8,
+          info = paste("npscoefhat core parity", regtype, bwtype)
+        )
+      }
+    }
+  }
+})
+
 
 test_that("semihat validates class and scalar controls", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
