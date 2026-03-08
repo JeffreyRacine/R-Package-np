@@ -122,6 +122,139 @@ npplreg.call <-
             bws = bws, ...)
   }
 
+.np_plot_plreg_local_fit <-
+  function(bws,
+           xdat,
+           ydat,
+           zdat,
+           exdat,
+           ezdat) {
+
+    xdat <- toFrame(xdat)
+    zdat <- toFrame(zdat)
+
+    keep.rows <- rep_len(TRUE, nrow(xdat))
+    rows.omit <- attr(na.omit(data.frame(xdat, ydat, zdat)), "na.action")
+    if (length(rows.omit) > 0L)
+      keep.rows[as.integer(rows.omit)] <- FALSE
+
+    if (!any(keep.rows))
+      stop("Training data has no rows without NAs")
+
+    xdat <- xdat[keep.rows, , drop = FALSE]
+    ydat <- ydat[keep.rows]
+    zdat <- zdat[keep.rows, , drop = FALSE]
+
+    no.exz <- missing(exdat)
+    if (!no.exz) {
+      exdat <- toFrame(exdat)
+      ezdat <- toFrame(ezdat)
+
+      keep.eval <- rep_len(TRUE, nrow(exdat))
+      rows.omit <- attr(na.omit(data.frame(exdat, ezdat)), "na.action")
+      if (length(rows.omit) > 0L)
+        keep.eval[as.integer(rows.omit)] <- FALSE
+
+      if (!any(keep.eval))
+        stop("Evaluation data has no rows without NAs")
+
+      exdat <- exdat[keep.eval, , drop = FALSE]
+      ezdat <- ezdat[keep.eval, , drop = FALSE]
+    }
+
+    if (is.factor(ydat)) {
+      tmp.ty <- adjustLevels(data.frame(ydat), bws$bw$yzbw$ydati)
+      tmp.ty <- (bws$bw$yzbw$ydati$all.dlev[[1L]])[as.integer(tmp.ty)]
+    } else {
+      tmp.ty <- as.double(ydat)
+    }
+
+    local.direct <- isTRUE(identical(bws$type, "generalized_nn"))
+
+    reg_mean <- function(regbw, ytrain, zeval = NULL) {
+      args <- list(
+        bws = regbw,
+        txdat = zdat,
+        tydat = ytrain,
+        local.mode = local.direct
+      )
+      if (!is.null(zeval))
+        args$exdat <- zeval
+      as.vector(do.call(.np_regression_direct, args)$mean)
+    }
+
+    yhat.train <- reg_mean(regbw = bws$bw$yzbw, ytrain = ydat)
+    resy <- tmp.ty - yhat.train
+
+    if (!no.exz)
+      yhat.eval <- reg_mean(regbw = bws$bw$yzbw, ytrain = ydat, zeval = ezdat)
+
+    ntrain <- nrow(xdat)
+    neval <- if (no.exz) ntrain else nrow(exdat)
+    p <- ncol(xdat)
+    resx <- matrix(0.0, nrow = ntrain, ncol = p)
+    resx.eval <- matrix(0.0, nrow = neval, ncol = p)
+
+    for (j in seq_len(p)) {
+      xhat.train <- reg_mean(regbw = bws$bw[[j + 1L]], ytrain = xdat[, j])
+
+      if (is.factor(xdat[1L, j])) {
+        tmp.dat <- adjustLevels(xdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati)
+        x.num.train <- (bws$bw[[j + 1L]]$ydati$all.dlev[[1L]])[as.integer(tmp.dat[, 1L])]
+      } else {
+        x.num.train <- as.double(xdat[, j])
+      }
+      resx[, j] <- x.num.train - xhat.train
+
+      if (!no.exz) {
+        xhat.eval <- reg_mean(regbw = bws$bw[[j + 1L]], ytrain = xdat[, j], zeval = ezdat)
+        if (is.factor(xdat[1L, j])) {
+          tmp.dat <- adjustLevels(exdat[, j, drop = FALSE], bws$bw[[j + 1L]]$ydati, allowNewCells = TRUE)
+          x.num.eval <- (bws$bw[[j + 1L]]$ydati$all.dlev[[1L]])[as.integer(tmp.dat[, 1L])]
+        } else {
+          x.num.eval <- as.double(exdat[, j])
+        }
+        resx.eval[, j] <- x.num.eval - xhat.eval
+      }
+    }
+
+    model <- lm(resy ~ resx - 1)
+    B <- coef(model)
+
+    train.fit <- as.vector(yhat.train + resx %*% B)
+    Bvcov <- sum((tmp.ty - train.fit)^2) /
+      (ntrain - ncol(xdat) - ncol(zdat)) *
+      chol2inv(chol(t(model.matrix(model)) %*% model.matrix(model)))
+    Berr <- sqrt(diag(Bvcov))
+
+    RSQ <- RSQfunc(tmp.ty, train.fit)
+    MSE <- MSEfunc(tmp.ty, train.fit)
+    MAE <- MAEfunc(tmp.ty, train.fit)
+    MAPE <- MAPEfunc(tmp.ty, train.fit)
+    CORR <- CORRfunc(tmp.ty, train.fit)
+    SIGN <- SIGNfunc(tmp.ty, train.fit)
+
+    ply <- if (no.exz) {
+      train.fit
+    } else {
+      as.vector(yhat.eval + resx.eval %*% B)
+    }
+
+    do.call(plregression, list(
+      bws = bws,
+      xcoef = B,
+      xcoeferr = Berr,
+      xcoefvcov = Bvcov,
+      evalx = if (no.exz) xdat else exdat,
+      evalz = if (no.exz) zdat else ezdat,
+      mean = ply,
+      ntrain = ntrain,
+      trainiseval = no.exz,
+      residuals = FALSE,
+      xtra = c(RSQ, MSE, MAE, MAPE, CORR, SIGN)
+    ))
+  }
+
 
 npplreg.plbandwidth <- 
   function(bws,

@@ -294,6 +294,68 @@ test_that("npplreg generalized-nn inid plot helper completes in session mode", {
   expect_true(all(is.finite(out[[2L]]$merr)))
 })
 
+test_that("npplreg generalized-nn plot means match public estimator in session mode", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(20260308)
+  n <- 80
+  x <- runif(n)
+  z <- runif(n)
+  y <- sin(z) + 2.0 * x + rnorm(n, sd = 0.05)
+
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+
+  bw <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bws = matrix(c(1, 9), nrow = 2, ncol = 1),
+    bandwidth.compute = FALSE
+  )
+
+  out <- plot(
+    bw,
+    xdat = tx,
+    ydat = y,
+    zdat = tz,
+    plot.behavior = "data",
+    perspective = FALSE,
+    plot.errors.method = "none"
+  )
+
+  ex.x <- out[[1L]]$evalx
+  ez.x <- out[[1L]]$evalz
+  fit.x <- npplreg(
+    bws = bw,
+    txdat = tx,
+    tydat = y,
+    tzdat = tz,
+    exdat = ex.x,
+    ezdat = ez.x
+  )
+
+  ex.z <- out[[2L]]$evalx
+  ez.z <- out[[2L]]$evalz
+  fit.z <- npplreg(
+    bws = bw,
+    txdat = tx,
+    tydat = y,
+    tzdat = tz,
+    exdat = ex.z,
+    ezdat = ez.z
+  )
+
+  expect_equal(as.vector(out[[1L]]$mean), as.vector(fit.x$mean), tolerance = 1e-10)
+  expect_equal(as.vector(out[[2L]]$mean), as.vector(fit.z$mean), tolerance = 1e-10)
+})
+
 test_that("npplreghat supports ll/lp with lp basis variants", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)
