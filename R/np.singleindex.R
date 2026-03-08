@@ -182,6 +182,35 @@ npindex.default <- function(bws, txdat, tydat, ...){
   do.call(npindex, c(call.args, list(...)))
 }
 
+.npindex_local_regression_fit <- function(source,
+                                          idx.train,
+                                          ydat,
+                                          idx.eval = NULL,
+                                          gradients = FALSE,
+                                          gradient.order = 1L) {
+  rbw <- .np_semihat_make_regbw_state(
+    source = source,
+    xdat = idx.train,
+    ydat = ydat,
+    bw = source$bw
+  )
+
+  direct.args <- list(
+    bws = rbw,
+    txdat = idx.train,
+    tydat = ydat,
+    exdat = idx.eval,
+    gradients = gradients,
+    gradient.order = gradient.order
+  )
+
+  if (isTRUE(gradients) && identical(source$type, "generalized_nn")) {
+    return(.npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args)))
+  }
+
+  do.call(.np_regression_direct, direct.args)
+}
+
 npindex.sibandwidth <-
   function(bws,
            txdat = stop("training data 'txdat' missing"),
@@ -202,7 +231,8 @@ npindex.sibandwidth <-
       stop("'boot.num' must be a positive integer")
     boot.num <- as.integer(boot.num)
     .npRmpi_require_active_slave_pool(where = "npindex()")
-    if (.npRmpi_autodispatch_active())
+    if (.npRmpi_autodispatch_active() &&
+        !(isTRUE(gradients) && identical(bws$type, "generalized_nn")))
       return(.npRmpi_autodispatch_call(match.call(), parent.frame()))
 
     no.ex = missing(exdat)
@@ -316,7 +346,7 @@ npindex.sibandwidth <-
 
     ## from this point on txdat and exdat have been recast as matrices
 
-    ## First, create the scalar index (n \times 1 vector)
+    ## First, create the scalar index (n x 1 vector)
 
     index <- txdat %*% bws$beta
 
@@ -327,11 +357,13 @@ npindex.sibandwidth <-
     } else {
       index.eval <- exdat %*% bws$beta
     }
+    index.df <- data.frame(index = as.vector(index))
+    index.eval.df <- data.frame(index = as.vector(index.eval))
 
     spec <- .npindex_resolve_spec(bws, where = "npindex")
     regtype <- spec$regtype.engine
     npreg.idx.args <- list(
-      txdat = index,
+      txdat = if (gradients) index.df else index,
       tydat = tydat,
       bws = bws$bw,
       ckertype = bws$ckertype,
@@ -392,10 +424,22 @@ npindex.sibandwidth <-
       }
 
     } else if(gradients==TRUE) {
-      model <- do.call(npreg, c(npreg.idx.args, list(
-        exdat = index.eval,
-        gradients = TRUE
-      )))
+      if (identical(bws$type, "generalized_nn")) {
+        model <- .npindex_local_regression_fit(
+          source = bws,
+          idx.train = index.df,
+          ydat = tydat,
+          idx.eval = index.eval.df,
+          gradients = TRUE,
+          gradient.order = 1L
+        )
+      } else {
+        npreg.idx.args$bwtype <- bws$type
+        model <- do.call(npreg, c(npreg.idx.args, list(
+          exdat = index.eval.df,
+          gradients = TRUE
+        )))
+      }
 
       index.mean <- model$mean
 
@@ -412,9 +456,19 @@ npindex.sibandwidth <-
         ## are specified. Also, needed for variance-covariance matrix
         ## (uses on ly the training data)
 
-        model <- do.call(npreg, c(npreg.idx.args, list(
-          gradients = TRUE
-        )))
+        model <- if (identical(bws$type, "generalized_nn")) {
+          .npindex_local_regression_fit(
+            source = bws,
+            idx.train = index.df,
+            ydat = tydat,
+            gradients = TRUE,
+            gradient.order = 1L
+          )
+        } else {
+          do.call(npreg, c(npreg.idx.args, list(
+            gradients = TRUE
+          )))
+        }
 
         index.tmean <- model$mean
 
@@ -455,17 +509,31 @@ npindex.sibandwidth <-
 
       W <- txdat[,-1,drop=FALSE]
 
-      tyindex <- npksum(txdat = index,
-                        tydat = rep(1,length(tydat)),
-                        weights = W,
-                        bws = bws$bw,
-                        ckertype = bws$ckertype,
-                        ckerorder = bws$ckerorder)$ksum
+      if (identical(bws$type, "generalized_nn")) {
+        kbw <- .np_indexhat_kbw(bws = bws, idx.train = index.df)
+        kw <- .np_kernel_weights_direct(
+          bws = kbw,
+          txdat = index.df,
+          bandwidth.divide = FALSE,
+          kernel.pow = 1.0
+        )
+        if (!is.matrix(kw))
+          kw <- matrix(kw, nrow = nrow(index.df))
+        tyindex <- structure(as.vector(t(W) %*% kw), dim = nrow(index.df))
+        tindex <- colSums(kw)
+      } else {
+        tyindex <- npksum(txdat = index,
+                          tydat = rep(1,length(tydat)),
+                          weights = W,
+                          bws = bws$bw,
+                          ckertype = bws$ckertype,
+                          ckerorder = bws$ckerorder)$ksum
 
-      tindex <- npksum(txdat = index,
-                       bws = bws$bw,
-                       ckertype = bws$ckertype,
-                       ckerorder = bws$ckerorder)$ksum
+        tindex <- npksum(txdat = index,
+                         bws = bws$bw,
+                         ckertype = bws$ckertype,
+                         ckerorder = bws$ckerorder)$ksum
+      }
 
       ## Need to trap case where k-1=1... ksum will return a 1 D
       ## array, need a 1 x n matrix
