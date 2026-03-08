@@ -3,6 +3,16 @@
     stop(sprintf("argument 'bws' must inherit from class '%s' in %s()", class.name, fn.name))
 }
 
+.npRmpi_with_local_hat_helper <- function(expr) {
+  old.ctx <- getOption("npRmpi.autodispatch.context", FALSE)
+  old.disable <- getOption("npRmpi.autodispatch.disable", FALSE)
+  options(npRmpi.autodispatch.context = TRUE)
+  options(npRmpi.autodispatch.disable = TRUE)
+  on.exit(options(npRmpi.autodispatch.context = old.ctx), add = TRUE)
+  on.exit(options(npRmpi.autodispatch.disable = old.disable), add = TRUE)
+  force(expr)
+}
+
 .np_semihat_make_regbw_args <- function(source, xdat, ydat, bw) {
   xdat <- toFrame(xdat)
   ncon.target <- sum(untangle(xdat)$icon)
@@ -753,38 +763,37 @@ npplreghat <-
     p <- ncol(txdat)
     m <- nrow(exdat)
 
-    H.y.eval <- npreghat(
-      bws = bws$bw$yzbw,
-      txdat = tzdat,
-      exdat = ezdat,
-      output = "matrix"
-    )
-
     resx.train <- matrix(0.0, nrow = n, ncol = p)
     resx.eval <- matrix(0.0, nrow = m, ncol = p)
 
-    for (j in seq_len(p)) {
-      H.x.eval <- npreghat(
-        bws = bws$bw[[j + 1L]],
+    if (identical(output, "matrix")) {
+      H.y.eval <- npreghat(
+        bws = bws$bw$yzbw,
         txdat = tzdat,
         exdat = ezdat,
         output = "matrix"
       )
-      xhat.train <- as.vector(npreghat(
-        bws = bws$bw[[j + 1L]],
-        txdat = tzdat,
-        y = x.train.num[, j],
-        output = "apply"
-      ))
-      xhat.eval <- H.x.eval %*% x.train.num[, j]
- 
-      resx.train[, j] <- x.train.num[, j] - xhat.train
-      resx.eval[, j] <- x.eval.num[, j] - as.vector(xhat.eval)
-    }
 
-    qrR <- qr(resx.train, tol = .Machine$double.eps)
+      for (j in seq_len(p)) {
+        H.x.eval <- npreghat(
+          bws = bws$bw[[j + 1L]],
+          txdat = tzdat,
+          exdat = ezdat,
+          output = "matrix"
+        )
+        xhat.train <- as.vector(npreghat(
+          bws = bws$bw[[j + 1L]],
+          txdat = tzdat,
+          y = x.train.num[, j],
+          output = "apply"
+        ))
+        xhat.eval <- as.vector(H.x.eval %*% x.train.num[, j])
 
-    if (identical(output, "matrix")) {
+        resx.train[, j] <- x.train.num[, j] - xhat.train
+        resx.eval[, j] <- x.eval.num[, j] - xhat.eval
+      }
+
+      qrR <- qr(resx.train, tol = .Machine$double.eps)
       H.y.train <- npreghat(
         bws = bws$bw$yzbw,
         txdat = tzdat,
@@ -800,23 +809,52 @@ npplreghat <-
     if (nrow(yy) != n)
       stop("number of rows in 'y' must equal number of training rows")
 
-    Hy.eval <- H.y.eval %*% yy
-    if (is.null(dim(Hy.eval)))
-      Hy.eval <- matrix(Hy.eval, ncol = 1L)
+    out <- .npRmpi_with_local_hat_helper({
+      for (j in seq_len(p)) {
+        xhat.train <- npreghat(
+          bws = bws$bw[[j + 1L]],
+          txdat = tzdat,
+          y = x.train.num[, j],
+          output = "apply"
+        )
+        xhat.eval <- npreghat(
+          bws = bws$bw[[j + 1L]],
+          txdat = tzdat,
+          exdat = ezdat,
+          y = x.train.num[, j],
+          output = "apply"
+        )
+        resx.train[, j] <- x.train.num[, j] - as.vector(xhat.train)
+        resx.eval[, j] <- x.eval.num[, j] - as.vector(xhat.eval)
+      }
 
-    Hy.train <- npreghat(
-      bws = bws$bw$yzbw,
-      txdat = tzdat,
-      y = yy,
-      output = "apply"
-    )
-    if (!is.matrix(Hy.train))
-      Hy.train <- matrix(Hy.train, ncol = ncol(yy))
+      qrR <- qr(resx.train, tol = .Machine$double.eps)
 
-    B <- qr.coef(qrR, yy - Hy.train)
-    B[is.na(B)] <- 0.0
+      Hy.eval <- npreghat(
+        bws = bws$bw$yzbw,
+        txdat = tzdat,
+        exdat = ezdat,
+        y = yy,
+        output = "apply"
+      )
+      if (!is.matrix(Hy.eval))
+        Hy.eval <- matrix(Hy.eval, ncol = ncol(yy))
 
-    out <- Hy.eval + resx.eval %*% B
+      Hy.train <- npreghat(
+        bws = bws$bw$yzbw,
+        txdat = tzdat,
+        y = yy,
+        output = "apply"
+      )
+      if (!is.matrix(Hy.train))
+        Hy.train <- matrix(Hy.train, ncol = ncol(yy))
+
+      B <- qr.coef(qrR, yy - Hy.train)
+      B[is.na(B)] <- 0.0
+
+      Hy.eval + resx.eval %*% B
+    })
+
     if (ncol(out) == 1L) as.vector(out) else out
   }
 

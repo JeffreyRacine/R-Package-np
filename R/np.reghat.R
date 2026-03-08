@@ -656,7 +656,7 @@ npreghat.rbandwidth <-
       (sum(s) == 0L || (sum(s) == 1L && all(s %in% c(0L, 1L))))
 
     if (direct.apply) {
-      direct.out <- .np_regression_direct(
+      direct.args <- list(
         bws = bws,
         txdat = txdat,
         tydat = as.vector(y[, 1L]),
@@ -664,6 +664,11 @@ npreghat.rbandwidth <-
         gradients = any(s > 0L),
         gradient.order = 1L
       )
+      direct.out <- if (identical(bws$type, "generalized_nn")) {
+        .npRmpi_with_local_regression(do.call(.np_regression_direct, direct.args))
+      } else {
+        do.call(.np_regression_direct, direct.args)
+      }
 
       if (!any(s > 0L))
         return(as.vector(direct.out$mean))
