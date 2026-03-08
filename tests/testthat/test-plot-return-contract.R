@@ -155,7 +155,22 @@ test_that("plot return contract: remaining public plot families return plot-data
     bandwidth.compute = FALSE
   )
   expect_plot_modes_match(bw.reg, fields = c("eval", "mean", "merr"), perspective = FALSE)
-
+  for (bt in c("generalized_nn", "adaptive_nn")) {
+    bw.reg.nn <- npregbw(
+      xdat = data.frame(x = x),
+      ydat = y,
+      bws = 7,
+      bwtype = bt,
+      bandwidth.compute = FALSE
+    )
+    fit.reg.nn <- npreg(bws = bw.reg.nn, txdat = data.frame(x = x), tydat = y)
+    expect_plot_modes_match(
+      fit.reg.nn,
+      fields = c("eval", "mean", "merr"),
+      perspective = FALSE,
+      plot.errors.method = "none"
+    )
+  }
   bw.cd <- npcdensbw(
     xdat = data.frame(x = x),
     ydat = data.frame(y = y),

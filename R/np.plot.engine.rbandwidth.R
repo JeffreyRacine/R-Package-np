@@ -201,7 +201,7 @@
       if (is.ordered(xdat[,2]))
         x2.eval <- (bws$xdati$all.dlev[[2]])[as.integer(x2.eval)]
 
-      if (plot.errors.method == "asymptotic") {
+      if (plot.errors.method == "asymptotic" || !identical(bws$type, "fixed")) {
         engine.trace(
           event = "npreg.start",
           fields = list(slice = 0L, gradients = gradients, n_eval = nrow(x.eval))
@@ -508,7 +508,9 @@
         }
         
         eval.slice <- subcol(exdat,ei,i)[seq_len(xi.neval),, drop = FALSE]
-        if (!gradients && plot.errors.method != "asymptotic") {
+        if (!gradients &&
+            plot.errors.method != "asymptotic" &&
+            identical(bws$type, "fixed")) {
           engine.trace(
             event = "hat.apply.start",
             fields = list(slice = i, gradients = gradients, n_eval = xi.neval)
