@@ -7451,6 +7451,27 @@ static inline int np_reg_cv_use_canonical_glp_fixed_kernel(const int int_ll,
   return 0;
 }
 
+static inline int np_reg_use_canonical_glp_degree1_estimation(const int int_ll,
+                                                              const int BANDWIDTH_reg,
+                                                              const int num_reg_continuous){
+  int i;
+
+  if((int_ll != LL_LP) ||
+     (BANDWIDTH_reg != BW_GEN_NN) ||
+     (num_reg_continuous <= 0) ||
+     (vector_glp_degree_extern == NULL) ||
+     (int_glp_basis_extern != 1) ||
+     (int_glp_bernstein_extern != 0))
+    return 0;
+
+  for(i = 0; i < num_reg_continuous; i++){
+    if(vector_glp_degree_extern[i] != 1)
+      return 0;
+  }
+
+  return 1;
+}
+
 static inline double np_glp_binom_coeff(const int n, const int k){
   int i, kk;
   double c = 1.0;
@@ -12898,6 +12919,10 @@ double *SIGN){
 
   const int do_grad = (gradient != NULL); 
   const int do_gerr = (gradient_stderr != NULL);
+  const int int_ll_est =
+    np_reg_use_canonical_glp_degree1_estimation(int_ll,
+                                                BANDWIDTH_reg,
+                                                num_reg_continuous) ? LL_LL : int_ll;
   np_gate_ctx_clear(&gate_ctx_local);
   const NP_GateOverrideCtx * const est_gate_ctx_ptr = &gate_ctx_local;
 
@@ -13178,7 +13203,7 @@ double *SIGN){
     }
 
     if(all_large_gate &&
-       ((int_ll == LL_LL) || (int_ll == LL_LP))){
+       ((int_ll_est == LL_LL) || (int_ll_est == LL_LP))){
       double kconst = 1.0;
       int kconst_ok = 1;
       const double ridge_eps = 1.0/(double)MAX(1, num_obs_train);
@@ -13210,7 +13235,7 @@ double *SIGN){
       if(!isfinite(kconst) || (kconst <= 0.0))
         kconst_ok = 0;
 
-      if(kconst_ok && int_ll == LL_LL){
+      if(kconst_ok && int_ll_est == LL_LL){
         const int k = num_reg_continuous + 1;
         MATRIX XtX = mat_creat(k, k, UNDEFINED);
         MATRIX XtXINV = mat_creat(k, k, UNDEFINED);
@@ -13308,7 +13333,7 @@ double *SIGN){
         if(XtXINV != NULL) mat_free(XtXINV);
         if(XtY != NULL) mat_free(XtY);
         if(BETA != NULL) mat_free(BETA);
-      } else if(kconst_ok && int_ll == LL_LP &&
+      } else if(kconst_ok && int_ll_est == LL_LP &&
                 (vector_glp_degree_extern != NULL) && (num_reg_continuous > 0)){
         const int use_bernstein = (int_glp_bernstein_extern != 0);
         int *glp_terms = NULL;
@@ -13535,7 +13560,7 @@ double *SIGN){
 
   // Conduct the estimation 
 
-  if(int_ll == LL_LC) { // local constant
+  if(int_ll_est == LL_LC) { // local constant
     // Nadaraya-Watson
     // Generate bandwidth vector given scale factors, nearest neighbors, or lambda 
 
@@ -13696,7 +13721,7 @@ double *SIGN){
     free(lc_Y[1]);
     free(lc_Y[2]);
 #undef NCOL_Y
-  } else if(int_ll == LL_LP) { // local polynomial (regtype = "lp")
+  } else if(int_ll_est == LL_LP) { // local polynomial (regtype = "lp")
     int *glp_terms = NULL;
     int glp_nterms = 0;
     const int use_bernstein = (int_glp_bernstein_extern != 0);
