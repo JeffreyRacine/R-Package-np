@@ -265,3 +265,38 @@ test_that("generalized-nn ll and canonical lp degree-1 share the same public/app
   expect_equal(as.vector(hat.apply.ll), as.vector(hat.matrix.ll %*% y), tolerance = 1e-10)
   expect_equal(as.vector(hat.apply.lp), as.vector(hat.matrix.lp %*% y), tolerance = 1e-10)
 })
+
+test_that("npreghat nonfixed higher-order lp operator matches npreg and matrix apply semantics", {
+  make_case <- function(seed, bwtype) {
+    set.seed(seed)
+    n <- 28
+    x <- data.frame(x = runif(n))
+    y <- cos(2 * pi * x$x) + rnorm(n, sd = if (identical(bwtype, "generalized_nn")) 0.05 else 0.03)
+    Y <- cbind(y, y^2)
+    bw <- npregbw(
+      xdat = x,
+      ydat = y,
+      regtype = "lp",
+      degree = 2,
+      basis = "tensor",
+      bernstein.basis = TRUE,
+      bwmethod = "cv.ls",
+      bwtype = bwtype
+    )
+    fit <- npreg(bws = bw, txdat = x, tydat = y)
+    H <- npreghat(bws = bw, txdat = x, output = "matrix")
+    a.vec <- npreghat(bws = bw, txdat = x, y = y, output = "apply")
+    a.mat <- npreghat(bws = bw, txdat = x, y = Y, output = "apply")
+    list(fit = fit, H = H, a.vec = a.vec, a.mat = a.mat, y = y, Y = Y)
+  }
+
+  for (case in list(
+    make_case(3, "generalized_nn"),
+    make_case(5, "adaptive_nn")
+  )) {
+    expect_equal(as.vector(case$H %*% case$y), as.vector(case$fit$mean), tolerance = 1e-8)
+    expect_equal(as.vector(case$a.vec), as.vector(case$fit$mean), tolerance = 1e-8)
+    expect_equal(as.vector(case$H %*% case$y), as.vector(case$a.vec), tolerance = 1e-10)
+    expect_equal(case$H %*% case$Y, case$a.mat, tolerance = 1e-10, ignore_attr = TRUE)
+  }
+})
