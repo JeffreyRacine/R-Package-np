@@ -417,6 +417,41 @@ test_that("session npreg factor example completes with quiet=FALSE", {
               info = paste(res$output, collapse = "\n"))
 })
 
+test_that("session nearest-neighbor npreg formula routes complete with summary and plot", {
+  skip_on_cran()
+  env <- subprocess_env()
+  skip_if(is.null(env), "local npRmpi install unavailable for subprocess smoke")
+  res <- run_rscript_subprocess(
+    lines = c(
+      "suppressPackageStartupMessages(library(npRmpi))",
+      "npRmpi.init(nslaves=1, quiet=TRUE)",
+      "on.exit(try(npRmpi.quit(), silent=TRUE), add=TRUE)",
+      "options(npRmpi.autodispatch=TRUE, np.messages=FALSE)",
+      "set.seed(11)",
+      "n <- 100",
+      "x <- runif(n)",
+      "y <- x^2 + rnorm(n, sd=0.1)",
+      "g.gen <- npreg(y~x, regtype='ll', bwtype='generalized_nn')",
+      "g.adp <- npreg(y~x, regtype='ll', bwtype='adaptive_nn')",
+      "summary(g.gen)",
+      "summary(g.adp)",
+      "pdf(tempfile(fileext='.pdf'))",
+      "plot(g.gen)",
+      "plot(g.adp)",
+      "dev.off()",
+      "stopifnot(inherits(g.gen, 'npregression'), inherits(g.adp, 'npregression'))",
+      "stopifnot(length(g.gen$mean) == n, length(g.adp$mean) == n)",
+      "cat('SESSION_NPREG_NN_FORMULA_OK\\n')"
+    ),
+    timeout = 60L,
+    env = env
+  )
+
+  expect_equal(res$status, 0L, info = paste(res$output, collapse = "\n"))
+  expect_true(any(grepl("SESSION_NPREG_NN_FORMULA_OK", res$output, fixed = TRUE)),
+              info = paste(res$output, collapse = "\n"))
+})
+
 test_that("session npreghat smoke completes in subprocess", {
   skip_on_cran()
   env <- subprocess_env()
