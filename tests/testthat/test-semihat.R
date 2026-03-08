@@ -645,12 +645,26 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         output = "apply",
         s = 0L
       )
+      si.H.mean <- npindexhat(
+        bws = si.bw,
+        txdat = tx.si,
+        exdat = ex.si,
+        output = "matrix",
+        s = 0L
+      )
       si.apply.grad <- npindexhat(
         bws = si.bw,
         txdat = tx.si,
         exdat = ex.si,
         y = y,
         output = "apply",
+        s = 1L
+      )
+      si.H.grad <- npindexhat(
+        bws = si.bw,
+        txdat = tx.si,
+        exdat = ex.si,
+        output = "matrix",
         s = 1L
       )
       expect_equal(
@@ -660,10 +674,34 @@ test_that("semihat apply mode matches core fits across bwtypes", {
         info = paste("npindexhat mean", regtype, bwtype)
       )
       expect_equal(
+        as.vector(si.H.mean %*% y),
+        as.vector(si.fit.mean$mean),
+        tolerance = 1e-8,
+        info = paste("npindexhat mean matrix", regtype, bwtype)
+      )
+      expect_equal(
+        as.vector(si.H.mean %*% y),
+        as.vector(si.apply.mean),
+        tolerance = 1e-10,
+        info = paste("npindexhat mean matrix/apply", regtype, bwtype)
+      )
+      expect_equal(
         as.vector(si.apply.grad),
         as.vector(si.fit.grad$grad[, 1]),
         tolerance = 1e-8,
         info = paste("npindexhat grad", regtype, bwtype)
+      )
+      expect_equal(
+        as.vector(si.H.grad %*% y),
+        as.vector(si.fit.grad$grad[, 1]),
+        tolerance = 1e-8,
+        info = paste("npindexhat grad matrix", regtype, bwtype)
+      )
+      expect_equal(
+        as.vector(si.H.grad %*% y),
+        as.vector(si.apply.grad),
+        tolerance = 1e-10,
+        info = paste("npindexhat grad matrix/apply", regtype, bwtype)
       )
     }
   }
@@ -877,6 +915,18 @@ test_that("semihat validates class and scalar controls", {
   expect_error(npindexhat(bws = rbw, txdat = data.frame(x = x)), "sibandwidth")
   expect_error(npplreghat(bws = rbw, txdat = data.frame(x = x), tzdat = data.frame(z = z)), "plbandwidth")
   expect_error(npscoefhat(bws = rbw, txdat = data.frame(x = x), tzdat = data.frame(z = z)), "scbandwidth")
+
+  sibw <- npindexbw(
+    xdat = data.frame(x = x, x2 = x^2),
+    ydat = y,
+    bws = c(1, 1, 0.2),
+    bandwidth.compute = FALSE,
+    regtype = "ll"
+  )
+  expect_error(
+    npindexhat(bws = sibw, txdat = data.frame(x = x, x2 = x^2), s = 1L, fd.step = 0),
+    "argument 'fd.step' must be a positive finite scalar"
+  )
 
   scbw <- npscoefbw(
     xdat = x,

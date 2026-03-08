@@ -391,6 +391,53 @@
                                output = c("matrix", "apply"),
                                s = 0L) {
   output <- match.arg(output)
+  if (s == 1L) {
+    rbw <- .np_indexhat_rbw(bws = bws, idx.train = idx.train)
+
+    fit_one <- function(ycol) {
+      fit <- .np_regression_direct(
+        bws = rbw,
+        txdat = idx.train,
+        tydat = ycol,
+        exdat = idx.eval,
+        gradients = TRUE,
+        gradient.order = 1L
+      )
+      fit$grad[, 1L]
+    }
+
+    if (identical(output, "apply")) {
+      if (is.null(y))
+        stop("argument 'y' is required when output='apply'")
+
+      y <- .np_indexhat_numeric_y(y)
+      if (nrow(y) != nrow(idx.train))
+        stop("number of rows in 'y' must equal number of training rows")
+
+      out <- vapply(
+        seq_len(ncol(y)),
+        function(j) fit_one(y[, j]),
+        numeric(nrow(idx.eval))
+      )
+
+      if (is.null(dim(out)))
+        return(as.vector(out))
+      if (ncol(out) == 1L)
+        return(as.vector(out[, 1L]))
+      return(out)
+    }
+
+    neval <- nrow(idx.eval)
+    ntrain <- nrow(idx.train)
+    H <- matrix(NA_real_, nrow = neval, ncol = ntrain)
+    for (j in seq_len(ntrain)) {
+      yj <- numeric(ntrain)
+      yj[j] <- 1.0
+      H[, j] <- fit_one(yj)
+    }
+    return(H)
+  }
+
   spec <- .npindex_resolve_spec(bws, where = "npindexhat")
   regtype <- spec$regtype.engine
   if (identical(regtype, "lc")) {
@@ -655,6 +702,11 @@ npindexhat <-
     s <- as.integer(s)
     if (length(s) != 1L || is.na(s) || !(s %in% c(0L, 1L)))
       stop("argument 's' must be 0 (fit) or 1 (index derivative)")
+    if (!is.null(fd.step)) {
+      fd.step <- as.double(fd.step)
+      if (length(fd.step) != 1L || is.na(fd.step) || !is.finite(fd.step) || fd.step <= 0)
+        stop("argument 'fd.step' must be a positive finite scalar")
+    }
 
     txdat <- toFrame(txdat)
     exdat <- toFrame(exdat)
@@ -670,6 +722,17 @@ npindexhat <-
 
     idx.train <- data.frame(index = index.train)
     idx.eval <- data.frame(index = index.eval)
+
+    if (s == 1L) {
+      return(.np_indexhat_exact(
+        bws = bws,
+        idx.train = idx.train,
+        idx.eval = idx.eval,
+        y = y,
+        output = output,
+        s = s
+      ))
+    }
 
     if (identical(output, "apply")) {
       return(.np_indexhat_apply_exact(
