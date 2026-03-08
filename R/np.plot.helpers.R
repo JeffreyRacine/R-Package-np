@@ -3376,25 +3376,13 @@ compute.bootstrap.errors.sibandwidth =
         stop("inid bootstrap requires helper mode with gradients=FALSE in compute.bootstrap.errors.sibandwidth", call. = FALSE)
       } else {
         boot.out <- tryCatch({
-          if (identical(bws$type, "fixed")) {
-            tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
-            rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
-            .np_inid_boot_from_regression(
-              xdat = tx.index,
-              exdat = tx.index,
-              bws = rbw,
-              ydat = ydat,
-              B = plot.errors.boot.num
-            )
-          } else {
-            .np_inid_boot_from_index_exact(
-              xdat = xdat,
-              ydat = ydat,
-              bws = bws,
-              B = plot.errors.boot.num,
-              gradients = FALSE
-            )
-          }
+          .np_inid_boot_from_index(
+            xdat = xdat,
+            ydat = ydat,
+            bws = bws,
+            B = plot.errors.boot.num,
+            gradients = FALSE
+          )
         }, error = function(e) {
           stop(sprintf("inid single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
                        conditionMessage(e)),
@@ -3413,27 +3401,14 @@ compute.bootstrap.errors.sibandwidth =
             blocklen = plot.errors.boot.blocklen,
             sim = plot.errors.boot.method
           )
-          if (identical(bws$type, "fixed")) {
-            tx.index <- data.frame(index = as.vector(toMatrix(xdat) %*% bws$beta))
-            rbw <- .np_indexhat_rbw(bws = bws, idx.train = tx.index)
-            .np_inid_boot_from_regression(
-              xdat = tx.index,
-              exdat = tx.index,
-              bws = rbw,
-              ydat = ydat,
-              B = plot.errors.boot.num,
-              counts.drawer = counts.drawer
-            )
-          } else {
-            .np_inid_boot_from_index_exact(
-              xdat = xdat,
-              ydat = ydat,
-              bws = bws,
-              B = plot.errors.boot.num,
-              counts.drawer = counts.drawer,
-              gradients = FALSE
-            )
-          }
+          .np_inid_boot_from_index(
+            xdat = xdat,
+            ydat = ydat,
+            bws = bws,
+            B = plot.errors.boot.num,
+            counts.drawer = counts.drawer,
+            gradients = FALSE
+          )
         }, error = function(e) {
           stop(sprintf("%s single-index helper failed in compute.bootstrap.errors.sibandwidth (%s)",
                        plot.errors.boot.method,

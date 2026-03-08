@@ -71,6 +71,79 @@
   args
 }
 
+.np_semihat_make_regbw_state <- function(source, xdat, ydat, bw) {
+  resolve_choice <- function(value, choices, default = choices[1L]) {
+    if (is.null(value) || !length(value))
+      return(default)
+    cand <- as.character(value)[1L]
+    if (!cand %in% choices)
+      return(default)
+    cand
+  }
+
+  xdat <- toFrame(xdat)
+  if (!(is.vector(ydat) || is.factor(ydat)))
+    stop("'ydat' must be a vector")
+
+  args <- .np_semihat_make_regbw_args(source = source, xdat = xdat, ydat = ydat, bw = bw)
+  xdati <- untangle(xdat)
+  ydati <- untangle(data.frame(ydat))
+  xmat <- toMatrix(xdat)
+  rcon <- xmat[, xdati$icon, drop = FALSE]
+  nobs <- nrow(xdat)
+  ncon <- sum(xdati$icon)
+  method <- resolve_choice(if (!is.null(args$bwmethod)) args$bwmethod else source$method,
+                           c("cv.ls", "cv.aic"))
+  bwtype <- resolve_choice(if (!is.null(args$bwtype)) args$bwtype else source$type,
+                           c("fixed", "generalized_nn", "adaptive_nn"))
+  ckertype <- resolve_choice(if (!is.null(args$ckertype)) args$ckertype else source$ckertype,
+                             c("gaussian", "truncated gaussian", "epanechnikov", "uniform"))
+  ckerorder <- if (!is.null(args$ckerorder)) args$ckerorder else source$ckerorder
+  ckerbound <- resolve_choice(if (!is.null(args$ckerbound)) args$ckerbound else source$ckerbound,
+                              c("none", "range", "fixed"))
+  ukertype <- resolve_choice(if (!is.null(args$ukertype)) args$ukertype else source$ukertype,
+                             c("aitchisonaitken", "liracine"))
+  okertype <- resolve_choice(if (!is.null(args$okertype)) args$okertype else source$okertype,
+                             c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
+
+  out <- list(
+    bw = as.double(args$bws),
+    regtype = args$regtype,
+    basis = args$basis,
+    degree = args$degree,
+    bernstein.basis = args$bernstein.basis,
+    method = method,
+    scaling = if (!is.null(args$bwscaling)) isTRUE(args$bwscaling) else FALSE,
+    type = bwtype,
+    ckertype = ckertype,
+    ckerorder = ckerorder,
+    ckerbound = ckerbound,
+    ckerlb = args$ckerlb,
+    ckerub = args$ckerub,
+    ukertype = ukertype,
+    okertype = okertype,
+    nobs = nobs,
+    ndim = ncol(xdat),
+    ncon = ncon,
+    nuno = sum(xdati$iuno),
+    nord = sum(xdati$iord),
+    icon = xdati$icon,
+    iuno = xdati$iuno,
+    iord = xdati$iord,
+    xnames = names(xdat),
+    ynames = if (!is.null(source$ynames) && length(source$ynames)) source$ynames else "y",
+    xdati = xdati,
+    ydati = ydati,
+    xmcv = mcvConstruct(xdati),
+    nconfac = nobs^(-1.0 / (2.0 * ckerorder + ncon)),
+    ncatfac = nobs^(-2.0 / (2.0 * ckerorder + ncon)),
+    sdev = EssDee(rcon)
+  )
+
+  class(out) <- "rbandwidth"
+  out
+}
+
 .npscoef_canonical_spec <- function(source, zdat, where = "npscoef") {
   zdat <- toFrame(zdat)
   npCanonicalConditionalRegSpec(
@@ -84,12 +157,12 @@
 }
 
 .np_indexhat_rbw <- function(bws, idx.train) {
-  do.call(npregbw, .np_semihat_make_regbw_args(
+  .np_semihat_make_regbw_state(
     source = bws,
     xdat = idx.train,
     ydat = rep.int(0.0, nrow(idx.train)),
     bw = bws$bw
-  ))
+  )
 }
 
 .np_indexhat_numeric_y <- function(y) {
@@ -100,6 +173,15 @@
 }
 
 .np_indexhat_kbw <- function(bws, idx.train) {
+  resolve_choice <- function(value, choices, default = choices[1L]) {
+    if (is.null(value) || !length(value))
+      return(default)
+    cand <- as.character(value)[1L]
+    if (!cand %in% choices)
+      return(default)
+    cand
+  }
+
   collapse_bound <- function(v, nm) {
     if (is.null(v))
       return(NULL)
@@ -114,20 +196,53 @@
          call. = FALSE)
   }
 
-  kbandwidth(
+  bwtype <- resolve_choice(bws$type, c("fixed", "generalized_nn", "adaptive_nn"))
+  ckertype <- resolve_choice(bws$ckertype, c("gaussian", "truncated gaussian", "epanechnikov", "uniform"))
+  ckerbound <- resolve_choice(bws$ckerbound, c("none", "range", "fixed"))
+  ukertype <- resolve_choice(bws$ukertype, c("aitchisonaitken", "liracine"))
+  okertype <- resolve_choice(bws$okertype, c("liracine", "wangvanryzin", "racineliyan", "nliracine"))
+
+  out <- list(
     bw = c(bws$bw),
-    bwtype = bws$type,
-    ckertype = bws$ckertype,
+    scaling = FALSE,
+    type = bwtype,
+    ptype = bwtToPrint(bwtype),
+    ckertype = ckertype,
     ckerorder = bws$ckerorder,
-    ckerbound = bws$ckerbound,
+    ckerbound = ckerbound,
     ckerlb = collapse_bound(bws$ckerlb, "ckerlb"),
     ckerub = collapse_bound(bws$ckerub, "ckerub"),
+    pckertype = cktToPrint(
+      ckertype,
+      order = switch(
+        bws$ckerorder / 2,
+        "Second-Order",
+        "Fourth-Order",
+        "Sixth-Order",
+        "Eighth-Order"
+      ),
+      kerbound = ckerbound
+    ),
+    ukertype = ukertype,
+    pukertype = uktToPrint(ukertype),
+    okertype = okertype,
+    pokertype = oktToPrint(okertype),
     nobs = nrow(idx.train),
+    ndim = 1L,
+    ncon = 1L,
+    nuno = 0L,
+    nord = 0L,
+    icon = TRUE,
+    iuno = FALSE,
+    iord = FALSE,
     xdati = untangle(idx.train),
     ydati = bws$ydati,
     xnames = "index",
-    ynames = bws$ynames
+    ynames = bws$ynames,
+    xmcv = mcvConstruct(untangle(idx.train))
   )
+  class(out) <- "kbandwidth"
+  out
 }
 
 .np_indexhat_core <- function(bws,
