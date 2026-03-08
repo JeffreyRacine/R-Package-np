@@ -490,7 +490,11 @@ int int_k_nn, double *nn_distance)
 		}
 
     if(!suppress_parallel){
-      MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+      if(my_rank == 0){
+        MPI_Gather(MPI_IN_PLACE, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+      } else {
+        MPI_Gather(nn_distance, stride, MPI_DOUBLE, NULL, stride, MPI_DOUBLE, 0, comm[1]);
+      }
       MPI_Bcast(nn_distance, num_obs, MPI_DOUBLE, 0, comm[1]);
     }
 #endif
@@ -692,7 +696,11 @@ int compute_nn_distance_train_eval(int num_obs_train,
 		}
 
     if(!suppress_parallel){
-      MPI_Gather(nn_distance, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+      if(my_rank == 0){
+        MPI_Gather(MPI_IN_PLACE, stride, MPI_DOUBLE, nn_distance, stride, MPI_DOUBLE, 0, comm[1]);
+      } else {
+        MPI_Gather(nn_distance, stride, MPI_DOUBLE, NULL, stride, MPI_DOUBLE, 0, comm[1]);
+      }
       MPI_Bcast(nn_distance, num_obs_eval, MPI_DOUBLE, 0, comm[1]);
     }
 #endif
