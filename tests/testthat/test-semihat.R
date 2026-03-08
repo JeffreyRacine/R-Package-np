@@ -294,6 +294,61 @@ test_that("npplreg generalized-nn inid plot helper completes in session mode", {
   expect_true(all(is.finite(out[[2L]]$merr)))
 })
 
+test_that("npplreg generalized-nn wild plot helper preserves means in session mode", {
+  if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
+  old.auto <- getOption("npRmpi.autodispatch", FALSE)
+  on.exit(options(npRmpi.autodispatch = old.auto), add = TRUE)
+  on.exit(close_mpi_slaves(force = TRUE), add = TRUE)
+  options(npRmpi.autodispatch = TRUE)
+
+  set.seed(20260308)
+  n <- 80
+  x <- runif(n)
+  z <- runif(n)
+  y <- sin(z) + 2.0 * x + rnorm(n, sd = 0.05)
+
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+
+  bw <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bws = matrix(c(1, 9), nrow = 2, ncol = 1),
+    bandwidth.compute = FALSE
+  )
+
+  none.out <- plot(
+    bw,
+    xdat = tx,
+    ydat = y,
+    zdat = tz,
+    plot.behavior = "data",
+    perspective = FALSE,
+    plot.errors.method = "none"
+  )
+
+  set.seed(20260308)
+  wild.out <- plot(
+    bw,
+    xdat = tx,
+    ydat = y,
+    zdat = tz,
+    plot.behavior = "data",
+    perspective = FALSE,
+    plot.errors.method = "bootstrap",
+    plot.errors.boot.method = "wild",
+    plot.errors.boot.num = 5
+  )
+
+  expect_equal(as.vector(wild.out[[1L]]$mean), as.vector(none.out[[1L]]$mean), tolerance = 1e-10)
+  expect_equal(as.vector(wild.out[[2L]]$mean), as.vector(none.out[[2L]]$mean), tolerance = 1e-10)
+  expect_true(all(is.finite(wild.out[[1L]]$merr)))
+  expect_true(all(is.finite(wild.out[[2L]]$merr)))
+})
+
 test_that("npplreg generalized-nn plot means match public estimator in session mode", {
   if (!spawn_mpi_slaves()) skip("Could not spawn MPI slaves")
   old.auto <- getOption("npRmpi.autodispatch", FALSE)

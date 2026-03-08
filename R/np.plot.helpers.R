@@ -4618,12 +4618,15 @@ compute.bootstrap.errors.plbandwidth =
         plot.errors.boot.wild <- plot.errors.boot.wild[1L]
       plot.errors.boot.wild <- match.arg(plot.errors.boot.wild, c("mammen", "rademacher"))
 
-      fit.train <- npplreg.plbandwidth(
+      fit.mean <- as.vector(npplreghat(
+        bws = bws,
         txdat = xdat,
-        tydat = ydat,
         tzdat = zdat,
-        bws = bws
-      )
+        exdat = xdat,
+        ezdat = zdat,
+        y = ydat,
+        output = "apply"
+      ))
       H <- npplreghat(
         bws = bws,
         txdat = xdat,
@@ -4634,7 +4637,7 @@ compute.bootstrap.errors.plbandwidth =
       )
 
       t0 <- as.vector(H %*% as.double(ydat))
-      eps <- as.double(ydat - as.vector(fit.train$mean))
+      eps <- as.double(ydat - fit.mean)
       n <- length(eps)
       B <- plot.errors.boot.num
 
@@ -4642,7 +4645,7 @@ compute.bootstrap.errors.plbandwidth =
         list(
           t = .np_wild_boot_t(
             H = H,
-            fit.mean = as.vector(fit.train$mean),
+            fit.mean = fit.mean,
             residuals = eps,
             B = B,
             wild = plot.errors.boot.wild
