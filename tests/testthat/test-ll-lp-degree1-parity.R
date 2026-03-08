@@ -489,3 +489,50 @@ test_that("npplreg multivariate cv and estimation match for ll and lp(degree=1)"
   expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
   expect_equal(as.numeric(fit.ll$xcoef), as.numeric(fit.lp$xcoef), tolerance = 1e-10)
 })
+
+test_that("npplreg generalized-nn semiparametric hat invariants match for ll and canonical lp degree-1", {
+  set.seed(20260308)
+  n <- 80
+  z <- runif(n)
+  x <- 0.7 * z + rnorm(n, sd = 0.2)
+  y <- 1 + 1.1 * x + sin(2 * pi * z) + rnorm(n, sd = 0.05)
+
+  tx <- data.frame(x = x)
+  tz <- data.frame(z = z)
+  bws.fixed <- matrix(c(1, 9), nrow = 2L)
+
+  bw.ll <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "ll",
+    bwtype = "generalized_nn",
+    bws = bws.fixed,
+    bandwidth.compute = FALSE
+  )
+  bw.lp <- npplregbw(
+    xdat = tx,
+    zdat = tz,
+    ydat = y,
+    regtype = "lp",
+    basis = "glp",
+    degree = 1L,
+    bernstein.basis = FALSE,
+    bwtype = "generalized_nn",
+    bws = bws.fixed,
+    bandwidth.compute = FALSE
+  )
+
+  fit.ll <- npplreg(bws = bw.ll, txdat = tx, tzdat = tz, tydat = y)
+  fit.lp <- npplreg(bws = bw.lp, txdat = tx, tzdat = tz, tydat = y)
+  hat.apply.ll <- npplreghat(bws = bw.ll, txdat = tx, tzdat = tz, y = y, output = "apply")
+  hat.apply.lp <- npplreghat(bws = bw.lp, txdat = tx, tzdat = tz, y = y, output = "apply")
+  hat.matrix.ll <- npplreghat(bws = bw.ll, txdat = tx, tzdat = tz, output = "matrix")
+  hat.matrix.lp <- npplreghat(bws = bw.lp, txdat = tx, tzdat = tz, output = "matrix")
+
+  expect_equal(as.numeric(fit.ll$mean), as.numeric(fit.lp$mean), tolerance = 1e-10)
+  expect_equal(as.numeric(fit.ll$xcoef), as.numeric(fit.lp$xcoef), tolerance = 1e-10)
+  expect_equal(as.numeric(hat.apply.ll), as.numeric(hat.apply.lp), tolerance = 1e-10)
+  expect_equal(as.numeric(hat.apply.ll), as.numeric(hat.matrix.ll %*% y), tolerance = 1e-10)
+  expect_equal(as.numeric(hat.apply.lp), as.numeric(hat.matrix.lp %*% y), tolerance = 1e-10)
+})
